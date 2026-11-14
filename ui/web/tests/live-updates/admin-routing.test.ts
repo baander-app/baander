@@ -9,6 +9,7 @@ import type { LiveRecovery, LiveSnapshot } from '@/shared/live/recovery'
 const rows: { name: string; family: LiveFamily; key: readonly unknown[] }[] = [
   { name: 'activity', family: 'activity', key: ['admin', 'activity', 'summary', 'week'] },
   { name: 'metadata', family: 'admin-metadata', key: ['admin-genres', { flat: true }] },
+  { name: 'match reviews', family: 'admin-metadata', key: ['admin-metadata-match-reviews'] },
   { name: 'recommendation jobs', family: 'admin-metadata', key: ['admin', 'recommendations', 'job', 'one'] },
   { name: 'configuration files', family: 'admin-runtime', key: ['config-check'] },
   { name: 'runtime', family: 'admin-runtime', key: ['server-stats'] },

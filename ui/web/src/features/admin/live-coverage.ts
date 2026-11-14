@@ -94,6 +94,30 @@ export const adminLiveCoverage = [
     },
   },
   {
+    id: "admin.admin-match-reviews",
+    family: "admin-metadata",
+    policy: {
+      kind: "stored",
+      reason: "The matcher marks and clears albums that need review, and a renamed album changes its listed title.",
+    },
+    audiences: ["admin"],
+    sourceTables: ["album_match_states", "albums"],
+    deploymentTables: [],
+    sources: ["'/api/admin/metadata/match/reviews'"],
+    keyVariants: ["matchReviewsKey=['admin-metadata-match-reviews']asconst"],
+    dependentFamilies: [],
+    mirrors: [],
+    responseCaches: ["authoritative-read"],
+    consumers: [
+      "src/features/admin/api/match-reviews-api.ts#getAdminMetadataMatchReviews:generated",
+      "src/features/admin/api/match-reviews-api.ts#useInfiniteQuery:matchReviewsKey=['admin-metadata-match-reviews']asconst",
+    ],
+    coverageVerification: ["tests/live-updates/coverage.test.ts"],
+    behaviorVerification: {
+      unitProofs: ["src/features/admin/components/matching/__tests__/MatchReviewTable.test.tsx"],
+    },
+  },
+  {
     id: "admin.admin-recommendation-jobs",
     family: "admin-metadata",
     policy: {

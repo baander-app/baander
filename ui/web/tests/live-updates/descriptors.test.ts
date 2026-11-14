@@ -15,6 +15,7 @@ const handwrittenVariants: readonly [LiveFamily, readonly unknown[]][] = [
   ['activity', ['admin', 'activity', 'engagement', 'month']],
   ['admin-metadata', ['admin-album-duplicates', 'library-a']],
   ['admin-metadata', ['admin-genres', { flat: true }]],
+  ['admin-metadata', ['admin-metadata-match-reviews']],
   ['deployment-definitions', ['admin-metadata-providers']],
   ['admin-metadata', ['admin', 'recommendations', 'jobs', 20]],
   ['admin-metadata', ['admin', 'recommendations', 'job', 'job-a']],

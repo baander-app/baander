@@ -12,6 +12,7 @@ export const adminLiveDescriptors: readonly LiveQueryDescriptor[] = [
     matches: key => [
       'admin-album-duplicates',
       'admin-genres',
+      'admin-metadata-match-reviews',
     ].some(prefix => keyStartsWith(key, prefix)),
   },
   {

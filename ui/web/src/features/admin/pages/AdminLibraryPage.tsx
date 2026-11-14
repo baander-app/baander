@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { textRole } from '@/shared/theme'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs'
@@ -7,8 +8,9 @@ import { MetadataPage } from './MetadataPage'
 import { GenresPage } from './GenresPage'
 import { AlbumDuplicatesPage } from './AlbumDuplicatesPage'
 import { LyricsAdminPage } from './LyricsAdminPage'
+import { MatchReviewTable } from '../components/matching/MatchReviewTable'
 
-const LIBRARY_TABS = ['libraries', 'metadata', 'genres', 'duplicates', 'lyrics'] as const
+const LIBRARY_TABS = ['libraries', 'metadata', 'matching', 'genres', 'duplicates', 'lyrics'] as const
 
 const Container = styled.div`
   display: flex;
@@ -43,6 +45,12 @@ const StyledTabsContent = styled(TabsContent)`
 
 export function AdminLibraryPage() {
   const [tab, setTab] = useTabParam('libraries', LIBRARY_TABS)
+  const navigate = useNavigate()
+
+  // Opens the album's page, whose metadata panel offers the MusicBrainz match.
+  const handleMatchAlbum = (albumPublicId: string) => {
+    navigate(`/music/albums/${albumPublicId}`)
+  }
 
   return (
     <Container>
@@ -55,6 +63,7 @@ export function AdminLibraryPage() {
           <TabsList variant="line">
             <TabsTrigger value="libraries">Libraries</TabsTrigger>
             <TabsTrigger value="metadata">Metadata</TabsTrigger>
+            <TabsTrigger value="matching">Matching</TabsTrigger>
             <TabsTrigger value="genres">Genres</TabsTrigger>
             <TabsTrigger value="duplicates">Duplicates</TabsTrigger>
             <TabsTrigger value="lyrics">Lyrics</TabsTrigger>
@@ -66,6 +75,9 @@ export function AdminLibraryPage() {
         </StyledTabsContent>
         <StyledTabsContent value="metadata">
           <MetadataPage />
+        </StyledTabsContent>
+        <StyledTabsContent value="matching">
+          <MatchReviewTable onMatchAlbum={handleMatchAlbum} />
         </StyledTabsContent>
         <StyledTabsContent value="genres">
           <GenresPage />
