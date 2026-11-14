@@ -101,6 +101,12 @@ final class ApplyMatchHandlerTest extends TestCase
     /** Fails every artist merge, after the apply wrote everything else. */
     private ?Throwable $mergeFailure = null;
 
+    /** Reports a failed commit after the operation's writes were committed after all. */
+    private ?Throwable $commitFailure = null;
+
+    /** Fails the lookup of a saved image, as a database that cannot be reached. */
+    private ?Throwable $imageLookupFailure = null;
+
     protected function setUp(): void
     {
         $this->setUpLibrary();
@@ -333,6 +339,44 @@ final class ApplyMatchHandlerTest extends TestCase
 
         self::assertSame([], $this->savedImages, 'The image row was rolled back.');
         self::assertContains('delete file', $this->calls, 'Its stored file is removed as well.');
+    }
+
+    public function testTheFileOfACoverCommittedDespiteAFailedCommitIsKept(): void
+    {
+        $album = $this->addAlbum();
+        [$release] = $this->longBed($album);
+        $release = self::releaseWith($release, hasFrontCover: true);
+        $this->lookup->covers[$release->id] = new MusicBrainzCoverImage(base64_decode(self::PIXEL), 'image/png');
+        $this->commitFailure = new \RuntimeException('The connection closed while the commit was answered.');
+
+        try {
+            ApplyMatchCommand::automatic($album->getId(), $this->candidate($album, $release)) |> $this->apply(...);
+            self::fail('The failed commit fails the apply.');
+        } catch (\RuntimeException $failure) {
+            self::assertSame($this->commitFailure, $failure);
+        }
+
+        self::assertCount(1, $this->savedImages, 'The image row was committed.');
+        self::assertNotContains('delete file', $this->calls, 'The committed cover keeps its file.');
+    }
+
+    public function testTheFileOfACoverIsKeptWhenItCannotBeToldWhetherTheCoverWasCommitted(): void
+    {
+        $album = $this->addAlbum();
+        [$release] = $this->longBed($album);
+        $release = self::releaseWith($release, hasFrontCover: true);
+        $this->lookup->covers[$release->id] = new MusicBrainzCoverImage(base64_decode(self::PIXEL), 'image/png');
+        $this->mergeFailure = new \RuntimeException('The merge failed after the cover was saved.');
+        $this->imageLookupFailure = new \RuntimeException('The database cannot be reached.');
+
+        try {
+            ApplyMatchCommand::automatic($album->getId(), $this->candidate($album, $release)) |> $this->apply(...);
+            self::fail('The failed merge fails the apply.');
+        } catch (\RuntimeException $failure) {
+            self::assertSame($this->mergeFailure, $failure);
+        }
+
+        self::assertNotContains('delete file', $this->calls, 'A cover that may have been committed keeps its file.');
     }
 
     public function testAMatchMarksEverySongItComparedAndLeavesASongAddedMeanwhileForTheNextMatch(): void
@@ -737,7 +781,9 @@ final class ApplyMatchHandlerTest extends TestCase
         $images->method('save')->willReturnCallback(function (Image $image): void {
             $this->savedImages[$image->getId()->toString()] = $image;
         });
-        $images->method('findByUuid')->willReturnCallback(fn (Uuid $id): ?Image => $this->savedImages[$id->toString()] ?? null);
+        $images->method('findByUuid')->willReturnCallback(
+            fn (Uuid $id): ?Image => $this->imageLookupFailure === null ? $this->savedImages[$id->toString()] ?? null : throw $this->imageLookupFailure,
+        );
         $images->method('assignArtistOwner')->willReturnCallback(function (Uuid $imageId, Uuid $artistId): bool {
             $this->calls[] = 'assign owner ' . $imageId->toString() . ' to ' . $this->catalogArtist($artistId)?->getName();
 
@@ -760,7 +806,10 @@ final class ApplyMatchHandlerTest extends TestCase
         return $storage;
     }
 
-    /** Runs the operation; when it fails, the images it saved are rolled back with it. */
+    /**
+     * Runs the operation; when it fails, the images it saved are rolled back with it. A commit
+     * failure keeps them, as a commit the server finished before the connection failed.
+     */
     private function transaction(): TransactionPortInterface
     {
         $transaction = $this->createStub(TransactionPortInterface::class);
@@ -770,11 +819,13 @@ final class ApplyMatchHandlerTest extends TestCase
             }
             $images = $this->savedImages;
             try {
-                return $operation();
+                $result = $operation();
             } catch (Throwable $failure) {
                 $this->savedImages = $images;
                 throw $failure;
             }
+
+            return $this->commitFailure === null ? $result : throw $this->commitFailure;
         });
 
         return $transaction;
