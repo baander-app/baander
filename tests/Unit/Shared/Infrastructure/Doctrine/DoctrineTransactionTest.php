@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Doctrine;
 
+use App\Shared\Application\Exception\TransactionDeadlockException;
 use App\Shared\Infrastructure\Doctrine\DoctrineTransaction;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Driver\AbstractException;
+use Doctrine\DBAL\Exception\DeadlockException;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\TestCase;
@@ -50,6 +53,29 @@ final class DoctrineTransactionTest extends TestCase
         } catch (\RuntimeException $caught) {
             self::assertSame($error, $caught);
         }
+    }
+
+    public function testADeadlockIsRethrownAsATransactionDeadlockThatKeepsTheDatabaseError(): void
+    {
+        $manager = $this->createMock(EntityManagerInterface::class);
+        $manager->method('isOpen')->willReturn(true);
+        $manager->expects($this->once())->method('clear');
+        $registry = $this->createMock(ManagerRegistry::class);
+        $registry->method('getManager')->willReturn($manager);
+        $registry->expects($this->never())->method('resetManager');
+        $connection = $this->createMock(Connection::class);
+        $connection->expects($this->once())->method('transactional')->willReturnCallback(static fn (callable $operation): mixed => $operation());
+        $manager->method('getConnection')->willReturn($connection);
+        $deadlock = new DeadlockException(new class ('deadlock detected', '40P01') extends AbstractException {}, null);
+
+        $caught = null;
+        try {
+            (new DoctrineTransaction($registry, new Swoole()))->run(static fn (): never => throw $deadlock);
+        } catch (TransactionDeadlockException $translated) {
+            $caught = $translated;
+        }
+
+        self::assertSame($deadlock, $caught->getPrevious(), 'The deadlock reaches the caller as a TransactionDeadlockException.');
     }
 
     public function testFlushFailureResetsAnOrdinaryClosedManager(): void

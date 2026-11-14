@@ -24,11 +24,10 @@ use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzReleaseSummary;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
+use App\Shared\Application\Exception\TransactionDeadlockException;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Unit\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchQueryFixtures;
 use DateTimeImmutable;
-use Doctrine\DBAL\Driver\AbstractException;
-use Doctrine\DBAL\Exception\DeadlockException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Messenger\Envelope;
@@ -235,7 +234,7 @@ final class AutomaticAlbumMatcherTest extends TestCase
         $album = $this->longBed();
         $this->found(self::release(self::releaseId(1)));
         $this->applyResult = static function (ApplyMatchCommand $command): never {
-            $deadlock = new DeadlockException(new class ('deadlock detected', '40P01') extends AbstractException {}, null);
+            $deadlock = new TransactionDeadlockException(new \RuntimeException('SQLSTATE[40P01]: deadlock detected'));
 
             throw new HandlerFailedException(new Envelope($command), [$deadlock]);
         };

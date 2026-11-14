@@ -5,17 +5,35 @@ below are relative to this reference. Recheck them after dependency upgrades.
 
 ## Identify the environment
 
-[composer.lock](../../../../composer.lock) records DBAL 4.4.3, ORM 3.6.6,
-DoctrineBundle 3.2.2, Migrations 3.9.7 and MigrationsBundle 4.0.0 at this review;
-the installed vendor tree matched the lock on 2026-10-10. Inspect both; a fresh
-lockfile install and the current runtime need not match.
-DBAL 4.4.3's PostgreSQL exception converter leaves lock timeout SQLSTATE `55P03`
-as a generic `DriverException`; do not assume `LockWaitTimeoutException` applies.
-Check `getSQLState()` and the installed converter when classifying database errors.
-The disposable PostgreSQL 18 lease contention test verifies this behavior in
-[WorkerDeploymentLeaseTest](../../../../tests/Integration/WorkerDeploymentLeaseTest.php).
-Use `composer show --locked doctrine/orm` and `composer show doctrine/orm`, repeating
+[composer.lock](../../../../composer.lock) records DBAL 4.5.0, ORM 3.7.6,
+DoctrineBundle 3.3.4, Migrations 3.9.8 and MigrationsBundle 4.0.1. On 2026-11-14 the
+installed vendor tree matched the lock for each of them. Inspect both; a fresh
+lockfile install and the current runtime need not match. Use
+`composer show --locked doctrine/orm` and `composer show doctrine/orm`, repeating
 for the relevant packages. Read installed implementation for generated SQL claims.
+
+DBAL's PostgreSQL exception converter
+(`vendor/doctrine/dbal/src/Driver/API/PostgreSQL/ExceptionConverter.php`, DBAL 4.5.0,
+read 2026-11-14) gives only some SQLSTATEs a class of their own:
+
+- Deadlock `40P01` and serialization failure `40001` both become `DeadlockException`.
+  Read in the converter. [DoctrineTransactionTest](../../../../tests/Unit/Shared/Infrastructure/Doctrine/DoctrineTransactionTest.php)
+  covers the transaction port's handling of that class with a constructed exception,
+  not a real deadlock.
+- Lock timeout `55P03` stays a generic `DriverException`; do not assume
+  `LockWaitTimeoutException` applies. Read in the converter, and asserted on
+  disposable PostgreSQL 18 by the lease contention cases of
+  [WorkerDeploymentLeaseTest](../../../../tests/Integration/WorkerDeploymentLeaseTest.php).
+- Check violation `23514` stays a generic `DriverException`. Read in the converter, and
+  asserted by the rollback case of
+  [MusicBrainzMatchApplyTest](../../../../tests/Integration/MusicBrainzMatchApplyTest.php),
+  which runs only in the CI image.
+
+Check `getSQLState()` and the installed converter when classifying database errors.
+Application code needs no DBAL exception type for a deadlock: the transaction port's
+[DoctrineTransaction](../../../../src/Shared/Infrastructure/Doctrine/DoctrineTransaction.php)
+rethrows a `DeadlockException` as the Shared `TransactionDeadlockException`, with the
+DBAL error as the previous exception, and passes every other error through unchanged.
 
 [doctrine.yaml](../../../../config/packages/doctrine.yaml) maps attributes under
 `src`, uses the underscore naming strategy, and excludes `domain_event_outbox`
@@ -116,7 +134,8 @@ every partial index unsupported or add unrelated objects to the exclusion list.
 Check SchemaTool's actual unique-index deduplication when indexes share columns.
 See [extension checks](extensions.md) before accepting index deletion/recreation.
 
-DBAL 4.4.3 does not model generated columns. PostgreSQL stores their expressions
+DBAL 4.5.0 does not model generated columns either: its `Schema/Column.php` has no
+generated-column property (read 2026-11-14). PostgreSQL stores their expressions
 in `pg_attrdef`, which DBAL would read as column defaults, so the platform's
 `getDefaultColumnValueSQLSnippet()` excludes rows with `attgenerated <> ''`. Map
 a stored generated column with `columnDefinition` (ignored by `columnsEqual`),

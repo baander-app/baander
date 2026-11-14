@@ -36,6 +36,7 @@ use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCreditedArtist;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMedium;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzTrack;
+use App\Shared\Application\Exception\TransactionDeadlockException;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
@@ -44,6 +45,7 @@ use App\Shared\Infrastructure\Pagination\CursorPaginator;
 use App\Tests\Unit\Catalog\Application\QueryHandler\MusicBrainzMatch\FakeMusicBrainzLookup;
 use Closure;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Exception\DeadlockException;
 use Doctrine\ORM\EntityManager;
 use Psr\Log\NullLogger;
 use Symfony\Component\Clock\NativeClock;
@@ -303,7 +305,7 @@ final class MatchApplyRace
 
     /**
      * Runs an operation as the production transaction port does: in one transaction, flushed at the
-     * end, the manager cleared when it fails.
+     * end, the manager cleared when it fails, and a deadlock reported as TransactionDeadlockException.
      */
     private static function transaction(EntityManager $manager, ?Closure $beforeCommit): TransactionPortInterface
     {
@@ -332,7 +334,7 @@ final class MatchApplyRace
                     if ($this->manager->isOpen()) {
                         $this->manager->clear();
                     }
-                    throw $error;
+                    throw $error instanceof DeadlockException ? new TransactionDeadlockException($error) : $error;
                 }
             }
         };

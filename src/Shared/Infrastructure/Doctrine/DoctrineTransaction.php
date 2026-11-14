@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Doctrine;
 
+use App\Shared\Application\Exception\TransactionDeadlockException;
 use App\Shared\Application\Port\TransactionPortInterface;
+use Doctrine\DBAL\Exception\DeadlockException;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
@@ -44,7 +46,8 @@ final readonly class DoctrineTransaction implements TransactionPortInterface
             } else {
                 $this->doctrine->resetManager();
             }
-            throw $error;
+            // DBAL raises PostgreSQL's deadlock (40P01) and serialization failure (40001) as DeadlockException.
+            throw $error instanceof DeadlockException ? new TransactionDeadlockException($error) : $error;
         }
     }
 }

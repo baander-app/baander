@@ -48,10 +48,10 @@ use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\Exception\ServiceUnavailableException;
+use App\Shared\Application\Exception\TransactionDeadlockException;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
-use Doctrine\DBAL\Exception\DeadlockException;
 use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -110,14 +110,14 @@ final readonly class ApplyMatchHandler
     }
 
     /**
-     * @throws InvalidInputException       when the public ID or the candidate's MusicBrainz ID is malformed
-     * @throws NotFoundException           when no such item exists, or MusicBrainz has no such candidate
-     * @throws ServiceUnavailableException when MusicBrainz or the Cover Art Archive did not answer (`musicbrainz_unavailable`)
-     * @throws ConflictException           when MusicBrainz refused the request (`musicbrainz_rejected`), the item changed
-     *                                     since the comparison (`match_stale`), or the apply deadlocked with another
-     *                                     writer (`match_busy`); nothing is written then. An automatic apply throws none
-     *                                     of these: its result reports the outcome.
-     * @throws DeadlockException           when an automatic apply deadlocked with another writer; nothing is written
+     * @throws InvalidInputException        when the public ID or the candidate's MusicBrainz ID is malformed
+     * @throws NotFoundException            when no such item exists, or MusicBrainz has no such candidate
+     * @throws ServiceUnavailableException  when MusicBrainz or the Cover Art Archive did not answer (`musicbrainz_unavailable`)
+     * @throws ConflictException            when MusicBrainz refused the request (`musicbrainz_rejected`), the item changed
+     *                                      since the comparison (`match_stale`), or the apply deadlocked with another
+     *                                      writer (`match_busy`); nothing is written then. An automatic apply throws none
+     *                                      of these: its result reports the outcome.
+     * @throws TransactionDeadlockException when an automatic apply deadlocked with another writer; nothing is written
      */
     public function __invoke(ApplyMatchCommand $command): MatchApplyResult
     {
@@ -127,7 +127,7 @@ final readonly class ApplyMatchHandler
                 MatchItemType::Song => $this->applySong($command),
                 MatchItemType::Artist => $this->applyArtist($command),
             };
-        } catch (DeadlockException $deadlock) {
+        } catch (TransactionDeadlockException $deadlock) {
             // An import message retries on its own; an admin applies again.
             if ($command->isAutomatic()) {
                 throw $deadlock;

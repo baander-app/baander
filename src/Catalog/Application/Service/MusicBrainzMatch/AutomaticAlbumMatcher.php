@@ -20,8 +20,8 @@ use App\Metadata\Application\Port\MusicBrainzLookupInterface;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Application\Exception\ServiceUnavailableException;
+use App\Shared\Application\Exception\TransactionDeadlockException;
 use App\Shared\Domain\Model\Uuid;
-use Doctrine\DBAL\Exception\DeadlockException;
 use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
@@ -145,7 +145,7 @@ final readonly class AutomaticAlbumMatcher implements AutomaticAlbumMatcherInter
             $cause = HandlerFailure::cause($failed);
 
             // The apply wrote nothing; another writer held the same rows.
-            return $cause instanceof DeadlockException ? AutomaticMatchOutcome::unavailable() : throw $cause;
+            return $cause instanceof TransactionDeadlockException ? AutomaticMatchOutcome::unavailable() : throw $cause;
         }
         if (!$result instanceof MatchApplyResult) {
             throw new \LogicException('Applying a match returns its result.');

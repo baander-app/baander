@@ -47,14 +47,13 @@ use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzReleaseGroup;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
 use App\Shared\Application\Exception\ConflictException;
+use App\Shared\Application\Exception\TransactionDeadlockException;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Catalog\MatchSelections;
 use App\Tests\Unit\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchQueryFixtures;
 use Closure;
-use Doctrine\DBAL\Driver\AbstractException;
-use Doctrine\DBAL\Exception\DeadlockException;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Clock\MockClock;
@@ -328,12 +327,12 @@ final class ApplyMatchHandlerTest extends TestCase
         $this->musicBrainz->releases[$release->id] = $release;
         $this->addSongsOf($album, $release);
         $comparison = $this->compare(MatchItemType::Album, $album->getPublicId()->toString(), $release->id);
-        $this->transactionFailure = new DeadlockException(new class ('deadlock detected', '40P01') extends AbstractException {}, null);
+        $this->transactionFailure = new TransactionDeadlockException(new \RuntimeException('SQLSTATE[40P01]: deadlock detected'));
 
         $conflict = $this->expectConflict(fn () => ApplyMatchCommand::manual(MatchItemType::Album, $album->getPublicId()->toString(), $release->id, MatchSelections::defaults($comparison)) |> $this->apply(...));
         self::assertSame('match_busy', $conflict->details['reason'] ?? null);
 
-        $this->expectException(DeadlockException::class);
+        $this->expectException(TransactionDeadlockException::class);
         ApplyMatchCommand::automatic($album->getId(), $this->candidate($album, $release)) |> $this->apply(...);
     }
 
