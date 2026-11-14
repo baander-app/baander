@@ -1741,13 +1741,14 @@ Verification checkpoint, 2026-11-14:
 
 Open:
 
-- The MusicBrainz lookup button in the album and song panels is an unwired
-  placeholder; it gets its own brainstorm, building on the artists this branch creates.
-  It also owns splitting a single artist value that names several artists: R7 keeps
-  such a value whole, so "Post Malone, Luke Combs" (album artist "Post Malone", no
-  MusicBrainz IDs) became its own artist, 14 "Post Malone, X" artists on the
-  persistent instance. On 2026-11-14 the user chose this over splitting on an
-  album-artist prefix in the scan.
+- The MusicBrainz lookup button, the splitting of a single artist value that names
+  several artists, the extract and match access gap, and merging artists that share a
+  MusicBrainz ID are delivered on `feat/musicbrainz-matching` but not yet merged
+  ([MusicBrainz matching](#musicbrainz-matching)). R7 keeps such a value whole, so
+  "Post Malone, Luke Combs" (album artist "Post Malone", no MusicBrainz IDs) became its
+  own artist, one of 14 "Post Malone, X" artists on the persistent instance; they stay
+  until the album is matched there. On 2026-11-14 the user chose matching over
+  splitting on an album-artist prefix in the scan.
 - At its default 500 ms spacing, `app:lyrics:fetch` drew HTTP 429 from LRCLIB for 34
   of 77 songs on the persistent instance, reported as unavailable; a second run with
   `--delay=4000` finished the other 40 without a 429. A larger default or a back-off
@@ -1763,8 +1764,6 @@ Open:
     them yet;
   - M4A tags: the ID3 reader finds none, so an MP4 atom reader is needed; the
     persistent library has no M4A files;
-  - the extract and match access gap, and merging artists that share a MusicBrainz ID:
-    both belong to the MusicBrainz work;
   - a forced-sync rename followed by a wrong ID: no code path reaches it today.
 - From review, not fixed: the import handler's size and its `PreparedSong` array shape
   (a split into a tag-credit reader and a rescan repair was suggested); genre creation
@@ -1774,10 +1773,160 @@ Open:
   around the enricher's flush, which is separate work); a retag is any byte change at a
   song's path, so a library-wide ReplayGain pass replaces hand-made credits on the next
   scan (the settled retag decision).
-- Housekeeping: `NewAlbumMetadataSyncTest` drains its transport with a `get()` loop
-  that returns one envelope per call; the postgres-remediation `doctrine.md` version
-  list is stale; the PGroonga throwaway-schema failure is a candidate for the extension
-  inventory once its cause is isolated; `composer normalize` fails on `master`.
+- Housekeeping: the postgres-remediation `doctrine.md` version list is stale; the
+  PGroonga throwaway-schema failure is a candidate for the extension inventory once its
+  cause is isolated; `composer normalize` fails on `master`.
+
+### MusicBrainz matching
+
+The "Sync from MusicBrainz" button in the album and song panels did nothing. Tags such
+as "Post Malone, Luke Combs" (album artist "Post Malone", no MusicBrainz IDs) had become
+14 artists of their own on the persistent instance. `POST /api/metadata/extract` and
+`/api/metadata/match` required only a signed-in user. Branch `feat/musicbrainz-matching`
+implements `docs/plans/2026-11-14-1219-feat-musicbrainz-matching-plan.md` (U1 to U14, R1
+to R30) in local commits `3c6b10f60` to `bc10bbe05` on `c8feae182`; it is not pushed.
+The plan's "Implementation Amendments" section records where the build departs from the
+plan text.
+
+- **U1, MusicBrainz port and shared limit:** one Metadata port searches and looks up
+  releases, recordings and artists, fetches front covers, and tells "not found" from
+  "unavailable". Every MusicBrainz and Cover Art Archive request, from any process,
+  takes a turn under one Redis token bucket that starts each turn at least a second
+  after the previous one; a request answered with 503 is sent again after 1 and then 3
+  seconds. The open search and browse routes get a per-user limit.
+  MusicBrainzAdapterTest 66/66, CoverArtArchiveAdapterTest 7/7,
+  MusicBrainzLimiterSpacingTest 1/1, MusicBrainzRateLimitTest 3/3,
+  MetadataMusicBrainzUserLimitTest 3/3.
+- **U2, schema:** `albums.release_mbid` and `matched_at`, `songs.matched_fields` and
+  `songs.match_checked_at`, and `album_match_states` with its CHECKs.
+  MusicBrainzMatchMigrationTest 22/22, SongMatchCheckMigrationTest 4/4,
+  MusicBrainzMatchPersistenceTest 4/4, InitialSchemaMigrationTest 23/23,
+  CommittedCaptureTest 21/21.
+- **U3, scan credits by ID:** a file whose artist values carry MusicBrainz IDs credits
+  each artist by ID, the first as primary under the tagged text and the rest as
+  featured. Opus files were scanned without tags because the Ogg parser expected a
+  packet-type byte before `OpusTags`; fixed in `e9c1763e3`, so a rescan fills their
+  tags. FlacReaderTest 16/16, Id3ReaderTest 13/13, OggReaderTest 13/13,
+  FilesDiscoveredArtistCreditTest 14/14, ScannedArtistCreditsTest 7/7.
+- **U4, rescans keep a match:** a rescan or retag keeps each field a match wrote unless
+  the tags carry MusicBrainz artist IDs or a value for that field, and takes its locks
+  in the apply's order. A hand edit of a matched field or of a song's credits drops that
+  matched mark (`e0c8ccf57`). RetaggedFileScanTest 5/5, MatchedSongRetagRaceTest 2/2,
+  RetagLockOrderTest 2/2, FilesDiscoveredRetagTest 13/13, SongTest 63/63,
+  ArtistCreditHandlersTest 21/21.
+- **U5, scoring:** one service scores a release, recording or artist against the local
+  item, pairs tracks and decides whether an album match is confident.
+  CandidateScorerTest 7/7, TrackPairingTest 7/7, MatchConfidenceTest 12/12.
+- **U6, artist merge and removal:** credits, favorites, play history, recommendations
+  and the cover move to the surviving artist; an artist left without credits is removed.
+  ArtistMergeTest 7/7, ArtistMergeRaceTest 3/3, DeleteArtistHandlerTest 4/4.
+- **U7, candidates and comparison:** a scored candidate list (albums: releases ranked
+  locally, the best five looked up) and a per-field, per-track comparison with its
+  artist merges and removals. SearchMatchCandidatesHandlerTest 13/13,
+  CompareMatchHandlerTest 13/13, MatchCatalogReadQueryTest 8/8.
+- **U8, apply:** writes exactly the ticked rows or nothing, under locks taken in this
+  order: album rows, one sorted identity lock, artist rows, song rows in ID order.
+  Before writing, it rechecks the values the admin saw and answers 409 `match_stale` on
+  a difference. A database deadlock surfaces as a retryable error.
+  ApplyMatchHandlerTest 18/18, MusicBrainzMatchApplyTest 6/6,
+  MusicBrainzMatchApplyRaceTest 2/2.
+- **U9, routes and commands:** admin-only candidates, comparison and apply routes with
+  `app:metadata:match:search`, `compare` and `apply`; extract and match become
+  admin-only with console counterparts. MusicBrainzMatchControllerTest 8/8,
+  MusicBrainzMatchCliParityTest 10/10, MusicBrainzMatchFirewallTest 16/16,
+  MetadataFileCliParityTest 5/5, MetadataSyncControllerAccessTest 3/3.
+- **U10, automatic matching:** every album sync requests a match, and so does ingest
+  when "Automatic MusicBrainz matching" is on. The queue claims the oldest due request
+  with `FOR UPDATE SKIP LOCKED`, and one chain of runs holds the queue; the scheduled
+  job "Recover the album match queue" runs every ten minutes and restarts a lost chain.
+  A confident album is matched fill-only; the rest wait for review. An outage pauses
+  the queue; a conflict or a refusal holds back only that album.
+  AutomaticAlbumMatcherTest 18/18,
+  DrainAlbumMatchesHandlerTest 14/14, RequestAlbumMatchHandlerTest 13/13,
+  RecoverAlbumMatchQueueHandlerTest 3/3, AlbumMatchQueueStatementsTest 8/8,
+  NewAlbumMetadataSyncTest 6/6.
+- **U11, review list:** `GET /api/admin/metadata/match/reviews` and
+  `app:metadata:match:reviews`. ListMatchReviewsHandlerTest 3/3,
+  MusicBrainzMatchReviewsTest 3/3, MusicBrainzMatchReviewsCommandTest 4/4.
+- **U12, U13, web:** the button opens a dialog to pick a candidate, review the
+  comparison and apply it; the admin library page gains a "Matching" tab.
+  MusicBrainzMatchDialog 14/14, MatchComparisonStep 17/17, MatchCandidateStep 9/9,
+  match-ticks 8/8, match-error-message 5/5, MatchReviewTable 7/7, InfoPanel 11/11,
+  use-musicbrainz-match 2/2.
+- **U14, documentation:** operator pages (external APIs, authentication and limits,
+  automatic matching), command pages, the Catalog and Metadata context guides and
+  READMEs, and the "MusicBrainz match" and "album match queue" entries in `CONCEPTS.md`.
+
+Verification checkpoint, 2026-11-14:
+
+- Full backend suite (`scripts/test-backend-container.sh`, `baander-ci:u10`) at
+  `bc10bbe05`: 12,700 tests, 139,179 assertions, no failures (ordinary 8,191, native
+  921, stack-1 1,567, stack-2 2,021), 1,938.3 s.
+- The run before it, at `4d63c92cf` (12,692 tests), failed five guard tests that the
+  targeted runs had not selected. The recovery job's seed reused the retired health
+  check job's ID (`HealthCheckJobRemovalTest`); the messenger routing, async workload
+  and mutation route inventories did not yet list `DrainAlbumMatchesMessage` and
+  `admin_metadata_match_apply`. Fixed in `83ea8153c` and `1f581ee04`.
+- Static gates at `bc10bbe05`: PHPStan over the whole project on the host reports only
+  `tests/Fixtures/Worker/media-control-ffmpeg.php`, whose `require` names the container
+  path `/var/www/html` (on `master` since `0062b4e7e`); in the CI image, Deptrac reports
+  0 violations, `lint:container` passes and `app:export-openapi-spec` leaves
+  `openapi.json` unchanged. PHPStan had also found a dead catch in the OAuth refresh
+  handler, caused by the transaction port's new `@throws`; fixed in `d286eaf9a`.
+- Web at `bc10bbe05`: typecheck, lint and `generate:check` pass; vitest passes 3,561
+  tests in 284 files.
+- Two `ce-code-review` runs (cross-model pass off by checkout config). The first, over
+  `c8feae182..2b74b352b`, found five defects, fixed in `5b3134688`: songs imported while
+  a match ran were never matched (now `songs.match_checked_at`), a lost queue run left
+  requests waiting (now the chain token and the recovery job), one album's conflict
+  paused the whole queue (now per-album retries), a failed apply left its stored cover
+  file behind, and the match state entity was not mapped read-only. The second, over
+  `2b74b352b..4d63c92cf`, said "Ready with fixes": an album parked for a retry held back
+  later requests for up to 6 hours, fixed in `bc10bbe05`. Its testing gaps and
+  maintainability notes are fixed in `83ea8153c`, `95220802d` and `a92ffbf25`; the
+  dialog race it reported cannot occur, because going back cancels the pending reload,
+  and `09ba9d65c` pins that.
+- Preview (`make preview-up`, its own catalog, the music library mounted read-only),
+  against MusicBrainz itself (AE1): `app:metadata:match:search` for "F-1 Trillion: Long
+  Bed" listed five releases, three scoring 100; `compare` against
+  `fef8b229-ee77-4e63-a07f-222c1ad56c97` listed 14 ticked merges; `apply --force` merged
+  the 14 "Post Malone, X" artists into Post Malone. Afterwards all 27 songs credit Post
+  Malone as primary, 15 keep their tagged text such as "Post Malone, Luke Combs" and
+  credit their guest as featured (14 new artists with MusicBrainz IDs, Luke Combs on two
+  songs), every song has a recording ID, the album has its release and release group
+  IDs, and the three songs given LRCLIB lyrics before the apply kept them. Before the
+  adapter asked again after a 503, most searches on the preview failed: MusicBrainz
+  answered the same well-spaced lookup with 503, then 200, then 200.
+- Learnings:
+  `docs/solutions/runtime-errors/doctrine-cannot-update-a-loaded-entity-keyed-by-its-association-under-the-strict-uuid-type.md`,
+  `docs/solutions/developer-experience/in-memory-transport-get-hands-out-one-message-per-call.md`,
+  and the lock-order test section of
+  `docs/solutions/architecture-patterns/concurrent-imports-find-or-create-identities-under-sorted-advisory-locks.md`.
+
+Open:
+
+- Persistent instance, after the merge to `master`: the updater applies the three
+  migrations; then, as an operator step with the user's go-ahead, match
+  "F-1 Trillion: Long Bed" from the dialog or turn automatic matching on.
+- The preview applied the recovery job's seed before `83ea8153c` changed the job's ID,
+  so the preview's next refresh refuses with "An applied migration changed" until the
+  user approves reconciling its saved release or resetting its data.
+- From review, not fixed:
+  - a request for an album while a run matches it ends the claim and can start a second
+    run on the same album. The apply's row lock and recheck keep a second write out, but
+    MusicBrainz is asked twice, and rarely a review mark is left on an album the other
+    run matched. Storing the claim apart from `due_at` would close it;
+  - a Cover Art Archive refusal during an apply counts as an outage and pauses the whole
+    queue; splitting it needs its own apply outcome;
+  - a hand change to a song's credits and the drop of its `credits` mark are separate
+    writes;
+  - the web dialog shows generic messages for an apply's 404 and 422;
+  - the `musicbrainz_user` limit is keyed by the user's email address;
+  - an album merge does not clear `match_checked_at` on the songs it moves;
+  - artist sync is never queued (predates the branch).
+- Housekeeping: `DrainAlbumMatchesMessage` is not in the Qualification fixture's
+  metadata job groups
+  (`packages/baander-tooling/src/Fixtures/Qualification/Qualification.php`).
 
 ## Roadmap maintenance
 
