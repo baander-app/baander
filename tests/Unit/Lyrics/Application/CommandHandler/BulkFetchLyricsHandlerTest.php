@@ -38,6 +38,9 @@ final class BulkFetchLyricsHandlerTest extends TestCase
     /** @var list<list<string>> the song IDs of each signature lookup, in order */
     private array $signatureLookups = [];
 
+    /** @var list<list<string>> the song IDs of each lookup of which songs have lyrics, in order */
+    private array $lyricsLookups = [];
+
     protected function setUp(): void
     {
         $this->marks = new InMemoryQueuedLyricsFetches();
@@ -61,12 +64,8 @@ final class BulkFetchLyricsHandlerTest extends TestCase
                     default => self::fail('Unexpected continuation ' . $after->toString()),
                 };
             });
-        $lyrics = $this->createStub(LyricsRepositoryInterface::class);
-        $lyrics->method('findBySongId')->willReturnCallback(
-            static fn (Uuid $songId): ?Lyrics => $songId->equals($cached) ? Lyrics::create($songId, 'Cached', 'embedded') : null,
-        );
 
-        self::assertSame(99, $this->handler($songs, $lyrics)(new BulkFetchLyricsCommand(delayMs: 0))->queued);
+        self::assertSame(99, $this->handler($songs, $this->lyricsFor([$cached]))(new BulkFetchLyricsCommand(delayMs: 0))->queued);
         self::assertSame([
             [null, 50],
             [end($firstPage)->toString(), 50],
@@ -216,13 +215,12 @@ final class BulkFetchLyricsHandlerTest extends TestCase
 
     public function testARunOutsideAJobOrThatQueuedNothingLeavesNoJobRunToCancel(): void
     {
+        $songId = Uuid::v7();
         $songs = $this->createStub(SongLookupInterface::class);
-        $songs->method('songIdsAfter')->willReturn([Uuid::v7()]);
+        $songs->method('songIdsAfter')->willReturn([$songId]);
         $this->handler($songs)(new BulkFetchLyricsCommand());
 
-        $lyrics = $this->createStub(LyricsRepositoryInterface::class);
-        $lyrics->method('findBySongId')->willReturn(Lyrics::create(Uuid::v7(), 'Stored lyrics', 'embedded'));
-        self::assertSame(0, $this->handler($songs, $lyrics, jobId: 'empty-job')(new BulkFetchLyricsCommand())->queued);
+        self::assertSame(0, $this->handler($songs, $this->lyricsFor([$songId]), jobId: 'empty-job')(new BulkFetchLyricsCommand())->queued);
 
         self::assertSame([], $this->marks->jobRuns);
     }
@@ -283,6 +281,36 @@ final class BulkFetchLyricsHandlerTest extends TestCase
         );
     }
 
+    /**
+     * The walk reads which songs of a page have lyrics in one lookup, not one per song. A song
+     * with lyrics is skipped before its signature is checked, so it is never counted as skipped.
+     */
+    public function testTheWalkReadsWhichSongsOfEachPageHaveLyricsInOneLookupAndSkipsThem(): void
+    {
+        $pages = [array_map(static fn (): Uuid => Uuid::v7(), range(1, 50)), [Uuid::v7(), Uuid::v7()]];
+        $songs = $this->createStub(SongLookupInterface::class);
+        $songs->method('songIdsAfter')->willReturnOnConsecutiveCalls(...$pages);
+        $withLyrics = [$pages[0][3], $pages[0][4], $pages[1][0]];
+
+        $result = $this->handler($songs, $this->lyricsFor($withLyrics), signatures: [
+            // Has lyrics as well as no artist: skipped for its lyrics, not counted.
+            $pages[0][4]->toString() => new SongLyricSignature('Rescue Me', null, 'Rescue Me', 200.0),
+            $pages[0][5]->toString() => new SongLyricSignature('Avarice', null, 'Ten Thousand Fists', 200.0),
+        ])(new BulkFetchLyricsCommand(delayMs: 0));
+
+        self::assertEquals(new BulkFetchLyricsResult(queued: 48, skippedNoArtist: 1, skippedNoLength: 0), $result);
+        $notQueued = array_map(static fn (Uuid $id): string => $id->toString(), [...$withLyrics, $pages[0][5]]);
+        $expected = array_values(array_filter(
+            array_map(static fn (Uuid $id): string => $id->toString(), [...$pages[0], ...$pages[1]]),
+            static fn (string $id): bool => !in_array($id, $notQueued, true),
+        ));
+        self::assertSame($expected, $this->queuedSongIds());
+        self::assertSame(
+            array_map(static fn (array $page): array => array_map(static fn (Uuid $id): string => $id->toString(), $page), $pages),
+            $this->lyricsLookups,
+        );
+    }
+
     public function testAFinishedRunRecordsItsTallyWithItsJobAndBecomesTheLatestRun(): void
     {
         $songIds = [Uuid::v7(), Uuid::v7(), Uuid::v7()];
@@ -339,10 +367,7 @@ final class BulkFetchLyricsHandlerTest extends TestCase
         ?string $jobId = null,
         array $signatures = [],
     ): BulkFetchLyricsHandler {
-        if ($lyrics === null) {
-            $lyrics = $this->createStub(LyricsRepositoryInterface::class);
-            $lyrics->method('findBySongId')->willReturn(null);
-        }
+        $lyrics ??= $this->lyricsFor();
         $bus = $this->createStub(MessageBusInterface::class);
         $bus->method('dispatch')->willReturnCallback(function (FetchLyricsCommand $command, array $stamps = []): Envelope {
             $envelope = new Envelope($command, $stamps);
@@ -421,6 +446,56 @@ final class BulkFetchLyricsHandlerTest extends TestCase
             public function visibleSongIds(array $songIds, LibraryReadScope $scope): array
             {
                 return $this->songs->visibleSongIds($songIds, $scope);
+            }
+        };
+    }
+
+    /**
+     * Stored lyrics for the given songs, read a page at a time.
+     *
+     * @param list<Uuid> $songIds the songs that have lyrics
+     */
+    private function lyricsFor(array $songIds = []): LyricsRepositoryInterface
+    {
+        $withLyrics = array_fill_keys(array_map(static fn (Uuid $id): string => $id->toString(), $songIds), true);
+
+        return new readonly class ($withLyrics, function (array $songIds): void {
+            $this->lyricsLookups[] = $songIds;
+        }) implements LyricsRepositoryInterface {
+            /**
+             * @param array<string, true> $withLyrics
+             * @param \Closure(list<string>): void $onLookup
+             */
+            public function __construct(private array $withLyrics, private \Closure $onLookup)
+            {
+            }
+
+            public function songIdsWithLyrics(array $songIds): array
+            {
+                $ids = array_map(static fn (Uuid $id): string => $id->toString(), $songIds);
+                ($this->onLookup)($ids);
+
+                return array_intersect_key($this->withLyrics, array_flip($ids));
+            }
+
+            public function findBySongId(Uuid $songId): ?Lyrics
+            {
+                throw new \LogicException('The bulk walk reads which songs have lyrics a page at a time.');
+            }
+
+            public function add(Lyrics $lyrics): bool
+            {
+                throw new \LogicException('The bulk walk stores no lyrics.');
+            }
+
+            public function save(Lyrics $lyrics): void
+            {
+                throw new \LogicException('The bulk walk stores no lyrics.');
+            }
+
+            public function delete(Lyrics $lyrics): void
+            {
+                throw new \LogicException('The bulk walk deletes no lyrics.');
             }
         };
     }

@@ -179,6 +179,14 @@ final class ApplyLyricsHandlerTest extends TestCase
                 return $this->bySong[$songId->toString()] ?? null;
             }
 
+            public function songIdsWithLyrics(array $songIds): array
+            {
+                return array_fill_keys(array_keys(array_intersect_key(
+                    $this->bySong,
+                    array_flip(array_map(static fn (Uuid $id): string => $id->toString(), $songIds)),
+                )), true);
+            }
+
             public function delete(Lyrics $lyrics): void
             {
                 unset($this->bySong[$lyrics->getSongId()->toString()]);

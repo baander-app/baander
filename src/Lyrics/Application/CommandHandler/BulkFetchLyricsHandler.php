@@ -96,8 +96,10 @@ final class BulkFetchLyricsHandler
             while ($limit === null || $queued < $limit) {
                 $remaining = $limit !== null ? min(self::BATCH_SIZE, $limit - $queued) : self::BATCH_SIZE;
                 $songIds = $this->songs->songIdsAfter($after, $remaining);
-                // A page's signatures come from one query that loads no song entities.
+                // A page's signatures, and which of its songs have lyrics, each come from one
+                // query that loads no entities.
                 $signatures = $this->songs->findLyricSignatures($songIds);
+                $withLyrics = $this->lyricsRepository->songIdsWithLyrics($songIds);
 
                 foreach ($songIds as $songId) {
                     if ($limit !== null && $queued >= $limit) {
@@ -107,7 +109,7 @@ final class BulkFetchLyricsHandler
                     // A cancelled job stops before its next song.
                     $this->cancellation->check();
 
-                    if ($this->lyricsRepository->findBySongId($songId) !== null) {
+                    if (isset($withLyrics[$songId->toString()])) {
                         continue;
                     }
 

@@ -73,6 +73,25 @@ final class LyricsRepository implements LyricsRepositoryInterface
         return $entity !== null ? $this->toDomain($entity) : null;
     }
 
+    public function songIdsWithLyrics(array $songIds): array
+    {
+        if ($songIds === []) {
+            return [];
+        }
+
+        // A scalar select: the rows' song IDs come back as strings and no lyrics entity is loaded.
+        /** @var list<string> $found */
+        $found = $this->entityManager->createQueryBuilder()
+            ->select('l.songId')
+            ->from(LyricsEntity::class, 'l')
+            ->where('l.songId IN (:songIds)')
+            ->setParameter('songIds', array_map(static fn (Uuid $id): string => $id->toString(), $songIds))
+            ->getQuery()
+            ->getSingleColumnResult();
+
+        return array_fill_keys($found, true);
+    }
+
     public function delete(Lyrics $lyrics): void
     {
         $entity = $this->entityManager

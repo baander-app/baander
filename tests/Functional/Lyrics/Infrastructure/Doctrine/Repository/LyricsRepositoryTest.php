@@ -9,6 +9,7 @@ use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\ValueObject\AlbumType;
 use App\Lyrics\Domain\Model\Lyrics;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
+use App\Lyrics\Infrastructure\Doctrine\Entity\LyricsEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
@@ -259,6 +260,32 @@ final class LyricsRepositoryTest extends TestCase
         $result = $this->lyricsRepository->findBySongId(new Uuid());
 
         $this->assertNull($result);
+    }
+
+    // --- songIdsWithLyrics: which songs of a set have lyrics ---
+
+    /** An instrumental record counts as lyrics, as it does for findBySongId; the lyrics text is never loaded. */
+    public function testSongIdsWithLyricsNamesTheSongsThatHaveLyricsAndLoadsNoEntities(): void
+    {
+        $withLyrics = $this->createSongFixture();
+        $instrumental = $this->createSongFixture();
+        $withoutLyrics = $this->createSongFixture();
+        $this->lyricsRepository->save(Lyrics::create($withLyrics, 'Stored lyrics', 'embedded'));
+        $this->lyricsRepository->save(Lyrics::create($instrumental, '', 'lrclib', isInstrumental: true));
+        $this->entityManager->clear();
+
+        $found = $this->lyricsRepository->songIdsWithLyrics([$withLyrics, $withoutLyrics, new Uuid(), $instrumental]);
+
+        $expected = [$withLyrics->toString() => true, $instrumental->toString() => true];
+        ksort($expected);
+        ksort($found);
+        $this->assertSame($expected, $found);
+        $this->assertSame([], $this->entityManager->getUnitOfWork()->getIdentityMap()[LyricsEntity::class] ?? []);
+    }
+
+    public function testSongIdsWithLyricsOfNoSongsIsEmpty(): void
+    {
+        $this->assertSame([], $this->lyricsRepository->songIdsWithLyrics([]));
     }
 
     // --- Happy path: delete lyrics ---
