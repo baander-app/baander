@@ -23,6 +23,10 @@ final class MatchConfidenceTest extends TestCase
     private const string EXPLICIT_ID = 'b2b2a7c4-1f63-4a8e-9d5c-6d1c3e0f2a11';
     private const string CLEAN_ID = '4e8f0c2d-93a1-4b7e-8c55-0a9d6f3b1e22';
     private const string DELUXE_ID = 'd71e9b30-5c4a-4f02-b6e8-27c1a0f49d33';
+    private const string ONE_DISC_ID = '1be7f9af-0000-4f0b-9e1d-5a3c7d2e8f44';
+
+    /** The one-disc edition's own recording, at the third track of the second disc (index 20 in track order). */
+    private const string ONE_DISC_RECORDING = 'c1ea0000-0000-4000-8000-000000000203';
 
     /** @var list<string> the tracks, by "<disc>-<position>", on which the clean edition has its own recording */
     private const array CLEAN_RECORDINGS = ['1-2', '1-5', '1-9', '2-3', '2-8'];
@@ -70,6 +74,36 @@ final class MatchConfidenceTest extends TestCase
         self::assertSame($clean, $decision->match->release, 'The earliest edition is the release recorded.');
         self::assertSame([$clean, $explicit], $decision->match->editions);
         self::assertSame(self::sharedRecordingIds($explicit), self::recordingIds($decision->match));
+    }
+
+    public function testAnEditionThatPutsTheSameTracksOnOneDiscIsATwinAndTheMatchStaysConfident(): void
+    {
+        $explicit = self::release(self::EXPLICIT_ID, date: '2024-08-16');
+        $oneDisc = self::resplit($explicit, self::ONE_DISC_ID, [27], '2024-08-17', [20 => self::ONE_DISC_RECORDING]);
+        $album = self::album(self::localTracksOf($explicit));
+        $oneDiscScore = new CandidateScorer(new TrackPairing())->scoreRelease($oneDisc, $album)->score;
+        self::assertGreaterThan(100 - MatchConfidence::MINIMUM_LEAD, $oneDiscScore, 'The one-disc edition scores within the lead.');
+
+        $decision = $this->decide($album, $explicit, $oneDisc);
+
+        self::assertTrue($decision->isConfident());
+        self::assertSame($explicit, $decision->match->release);
+        self::assertSame([$explicit, $oneDisc], $decision->match->editions);
+        self::assertSame(array_replace(self::recordingIdsOf($explicit), ['2-3' => null]), self::recordingIds($decision->match), 'A recording ID is kept where both editions have it at that place in the track order.');
+    }
+
+    public function testAnEarlierTwinThatSplitsItsDiscsOtherwiseIsNotTheReleaseRecorded(): void
+    {
+        $explicit = self::release(self::EXPLICIT_ID, date: '2024-08-16');
+        $oneDisc = self::resplit($explicit, self::ONE_DISC_ID, [27], '2024-08-09');
+        $album = self::album(self::localTracksOf($explicit));
+
+        $decision = $this->decide($album, $explicit, $oneDisc);
+
+        self::assertTrue($decision->isConfident());
+        self::assertSame($explicit, $decision->match->release, 'The release recorded keeps every song at its own disc and number.');
+        self::assertSame([$oneDisc, $explicit], $decision->match->editions, 'Every edition, earliest first.');
+        self::assertSame(self::recordingIdsOf($explicit), self::recordingIds($decision->match), 'Each song pairs with its own disc and number.');
     }
 
     /** @param array<string, array{title?: string, lengthMs?: int|null, artistCredit?: MusicBrainzArtistCredit}> $changes */

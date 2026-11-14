@@ -4,23 +4,24 @@ declare(strict_types=1);
 
 namespace App\Catalog\Application\Service\MusicBrainzMatch;
 
-use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMedium;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
-use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzTrack;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 /**
- * The release an album match stands for. Twin editions, which agree on every track's title,
- * artist credit and length and differ only in recording IDs the files cannot tell apart, form one
- * candidate: it records the earliest edition's release ID and keeps a recording ID only where
- * every edition has the same one. A match writes only the values all its editions agree on, which
- * the writer works out from `$editions`.
+ * The release an album match stands for. Twin editions, which hold the same tracks in the same order
+ * with the same titles, artist credits and lengths and differ only in recording IDs the files cannot
+ * tell apart, or in how their discs split the tracks, form one candidate: it records the release ID
+ * of the edition that keeps the most songs at their own disc and number, the earliest released of
+ * those, and keeps a recording ID only where every edition has the same one at that place in the
+ * track order. A match writes only the values
+ * all its editions agree on, which the writer works out from `$editions`.
  */
 #[Exclude]
 final readonly class MatchCandidate
 {
     /**
-     * @param MusicBrainzRelease $release the edition whose release ID the match records: the earliest released
+     * @param MusicBrainzRelease $release the edition whose release ID the match records: of the editions that keep the
+     *                                   most songs at their own disc and number, the earliest released
      * @param int<0, 100> $score the best score among the editions
      * @param TrackPairs $pairs the local tracks paired with the tracks of `$release`; a paired track's own
      *                         recording ID belongs to `$release` alone, so take recording IDs from recordingId()
@@ -34,21 +35,37 @@ final readonly class MatchCandidate
     ) {
     }
 
-    /** The recording ID at the track's disc and position when every edition has the same one there; null otherwise. */
+    /**
+     * The recording ID of a track of `$release` when every edition has the same one at that place in
+     * the track order; null otherwise.
+     */
     public function recordingId(ReleaseTrack $track): ?string
     {
+        $place = $this->placeOf($track);
+        if ($place === null) {
+            return null;
+        }
         $ids = array_map(
-            static fn (MusicBrainzRelease $edition): ?string => self::trackAt($edition, $track->disc, $track->track->position)?->recordingId,
+            static fn (MusicBrainzRelease $edition): ?string => ($edition->tracks()[$place] ?? null)?->recordingId,
             $this->editions,
         ) |> array_unique(...);
 
         return count($ids) === 1 ? array_first($ids) : null;
     }
 
-    private static function trackAt(MusicBrainzRelease $edition, int $disc, int $position): ?MusicBrainzTrack
+    /** The track's index in the track order of `$release`, across its discs; null when it is not one of its tracks. */
+    private function placeOf(ReleaseTrack $track): ?int
     {
-        $medium = array_find($edition->media, static fn (MusicBrainzMedium $medium): bool => $medium->position === $disc);
+        $place = 0;
+        foreach ($this->release->media as $medium) {
+            foreach ($medium->tracks as $releaseTrack) {
+                if ($medium->position === $track->disc && $releaseTrack->position === $track->track->position) {
+                    return $place;
+                }
+                ++$place;
+            }
+        }
 
-        return array_find($medium->tracks ?? [], static fn (MusicBrainzTrack $track): bool => $track->position === $position);
+        return null;
     }
 }

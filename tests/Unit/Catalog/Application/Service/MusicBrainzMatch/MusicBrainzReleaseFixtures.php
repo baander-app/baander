@@ -76,6 +76,53 @@ trait MusicBrainzReleaseFixtures
         );
     }
 
+    /**
+     * An edition with the same tracks as `$release` in the same order, split into discs as `$discs`
+     * says, as MusicBrainz lists an edition that puts both discs of an album on one medium.
+     *
+     * @param list<int>          $discs      tracks per disc
+     * @param array<int, string> $recordings recording IDs of the edition's own, by index in the track order
+     */
+    private static function resplit(MusicBrainzRelease $release, string $id, array $discs, ?string $date, array $recordings = []): MusicBrainzRelease
+    {
+        $tracks = $release->tracks();
+        $media = [];
+        $offset = 0;
+        foreach ($discs as $discIndex => $trackCount) {
+            $disc = $discIndex + 1;
+            $media[] = new MusicBrainzMedium($disc, 'Digital Media', null, array_map(
+                static fn (MusicBrainzTrack $track, int $index): MusicBrainzTrack => new MusicBrainzTrack(
+                    id: sprintf('7a1c0de1-0000-4000-8000-%04d%08d', $disc, $index + 1),
+                    position: $index + 1,
+                    number: (string) ($index + 1),
+                    title: $track->title,
+                    lengthMs: $track->lengthMs,
+                    recordingId: $recordings[$offset + $index] ?? $track->recordingId,
+                    artistCredit: $track->artistCredit,
+                ),
+                array_slice($tracks, $offset, $trackCount),
+                range(0, $trackCount - 1),
+            ));
+            $offset += $trackCount;
+        }
+
+        return new MusicBrainzRelease(
+            id: $id,
+            title: $release->title,
+            artistCredit: $release->artistCredit,
+            date: $date,
+            country: 'JP',
+            status: $release->status,
+            disambiguation: $release->disambiguation,
+            barcode: $release->barcode,
+            labels: $release->labels,
+            media: $media,
+            releaseGroup: $release->releaseGroup,
+            genres: $release->genres,
+            hasFrontCover: $release->hasFrontCover,
+        );
+    }
+
     private static function lengthMs(int $index): int
     {
         return 150_000 + 7_000 * $index;

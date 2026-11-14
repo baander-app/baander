@@ -7,16 +7,16 @@ namespace App\Catalog\Application\Service\MusicBrainzMatch;
 use App\Catalog\Domain\ValueObject\AlbumMatchReviewReason;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtistCredit;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCreditedArtist;
-use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMedium;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzTrack;
 
 /**
  * Decides whether the best of an album's scored releases may be applied without an admin.
  *
- * The best release first takes in its twins: editions scoring less than the lead below it whose
- * media hold the same tracks with the same titles and artist credits and lengths within the
- * pairing tolerance of each other, whatever their recording IDs. The candidate is confident when
+ * The best release first takes in its twins: editions scoring less than the lead below it that hold
+ * the same tracks in the same order with the same titles and artist credits and lengths within the
+ * pairing tolerance of each other, whatever their recording IDs and however their discs split the
+ * tracks. The candidate is confident when
  * it has the album's track count, pairs every local track within the tolerance, scores at least
  * 90 and leads the best remaining release by at least 10. Otherwise the album needs review for the
  * first of those checks that fails; an album without releases needs review for having none.
@@ -59,37 +59,48 @@ final class MatchConfidence
         };
     }
 
-    /** @param non-empty-list<ScoredRelease> $twins */
+    /**
+     * One candidate for the best release and its twins. Twins may split the same tracks into discs
+     * differently, and a match writes the disc and number of the track each song is paired with, so
+     * the candidate stands for the twin that keeps the most songs at their own disc and number, the
+     * earliest released of those, and pairs the songs as that twin does.
+     *
+     * @param non-empty-list<ScoredRelease> $twins
+     */
     private static function collapse(array $twins): MatchCandidate
     {
         usort($twins, static fn (ScoredRelease $one, ScoredRelease $other): int => self::earlier($one->release, $other->release));
-        $earliest = $twins[0];
+        $mostInPlace = array_map(self::songsInPlace(...), $twins) |> max(...);
+        $recorded = array_find($twins, static fn (ScoredRelease $twin): bool => self::songsInPlace($twin) === $mostInPlace) ?? $twins[0];
 
         return new MatchCandidate(
-            release: $earliest->release,
+            release: $recorded->release,
             score: array_column($twins, 'score') |> max(...),
-            pairs: $earliest->pairs,
+            pairs: $recorded->pairs,
             editions: array_column($twins, 'release'),
         );
     }
 
-    private static function areTwins(MusicBrainzRelease $one, MusicBrainzRelease $other): bool
+    /** How many songs the release pairs with the track at their own disc and number; a song without a disc counts as on the first. */
+    private static function songsInPlace(ScoredRelease $scored): int
     {
-        return count($one->media) === count($other->media)
-            && array_all($one->media, static fn (MusicBrainzMedium $medium, int $index): bool => self::twinMedia($medium, $other->media[$index]));
+        return array_filter(
+            $scored->pairs->pairs,
+            static fn (TrackPair $pair): bool => ($pair->local->disc ?? 1) === $pair->release->disc && $pair->local->position === $pair->release->track->position,
+        ) |> count(...);
     }
 
-    private static function twinMedia(MusicBrainzMedium $one, MusicBrainzMedium $other): bool
+    private static function areTwins(MusicBrainzRelease $one, MusicBrainzRelease $other): bool
     {
-        return $one->position === $other->position
-            && count($one->tracks) === count($other->tracks)
-            && array_all($one->tracks, static fn (MusicBrainzTrack $track, int $index): bool => self::twinTracks($track, $other->tracks[$index]));
+        $otherTracks = $other->tracks();
+
+        return count($one->tracks()) === count($otherTracks)
+            && array_all($one->tracks(), static fn (MusicBrainzTrack $track, int $index): bool => self::twinTracks($track, $otherTracks[$index]));
     }
 
     private static function twinTracks(MusicBrainzTrack $one, MusicBrainzTrack $other): bool
     {
-        return $one->position === $other->position
-            && $one->title === $other->title
+        return $one->title === $other->title
             && self::creditKey($one->artistCredit) === self::creditKey($other->artistCredit)
             && self::lengthsAgree($one->lengthMs, $other->lengthMs);
     }

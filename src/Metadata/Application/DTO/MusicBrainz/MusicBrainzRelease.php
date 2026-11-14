@@ -42,8 +42,13 @@ final readonly class MusicBrainzRelease
     /** The tracks on all media together. */
     public function trackCount(): int
     {
-        return array_map(static fn(MusicBrainzMedium $medium): int => count($medium->tracks), $this->media)
-            |> array_sum(...);
+        return count($this->tracks());
+    }
+
+    /** @return list<MusicBrainzTrack> the tracks of every medium, in disc order and then track order */
+    public function tracks(): array
+    {
+        return array_merge(...array_column($this->media, 'tracks'));
     }
 
     /** @return list<string> the formats of the media, such as "CD" or "Digital Media", each once */
