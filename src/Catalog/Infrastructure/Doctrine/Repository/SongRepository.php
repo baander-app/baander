@@ -34,6 +34,7 @@ use Doctrine\ORM\NonUniqueResultException;
  */
 final class SongRepository implements SongRepositoryInterface
 {
+    use PerformerCreditsTrait;
     use PgroongaSearchTrait;
     use RefreshedEntityTrait;
 
@@ -535,6 +536,11 @@ final class SongRepository implements SongRepositoryInterface
             ->setParameter('songId', $songId, 'uuid')
             ->getQuery()
             ->execute();
+    }
+
+    public function replacePerformerCredits(Uuid $songId, array $credits): bool
+    {
+        return $this->writePerformerCredits(ArtistSongEntity::class, 'song', $songId, $credits);
     }
 
     public function findCreditedSongIds(array $songIds): array

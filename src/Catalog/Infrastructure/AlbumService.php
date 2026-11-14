@@ -229,4 +229,19 @@ final class AlbumService implements AlbumPortInterface
             'creditedName' => count($creditedNames) === 1 ? (string) array_key_first($creditedNames) : $artist['artistName'],
         ];
     }
+
+    public function lockInIdOrder(array $albumIds): void
+    {
+        $this->albumRepository->lockInIdOrder($albumIds);
+    }
+
+    public function replacePerformerCredits(Uuid $albumId, array $credits): bool
+    {
+        return $this->albumRepository->replacePerformerCredits($albumId, $credits);
+    }
+
+    public function replaceGenres(Uuid $albumId, array $genreIds): bool
+    {
+        return $this->albumRepository->replaceGenres($albumId, $genreIds);
+    }
 }

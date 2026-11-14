@@ -213,6 +213,26 @@ final class ImageRepository implements ImageRepositoryInterface
         $this->entityManager->flush();
     }
 
+    public function assignArtistOwner(Uuid $imageId, Uuid $artistId): bool
+    {
+        $assigned = (int) $this->entityManager
+            ->createQuery(
+                'UPDATE ' . ImageEntity::class . ' image SET image.artist = :artist, image.updatedAt = CURRENT_TIMESTAMP()'
+                . " WHERE image.id = :image AND image.imageableType = 'artist' AND (image.artist IS NULL OR image.artist <> :artist)",
+            )
+            ->setParameter('artist', $artistId)
+            ->setParameter('image', $imageId)
+            ->execute();
+
+        // The statement bypassed the unit of work: a loaded image would still name its old owner.
+        $loaded = $this->entityManager->getUnitOfWork()->tryGetById(['id' => $imageId], ImageEntity::class);
+        if ($assigned === 1 && $loaded !== false && !$this->entityManager->getUnitOfWork()->isUninitializedObject($loaded)) {
+            $this->entityManager->refresh($loaded);
+        }
+
+        return $assigned === 1;
+    }
+
     public function findByUuid(Uuid $uuid): ?Image
     {
         $entity = $this->entityManager

@@ -24,6 +24,17 @@ interface ImageRepositoryInterface
 
     public function save(Image $image): void;
 
+    /**
+     * Makes the artist the owner of the artist image, for an image another artist's cover moved to
+     * it, such as when an artist merge gives the surviving artist the merged artist's cover. Writes
+     * at once, inside the caller's transaction when there is one; an image this process holds
+     * loaded is read again. Changes nothing for an image that does not exist or is not an artist
+     * image.
+     *
+     * @return bool whether the image now belongs to the artist because of this call
+     */
+    public function assignArtistOwner(Uuid $imageId, Uuid $artistId): bool;
+
     public function findByUuid(Uuid $uuid): ?Image;
 
     /**

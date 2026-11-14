@@ -6,6 +6,7 @@ namespace App\Catalog\Domain\Repository;
 
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
+use App\Catalog\Domain\ValueObject\ArtistRole;
 use App\Catalog\Domain\ValueObject\MusicbrainzId;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
@@ -102,6 +103,44 @@ interface AlbumRepositoryInterface extends Searchable
 
     /** Adds a credit of the album to the artist; the next flush writes it. */
     public function addArtistCredit(Uuid $albumId, Uuid $artistId, string $role, string $creditedName): void;
+
+    /**
+     * Locks the rows of these albums, inside the caller's transaction and in ID order, against every
+     * other writer of an album until that transaction ends. Songs and credits added to an album
+     * meanwhile do not wait. Albums that no longer exist are skipped. Read the albums after this
+     * call, in statements of their own, to see what a writer that held a lock first committed.
+     *
+     * @param list<Uuid> $albumIds
+     *
+     * @throws \LogicException outside a transaction, before locking anything
+     */
+    public function lockInIdOrder(array $albumIds): void;
+
+    /**
+     * Replaces the album's primary and featured artist credits with these, writing only what
+     * differs: a credit no longer given is deleted and a credit whose credited name changed takes
+     * the new name at once, and a missing credit is added on the next flush. Credits of every
+     * other role stay.
+     *
+     * @param list<array{artistId: Uuid, role: ArtistRole, creditedName: string}> $credits the first of each artist and role counts
+     *
+     * @return bool whether a credit changed
+     *
+     * @throws \RuntimeException when the album or a credited artist does not exist
+     */
+    public function replacePerformerCredits(Uuid $albumId, array $credits): bool;
+
+    /**
+     * Files the album under exactly these genres: links to other genres are deleted at once, and
+     * missing links are added on the next flush.
+     *
+     * @param list<Uuid> $genreIds
+     *
+     * @return bool whether a link changed
+     *
+     * @throws \RuntimeException when the album or a genre does not exist
+     */
+    public function replaceGenres(Uuid $albumId, array $genreIds): bool;
 
     /**
      * @return array<int, array{name: string, role: string|null}>

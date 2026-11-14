@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Application\Port;
 
 use App\Catalog\Domain\Model\Song;
+use App\Catalog\Domain\ValueObject\ArtistRole;
 use App\Shared\Domain\Model\CursorPage;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
@@ -78,6 +79,33 @@ interface SongPortInterface
     public function lockForRetag(array $artists, array $genres, array $songIds): void;
 
     /**
+     * Takes the import's advisory locks of these artist identities and genres in one sorted pass,
+     * inside the caller's transaction: the tagged name of each artist, its MusicBrainz ID when it
+     * has one, and the slug of each genre. They hold until the transaction ends. A key the
+     * transaction holds already is granted again at once, so the artist resolver and the genre
+     * lookup may take any of these keys later. Take every key the transaction needs in this one
+     * call: a later call could take a key that sorts before a held one and deadlock.
+     *
+     * @param list<ArtistIdentity> $artists
+     * @param list<string>         $genres tagged genre names
+     *
+     * @throws \LogicException outside a transaction, before taking any lock
+     */
+    public function lockImportIdentities(array $artists, array $genres): void;
+
+    /**
+     * Locks the rows of these songs FOR NO KEY UPDATE, inside the caller's transaction and in ID
+     * order, after the import identity locks. A play, favorite or credit recorded for one of the
+     * songs meanwhile does not wait. Read the songs again after this call, with findFreshByUuid(),
+     * to see what a writer that held a lock first committed.
+     *
+     * @param list<Uuid> $songIds
+     *
+     * @throws \LogicException outside a transaction, before locking anything
+     */
+    public function lockInIdOrder(array $songIds): void;
+
+    /**
      * The songs of the library stored at these paths, whatever the availability of their files.
      * Where several songs share a path, the oldest is returned.
      *
@@ -130,6 +158,19 @@ interface SongPortInterface
      * this unit of work and not flushed yet is not deleted.
      */
     public function removeArtistCredits(Uuid $songId): void;
+
+    /**
+     * Replaces the song's primary and featured artist credits with these, writing only the credits
+     * that differ; credits of every other role stay. Deletes and renames run at once, inserts on
+     * the next flush.
+     *
+     * @param list<array{artistId: Uuid, role: ArtistRole, creditedName: string}> $credits the first of each artist and role counts
+     *
+     * @return bool whether a credit changed
+     *
+     * @throws \RuntimeException when the song or a credited artist does not exist
+     */
+    public function replacePerformerCredits(Uuid $songId, array $credits): bool;
 
     /**
      * Which of these songs have at least one artist credit, of any role. Reads committed credits

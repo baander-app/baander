@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Domain\Repository;
 
 use App\Catalog\Domain\Model\Song;
+use App\Catalog\Domain\ValueObject\ArtistRole;
 use App\Shared\Domain\Model\Cursor;
 use App\Shared\Domain\Model\CursorPage;
 use App\Shared\Domain\Model\PublicId;
@@ -122,6 +123,20 @@ interface SongRepositoryInterface extends Searchable
      * this unit of work and not flushed yet is not deleted.
      */
     public function removeArtistCredits(Uuid $songId): void;
+
+    /**
+     * Replaces the song's primary and featured artist credits with these, writing only what
+     * differs: a credit no longer given is deleted and a credit whose credited name changed takes
+     * the new name at once, and a missing credit is added on the next flush. Credits of every
+     * other role stay.
+     *
+     * @param list<array{artistId: Uuid, role: ArtistRole, creditedName: string}> $credits the first of each artist and role counts
+     *
+     * @return bool whether a credit changed
+     *
+     * @throws \RuntimeException when the song or a credited artist does not exist
+     */
+    public function replacePerformerCredits(Uuid $songId, array $credits): bool;
 
     /**
      * Which of these songs have at least one artist credit, of any role. Reads committed credits

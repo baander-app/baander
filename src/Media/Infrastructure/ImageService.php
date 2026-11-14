@@ -62,6 +62,11 @@ final class ImageService implements ImagePortInterface
         $this->imageRepository->save($image);
     }
 
+    public function assignArtistOwner(Uuid $imageId, Uuid $artistId): bool
+    {
+        return $this->imageRepository->assignArtistOwner($imageId, $artistId);
+    }
+
     public function delete(Image $image): void
     {
         $this->imageRepository->delete($image);

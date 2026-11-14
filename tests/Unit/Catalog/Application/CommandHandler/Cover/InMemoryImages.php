@@ -63,6 +63,11 @@ final class InMemoryImages implements ImagePortInterface
         $this->records[$image->getId()->toString()] = $image;
     }
 
+    public function assignArtistOwner(Uuid $imageId, Uuid $artistId): bool
+    {
+        throw new \LogicException('Not used by the cover use cases.');
+    }
+
     public function delete(Image $image): void
     {
         unset($this->records[$image->getId()->toString()]);

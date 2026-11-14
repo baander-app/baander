@@ -37,6 +37,13 @@ interface ArtistPortInterface
     public function findByName(string $name): ?Artist;
 
     /**
+     * @param list<Uuid> $uuids
+     *
+     * @return array<string, Artist> keyed by UUID string; an artist that does not exist is absent
+     */
+    public function findByUuids(array $uuids): array;
+
+    /**
      * Gives the artist a MusicBrainz ID that a metadata search matched, in a transaction of its
      * own that locks the artist's name and the ID as imports do, so it never races an import
      * that adopts or creates an artist for either. The ID is written in its canonical lowercase

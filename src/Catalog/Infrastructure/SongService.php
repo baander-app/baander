@@ -85,12 +85,26 @@ final class SongService implements SongPortInterface
 
     public function lockForRetag(array $artists, array $genres, array $songIds): void
     {
+        $this->lockImportIdentities($artists, $genres);
+        $this->songRepository->lockInIdOrder($songIds);
+    }
+
+    public function lockImportIdentities(array $artists, array $genres): void
+    {
         $artistKeys = array_map(ImportIdentityLock::artistKeys(...), $artists)
             |> (static fn (array $keys): array => array_merge(...$keys));
         $genreKeys = array_map(static fn (string $genre): string => ImportIdentityLock::genreSlug($genre) |> ImportIdentityLock::genreKey(...), $genres);
         // Artist keys sort before genre keys, so this pass takes them in the order the artist
         // resolver and the genre lookup take theirs.
         ImportIdentityLock::acquire($this->connection, [...$artistKeys, ...$genreKeys]);
+    }
+
+    public function lockInIdOrder(array $songIds): void
+    {
+        // Outside a transaction the row locks would end with their own statement.
+        if (!$this->connection->isTransactionActive()) {
+            throw new \LogicException('Lock song rows inside the transaction that writes them.');
+        }
         $this->songRepository->lockInIdOrder($songIds);
     }
 
@@ -168,6 +182,11 @@ final class SongService implements SongPortInterface
     public function removeArtistCredits(Uuid $songId): void
     {
         $this->songRepository->removeArtistCredits($songId);
+    }
+
+    public function replacePerformerCredits(Uuid $songId, array $credits): bool
+    {
+        return $this->songRepository->replacePerformerCredits($songId, $credits);
     }
 
     public function findCreditedSongIds(array $songIds): array

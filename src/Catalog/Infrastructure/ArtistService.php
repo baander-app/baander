@@ -78,6 +78,11 @@ final class ArtistService implements ArtistPortInterface
         return $this->artistRepository->findByName($name);
     }
 
+    public function findByUuids(array $uuids): array
+    {
+        return $this->artistRepository->findByUuids($uuids);
+    }
+
     public function assignMusicbrainzId(Uuid $artistId, string $musicbrainzId, string $matchedName): bool
     {
         $id = MusicbrainzId::tryFromString($musicbrainzId);

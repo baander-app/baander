@@ -13,6 +13,8 @@ use App\Catalog\Domain\ValueObject\MusicbrainzId;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistAlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\GenreAlbumEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\GenreEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Catalog\Infrastructure\Doctrine\Query\CatalogReadScopeQuery;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
@@ -23,6 +25,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Doctrine\Repository\RefreshedEntityTrait;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Infrastructure\Doctrine\Repository\PgroongaSearchTrait;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -30,6 +33,7 @@ use Doctrine\ORM\EntityManagerInterface;
  */
 final class AlbumRepository implements AlbumRepositoryInterface
 {
+    use PerformerCreditsTrait;
     use PgroongaSearchTrait;
     use RefreshedEntityTrait;
 
@@ -474,6 +478,71 @@ final class AlbumRepository implements AlbumRepositoryInterface
             ?? throw new \RuntimeException(sprintf('Artist not found: %s', $artistId->toString()));
 
         $this->entityManager->persist(new ArtistAlbumEntity($artistEntity, $albumEntity, $role, $creditedName));
+    }
+
+    public function lockInIdOrder(array $albumIds): void
+    {
+        $connection = $this->entityManager->getConnection();
+        // Outside a transaction the row locks would end with their own statement.
+        if (!$connection->isTransactionActive()) {
+            throw new \LogicException('Lock album rows inside the transaction that writes them.');
+        }
+        if ($albumIds === []) {
+            return;
+        }
+
+        // SQL because DQL locks rows only FOR UPDATE or FOR SHARE. FOR UPDATE would also make every
+        // song and credit insert into the album wait, since their foreign keys lock the row FOR KEY
+        // SHARE. The rows are locked in the order the sort returns them, so writers of the same
+        // albums never wait on each other in a cycle.
+        $connection->executeQuery(
+            'SELECT id FROM albums WHERE id IN (:ids) ORDER BY id FOR NO KEY UPDATE',
+            ['ids' => array_map(static fn (Uuid $id): string => $id->toString(), $albumIds)],
+            ['ids' => ArrayParameterType::STRING],
+        )->free();
+    }
+
+    public function replacePerformerCredits(Uuid $albumId, array $credits): bool
+    {
+        return $this->writePerformerCredits(ArtistAlbumEntity::class, 'album', $albumId, $credits);
+    }
+
+    public function replaceGenres(Uuid $albumId, array $genreIds): bool
+    {
+        $wanted = array_map(static fn (Uuid $id): string => $id->toString() |> strtolower(...), $genreIds) |> array_unique(...);
+        $current = $this->entityManager
+            ->createQuery('SELECT link.id AS id, IDENTITY(link.genre) AS genreId FROM ' . GenreAlbumEntity::class . ' link WHERE link.album = :album')
+            ->setParameter('album', $albumId)
+            ->getResult();
+        $linked = array_map(static fn (array $row): string => strtolower((string) $row['genreId']), $current);
+
+        $stale = array_filter($current, static fn (array $row): bool => !in_array(strtolower((string) $row['genreId']), $wanted, true))
+            |> (static fn (array $rows): array => array_column($rows, 'id'));
+        if ($stale !== []) {
+            $this->entityManager->createQuery('DELETE ' . GenreAlbumEntity::class . ' link WHERE link.id IN (:ids)')
+                ->setParameter('ids', array_map(static fn (Uuid $id): string => $id->toString(), $stale))
+                ->execute();
+            $unitOfWork = $this->entityManager->getUnitOfWork();
+            foreach ($stale as $id) {
+                $link = $unitOfWork->tryGetById(['id' => $id], GenreAlbumEntity::class);
+                if ($link !== false) {
+                    $this->entityManager->detach($link);
+                }
+            }
+        }
+
+        $missing = array_diff($wanted, $linked);
+        if ($missing !== []) {
+            $album = $this->entityManager->find(AlbumEntity::class, $albumId)
+                ?? throw new \RuntimeException(sprintf('Album not found: %s', $albumId->toString()));
+            foreach ($missing as $genreId) {
+                $genre = $this->entityManager->find(GenreEntity::class, Uuid::fromString($genreId))
+                    ?? throw new \RuntimeException(sprintf('Genre not found: %s', $genreId));
+                $this->entityManager->persist(new GenreAlbumEntity($genre, $album));
+            }
+        }
+
+        return $stale !== [] || $missing !== [];
     }
 
     /**
