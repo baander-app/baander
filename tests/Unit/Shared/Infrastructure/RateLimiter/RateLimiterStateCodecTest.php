@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Infrastructure\RateLimiter;
 
 use App\Shared\Application\Exception\RateLimiterUnavailableException;
+use App\Shared\Infrastructure\RateLimiter\ContinuousTokenBucket;
 use App\Shared\Infrastructure\RateLimiter\RateLimiterStateCodec;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -51,6 +52,45 @@ final class RateLimiterStateCodecTest extends TestCase
         ], JSON_THROW_ON_ERROR);
         $this->expectException(RateLimiterUnavailableException::class);
         (new RateLimiterStateCodec($config, 'test-subject'))->decode($kind === 'malformed' ? '{' : $payload);
+    }
+
+    public function testTokenBucketRoundTripKeepsItsRefillMomentAndOutlivesIt(): void
+    {
+        $codec = new RateLimiterStateCodec($this->tokenBucketConfig(), 'test-subject');
+        $state = new ContinuousTokenBucket('test-subject', microtime(true) + 2.5);
+        $copy = $codec->decode($codec->encode($state));
+        self::assertEquals($state, $copy);
+        self::assertSame(3, $copy?->getExpirationTime());
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function tokenBucketCorruptions(): iterable
+    {
+        foreach (['wrong class', 'wrong id', 'negative moment', 'infinite moment', 'missing moment'] as $kind) {
+            yield $kind => [$kind];
+        }
+    }
+
+    #[DataProvider('tokenBucketCorruptions')]
+    public function testCorruptTokenBucketNeverBecomesAFullBucket(string $kind): void
+    {
+        $config = $this->tokenBucketConfig();
+        $serialized = match ($kind) {
+            'wrong class' => new Window('test-subject', 1, 1) |> serialize(...),
+            'wrong id' => new ContinuousTokenBucket('other-subject', 1.0) |> serialize(...),
+            'negative moment' => new ContinuousTokenBucket('test-subject', -1.0) |> serialize(...),
+            'infinite moment' => new ContinuousTokenBucket('test-subject', INF) |> serialize(...),
+            default => sprintf('O:%d:"%s":1:{s:2:"id";s:12:"test-subject";}', strlen(ContinuousTokenBucket::class), ContinuousTokenBucket::class),
+        };
+        $payload = json_encode(['config' => hash('sha256', serialize($config)), 'state' => base64_encode($serialized)], JSON_THROW_ON_ERROR);
+        $this->expectException(RateLimiterUnavailableException::class);
+        new RateLimiterStateCodec($config, 'test-subject')->decode($payload);
+    }
+
+    /** @return array{id: string, policy: string, limit: int, rate: array{interval: string, amount: int}} */
+    private function tokenBucketConfig(): array
+    {
+        return ['id' => 'test', 'policy' => 'token_bucket', 'limit' => 1, 'rate' => ['interval' => '1 second', 'amount' => 1]];
     }
 
     /** @return array{id: string, policy: string, limit: int, interval: string} */

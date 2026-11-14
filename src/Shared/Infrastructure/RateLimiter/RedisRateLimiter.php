@@ -51,7 +51,7 @@ final readonly class RedisRateLimiter implements LimiterInterface
             $snapshot = $this->store->read($this->config['id'], $this->subject);
             $this->checkDeadline($started);
             $storage = new SnapshotRateLimiterStorage($id, $codec->decode($snapshot->payload));
-            $policy = (new RateLimiterFactory($this->config, $storage))->create($this->subject);
+            $policy = $this->policy($storage, $id);
             try {
                 $result = $operation === 'consume' ? $policy->consume($tokens) : $policy->reserve($tokens, $maxTime);
             } catch (MaxWaitDurationExceededException $exception) {
@@ -69,6 +69,13 @@ final readonly class RedisRateLimiter implements LimiterInterface
         }
 
         throw new RateLimiterUnavailableException();
+    }
+
+    private function policy(SnapshotRateLimiterStorage $storage, string $id): LimiterInterface
+    {
+        return $this->config['policy'] === 'token_bucket'
+            ? ContinuousTokenBucketLimiter::fromConfig($this->config, $id, $storage)
+            : new RateLimiterFactory($this->config, $storage)->create($this->subject);
     }
 
     private function checkDeadline(int $started): void

@@ -35,7 +35,7 @@ final class MusicBrainzRateLimitTest extends TestCase
     private const string RELEASE_ID = 'f3c3a3b8-5d1e-4c55-9a0e-7a51f4c2d001';
     private const string CHILD = <<<'PHP'
         require $argv[1];
-        echo json_encode(\App\Tests\Integration\Metadata\MusicBrainzRateLimitTest::lookUpInChild($argv[2], $argv[3], $argv[4], $argv[5]), JSON_THROW_ON_ERROR);
+        echo json_encode(\App\Tests\Integration\Metadata\MusicBrainzRateLimitTest::lookUpInChild($argv[2], $argv[3], $argv[4], $argv[5], (float) $argv[6]), JSON_THROW_ON_ERROR);
         PHP;
 
     private string $dsn;
@@ -89,30 +89,19 @@ final class MusicBrainzRateLimitTest extends TestCase
 
     public function testTwoProcessesCallingAtOnceGetTurnsAtLeastOneSecondApart(): void
     {
-        $children = array_map($this->child(...), ['first', 'second']);
-        foreach ($children as $child) {
-            $child->start();
-        }
-        $deadline = hrtime(true) + 15_000_000_000;
-        while (count(glob($this->directory . '/*.ready') ?: []) < count($children)) {
-            foreach ($children as $child) {
-                $child->checkTimeout();
-                self::assertTrue($child->isRunning(), 'A child exited before the barrier: ' . $child->getErrorOutput());
-            }
-            self::assertLessThan($deadline, hrtime(true), 'The children did not reach the barrier.');
-            usleep(10_000);
-        }
-        file_put_contents($this->directory . '/go', 'go');
+        $turns = $this->lookUpAfterTheBarrier(['first' => 0.0, 'second' => 0.0]);
 
-        $results = array_map($this->finish(...), $children);
-        $this->subjects = array_column($results, 'subject') |> array_unique(...) |> array_values(...);
+        self::assertGreaterThanOrEqual(1.0, $turns[1] - $turns[0]);
+    }
 
-        self::assertCount(1, $this->subjects, 'Both processes spend the same budget.');
-        foreach ($results as $result) {
-            self::assertGreaterThanOrEqual($result['turn'], $result['requestedAt'], 'A request waits for its turn.');
-        }
-        $turns = array_column($results, 'turn');
-        self::assertGreaterThanOrEqual(1.0, max($turns) - min($turns));
+    public function testAProcessAskingJustAfterTheFirstTurnsSecondEndsStillWaitsASecondAfterTheTurnBefore(): void
+    {
+        // The second asks while the first turn's second runs and is given the next one; the
+        // third asks just after the first turn's second has ended, before the second turn.
+        $turns = $this->lookUpAfterTheBarrier(['first' => 0.0, 'second' => 0.3, 'third' => 1.05]);
+
+        self::assertGreaterThanOrEqual(1.0, $turns[1] - $turns[0]);
+        self::assertGreaterThanOrEqual(1.0, $turns[2] - $turns[1]);
     }
 
     public function testABoundedCallWhoseTurnIsMoreThanTenSecondsAwayAnswersUnavailableAtOnce(): void
@@ -144,12 +133,12 @@ final class MusicBrainzRateLimitTest extends TestCase
     }
 
     /**
-     * Runs in a child process: waits at the barrier, then looks a release up through the
-     * adapter on the shared Redis limit.
+     * Runs in a child process: waits at the barrier and then for its delay, then looks a
+     * release up through the adapter on the shared Redis limit.
      *
      * @return array{subject: string, turn: float, requestedAt: float}
      */
-    public static function lookUpInChild(string $dsn, string $name, string $directory, string $participant): array
+    public static function lookUpInChild(string $dsn, string $name, string $directory, string $participant, float $delay): array
     {
         $pool = new RedisClientFactory($dsn);
         $turns = [];
@@ -172,6 +161,9 @@ final class MusicBrainzRateLimitTest extends TestCase
                 }
                 usleep(1000);
             }
+            if ($delay > 0) {
+                usleep((int) ($delay * 1e6));
+            }
 
             if (!$adapter->fetchRelease(self::RELEASE_ID, MusicBrainzSlotWait::Unbounded) instanceof MusicBrainzRelease || $requestedAt === null) {
                 throw new \RuntimeException('The lookup failed.');
@@ -184,11 +176,49 @@ final class MusicBrainzRateLimitTest extends TestCase
         }
     }
 
-    private function child(string $participant): Process
+    /**
+     * Starts one child per participant, releases them together, and returns their turns in
+     * order once every request has waited for its own.
+     *
+     * @param array<string, float> $delays seconds each participant waits after the barrier
+     *
+     * @return list<float>
+     */
+    private function lookUpAfterTheBarrier(array $delays): array
+    {
+        $children = array_map($this->child(...), array_keys($delays), $delays);
+        foreach ($children as $child) {
+            $child->start();
+        }
+        $deadline = hrtime(true) + 15_000_000_000;
+        while (count(glob($this->directory . '/*.ready') ?: []) < count($children)) {
+            foreach ($children as $child) {
+                $child->checkTimeout();
+                self::assertTrue($child->isRunning(), 'A child exited before the barrier: ' . $child->getErrorOutput());
+            }
+            self::assertLessThan($deadline, hrtime(true), 'The children did not reach the barrier.');
+            usleep(10_000);
+        }
+        file_put_contents($this->directory . '/go', 'go');
+
+        $results = array_map($this->finish(...), $children);
+        $this->subjects = array_column($results, 'subject') |> array_unique(...) |> array_values(...);
+
+        self::assertCount(1, $this->subjects, 'Every process spends the same budget.');
+        foreach ($results as $result) {
+            self::assertGreaterThanOrEqual($result['turn'], $result['requestedAt'], 'A request waits for its turn.');
+        }
+        $turns = array_column($results, 'turn');
+        sort($turns);
+
+        return $turns;
+    }
+
+    private function child(string $participant, float $delay): Process
     {
         $child = new Process([
             PHP_BINARY, '-r', self::CHILD,
-            dirname(__DIR__, 3) . '/vendor/autoload.php', $this->dsn, $this->name, $this->directory, $participant,
+            dirname(__DIR__, 3) . '/vendor/autoload.php', $this->dsn, $this->name, $this->directory, $participant, (string) $delay,
         ], timeout: 30);
         $this->children[] = $child;
 

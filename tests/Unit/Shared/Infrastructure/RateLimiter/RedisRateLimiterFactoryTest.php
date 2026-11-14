@@ -12,6 +12,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\RateLimiter\Exception\MaxWaitDurationExceededException;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Reservation;
 use Symfony\Component\RateLimiter\LimiterStateInterface;
 use Symfony\Component\RateLimiter\Policy\SlidingWindow;
 use Symfony\Component\RateLimiter\Policy\Window;
@@ -89,7 +90,51 @@ final class RedisRateLimiterFactoryTest extends TestCase
     public function testUnsupportedPolicyIsRejectedRatherThanBecomingUnlimited(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new RedisRateLimiterFactory($this->config('token_bucket'), $this->workingStore());
+        new RedisRateLimiterFactory($this->config('no_limit'), $this->workingStore());
+    }
+
+    public function testATokenBucketGrantsItsBurstAtOnceAndThenOneTurnPerRefill(): void
+    {
+        $limiter = new RedisRateLimiterFactory($this->tokenBucket(3), $this->workingStore())->create('subject');
+
+        $reservations = array_map(static fn(): Reservation => $limiter->reserve(), range(1, 5));
+
+        self::assertSame([true, true, true, false, false], array_map(static fn(Reservation $reservation): bool => $reservation->getRateLimit()->isAccepted(), $reservations));
+        $turns = array_map(static fn(Reservation $reservation): float => $reservation->getTimeToAct(), $reservations);
+        self::assertEqualsWithDelta($turns[0] + 1.0, $turns[3], 1e-6);
+        self::assertEqualsWithDelta($turns[3] + 1.0, $turns[4], 1e-6);
+    }
+
+    public function testATokenBucketTurnBeyondTheMaximumWaitIsRefusedWithoutTakingIt(): void
+    {
+        $limiter = new RedisRateLimiterFactory($this->tokenBucket(1), $this->workingStore())->create('subject');
+        $first = $limiter->reserve()->getTimeToAct();
+
+        self::assertFalse($limiter->consume()->isAccepted());
+        try {
+            $limiter->reserve(1, 0.5);
+            self::fail('A turn further away than the maximum wait must be refused.');
+        } catch (MaxWaitDurationExceededException $exception) {
+            self::assertFalse($exception->getRateLimit()->isAccepted());
+        }
+
+        // Neither refused call took a turn, so the next one is still a single refill away.
+        self::assertEqualsWithDelta($first + 1.0, $limiter->reserve(1, 1.0)->getTimeToAct(), 1e-6);
+    }
+
+    /** @return iterable<string, array{array<string, mixed>}> */
+    public static function incompleteTokenBuckets(): iterable
+    {
+        yield 'no refill rate' => [['id' => 'test', 'policy' => 'token_bucket', 'limit' => 1, 'interval' => '1 second']];
+        yield 'no refill amount' => [['id' => 'test', 'policy' => 'token_bucket', 'limit' => 1, 'rate' => ['interval' => '1 second', 'amount' => 0]]];
+    }
+
+    /** @param array<string, mixed> $config */
+    #[DataProvider('incompleteTokenBuckets')]
+    public function testATokenBucketNeedsARefillIntervalAndAPositiveAmount(array $config): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new RedisRateLimiterFactory($config, $this->workingStore());
     }
 
     public function testReadOnlyInspectionDoesNotCommitState(): void
@@ -145,6 +190,12 @@ final class RedisRateLimiterFactoryTest extends TestCase
     private function config(string $policy): array
     {
         return ['id' => 'test', 'policy' => $policy, 'limit' => 3, 'interval' => '60 seconds'];
+    }
+
+    /** @return array{id: string, policy: string, limit: int, rate: array{interval: string, amount: int}} */
+    private function tokenBucket(int $burst): array
+    {
+        return ['id' => 'test', 'policy' => 'token_bucket', 'limit' => $burst, 'rate' => ['interval' => '1 second', 'amount' => 1]];
     }
 
     /** @param array<string, mixed>|null $config

@@ -15,7 +15,8 @@ final readonly class RateLimiterStateCodec
 {
     private string $fingerprint;
     private string $class;
-    private int $interval;
+    /** The window length in seconds; a token bucket has none. */
+    private ?int $interval;
     private int $limit;
 
     /** @param array<string, mixed> $config */
@@ -25,11 +26,14 @@ final readonly class RateLimiterStateCodec
         $this->class = match ($config['policy']) {
             'fixed_window' => Window::class,
             'sliding_window' => SlidingWindow::class,
+            'token_bucket' => ContinuousTokenBucket::class,
             default => throw new \InvalidArgumentException('Unsupported atomic rate limiter policy.'),
         };
         $this->limit = $config['limit'];
         $now = new \DateTimeImmutable('@' . time());
-        $this->interval = $now->modify('+' . $config['interval'])->getTimestamp() - $now->getTimestamp();
+        $this->interval = $this->class === ContinuousTokenBucket::class
+            ? null
+            : $now->modify('+' . $config['interval'])->getTimestamp() - $now->getTimestamp();
     }
 
     public function encode(LimiterStateInterface $state): string
@@ -74,6 +78,13 @@ final readonly class RateLimiterStateCodec
     {
         if ($state::class !== $this->class || $state->getId() !== $this->id) {
             throw new RateLimiterUnavailableException();
+        }
+        if ($state instanceof ContinuousTokenBucket) {
+            if (!$this->validTime($state->refilledAt)) {
+                throw new RateLimiterUnavailableException();
+            }
+
+            return;
         }
         if ($state instanceof Window) {
             $data = $state->__serialize();

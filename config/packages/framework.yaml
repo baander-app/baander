@@ -131,14 +131,17 @@ framework:
             limit: 10
             interval: '60 seconds'
 
-        # MusicBrainz allows one request per second from an address, on average. Every
-        # MusicBrainz and Cover Art Archive call, from workers and web requests alike,
-        # reserves a turn here first; a fixed window queues later callers into later
-        # one-second windows.
+        # MusicBrainz allows one request per second from an address and answers 503 to an
+        # address that sends faster. Every MusicBrainz and Cover Art Archive call,
+        # from workers and web requests alike, reserves a turn here first. The atomic store
+        # refills this one-token bucket a full second after each turn is taken, so every
+        # turn starts at least a second after the one before it.
         musicbrainz:
-            policy: fixed_window
+            policy: token_bucket
             limit: 1
-            interval: '1 second'
+            rate:
+                interval: '1 second'
+                amount: 1
         # The open /api/metadata/search and /browse routes spend a user's own allowance
         # before a shared turn, so one member cannot queue ahead of the matcher.
         musicbrainz_user:

@@ -116,12 +116,12 @@ mutation, lyrics and push unsubscribe routes with PostgreSQL adapters).
 
 ## Atomic rate-limit storage
 
-Configured rate limiters execute Symfony's installed fixed/sliding-window policies
-against operation-local snapshots and commit state through Redis compare-and-set.
+Configured rate limiters execute Symfony's installed fixed/sliding-window policies, or
+Baander's continuous token bucket for `token_bucket`, against operation-local snapshots and commit state through Redis compare-and-set.
 The focused regressions must distinguish an absent subject from failed or corrupt
 storage, preserve ordinary exhaustion responses, and refuse protected effects when
 state cannot be established. All 21 configured names and budgets remain in force.
-Container compilation rejects policies other than fixed and sliding windows.
+Container compilation rejects policies other than fixed windows, sliding windows and token buckets.
 
 Storage cases cover policy parity, negative token counts, state identity and TTLs,
 conflicting writers, uncertain writes without replay, per-subject reset and named

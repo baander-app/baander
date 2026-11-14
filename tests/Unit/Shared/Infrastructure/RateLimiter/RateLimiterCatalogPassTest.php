@@ -22,6 +22,7 @@ final class RateLimiterCatalogPassTest extends TestCase
         $container->setParameter('login.max_attempts', 20);
         $this->addLimiter($container, 'login', ['policy' => 'fixed_window', 'limit' => '%login.max_attempts%', 'interval' => '300 seconds']);
         $this->addLimiter($container, 'api', ['policy' => 'sliding_window', 'limit' => 360, 'interval' => '60 seconds']);
+        $this->addLimiter($container, 'upstream', ['policy' => 'token_bucket', 'limit' => 1, 'rate' => ['interval' => '1 second', 'amount' => 1]]);
 
         (new RateLimiterCatalogPass())->process($container);
 
@@ -29,8 +30,9 @@ final class RateLimiterCatalogPassTest extends TestCase
         self::assertSame([
             'login' => ['policy' => 'fixed_window', 'limit' => 20, 'interval' => '300 seconds', 'description' => 'Login attempts', 'storageNamespace' => RedisRateLimiterStore::namespace('login')],
             'api' => ['policy' => 'sliding_window', 'limit' => 360, 'interval' => '60 seconds', 'description' => null, 'storageNamespace' => RedisRateLimiterStore::namespace('api')],
+            'upstream' => ['policy' => 'token_bucket', 'limit' => 1, 'interval' => '1 second', 'description' => null, 'storageNamespace' => RedisRateLimiterStore::namespace('upstream')],
         ], $catalog);
-        foreach (['login', 'api'] as $name) {
+        foreach (['login', 'api', 'upstream'] as $name) {
             $factory = $container->getDefinition('limiter.' . $name);
             self::assertSame(RedisRateLimiterFactory::class, $factory->getClass());
             self::assertSame(RedisRateLimiterStore::class, (string) $factory->getArgument(1));
@@ -52,7 +54,7 @@ final class RateLimiterCatalogPassTest extends TestCase
         $container = $this->container();
         $this->addLimiter($container, 'login', ['policy' => 'no_limit']);
         $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('must use a fixed_window or sliding_window policy');
+        $this->expectExceptionMessage('must use a fixed_window, sliding_window or token_bucket policy');
         (new RateLimiterCatalogPass())->process($container);
     }
 

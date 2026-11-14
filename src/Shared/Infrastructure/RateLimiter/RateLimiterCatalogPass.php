@@ -26,17 +26,17 @@ final class RateLimiterCatalogPass implements CompilerPassInterface
             $name = (string) $tags[0]['name'];
             $limiter = $container->getDefinition($serviceId);
             $config = $container->getParameterBag()->resolveValue($limiter->getArgument(0));
-            if (!is_array($config) || !in_array($config['policy'] ?? null, ['fixed_window', 'sliding_window'], true)) {
-                throw new LogicException(sprintf('Rate limiter "%s" must use a fixed_window or sliding_window policy for atomic Redis storage.', $name));
+            if (!is_array($config) || !in_array($config['policy'] ?? null, RedisRateLimiterFactory::POLICIES, true)) {
+                throw new LogicException(sprintf('Rate limiter "%s" must use a fixed_window, sliding_window or token_bucket policy for atomic Redis storage.', $name));
             }
             if (isset($limiters[$name]) || ($config['id'] ?? null) !== $name) {
                 throw new LogicException(sprintf('Rate limiter "%s" must have a unique matching configuration id.', $name));
             }
-            /** @var array{id: string, policy: string, limit: int|string, interval: string} $config */
+            /** @var array{id: string, policy: string, limit: int|string} $config */
             $limiters[$name] = [
                 'policy' => $config['policy'],
                 'limit' => (int) $config['limit'],
-                'interval' => $config['interval'],
+                'interval' => RedisRateLimiterFactory::interval($config),
                 'description' => $descriptions[$name] ?? null,
                 'storageNamespace' => RedisRateLimiterStore::namespace($name),
             ];
