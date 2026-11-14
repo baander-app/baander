@@ -122,6 +122,7 @@ Application console commands run inside `app`, while the control/execution worke
 
 | Command | Description |
 |---------|-------------|
+| [app:metadata:match:reviews](app-metadata-match-reviews.md) | List the albums that need a MusicBrainz match review, the most recently checked first |
 | [app:metadata:providers](app-metadata-providers.md) | List the metadata providers and whether each one is configured |
 | [app:metadata:status](app-metadata-status.md) | Show track coverage, the last sync and the sync jobs by type |
 | [app:metadata:sync](app-metadata-sync.md) | Queue a metadata sync for every library, or only the genre sync |
