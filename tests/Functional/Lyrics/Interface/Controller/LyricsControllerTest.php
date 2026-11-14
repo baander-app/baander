@@ -366,7 +366,7 @@ final class LyricsControllerTest extends TestCase
             [$artistId->toString(), (new PublicId())->toString(), 'Lyrics test artist', '{}', $now, $now],
         );
         $conn->executeStatement(
-            "INSERT INTO artist_song (id, artist_id, song_id, role) VALUES (?, ?, ?, 'primary')",
+            "INSERT INTO artist_song (id, artist_id, song_id, role, credited_name) VALUES (?, ?, ?, 'primary', 'Lyrics test artist')",
             [Uuid::v7()->toString(), $artistId->toString(), $songId->toString()],
         );
 

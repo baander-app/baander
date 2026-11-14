@@ -88,7 +88,7 @@ final class SongCursorPaginationTest extends TestCase
             if ($definition['artist'] !== null) {
                 $artists[$definition['artist']] ??= new ArtistEntity(new PublicId(), $definition['artist']);
                 $this->entityManager->persist($artists[$definition['artist']]);
-                $this->entityManager->persist(new ArtistSongEntity($artists[$definition['artist']], $song, 'primary'));
+                $this->entityManager->persist(new ArtistSongEntity($artists[$definition['artist']], $song, 'primary', $artists[$definition['artist']]->getName()));
             }
 
             $id = $song->getId()->toString();

@@ -49,12 +49,12 @@ final class CatalogReadScopeRepositoryTest extends TestCase
         $this->orphanArtist = new ArtistEntity(new PublicId(), 'Acceptance Orphan');
         $genre = new GenreEntity('Hidden Genre', 'hidden-genre');
         foreach ([$this->allowedLibrary, $deniedLibrary, $this->allowedAlbum, $this->deniedAlbum, $this->allowedSong, $this->deniedSong, $this->sharedArtist, $this->deniedArtist, $this->orphanArtist, $genre,
-            new ArtistAlbumEntity($this->sharedArtist, $this->allowedAlbum, 'primary'),
-            new ArtistAlbumEntity($this->sharedArtist, $this->allowedAlbum, 'featured'),
-            new ArtistAlbumEntity($this->sharedArtist, $this->deniedAlbum, 'primary'),
-            new ArtistSongEntity($this->sharedArtist, $this->allowedSong, 'primary'),
-            new ArtistSongEntity($this->deniedArtist, $this->deniedSong, 'primary'),
-            new ArtistSongEntity($this->sharedArtist, $this->deniedSong, 'featured'),
+            new ArtistAlbumEntity($this->sharedArtist, $this->allowedAlbum, 'primary', $this->sharedArtist->getName()),
+            new ArtistAlbumEntity($this->sharedArtist, $this->allowedAlbum, 'featured', $this->sharedArtist->getName()),
+            new ArtistAlbumEntity($this->sharedArtist, $this->deniedAlbum, 'primary', $this->sharedArtist->getName()),
+            new ArtistSongEntity($this->sharedArtist, $this->allowedSong, 'primary', $this->sharedArtist->getName()),
+            new ArtistSongEntity($this->deniedArtist, $this->deniedSong, 'primary', $this->deniedArtist->getName()),
+            new ArtistSongEntity($this->sharedArtist, $this->deniedSong, 'featured', $this->sharedArtist->getName()),
             new GenreSongEntity($genre, $this->deniedSong),
             new MovieEntity(new PublicId(), $this->allowedLibrary, 'Acceptance Allowed'),
             new MovieEntity(new PublicId(), $deniedLibrary, 'Acceptance Denied'),

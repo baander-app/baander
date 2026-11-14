@@ -131,15 +131,15 @@ final class CatalogReadFirewallTest extends TestCase
             foreach ([$library, $album, $song, $artist, $movie] as $entity) {
                 $this->persistFixture($entity, $entity->getId());
             }
-            $this->manager->persist(new ArtistSongEntity($artist, $song, 'primary'));
-            $this->manager->persist(new ArtistAlbumEntity($artist, $album, 'primary'));
+            $this->manager->persist(new ArtistSongEntity($artist, $song, 'primary', $artist->getName()));
+            $this->manager->persist(new ArtistAlbumEntity($artist, $album, 'primary', $artist->getName()));
         }
         $this->sharedArtist = new ArtistEntity(new PublicId(), 'Acceptance shared artist');
         $this->unlinkedArtist = new ArtistEntity(new PublicId(), 'Acceptance unlinked artist');
         $this->persistFixture($this->sharedArtist, $this->sharedArtist->getId());
         $this->persistFixture($this->unlinkedArtist, $this->unlinkedArtist->getId());
         foreach ($this->catalog as $entities) {
-            $this->manager->persist(new ArtistSongEntity($this->sharedArtist, $entities['song'], 'featured'));
+            $this->manager->persist(new ArtistSongEntity($this->sharedArtist, $entities['song'], 'featured', $this->sharedArtist->getName()));
         }
         $this->seedGenres();
         $this->manager->flush();

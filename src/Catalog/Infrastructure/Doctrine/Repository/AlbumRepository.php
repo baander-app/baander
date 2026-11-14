@@ -468,7 +468,7 @@ final class AlbumRepository implements AlbumRepositoryInterface
             return;
         }
 
-        $artistAlbum = new ArtistAlbumEntity($artistEntity, $albumEntity, $role);
+        $artistAlbum = new ArtistAlbumEntity($artistEntity, $albumEntity, $role, $artistEntity->getName());
         $this->entityManager->persist($artistAlbum);
     }
 

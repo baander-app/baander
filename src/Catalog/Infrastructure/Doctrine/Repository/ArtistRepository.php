@@ -386,7 +386,7 @@ final class ArtistRepository implements ArtistRepositoryInterface
         }
 
         if ($this->creditLink(ArtistSongEntity::class, 'song', $artistId, $songId, $role) === null) {
-            $this->entityManager->persist(new ArtistSongEntity($artistEntity, $songEntity, $role));
+            $this->entityManager->persist(new ArtistSongEntity($artistEntity, $songEntity, $role, $artistEntity->getName()));
             $this->entityManager->flush();
         }
 
@@ -418,7 +418,7 @@ final class ArtistRepository implements ArtistRepositoryInterface
         }
 
         if ($this->creditLink(ArtistAlbumEntity::class, 'album', $artistId, $albumId, $role) === null) {
-            $this->entityManager->persist(new ArtistAlbumEntity($artistEntity, $albumEntity, $role));
+            $this->entityManager->persist(new ArtistAlbumEntity($artistEntity, $albumEntity, $role, $artistEntity->getName()));
             $this->entityManager->flush();
         }
 

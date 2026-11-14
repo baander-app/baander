@@ -110,7 +110,7 @@ final class PlaylistReadFirewallTest extends TestCase
             foreach ([$library, $album, $artist, $song] as $entity) {
                 $this->persist($entity);
             }
-            $this->manager->persist(new ArtistSongEntity($artist, $song, 'primary'));
+            $this->manager->persist(new ArtistSongEntity($artist, $song, 'primary', $artist->getName()));
             if ($visibility === 'allowed') {
                 $this->allowedLibrary = $library;
                 $this->allowedSong = $song;

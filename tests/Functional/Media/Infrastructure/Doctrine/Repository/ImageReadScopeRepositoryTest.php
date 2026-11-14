@@ -72,10 +72,10 @@ final class ImageReadScopeRepositoryTest extends TestCase
             $user, $other, $allowed, $denied, $this->allowedAlbum, $this->deniedAlbum,
             $this->sharedArtist, $deniedArtist, $orphanArtist, $this->ownedPlaylist, $this->otherPlaylist,
             ...array_values($this->images),
-            new ArtistAlbumEntity($this->sharedArtist, $this->allowedAlbum, 'primary'),
-            new ArtistAlbumEntity($this->sharedArtist, $this->allowedAlbum, 'featured'),
-            new ArtistAlbumEntity($this->sharedArtist, $this->deniedAlbum, 'primary'),
-            new ArtistAlbumEntity($deniedArtist, $this->deniedAlbum, 'primary'),
+            new ArtistAlbumEntity($this->sharedArtist, $this->allowedAlbum, 'primary', $this->sharedArtist->getName()),
+            new ArtistAlbumEntity($this->sharedArtist, $this->allowedAlbum, 'featured', $this->sharedArtist->getName()),
+            new ArtistAlbumEntity($this->sharedArtist, $this->deniedAlbum, 'primary', $this->sharedArtist->getName()),
+            new ArtistAlbumEntity($deniedArtist, $this->deniedAlbum, 'primary', $deniedArtist->getName()),
         ] as $entity) {
             $this->entityManager->persist($entity);
         }
@@ -117,8 +117,8 @@ final class ImageReadScopeRepositoryTest extends TestCase
         $direct->setArtist($artist);
         $artist->setCoverImage($reverse);
         foreach ([$artist, $song, $direct, $reverse,
-            new ArtistSongEntity($artist, $song, 'primary'),
-            new ArtistSongEntity($artist, $song, 'featured'),
+            new ArtistSongEntity($artist, $song, 'primary', $artist->getName()),
+            new ArtistSongEntity($artist, $song, 'featured', $artist->getName()),
         ] as $entity) {
             $this->entityManager->persist($entity);
         }

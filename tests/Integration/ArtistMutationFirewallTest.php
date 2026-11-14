@@ -161,7 +161,7 @@ final class ArtistMutationFirewallTest extends TestCase
 
     public function testAnonymousCannotMutateAndLibraryMemberCanStillReadArtist(): void
     {
-        $this->manager->persist(new ArtistSongEntity($this->artist, $this->song, 'primary'));
+        $this->manager->persist(new ArtistSongEntity($this->artist, $this->song, 'primary', $this->artist->getName()));
         $this->manager->flush();
         $before = $this->catalogState();
         foreach (self::mutations() as [$action, $admin]) {
@@ -182,10 +182,10 @@ final class ArtistMutationFirewallTest extends TestCase
     private function prepareLinks(string $action): void
     {
         if (in_array($action, ['remove-song', 'song-role'], true)) {
-            $this->manager->persist(new ArtistSongEntity($this->artist, $this->song, 'primary'));
+            $this->manager->persist(new ArtistSongEntity($this->artist, $this->song, 'primary', $this->artist->getName()));
         }
         if (in_array($action, ['remove-album', 'album-role'], true)) {
-            $this->manager->persist(new ArtistAlbumEntity($this->artist, $this->album, 'primary'));
+            $this->manager->persist(new ArtistAlbumEntity($this->artist, $this->album, 'primary', $this->artist->getName()));
         }
         $this->manager->flush();
     }

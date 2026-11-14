@@ -504,7 +504,7 @@ final class SongRepository implements SongRepositoryInterface
             return;
         }
 
-        $artistSong = new ArtistSongEntity($artistEntity, $songEntity, $role);
+        $artistSong = new ArtistSongEntity($artistEntity, $songEntity, $role, $artistEntity->getName());
         $this->entityManager->persist($artistSong);
     }
 

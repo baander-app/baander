@@ -106,7 +106,7 @@ try {
     $images['artist-direct']->setArtist($artist);
     $images['playlist']->setPlaylist($playlist);
     foreach ([$actor, $allowed, $denied, $album, $artist, $playlist,
-        ...array_values($images), new ArtistAlbumEntity($artist, $album, 'primary'),
+        ...array_values($images), new ArtistAlbumEntity($artist, $album, 'primary', $artist->getName()),
     ] as $entity) {
         $manager->persist($entity);
     }

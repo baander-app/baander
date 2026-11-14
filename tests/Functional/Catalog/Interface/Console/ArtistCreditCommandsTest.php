@@ -86,6 +86,32 @@ final class ArtistCreditCommandsTest extends TestCase
         self::assertSame(['primary'], $this->albumRoles());
     }
 
+    public function testAHandCreditKeepsTheArtistNameItWasAddedUnder(): void
+    {
+        $original = $this->artist->getName();
+        foreach ([
+            'app:artist:song:add' => ['song-id' => $this->songId()],
+            'app:artist:album:add' => ['album-id' => $this->albumId()],
+        ] as $name => $target) {
+            $add = $this->command($name);
+            self::assertSame(Command::SUCCESS, $add->execute(['public-id' => $this->publicId(), ...$target, 'role' => 'primary']), $add->getDisplay());
+        }
+        self::assertSame([['primary' => $original], ['primary' => $original]], [$this->songCreditedNames(), $this->albumCreditedNames()]);
+
+        $rename = $this->command('app:artist:update');
+        self::assertSame(Command::SUCCESS, $rename->execute(['public-id' => $this->publicId(), '--name' => 'Renamed credit fixture artist']), $rename->getDisplay());
+        self::assertSame([['primary' => $original], ['primary' => $original]], [$this->songCreditedNames(), $this->albumCreditedNames()]);
+
+        $song = $this->command('app:artist:song:add');
+        self::assertSame(Command::SUCCESS, $song->execute(['public-id' => $this->publicId(), 'song-id' => $this->songId(), 'role' => 'primary']), $song->getDisplay());
+        self::assertSame(['primary' => $original], $this->songCreditedNames(), 'Adding a credit the artist already has keeps its name.');
+        self::assertSame(Command::SUCCESS, $song->execute(['public-id' => $this->publicId(), 'song-id' => $this->songId(), 'role' => 'featured']), $song->getDisplay());
+        $album = $this->command('app:artist:album:add');
+        self::assertSame(Command::SUCCESS, $album->execute(['public-id' => $this->publicId(), 'album-id' => $this->albumId(), 'role' => 'featured']), $album->getDisplay());
+        $credits = ['featured' => 'Renamed credit fixture artist', 'primary' => $original];
+        self::assertSame([$credits, $credits], [$this->songCreditedNames(), $this->albumCreditedNames()]);
+    }
+
     public function testRemovingACreditThatDoesNotExistIsNotFoundOnBothPaths(): void
     {
         $admin = $this->createAdminUser();
@@ -191,11 +217,11 @@ final class ArtistCreditCommandsTest extends TestCase
         if ($kind === 'song') {
             $song = $this->entityManager->find(SongEntity::class, $this->song->getId());
             self::assertInstanceOf(SongEntity::class, $song);
-            $this->entityManager->persist(new ArtistSongEntity($artist, $song, $role));
+            $this->entityManager->persist(new ArtistSongEntity($artist, $song, $role, $artist->getName()));
         } else {
             $album = $this->entityManager->find(AlbumEntity::class, $this->album->getId());
             self::assertInstanceOf(AlbumEntity::class, $album);
-            $this->entityManager->persist(new ArtistAlbumEntity($artist, $album, $role));
+            $this->entityManager->persist(new ArtistAlbumEntity($artist, $album, $role, $artist->getName()));
         }
         $this->entityManager->flush();
     }
@@ -224,6 +250,32 @@ final class ArtistCreditCommandsTest extends TestCase
         sort($roles);
 
         return $roles;
+    }
+
+    /** @return array<string, string> the artist's credited name on the song, by role */
+    private function songCreditedNames(): array
+    {
+        $this->entityManager->clear();
+        $names = [];
+        foreach ($this->entityManager->getRepository(ArtistSongEntity::class)->findBy(['artist' => $this->artist->getId()]) as $credit) {
+            $names[(string) $credit->getRole()] = $credit->getCreditedName();
+        }
+        ksort($names);
+
+        return $names;
+    }
+
+    /** @return array<string, string> the artist's credited name on the album, by role */
+    private function albumCreditedNames(): array
+    {
+        $this->entityManager->clear();
+        $names = [];
+        foreach ($this->entityManager->getRepository(ArtistAlbumEntity::class)->findBy(['artist' => $this->artist->getId()]) as $credit) {
+            $names[(string) $credit->getRole()] = $credit->getCreditedName();
+        }
+        ksort($names);
+
+        return $names;
     }
 
     private function publicId(): string

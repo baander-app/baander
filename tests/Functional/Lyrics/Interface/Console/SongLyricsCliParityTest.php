@@ -181,7 +181,7 @@ final class SongLyricsCliParityTest extends TestCase
             [$artistId->toString(), (new PublicId())->toString(), 'GLaDOS', '{}', $now, $now],
         );
         $conn->executeStatement(
-            "INSERT INTO artist_song (id, artist_id, song_id, role) VALUES (?, ?, ?, 'primary')",
+            "INSERT INTO artist_song (id, artist_id, song_id, role, credited_name) VALUES (?, ?, ?, 'primary', 'GLaDOS')",
             [Uuid::v7()->toString(), $artistId->toString(), $songId->toString()],
         );
         $this->entityManager->clear();

@@ -118,8 +118,8 @@ final class AlbumDuplicateControllerTest extends TestCase
         $albumIds = $this->createDuplicateAlbumsFixture($libraryId);
         // Give the second album every artist of the first, so their artists overlap enough to match.
         $this->entityManager->getConnection()->executeStatement(
-            'INSERT INTO artist_album (id, artist_id, album_id, role)
-             SELECT gen_random_uuid(), artist_id, ?, role FROM artist_album a
+            'INSERT INTO artist_album (id, artist_id, album_id, role, credited_name)
+             SELECT gen_random_uuid(), artist_id, ?, role, credited_name FROM artist_album a
              WHERE a.album_id = ? AND NOT EXISTS (SELECT 1 FROM artist_album b WHERE b.album_id = ? AND b.artist_id = a.artist_id)',
             [$albumIds[1]->toString(), $albumIds[0]->toString(), $albumIds[1]->toString()],
         );
@@ -334,22 +334,22 @@ final class AlbumDuplicateControllerTest extends TestCase
         // Link artists to albums (50% overlap for Jaccard)
         // Album 1: Artist 1, Artist 2
         $conn->executeStatement(
-            'INSERT INTO artist_album (id, artist_id, album_id, role) VALUES (?, ?, ?, ?)',
-            [Uuid::v7()->toString(), $artist1Id->toString(), $album1Id->toString(), null],
+            'INSERT INTO artist_album (id, artist_id, album_id, role, credited_name) VALUES (?, ?, ?, ?, ?)',
+            [Uuid::v7()->toString(), $artist1Id->toString(), $album1Id->toString(), null, 'Artist One'],
         );
         $conn->executeStatement(
-            'INSERT INTO artist_album (id, artist_id, album_id, role) VALUES (?, ?, ?, ?)',
-            [Uuid::v7()->toString(), $artist2Id->toString(), $album1Id->toString(), null],
+            'INSERT INTO artist_album (id, artist_id, album_id, role, credited_name) VALUES (?, ?, ?, ?, ?)',
+            [Uuid::v7()->toString(), $artist2Id->toString(), $album1Id->toString(), null, 'Artist Two'],
         );
 
         // Album 2: Artist 1, Artist 3 (50% overlap with Album 1 via Artist 1)
         $conn->executeStatement(
-            'INSERT INTO artist_album (id, artist_id, album_id, role) VALUES (?, ?, ?, ?)',
-            [Uuid::v7()->toString(), $artist1Id->toString(), $album2Id->toString(), null],
+            'INSERT INTO artist_album (id, artist_id, album_id, role, credited_name) VALUES (?, ?, ?, ?, ?)',
+            [Uuid::v7()->toString(), $artist1Id->toString(), $album2Id->toString(), null, 'Artist One'],
         );
         $conn->executeStatement(
-            'INSERT INTO artist_album (id, artist_id, album_id, role) VALUES (?, ?, ?, ?)',
-            [Uuid::v7()->toString(), $artist3Id->toString(), $album2Id->toString(), null],
+            'INSERT INTO artist_album (id, artist_id, album_id, role, credited_name) VALUES (?, ?, ?, ?, ?)',
+            [Uuid::v7()->toString(), $artist3Id->toString(), $album2Id->toString(), null, 'Artist Three'],
         );
 
         return [$album1Id, $album2Id];

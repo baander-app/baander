@@ -371,7 +371,7 @@ final class LyricsAdminControllerTest extends TestCase
         );
         foreach ($songs as $songId) {
             $conn->executeStatement(
-                "INSERT INTO artist_song (id, artist_id, song_id, role) VALUES (?, ?, ?, 'primary')",
+                "INSERT INTO artist_song (id, artist_id, song_id, role, credited_name) VALUES (?, ?, ?, 'primary', 'Lyrics admin artist')",
                 [Uuid::v7()->toString(), $artistId, $songId->toString()],
             );
             $this->artistSongs[] = $songId->toString();

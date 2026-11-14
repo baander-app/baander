@@ -52,19 +52,19 @@ final class SongArtistSortPaginationTest extends TestCase
             $song = new SongEntity(new PublicId(), $album, $title, '/media/sort/' . $track . '.flac', $track, 'audio/flac');
             ++$track;
             $this->entityManager->persist($song);
-            $this->entityManager->persist(new ArtistSongEntity($featured, $song, 'featured'));
+            $this->entityManager->persist(new ArtistSongEntity($featured, $song, 'featured', $featured->getName()));
             if ($primaryName === '') {
                 continue;
             }
             $artists[$primaryName] ??= new ArtistEntity(new PublicId(), $primaryName);
             $this->entityManager->persist($artists[$primaryName]);
-            $this->entityManager->persist(new ArtistSongEntity($artists[$primaryName], $song, 'primary'));
+            $this->entityManager->persist(new ArtistSongEntity($artists[$primaryName], $song, 'primary', $artists[$primaryName]->getName()));
         }
         // A second, later-sorting primary artist does not change the key.
         $this->entityManager->flush();
         $bea = $this->entityManager->getRepository(SongEntity::class)->findOneBy(['title' => 'Song Bea']);
         self::assertInstanceOf(SongEntity::class, $bea);
-        $this->entityManager->persist(new ArtistSongEntity($artists['Zed'], $bea, 'primary'));
+        $this->entityManager->persist(new ArtistSongEntity($artists['Zed'], $bea, 'primary', $artists['Zed']->getName()));
         $this->entityManager->flush();
         $this->entityManager->clear();
 

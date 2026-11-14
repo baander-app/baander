@@ -24,7 +24,7 @@ make exec cmd="php bin/console app:artist:update V1StGXR8_Z5jdHi6B-myT --lock=na
 
 | Option | Description |
 |--------|-------------|
-| `--name=NAME` | The new name; it cannot be empty |
+| `--name=NAME` | The new name; it cannot be empty. Songs and albums already credited to the artist keep the credited name they were given |
 | `--country=COUNTRY` | The country, such as `GB` |
 | `--gender=GENDER` | The gender of a person |
 | `--type=TYPE` | The artist type, such as `person` or `group` |

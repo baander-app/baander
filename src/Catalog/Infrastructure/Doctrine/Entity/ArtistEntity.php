@@ -13,6 +13,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'artists')]
 #[ORM\Index(name: 'idx_artists_cover_image_id', columns: ['cover_image_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_artists_public_id', columns: ['public_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_artists_mbid', columns: ['mbid'])]
 #[ORM\Index(name: 'idx_artists_name', columns: ['name'])]
 #[ORM\Index(
     name: 'idx_artists_name_pgroonga',

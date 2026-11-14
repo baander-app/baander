@@ -29,15 +29,21 @@ class ArtistAlbumEntity
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $role = null;
 
+    /** The artist name the album is credited under, kept when the artist is renamed. */
+    #[ORM\Column(type: 'text')]
+    private string $creditedName;
+
     public function __construct(
         ArtistEntity $artist,
         AlbumEntity $album,
-        ?string $role = null,
+        ?string $role,
+        string $creditedName,
     ) {
         $this->id = new Uuid();
         $this->artist = $artist;
         $this->album = $album;
         $this->role = $role;
+        $this->creditedName = $creditedName;
     }
 
     public function getId(): Uuid
@@ -63,5 +69,10 @@ class ArtistAlbumEntity
     public function setRole(?string $role): void
     {
         $this->role = $role;
+    }
+
+    public function getCreditedName(): string
+    {
+        return $this->creditedName;
     }
 }

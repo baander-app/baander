@@ -125,8 +125,8 @@ final class ImageReadFirewallTest extends TestCase
         foreach ([$this->allowedLibrary, $deniedLibrary, $album, $this->deniedAlbum, $this->allowedArtist, $deniedArtist, $playlist, $this->deniedPlaylist] as $entity) {
             $this->persist($entity);
         }
-        $this->manager->persist(new ArtistAlbumEntity($this->allowedArtist, $album, 'primary'));
-        $this->manager->persist(new ArtistAlbumEntity($deniedArtist, $this->deniedAlbum, 'primary'));
+        $this->manager->persist(new ArtistAlbumEntity($this->allowedArtist, $album, 'primary', $this->allowedArtist->getName()));
+        $this->manager->persist(new ArtistAlbumEntity($deniedArtist, $this->deniedAlbum, 'primary', $deniedArtist->getName()));
         $this->manager->persist(new UserLibraryAccessEntity($this->member->getId(), $this->allowedLibrary, new \DateTimeImmutable()));
 
         foreach (['album', 'artist', 'reverse-album', 'reverse-artist', 'playlist', 'mixed', 'denied-album', 'denied-artist', 'denied-playlist', 'orphan'] as $name) {
