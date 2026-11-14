@@ -403,7 +403,10 @@ graph TD
     Party -->|"playback sync"| Transcode
     Transcode -->|"video lookup"| Catalog
     Lyrics -->|"song/album metadata"| Catalog
-    Catalog -->|"album sync request<br/><small>Application</small>"| Metadata
+    Catalog -->|"MusicBrainz lookup, album sync message<br/><small>Application</small>"| Metadata
+    Catalog -->|"artist merge<br/><small>Infrastructure</small>"| Favorites
+    Catalog -->|"artist merge<br/><small>Infrastructure</small>"| Activity
+    Catalog -->|"artist merge<br/><small>Infrastructure</small>"| Recommendation
     Catalog -->|"lyrics fetch request<br/><small>Application</small>"| Lyrics
     Auth -->|"settings contract<br/><small>Application, Infrastructure, Interface</small>"| UserPreference
     Notification -->|"settings contract<br/><small>Application</small>"| UserPreference
@@ -442,8 +445,13 @@ graph TD
 
 ### Catalog -> Metadata (Application layer)
 
-- **What:** `Catalog\Application\CommandHandler\FilesDiscoveredHandler` calls `Metadata\Application\Port\AlbumMetadataSyncRequestInterface::requestSync()` for each album it creates, after the flush that stores it. The Metadata implementation queues a `SyncAlbumMessage` while `metadata.auto_sync` is on. Deptrac allows this through the `Metadata Album Sync Request Contract` layer, which contains only that interface.
-- **Why:** A sync started when the scan completes can run before Catalog has ingested the scan's albums. Requesting the sync from ingest means the album already exists when the sync looks it up.
+- **What:** Catalog's MusicBrainz matching searches and looks up releases, recordings and artists, and fetches front covers, through `Metadata\Application\Port\MusicBrainzLookupInterface` and its DTOs in `Metadata\Application\DTO\MusicBrainz\`, which form the `Metadata MusicBrainz Lookup Contract` Deptrac layer. `Catalog\Application\MessageHandler\RequestAlbumMatchHandler` handles Metadata's `SyncAlbumMessage`, which the library and genre syncs dispatch for each album, by requesting the album's match in Catalog's album match queue; the queue reads `metadata.auto_sync` by the constant of `MetadataSettingDefinitions`. Those two classes form the `Metadata Album Sync Contract` layer. Ingest requests automatic matches through Catalog's own `AlbumMatchRequestInterface`, without Metadata.
+- **Why:** Every write a match makes is a Catalog write, so Catalog owns matching and Metadata keeps the MusicBrainz client. The narrow layers keep the rest of Metadata out of Catalog's reach, and the admin syncs keep their message while Catalog decides what an album sync does.
+
+### Catalog -> Favorites, Activity, Recommendation (Infrastructure layer)
+
+- **What:** `Catalog\Infrastructure\ArtistMergeService` moves a merged artist's favorites, play history and artist recommendations to the artist it merges into, and deletes a removed artist's favorites and recommendations, through `ArtistFavoriteMergePortInterface`, `ArtistActivityMergePortInterface` and `ArtistRecommendationMergePortInterface`. The ports form the `Favorites Artist Merge Contract`, `Activity Artist Merge Contract` and `Recommendation Artist Merge Contract` Deptrac layers, and each runs as statements inside the caller's transaction.
+- **Why:** A MusicBrainz match merges artists that turn out to be one performer, so that their favorites and plays follow the surviving artist. Each context writes its own tables; Catalog only orders the steps.
 
 ### Catalog -> Lyrics (Application layer)
 
@@ -616,7 +624,7 @@ graph TD
 | Catalog | Full 4-layer | State objects | Core domain. PGroonga search on `SongRepository`. 6 aggregates. |
 | Library | Full 4-layer | No state object | Orchestrates scanning pipeline. Heaviest cross-context coupling. |
 | Media | Full 4-layer | No state object | Storage/streaming abstraction. |
-| Metadata | Partial | No aggregates | Operates on Catalog data. Admin port and the published album sync request contract. 6 external APIs. |
+| Metadata | Partial | No aggregates | Operates on Catalog data. Admin port and the published MusicBrainz lookup and album sync contracts. 6 external APIs. |
 | Playlist | Full 4-layer | No state object | Manual + smart playlists. |
 | Recommendation | Full 4-layer | Old positional-arg pattern | Has CQRS queries. Candidate for state-object migration. |
 | Activity | Full 4-layer | No state object | Simple record/play model. |

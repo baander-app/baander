@@ -16,7 +16,9 @@ Six aggregate roots, each with its own state object and repository:
 - **Video** — a single video file, used by Transcode for transcoding.
 - **Genre** — tagged onto songs and albums.
 
-Most CRUD flows bypass CQRS handlers and go straight through port interfaces. The only CQRS handler is `BatchExtractCoversHandler` for bulk cover extraction.
+The admin API and the console run catalog edits, deletes, covers, credits and MusicBrainz matching through the same command and query handlers. Other contexts reach Catalog through port interfaces.
+
+MusicBrainz matching lives here: candidate search and scoring, the field-by-field comparison, the apply with its artist merges and removals, and the album match queue that matches albums automatically and lists the ones that need review. It reaches MusicBrainz through Metadata's `MusicBrainzLookupInterface`.
 
 ## Ports
 
@@ -27,6 +29,8 @@ Most CRUD flows bypass CQRS handlers and go straight through port interfaces. Th
 | `ArtistPortInterface` | Artist CRUD |
 | `GenrePortInterface` | Genre CRUD |
 | `MoviePortInterface` | Movie CRUD |
+| `ArtistMergePortInterface` | Merge one artist into another, or remove one, inside the caller's transaction |
+| `AlbumMatchRequestInterface` | Request automatic MusicBrainz matches of albums in the album match queue |
 | `SongLookupInterface` | Published contract for Lyrics and Playlist: visible song ID by public ID, lyric signature (`SongLyricSignature`) of one song or of a song-ID set (one query that loads no entities), song-ID pages, and the visible subset of a song-ID set (one `uuid[]` parameter) |
 
 ## Events
@@ -40,7 +44,8 @@ Most CRUD flows bypass CQRS handlers and go straight through port interfaces. Th
 ## Interactions
 
 - **Library** populates Catalog during scans via port interfaces
-- **Metadata** enriches Catalog data via port interfaces after external API lookups
+- **Metadata** enriches Catalog data via port interfaces after external API lookups; Catalog matches with MusicBrainz through Metadata's `MusicBrainzLookupInterface` and turns Metadata's `SyncAlbumMessage` into album match requests
+- **Favorites, Activity, Recommendation** move or delete an artist's favorites, plays and recommendations through their artist merge ports when Catalog merges or removes the artist
 - **Media** provides cover art for albums and artists
 - **Activity, Recommendation** reference Catalog entities via Doctrine FKs
 - **Lyrics, Playlist** store scalar song IDs (constraints declared by their own FK providers) and read songs through `SongLookupInterface`

@@ -13,18 +13,17 @@ The enrichment pipeline flows: **extract** → **match** → **enrich**
 - **API adapters** (`Infrastructure/Api/`) wrap six external services behind internal adapters:
   Discogs, Last.fm, MusicBrainz, Spotify, TasteDive, CoverArtArchive
 - **Matching** (`Infrastructure/Matching/`) compares local metadata against API results using validators to score match quality
-- **Enrichers** (`Application/`) — `AlbumMetadataEnricher`, `ArtistMetadataEnricher`, `SongMetadataEnricher` — orchestrate the lookup and write-back to Catalog via port interfaces
+- **Enrichers** (`Application/`) — `ArtistMetadataEnricher`, `SongMetadataEnricher` — orchestrate the lookup and write-back to Catalog via port interfaces; the song enricher adds genres only
 
-Catalog ingest dispatches `ExtractAlbumCoverCommand` for an album without a cover. Syncs run from Messenger messages (`SyncAlbumMessage`, `SyncArtistMessage`, etc.).
+Catalog ingest dispatches `ExtractAlbumCoverCommand` for an album without a cover. Syncs run from Messenger messages (`SyncArtistMessage`, `SyncSongMessage`, etc.).
 
-- Automatic sync: while `metadata.auto_sync` is on, Catalog ingest queues one `SyncAlbumMessage` for each album it creates. The setting is off by default and does not gate the admin sync.
+- Albums: Catalog owns MusicBrainz matching. The library and genre syncs dispatch a `SyncAlbumMessage` for each album, which Catalog's `RequestAlbumMatchHandler` turns into a request in its album match queue. `metadata.auto_sync`, defined in `MetadataSettingDefinitions` and labelled "Automatic MusicBrainz matching", is read by Catalog alone; it is off by default and does not gate the admin sync. Catalog reaches both classes through the `Metadata Album Sync Contract` Deptrac layer.
 
 ## Ports
 
 | Port | Layer | Purpose |
 |------|-------|---------|
 | `MetadataAdminPortInterface` | Application | Sync status and provider list for the admin API, `app:metadata:status` and `app:metadata:providers`; the admin sync and `app:metadata:sync` dispatch `SyncMetadataCommand` |
-| `AlbumMetadataSyncRequestInterface` | Application (contract) | Lets Catalog ingest request syncs for new albums; reads `metadata.auto_sync` on every call |
 | `MusicBrainzLookupInterface` | Application (contract) | Lets Catalog matching search and look up MusicBrainz releases, recordings and artists and fetch Cover Art Archive front covers, each call under the shared `musicbrainz` rate limit; published as the `Metadata MusicBrainz Lookup Contract` Deptrac layer |
 
 ## Events
@@ -34,7 +33,8 @@ None. Metadata neither publishes nor consumes domain events.
 ## Interactions
 
 - **Catalog** — reads and writes via `AlbumPortInterface`, `ArtistPortInterface`, `SongPortInterface`, `GenrePortInterface`
-- **Catalog ingest** — dispatches `ExtractAlbumCoverCommand` and requests album syncs through `AlbumMetadataSyncRequestInterface`
+- **Catalog ingest** — dispatches `ExtractAlbumCoverCommand`
+- **Catalog album match queue** — handles `SyncAlbumMessage` and reads `metadata.auto_sync` through `MetadataSettingDefinitions`
 - **Catalog matching** — searches and reads MusicBrainz releases through `MusicBrainzLookupInterface`
 - **Library** — `MetadataSyncOrchestrator` looks up libraries through `LibraryPortInterface`
 - **Media** — stores cover art via `ImagePortInterface` and `StoragePortInterface`

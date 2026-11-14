@@ -58,12 +58,13 @@ The API controllers and the console commands dispatch the same commands and quer
 | `CreateGenreCommand` | `CreateGenreHandler` | Create a genre, optionally below a parent (`app:genre:create`) |
 | `UpdateGenreCommand` | `UpdateGenreHandler` | Change a genre's name, slug, parent or MusicBrainz ID (`app:genre:update`) |
 | `DeleteGenreCommand` | `DeleteGenreHandler` | Delete a genre; its children become root genres (`app:genre:delete`) |
+| `ApplyMatchCommand` | `ApplyMatchHandler` | Apply a MusicBrainz candidate to an album, song or artist (`POST /api/admin/metadata/match/{type}/{publicId}/apply`, `app:metadata:match:apply`), or an automatic album match for the album match queue; see [MusicBrainz Matching](#musicbrainz-matching) |
 
 `FilesDiscoveredHandler` handles Library's `FilesDiscovered` message and imports the files a scan found. It reads the metadata of up to 50 audio files and probes their audio, then writes their songs, artist credits and genres in one transaction; a delete with files cannot claim the library while that transaction runs (see [Library](library.md#media-file-deletion)). When a delete holds the library, the handler puts the files it has not imported back on the queue.
 
-A song's length comes from the audio probe, never from its tags. A song is credited to the artist its tags name, under a credited name: the first artist value names the artist, and the credited name joins every value with "; ", so the song shows the name it was tagged with even when the artist's own name differs. A file without an artist value is imported without a credit. Inside the transaction, after the library and file-index locks and before any song is written, one `ArtistIdentityResolverInterface::resolve()` call finds or creates every artist the batch credits. It takes a transaction-scoped advisory lock on each tagged name and on the MusicBrainz ID of each identity that has one, sorted and one key per statement, and resolves each identity by its MusicBrainz artist ID when the file carries exactly one valid ID, otherwise by its exact name; `ArtistIdentityIndex` states the tie-breaks. Imports running at once therefore never create two artists for one ID or, without an ID, for one name. The batch's genre locks sort after the artist locks and are taken after them.
+A song's length comes from the audio probe, never from its tags. A song is credited to the artist its tags name, under a credited name: the first artist value names the artist, and the credited name joins every value with "; ", so the song shows the name it was tagged with even when the artist's own name differs. A file without an artist value is imported without a credit. Inside the transaction, after the library and file-index locks and before any song is written, one `ArtistIdentityResolverInterface::resolve()` call finds or creates every artist the batch credits. It takes a transaction-scoped advisory lock on each tagged name and on the MusicBrainz ID of each identity that has one, sorted and one key per statement, and resolves each identity by its MusicBrainz artist ID when the file carries exactly one valid ID, otherwise by its exact name; `ArtistIdentityIndex` states the tie-breaks. A file that names its artists one by one, in its `ARTISTS` values or else its artist values, and gives exactly one valid MusicBrainz artist ID per name credits each name by the ID in the same position: the first as primary under the joined artist values, every other one as featured under its own name. Imports running at once therefore never create two artists for one ID or, without an ID, for one name. The batch's genre locks sort after the artist locks and are taken after them.
 
-A file whose hash a stored song holds never becomes a new song. At the song's path, or renamed within the song's directory while the old file is gone, it repairs that song, as on a rescan: the song moves to a renamed file's path, takes its length from the probe (a failed probe keeps the stored length) and, when it has no artist credit of any role, takes its tagged credit. A file elsewhere is left alone. A file with a hash no song holds, at the path of a song in the same library, is that song retagged: the song keeps its ID, album, lyrics and genres, takes the new hash, technical fields, length and unlocked tag fields, and its artist credits are replaced by the new tags' credit. The song stays in its album, and an album is created only for new songs. After the message's last batch, each album it touched that has no artist credit gets one, in a transaction that locks the album row `FOR NO KEY UPDATE`: from the first album-artist tag among the album's files in the message, in path order, or else among the files of its stored songs; else to the artist every song of the album is credited to; else none. An album that has a credit of any role keeps it.
+A file whose hash a stored song holds never becomes a new song. At the song's path, or renamed within the song's directory while the old file is gone, it repairs that song, as on a rescan: the song moves to a renamed file's path, takes its length from the probe (a failed probe keeps the stored length) and, when it has no artist credit of any role, takes its tagged credit. A file elsewhere is left alone. A file with a hash no song holds, at the path of a song in the same library, is that song retagged: the song keeps its ID, album, MusicBrainz ID, lyrics and genres, and takes the new hash, technical fields, length and unlocked tag fields. A title, track, disc or year that the song's `matched_fields` lists changes only when the tags carry a value for it, and then leaves the list; a title or track number taken from the file name does not count. The new tags' credits replace the song's artist credits, unless `matched_fields` lists `credits` and the tags give the primary artist no MusicBrainz ID: the match's credits then stay, and the batch neither finds nor creates the tagged artist. When a batch holds retagged songs, its transaction first takes every artist and genre key the batch may write in one sorted pass, then locks the retagged songs' rows `FOR NO KEY UPDATE` in ID order, the order a match apply takes, and reads those songs again before it decides. The song stays in its album, and an album is created only for new songs. After the message's last batch, each album it touched that has no artist credit gets one, in a transaction that locks the album row `FOR NO KEY UPDATE`: from the first album-artist tag among the album's files in the message, in path order, or else among the files of its stored songs; else to the artist every song of the album is credited to; else none. An album that has a credit of any role keeps it. Ingest then asks `AlbumMatchRequestInterface::requestAfterImport()` for automatic MusicBrainz matches of the albums the message touched (see [Album match queue](#album-match-queue)); when that call throws, ingest logs the error and carries on.
 
 ### Queries
 
@@ -71,6 +72,9 @@ A file whose hash a stored song holds never becomes a new song. At the song's pa
 |-------|---------|---------|
 | `GetAlbumDeletePreviewQuery` | `GetAlbumDeletePreviewHandler` | What deleting an album would remove: its songs, their total size, the cover and the playlists that lose songs; with `deleteFiles`, each song file checked as the delete would check it (`GET /api/admin/albums/{publicId}/delete-preview`, `app:album:delete --dry-run`) |
 | `GetSongDeletePreviewQuery` | `GetSongDeletePreviewHandler` | What deleting a song would remove: the song, its file and its playlist entries; with `deleteFile`, the file checked as the delete would check it (`GET /api/admin/songs/{publicId}/delete-preview`, `app:song:delete --dry-run`) |
+| `SearchMatchCandidatesQuery` | `SearchMatchCandidatesHandler` | Up to five scored MusicBrainz candidates for an album, song or artist (`GET /api/admin/metadata/match/{type}/{publicId}/candidates`, `app:metadata:match:search`) |
+| `CompareMatchQuery` | `CompareMatchHandler` | What matching an item with one candidate would set, row by row (`GET /api/admin/metadata/match/{type}/{publicId}/comparison`, `app:metadata:match:compare`) |
+| `ListMatchReviewsQuery` | `ListMatchReviewsHandler` | The albums that need a match review, most recently checked first (`GET /api/admin/metadata/match/reviews`, `app:metadata:match:reviews`) |
 
 The previews change nothing. They read playlists through Playlist's `PlaylistDeletionPreviewPortInterface` and check files through Library's `LibraryMediaFilesInterface::inspect()`, which returns a verdict for each path in a `FileDeletionPreview`.
 
@@ -86,7 +90,7 @@ The previews change nothing. They read playlists through Playlist's `PlaylistDel
 
 An update command takes the edit, a complete `lockedFields` list that replaces the current one, and fields to `lock` and `unlock`. `CatalogInput::lockChanges()` turns these into fields to unlock and fields to lock. The handler applies the unlocks, then the edit, then the locks, and saves only when all three are accepted. One request can therefore unlock a field and change it, or change a field and lock it. A field in both lists ends locked. On the console, `--lock` and `--unlock` can be repeated and accept comma-separated field names.
 
-Automatic updates skip locked fields rather than fail. Metadata's `AlbumMetadataEnricher` and `ArtistMetadataEnricher` leave locked fields out of the values they apply. `AlbumMergeService` keeps the target album's value for a locked field, even when that value is empty. After the merge, the target also locks every field that was locked on the source album.
+Automatic updates skip locked fields rather than fail. Metadata's `ArtistMetadataEnricher` leaves locked fields out of the values it applies. A MusicBrainz match shows a locked field in its comparison but never ticks or writes it, and a manual apply whose ticked row has become locked answers 409 `match_stale`. A retag leaves a locked song field as it is. `AlbumMergeService` keeps the target album's value for a locked field, even when that value is empty. After the merge, the target also locks every field that was locked on the source album.
 
 ## Deletes
 
@@ -108,6 +112,42 @@ The public delete routes pass only the public ID, so they keep the audio files a
 
 A credit links an artist to a song or an album (`CreditTarget`) with an `ArtistRole`. In `AddArtistCreditCommand`, `ChangeArtistCreditRoleCommand`, and `RemoveArtistCreditCommand`, the target song or album is named by its 21-character `PublicId`, which `ArtistCreditInput::targetId()` resolves to a `Uuid`. The `ArtistPortInterface` credit methods return `false` instead of throwing, and the handlers turn that into a 404 for an unknown artist, song or album, or an artist without the named credit. `ChangeArtistCreditRoleCommand` names the credit to change by its current role. The current role may be omitted when the artist has a single credit on the target; with several credits, omitting it is a 422. When the new role is one the artist already holds on the target, the changed credit is removed. A credit added by hand stores the artist's name at that moment as its credited name; renaming the artist later leaves it unchanged.
 
+## MusicBrainz Matching
+
+Catalog matches albums, songs and artists with MusicBrainz, because every write a match makes is a Catalog write. It reaches MusicBrainz and the Cover Art Archive only through Metadata's `MusicBrainzLookupInterface`, whose calls each wait for a turn under the shared `musicbrainz` rate limit. An album matches a release, one edition, and the release's group fills `albums.mbid`; a song matches a recording and an artist an artist. [External APIs](../../part-1-operator-guide/media/external-apis.md#musicbrainz-matching) describes matching for operators.
+
+### Candidates and comparison
+
+`SearchMatchCandidatesHandler` reads the item before it asks MusicBrainz, so an unknown item spends no request. An album runs one release search on its title and primary artist, ranks the hits by title, artist and track count, and looks up the best five with their tracks; a song runs one recording search on its title and the artist text it shows; an artist runs one artist search on its name. `CandidateScorer` scores each candidate from 0 to 100 after folding case, punctuation and featuring joiners: a looked-up release by title 25, artist 20, track count 20 and track lengths 35; a recording by title 45, artist 35 and length 20; an artist by its name, or by name 80 and disambiguation 20. `TrackPairing` pairs local tracks with release tracks by disc and position, then by a length within 3 seconds that fits one track only. `MusicBrainzAnswer` turns an outage into a 503 with the reason `musicbrainz_unavailable` and a refused request into a 409 with `musicbrainz_rejected`.
+
+`CompareMatchHandler` looks the candidate up once and builds a `MatchComparison` with `MatchComparisonBuilder`, which reads the catalog through `MatchCatalogReadInterface` and changes nothing. The comparison holds three kinds of rows:
+
+- Field rows (`MatchFieldRow`): MusicBrainz IDs and empty fields are ticked, a field holding a different value is not, and a locked field is shown but never ticked.
+- Credits rows (`MatchCreditsRow`), ticked when they change something: MusicBrainz's first credited artist becomes primary and the others featured. The primary credit keeps the song's or album's own credited name, and a featured credit takes the name MusicBrainz credits. Only primary and featured credits are replaced; credits of other roles stay. Each credited artist resolves as an import resolves it, so a row names the local artist, or the new one, each credit would go to.
+- Artist actions (`MatchArtistAction`), ticked: an artist the ticked credits rows leave without any credit merges into the artist that takes over most of its primary credits, or is removed when it held none. An artist match whose ID another artist holds becomes a merge into that holder.
+
+### Apply
+
+`ApplyMatchHandler` handles `ApplyMatchCommand` and writes a match in one transaction, or nothing. Every MusicBrainz call runs before the transaction: a manual apply looks the candidate up again by its ID and compares it with the item as stored, never with values the client sent, and a front cover the match sets is downloaded and stored as a file (`MatchCovers`). The transaction then takes its locks in the order every catalog writer takes them: the album row `FOR NO KEY UPDATE`; every artist and genre import key in one sorted pass; the rows of the artists the match may credit, merge, merge into or remove, `FOR UPDATE` through `ArtistMergePortInterface::lock()`; the rows of the songs it writes, `FOR NO KEY UPDATE` in ID order. Under those locks it reads the item again and builds the comparison once more. A manual apply whose ticked rows no longer show what the admin saw, or whose comparison now needs a lock it did not take, writes nothing and answers 409 `match_stale`; a deadlock answers 409 `match_busy`.
+
+The apply writes fields, IDs and the credits that change, records on each song the fields a match set in `songs.matched_fields` (`title`, `track`, `disc`, `year`, and `credits` when it set the credits), and records an album's release in `albums.release_mbid` with the time in `albums.matched_at`. It then merges or removes the artists the new credits left without any. A manual album apply also deletes the album's match state, which takes it off the review list. Covers that merges, removals or a replaced cover free are discarded after the commit.
+
+`ApplyMatchCommand::automatic()` carries the candidate the album match queue decided on. An automatic apply writes no admin ticks: it fills every MusicBrainz ID, field and cover that is empty and unlocked, writes every credits row that changes, and applies the merges and removals those credits cause. It reports to the queue how it ended.
+
+`ArtistMergePortInterface`, implemented by `ArtistMergeService`, runs inside the caller's transaction after the caller took the import keys and called `lock()`. A merge moves the source artist's credits, keeping the stronger role where both artists hold a song or album, and its favorites, play history and artist recommendations, through ports of Favorites, Activity and Recommendation, dropping rows that would collide; the target keeps its cover, else takes the source's. A removal deletes the artist with its credits, favorites and recommendations, and its play history stays without an artist. Both write through statements and release the managed entities they make stale.
+
+### Album match queue
+
+`album_match_states` holds at most one row per album. A `requested` row carries the request's `source`, `ingest` or `admin`, and its `due_at`; a `needs_review` row carries the review's `reason`, `best_score`, `checked_song_count` and `checked_at`. The mark lives in its own table rather than an album column because the album capture trigger would publish it to every library reader; its rows publish live changes to admins only.
+
+`AlbumMatchRequester` implements `AlbumMatchRequestInterface`. `FilesDiscoveredHandler` calls `requestAfterImport()` for the albums a message touched once their songs are committed; it does nothing while `metadata.auto_sync` is off, and its requests fall due after 300 seconds, so that an album's other discs land first. `RequestAlbumMatchHandler` calls `requestForAdmin()` for each `SyncAlbumMessage` the library and genre syncs dispatch; that request falls due at once whatever the setting says. Both skip an album with nothing to match: one marked for review whose song count is still the one the matcher checked, and a matched album without new songs. A request for an album that already waits keeps the earlier due time, and an admin request stays an admin request.
+
+One `DrainAlbumMatchesMessage` on `async` runs the queue. A request dispatches it only when it is the first to wait: it writes its row and then looks for others, while a run removes or marks its album and then looks for what is left, so of a request and a finishing run that overlap, at least one sees the other's write. `DrainAlbumMatchesHandler` claims the request that has been due longest in one statement, `FOR UPDATE SKIP LOCKED`, moving its `due_at` to the end of the claim; `due_at` identifies the claim. A request made for the album during the claim moves `due_at` earlier, which ends the claim, and the run's later writes leave that request alone. A song imported while a match runs is matched on a later run. Two runs can overlap briefly when a request races a finishing run; the claims keep them on different albums, and every MusicBrainz call still waits for the shared rate limit.
+
+The run removes every import request when it claims one while `metadata.auto_sync` is off. Otherwise `AutomaticAlbumMatcher` matches the album. An album without a release runs the album search a candidate list runs, and `MatchConfidence` decides: the best release, together with its twin editions that score within the lead and agree on every track's title, artist credit and length, is confident when it has the album's track count, pairs every track within 3 seconds, scores at least 90 and leads the next release by at least 10. A matched album looks up only its stored release and pairs its new songs against it. When the album is matched, or no longer exists, its request is removed; any other album is marked for review with the reason, the best score and the song count checked. A MusicBrainz outage gives the request back and pauses the queue for 5, 15 and 60 minutes, then hourly. Only an outage pauses it: an album whose apply hits a conflict is retried later on its own. While requests wait, the run queues the next one a second later, or when the next request falls due, and a scheduled run restarts the queue if a run is lost.
+
+`ListMatchReviewsHandler` pages through the `needs_review` rows with `MatchReviewReadInterface`, one SQL statement per page, the most recently checked first; its cursor holds the check time and the album's public ID.
+
 ## Ports
 
 | Port | Purpose |
@@ -116,7 +156,9 @@ A credit links an artist to a song or an album (`CreditTarget`) with an `ArtistR
 | `AlbumDuplicatePortInterface` | Duplicate album detection and grouping |
 | `AlbumMergePortInterface` | Album merge operations |
 | `ArtistPortInterface` | Artist CRUD operations and song and album credits (add, remove, list roles, change role); each credit method reports whether it found its target |
-| `ArtistIdentityResolverInterface` | Finds or creates the artists an import credits, under advisory locks on their names and MusicBrainz IDs (`ArtistIdentityResolver`) |
+| `ArtistIdentityResolverInterface` | Finds or creates the artists an import or a match credits, under advisory locks on their names and MusicBrainz IDs (`ArtistIdentityResolver`) |
+| `ArtistMergePortInterface` | Merges one artist into another or removes one, inside the caller's transaction (`ArtistMergeService`) |
+| `AlbumMatchRequestInterface` | Requests automatic MusicBrainz matches of albums in the album match queue, after an import or for an admin sync (`AlbumMatchRequester`) |
 | `GenrePortInterface` | Genre CRUD operations |
 | `MetadataContentReaderPortInterface` | Read metadata content for catalog entities |
 | `MoviePortInterface` | Movie CRUD operations |
@@ -210,6 +252,19 @@ Routes under `/api/admin/albums` (controller `AlbumDuplicateController`, gated `
 |--------|------|---------|
 | GET | `/api/admin/albums/duplicates` | List duplicate album groups for a library |
 
+### Admin — MusicBrainz Matching
+
+Routes under `/api/admin/metadata/match` (controller `MusicBrainzMatchController`, gated `ROLE_ADMIN`). `{type}` is `album`, `song` or `artist`. Each route has a console counterpart.
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/admin/metadata/match/{type}/{publicId}/candidates` | Scored MusicBrainz candidates, best first; `title` and `artist` refine the search |
+| GET | `/api/admin/metadata/match/{type}/{publicId}/comparison` | Compare the item with the candidate `candidate` names |
+| POST | `/api/admin/metadata/match/{type}/{publicId}/apply` | Apply the ticked rows of the comparison |
+| GET | `/api/admin/metadata/match/reviews` | Albums that need a match review, cursor-paginated |
+
+The album resource carries `mbid` (the release group), `releaseMbid` (the matched release) and `lockedFields`, the artist resource `mbid` and `lockedFields`, and the song resource `mbid` (the recording).
+
 ### Admin — Deletes With Files
 
 Routes under `/api/admin/albums` and `/api/admin/songs` (controllers `AdminAlbumController` and `AdminSongController`, gated `ROLE_ADMIN`).
@@ -231,7 +286,8 @@ Routes under `/api/admin/albums` and `/api/admin/songs` (controllers `AdminAlbum
 | Depends on | Filesystem | `MimeDetectorPortInterface` checks cover files |
 | Depends on | Playlist | `PlaylistDeletionPreviewPortInterface` names the playlists a delete affects |
 | Depends on | Lyrics | `FilesDiscoveredHandler` requests lyrics fetches through `LyricsFetchRequestInterface` |
-| Depends on | Metadata | `FilesDiscoveredHandler` requests album metadata syncs (`AlbumMetadataSyncRequestInterface`) and dispatches `ExtractAlbumCoverCommand` |
+| Depends on | Metadata | `FilesDiscoveredHandler` dispatches `ExtractAlbumCoverCommand`. Matching searches and looks up MusicBrainz through `MusicBrainzLookupInterface` (the `Metadata MusicBrainz Lookup Contract` Deptrac layer); `RequestAlbumMatchHandler` handles `SyncAlbumMessage`, and the album match queue reads `metadata.auto_sync` from `MetadataSettingDefinitions` (the `Metadata Album Sync Contract` layer) |
+| Depends on | Favorites, Activity, Recommendation | `ArtistMergeService` moves or deletes an artist's favorites, play history and recommendations through `ArtistFavoriteMergePortInterface`, `ArtistActivityMergePortInterface` and `ArtistRecommendationMergePortInterface` |
 | Depends on | Transcode | `FilesDiscoveredHandler` probes audio and video files through `AudioProbePortInterface` and `VideoProbePortInterface` |
 | Depended on by | Activity | References songs, albums, artists, and movies |
 | Depended on by | Library | `CatalogStatsQuery` implements `LibraryContentStatsInterface` |
@@ -239,7 +295,7 @@ Routes under `/api/admin/albums` and `/api/admin/songs` (controllers `AdminAlbum
 | Depended on by | Media | Uses `VideoPortInterface`, `SongRepositoryInterface`, and `SongAvailabilityPortInterface` |
 | Depended on by | Playlist | References songs through `SongLookupInterface` |
 | Depended on by | Recommendation | References artists and genres |
-| Depended on by | Metadata | Enriches catalog entities |
+| Depended on by | Metadata | Enriches catalog entities; its library and genre syncs dispatch the `SyncAlbumMessage` Catalog handles |
 
 ## Infrastructure
 
@@ -250,9 +306,12 @@ Routes under `/api/admin/albums` and `/api/admin/songs` (controllers `AdminAlbum
 | `CatalogStatsQuery`, `CatalogReadScopeQuery` | Doctrine query | Implement `LibraryContentStatsInterface` and catalog read-scope queries |
 | `AdminRateLimitListener` | Event listener | Rate-limits `POST /api/albums/covers/extract` |
 | `AlbumVoter` | Security | Voter for album access checks |
-| `CatalogMessagePayloadCodec` | Messaging | Messenger payload codec for catalog commands |
+| `CatalogMessagePayloadCodec` | Messaging | Messenger payload codec for `BatchExtractCoversCommand` and `DrainAlbumMatchesMessage` |
 | `AlbumService`, `SongService`, `ArtistService`, `MovieService`, `GenreService`, `VideoService`, `SongAvailability`, `AlbumDuplicateService`, `SongLookupService` | Port implementation | Implement the matching ports |
 | `AlbumMergeService` | Port implementation | Implements `AlbumMergePortInterface`: moves songs, fills metadata the target lacks, and skips the target's locked fields |
+| `ArtistMergeService` | Port implementation | Implements `ArtistMergePortInterface` with statements on the caller's connection and transaction |
+| `AlbumMatchStateRepository` | DBAL repository | The album match states: requests, claims and review marks, each decision in one statement |
+| `MatchCatalogReadQuery`, `MatchReviewReadQuery` | Doctrine query | The catalog reads a comparison needs (`MatchCatalogReadInterface`), and the pages of the review list (`MatchReviewReadInterface`) |
 
 ### Console Commands
 
@@ -270,6 +329,8 @@ Routes under `/api/admin/albums` and `/api/admin/songs` (controllers `AdminAlbum
 | `app:artist:delete`, `app:movie:delete` | Delete an artist or a movie |
 | `app:album:merge`, `app:album:duplicates` | Merge albums; list duplicate album groups |
 | `app:album:extract-covers` | Queue embedded cover extraction for every album without a cover |
+| `app:metadata:match:search`, `app:metadata:match:compare`, `app:metadata:match:apply` | List MusicBrainz candidates, compare one with an album, song or artist, and apply it |
+| `app:metadata:match:reviews` | List the albums that need a match review |
 | `app:genre:list`, `app:genre:create`, `app:genre:update`, `app:genre:delete` | Manage genres |
 | `app:genre:song:add`, `app:genre:song:remove`, `app:genre:album:add`, `app:genre:album:remove` | Assign or remove a genre |
 | `app:e2e:ingest-video` | Ingest a test video file for end-to-end tests |

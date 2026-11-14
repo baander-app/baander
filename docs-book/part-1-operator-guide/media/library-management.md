@@ -44,11 +44,11 @@ Both routes then follow the same stages:
 
 1. **Discovery** walks the directory, filters recognized extensions, hashes files and updates the file index. It records changed directories for later ingestion.
 2. **Catalog ingestion** consumes those directory messages in the background. Music ingestion reads tags and creates albums and tracks; movie ingestion creates movie and video records.
-3. **Optional enrichment** queues metadata or lyrics work for newly created music records, and lyrics work for tracks a rescan repairs, when the corresponding setting is enabled.
+3. **Optional enrichment** queues MusicBrainz matching of the albums an import or rescan touches, and lyrics work for newly created tracks and for tracks a rescan repairs, when the corresponding setting is enabled.
 
 The scan's file totals and completed library status describe discovery. They do not prove that every queued directory has reached the catalog. Check the resulting albums, tracks or movies separately, and use [Monitoring](../operations/README.md) to investigate pending or failed background work. [Background Work](../workers/background-work.md) explains the delivery stages and worker requirements.
 
-Incremental scans skip unchanged indexed files. A full rescan reprocesses discovery and repairs tracks Baander already has, filling in a missing artist credit and measuring the length again (see [What a rescan repairs](../commands/app-library-scan.md#what-a-rescan-repairs)); it is not a request to erase and rebuild the catalog. Missing sources retain file-index records marked unavailable. A scan does not promise blanket removal of catalog entries for deleted files. Restore a missing mount before scanning: an unavailable directory can look like an empty library to discovery.
+Incremental scans skip unchanged indexed files. A full rescan reprocesses discovery and repairs tracks Baander already has, filling in a missing artist credit and measuring the length again (see [What a rescan repairs](../commands/app-library-scan.md#what-a-rescan-repairs)); it is not a request to erase and rebuild the catalog. A rescan keeps what a [MusicBrainz match](external-apis.md#musicbrainz-matching) set. A retag keeps it too, except where the new tags carry a value for a field or credit the artist by MusicBrainz ID; see [Retagged files](../commands/app-library-scan.md#retagged-files). Missing sources retain file-index records marked unavailable. A scan does not promise blanket removal of catalog entries for deleted files. Restore a missing mount before scanning: an unavailable directory can look like an empty library to discovery.
 
 Only one scan of a library runs at a time. Starting a scan claims the library, and while the claim holds, the admin panel and the command refuse a second scan of it. `app:library:scan --all` scans every library that is not already scanning. A running scan renews its claim as it works. A claim that nobody renews for 15 minutes lapses, for example after a scan process was killed. The library then reads as `failed` and can be scanned again. To free a library sooner, release its claim with `app:library:scan my-music --release --force` once you know its scan is gone.
 
@@ -56,14 +56,14 @@ See the [command reference](../commands/app-library-scan.md) for details. The ot
 
 ### What happens to new music
 
-After discovery, background ingestion adds new albums and tracks to the catalog. Two [server settings](../configuration/server-settings.md#server-settings), both off by default, add work for each new item. Baander reads them each time it adds an album or tracks, so a change applies to the next scan without a restart.
+After discovery, background ingestion adds new albums and tracks to the catalog. Two [server settings](../configuration/server-settings.md#server-settings), both off by default, add work for the music a scan imports. Baander reads them each time it imports music, so a change applies to the next scan without a restart.
 
 | Setting | While it is on |
 |---------|----------------|
-| `metadata.auto_sync` | Each new album is queued for a metadata sync from the [external services](external-apis.md), right after the catalog stores it. |
+| `metadata.auto_sync` | Each album an import or rescan touches is queued for [automatic MusicBrainz matching](external-apis.md#automatic-matching) when it has no match yet, or when it is matched and has gained songs since. The request waits at least five minutes, so that the album's other discs land first. |
 | `lyrics.auto_fetch` | Each new track without an `.lrc` lyrics file beside it is queued for a lyrics fetch from LRCLIB, once the catalog has stored the track. A track with an `.lrc` file takes its lyrics from that file. A track without lyrics that a rescan gives an artist credit or a new length is queued the same way. |
 
-`metadata.auto_sync` acts only on albums that a scan creates, so a rescan of music Baander already has requests no automatic metadata sync. `lyrics.auto_fetch` acts on new tracks and on the tracks a rescan repairs; see [What a rescan repairs](../commands/app-library-scan.md#what-a-rescan-repairs). The bulk lyrics fetch, [`app:lyrics:fetch`](../commands/app-lyrics-fetch.md), and the syncs and fetches an administrator starts are not affected by either setting.
+`metadata.auto_sync` also acts on albums Baander already has, so a rescan with the setting on queues every album it touches that has no match yet; an album left for review is queued again only when its number of songs has changed. `lyrics.auto_fetch` acts on new tracks and on the tracks a rescan repairs; see [What a rescan repairs](../commands/app-library-scan.md#what-a-rescan-repairs). The bulk lyrics fetch, [`app:lyrics:fetch`](../commands/app-lyrics-fetch.md), and the syncs and fetches an administrator starts are not affected by either setting.
 
 ## File Watching
 

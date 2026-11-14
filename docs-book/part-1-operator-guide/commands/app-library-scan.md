@@ -92,10 +92,11 @@ whose content belongs to a song in the catalog, the worker reads the file's tags
 audio with ffprobe, and repairs that song in place. An ordinary scan repairs the song of a
 returning file the same way. A repair works as follows:
 
-- A song with no artist credit of any role is credited to the artist its tags name, under the
-  name it was tagged with. A song with a credit keeps it and gains none, so a credit changed by
-  hand survives a rescan. A rescan cannot tell a missing credit from a removed one: a song whose
-  credits were all removed by hand is credited to its tagged artist again.
+- A song with no artist credit of any role is credited to the artists its tags name, by the
+  rules [Retagged files](#retagged-files) gives. A song with a credit keeps it and gains none, so a
+  credit changed by hand or set by a MusicBrainz match survives a rescan. A rescan cannot tell a
+  missing credit from a removed one: a song whose credits were all removed by hand is credited to
+  its tagged artist again.
 - The song's length is measured from its audio again. When ffprobe cannot read the file, the
   worker logs a warning and keeps the stored length; the import does not fail.
 - An album with no artist credit is credited by the rule an import follows: from its
@@ -103,12 +104,16 @@ returning file the same way. A repair works as follows:
 - While the `lyrics.auto_fetch` [server setting](../configuration/server-settings.md#server-settings)
   is on, a song without lyrics that gains a primary credit or a new length is queued for a
   lyrics fetch.
+- While the `metadata.auto_sync` setting is on, each album the rescan touches that has no
+  MusicBrainz match yet, or that is matched and has gained songs since, is queued for
+  [automatic matching](../media/external-apis.md#automatic-matching).
 
 The song stays in the album it is stored in, so a rescan after an album was renamed with
 [app:album:update](app-album-update.md) or merged with [app:album:merge](app-album-merge.md)
 creates no album from the files' old album tag. A repair leaves the song's title, genres and
-other tag fields as they are. A file whose content changed is not repaired but updates its song,
-as [Retagged files](#retagged-files) describes.
+other tag fields as they are, as well as the MusicBrainz IDs of the song and its album. A file whose
+content changed is not repaired but updates its song, as [Retagged files](#retagged-files)
+describes.
 
 The repair has a cost: the workers read and probe every file of the library again, as they did
 for its first import, where an ordinary scan skips unchanged files.
@@ -119,15 +124,27 @@ A file whose content changed at a song's path, for example after a tag editor re
 updates that song in place. The file's hash changed, so an ordinary scan finds it, and so does
 `--rescan`. A song whose file was marked unavailable is updated the same way when the file comes
 back with new content. The song keeps its ID, and with it its play history, favorites and
-playlist entries. It also keeps its album, lyrics and genres. From the file it takes:
+playlist entries. It also keeps its album, MusicBrainz recording ID, lyrics and genres. From the
+file it takes:
 
 - Its hash, size and technical fields, and its length, which ffprobe measures from the audio.
 - Its title, track, disc, year and comment. A field locked with
   [app:song:update](app-song-update.md) keeps its value; a tag the file no longer carries clears
-  its field.
-- Its artist credits. The credit the new tags give replaces every credit the song held,
+  its field. A title, track, disc or year that a MusicBrainz match set changes only when the new
+  tags carry a value for it; a title or track number taken from the file name does not count.
+- Its artist credits. The credits the new tags give replace every credit the song held,
   including credits added or changed by hand. When the new tags name no artist, the song is left
-  without credits.
+  without credits. Credits a MusicBrainz match set follow their own rule, below.
+
+Tags credit the artist their first artist value names, under every artist value joined with
+"; ". A file that names its artists one by one, as Picard's `ARTISTS` tag or several `ARTIST`
+values do, and gives one MusicBrainz artist ID for each, credits each of those artists by its ID:
+the first as primary, still under the joined artist values, and the others as featured under
+their own names.
+
+Credits a MusicBrainz match set stay through a retag, even when the new tags name no artist,
+unless the new tags credit the song's primary artist by MusicBrainz ID: the file gives a single
+artist ID, or one for each artist it names. Picard writes such tags, and they give the credits a match would.
 
 A retagged file creates no album and no second song, even when its album tag changed.
 

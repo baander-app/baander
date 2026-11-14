@@ -181,22 +181,41 @@ oldest artist without an ID when several share the name. Alias names that share 
 therefore credit one artist. A credit keeps its credited name: the name the song was
 tagged with, which the song shows and lyrics lookups send even when the artist's own
 name differs. A tag with several separate artist values credits the first value's
-artist under all values joined by "; ". Artist credits are not lockable fields; a
-rescan of an unchanged file adds credits only to a song or album that has none, and a
-retagged file replaces its song's credits.
+artist under all values joined by "; ". A file that names its artists one by one with
+one MusicBrainz artist ID each credits every named artist by its ID instead: the first
+as primary under the joined values, the others as featured. Artist credits are not
+lockable fields; a rescan of an unchanged file adds credits only to a song or album
+that has none, and a retagged file replaces its song's credits. Credits a MusicBrainz
+match set are the exception: a retag keeps them unless its tags credit the song's
+artist by MusicBrainz ID.
 
 ### MusicBrainz match
 
-The link between a song, album or artist and its MusicBrainz entity, chosen by an admin
-from a scored list of candidates or applied by automatic matching when one album
+The link between a song, album or artist and its MusicBrainz entity: a recording, a
+release (one edition of the album) or an artist. An admin chooses it from candidates
+ranked by Baander's own fit score, or automatic matching applies it when one album
 candidate clearly fits. A match records MusicBrainz IDs and sets artist credits from
 MusicBrainz, so a tag such as "Post Malone, Luke Combs" becomes a primary and a featured
-artist; artists that turn out to share an ID merge unless an admin applying the match
-keeps them apart. It never writes the media file.
+artist. An artist the new credits leave without any credit merges into the artist that
+took over its primary credits, or is removed when it had none, unless an admin applying
+the match keeps it; an artist given an ID another artist holds merges into that artist.
+A match fills empty fields; only an admin's ticks replace a value, and never a locked
+one. It never writes the media file.
 
-A match outlives rescans and retags, except that tags carrying MusicBrainz artist IDs
-replace its credits and a value the new tags carry replaces that field's matched value.
-An album that automatic matching cannot match with confidence needs review by an admin.
+A match outlives rescans and retags, except that tags crediting the artist by
+MusicBrainz ID replace its credits and a value the new tags carry replaces that field's
+matched value. An album that automatic matching cannot match with confidence needs
+review by an admin.
+
+### Album match queue
+
+The albums waiting for automatic MusicBrainz matching, which are matched one after
+another in the background. While automatic matching is on, an import or rescan adds each album it touches
+that has no match yet or that gained songs since its match; an admin's metadata sync
+adds them whatever the setting says. A confident match is applied. Any other album
+leaves the queue needing review and stays on the review list until an admin applies a
+match, or until its number of songs changes and it is queued again. A MusicBrainz
+outage keeps the requests and pauses the queue.
 
 ## Lyrics
 
