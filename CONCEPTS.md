@@ -170,6 +170,21 @@ when its content is unchanged. This observation does not diagnose a failed mount
 or guarantee that the file is still reachable at playback time. A catalog track
 without an index observation is unavailable until a scan confirms its source.
 
+## Catalog
+
+### Artist credit
+
+The link between a song or album and one artist, with a role such as primary. The
+scan derives credits from file tags and resolves the artist by its MusicBrainz artist
+ID when the file carries exactly one, otherwise by its exact name, preferring the
+oldest artist without an ID when several share the name. Alias names that share an ID
+therefore credit one artist. A credit keeps its credited name: the name the song was
+tagged with, which the song shows and lyrics lookups send even when the artist's own
+name differs. A tag with several separate artist values credits the first value's
+artist under all values joined by "; ". Artist credits are not lockable fields; a
+rescan of an unchanged file adds credits only to a song or album that has none, and a
+retagged file replaces its song's credits.
+
 ## Playback destinations
 
 ### Playback destination
