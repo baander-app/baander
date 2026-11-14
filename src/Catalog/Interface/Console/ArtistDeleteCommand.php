@@ -19,7 +19,7 @@ use Throwable;
  */
 #[AsCommand(
     name: 'app:artist:delete',
-    description: 'Delete an artist, its credits and its cover image.',
+    description: 'Delete an artist, its credits, favorites, recommendations and cover image.',
 )]
 final class ArtistDeleteCommand extends Command
 {
@@ -41,7 +41,7 @@ final class ArtistDeleteCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $publicId = (string) $input->getArgument('public-id');
 
-        $refused = AdminCommandSupport::confirm($input, $io, sprintf('Delete artist %s, its song and album credits and its cover? This cannot be undone.', $publicId));
+        $refused = AdminCommandSupport::confirm($input, $io, sprintf('Delete artist %s, its song and album credits, its favorites and recommendations, and its cover? This cannot be undone.', $publicId));
         if ($refused !== null) {
             return $refused;
         }

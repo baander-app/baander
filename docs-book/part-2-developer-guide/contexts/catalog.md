@@ -53,7 +53,7 @@ The API controllers and the console commands dispatch the same commands and quer
 | `RemoveCoverCommand` | `RemoveCoverHandler` | Remove an album's or artist's cover and delete the image (`app:album:cover:remove`, `app:artist:cover:remove`) |
 | `DeleteAlbumCommand` | `DeleteAlbumHandler` | Delete an album and every song on it, optionally with the audio files and the cover (`app:album:delete`) |
 | `DeleteSongCommand` | `DeleteSongHandler` | Delete a song, optionally with its audio file (`app:song:delete`) |
-| `DeleteArtistCommand` | `DeleteArtistHandler` | Delete an artist, its credits and its cover image; songs and albums stay (`app:artist:delete`) |
+| `DeleteArtistCommand` | `DeleteArtistHandler` | Delete an artist, its credits, favorites, recommendations and cover image; songs and albums stay (`app:artist:delete`) |
 | `DeleteMovieCommand` | `DeleteMovieHandler` | Delete a movie and the videos no other movie uses; the video files stay on disk (`app:movie:delete`) |
 | `CreateGenreCommand` | `CreateGenreHandler` | Create a genre, optionally below a parent (`app:genre:create`) |
 | `UpdateGenreCommand` | `UpdateGenreHandler` | Change a genre's name, slug, parent or MusicBrainz ID (`app:genre:update`) |

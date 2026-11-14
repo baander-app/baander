@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Catalog\Infrastructure;
 
+use App\Catalog\Application\Port\ArtistMergePortInterface;
 use App\Catalog\Application\Port\ArtistPortInterface;
+use App\Catalog\Application\Port\ArtistRemoval;
+use App\Catalog\Application\Service\CoverImageDiscarder;
 use App\Catalog\Domain\Model\Artist;
 use App\Catalog\Domain\Repository\ArtistRepositoryInterface;
 use App\Catalog\Domain\ValueObject\MusicbrainzId;
@@ -25,6 +28,8 @@ final class ArtistService implements ArtistPortInterface
         private readonly TransactionPortInterface $transaction,
         private readonly ArtistMusicbrainzIdAssigner $musicbrainzIds,
         private readonly LoggerInterface $logger,
+        private readonly ArtistMergePortInterface $merges,
+        private readonly CoverImageDiscarder $covers,
     ) {
     }
 
@@ -117,9 +122,17 @@ final class ArtistService implements ArtistPortInterface
         $this->artistRepository->flush();
     }
 
+    /**
+     * Deletes the artist with its credits, favorites and recommendations in one transaction, then
+     * its cover image once that has committed, so a rollback leaves the artist with its cover.
+     */
     public function delete(Artist $artist): void
     {
-        $this->artistRepository->delete($artist);
+        $removal = $this->transaction->run(fn (): ArtistRemoval => $artist->getId() |> $this->merges->remove(...));
+
+        foreach ($removal->imagesToDiscard as $imageId) {
+            $this->covers->discard($imageId);
+        }
     }
 
     public function addSongToArtist(Uuid $artistId, Uuid $songId, string $role): bool

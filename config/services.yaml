@@ -660,6 +660,8 @@ services:
         alias: App\Catalog\Infrastructure\AlbumDuplicateService
     App\Catalog\Application\Port\AlbumMergePortInterface:
         alias: App\Catalog\Infrastructure\AlbumMergeService
+    App\Catalog\Application\Port\ArtistMergePortInterface:
+        alias: App\Catalog\Infrastructure\ArtistMergeService
 
     # Resolved directly by scripts/e2e-ingest-video.php; its handlers stay private.
     App\Catalog\Application\Service\MovieLibraryIngest:
@@ -784,6 +786,8 @@ services:
         alias: App\Recommendation\Infrastructure\Doctrine\Repository\RecommendationInsightsRepository
     App\Recommendation\Application\Port\RecommendationJobPortInterface:
         alias: App\Recommendation\Infrastructure\RecommendationJobService
+    App\Recommendation\Application\Port\ArtistRecommendationMergePortInterface:
+        alias: App\Recommendation\Infrastructure\Doctrine\ArtistRecommendationMerge
 
     # --- Playlist Domain Repository Aliases ---
     App\Playlist\Domain\Repository\PlaylistRepositoryInterface:
@@ -799,6 +803,9 @@ services:
 
     App\Activity\Application\Port\ActivityAnalyticsPortInterface:
         alias: App\Activity\Infrastructure\Doctrine\Repository\ActivityAnalyticsRepository
+
+    App\Activity\Application\Port\ArtistActivityMergePortInterface:
+        alias: App\Activity\Infrastructure\Doctrine\ArtistActivityMerge
 
     # --- Playlist Application Ports ---
     App\Playlist\Application\Port\PlaylistPortInterface:
@@ -1480,6 +1487,8 @@ services:
     # --- Favorites Application Port Aliases ---
     App\Favorites\Application\Port\FavoritesPortInterface:
         alias: App\Favorites\Infrastructure\FavoritesService
+    App\Favorites\Application\Port\ArtistFavoriteMergePortInterface:
+        alias: App\Favorites\Infrastructure\Doctrine\ArtistFavoriteMerge
 
     # --- Outbox Wiring ---
     App\Shared\Domain\Event\Outbox\OutboxRepository: ~

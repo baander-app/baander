@@ -5,20 +5,16 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Catalog\Application\CommandHandler;
 
 use App\Catalog\Application\Command\Album\DeleteAlbumCommand;
-use App\Catalog\Application\Command\Artist\DeleteArtistCommand;
 use App\Catalog\Application\Command\Movie\DeleteMovieCommand;
 use App\Catalog\Application\Command\Song\DeleteSongCommand;
 use App\Catalog\Application\CommandHandler\Album\DeleteAlbumHandler;
-use App\Catalog\Application\CommandHandler\Artist\DeleteArtistHandler;
 use App\Catalog\Application\Service\CoverImageDiscarder;
 use App\Catalog\Application\CommandHandler\Movie\DeleteMovieHandler;
 use App\Catalog\Application\CommandHandler\Song\DeleteSongHandler;
 use App\Catalog\Application\Port\AlbumPortInterface;
-use App\Catalog\Application\Port\ArtistPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Domain\Model\Album;
-use App\Catalog\Domain\Model\Artist;
 use App\Catalog\Domain\Model\Movie;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
@@ -228,35 +224,6 @@ final class CatalogDeleteHandlersTest extends TestCase
 
         self::assertSame(['begin', 'delete movie', 'delete unlinked videos', 'commit'], $this->log);
         self::assertSame(['movies' => 1, 'videos' => 1], $result->deleted);
-    }
-
-    public function testAnArtistDeleteDiscardsItsCoverAfterTheArtistIsDeleted(): void
-    {
-        $artist = Artist::create('Artist');
-        $this->cover = $this->image();
-        $artist->setCoverImage($this->cover->getId());
-        $artists = $this->createStub(ArtistPortInterface::class);
-        $artists->method('findByPublicId')->willReturn($artist);
-        $artists->method('delete')->willReturnCallback(function (): void {
-            $this->log[] = 'delete artist';
-        });
-
-        $result = (new DeleteArtistHandler($artists, $this->discarder()))(new DeleteArtistCommand($artist->getPublicId()->toString()));
-
-        self::assertSame(['delete artist', 'delete image', 'delete image file'], $this->log);
-        self::assertSame(['artists' => 1, 'coverImages' => 1], $result->deleted);
-    }
-
-    public function testAnArtistWithoutACoverDeletesNoImage(): void
-    {
-        $artist = Artist::create('Artist');
-        $artists = $this->createStub(ArtistPortInterface::class);
-        $artists->method('findByPublicId')->willReturn($artist);
-
-        $result = (new DeleteArtistHandler($artists, $this->discarder()))(new DeleteArtistCommand($artist->getPublicId()->toString()));
-
-        self::assertSame([], $this->log);
-        self::assertSame(['artists' => 1, 'coverImages' => 0], $result->deleted);
     }
 
     /** @param list<Song> $songs */

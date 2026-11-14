@@ -7,22 +7,19 @@ namespace App\Catalog\Application\CommandHandler\Artist;
 use App\Catalog\Application\Command\Artist\DeleteArtistCommand;
 use App\Catalog\Application\Command\CatalogDeletionResult;
 use App\Catalog\Application\Service\CatalogInput;
-use App\Catalog\Application\Service\CoverImageDiscarder;
 use App\Catalog\Application\Port\ArtistPortInterface;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
- * Deletes an artist, then its cover image record, file and derived files. The image row keeps
- * no owner once the artist is gone (images.artist_id is ON DELETE SET NULL), so it is deleted
- * after the artist's delete has committed.
+ * Deletes an artist with its credits, favorites and recommendations in one transaction, then its
+ * cover image record, file and derived files once that has committed.
  */
 final readonly class DeleteArtistHandler
 {
     public function __construct(
         private ArtistPortInterface $artists,
-        private CoverImageDiscarder $covers,
     ) {
     }
 
@@ -33,16 +30,12 @@ final readonly class DeleteArtistHandler
     #[AsMessageHandler]
     public function __invoke(DeleteArtistCommand $command): CatalogDeletionResult
     {
-        $artist = $this->artists->findByPublicId(CatalogInput::publicId($command->publicId))
-            ?? throw new NotFoundException(sprintf('Artist "%s" not found.', $command->publicId));
-        $coverImageId = $artist->getCoverImageId();
+        $artist = CatalogInput::publicId($command->publicId)
+            |> $this->artists->findByPublicId(...)
+            ?? throw new NotFoundException('Artist "' . $command->publicId . '" not found.');
 
         $this->artists->delete($artist);
 
-        if ($coverImageId !== null) {
-            $this->covers->discard($coverImageId);
-        }
-
-        return CatalogDeletionResult::of(['artists' => 1, 'coverImages' => $coverImageId !== null ? 1 : 0]);
+        return CatalogDeletionResult::of(['artists' => 1, 'coverImages' => $artist->getCoverImageId() !== null ? 1 : 0]);
     }
 }

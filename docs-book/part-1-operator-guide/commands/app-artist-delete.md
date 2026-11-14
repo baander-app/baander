@@ -1,6 +1,6 @@
 # app:artist:delete
 
-Delete an artist, its song and album credits, and its cover image. The command does what `DELETE /api/artists/{publicId}` does in the admin API, through the same use case.
+Delete an artist, its song and album credits, the favorites and recommendations that name it, and its cover image. The command does what `DELETE /api/artists/{publicId}` does in the admin API, through the same use case.
 
 ## Quick start
 
