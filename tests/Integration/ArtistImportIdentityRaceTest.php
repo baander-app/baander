@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Catalog\Application\Port\ArtistIdentity;
+use App\Catalog\Domain\ValueObject\MusicbrainzId;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity;
 use App\Catalog\Infrastructure\Doctrine\ImportIdentity\ArtistIdentityResolver;
+use App\Catalog\Infrastructure\Doctrine\ImportIdentity\ArtistMusicbrainzIdAssigner;
 use App\Catalog\Infrastructure\Doctrine\ImportIdentity\ImportIdentityLock;
+use App\Catalog\Infrastructure\Doctrine\ImportIdentity\MusicbrainzIdAssignment;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Catalog\ArtistImportIdentityRace;
@@ -20,8 +23,10 @@ use PHPUnit\Framework\TestCase;
  * Imports resolve their artists under advisory locks on every tagged name and MusicBrainz ID.
  * The test session holds a resolution open while a second session, a child process, resolves a
  * competing identity: the second waits on a lock and, once the first commits, reads its artist
- * instead of creating another. The artists table is the migrated one, with uniq_artists_mbid and
- * the PGroonga name index. Advisory locks span the database, so every name and ID is random.
+ * instead of creating another. A metadata search giving an artist an ID takes the same locks and
+ * races an import the same way. The artists table copies the migrated one with uniq_artists_mbid
+ * and its B-tree indexes but not its PGroonga index. Advisory locks span the database, so every
+ * name and ID is random.
  */
 final class ArtistImportIdentityRaceTest extends TestCase
 {
@@ -46,7 +51,7 @@ final class ArtistImportIdentityRaceTest extends TestCase
         self::assertSame('read committed', $this->observer->fetchOne('SHOW default_transaction_isolation'));
         $this->observer->executeStatement('CREATE SCHEMA ' . $this->schema);
         $this->observer->executeStatement('SET search_path TO ' . $this->schema . ', public');
-        $this->observer->executeStatement('CREATE TABLE artists (LIKE public.artists INCLUDING ALL)');
+        ArtistImportIdentityRace::copyTableWithoutPgroonga($this->observer, 'artists');
 
         $this->writer = ArtistImportIdentityRace::connect($this->schema);
         $this->manager = ArtistImportIdentityRace::entityManager($this->writer);
@@ -228,6 +233,54 @@ final class ArtistImportIdentityRaceTest extends TestCase
         self::assertSame(['locked' => true], ArtistImportIdentityRace::finish($child, $this->observer));
     }
 
+    /**
+     * A metadata search gives an artist an ID under the same name and ID locks. The import holds
+     * them first and adopts its ID onto the name-only artist; the search waits on the name lock,
+     * then reads the adopted ID and leaves it.
+     */
+    public function testAnIdAnImportAdoptsStaysWhenAMetadataSearchAssignsAnotherToTheSameArtist(): void
+    {
+        $name = $this->tagged('H');
+        $artist = $this->storeArtist($name, null, '2026-10-01 10:00:00+00');
+        $tagged = $this->mbid();
+
+        $this->writer->beginTransaction();
+        self::assertSame($artist, $this->resolveOne($name, [$tagged])->toString());
+        $child = self::startMusicbrainzIdAssignment($this->schema, [$artist, strtoupper($this->mbid()), $name]);
+        ArtistImportIdentityRace::awaitAdvisoryLockWait($this->observer, $child);
+        $this->writer->commit();
+
+        self::assertSame(['assignment' => MusicbrainzIdAssignment::ArtistHasId->value], ArtistImportIdentityRace::finish($child, $this->observer));
+        self::assertSame([[$artist, $name, $tagged]], $this->storedArtists());
+    }
+
+    /**
+     * The search holds the locks first and gives the name-only artist its ID; the import waits on
+     * the name lock, then finds no same-name artist without an ID and creates one for its own.
+     */
+    public function testAnImportWaitingOnAMetadataSearchCreatesAnArtistForItsIdOnceTheSearchAssignedAnother(): void
+    {
+        $name = $this->tagged('H');
+        $artist = $this->storeArtist($name, null, '2026-10-01 10:00:00+00');
+        $searched = MusicbrainzId::fromString($this->mbid());
+        self::assertNotNull($searched);
+        $tagged = $this->mbid();
+
+        $this->writer->beginTransaction();
+        self::assertSame(
+            MusicbrainzIdAssignment::Assigned,
+            new ArtistMusicbrainzIdAssigner($this->manager)->assign(Uuid::fromString($artist), $searched, $name),
+        );
+        $child = ArtistImportIdentityRace::start($this->schema, 'resolve', [[$name, [$tagged]]]);
+        ArtistImportIdentityRace::awaitAdvisoryLockWait($this->observer, $child);
+        $this->writer->commit();
+
+        $created = ArtistImportIdentityRace::finish($child, $this->observer)['artists'][0] ?? null;
+        self::assertIsString($created);
+        self::assertNotSame($artist, $created);
+        self::assertSame([[$artist, $name, $searched->toString()], [$created, $name, $tagged]], $this->storedArtists());
+    }
+
     public function testResolvingOutsideATransactionIsRefusedBeforeWriting(): void
     {
         try {
@@ -237,6 +290,34 @@ final class ArtistImportIdentityRaceTest extends TestCase
         }
 
         self::assertSame([], $this->storedArtists());
+    }
+
+    /**
+     * Starts the child session that gives an artist a searched MusicBrainz ID in one transaction
+     * (artist-musicbrainz-id.php), in the shape ArtistImportIdentityRace waits on and finishes.
+     *
+     * @param array{0: string, 1: string, 2: string} $assignment artist ID, searched ID and the search hit's name
+     *
+     * @return array{process: resource, output: resource, application: string}
+     */
+    private static function startMusicbrainzIdAssignment(string $schema, array $assignment): array
+    {
+        $application = 'artist_mbid_' . bin2hex(random_bytes(6));
+        $output = tmpfile();
+        if ($output === false) {
+            throw new \RuntimeException('Cannot create the contender output.');
+        }
+        $process = proc_open(
+            [PHP_BINARY, dirname(__DIR__) . '/Fixtures/Catalog/artist-musicbrainz-id.php', $schema, $application, json_encode($assignment, JSON_THROW_ON_ERROR)],
+            [0 => ['file', '/dev/null', 'r'], 1 => $output, 2 => $output],
+            $pipes,
+        );
+        if (!is_resource($process)) {
+            fclose($output);
+            throw new \RuntimeException('Cannot start the contender.');
+        }
+
+        return ['process' => $process, 'output' => $output, 'application' => $application];
     }
 
     /** @param list<string> $mbids */

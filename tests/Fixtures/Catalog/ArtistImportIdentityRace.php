@@ -23,6 +23,26 @@ use Doctrine\ORM\ORMSetup;
  */
 final class ArtistImportIdentityRace
 {
+    /**
+     * Copies a public table into the connection's current schema with its constraints and every
+     * index except the PGroonga ones. A PGroonga index created and dropped with a throwaway schema
+     * leaves its Groonga objects behind for later sessions of the same database, where another
+     * suite's PGroonga lookup then fails with "object isn't found"; the races need only the unique
+     * and B-tree indexes.
+     */
+    public static function copyTableWithoutPgroonga(Connection $connection, string $table): void
+    {
+        $schema = (string) $connection->fetchOne('SELECT current_schema()');
+        $connection->executeStatement(sprintf('CREATE TABLE %s (LIKE public.%s INCLUDING ALL EXCLUDING INDEXES)', $table, $table));
+        $definitions = $connection->fetchFirstColumn(
+            "SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' AND tablename = :table AND indexdef NOT LIKE '% USING pgroonga %'",
+            ['table' => $table],
+        );
+        foreach ($definitions as $definition) {
+            $connection->executeStatement(str_replace(' ON public.' . $table . ' ', ' ON ' . $schema . '.' . $table . ' ', (string) $definition));
+        }
+    }
+
     public static function connect(string $schema, ?string $applicationName = null): Connection
     {
         $url = getenv('OUTBOX_TEST_DATABASE_URL');

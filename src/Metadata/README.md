@@ -42,3 +42,5 @@ None. Metadata neither publishes nor consumes domain events.
 <!-- Everything below this line is hand-written. Edit freely. -->
 
 ## Notes
+
+- An artist sync never writes a MusicBrainz ID itself. It passes the search hit's ID and name to `ArtistPortInterface::assignMusicbrainzId()`, which stores the ID in lowercase only when the artist has no ID, no other artist holds this one, and the hit's name equals the artist's name ignoring case. The name check keeps a hit such as "Hank Williams, Jr." from binding its ID to the artist "Post Malone, Hank Williams Jr.". The call runs in its own transaction and takes the locks an import takes on the artist's name and the ID, so a sync and an import that touch the same artist or the same ID run one after the other. A forced sync never replaces a stored ID, including one read from tags. Each refusal is logged as `Artist MusicBrainz ID not assigned` with its reason, and the hit's other fields still apply.

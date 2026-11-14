@@ -8,16 +8,24 @@ use App\Catalog\Application\Port\ArtistPortInterface;
 use App\Catalog\Domain\Model\Artist;
 use App\Catalog\Domain\Repository\ArtistRepositoryInterface;
 use App\Catalog\Domain\ValueObject\MusicbrainzId;
+use App\Catalog\Infrastructure\Doctrine\ImportIdentity\ArtistMusicbrainzIdAssigner;
+use App\Catalog\Infrastructure\Doctrine\ImportIdentity\MusicbrainzIdAssignment;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
+use InvalidArgumentException;
+use Psr\Log\LoggerInterface;
 
 final class ArtistService implements ArtistPortInterface
 {
     public function __construct(
         private readonly ArtistRepositoryInterface $artistRepository,
+        private readonly TransactionPortInterface $transaction,
+        private readonly ArtistMusicbrainzIdAssigner $musicbrainzIds,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -64,6 +72,25 @@ final class ArtistService implements ArtistPortInterface
     public function findByName(string $name): ?Artist
     {
         return $this->artistRepository->findByName($name);
+    }
+
+    public function assignMusicbrainzId(Uuid $artistId, string $musicbrainzId, string $matchedName): bool
+    {
+        $id = self::validMusicbrainzId($musicbrainzId);
+        $outcome = $id === null
+            ? MusicbrainzIdAssignment::MalformedId
+            : $this->transaction->run(fn (): MusicbrainzIdAssignment => $this->musicbrainzIds->assign($artistId, $id, $matchedName));
+
+        if ($outcome !== MusicbrainzIdAssignment::Assigned) {
+            $this->logger->info('Artist MusicBrainz ID not assigned', [
+                'artist_id' => $artistId->toString(),
+                'mbid' => $musicbrainzId,
+                'matched_name' => $matchedName,
+                'reason' => $outcome->value,
+            ]);
+        }
+
+        return $outcome === MusicbrainzIdAssignment::Assigned;
     }
 
     public function search(SearchOptions $options): SearchResult
@@ -134,5 +161,16 @@ final class ArtistService implements ArtistPortInterface
     public function updateAlbumRole(Uuid $artistId, Uuid $albumId, ?string $currentRole, string $role): bool
     {
         return $this->artistRepository->updateAlbumRole($artistId, $albumId, $currentRole, $role);
+    }
+
+    private static function validMusicbrainzId(string $id): ?MusicbrainzId
+    {
+        try {
+            $parsed = MusicbrainzId::fromString($id);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+
+        return $parsed !== null && !$parsed->isEmpty() ? $parsed : null;
     }
 }

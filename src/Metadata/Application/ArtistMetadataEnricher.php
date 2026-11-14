@@ -109,6 +109,12 @@ final class ArtistMetadataEnricher
             return EnrichmentResult::noMatch($source, $quality);
         }
 
+        // Only Catalog writes a searched MusicBrainz ID, checked against the stored artist under
+        // the locks imports take. It runs before the re-read below, so the save after it carries
+        // the ID the artist holds rather than writing one, and before a forced sync renames the
+        // artist to the hit's name, which would make every hit's name match.
+        $mbidAssigned = $this->assignMusicbrainzId($artist, $data);
+
         // The lookups take seconds: decide and write against the stored state, so an edit, lock
         // or cover set meanwhile survives.
         $current = $this->artistService->findFreshByUuid($artist->getId());
@@ -141,10 +147,7 @@ final class ArtistMetadataEnricher
         // Gender is not reliably available from the current providers.
         $artist->updateMetadata(...$changes);
         $updatedFields = array_keys($changes);
-
-        // Apply identifiers
-        if (!empty($data['mbid']) && ($forceUpdate || $artist->getMbid() === null)) {
-            $artist->updateExternalIds(mbid: $data['mbid']);
+        if ($mbidAssigned) {
             $updatedFields[] = 'mbid';
         }
 
@@ -153,9 +156,12 @@ final class ArtistMetadataEnricher
             $updatedFields[] = 'discogsId';
         }
 
-        if (!empty($updatedFields)) {
+        // Catalog has stored the MusicBrainz ID already.
+        if (array_diff($updatedFields, ['mbid']) !== []) {
             $this->artistService->save($artist);
+        }
 
+        if ($updatedFields !== []) {
             $this->logger->info('Artist enriched', [
                 'artist_id' => $artist->getId(),
                 'source' => $source,
@@ -171,6 +177,18 @@ final class ArtistMetadataEnricher
             updatedFields: $updatedFields,
             identifiersUpdated: !empty(array_intersect(['mbid', 'discogsId'], $updatedFields)),
         );
+    }
+
+    /** @param array<string, mixed> $data */
+    private function assignMusicbrainzId(Artist $artist, array $data): bool
+    {
+        $mbid = $data['mbid'] ?? null;
+        if (!is_string($mbid) || $mbid === '') {
+            return false;
+        }
+        $matchedName = $data['name'] ?? null;
+
+        return $this->artistService->assignMusicbrainzId($artist->getId(), $mbid, is_string($matchedName) ? $matchedName : '');
     }
 
     private function parseDate(?string $date): ?\DateTimeInterface

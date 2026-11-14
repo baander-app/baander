@@ -36,6 +36,21 @@ interface ArtistPortInterface
 
     public function findByName(string $name): ?Artist;
 
+    /**
+     * Gives the artist a MusicBrainz ID that a metadata search matched, in a transaction of its
+     * own that locks the artist's name and the ID as imports do, so it never races an import
+     * that adopts or creates an artist for either. The ID is written in its canonical lowercase
+     * form only when the artist has none, no other artist holds it, and $matchedName, the name
+     * of the search hit, equals the artist's name ignoring case. A stored ID is never replaced.
+     * Every refusal, a malformed ID included, is logged with its reason.
+     *
+     * The write bypasses objects this process already loaded: re-read the artist with
+     * findFreshByUuid() before saving it.
+     *
+     * @return bool true when the artist holds the ID because of this call
+     */
+    public function assignMusicbrainzId(Uuid $artistId, string $musicbrainzId, string $matchedName): bool;
+
     public function search(SearchOptions $options): SearchResult;
 
     public function count(): int;
