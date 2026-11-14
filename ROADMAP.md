@@ -1643,6 +1643,13 @@ Node 24.15.0):
   `/` with 308. All responses used valid HTTPS. The live home page, `/bac/` and
   `sitemap.xml` match the local build byte for byte. The visual checks were not
   repeated on the live site.
+- **Held-out recordings disclosure (2026-11-13):** on `/bac/`, the long "Held-out
+  recordings" text in the lossless section now sits in a disclosure that starts
+  closed. Its summary matches the "Streams and files" heading beside it, and the
+  text itself is unchanged. The lossless browser test checks that the disclosure
+  starts closed and shows the text once opened. Website build (237 pages), site
+  typecheck and the Chromium suite 93 of 93 passed; screenshots at 1280px and 390px,
+  closed and open, showed no layout problem. Not yet published.
 
 Not run anywhere before the landing: the macOS and NEON kernel step, the Windows
 MSVC binding and the first CI run after the cache keys changed. Only the binding

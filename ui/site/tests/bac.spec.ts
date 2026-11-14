@@ -85,6 +85,12 @@ test('the lossless table sets Bånder Audio Core level 5 and level 8 beside the 
   const section = page.locator('#lossless');
   await expect(section.getByRole('heading', { level: 2 })).toHaveText('Standard FLAC, measured level for level.');
   await expect(section).not.toContainText('does not imply a Bånder Audio Core lossless mode');
+  const heldOut = section.locator('details.bac-copy-detail');
+  const heldOutText = heldOut.getByText(/^The gates also run on held-out recordings/);
+  await expect(heldOut).not.toHaveAttribute('open');
+  await expect(heldOutText).toBeHidden();
+  await heldOut.getByText('Held-out recordings', { exact: true }).click();
+  await expect(heldOutText).toBeVisible();
   await expect(section.locator('.bac-dateline'))
     .toHaveText(/^Recorded \d{1,2} [A-Z][a-z]+ \d{4} on .+\. The references were flac 1\.4\.3 and FFmpeg \S+\. /);
   await expect(section.locator('tbody th')).toHaveText([

@@ -160,10 +160,10 @@ $speed = static fn (?float $value): string => $value === null ? 'Not measured' :
         <h3>Streams and files</h3>
         <p>The encoder writes and the decoder reads tags and pictures. <code>flac</code> and FFmpeg decode the encoder's streams to the input samples. The decoder passes over an ID3v2 tag in front of a stream and an ID3v1 tag behind its last frame, verifies every sample between them and reports both tags; the reference decoder reports the second as lost sync. Encoded bytes do not depend on the compiler, the optimization level, the processor or the C library: every CI runner has to reproduce fifteen streams pinned by their digests.</p>
       </div>
-      <div>
-        <h3>Held-out recordings</h3>
+      <details class="bac-copy-detail">
+        <summary>Held-out recordings</summary>
         <p>The gates also run on held-out recordings, which the encoder is never tuned on. The first held-out set, seven recordings from the FLAC decoder testbench, ran once before the encoder was final, and two of its encode gates failed. Four speed changes to the encoder followed. They were measured on the corpus and left every encoded byte as it was, but the failures had prompted them, so the seven recordings moved into the corpus, where they keep gates of their own. A second set of three recordings followed, and it was replaced in turn after code review changed the encoder binary, because an earlier build had already read it. The held-out gates are now judged on a third set: Avon Chang's piano recording of Bach's Cello Suite No. 6 (96 kHz, 24-bit), twenty seconds of the 5.1 mix of the film Tears of Steel and a minute of Cloudkicker's "Let Yourself Be Huge", fetched against pinned checksums.<?= $losslessRun !== null && $losslessRun['heldOutFirstRun'] ? ' The recorded run was the first to read them.' : '' ?> In that run one held-out gate failed: on the piano recording Bånder Audio Core's level 5 frames were 0.27 % larger than those of <code>flac -5</code>. The failure stands, and the encoder is not tuned in answer to it.</p>
-      </div>
+      </details>
     </div>
     <?php if ($losslessRun !== null): ?>
       <p class="bac-dateline">Recorded <?= $escape($losslessRun['date']) ?> on <?= $escape($losslessRun['processor']) ?>.<?= $losslessRun['compiler'] === '' ? '' : ' Bånder Audio Core was built with ' . $escape($losslessRun['compiler']) . '.' ?> The references were <?= $escape($losslessRun['flac']) ?> and <?= $escape($losslessRun['ffmpeg']) ?>. Each timed run is one process on one pinned core over the corpus repeated <?= $number($losslessRun['repetitions'], 0) ?> times. Compare speeds within this run only.</p>

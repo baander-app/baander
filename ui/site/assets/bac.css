@@ -41,6 +41,7 @@
 .bac-section-heading > p:not(.eyebrow), .bac-copy-grid p, .bac-method-detail p { color: var(--color-muted-foreground); }
 .bac-copy-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px; }
 .bac-copy-grid p { margin-top: 16px; }
+.bac-copy-detail > summary { font-size: 20px; font-weight: 600; line-height: 1.2; letter-spacing: -.01em; cursor: pointer; }
 .bac-copy-grid + .bac-note { margin-top: 32px; }
 .bac-note { border-left: 2px solid var(--color-accent-text); background: var(--color-card); padding: 24px; }
 .bac-note p + p { margin-top: 16px; }
