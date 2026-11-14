@@ -46,7 +46,7 @@ The issuer is `APP_URL`. `app:auth:setup-clients` creates only the first-party c
 ### Rate limiting
 
 Limits are set in `config/packages/auth.yaml`. They feed the Symfony policies in
-`config/packages/framework.yaml`; all 19 configured limiters consume state through
+`config/packages/framework.yaml`; all 21 configured limiters consume state through
 atomic Redis compare-and-set. Each limiter has its own namespace, so the admin
 **Rate Limits** tab and `app:rate-limiter:clear` reset its generation without
 changing other limiters. The catalog reports `storageNamespace`, not a cache pool.
@@ -108,15 +108,19 @@ Each limiter counts requests per key:
 | `oauth_device_verify_ip` | `GET /api/oauth/device/verify`, `POST /api/oauth/device/approve` | Client IP |
 | `config_check` | Admin configuration check (10 per minute) | One bucket shared by all callers |
 | `batch_cover_extract` | `POST /api/albums/covers/extract` (10 per minute) | Client IP |
+| `musicbrainz` | Every MusicBrainz request and every Cover Art Archive cover fetch, from workers and web requests alike (1 per second) | One bucket shared by all callers |
+| `musicbrainz_user` | `GET /api/metadata/browse/*`, and `GET /api/metadata/search/*` when it searches MusicBrainz, the default source (1 per 10 seconds) | User email address |
 | `discovery_endpoint_ip` | Discovery registration and pairing (30 per minute) | Client IP |
 
-The last three have fixed limits in `config/packages/framework.yaml` and no `auth.yaml` parameter.
+The last five have fixed limits in `config/packages/framework.yaml` and no `auth.yaml` parameter.
 
 A request over a limit gets `429 Too Many Requests` with a `Retry-After` header in seconds. The password reset account limit and the verification resend user limit are the exceptions. Over the reset account limit, the endpoint returns the same `200` response as for any other address but issues no reset token, so the response never shows whether an account exists. Over the resend user limit, the endpoint returns its usual `200` response but sends no email. The per-IP reset and verification limits still answer `429`.
 
+The `musicbrainz` limit never answers `429`; callers wait for their turn instead. MusicBrainz allows one request per second from an address, so every MusicBrainz request and Cover Art Archive cover fetch, from any worker or web process, reserves the next free one-second turn in this shared bucket and waits for it. Background work waits as long as the queue ahead of it takes. A MusicBrainz search or lookup on the metadata search and browse routes, which any signed-in user may call, first spends one call of the user's `musicbrainz_user` allowance and answers `429` when the allowance is spent. It then waits at most 10 seconds for a turn, and answers `503 Service Unavailable` when no turn comes within those 10 seconds or when the limiter state in Redis cannot be read.
+
 Media delivery routes are exempt from `anonymous_api` and `authenticated_api`, so playback is never throttled by the general API budget: the audio stream (`/api/stream/track`), the HLS and DASH manifests and segments under `/api/transcode/{id}/` (`master.m3u8`, `media.m3u8`, `manifest.mpd`, `init`, `segment`), subtitle playlists and segments, image files (`/api/images/{id}/file`) and album covers (`GET /api/albums/{id}/cover`). Health, readiness and metrics endpoints (`/health`, `/ready`, `/live`, `/metrics`) are outside `/api` and are never limited.
 
-With `APP_ENV=dev`, only the `config_check`, `auth_password_reset_email` and `auth_email_verification_user` limits apply; the others are skipped.
+With `APP_ENV=dev`, only the `config_check`, `auth_password_reset_email`, `auth_email_verification_user`, `musicbrainz` and `musicbrainz_user` limits apply; the others are skipped.
 
 Both HTTP layers read `TRUSTED_PROXIES`, a comma-separated list of trusted proxy
 addresses or CIDRs that defaults to empty. With that default, a direct client

@@ -177,6 +177,7 @@ class FavoriteAlbumEntity
 - Primary keys always use UUID v7 (via the `Uuid` domain model and `UuidType` Doctrine type). Never use auto-incrementing integers.
 - String columns always use `TEXT`, never `VARCHAR(n)`. Length validation belongs in the domain layer.
 - JSON columns always use JSONB (via `options: ['jsonb' => true]` on `json` type).
+- When an entity's primary key is a to-one association (`#[ORM\Id]` on a `ManyToOne` or `OneToOne`), its repository reads and writes the table with DBAL statements, not the unit of work, and the entity stays as schema mapping only: once Doctrine has loaded such an entity, the strict `uuid` type rejects the key it binds on update. See `docs/solutions/runtime-errors/doctrine-cannot-update-a-loaded-entity-keyed-by-its-association-under-the-strict-uuid-type.md`.
 
 ## 7. Doctrine Repository Implementation
 

@@ -22,6 +22,8 @@ Discogs for queued enrichment.
 
 The template also lists `MUSICBRAINZ_VERSION`, `MUSICBRAINZ_CONTACT` and `LASTFM_API_SECRET`. The current adapters do not consume those values: changing them does not change the MusicBrainz User-Agent or authenticate Last.fm requests. See [Configuration](../configuration/README.md) for the effective deployment settings.
 
+MusicBrainz allows one request per second from an address. Every MusicBrainz request, whether it comes from a worker or a web request, first waits for a turn under the shared `musicbrainz` [rate limit](../configuration/authentication-and-limits.md#rate-limiting), which keeps all processes together to at most one request per second. Adding workers therefore does not make MusicBrainz lookups faster. Queued enrichment waits for its turn however long that takes; the metadata search and browse routes wait at most 10 seconds and then answer `503`. Search terms are escaped, so MusicBrainz reads a title such as "AC/DC" or "Re: Foo" as text rather than as query syntax.
+
 ## Degradation Matrix
 
 Use this table when catalog records exist but enrichment is missing.
