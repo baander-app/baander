@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-11-09. This roadmap selects future work and records unresolved
+Updated: 2026-11-15. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
@@ -301,59 +301,55 @@ that limitation is recorded for follow-up, with no runtime change in the 2026-10
 
 ## Resume here
 
-### State on 2026-11-13
+### State on 2026-11-15
 
-`master` is `ca4f71103` or later on GitHub and Forgejo. Landed on 2026-11-13: the
-quality-gate tail fixes, the capability and size deployment settings, the registry
-deadline-readiness fix, the rename to Bånder Audio Core (`bac`) and its FFmpeg image
-pin. The website is published from `57fc9e1e3`, and the persistent instance runs
-`ca4f71103`.
+`master` is `6912eaaf6` on GitHub and Forgejo, and the persistent instance runs it.
+Landed on 2026-11-14: scan artist credits and MusicBrainz matching. The last recorded
+website publication is the local build of `57fc9e1e3` from 2026-11-13, before both.
+The local branch `chore/roadmap-current`, on `6912eaaf6` and not pushed, holds the
+work since: the CI fixes, two web fixes and this roadmap.
 
-- **Master CI, set aside by the user on 2026-11-13.** The `CI` run on `c34a8e0a1`
-  (run 43445479040) passed the quality gate's steps 39 to 44 for the first time, then
-  failed step 45, "Worker command lifecycle and delivery"
-  (`scripts/test-worker-command-container.sh`), with "Invalid topology diagnostics
-  leaked credentials or launched worker". The check that prints it,
-  `invalidTopology()` in `packages/baander-tooling/src/Fixtures/Worker/Command.php`,
-  expects the worker's logs to name the rejected Redis setting. The likely cause,
-  reproduced on the host without containers: the drill passes `--deployment-profile`,
-  but its containers do not set `BAANDER_DEPLOYMENT_PROFILE`, so
-  `WorkerCommand::deploymentProfile()` exits with "Worker profile must match the web
-  deployment profile." before it checks the Redis settings. Proposed fix, not yet run
-  in containers: add `BAANDER_DEPLOYMENT_PROFILE` to the drill's common container
-  environment in `Command.php`. The same run's registry jobs failed on the
-  deadline-readiness race that `e1a850a85` fixes. Nobody waited for the run on
-  `ca4f71103`. The first green run since 2026-11-05 is the point to write the
-  CI-repair learning with `ce-compound`, which the user confirmed.
+- **Master CI.** No `CI` run on `master` has been green since 2026-11-05. The run for
+  `435a11639` (43638221630) failed step 37 of the quality gate, and the queued run for
+  `6912eaaf6` (43639234220) carries the same code. The branch fixes the defects found
+  at steps 28, 37, 45 and 53; see [Master CI repair](#master-ci-repair). Next: merge
+  and push the branch, then watch its run. Steps 46 to 53 have not run on GitHub since
+  the port. The first green run is the point to write the CI-repair learning with
+  `ce-compound`, which the user confirmed on 2026-11-13.
+- **Web fixes.** On the same branch, a click on the active lyrics effect turns effects
+  off, and the songs view's genre, artist and album panes scroll; see
+  [Lyrics effect toggle and song browser panes](#lyrics-effect-toggle-and-song-browser-panes).
 - **Rename landing, remaining steps.** Done: `master`, the FFmpeg pin, the website,
-  the tag `audio-core-v0.2.0` and the persistent instance. Remaining:
-  1. The `audio-core-v0.2.0` release has no assets yet. In its run (43478502093) the
+  the tag `audio-core-v0.2.0` and the persistent instance. Remaining, each checked
+  again on 2026-11-14:
+  1. The `audio-core-v0.2.0` release does not exist yet. In its run (43478502093) the
      Linux x64, Windows x64 and macOS x64 prebuilds passed three times, and GitHub
      never assigned a macOS arm64 runner ("The job was not acquired by Runner of type
      hosted even after multiple attempts"), so the release job was skipped. Re-run the
      failed job, then check the four prebuilds, `SHA256SUMS` and a clean desktop
      install that fetches its prebuild.
-  2. Move `bench/work/` from `/home/martin/dev/baander-baac-lossless` into
-     `packages/baander-audio-core/bench/`. Copy `work/heldout/runs.json` first, then
-     run `./rename_ledger.py work/heldout/runs.json` and `./setup-refs.sh` without
+  2. Move `packages/baander-aac/bench/work/` from
+     `/home/martin/dev/baander-baac-lossless` into `packages/baander-audio-core/bench/`.
+     Copy `work/heldout/runs.json` first, then run
+     `./rename_ledger.py work/heldout/runs.json` and `./setup-refs.sh` without
      `--lossless-only`, so `env.sh` loses the old absolute paths.
   3. Forgejo CI is set aside by the user; re-run its `ci.yaml` once Forgejo's FFmpeg
      image carries `libbac`.
-
-  Not run before `master`: the draft pull request CI (the user chose not to wait for
-  CI), the full backend suite on the merge with `master` and `test:tooling` after
-  `491009232`.
 - **Capability and size.** No host size is qualified yet (user decision,
   2026-11-12). Next: the 4 GB remux qualification in the VM (its plan's U9), after
-  rebuilding the images from `master`.
+  rebuilding the images from `master`. Before it, check the qualification harness
+  against the album match queue (see the housekeeping under
+  [MusicBrainz matching](#musicbrainz-matching)).
 - **Next plans.** Better compression of material like the failed held-out recording
   (lossless plan KD12) follows the rename. Its fourth held-out set may be read only
   after the benchmark data has moved and its ledger is rewritten.
-- **Cleanup, done 2026-11-13.** Every branch was contained in `master`; GitHub and
-  Forgejo carry only `master`, and the merged local branches and agent worktrees are
-  removed, their `var/` receipts copied to
-  `~/.local/state/baander/receipts/2026-11-13/`. `/home/martin/dev/baander-baac-lossless`
-  stays, detached at `a97ae0058`, until its `bench/work/` has moved.
+- **Cleanup.** GitHub and Forgejo carry only `master`. Left locally on 2026-11-15,
+  beside the unmerged branch: the merged branch `fix/scan-artist-credits`, and two
+  worktrees whose heads are in `master`, `/home/martin/dev/baander-verify`
+  (`ff68e09f2`) and `~/.codex/worktrees/ba59/baander` (`ba5750533`).
+  `/home/martin/dev/baander-baac-lossless` stays, detached at `a97ae0058`, until its
+  `bench/work/` has moved. The receipts of the 2026-11-13 cleanup are in
+  `~/.local/state/baander/receipts/2026-11-13/`.
 
 Continue the Back-to-next-movie investigation through a newly reviewed, bounded
 scope. Capture the browser failure and the next movie's actual startup outcome,
@@ -1243,6 +1239,76 @@ of 6 runs at 79 to 103 ms; with the wait, 9 of 10 runs passed, the tenth under l
 that also stalled startup readiness. The check had failed once in the last 40 GitHub
 runs.
 
+The runs for `a67ed57e4` (43584904626), `c8feae182` (43587064305) and `435a11639`
+(43638221630) then failed at steps 45, 28 and 37. Fixed 2026-11-14 in local commits
+`d1504daa3` to `77bb3c8e4` on `6912eaaf6`, on the branch `chore/roadmap-current`; they
+are not pushed:
+
+- **Step 45, deployment profile (`d1504daa3`):** the worker command drill passes
+  `--deployment-profile` and its containers set no `BAANDER_DEPLOYMENT_PROFILE`, so
+  every worker compared the drill's 3 + 1 profile with the default 8 + 12 and stopped
+  with "Worker profile must match the web deployment profile." before it read the
+  Redis settings. The default left the drill's 3 + 1 in `69b7b45e6` (2026-11-03); no
+  run reached the step until `c34a8e0a1`. The drill's containers now carry the
+  profile. In an image built from `6912eaaf6`, a worker with a rejected stream setting
+  then names it ("MESSENGER_TRANSPORT_DSN query must use unique scalar connection
+  options or the configured stream and group.").
+- **Step 45, installed schedules (`894f39250`):** with the profile fixed, the drill
+  failed whenever a worker pair ran across a ten-minute mark, with "Manual request
+  must remain durable and undispatched before lease admission." The migration
+  `Version20261115110000`, from MusicBrainz matching, installs the album match queue's
+  recovery every ten minutes, and the drill's scheduler checks count every occurrence,
+  stream entry and execution. A run from 21:16:00 to 21:21:44 UTC failed with the
+  recovery's occurrence, dispatched at 21:20:49, beside the fixture's; a run from
+  21:02:30 to 21:08:55 passed. The drill's setup now pauses the installed schedules.
+- **Step 28, rapid seeks (`fb3ea85a3`):** the Chromium two-command gate failed once
+  with "Source seeking must span the full source duration" (180 !== null). The
+  rapid-scrub check compared each gesture's slider with the playback snapshot's
+  duration. The first seek starts a new generation, whose signing answers carry no
+  duration until it is ready, and in the failed run one arrived before the second
+  gesture (generation 9, `ready: false`, 206 ms after the last ready answer). The
+  slider showed 180 s throughout. The loop now passes the duration read before the
+  first seek. The step passed on the three runs before and on the run after.
+- **Step 53, start without PostgreSQL (`51988b869`, `77bb3c8e4`):** the web shutdown
+  drill's last scenario started `app:serve` with PostgreSQL stopped and expected one
+  logged cleanup failure. Since `336d60ff4` (2026-11-03) the start checks the
+  database's default time zone and refuses an unreachable database, so the drill
+  failed with "app:serve did not answer /live." after 27 passing checks. On 2026-11-14
+  the user chose to keep the refusal. The drill now stops PostgreSQL under a running
+  server and requires one drain and exit 0, then requires the next start to exit
+  non-zero over a database connection failure without logging a credential. The
+  deployment profiles, `app:worker` and runtime drill pages say that an unreachable
+  database refuses the start.
+- **Step 37, qualification transport (`841db23a7`):** with matching,
+  `MusicBrainzAdapter` gained two constructor arguments and Lucene escaping, and
+  `QualificationMetadataTransportTest` still built it with three arguments: 1 error in
+  1,588 tests in the run for `435a11639`. The recorded transport looked titles up by
+  the raw query, so with "-" escaped it answered every search as unmatched. The test
+  builds the adapter with a no-limit limiter, and the transport reads the query's
+  escapes before the lookup.
+- **Step 37, controller payload race (`a51392298`):** in the run for `57fc9e1e3`
+  (43487231897),
+  `ControllerPayloadTest::testConcurrentConverterRefusesTheBarrierWhileHoldingAnOldLease`
+  read its child's `report.json` between creation and write: JSON "Syntax error", 1
+  error in 1,588 tests. A reader polling for the file saw an incomplete in-place write
+  once in 3,000 rounds and never with a write through a temporary file and a rename,
+  which the child now uses.
+
+Verified locally on 2026-11-14, on the host with each step's workflow environment,
+against images built from the branch: step 28 in Chromium passes, its rapid-scrub
+control committing 22, 26 and 30 s; step 45 passes across the 21:30 UTC mark with the
+fixtures taken from the image (21:26:02 to 21:34:07); steps 46 to 52 pass (236, 540, 52,
+50, 98, 98 and 110 s); step 53 passes 29 checks, the server draining in 5.7 s with
+PostgreSQL gone and the refused start exiting 7. Step 37 passes in the CI image: at
+`841db23a7`, its four dependency, architecture and format checks, PHPUnit with 1,588
+tests and 13,452 assertions (7 skipped), the two Python-subject tests and PHPStan; at
+`052e8684d`, the architecture and format checks, PHPStan, and `ControllerPayloadTest`
+with `QualificationMetadataTransportTest` (21 tests). `ce-code-review` (one independent
+adversarial read beside the lead's; cross-model pass off by checkout config) said "Ready
+with fixes"; its one finding, the lost drain check, is fixed in `77bb3c8e4`. Not run:
+the Firefox two-command gate, steps 38 to 44 and 54 onward, and the gate as one job in
+the runner container.
+
 Open: no complete green `CI` run on GitHub has been observed since 2026-11-05. Each
 run draws a new test-order seed, so another order-dependent test can still surface in
 step 41. The registry release job failed once on a load-smoke lookup that answered
@@ -1957,7 +2023,40 @@ Open:
   - artist sync is never queued (predates the branch).
 - Housekeeping: `DrainAlbumMatchesMessage` is not in the Qualification fixture's
   metadata job groups
-  (`packages/baander-tooling/src/Fixtures/Qualification/Qualification.php`).
+  (`packages/baander-tooling/src/Fixtures/Qualification/Qualification.php`). The
+  qualification metadata transport (`MetadataTransport.php` beside it) answers
+  MusicBrainz free-text searches without an artist and no `/release` request, so
+  the match queue's requests would end unmatched in a qualification run; check this
+  before the 4 GB qualification.
+
+### Lyrics effect toggle and song browser panes
+
+Two reported web defects, fixed 2026-11-14 in local commits `9ecf84a3d` and
+`052e8684d` on the branch `chore/roadmap-current`; they are not pushed.
+
+- **Lyrics effects (`9ecf84a3d`):** in the fullscreen lyrics view, a click on the
+  active effect did nothing. It now turns effects off: the shared visualizer mode
+  returns to `spectrum`, which is not an engine mode, so the view shows the album
+  background and no effect is pressed.
+- **Song browser panes (`052e8684d`):** in the songs view, each of the genre, artist
+  and album columns grew to its full list inside a pane of fixed height, and the pane
+  clipped it without a scrollbar: the artist list was 960 px tall in a 163 px pane.
+  The column now fills its pane, and its list (131 px) scrolls inside it.
+
+Verification checkpoint, 2026-11-14:
+
+- `LyricsFullscreenOverlay.test.tsx` passes 2/2; its toggle case fails without the
+  change ("expected [ 'Enhanced' ] to deeply equal []"). `BrowserColumn.test.tsx` passes
+  2/2. `yarn typecheck` passes, `yarn lint` reports no error (10 warnings), and vitest
+  passes 3,563 tests in 285 files.
+- Preview (`make preview-url`, Chrome): all three panes showed a scrollbar, and the
+  artist pane scrolled to its end (offset 829 of 829, "Yamamoto" in view). In the
+  fullscreen lyrics view a click on "Enhanced" pressed it and drew the visualizer; a
+  second click left no effect pressed and removed the canvas.
+- Not run: `yarn build`, and Firefox or Safari.
+
+Open: the pane fix has no automated test, because jsdom computes no layout; a
+Playwright check of the songs view would cover it.
 
 ## Roadmap maintenance
 
