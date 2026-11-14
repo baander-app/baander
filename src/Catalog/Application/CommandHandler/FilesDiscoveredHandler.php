@@ -428,7 +428,7 @@ final class FilesDiscoveredHandler
             }
         }
 
-        return $names === [] ? [] : $this->genreService->findOrCreateForImport($names);
+        return $names === [] ? [] : $this->genreService->findOrCreateForImport(array_values(array_unique($names)));
     }
 
     /**
