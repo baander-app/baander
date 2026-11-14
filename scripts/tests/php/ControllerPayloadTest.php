@@ -40,7 +40,12 @@ use Baander\Tooling\Configuration\ToolingConfiguration;
 use Baander\Tooling\Development\RetainedGenerationProbe;
 if (in_array($argv[1] ?? '', ['convert', 'convert-managed', 'drain'], true)) {
     $directory = $argv[4];
-    file_put_contents($directory . '/ready', (string) getmypid());
+    // The test reads each file as soon as it exists, so each one appears whole.
+    $publish = static function (string $path, string $content): void {
+        file_put_contents($path . '.tmp', $content);
+        rename($path . '.tmp', $path);
+    };
+    $publish($directory . '/ready', (string) getmypid());
     while (!is_file($directory . '/begin')) { usleep(1000); }
     $context = str_ends_with($argv[1], '-managed')
         ? new Baander\Tooling\Process\ExecutionContext(getenv())
@@ -57,7 +62,7 @@ if (in_array($argv[1] ?? '', ['convert', 'convert-managed', 'drain'], true)) {
     } catch (Throwable $error) {
         $report = ['status' => $error->getCode(), 'message' => $error->getMessage()];
     }
-    file_put_contents($directory . '/report.json', json_encode($report, JSON_THROW_ON_ERROR));
+    $publish($directory . '/report.json', json_encode($report, JSON_THROW_ON_ERROR));
     while (!is_file($directory . '/finish')) { usleep(1000); }
     $barrier?->release();
     $executor->close();
