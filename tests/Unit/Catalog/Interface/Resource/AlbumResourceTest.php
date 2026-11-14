@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Catalog\Interface\Resource;
 
 use App\Catalog\Domain\Model\Album;
+use App\Catalog\Domain\ValueObject\MusicbrainzId;
 use App\Catalog\Interface\Resource\AlbumResource;
 use App\Media\Domain\Model\Image;
 use App\Shared\Domain\Model\PublicId;
@@ -13,6 +14,9 @@ use PHPUnit\Framework\TestCase;
 
 final class AlbumResourceTest extends TestCase
 {
+    private const string RELEASE_GROUP_ID = '1f4b1bf0-1f3b-4d2b-8f0d-1a2b3c4d5e6f';
+    private const string RELEASE_ID = '6d1c3e5a-0b2f-4a7e-9c1d-3f5e7a9b1c2d';
+
     private Album $album;
 
     protected function setUp(): void
@@ -21,7 +25,7 @@ final class AlbumResourceTest extends TestCase
             Uuid::v4(),
             'Abbey Road',
             'Album',
-            mbid: '1f4b1bf0-1f3b-4d2b-8f0d-1a2b3c4d5e6f',
+            mbid: self::RELEASE_GROUP_ID,
             discogsId: '12345',
             spotifyId: '6nS5rofSTANWiGm2ENb7Os',
             year: 1969,
@@ -97,11 +101,33 @@ final class AlbumResourceTest extends TestCase
         $this->assertArrayNotHasKey('annotation', $result);
         $this->assertArrayNotHasKey('disambiguation', $result);
         $this->assertArrayNotHasKey('catalogNumber', $result);
-        $this->assertArrayNotHasKey('mbid', $result);
         $this->assertArrayNotHasKey('discogsId', $result);
         $this->assertArrayNotHasKey('spotifyId', $result);
         $this->assertArrayNotHasKey('updatedAt', $result);
-        $this->assertArrayNotHasKey('lockedFields', $result);
+    }
+
+    public function testFromCarriesTheMusicBrainzIdsAndLockedFields(): void
+    {
+        $this->album->recordReleaseMatch(MusicbrainzId::fromString(self::RELEASE_ID), new \DateTimeImmutable());
+        $this->album->lockField('title');
+        $this->album->lockField('year');
+
+        $result = AlbumResource::from($this->album);
+
+        $this->assertSame(self::RELEASE_GROUP_ID, $result['mbid']);
+        $this->assertSame(self::RELEASE_ID, $result['releaseMbid']);
+        $this->assertSame(['title', 'year'], $result['lockedFields']);
+    }
+
+    public function testFromGivesAnUnmatchedAlbumNullIdsAndNoLockedFields(): void
+    {
+        $result = Album::create(Uuid::v4(), 'Minimal Album', 'EP') |> AlbumResource::from(...);
+
+        $this->assertArrayHasKey('mbid', $result);
+        $this->assertNull($result['mbid']);
+        $this->assertArrayHasKey('releaseMbid', $result);
+        $this->assertNull($result['releaseMbid']);
+        $this->assertSame([], $result['lockedFields']);
     }
 
     public function testFromHandlesNullOptionalFields(): void

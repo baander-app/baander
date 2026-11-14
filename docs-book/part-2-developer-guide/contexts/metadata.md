@@ -39,6 +39,7 @@ The admin sync, `POST /api/admin/metadata/trigger-sync`, and `app:metadata:sync`
 |------|---------|
 | `MetadataAdminPortInterface` | Sync status and provider list for the admin API and `app:metadata:status` and `app:metadata:providers` |
 | `AlbumMetadataSyncRequestInterface` | Published contract for Catalog ingest: requests a sync of newly created albums while `metadata.auto_sync` is on |
+| `MediaFileMetadataInterface` | Reads the tags of a file on the server and ranks candidate records against them, for the extract and match routes and `app:metadata:file:extract` and `app:metadata:file:match` |
 
 ## API Endpoints
 
@@ -51,8 +52,10 @@ All endpoints are prefixed with `/api`.
 | GET | `/api/metadata/search/song` | `MetadataSearchController` | Search external APIs for a song |
 | GET | `/api/metadata/browse/artist/{mbid}` | `MetadataBrowseController` | Browse MusicBrainz artist details |
 | GET | `/api/metadata/browse/release-group/{mbid}` | `MetadataBrowseController` | Browse MusicBrainz release group details |
-| POST | `/api/metadata/extract` | `MetadataSyncController` | Extract metadata for a media file |
-| POST | `/api/metadata/match` | `MetadataSyncController` | Match a scanned file against external records |
+| POST | `/api/metadata/extract` | `MetadataSyncController` | Read the tags of a file on the server; admin only |
+| POST | `/api/metadata/match` | `MetadataSyncController` | Rank candidate records against the tags of a file on the server; admin only |
+
+Extract and match open any path the server can read, so both need `ROLE_ADMIN`. A path with no file, or a file no tag reader supports, is rejected with 422.
 
 ### Admin — Metadata
 
@@ -87,6 +90,7 @@ Routes under `/api/admin/metadata` (controller `MetadataAdminController`, gated 
 | Component | Purpose |
 |-----------|---------|
 | `MetadataContentReader` | Implements Catalog's `MetadataContentReaderPortInterface` by detecting audio format via `FormatDetector` and delegating to the matching tag reader |
+| `MediaFileMetadata` | Implements `MediaFileMetadataInterface` with `MetadataContentReader`'s readers and `MatchingStrategy`, so extract and match read every format the scan reads |
 | `MetadataAdminService` | Implements `MetadataAdminPortInterface`, querying `songs`, `genre_song`, and `job_monitors` for sync status and reporting configured providers |
 | `MetadataMessagePayloadCodec` | Encodes and decodes `ExtractAlbumCoverCommand`, `SyncMetadataCommand`, `SyncAlbumMessage`, `SyncLibraryMessage`, and `SyncSongMessage` for the `async` transport and job monitor |
 

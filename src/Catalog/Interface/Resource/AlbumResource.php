@@ -20,6 +20,9 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'barcode', type: 'string', nullable: true, description: 'Barcode'),
         new OA\Property(property: 'country', type: 'string', nullable: true, description: 'Country of release'),
         new OA\Property(property: 'language', type: 'string', nullable: true, description: 'Release language as stored; usually a language code, but tag readers may store free text'),
+        new OA\Property(property: 'mbid', type: 'string', nullable: true, description: 'MusicBrainz release group ID'),
+        new OA\Property(property: 'releaseMbid', type: 'string', nullable: true, description: 'MusicBrainz release (edition) the album was matched to; null until a match is applied'),
+        new OA\Property(property: 'lockedFields', type: 'array', items: new OA\Items(type: 'string'), description: 'Fields locked from automatic updates'),
         new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', description: 'Creation timestamp'),
     ],
 )]
@@ -38,6 +41,9 @@ final class AlbumResource extends AbstractResource
             'barcode' => $source->getBarcode(),
             'country' => $source->getCountry(),
             'language' => $source->getLanguage(),
+            'mbid' => $source->getMbid(),
+            'releaseMbid' => $source->getReleaseMbid(),
+            'lockedFields' => $source->getLockedFields(),
             'createdAt' => $source->getCreatedAt()->format(\DateTimeInterface::ATOM),
         ];
     }

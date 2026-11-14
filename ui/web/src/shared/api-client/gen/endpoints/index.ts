@@ -1994,6 +1994,11 @@ export interface SongResource {
   bitrate?: number | null;
   /** Whether the song is explicit */
   explicit: boolean;
+  /**
+     * MusicBrainz recording ID
+     * @nullable
+     */
+  mbid?: string | null;
   /** Fields locked from automatic updates */
   lockedFields: string[];
   /** Creation timestamp */
@@ -2037,6 +2042,18 @@ export interface AlbumResource {
      * @nullable
      */
   language?: string | null;
+  /**
+     * MusicBrainz release group ID
+     * @nullable
+     */
+  mbid?: string | null;
+  /**
+     * MusicBrainz release (edition) the album was matched to; null until a match is applied
+     * @nullable
+     */
+  releaseMbid?: string | null;
+  /** Fields locked from automatic updates */
+  lockedFields: string[];
   /** Creation timestamp */
   createdAt: string;
 }
@@ -2089,6 +2106,13 @@ export interface ArtistResource {
      * @nullable
      */
   sortName?: string | null;
+  /**
+     * MusicBrainz artist ID
+     * @nullable
+     */
+  mbid?: string | null;
+  /** Fields locked from automatic updates */
+  lockedFields: string[];
   /** Creation timestamp */
   createdAt: string;
 }
@@ -4883,6 +4907,66 @@ export type PatchMovieUpdate200 = {
   data?: MovieResource;
 };
 
+export type GetAdminMetadataMatchReviewsParams = {
+  /**
+   * Albums per page
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  /** The `next_cursor` of the previous page */
+  cursor?: string;
+};
+
+/**
+ * Why the matcher left the album for an admin
+ */
+export type GetAdminMetadataMatchReviews200DataItemsItemReason = typeof GetAdminMetadataMatchReviews200DataItemsItemReason[keyof typeof GetAdminMetadataMatchReviews200DataItemsItemReason];
+
+
+export const GetAdminMetadataMatchReviews200DataItemsItemReason = {
+  no_candidates: 'no_candidates',
+  low_score: 'low_score',
+  close_runner_up: 'close_runner_up',
+  track_count_differs: 'track_count_differs',
+  track_lengths_differ: 'track_lengths_differ',
+} as const;
+
+export type GetAdminMetadataMatchReviews200DataItemsItem = {
+  /** The album's public ID */
+  albumPublicId: string;
+  /** The album's title */
+  title: string;
+  /** Why the matcher left the album for an admin */
+  reason: GetAdminMetadataMatchReviews200DataItemsItemReason;
+  /** When the matcher checked the album */
+  checkedAt: string;
+  /**
+     * The best candidate's fit score, from 0 to 100; null when MusicBrainz returned no candidate
+     * @minimum 0
+     * @maximum 100
+     * @nullable
+     */
+  bestScore: number | null;
+};
+
+export type GetAdminMetadataMatchReviews200Data = {
+  items: GetAdminMetadataMatchReviews200DataItemsItem[];
+  /**
+     * Cursor for the next page; null on the last page
+     * @nullable
+     */
+  next_cursor: string | null;
+  /** Whether another page follows */
+  has_next_page: boolean;
+  /** The page size */
+  per_page: number;
+};
+
+export type GetAdminMetadataMatchReviews200 = {
+  data?: GetAdminMetadataMatchReviews200Data;
+};
+
 export type GetSongIndexParams = {
   /** Cursor for pagination (base64-encoded) */
   cursor?: string;
@@ -5616,8 +5700,8 @@ export type PostMetadataExtract200DataMetadata = {
   discNumber?: number | null;
   /** @nullable */
   year?: number | null;
-  /** @nullable */
-  genre?: string | null;
+  /** Genre values in tag order */
+  genre?: string[];
   /** @nullable */
   composer?: string | null;
   /** @nullable */
@@ -5650,7 +5734,7 @@ export type PostMetadataExtract200DataMetadata = {
 };
 
 export type PostMetadataExtract200Data = {
-  /** Detected file format (mp3, m4a, flac, ogg) */
+  /** Detected file format (mp3, m4a, flac, ogg, opus or wav) */
   format?: string;
   metadata?: PostMetadataExtract200DataMetadata;
 };
@@ -17442,6 +17526,115 @@ export const usePatchMovieUpdate = <TError = ErrorType<ApiError | ValidationErro
       return useMutation(getPatchMovieUpdateMutationOptions(options), queryClient);
     }
 
+export const getGetAdminMetadataMatchReviewsUrl = (params?: GetAdminMetadataMatchReviewsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/metadata/match/reviews?${stringifiedParams}` : `/api/admin/metadata/match/reviews`
+}
+
+/**
+ * Albums marked as needing a MusicBrainz match review, the most recently checked first. Pass `next_cursor` back as `cursor` for the next page.
+ * @summary List albums that need a MusicBrainz match review
+ */
+export const getAdminMetadataMatchReviews = async (params?: GetAdminMetadataMatchReviewsParams, options?: Parameters<typeof customInstance>[1]): Promise<GetAdminMetadataMatchReviews200> => {
+
+  return customInstance<GetAdminMetadataMatchReviews200>(getGetAdminMetadataMatchReviewsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminMetadataMatchReviewsQueryKey = (params?: GetAdminMetadataMatchReviewsParams,) => {
+    return [
+    `/api/admin/metadata/match/reviews`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAdminMetadataMatchReviewsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>, TError = ErrorType<ApiError>>(params?: GetAdminMetadataMatchReviewsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminMetadataMatchReviewsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>> = ({ signal }) => getAdminMetadataMatchReviews(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAdminMetadataMatchReviewsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>>
+export type GetAdminMetadataMatchReviewsQueryError = ErrorType<ApiError>
+
+
+export function useGetAdminMetadataMatchReviews<TData = Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>, TError = ErrorType<ApiError>>(
+ params: undefined |  GetAdminMetadataMatchReviewsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminMetadataMatchReviews<TData = Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>, TError = ErrorType<ApiError>>(
+ params?: GetAdminMetadataMatchReviewsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminMetadataMatchReviews<TData = Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>, TError = ErrorType<ApiError>>(
+ params?: GetAdminMetadataMatchReviewsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List albums that need a MusicBrainz match review
+ */
+
+export function useGetAdminMetadataMatchReviews<TData = Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>, TError = ErrorType<ApiError>>(
+ params?: GetAdminMetadataMatchReviewsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAdminMetadataMatchReviewsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetSongIndexUrl = (params?: GetSongIndexParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -22198,7 +22391,7 @@ return customInstance<PostMetadataExtract200>(getPostMetadataExtractUrl(),
 
 export const getPostMetadataExtractMutationKey = () => ['postMetadataExtract'] as const;
 
-export const getPostMetadataExtractMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+export const getPostMetadataExtractMutationOptions = <TError = ErrorType<void | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postMetadataExtract>>, TError,PostMetadataExtractMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postMetadataExtract>>, TError,PostMetadataExtractMutationVariables, TContext> => {
 
@@ -22227,13 +22420,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostMetadataExtractMutationResult = NonNullable<Awaited<ReturnType<typeof postMetadataExtract>>>
     export type PostMetadataExtractMutationBody = BodyType<PostMetadataExtractBody>
-    export type PostMetadataExtractMutationError = ErrorType<ApiError | ValidationError>
+    export type PostMetadataExtractMutationError = ErrorType<void | ValidationError>
     export type PostMetadataExtractMutationVariables = {data: BodyType<PostMetadataExtractBody>}
 
     /**
  * @summary Extract embedded metadata from a local media file
  */
-export const usePostMetadataExtract = <TError = ErrorType<ApiError | ValidationError>,
+export const usePostMetadataExtract = <TError = ErrorType<void | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postMetadataExtract>>, TError,PostMetadataExtractMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postMetadataExtract>>,
@@ -22286,7 +22479,7 @@ return customInstance<PostMetadataMatch200>(getPostMetadataMatchUrl(),
 
 export const getPostMetadataMatchMutationKey = () => ['postMetadataMatch'] as const;
 
-export const getPostMetadataMatchMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+export const getPostMetadataMatchMutationOptions = <TError = ErrorType<void | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postMetadataMatch>>, TError,PostMetadataMatchMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postMetadataMatch>>, TError,PostMetadataMatchMutationVariables, TContext> => {
 
@@ -22315,13 +22508,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostMetadataMatchMutationResult = NonNullable<Awaited<ReturnType<typeof postMetadataMatch>>>
     export type PostMetadataMatchMutationBody = BodyType<PostMetadataMatchBody>
-    export type PostMetadataMatchMutationError = ErrorType<ApiError | ValidationError>
+    export type PostMetadataMatchMutationError = ErrorType<void | ValidationError>
     export type PostMetadataMatchMutationVariables = {data: BodyType<PostMetadataMatchBody>}
 
     /**
  * @summary Match extracted metadata against candidate sources
  */
-export const usePostMetadataMatch = <TError = ErrorType<ApiError | ValidationError>,
+export const usePostMetadataMatch = <TError = ErrorType<void | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postMetadataMatch>>, TError,PostMetadataMatchMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postMetadataMatch>>,

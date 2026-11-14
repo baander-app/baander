@@ -10,6 +10,8 @@ use PHPUnit\Framework\TestCase;
 
 final class ArtistResourceTest extends TestCase
 {
+    private const string ARTIST_ID = 'b10bbbfc-cf9e-42e0-be17-e2c3e1d2600d';
+
     private Artist $artist;
 
     protected function setUp(): void
@@ -21,7 +23,7 @@ final class ArtistResourceTest extends TestCase
             type: 'Group',
             disambiguation: 'British rock band',
             sortName: 'Beatles, The',
-            mbid: 'b10bbbfc-cf9e-42e0-be17-e2c3e1d2600d',
+            mbid: self::ARTIST_ID,
             discogsId: '18839',
             spotifyId: '3WrFJ7ztbogyGnTHbHJFl2',
         );
@@ -86,13 +88,31 @@ final class ArtistResourceTest extends TestCase
 
         $this->assertArrayNotHasKey('gender', $result);
         $this->assertArrayNotHasKey('biography', $result);
-        $this->assertArrayNotHasKey('mbid', $result);
         $this->assertArrayNotHasKey('discogsId', $result);
         $this->assertArrayNotHasKey('spotifyId', $result);
         $this->assertArrayNotHasKey('lifeSpanBegin', $result);
         $this->assertArrayNotHasKey('lifeSpanEnd', $result);
         $this->assertArrayNotHasKey('updatedAt', $result);
-        $this->assertArrayNotHasKey('lockedFields', $result);
+    }
+
+    public function testFromCarriesTheMusicBrainzIdAndLockedFields(): void
+    {
+        $this->artist->lockField('name');
+        $this->artist->lockField('sortName');
+
+        $result = ArtistResource::from($this->artist);
+
+        $this->assertSame(self::ARTIST_ID, $result['mbid']);
+        $this->assertSame(['name', 'sortName'], $result['lockedFields']);
+    }
+
+    public function testFromGivesAnUnmatchedArtistANullIdAndNoLockedFields(): void
+    {
+        $result = Artist::create('Minimal Artist') |> ArtistResource::from(...);
+
+        $this->assertArrayHasKey('mbid', $result);
+        $this->assertNull($result['mbid']);
+        $this->assertSame([], $result['lockedFields']);
     }
 
     public function testFromHandlesNullOptionalFields(): void

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Metadata\Infrastructure\Reader;
 
 use App\Metadata\Infrastructure\Reader\OggParser;
+use App\Tests\Support\Metadata\TaggedMediaFiles;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
@@ -36,6 +37,25 @@ final class OggParserTest extends TestCase
         $this->assertSame(['Ogg Song'], $comments['comments']['TITLE']);
         $this->assertSame(['Ogg Artist'], $comments['comments']['ARTIST']);
         $this->assertSame(['Ogg Album'], $comments['comments']['ALBUM']);
+    }
+
+    public function testParsesTheOpusTagsThatFollowTheOpusHeader(): void
+    {
+        $files = new TaggedMediaFiles();
+
+        try {
+            $parser = new OggParser($files->opus('Opus Song', 'Opus Artist'), $this->logger);
+            $parser->parse();
+        } finally {
+            $files->remove();
+        }
+
+        $this->assertTrue($parser->isValid());
+        $comments = $parser->getVorbisCommentBlock();
+        $this->assertNotNull($comments);
+        $this->assertSame('Baander test encoder', $comments['vendor']);
+        $this->assertSame(['Opus Song'], $comments['comments']['TITLE']);
+        $this->assertSame(['Opus Artist'], $comments['comments']['ARTIST']);
     }
 
     public function testParsesMultipleValuesForSameKey(): void

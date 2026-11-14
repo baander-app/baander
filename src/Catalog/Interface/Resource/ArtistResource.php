@@ -18,6 +18,8 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'type', type: 'string', nullable: true, description: 'Artist type'),
         new OA\Property(property: 'disambiguation', type: 'string', nullable: true, description: 'Disambiguation text'),
         new OA\Property(property: 'sortName', type: 'string', nullable: true, description: 'Sort name'),
+        new OA\Property(property: 'mbid', type: 'string', nullable: true, description: 'MusicBrainz artist ID'),
+        new OA\Property(property: 'lockedFields', type: 'array', items: new OA\Items(type: 'string'), description: 'Fields locked from automatic updates'),
         new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', description: 'Creation timestamp'),
     ],
 )]
@@ -34,6 +36,8 @@ final class ArtistResource extends AbstractResource
             'type' => $source->getType(),
             'disambiguation' => $source->getDisambiguation(),
             'sortName' => $source->getSortName(),
+            'mbid' => $source->getMbid(),
+            'lockedFields' => $source->getLockedFields(),
             'createdAt' => $source->getCreatedAt()->format(\DateTimeInterface::ATOM),
         ];
     }

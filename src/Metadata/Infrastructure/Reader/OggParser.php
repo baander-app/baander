@@ -16,6 +16,7 @@ final class OggParser
 {
     private const string OGG_SIGNATURE = 'OggS';
     private const int VORBIS_COMMENT = 3;
+    private const string OPUS_TAGS_SIGNATURE = 'OpusTags';
 
     private bool $isValid = false;
     /** @var array{vendor: string, comments: array<string, list<string>>}|null */
@@ -121,16 +122,16 @@ final class OggParser
                 $packetType = ord($pageData[$offset]);
                 $signature = substr($pageData, $offset + 1, 6);
 
-                // Vorbis: \x03vorbis (7 bytes), Opus: \x03OpusTags (8 bytes)
+                // Vorbis: \x03vorbis (7 bytes), Opus: OpusTags (8 bytes, no packet type byte)
                 $isVorbis = $signature === 'vorbis';
-                $isOpus = str_starts_with(substr($pageData, $offset + 1, 7), 'OpusTags');
+                $isOpus = substr($pageData, $offset, 8) === self::OPUS_TAGS_SIGNATURE;
 
                 if (!$isVorbis && !$isOpus) {
                     break;
                 }
 
                 if ($packetType === self::VORBIS_COMMENT || $isOpus) {
-                    $headerSize = $isVorbis ? 7 : 8; // skip \x03vorbis or \x03OpusTags
+                    $headerSize = $isVorbis ? 7 : 8; // skip \x03vorbis or OpusTags
                     $commentData = substr($pageData, $offset + $headerSize);
                     $this->parseVorbisCommentData($commentData);
                     $this->isValid = true;

@@ -122,6 +122,8 @@ Application console commands run inside `app`, while the control/execution worke
 
 | Command | Description |
 |---------|-------------|
+| [app:metadata:file:extract](app-metadata-file-extract.md) | Read the tags embedded in a media file on the server |
+| [app:metadata:file:match](app-metadata-file-match.md) | Rank candidate records by how well they fit the tags of a media file on the server |
 | [app:metadata:match:reviews](app-metadata-match-reviews.md) | List the albums that need a MusicBrainz match review, the most recently checked first |
 | [app:metadata:providers](app-metadata-providers.md) | List the metadata providers and whether each one is configured |
 | [app:metadata:status](app-metadata-status.md) | Show track coverage, the last sync and the sync jobs by type |

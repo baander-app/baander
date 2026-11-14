@@ -4,34 +4,32 @@ declare(strict_types=1);
 
 namespace App\Metadata\Interface\Controller;
 
-use App\Metadata\Domain\Model\ExtractedMetadata;
-use App\Metadata\Infrastructure\Matching\MatchingStrategy;
-use App\Metadata\Infrastructure\Reader\FormatDetector;
-use App\Metadata\Infrastructure\Reader\Id3Reader;
-use App\Metadata\Infrastructure\Reader\FlacReader;
-use App\Metadata\Infrastructure\Reader\OggReader;
+use App\Metadata\Application\Port\MediaFileMetadataInterface;
 use App\Metadata\Interface\Request\ExtractMetadataRequest;
 use App\Metadata\Interface\Request\MatchMetadataRequest;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
+use App\Shared\Interface\DTO\ValidationError;
 use OpenApi\Attributes as OA;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
+/**
+ * Reads the tags of a file on the server and ranks candidate records against them.
+ *
+ * Both routes open any path the server can read, so only administrators reach them.
+ */
 #[OA\Tag(name: 'Metadata', description: 'External metadata enrichment endpoints')]
 #[Route('/api/metadata', name: 'metadata_')]
 final class MetadataSyncController
 {
     use ApiResponsesTrait;
-    use TranslatorTrait;
+
     public function __construct(
-        private readonly FormatDetector $formatDetector,
-        private readonly Id3Reader $id3Reader,
-        private readonly FlacReader $flacReader,
-        private readonly OggReader $oggReader,
-        private readonly MatchingStrategy $matchingStrategy,
+        private readonly MediaFileMetadataInterface $files,
     ) {
     }
 
@@ -52,7 +50,7 @@ final class MetadataSyncController
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'format', description: 'Detected file format (mp3, m4a, flac, ogg)', type: 'string', example: 'flac'),
+                            new OA\Property(property: 'format', description: 'Detected file format (mp3, m4a, flac, ogg, opus or wav)', type: 'string', example: 'flac'),
                             new OA\Property(property: 'metadata', properties: [
                                 new OA\Property(property: 'title', type: 'string', nullable: true),
                                 new OA\Property(property: 'artist', type: 'string', nullable: true),
@@ -61,7 +59,7 @@ final class MetadataSyncController
                                 new OA\Property(property: 'trackNumber', type: 'integer', nullable: true),
                                 new OA\Property(property: 'discNumber', type: 'integer', nullable: true),
                                 new OA\Property(property: 'year', type: 'integer', nullable: true),
-                                new OA\Property(property: 'genre', type: 'string', nullable: true),
+                                new OA\Property(property: 'genre', description: 'Genre values in tag order', type: 'array', items: new OA\Items(type: 'string')),
                                 new OA\Property(property: 'composer', type: 'string', nullable: true),
                                 new OA\Property(property: 'bpm', type: 'integer', nullable: true),
                                 new OA\Property(property: 'duration', description: 'Duration in seconds', type: 'number', nullable: true),
@@ -75,50 +73,21 @@ final class MetadataSyncController
                     type: 'object',
                 ),
             ),
-            new OA\Response(response: '400', description: 'File not found or unsupported format', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '401', description: 'Authentication required'),
+            new OA\Response(response: '403', description: 'Administrator role required'),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid request, or no file exists at the path, or the file is in a format the tag readers do not support',
+                content: new OA\JsonContent(ref: new Model(type: ValidationError::class)),
+            ),
         ],
     )]
     #[Route('/extract', name: 'extract', methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    #[CliCounterpart('app:metadata:file:extract')]
     public function extract(#[MapRequestPayload] ExtractMetadataRequest $payload): JsonResponse
     {
-        if (!file_exists($payload->path)) {
-            return $this->errorResponse($this->trans('errors.valid_path_required', domain: 'metadata'));
-        }
-
-        $format = $this->formatDetector->detect($payload->path);
-
-        if ($format === null) {
-            return $this->errorResponse($this->trans('errors.unsupported_format', domain: 'metadata'));
-        }
-
-        $metadata = match ($format) {
-            'mp3', 'm4a' => $this->id3Reader->read($payload->path),
-            'flac' => $this->flacReader->read($payload->path),
-            'ogg' => $this->oggReader->read($payload->path),
-            default => new ExtractedMetadata(),
-        };
-
-        return $this->successResponse([
-            'format' => $format,
-            'metadata' => [
-                'title' => $metadata->getTitle(),
-                'artist' => $metadata->getArtist(),
-                'album' => $metadata->getAlbum(),
-                'albumArtist' => $metadata->getAlbumArtist(),
-                'trackNumber' => $metadata->getTrackNumber(),
-                'discNumber' => $metadata->getDiscNumber(),
-                'year' => $metadata->getYear(),
-                'genre' => $metadata->getGenre(),
-                'composer' => $metadata->getComposer(),
-                'bpm' => $metadata->getBpm(),
-                'duration' => $metadata->getDuration(),
-                'bitrate' => $metadata->getBitrate(),
-                'mbid' => $metadata->getMbid(),
-                'mbAlbumId' => $metadata->getMbAlbumId(),
-                'mbArtistId' => $metadata->getMbArtistId(),
-            ],
-        ]);
+        return $this->files->extract($payload->path) |> $this->successResponse(...);
     }
 
     #[OA\Post(
@@ -154,52 +123,20 @@ final class MetadataSyncController
                     type: 'object',
                 ),
             ),
-            new OA\Response(response: '400', description: 'File not found or unsupported format', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '401', description: 'Authentication required'),
+            new OA\Response(response: '403', description: 'Administrator role required'),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid request, or no file exists at the path, or the file is in a format the tag readers do not support',
+                content: new OA\JsonContent(ref: new Model(type: ValidationError::class)),
+            ),
         ],
     )]
     #[Route('/match', name: 'match', methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    #[CliCounterpart('app:metadata:file:match')]
     public function match(#[MapRequestPayload] MatchMetadataRequest $payload): JsonResponse
     {
-        if (!file_exists($payload->path)) {
-            return $this->errorResponse($this->trans('errors.valid_path', domain: 'metadata'));
-        }
-
-        $format = $this->formatDetector->detect($payload->path);
-
-        if ($format === null) {
-            return $this->errorResponse($this->trans('errors.unsupported_format', domain: 'metadata'));
-        }
-
-        $metadata = match ($format) {
-            'mp3', 'm4a' => $this->id3Reader->read($payload->path),
-            'flac' => $this->flacReader->read($payload->path),
-            'ogg' => $this->oggReader->read($payload->path),
-            default => new ExtractedMetadata(),
-        };
-
-        $matches = $this->matchingStrategy->match($metadata, $payload->candidates);
-
-        $matchData = array_map(
-            static function (\App\Metadata\Domain\Model\MetadataMatch $match): array {
-                $candidate = $match->getCandidate();
-
-                return [
-                    'source' => $candidate['source'] ?? null,
-                    'sourceId' => $candidate['sourceId'] ?? null,
-                    'confidence' => $match->getConfidence(),
-                    'data' => [
-                        'title' => $candidate['title'] ?? null,
-                        'artist' => $candidate['artist'] ?? null,
-                        'album' => $candidate['album'] ?? null,
-                        'year' => $candidate['year'] ?? null,
-                        'mbid' => $candidate['mbid'] ?? null,
-                    ],
-                ];
-            },
-            $matches,
-        );
-
-        return $this->successResponse($matchData);
+        return $this->files->match($payload->path, $payload->candidates) |> $this->successResponse(...);
     }
 }

@@ -4,25 +4,19 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Interface\Controller;
 
-use App\Metadata\Infrastructure\Matching\MatchingStrategy;
-use App\Metadata\Infrastructure\Matching\Validator\AlbumValidator;
-use App\Metadata\Infrastructure\Matching\Validator\ArtistValidator;
-use App\Metadata\Infrastructure\Matching\Validator\SongValidator;
-use App\Metadata\Infrastructure\Reader\FlacReader;
-use App\Metadata\Infrastructure\Reader\FormatDetector;
-use App\Metadata\Infrastructure\Reader\Id3Reader;
-use App\Metadata\Infrastructure\Reader\OggReader;
+use App\Metadata\Application\Exception\UnreadableMediaFileException;
 use App\Metadata\Interface\Controller\MetadataSyncController;
 use App\Metadata\Interface\Request\ExtractMetadataRequest;
 use App\Metadata\Interface\Request\MatchMetadataRequest;
+use App\Tests\Support\Metadata\TaggedMediaFiles;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 final class MetadataSyncControllerTest extends TestCase
 {
     private const string ARTIST_ID = '4d1e2a3b-5c6f-4a7b-8c9d-0e1f2a3b4c5d';
     private const string OTHER_ARTIST_ID = '7f8e9d0c-1b2a-4c3d-9e4f-5a6b7c8d9e0f';
 
+    private TaggedMediaFiles $files;
     private string $path;
     /** @var list<string> */
     private array $temporaryFiles = [];
@@ -30,32 +24,14 @@ final class MetadataSyncControllerTest extends TestCase
 
     protected function setUp(): void
     {
-        $path = tempnam(sys_get_temp_dir(), 'baander-metadata-');
-        self::assertNotFalse($path);
-        $this->path = $path;
-
-        $tag = 'TAG'
-            . str_pad('Test Song', 30, "\x00")
-            . str_pad('Test Artist', 30, "\x00")
-            . str_pad('Test Album', 30, "\x00")
-            . '2026'
-            . str_repeat("\x00", 30)
-            . "\xFF";
-        file_put_contents($path, "\xFF\xFB" . str_repeat("\x00", 254) . $tag);
-
-        $logger = new NullLogger();
-        $this->controller = new MetadataSyncController(
-            new FormatDetector(),
-            new Id3Reader($logger),
-            new FlacReader($logger),
-            new OggReader($logger),
-            new MatchingStrategy(new ArtistValidator(), new AlbumValidator(), new SongValidator()),
-        );
+        $this->files = new TaggedMediaFiles();
+        $this->path = $this->files->mp3();
+        $this->controller = new MetadataSyncController(TaggedMediaFiles::reader());
     }
 
     protected function tearDown(): void
     {
-        unlink($this->path);
+        $this->files->remove();
 
         foreach ($this->temporaryFiles as $file) {
             unlink($file);
@@ -80,6 +56,57 @@ final class MetadataSyncControllerTest extends TestCase
 
         self::assertSame('Headhunterz', $metadata['artist']);
         self::assertNull($metadata['mbArtistId']);
+    }
+
+    public function testExtractReadsTheTagsOfAWavFile(): void
+    {
+        $response = $this->controller->extract(new ExtractMetadataRequest($this->files->wav('Wave Song', 'Wave Artist')));
+
+        $data = json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
+        self::assertSame('wav', $data['format']);
+        self::assertSame('Wave Song', $data['metadata']['title']);
+        self::assertSame('Wave Artist', $data['metadata']['artist']);
+    }
+
+    public function testExtractReadsTheTagsOfAnOpusFile(): void
+    {
+        $response = $this->controller->extract(new ExtractMetadataRequest($this->files->opus('Opus Song', 'Opus Artist')));
+
+        $data = json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
+        self::assertSame('ogg', $data['format']);
+        self::assertSame('Opus Song', $data['metadata']['title']);
+        self::assertSame('Opus Artist', $data['metadata']['artist']);
+    }
+
+    public function testExtractRejectsAPathWithNoFile(): void
+    {
+        $this->expectExceptionObject(UnreadableMediaFileException::missing());
+
+        $this->controller->extract(new ExtractMetadataRequest($this->files->missing()));
+    }
+
+    public function testMatchRejectsAPathWithNoFileBeforeComparingCandidates(): void
+    {
+        $this->expectExceptionObject(UnreadableMediaFileException::missing());
+
+        $this->controller->match(new MatchMetadataRequest($this->files->missing(), [['title' => 'Test Song']]));
+    }
+
+    public function testExtractAndMatchRejectAFileNoTagReaderSupports(): void
+    {
+        $unsupported = $this->files->unsupported();
+
+        foreach ([
+            fn () => $this->controller->extract(new ExtractMetadataRequest($unsupported)),
+            fn () => $this->controller->match(new MatchMetadataRequest($unsupported, [['title' => 'Test Song']])),
+        ] as $call) {
+            try {
+                $call();
+                self::fail('A file in an unsupported format was read.');
+            } catch (UnreadableMediaFileException $rejected) {
+                self::assertSame(UnreadableMediaFileException::unsupportedFormat()->getMessage(), $rejected->getMessage());
+            }
+        }
     }
 
     public function testMatchMapsTheCandidateIdentityAndMetadata(): void

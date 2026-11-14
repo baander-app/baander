@@ -4,4 +4,3 @@ errors:
   release_group_not_found: "Udgivelsesgruppe ikke fundet i MusicBrainz."
   valid_path_required: 'Gyldig "path" til en eksisterende fil er påkrævet.'
   unsupported_format: "Lydformatet understøttes ikke."
-  valid_path: 'Gyldig "path" er påkrævet.'

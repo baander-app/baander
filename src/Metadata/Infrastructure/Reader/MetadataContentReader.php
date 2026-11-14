@@ -22,10 +22,16 @@ final class MetadataContentReader implements MetadataContentReaderPortInterface
     {
         $format = $this->formatDetector->detect($path);
 
-        if ($format === null) {
-            return null;
-        }
+        return $format === null ? null : $this->readAs($path, $format);
+    }
 
+    /**
+     * The tags of a file whose format was already detected, or null when no reader handles the format.
+     *
+     * @param string $format a format FormatDetector names, such as 'flac'
+     */
+    public function readAs(string $path, string $format): ?ExtractedMetadata
+    {
         return match ($format) {
             'mp3', 'm4a' => $this->id3Reader->read($path),
             'flac' => $this->flacReader->read($path),

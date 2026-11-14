@@ -7180,6 +7180,153 @@
                 }
             }
         },
+        "/api/admin/metadata/match/reviews": {
+            "get": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "List albums that need a MusicBrainz match review",
+                "description": "Albums marked as needing a MusicBrainz match review, the most recently checked first. Pass `next_cursor` back as `cursor` for the next page.",
+                "operationId": "get_admin_metadata_match_reviews",
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "description": "Albums per page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 50,
+                            "maximum": 100,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "description": "The `next_cursor` of the previous page",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "One page of albums that need a review",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "required": [
+                                                "items",
+                                                "next_cursor",
+                                                "has_next_page",
+                                                "per_page"
+                                            ],
+                                            "properties": {
+                                                "items": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "required": [
+                                                            "albumPublicId",
+                                                            "title",
+                                                            "reason",
+                                                            "checkedAt",
+                                                            "bestScore"
+                                                        ],
+                                                        "properties": {
+                                                            "albumPublicId": {
+                                                                "description": "The album's public ID",
+                                                                "type": "string"
+                                                            },
+                                                            "title": {
+                                                                "description": "The album's title",
+                                                                "type": "string"
+                                                            },
+                                                            "reason": {
+                                                                "description": "Why the matcher left the album for an admin",
+                                                                "type": "string",
+                                                                "enum": [
+                                                                    "no_candidates",
+                                                                    "low_score",
+                                                                    "close_runner_up",
+                                                                    "track_count_differs",
+                                                                    "track_lengths_differ"
+                                                                ]
+                                                            },
+                                                            "checkedAt": {
+                                                                "description": "When the matcher checked the album",
+                                                                "type": "string",
+                                                                "format": "date-time"
+                                                            },
+                                                            "bestScore": {
+                                                                "description": "The best candidate's fit score, from 0 to 100; null when MusicBrainz returned no candidate",
+                                                                "type": "integer",
+                                                                "nullable": true,
+                                                                "maximum": 100,
+                                                                "minimum": 0
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "next_cursor": {
+                                                    "description": "Cursor for the next page; null on the last page",
+                                                    "type": "string",
+                                                    "nullable": true
+                                                },
+                                                "has_next_page": {
+                                                    "description": "Whether another page follows",
+                                                    "type": "boolean"
+                                                },
+                                                "per_page": {
+                                                    "description": "The page size",
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The limit is not an integer from 1 to the maximum",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Administrator role required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The cursor is not one this list issued",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/songs/": {
             "get": {
                 "tags": [
@@ -10824,7 +10971,7 @@
                                         "data": {
                                             "properties": {
                                                 "format": {
-                                                    "description": "Detected file format (mp3, m4a, flac, ogg)",
+                                                    "description": "Detected file format (mp3, m4a, flac, ogg, opus or wav)",
                                                     "type": "string",
                                                     "example": "flac"
                                                 },
@@ -10859,8 +11006,11 @@
                                                             "nullable": true
                                                         },
                                                         "genre": {
-                                                            "type": "string",
-                                                            "nullable": true
+                                                            "description": "Genre values in tag order",
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "string"
+                                                            }
                                                         },
                                                         "composer": {
                                                             "type": "string",
@@ -10907,18 +11057,14 @@
                             }
                         }
                     },
-                    "400": {
-                        "description": "File not found or unsupported format",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ApiError"
-                                }
-                            }
-                        }
+                    "401": {
+                        "description": "Authentication required"
+                    },
+                    "403": {
+                        "description": "Administrator role required"
                     },
                     "422": {
-                        "description": "Validation error",
+                        "description": "Invalid request, or no file exists at the path, or the file is in a format the tag readers do not support",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -11023,18 +11169,14 @@
                             }
                         }
                     },
-                    "400": {
-                        "description": "File not found or unsupported format",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ApiError"
-                                }
-                            }
-                        }
+                    "401": {
+                        "description": "Authentication required"
+                    },
+                    "403": {
+                        "description": "Administrator role required"
                     },
                     "422": {
-                        "description": "Validation error",
+                        "description": "Invalid request, or no file exists at the path, or the file is in a format the tag readers do not support",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -26496,6 +26638,11 @@
                         "description": "Whether the song is explicit",
                         "type": "boolean"
                     },
+                    "mbid": {
+                        "description": "MusicBrainz recording ID",
+                        "type": "string",
+                        "nullable": true
+                    },
                     "lockedFields": {
                         "description": "Fields locked from automatic updates",
                         "type": "array",
@@ -26516,6 +26663,7 @@
                     "publicId",
                     "title",
                     "type",
+                    "lockedFields",
                     "createdAt"
                 ],
                 "properties": {
@@ -26558,6 +26706,23 @@
                         "description": "Release language as stored; usually a language code, but tag readers may store free text",
                         "type": "string",
                         "nullable": true
+                    },
+                    "mbid": {
+                        "description": "MusicBrainz release group ID",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "releaseMbid": {
+                        "description": "MusicBrainz release (edition) the album was matched to; null until a match is applied",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "lockedFields": {
+                        "description": "Fields locked from automatic updates",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
                     },
                     "createdAt": {
                         "description": "Creation timestamp",
@@ -26607,6 +26772,7 @@
                 "required": [
                     "publicId",
                     "name",
+                    "lockedFields",
                     "createdAt"
                 ],
                 "properties": {
@@ -26640,6 +26806,18 @@
                         "description": "Sort name",
                         "type": "string",
                         "nullable": true
+                    },
+                    "mbid": {
+                        "description": "MusicBrainz artist ID",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "lockedFields": {
+                        "description": "Fields locked from automatic updates",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
                     },
                     "createdAt": {
                         "description": "Creation timestamp",

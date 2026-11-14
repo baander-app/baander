@@ -170,14 +170,6 @@ deptrac:
       - App\Metadata\Infrastructure\Api\Discogs\DiscogsAdapter
       - App\Metadata\Infrastructure\Api\LastFm\LastFmAdapter
       - App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter
-    App\Metadata\Interface\Controller\MetadataSyncController:
-      - App\Metadata\Domain\Model\ExtractedMetadata
-      - App\Metadata\Domain\Model\MetadataMatch
-      - App\Metadata\Infrastructure\Matching\MatchingStrategy
-      - App\Metadata\Infrastructure\Reader\FlacReader
-      - App\Metadata\Infrastructure\Reader\FormatDetector
-      - App\Metadata\Infrastructure\Reader\Id3Reader
-      - App\Metadata\Infrastructure\Reader\OggReader
     App\Notification\Application\Handler\CreateNotificationHandler:
       - App\Auth\Domain\Model\User
       - App\Auth\Domain\Repository\UserRepositoryInterface

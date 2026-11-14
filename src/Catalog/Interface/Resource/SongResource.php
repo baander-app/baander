@@ -26,6 +26,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'disc', type: 'integer', nullable: true, description: 'Disc number'),
         new OA\Property(property: 'bitrate', type: 'integer', nullable: true, description: 'Bitrate in bps'),
         new OA\Property(property: 'explicit', type: 'boolean', description: 'Whether the song is explicit'),
+        new OA\Property(property: 'mbid', type: 'string', nullable: true, description: 'MusicBrainz recording ID'),
         new OA\Property(property: 'lockedFields', type: 'array', items: new OA\Items(type: 'string'), description: 'Fields locked from automatic updates'),
         new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', description: 'Creation timestamp'),
     ],
@@ -64,6 +65,7 @@ final class SongResource extends AbstractResource
             'disc' => $song->getDisc(),
             'bitrate' => $song->getBitrate(),
             'explicit' => $song->isExplicit(),
+            'mbid' => $song->getMbid(),
             'lockedFields' => $song->getLockedFields(),
             'createdAt' => $song->getCreatedAt()->format(\DateTimeInterface::ATOM),
         ];

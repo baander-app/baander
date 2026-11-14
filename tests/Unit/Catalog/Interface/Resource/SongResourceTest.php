@@ -62,6 +62,22 @@ final class SongResourceTest extends TestCase
         self::assertSame(['jpn', 'kor'], array_column($data, 'albumLanguage'));
     }
 
+    public function testSongCarriesItsMusicBrainzRecordingId(): void
+    {
+        $song = $this->song();
+        $song->updateExternalIds(mbid: 'a8e3c6f1-2b4d-4e5f-8a7b-9c0d1e2f3a4b');
+
+        self::assertSame('a8e3c6f1-2b4d-4e5f-8a7b-9c0d1e2f3a4b', SongResource::from($song)['mbid']);
+    }
+
+    public function testUnmatchedSongCarriesANullMusicBrainzId(): void
+    {
+        $data = $this->song() |> SongResource::from(...);
+
+        self::assertArrayHasKey('mbid', $data);
+        self::assertNull($data['mbid']);
+    }
+
     private function song(): Song
     {
         $song = Song::create(new Uuid(), 'Song', '/music/song.flac', 1, 'audio/flac');
