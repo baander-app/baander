@@ -439,7 +439,7 @@ U3 depends only on U2; U4 on U2 and U3; U5 on U1; U6 on U2; U7 on U1 and U5; U8 
 - **Test scenarios:**
   - Covers AE8. A FLAC with ARTIST "Post Malone feat. Luke Combs", ARTISTS "Post Malone" and "Luke Combs" and two IDs yields a primary credit to the Post Malone ID under "Post Malone feat. Luke Combs" and a featured credit to the Luke Combs ID under "Luke Combs".
   - An MP3 with `TXXX:ARTISTS` and two `TXXX:MusicBrainz Artist Id` values gives the same credits.
-  - Two ARTIST values with one ID keep today's single primary credit by name.
+  - Two ARTIST values with one ID keep today's single primary credit, resolved by that ID.
   - Two ARTIST values without IDs keep today's credit under the "; "-joined text.
 - **Verification:** reader and handler unit tests and the real-file functional test pass.
 
@@ -718,6 +718,19 @@ U3 depends only on U2; U4 on U2 and U3; U5 on U1; U6 on U2; U7 on U1 and U5; U8 
 | Review | `ce-code-review` on the branch | before shipping |
 
 Race tests (U4, U6, U8) run as Integration tests on disposable PostgreSQL and copy tables without their PGroonga indexes (`docs/solutions/developer-experience/pgroonga-indexes-in-throwaway-test-schemas-break-later-suites.md`). No test calls MusicBrainz; the preview check does.
+
+## Implementation Amendments
+
+Recorded during implementation on 2026-11-14. Each replaces the plan text it names; the decisions it does not mention stand as planned.
+
+- **Drain serialization (KTD10 step 1, U10 approach 1).** A session-level advisory lock is not pool-safe behind the transaction-mode connection pooler, and the project's pool-safe SQL convention test forbids it. The drain instead claims the oldest due request with `FOR UPDATE SKIP LOCKED`, using the request's due time as the claim token, so no album is matched by two runs at once. One chain of runs is held by a token in the application cache: a run without a token starts a chain in place of any other, and a run of a replaced chain ends. A scheduled job, "Recover the album match queue" (every ten minutes), starts a chain when a request is due and no chain holds the queue, so a lost run or a message out of retries no longer leaves requests waiting. The U10 scenario "two drain messages at once process one album at a time" becomes "two runs never take the same album".
+- **Per-album retry (KTD10 outage rule).** Only a MusicBrainz outage pauses the whole queue (5, 15, 60 minutes, then hourly). An apply that met changed rows or a deadlock gives back only that album's request for 15 minutes, and a MusicBrainz refusal for 6 hours. A Cover Art Archive refusal during the apply still counts as an outage; splitting it needs a separate apply outcome.
+- **Which songs are new (KTD10, R22).** `albums.matched_at` no longer decides which songs a matched album holds that no match has seen: a song committed between the candidate snapshot and the apply was neither paired nor newer. Each song carries `songs.match_checked_at`, set by the apply for every song it compared, under its locks; the requester and the matcher look for songs without it. `matched_at` stays as the album's last match time.
+- **Match state on apply (KTD8, U8 approach 3).** A manual apply deletes the album's match state; an automatic apply leaves it to the drain, which removes the request it claimed, so a request made while the match ran (a second disc arriving) survives.
+- **Manual edits (R24, KTD7).** An admin's edit that changes a matched song field, and any hand change to a song's credits, drop that field or `credits` from `matched_fields`, so a later retag treats them as hand-made rather than matched.
+- **Rate limit spacing (KTD2).** The fixed-window limiter kept the average at one request per second but let two requests out milliseconds apart at a window boundary. The shared limit now spaces every MusicBrainz and Cover Art Archive request at least one second apart.
+- **Asking again after a 503 (KTD2).** On the preview, MusicBrainz answered 503 intermittently to single, well-spaced requests: the same release lookup answered 503, then 200, then 200. The adapter now sends a request answered with 503 again up to twice, after 1 and then 3 seconds, each on a fresh turn under the shared limit; a web request asks again only within its 10-second wait. Only a 503 that survives those attempts counts as an outage.
+- **Cover row and error messages (KTD12, U9).** The comparison's cover row carries whether the album has a cover (`true`/`null`), and the apply rechecks that presence, so no image ID crosses the API. Unknown-candidate and gone-item messages carry no ID, because the API redacts UUID-shaped text and the console must say the same thing.
 
 ## Definition of Done
 
