@@ -828,17 +828,28 @@ final class ShutdownWorkflow
     }
     private function databaseOutage(): void
     {
-        // The start checks the database's default time zone, so an unreachable database refuses it.
+        // A running server still drains once its database is gone.
+        $this->startWeb();
         $this->docker(['stop', $this->id . '-postgres']);
+        $started = microtime(true);
+        $this->docker(['kill', '--signal', 'TERM', $this->id . '-web']);
+        $this->awaitExit();
+        $this->assertStopped('SIGTERM with PostgreSQL stopped after the start', $started);
+        // The start checks the database's default time zone, so an unreachable database refuses it.
         $this->startWebContainer();
         $this->awaitExit();
         $code = $this->state('ExitCode');
-        Runtime::require($code !== '0', 'With PostgreSQL stopped, app:serve started instead of refusing.');
+        $log = $this->runLog();
         Runtime::require(
-            !str_contains($this->runLog(), 'test-only'),
-            'The refused start logged a credential.',
+            $code !== '0' && $this->state('OOMKilled') === 'false',
+            'With PostgreSQL stopped, app:serve started instead of refusing.',
         );
-        echo "PASS: with PostgreSQL stopped, app:serve refused to start and exited {$code} without logging a credential.\n";
+        Runtime::require(
+            str_contains($log, 'SQLSTATE[08'),
+            'The refused start did not report a database connection failure.',
+        );
+        Runtime::require(!str_contains($log, 'test-only'), 'The refused start logged a credential.');
+        echo "PASS: with PostgreSQL stopped, app:serve refused to start over the failed database connection, exited {$code} and logged no credential.\n";
     }
     private function cleanup(bool $failed): void
     {

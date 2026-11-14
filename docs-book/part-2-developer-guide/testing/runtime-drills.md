@@ -102,8 +102,11 @@ has two parts:
      exit `1`;
    - with the server started through `docker exec` rather than as PID 1, no web
      process remains after the stop; web starts no FFmpeg or CPU pool children;
+   - with PostgreSQL stopped after the start, the server still drains once and
+     exits `0`;
    - with PostgreSQL down, `app:serve` cannot read the database's default time
-     zone, refuses to start and exits non-zero without logging a credential.
+     zone, refuses to start and exits non-zero, naming the failed connection
+     without logging a credential.
 
 The drill accepts the same image variables as the other runtime runners and
 enforces its own 15-minute timeout.
