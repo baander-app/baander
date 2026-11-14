@@ -255,6 +255,7 @@ final class Command
             php -d memory_limit=512M bin/console doctrine:migrations:migrate --no-interaction --env=prod
             php -d memory_limit=512M bin/console doctrine:migrations:migrate --no-interaction --env=prod
             php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php prepare-consumer-ack baander.app:commandtest aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+            php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php pause-installed-schedules baander.app:commandtest aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
             php -d memory_limit=256M tests/Fixtures/Worker/worker-command-check.php seed-outbox baander.app:commandtest aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
             SH,
         ]);

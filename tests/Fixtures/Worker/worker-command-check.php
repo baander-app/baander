@@ -43,6 +43,7 @@ $allowedModes = [
     'start-unit',
     'lease-ready',
     'prepare-consumer-ack',
+    'pause-installed-schedules',
     'hold-consumer-ack',
     'release-consumer-ack',
     'verify-consumer-ack-blocked',
@@ -127,6 +128,13 @@ if ($mode === 'prepare-consumer-ack') {
         )
         SQL);
     $db->executeStatement('INSERT INTO worker_command_consumer_ack_gate (id) VALUES (true)');
+    exit(0);
+}
+if ($mode === 'pause-installed-schedules') {
+    // The migrations install active schedules, such as the album match queue's ten-minute
+    // recovery. One that falls due while a drill pair runs adds its own occurrence, stream entry
+    // and execution, and the scheduler checks count every one of them.
+    $db->executeStatement("UPDATE scheduled_jobs SET status = 'paused' WHERE status = 'active'");
     exit(0);
 }
 if ($mode === 'hold-consumer-ack') {
