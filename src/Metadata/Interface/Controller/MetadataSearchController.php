@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Metadata\Interface\Controller;
 
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzSlotWait;
 use App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter;
 use App\Metadata\Infrastructure\Api\Discogs\DiscogsAdapter;
@@ -17,7 +18,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 /**
@@ -62,7 +62,7 @@ final class MetadataSearchController
         ],
     )]
     #[Route('/artist', name: 'artist', methods: ['GET'])]
-    public function searchArtist(Request $request, #[CurrentUser] UserInterface $user): JsonResponse
+    public function searchArtist(Request $request, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
         $query = $request->query->get('q', '');
         $source = $request->query->get('source', 'musicbrainz');
@@ -103,7 +103,7 @@ final class MetadataSearchController
         ],
     )]
     #[Route('/album', name: 'album', methods: ['GET'])]
-    public function searchAlbum(Request $request, #[CurrentUser] UserInterface $user): JsonResponse
+    public function searchAlbum(Request $request, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
         $query = $request->query->get('q', '');
         $source = $request->query->get('source', 'musicbrainz');
@@ -144,7 +144,7 @@ final class MetadataSearchController
         ],
     )]
     #[Route('/song', name: 'song', methods: ['GET'])]
-    public function searchSong(Request $request, #[CurrentUser] UserInterface $user): JsonResponse
+    public function searchSong(Request $request, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
         $query = $request->query->get('q', '');
         $source = $request->query->get('source', 'musicbrainz');
@@ -163,10 +163,14 @@ final class MetadataSearchController
         return $this->successResponse(get_object_vars($results));
     }
 
-    /** The MusicBrainz adapter, once the user has spent a call of their own allowance; 429 when it is spent. */
-    private function musicBrainzFor(UserInterface $user): MusicBrainzAdapter
+    /**
+     * The MusicBrainz adapter, once the user has spent a call of their own allowance; 429 when it is spent.
+     *
+     * The allowance is counted per user ID, so a changed email address starts no new one.
+     */
+    private function musicBrainzFor(AuthenticatedUserIdentityInterface $user): MusicBrainzAdapter
     {
-        $allowance = $this->musicbrainzUserLimiter->create($user->getUserIdentifier())->consume();
+        $allowance = $this->musicbrainzUserLimiter->create($user->getId())->consume();
         if (!$allowance->isAccepted()) {
             throw new TooManyRequestsHttpException(
                 max(1, $allowance->getRetryAfter()->getTimestamp() - time()),

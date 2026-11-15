@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Interface\Controller;
 
+use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Metadata\Infrastructure\Api\CoverArtArchive\CoverArtArchiveAdapter;
 use App\Metadata\Infrastructure\Api\Discogs\DiscogsAdapter;
 use App\Metadata\Infrastructure\Api\LastFm\LastFmAdapter;
@@ -21,7 +22,6 @@ use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
-use Symfony\Component\Security\Core\User\InMemoryUser;
 
 final class MetadataResponseTest extends TestCase
 {
@@ -51,7 +51,7 @@ final class MetadataResponseTest extends TestCase
             self::unlimited(),
         );
 
-        $response = $controller->{$action}(new Request(['q' => 'track', 'source' => $source]), new InMemoryUser('member@baander.app', null));
+        $response = $controller->{$action}(new Request(['q' => 'track', 'source' => $source]), self::member());
         $payload = json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(200, $response->getStatusCode());
@@ -71,7 +71,7 @@ final class MetadataResponseTest extends TestCase
             self::unlimited(),
         );
 
-        $response = $controller->releaseGroup('release-id', new InMemoryUser('member@baander.app', null));
+        $response = $controller->releaseGroup('release-id', self::member());
         $payload = json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(200, $response->getStatusCode());
@@ -87,5 +87,11 @@ final class MetadataResponseTest extends TestCase
     private static function unlimited(): RateLimiterFactory
     {
         return new RateLimiterFactory(['id' => 'musicbrainz', 'policy' => 'no_limit'], new InMemoryStorage());
+    }
+
+    /** A signed-in member as the firewall supplies one. */
+    private static function member(): SecurityUser
+    {
+        return new SecurityUser('0195c2a4-7b1e-7c3d-9f20-4a6b8c0d2e11', 'member@baander.app', 'stored-password-hash');
     }
 }

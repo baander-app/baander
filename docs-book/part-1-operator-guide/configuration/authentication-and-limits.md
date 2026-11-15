@@ -109,7 +109,7 @@ Each limiter counts requests per key:
 | `config_check` | Admin configuration check (10 per minute) | One bucket shared by all callers |
 | `batch_cover_extract` | `POST /api/albums/covers/extract` (10 per minute) | Client IP |
 | `musicbrainz` | Every MusicBrainz request and every Cover Art Archive cover fetch, from workers and web requests alike (1 per second) | One bucket shared by all callers |
-| `musicbrainz_user` | `GET /api/metadata/browse/*`, and `GET /api/metadata/search/*` when it searches MusicBrainz, the default source (1 per 10 seconds) | User email address |
+| `musicbrainz_user` | `GET /api/metadata/browse/*`, and `GET /api/metadata/search/*` when it searches MusicBrainz, the default source (1 per 10 seconds) | User ID |
 | `discovery_endpoint_ip` | Discovery registration and pairing (30 per minute) | Client IP |
 
 The last five have fixed limits in `config/packages/framework.yaml` and no `auth.yaml` parameter.

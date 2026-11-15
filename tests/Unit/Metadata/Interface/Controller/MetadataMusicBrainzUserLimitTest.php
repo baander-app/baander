@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Interface\Controller;
 
+use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzSlotWait;
 use App\Metadata\Infrastructure\Api\CoverArtArchive\CoverArtArchiveAdapter;
@@ -22,7 +23,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
-use Symfony\Component\Security\Core\User\InMemoryUser;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Yaml\Yaml;
 
@@ -30,6 +30,8 @@ use Symfony\Component\Yaml\Yaml;
 final class MetadataMusicBrainzUserLimitTest extends TestCase
 {
     private const string RELEASE_ID = 'f3c3a3b8-5d1e-4c55-9a0e-7a51f4c2d001';
+    private const string MEMBER_ID = '0192f3a1-7b2c-7d4e-8f90-a1b2c3d4e501';
+    private const string OTHER_ID = '0192f3a1-7b2c-7d4e-8f90-a1b2c3d4e502';
 
     /** @var list<string> */
     private array $musicBrainzUrls = [];
@@ -72,7 +74,7 @@ final class MetadataMusicBrainzUserLimitTest extends TestCase
 
     public function testAMemberCallingASearchRouteInALoopGetsTooManyRequestsAfterTheFirstCallInTenSeconds(): void
     {
-        $member = new InMemoryUser('member@baander.app', null);
+        $member = self::member(self::MEMBER_ID, 'member@baander.app');
 
         self::assertSame(200, $this->search->searchArtist(new Request(['q' => 'Post Malone']), $member)->getStatusCode());
         foreach (['searchArtist', 'searchAlbum', 'searchSong'] as $action) {
@@ -84,10 +86,22 @@ final class MetadataMusicBrainzUserLimitTest extends TestCase
         self::assertCount(1, $this->musicBrainzUrls, 'A refused call spends nothing of the shared budget.');
     }
 
+    public function testOneMemberUnderTwoEmailAddressesSharesOneAllowance(): void
+    {
+        $before = self::member(self::MEMBER_ID, 'member@baander.app');
+        $after = self::member(self::MEMBER_ID, 'renamed@baander.app');
+
+        self::assertSame(200, $this->search->searchArtist(new Request(['q' => 'Post Malone']), $before)->getStatusCode());
+        $this->assertTooManyRequests(fn() => $this->search->searchArtist(new Request(['q' => 'Post Malone']), $after));
+        $this->assertTooManyRequests(fn() => $this->browse->artist(self::RELEASE_ID, $after));
+
+        self::assertCount(1, $this->musicBrainzUrls);
+    }
+
     public function testTheLimitIsPerMemberAndOnlyForMusicBrainz(): void
     {
-        $member = new InMemoryUser('member@baander.app', null);
-        $other = new InMemoryUser('other@baander.app', null);
+        $member = self::member(self::MEMBER_ID, 'member@baander.app');
+        $other = self::member(self::OTHER_ID, 'other@baander.app');
 
         self::assertSame(200, $this->browse->releaseGroup(self::RELEASE_ID, $member)->getStatusCode());
         self::assertSame(200, $this->search->searchAlbum(new Request(['q' => 'F-1 Trillion', 'source' => 'discogs']), $member)->getStatusCode());
@@ -97,7 +111,7 @@ final class MetadataMusicBrainzUserLimitTest extends TestCase
 
     public function testAnAdminLookupStillGetsATurnWithinTheWaitLimitWhileAMemberLoops(): void
     {
-        $member = new InMemoryUser('member@baander.app', null);
+        $member = self::member(self::MEMBER_ID, 'member@baander.app');
         $this->search->searchSong(new Request(['q' => 'Pour Me a Drink']), $member);
         for ($call = 0; $call < 5; ++$call) {
             $this->assertTooManyRequests(fn() => $this->search->searchSong(new Request(['q' => 'Pour Me a Drink']), $member));
@@ -120,6 +134,12 @@ final class MetadataMusicBrainzUserLimitTest extends TestCase
             self::assertGreaterThanOrEqual(1, $refusal->getHeaders()['Retry-After']);
             self::assertLessThanOrEqual(11, $refusal->getHeaders()['Retry-After']);
         }
+    }
+
+    /** A signed-in member as the firewall supplies one. */
+    private static function member(string $id, string $email): SecurityUser
+    {
+        return new SecurityUser($id, $email, 'stored-password-hash');
     }
 
     /** A limiter with the configuration the application ships, on in-memory storage. */

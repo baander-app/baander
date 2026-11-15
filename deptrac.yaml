@@ -1374,6 +1374,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Metadata Interface':
+      - 'Auth Identity Contract'
       - 'Metadata Application'
       - 'Metadata MusicBrainz Lookup Contract'
       - 'Shared Domain'

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Metadata\Interface\Controller;
 
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzSlotWait;
 use App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter;
 use App\Metadata\Infrastructure\Api\LastFm\LastFmAdapter;
@@ -15,7 +16,6 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 /**
@@ -62,7 +62,7 @@ final class MetadataBrowseController
         ],
     )]
     #[Route('/artist/{mbid}', name: 'artist', methods: ['GET'])]
-    public function artist(string $mbid, #[CurrentUser] UserInterface $user): JsonResponse
+    public function artist(string $mbid, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
         $artist = $this->musicBrainzFor($user)->lookupArtist($mbid, MusicBrainzSlotWait::Bounded);
 
@@ -98,7 +98,7 @@ final class MetadataBrowseController
         ],
     )]
     #[Route('/release-group/{mbid}', name: 'release_group', methods: ['GET'])]
-    public function releaseGroup(string $mbid, #[CurrentUser] UserInterface $user): JsonResponse
+    public function releaseGroup(string $mbid, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
         $releaseGroup = $this->musicBrainzFor($user)->lookupReleaseGroup($mbid, MusicBrainzSlotWait::Bounded);
 
@@ -109,10 +109,14 @@ final class MetadataBrowseController
         return $this->successResponse(get_object_vars($releaseGroup));
     }
 
-    /** The MusicBrainz adapter, once the user has spent a call of their own allowance; 429 when it is spent. */
-    private function musicBrainzFor(UserInterface $user): MusicBrainzAdapter
+    /**
+     * The MusicBrainz adapter, once the user has spent a call of their own allowance; 429 when it is spent.
+     *
+     * The allowance is counted per user ID, so a changed email address starts no new one.
+     */
+    private function musicBrainzFor(AuthenticatedUserIdentityInterface $user): MusicBrainzAdapter
     {
-        $allowance = $this->musicbrainzUserLimiter->create($user->getUserIdentifier())->consume();
+        $allowance = $this->musicbrainzUserLimiter->create($user->getId())->consume();
         if (!$allowance->isAccepted()) {
             throw new TooManyRequestsHttpException(
                 max(1, $allowance->getRetryAfter()->getTimestamp() - time()),
