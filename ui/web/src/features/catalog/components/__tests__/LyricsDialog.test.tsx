@@ -95,6 +95,13 @@ function searchesSent(): string[] {
 }
 
 describe('LyricsDialog', () => {
+  it('labels the search field with a placeholder that ends in an ellipsis', async () => {
+    const user = userEvent.setup()
+    mount()
+    await user.click(await screen.findByRole('tab', { name: 'Search' }))
+    expect(screen.getByRole('textbox')).toHaveAttribute('placeholder', 'Search lyrics\u2026')
+  })
+
   it('leaves disabled search usable and shows an empty result only after the requested search finishes', async () => {
     let finish!: (value: unknown) => void
     answers.search = () => new Promise(resolve => { finish = resolve })

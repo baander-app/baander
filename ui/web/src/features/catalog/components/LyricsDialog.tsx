@@ -381,7 +381,7 @@ export function LyricsDialog({
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <SearchForm onSubmit={handleSubmitSearch}>
                   <Input
-                    placeholder="Search lyrics\u2026"
+                    placeholder={'Search lyrics\u2026'}
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                   />
