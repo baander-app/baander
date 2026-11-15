@@ -265,17 +265,30 @@ that limitation is recorded for follow-up, with no runtime change in the 2026-10
 scan artist credits and MusicBrainz matching. The persistent instance ran `6912eaaf6`
 before that push and updates itself from `master`. The last recorded website
 publication is the local build of `57fc9e1e3` from 2026-11-13, before all of these.
+Pushed later on 2026-11-15, on top of `23f899976`: the matching follow-ups
+(`a7d1c7466` to `6991a9f9a` and their roadmap record), with the fix for the CI cleanup
+limit.
 
-- **Master CI.** No `CI` run on `master` has been green since 2026-11-05. The run for
-  `435a11639` (43638221630) failed step 37 of the quality gate, and the queued run for
-  `6912eaaf6` (43639234220) carries the same code. The pushed fixes cover the defects
-  found at steps 28, 37, 45 and 53; see [Master CI repair](#master-ci-repair). Next:
-  watch the run on the pushed tip. Steps 46 to 53 have not run on GitHub since the
-  port. The first green run is the point to write the CI-repair learning with
-  `ce-compound`, which the user confirmed on 2026-11-13.
+- **Master CI.** No `CI` run on `master` has been green since 2026-11-05. Run
+  43695574134 on the pushed tip `23f899976` passed steps 1 to 38 of the quality gate
+  in its first attempt, among them steps 28 and 37, which the pushed fixes repaired.
+  It failed step 39 on a cleanup time limit after the step's checks had passed, and
+  its second attempt failed while building the CI image; see
+  [Master CI repair](#master-ci-repair). The third attempt was running when the
+  matching follow-ups were pushed; that push starts a run on the new tip, which
+  carries the fix for the cleanup limit. Steps 40 onward have not run on GitHub with
+  the fixes, among them the repaired steps 45 and 53. The first green run is the point
+  to write the CI-repair learning with `ce-compound`, which the user confirmed on
+  2026-11-13.
 - **Web fixes.** With the same push, a click on the active lyrics effect turns effects
   off, and the songs view's genre, artist and album panes scroll; see
   [Lyrics effect toggle and song browser panes](#lyrics-effect-toggle-and-song-browser-panes).
+- **Matching follow-ups.** On `master` since 2026-11-15: the twelve units of the plan,
+  the code review's fixes and the fix for the CI cleanup limit; see
+  [Matching follow-ups](#matching-follow-ups). The persistent instance takes them
+  with its next update. A lyrics fetch queued before that update fails to decode, and
+  "Ten Thousand Fists" stays on its review list until an admin applies a candidate
+  from the match dialog.
 - **Rename landing, remaining steps.** Done: `master`, the FFmpeg pin, the website,
   the tag `audio-core-v0.2.0` and the persistent instance. Remaining, each checked
   again on 2026-11-14:
@@ -294,15 +307,15 @@ publication is the local build of `57fc9e1e3` from 2026-11-13, before all of the
      image carries `libbac`.
 - **Capability and size.** No host size is qualified yet (user decision,
   2026-11-12). Next: the 4 GB remux qualification in the VM (its plan's U9), after
-  rebuilding the images from `master`. Before it, check the qualification harness
-  against the album match queue (see the housekeeping under
-  [MusicBrainz matching](#musicbrainz-matching)).
+  rebuilding the images from `master`. The qualification harness follows the album
+  match queue since the matching follow-ups; see the qualification items under
+  [Matching follow-ups](#matching-follow-ups).
 - **Next plans.** Better compression of material like the failed held-out recording
   (lossless plan KD12) follows the rename. Its fourth held-out set may be read only
   after the benchmark data has moved and its ledger is rewritten.
 - **Cleanup.** GitHub and Forgejo carry only `master`. Left locally on 2026-11-15: the
-  merged branch `fix/scan-artist-credits`, and two worktrees whose heads are in
-  `master`, `/home/martin/dev/baander-verify`
+  merged branches `fix/scan-artist-credits` and `fix/matching-follow-ups`, and two
+  worktrees whose heads are in `master`, `/home/martin/dev/baander-verify`
   (`ff68e09f2`) and `~/.codex/worktrees/ba59/baander` (`ba5750533`).
   `/home/martin/dev/baander-baac-lossless` stays, detached at `a97ae0058`, until its
   `bench/work/` has moved. The receipts of the 2026-11-13 cleanup are in
@@ -832,11 +845,27 @@ No `CI` run on `master` has been green on GitHub since 2026-11-05. The fixes up 
 
 Open:
 
-- Watch the run on the pushed tip. Locally, on the host against images built from
-  the fixes, steps 28 (Chromium), 37, 45 and 46 to 53 pass. Not run with the fixes:
-  the Firefox two-command gate, steps 38 to 44 and 54 onward, and the gate as one job
-  in the runner container.
-- Steps 46 to 53 have not run on GitHub since the port.
+- Run 43695574134 on the pushed tip `23f899976`:
+  - The first attempt passed steps 1 to 38, among them the repaired steps 28 and 37
+    and the Firefox two-command gate (step 30). It failed step 39, "Development
+    instance safety and source admission", after the step's 371 tests and both of its
+    drills had passed: the operator drill's cleanup removed its work directory under
+    a five-second limit, the log says `rm timed out.`, and a cleanup error turns a
+    passing drill into exit 1. The same step passed in run 43584904626. The removal
+    now has the configured cleanup budget (`5eb1de941`, pushed with the matching
+    follow-ups; `WorkerCleanupTest`, 41 tests, passes with it). That the message belongs
+    to this removal is read from the code, where it is the drill's only `rm` under a
+    time limit; the log names no path.
+  - The second attempt failed at "Build CI image" after 12 minutes with
+    `docker exited with status 1`. Its build log stayed on the runner, so the cause
+    is unknown; the first attempt had built the same revision.
+  - The third attempt was running when the matching follow-ups were pushed. That
+    push starts a run on the new tip.
+- Steps 40 onward have not run on GitHub with the fixes, among them the repaired
+  steps 45 and 53; steps 46 to 53 have not run there since the port. Locally, on the
+  host against images built from the fixes, steps 28 (Chromium), 37, 45 and 46 to 53
+  pass. Not run with the fixes anywhere: steps 40 to 44 and 54 onward, and the gate
+  as one job in the runner container.
 - Each run draws a new test-order seed, so another order-dependent test can still
   surface in step 41.
 - The registry release job failed once on a load-smoke lookup that answered 503; it
@@ -969,10 +998,6 @@ Open:
 - A single artist value that names several artists stays whole in the scan (R7);
   matching the album splits it. On 2026-11-14 the user chose matching over splitting
   on an album-artist prefix in the scan.
-- At its default 500 ms spacing, `app:lyrics:fetch` drew HTTP 429 from LRCLIB for 34
-  of 77 songs on the persistent instance, reported as unavailable; a second run with
-  `--delay=4000` finished the other 40 without a 429. A larger default or a back-off
-  on 429 would let one run finish.
 - Deferred, each separate work:
   - album identity across directories: albums have no uniqueness on title, and
     duplicate detection with `app:album:merge` covers the outcome until album identity
@@ -1007,30 +1032,148 @@ build departs from the plan text.
 
 Open:
 
-- "Ten Thousand Fists [Reprise Records,9362-49433-2,EU]" finds no MusicBrainz
-  candidates, probably because its title carries the label, catalogue number and
-  country; an admin can refine the search in the dialog. Removing such text from the
-  search title is separate work.
 - From review, not fixed:
-  - a request for an album while a run matches it ends the claim and can start a second
-    run on the same album. The apply's row lock and recheck keep a second write out, but
-    MusicBrainz is asked twice, and rarely a review mark is left on an album the other
-    run matched. Storing the claim apart from `due_at` would close it;
-  - a Cover Art Archive refusal during an apply counts as an outage and pauses the whole
-    queue; splitting it needs its own apply outcome;
   - a hand change to a song's credits and the drop of its `credits` mark are separate
-    writes;
-  - the web dialog shows generic messages for an apply's 404 and 422;
-  - the `musicbrainz_user` limit is keyed by the user's email address;
-  - an album merge does not clear `match_checked_at` on the songs it moves;
-  - artist sync is never queued (predates the branch).
-- Housekeeping: `DrainAlbumMatchesMessage` is not in the Qualification fixture's
-  metadata job groups
-  (`packages/baander-tooling/src/Fixtures/Qualification/Qualification.php`). The
-  qualification metadata transport (`MetadataTransport.php` beside it) answers
-  MusicBrainz free-text searches without an artist and no `/release` request, so
-  the match queue's requests would end unmatched in a qualification run; check this
-  before the 4 GB qualification.
+    writes, and the three credit handlers take no song row lock, so a hand change can
+    interleave with a match apply. Today a hand-made credit can keep the matched mark
+    and survive one retag. The complete repair joins hand edits to the catalog lock
+    order and needs its own race tests;
+  - artist sync is never queued (predates the branch): `SyncArtistMessage` has no
+    producer, route or payload codec, and the enricher would write the top hit of a
+    name search onto an artist a match already identified. What artist sync should do
+    now that a match gives artists their IDs is a product decision.
+- The other review leftovers and the qualification housekeeping listed here before
+  were delivered by [Matching follow-ups](#matching-follow-ups).
+
+### Matching follow-ups
+
+Delivered from
+[the matching follow-ups plan](docs/plans/2026-11-15-1038-fix-matching-follow-ups-plan.md)
+and on `master` since 2026-11-15 (`a7d1c7466` to `6991a9f9a` and this record, on top
+of `23f899976`):
+
+- **Lyrics** (U1 to U3). Every LRCLIB request, from any process, takes a turn under one
+  shared pace of one request every two seconds. A 429, or a 503 with `Retry-After`,
+  pauses every process for the time LRCLIB names, an hour at most, and the request is
+  sent again afterwards. A call waits at most 10 seconds, a queued fetch 30. A fetch
+  sends one request, where it sent two and the first went to a route LRCLIB no longer
+  serves. Queued fetches are spaced 3,000 ms, which is also the minimum. A worker's
+  waits last their full time although its keepalive alarm arrives. The lyrics dialog
+  searches on submit, and a failed search is sent once.
+- **Album match queue** (U4 to U7). A run's claim is an ID and a 15-minute expiry in
+  columns of their own, so a request for an album that a run is matching starts no
+  second run and takes effect when the run ends. A cover the Cover Art Archive refuses
+  no longer pauses the queue: the match is applied without it, and a manual apply
+  answers 409 `cover_refused`. An album search that finds nothing is repeated without
+  a trailing comma-separated list in square brackets. A match's 404 names its cause,
+  and the dialog says what to do for a 404 and a 422.
+- **Smaller corrections** (U8, U9). A merge clears `match_checked_at` on the songs it
+  moves and requests a match of the target while automatic matching is on; a song that
+  joins a matched album takes a track's recording ID and credits only within the
+  length tolerance. The per-user MusicBrainz allowance is keyed by user ID.
+- **Qualification harness** (U10, U11). The metadata transport answers the queue's
+  release search and lookup, queue runs count as metadata work, and a scenario's
+  window requires song identities, with the count of 100 albums holding a MusicBrainz
+  ID as the proof of the album matches (user decision, 2026-11-15).
+- **Documentation** (U12). The operator pages, context guides, READMEs and
+  `CONCEPTS.md` describe the above, and no page says an artist sync runs.
+- **From the code review**, decided by the user on 2026-11-15: `GET /api/lyrics/search`
+  requires the administrator role, because each search takes a turn of the shared
+  pace, and a pause LRCLIB names is capped at one hour.
+
+Verification on 2026-11-15:
+
+- Full backend suite in disposable containers at `5eb1de941`: 12,822 tests in four
+  lanes, 12,821 passed. The one failure was the referential integrity guard, which
+  did not list the new `claim_id` column; `2f59f6ccf` lists it, and the guard's 10
+  tests pass. The run at `85bfb293b` selected 12,833 tests and passed all but two,
+  both in tests the branch does not touch. `StreamedResponseProcessorTest` once got
+  curl's exit 52 where it expects 18, and passed three reruns on its own.
+  `CoveredIndexPersistenceTest` failed on `pgroonga: failed to remove column` during
+  an `ANALYZE`, the order-dependent PGroonga failure of throwaway test schemas, and
+  passed when run directly after `AlbumMatchClaimMigrationTest`.
+- Static gates at `85bfb293b`: PHPStan reports no errors, Deptrac 0 violations,
+  `lint:container` passes, and the OpenAPI specification and the generated web client
+  match the application.
+- Tooling in a CI image built at `4077229f3`: 1,595 tests, 13,553 assertions, 7
+  skipped, with the tooling analysis, architecture and format checks clean. After the
+  later tooling change (`5eb1de941`) the three static checks pass on the host.
+- Web at `6991a9f9a`: typecheck passes, lint reports 0 errors and 10 warnings, and
+  all 3,580 tests in 285 files pass. The full run found four cases of a permissions
+  test that pinned the lyrics search's query options; the test now expects the search
+  without a retry.
+- The match claim's race test fails with a `DELETE` and an `UPDATE` as parts of one
+  statement and passes with the `MERGE` that was kept (two sessions, PostgreSQL 18.4).
+- The preview, at `2f59f6ccf`, against LRCLIB and MusicBrainz themselves:
+  - one `app:lyrics:fetch` with default settings queued 77 fetches and finished in
+    about four minutes with 61 found, 16 without a match, none rejected and none
+    unavailable. LRCLIB answered no 429, so no pause was stored;
+  - in the lyrics dialog, typing 18 characters sent no request and Enter sent one;
+  - `app:metadata:match:search` lists five releases of "Ten Thousand Fists" by
+    Disturbed for "Ten Thousand Fists [Reprise Records,9362-49433-2,EU]", each scoring
+    100, where the album found no candidate before;
+  - a queue run claimed that album's request and within about ten seconds left the
+    album for review with `close_runner_up` and a best score of 100. For this check
+    the album's earlier review mark was turned into a due request by hand.
+- Simplification pass: three reviewers, ten findings, none applied; the ones worth
+  keeping are listed below.
+- Code review: twelve reviewers, verdict "Ready with fixes", no finding above
+  moderate. Applied: the two decisions above, this record, and the retry of a failed
+  lyrics search.
+
+Open:
+
+- On an instance that updates: a lyrics fetch queued before the update carries no
+  queued flag and fails to decode, and its song stays marked for a day. The
+  persistent instance updates itself from `master`, so a bulk run in flight at that
+  moment loses its remaining fetches until a later run. A match request a run held at
+  the update keeps its due time and is matched within the hour.
+- A metadata sync does not request again an album that is on the review list with an
+  unchanged song count. "Ten Thousand Fists" therefore keeps its `no_candidates`
+  review on the persistent instance until an admin opens its match dialog, which now
+  lists candidates, and applies one. Several 14-track editions tie at score 100.
+- The pause has met no real 429. A `Retry-After` in date form takes the fallback of 5
+  and then 15 seconds, so the request could be sent again inside the time LRCLIB
+  named; the warning logged with the first real pause shows which form LRCLIB sends.
+  A stored pause ends early only when its Redis key `lyrics:lrclib:pause` is deleted.
+- The claim's lease is not renewed. A match that takes longer than 15 minutes lets a
+  second run take the album: MusicBrainz is asked twice, and the apply's row lock and
+  release recheck keep a second write out.
+- Not run on the preview: an album merge, because its five albums hold no pair to
+  merge. `AlbumMergeTest` (14 tests) runs a merge through the real matcher and apply.
+- Deferred, each separate work: album merge atomicity (the merge runs without a
+  transaction and leaves album favorites behind); a manual apply beside a queue run in
+  flight, where two effects were read from the code and not reproduced (a request for
+  a song committed after the apply read the album is dropped, and an automatic match
+  of new songs can overwrite credits an admin kept seconds earlier).
+- Waits that a worker's keepalive alarm can still cut short: the webhook delivery
+  back-off (`WebhookDeliveryService`), and the `Retry-After` waits of the Discogs,
+  Spotify and TMDB adapters, which no worker reaches today.
+- From the code review, not built: tests for a run of a replaced chain after an
+  outage, a review mark, a failed matcher and the import removal; a test that fails
+  when the MusicBrainz adapter goes back to the interruptible sleep; a dialog-level
+  test of an apply that answers `cover_refused`; one contract test for the in-memory
+  match states and the SQL repository.
+- `AlbumMatchClaimMigrationTest` replays the migrations, PGroonga indexes included,
+  into a throwaway schema and drops it, as the older migration tests do. The second
+  full run above hit the PGroonga failure in a later suite. Isolating its mechanism
+  is the housekeeping item under
+  [Scan artist credits, song lengths and lyrics outcomes](#scan-artist-credits-song-lengths-and-lyrics-outcomes);
+  until then a full run can fail on it in any order that puts such a test first.
+- From the simplification pass, left as they are: the same User-Agent string in the
+  LRCLIB, MusicBrainz and Cover Art Archive adapters; the ranking of candidates
+  written twice, in the dialog's search handler and the matcher (predates the branch);
+  `nextRequestDueAt()` reads every requested row since it counts a claimed row from
+  its claim's expiry; `LrclibClient` takes a sleep closure where the Transcode context
+  uses `SleeperInterface`.
+- Qualification: the 4 GB run is still to do. Its cold start gets its album matches
+  from the admin sync, since automatic matching is off by default. An album the queue
+  leaves for review keeps the count below 100 until the two-hour maintenance deadline,
+  and that failure names no album.
+- `app:metadata:status` still counts an artist sync job that nothing queues. A new
+  song without a measured length never pairs on a matched album, as in a searched
+  match; the pages do not say so.
+- The plan file stays until the next cleanup retires it.
 
 ### Lyrics effect toggle and song browser panes
 
