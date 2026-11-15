@@ -19,7 +19,10 @@ enum MatchApplyOutcome: string
     /** The album holds another release ID than the matcher read; nothing was written. */
     case AlbumMatchedMeanwhile = 'album_matched';
 
-    /** The album, its songs or their artists changed while the apply waited for its locks; nothing was written. */
+    /**
+     * The album, its songs or their artists changed since the matcher read them or while the apply
+     * waited for its locks; nothing was written.
+     */
     case Stale = 'match_stale';
 
     /** The Cover Art Archive did not answer or throttled the request for the cover; nothing was written. */

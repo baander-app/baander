@@ -13,6 +13,7 @@ use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzReleaseSummary;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzSlotWait;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
 use App\Metadata\Application\Port\MusicBrainzLookupInterface;
+use Closure;
 
 /** Answers MusicBrainz calls from what a test set, records every call and never touches the network. */
 final class FakeMusicBrainzLookup implements MusicBrainzLookupInterface
@@ -38,6 +39,14 @@ final class FakeMusicBrainzLookup implements MusicBrainzLookupInterface
     /** @var array<string, MusicBrainzArtist|MusicBrainzRejected|MusicBrainzUnavailable> by artist ID */
     public array $artists = [];
 
+    /**
+     * Runs during a release lookup, before the answer: what another session commits while
+     * MusicBrainz is asked, between the caller's read of the catalog and its writes.
+     *
+     * @var (Closure(string): void)|null given the release ID looked up
+     */
+    public ?Closure $duringReleaseLookup = null;
+
     #[\Override]
     public function findReleases(string $title, ?string $artist, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): array|MusicBrainzRejected|MusicBrainzUnavailable
     {
@@ -51,6 +60,7 @@ final class FakeMusicBrainzLookup implements MusicBrainzLookupInterface
     public function fetchRelease(string $releaseId, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): MusicBrainzRelease|MusicBrainzRejected|MusicBrainzUnavailable|null
     {
         $this->calls[] = 'fetchRelease:' . $releaseId;
+        $this->duringReleaseLookup?->__invoke($releaseId);
 
         return $this->releases[$releaseId] ?? null;
     }

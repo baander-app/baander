@@ -11,6 +11,7 @@ use App\Catalog\Application\Command\MusicBrainzMatch\MatchSelection;
 use App\Catalog\Application\Command\MusicBrainzMatch\SeenField;
 use App\Catalog\Application\CommandHandler\MusicBrainzMatch\ApplyMatchHandler;
 use App\Catalog\Application\CommandHandler\MusicBrainzMatch\MatchCovers;
+use App\Catalog\Application\CommandHandler\MusicBrainzMatch\MatchTicks;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistIdentityResolverInterface;
 use App\Catalog\Application\Port\ArtistMergePortInterface;
@@ -27,7 +28,10 @@ use App\Catalog\Application\QueryHandler\MusicBrainzMatch\CompareMatchHandler;
 use App\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchComparisonBuilder;
 use App\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchSnapshots;
 use App\Catalog\Application\Service\CoverImageDiscarder;
+use App\Catalog\Application\Service\MusicBrainzMatch\AlbumReleaseSearch;
+use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticAlbumMatcher;
 use App\Catalog\Application\Service\MusicBrainzMatch\MatchCandidate;
+use App\Catalog\Application\Service\MusicBrainzMatch\MatchConfidence;
 use App\Catalog\Application\Service\MusicBrainzMatch\TrackPairs;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Artist;
@@ -62,6 +66,9 @@ use Psr\Log\AbstractLogger;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Clock\MockClock;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Throwable;
 
 /**
@@ -541,6 +548,155 @@ final class ApplyMatchHandlerTest extends TestCase
         self::assertNotContains('remove match state', $this->calls);
     }
 
+    public function testAMatchedAlbumWithoutANewSongKeepsTheCreditsAnAdminGaveItAndTakesANewMatchTime(): void
+    {
+        $album = $this->addAlbum();
+        $release = $this->musicBrainz->releases[self::releaseId(1)] = self::release(self::releaseId(1));
+        $this->addSongsOf($album, $release);
+        $this->matchWith($album, $release);
+        $austinPost = $this->catalog->artist('Austin Post');
+        $this->catalog->creditAlbum($album, $austinPost, ArtistRole::Primary);
+
+        $result = $this->matcherApplyOf($album) |> $this->apply(...);
+
+        self::assertTrue($result->isApplied());
+        self::assertSame([['Austin Post', 'primary', 'Austin Post']], $this->albumCreditsOf($album), 'The release credits Post Malone; the album keeps the credit it holds.');
+        self::assertFalse($result->creditsChanged);
+        self::assertSame($austinPost, $this->catalogArtist($austinPost->getId()));
+        self::assertSame([[], []], [$result->mergedArtists, $result->removedArtists]);
+        self::assertSame('2026-11-14 12:00:00', $album->getMatchedAt()?->format('Y-m-d H:i:s'));
+    }
+
+    public function testAMatchOfAMatchedAlbumsNewSongCreditsTheSongAndKeepsTheArtistOnlyTheAlbumCredits(): void
+    {
+        [$album, $new, $austinPost, $duetArtist] = $this->matchedLongBedWithANewDuet();
+
+        $result = $this->matcherApplyOf($album) |> $this->apply(...);
+
+        self::assertSame(
+            [['Post Malone', 'primary', 'Post Malone, Tim McGraw'], ['Tim McGraw', 'featured', 'Tim McGraw']],
+            $this->creditsOf($new),
+        );
+        self::assertSame(self::recordingId(2, 9), $new->getMbid());
+        self::assertSame([['Austin Post', 'primary', 'Austin Post']], $this->albumCreditsOf($album), 'The album keeps the credit it holds.');
+        self::assertFalse($result->creditsChanged);
+        self::assertSame($austinPost, $this->catalogArtist($austinPost->getId()), 'Only the album credits Austin Post; the artist is neither merged nor removed.');
+        self::assertSame([[$duetArtist->getPublicId()->toString()], []], [$result->mergedArtists, $result->removedArtists], 'The new song\'s combined artist still merges into Post Malone.');
+        self::assertSame(1, $result->songsChanged);
+    }
+
+    public function testTheRowsOfAMatchOfAMatchedAlbumsNewSongsHoldNeitherTheAlbumsCreditsNorAMergeThatNeedsThem(): void
+    {
+        [$album, $new] = $this->matchedLongBedWithANewDuet();
+        $candidate = $this->matcherApplyOf($album)->candidate ?? throw new \LogicException('The matcher applies a candidate.');
+        $comparison = new MatchComparisonBuilder($this->catalog, $this->catalogArtists())->album($this->snapshotsOverPorts()->ofAlbum($album), $candidate);
+
+        $first = MatchTicks::automatic($comparison, ofMatchedAlbum: false);
+        $ofNewSongs = MatchTicks::automatic($comparison, ofMatchedAlbum: true);
+
+        self::assertNotNull($first->creditsOf(null), 'An album\'s first match writes the album\'s credits.');
+        self::assertSame(['Austin Post', 'Post Malone, Tim McGraw'], array_column($first->actions, 'artistName'));
+        self::assertNull($ofNewSongs->creditsOf(null));
+        self::assertNotNull($ofNewSongs->creditsOf($new->getPublicId()->toString()));
+        self::assertSame(['Post Malone, Tim McGraw'], array_column($ofNewSongs->actions, 'artistName'));
+        self::assertSame($first->fields, $ofNewSongs->fields);
+        self::assertSame($first->songFields, $ofNewSongs->songFields);
+    }
+
+    public function testTheFirstMatchWithoutAnAdminReplacesTheAlbumsCreditsWithTheReleases(): void
+    {
+        $album = $this->addAlbum();
+        $release = self::release(self::releaseId(1));
+        $this->addSongsOf($album, $release);
+        $austinPost = $this->catalog->artist('Austin Post');
+        $this->catalog->creditAlbum($album, $austinPost, ArtistRole::Primary);
+
+        $result = ApplyMatchCommand::automatic($album->getId(), $this->candidate($album, $release)) |> $this->apply(...);
+
+        self::assertSame([['Post Malone', 'primary', 'Austin Post']], $this->albumCreditsOf($album), 'The primary credit keeps the name the album showed.');
+        self::assertTrue($result->creditsChanged);
+        self::assertSame([$austinPost->getPublicId()->toString()], $result->mergedArtists);
+    }
+
+    public function testAMatchOfAMatchedAlbumsNewSongsStillFillsTheAlbumsEmptyFieldsAndMissingCover(): void
+    {
+        $album = $this->addAlbum(year: 2023);
+        $release = self::releaseWith($this->countryRelease(), hasFrontCover: true);
+        $this->musicBrainz->releases[$release->id] = $release;
+        $this->addSongsOf($album, $release);
+        $this->matchWith($album, $release);
+        $this->lookup->covers[$release->id] = new MusicBrainzCoverImage(base64_decode(self::PIXEL), 'image/png');
+
+        $result = $this->matcherApplyOf($album) |> $this->apply(...);
+
+        self::assertSame(2023, $album->getYear(), 'A year that holds a value is never replaced.');
+        self::assertSame('XW', $album->getCountry());
+        self::assertSame(['Country'], $this->catalog->albumGenres[$album->getId()->toString()] ?? []);
+        self::assertArrayHasKey($album->getCoverImageId()?->toString() ?? '', $this->savedImages);
+        self::assertEqualsCanonicalizing(['mbid', 'country', 'genres', 'cover'], $result->fields);
+    }
+
+    public function testAMatchOfAMatchedAlbumsNewSongWritesNothingOnceAnotherMatchComparedTheSong(): void
+    {
+        [$album, $new] = $this->matchedLongBedWithANewDuet();
+        $release = self::releaseWith($this->musicBrainz->releases[self::releaseId(1)], hasFrontCover: true);
+        $this->musicBrainz->releases[$release->id] = $release;
+        $this->lookup->covers[$release->id] = new MusicBrainzCoverImage(base64_decode(self::PIXEL), 'image/png');
+        $command = $this->matcherApplyOf($album);
+        $comparedAt = new \DateTimeImmutable('2026-11-14 11:59:00');
+        $this->whileWaitingForTheAlbum = static fn () => $new->markMatchChecked($comparedAt);
+
+        $result = $this->apply($command);
+
+        self::assertSame([['Post Malone, Tim McGraw', 'primary', 'Post Malone, Tim McGraw']], $this->creditsOf($new), 'The song keeps the credits the other match left it.');
+        self::assertSame(MatchApplyOutcome::Stale, $result->outcome);
+        self::assertNull($new->getMbid());
+        self::assertSame($comparedAt, $new->getMatchCheckedAt());
+        self::assertSame('2026-11-14 11:00:00', $album->getMatchedAt()?->format('Y-m-d H:i:s'), 'The album keeps its match time.');
+        self::assertNull($album->getCoverImageId());
+        self::assertNotContains('resolve', $this->calls);
+        self::assertContains('delete file', $this->calls, 'The downloaded cover file is removed again.');
+    }
+
+    public function testAMatchOfAMatchedAlbumsNewSongsWritesNothingOnceTheSongsPairWithOtherTracks(): void
+    {
+        $album = $this->addAlbum();
+        $release = $this->musicBrainz->releases[self::releaseId(1)] = self::release(self::releaseId(1));
+        $compared = $this->addSongsOf($album, $release, missing: ['2-8', '2-9']);
+        $this->matchWith($album, $release);
+        [$eighth, $ninth] = $this->addSongsOf($album, $release, missing: array_map(self::placeOf(...), $compared));
+        $command = $this->matcherApplyOf($album);
+        $this->whileWaitingForTheAlbum = static function () use ($eighth, $ninth): void {
+            $eighth->updateMetadata(track: 9);
+            $ninth->updateMetadata(track: 8);
+        };
+
+        $result = $this->apply($command);
+
+        self::assertSame([null, null], [$eighth->getMbid(), $ninth->getMbid()], 'Neither song takes the recording of the track it paired with before its number changed.');
+        self::assertSame(MatchApplyOutcome::Stale, $result->outcome);
+        self::assertSame([null, null], [$eighth->getMatchCheckedAt(), $ninth->getMatchCheckedAt()], 'Both songs stay new for the next match.');
+        self::assertSame('2026-11-14 11:00:00', $album->getMatchedAt()?->format('Y-m-d H:i:s'), 'The album keeps its match time.');
+        self::assertNotContains('resolve', $this->calls);
+    }
+
+    public function testAMatchOfAMatchedAlbumMarksANewSongWhoseLengthFitsNoTrackAsComparedAndWritesNothingToIt(): void
+    {
+        $album = $this->addAlbum();
+        $release = $this->musicBrainz->releases[self::releaseId(1)] = self::release(self::releaseId(1));
+        $compared = $this->addSongsOf($album, $release, missing: ['2-9']);
+        $this->matchWith($album, $release);
+        [$new] = $this->addSongsOf($album, $release, missing: array_map(self::placeOf(...), $compared));
+        $new->updateLength(($new->getLength() ?? 0.0) + 40.0);
+
+        $result = $this->matcherApplyOf($album) |> $this->apply(...);
+
+        self::assertTrue($result->isApplied(), 'The song pairs with no track, as when the matcher read it.');
+        self::assertNull($new->getMbid());
+        self::assertEquals(new \DateTimeImmutable('2026-11-14 12:00:00'), $new->getMatchCheckedAt());
+        self::assertSame(0, $result->songsChanged);
+    }
+
     public function testADeadlockAnswersAManualApplyWithARetryableConflictAndFailsAnAutomaticOne(): void
     {
         $album = $this->addAlbum();
@@ -621,6 +777,43 @@ final class ApplyMatchHandlerTest extends TestCase
         return [$release, $songs, $postMalone, $duetArtists];
     }
 
+    /**
+     * Long Bed as an apply left it an hour ago, holding the release and every song compared, and
+     * credited since by hand to "Austin Post", who holds no other credit. The song of the release's
+     * last track arrived after that apply, credited as tagged to a "Post Malone, Tim McGraw" artist
+     * of its own; the release credits that track to Post Malone featuring Tim McGraw.
+     *
+     * @return array{Album, Song, Artist, Artist} the album, the new song, Austin Post and the new song's artist
+     */
+    private function matchedLongBedWithANewDuet(): array
+    {
+        $album = $this->addAlbum();
+        $release = self::release(self::releaseId(1), changes: ['2-9' => ['artistCredit' => self::credit(self::ALBUM_ARTIST, 'Tim McGraw')]]);
+        $this->musicBrainz->releases[$release->id] = $release;
+        $compared = $this->addSongsOf($album, $release, missing: ['2-9']);
+        $this->matchWith($album, $release);
+        $this->catalog->artist(self::ALBUM_ARTIST, self::artistId(self::ALBUM_ARTIST));
+        $austinPost = $this->catalog->artist('Austin Post');
+        $this->catalog->creditAlbum($album, $austinPost, ArtistRole::Primary);
+        [$new] = $this->addSongsOf($album, $release, missing: array_map(self::placeOf(...), $compared));
+        $duetArtist = $this->catalog->artist(self::ALBUM_ARTIST . ', Tim McGraw');
+        $this->catalog->creditSong($new, $duetArtist, ArtistRole::Primary);
+
+        return [$album, $new, $austinPost, $duetArtist];
+    }
+
+    /** The album as an apply of the release left it an hour before the test's clock: it holds the release, and every song it has was compared. */
+    private function matchWith(Album $album, MusicBrainzRelease $release): void
+    {
+        $matchedAt = new \DateTimeImmutable('2026-11-14 11:00:00');
+        $album->recordReleaseMatch(MusicbrainzId::fromString($release->id) ?? throw new \LogicException(), $matchedAt);
+        foreach ($this->songs as $song) {
+            if ($song->getAlbumId()->equals($album->getId())) {
+                $song->markMatchChecked($matchedAt);
+            }
+        }
+    }
+
     private function countryRelease(): MusicBrainzRelease
     {
         $release = self::releaseWith(
@@ -649,6 +842,32 @@ final class ApplyMatchHandlerTest extends TestCase
         $scored = $this->scorer()->scoreRelease($release, $this->snapshotsOverPorts()->ofAlbum($album)->localAlbum());
 
         return new MatchCandidate($release, $scored->score, $scored->pairs, [$release]);
+    }
+
+    /**
+     * The apply the album match queue's matcher dispatches for the album as it is now. For a matched
+     * album the matcher looks up the stored release and compares it with the songs no match has
+     * compared yet.
+     */
+    private function matcherApplyOf(Album $album): ApplyMatchCommand
+    {
+        $dispatched = null;
+        $bus = $this->createStub(MessageBusInterface::class);
+        $bus->method('dispatch')->willReturnCallback(function (object $command) use (&$dispatched): Envelope {
+            $dispatched = $command;
+
+            return new Envelope($command, [new HandledStamp(MatchApplyResult::notApplied(MatchApplyOutcome::Stale, null, ''), 'apply')]);
+        });
+        new AutomaticAlbumMatcher($this->albumPort(), $this->snapshotsOverPorts(), $this->lookup, new AlbumReleaseSearch($this->lookup), $this->scorer(), new MatchConfidence(), $bus)
+            ->match($album->getId());
+
+        return $dispatched instanceof ApplyMatchCommand ? $dispatched : throw new \LogicException('The matcher applied nothing.');
+    }
+
+    /** The song's tagged place, as addSongsOf() names a track. */
+    private static function placeOf(Song $song): string
+    {
+        return $song->getDisc() . '-' . $song->getTrack();
     }
 
     private function compare(MatchItemType $type, string $publicId, string $candidateId): MatchComparison
@@ -695,6 +914,15 @@ final class ApplyMatchHandlerTest extends TestCase
         return array_map(
             static fn (CatalogCredit $credit): array => [$credit->artistName, $credit->role, $credit->creditedName],
             $this->catalog->songCredits[$song->getId()->toString()] ?? [],
+        );
+    }
+
+    /** @return list<array{string, string|null, string}> artist name, role and credited name of each credit of the album */
+    private function albumCreditsOf(Album $album): array
+    {
+        return array_map(
+            static fn (CatalogCredit $credit): array => [$credit->artistName, $credit->role, $credit->creditedName],
+            $this->catalog->albumCredits[$album->getId()->toString()] ?? [],
         );
     }
 

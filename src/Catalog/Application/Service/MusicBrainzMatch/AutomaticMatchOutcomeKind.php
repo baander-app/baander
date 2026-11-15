@@ -19,8 +19,9 @@ enum AutomaticMatchOutcomeKind: string
 
     /**
      * Nothing was written, and this album alone is matched again after a delay: the apply met rows
-     * that changed while it waited for its locks or a deadlock, or MusicBrainz refused a request
-     * about the album. The other albums go on being matched.
+     * that changed since the matcher read the album or while it waited for its locks, or a
+     * deadlock, or MusicBrainz refused a request about the album. The other albums go on being
+     * matched.
      */
     case RetryLater = 'retry_later';
 

@@ -77,6 +77,12 @@ use Throwable;
  * itself, after an automatic apply returns. Covers the merges and removals free are discarded
  * after the commit.
  *
+ * An automatic apply to an album that held the release when the matcher read it matches the
+ * album's new songs. It never writes the album's own credits, nor a merge or removal that needs
+ * them, so credits an admin changed by hand stay. Under the locks it also checks the songs the
+ * matcher compared: when another match compared one of them meanwhile, or one pairs with another
+ * track of the release by now, it writes nothing and reports the match as stale.
+ *
  * A manual apply that cannot apply answers with an exception, also when the Cover Art Archive
  * refuses the cover it ticked. An automatic apply reports every outcome in its result instead, a
  * Cover Art Archive outage included, and fails only on a deadlock, which the queue's message
@@ -227,6 +233,7 @@ final readonly class ApplyMatchHandler
                     $this->songs->findFreshByUuid($songId);
                 }
                 $snapshot = $this->snapshots->ofAlbum($album);
+                $this->assertNewSongsUnchanged($command, $snapshot, $candidate, $compared);
                 $plan = $this->albumPlan($command, $this->comparisons->album($snapshot, $candidate), $snapshot, $candidate);
                 if (!$locks->covers($plan->locks())) {
                     throw MatchTicks::stale('The album changed since the comparison.');
@@ -616,6 +623,56 @@ final readonly class ApplyMatchHandler
         }
     }
 
+    /**
+     * An automatic apply to an album that held the release when the matcher read it writes the
+     * album's new songs only as the matcher compared them. The matcher took every song of the
+     * candidate for one no match had compared; a song an apply compared since then is no longer
+     * new, and that apply decided what the song takes. The matcher also paired each song by the
+     * disc, number and length it read, so the songs are paired with the release once more as they
+     * are now, without asking MusicBrainz: a new song keeps its pair only within the pairing
+     * tolerance, as the matcher decides it, and each must pair with the track it paired with then,
+     * or with none as then.
+     *
+     * @param list<Uuid> $compared the songs the candidate was compared with, all locked and read again
+     *
+     * @throws ConflictException when a match compared one of the songs meanwhile, or one pairs with another track or
+     *                           with none by now (`match_stale`)
+     */
+    private function assertNewSongsUnchanged(ApplyMatchCommand $command, AlbumSnapshot $snapshot, MatchCandidate $candidate, array $compared): void
+    {
+        if ($command->releaseIdSeen === null) {
+            return;
+        }
+        $songs = array_map(static fn (Uuid $songId): ?Song => $snapshot->song($songId->toString()), $compared) |> array_filter(...);
+        if (array_any($songs, static fn (Song $song): bool => $song->getMatchCheckedAt() !== null)) {
+            throw MatchTicks::stale('A match compared one of the album\'s new songs since the matcher read them.');
+        }
+
+        $then = self::trackOfEachSong($candidate->pairs->pairs);
+        $now = array_filter(
+            $this->scorer->scoreRelease($candidate->release, $snapshot->localAlbum())->pairs->pairs,
+            static fn (TrackPair $pair): bool => $pair->isWithinLengthTolerance(),
+        ) |> self::trackOfEachSong(...);
+        $track = static fn (array $tracks, Song $song): ?string => $tracks[$song->getId()->toString()] ?? null;
+        if (array_any($songs, static fn (Song $song): bool => $track($now, $song) !== $track($then, $song))) {
+            throw MatchTicks::stale('The album\'s new songs pair with other tracks of the release than when the matcher read them.');
+        }
+    }
+
+    /**
+     * @param array<TrackPair> $pairs
+     *
+     * @return array<string, string> the place on the release of the track each paired song pairs with, by song ID
+     */
+    private static function trackOfEachSong(array $pairs): array
+    {
+        return array_column(
+            array_map(static fn (TrackPair $pair): array => [$pair->local->id, $pair->release->key()], $pairs),
+            1,
+            0,
+        );
+    }
+
     /** @param array<string, Uuid> $resolved */
     private function targetId(PredictedArtist $target, MatchPlan $plan, array $resolved): ?Uuid
     {
@@ -660,7 +717,9 @@ final readonly class ApplyMatchHandler
 
     private function albumPlan(ApplyMatchCommand $command, MatchComparison $comparison, AlbumSnapshot $snapshot, MatchCandidate $candidate): MatchPlan
     {
-        $ticks = $command->isAutomatic() ? MatchTicks::automatic($comparison) : MatchTicks::manual($comparison, $command->selection);
+        $ticks = $command->isAutomatic()
+            ? MatchTicks::automatic($comparison, ofMatchedAlbum: $command->releaseIdSeen !== null)
+            : MatchTicks::manual($comparison, $command->selection);
         $sources = ['' => $candidate->release->artistCredit];
         $songs = [];
         foreach ($candidate->pairs->pairs as $pair) {

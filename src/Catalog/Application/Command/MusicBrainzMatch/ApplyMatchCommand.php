@@ -17,7 +17,10 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
  * admin saw. An automatic apply matches an album without an admin: it fills the album and the songs
  * the candidate pairs from the candidate the matcher decided on, writing MusicBrainz IDs, artist
  * credits and the merges and removals they cause, empty fields and a missing cover, and never a
- * field that holds a value or is locked. Either kind moves an album's match time to the apply when
+ * field that holds a value or is locked. For an album that held the release when the matcher read
+ * it, an automatic apply leaves the album's own credits as they are, and writes nothing when
+ * another match compared one of the album's new songs since, or one pairs with another track by
+ * then. Either kind moves an album's match time to the apply when
  * it records the release, or when the album holds that release already, as when the matcher pairs
  * a matched album's new songs against its stored release. An album apply also marks every song the
  * candidate was compared with as checked, paired or not; a song imported while the match ran is not
@@ -56,7 +59,8 @@ final readonly class ApplyMatchCommand
      * @param MatchCandidate $candidate     the release the matcher decided on, with its twin editions and the songs it pairs:
      *                                      for a matched album, its stored release and the songs no match has compared yet
      * @param string|null    $releaseIdSeen the release ID the album held when the matcher read it, null for an unmatched album;
-     *                                      the apply writes nothing when the album holds another one by then
+     *                                      the apply writes nothing when the album holds another one by then, and with a
+     *                                      release ID seen it matches the album's new songs only
      */
     public static function automatic(Uuid $albumId, MatchCandidate $candidate, ?string $releaseIdSeen = null): self
     {

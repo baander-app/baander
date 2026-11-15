@@ -44,8 +44,14 @@ final readonly class MatchTicks
      * The rows a match without an admin writes: every MusicBrainz ID, field and cover that is empty
      * and unlocked, every credits row that changes, and every merge and removal those credits cause.
      * A field that holds a value is never written, whatever MusicBrainz gives.
+     *
+     * A match of a matched album's new songs leaves the album's own credits row out: the album took
+     * the release's credits when it was first matched, and what an admin made of them since stays.
+     * A merge or removal that needs that row goes with it.
+     *
+     * @param bool $ofMatchedAlbum whether the album held the release already when the matcher read it
      */
-    public static function automatic(MatchComparison $comparison): self
+    public static function automatic(MatchComparison $comparison, bool $ofMatchedAlbum): self
     {
         $fills = static fn (array $rows): array => array_filter($rows, self::fills(...)) |> array_values(...);
         $songFields = [];
@@ -55,7 +61,10 @@ final readonly class MatchTicks
                 $songFields[$publicId] = $rows;
             }
         }
-        $credits = array_filter(self::creditRows($comparison), static fn (MatchCreditsRow $row): bool => $row->changes()) |> array_values(...);
+        $credits = array_filter(
+            self::creditRows($comparison),
+            static fn (MatchCreditsRow $row): bool => $row->changes() && !($ofMatchedAlbum && $row->isAlbumCredits()),
+        ) |> array_values(...);
 
         return new self($fills($comparison->fields), $songFields, $credits, self::standing($comparison->artistActions, $credits));
     }

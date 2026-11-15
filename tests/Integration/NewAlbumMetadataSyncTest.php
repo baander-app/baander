@@ -246,6 +246,39 @@ final class NewAlbumMetadataSyncTest extends KernelTestCase
         self::assertSame(0, (int) $this->connection()->fetchOne("SELECT count(*) FROM artists WHERE name = 'Post Malone, Hank Williams Jr.'"));
     }
 
+    /**
+     * An admin credited the matched album to another artist than its release names. The match of
+     * the songs that arrived since credits them from their tracks and leaves the album's own
+     * credits, and the artist they name, as the admin left them.
+     */
+    public function testAMatchOfAMatchedAlbumsNewSongsLeavesTheAlbumCreditsAnAdminSetByHand(): void
+    {
+        $this->setAutomaticMatching(true);
+        $this->fakeMusicBrainz([$this->longBed(self::EXPLICIT_EDITION, self::YOURS_EXPLICIT)]);
+        $fixture = $this->storeLongBed(matchedBefore: 1);
+        $austinPost = $this->storeArtist('Austin Post');
+        $this->connection()->executeStatement(
+            "UPDATE artist_album SET artist_id = ?, credited_name = 'Austin Post' WHERE album_id = ?",
+            [$austinPost, $fixture['album']->toString()],
+        );
+        $this->states()->request($fixture['album'], AlbumMatchSource::Ingest, new DateTimeImmutable('-1 minute'));
+
+        static::getContainer()->get(DrainAlbumMatchesHandler::class)(new DrainAlbumMatchesMessage());
+
+        self::assertNull($this->states()->findByAlbum($fixture['album']), 'The run matched the album.');
+        self::assertSame(
+            ['Finer Things', self::FINER_THINGS, 'Post Malone, Hank Williams Jr.', self::POST_MALONE, 'Hank Williams Jr.', 'Lyrics of Finer Things'],
+            $this->creditsOf($fixture['songs'][1]),
+        );
+        self::assertSame(
+            [['Austin Post', 'primary', 'Austin Post']],
+            $this->connection()->fetchAllNumeric(
+                'SELECT a.name, c.role, c.credited_name FROM artist_album c JOIN artists a ON a.id = c.artist_id WHERE c.album_id = ?',
+                [$fixture['album']->toString()],
+            ),
+        );
+    }
+
     private function setAutomaticMatching(bool $enabled): void
     {
         static::getContainer()->get(SystemSettingStoreInterface::class)->save([MetadataSettingDefinitions::AUTO_SYNC => $enabled]);
