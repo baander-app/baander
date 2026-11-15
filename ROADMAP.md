@@ -259,20 +259,21 @@ that limitation is recorded for follow-up, with no runtime change in the 2026-10
 
 ### State on 2026-11-15
 
-`master` is `6912eaaf6` on GitHub and Forgejo, and the persistent instance runs it.
-Landed on 2026-11-14: scan artist credits and MusicBrainz matching. The last recorded
-website publication is the local build of `57fc9e1e3` from 2026-11-13, before both.
-The local branch `chore/roadmap-current`, on `6912eaaf6` and not pushed, holds the
-work since: the CI fixes, two web fixes and this roadmap.
+`master` on GitHub and Forgejo carries, on top of `6912eaaf6`, the work pushed on
+2026-11-15: the CI fixes (`d1504daa3` to `77bb3c8e4`), two web fixes (`9ecf84a3d`,
+`052e8684d`) and the roadmap cleanup with its plan retirement. Landed on 2026-11-14:
+scan artist credits and MusicBrainz matching. The persistent instance ran `6912eaaf6`
+before that push and updates itself from `master`. The last recorded website
+publication is the local build of `57fc9e1e3` from 2026-11-13, before all of these.
 
 - **Master CI.** No `CI` run on `master` has been green since 2026-11-05. The run for
   `435a11639` (43638221630) failed step 37 of the quality gate, and the queued run for
-  `6912eaaf6` (43639234220) carries the same code. The branch fixes the defects found
-  at steps 28, 37, 45 and 53; see [Master CI repair](#master-ci-repair). Next: merge
-  and push the branch, then watch its run. Steps 46 to 53 have not run on GitHub since
-  the port. The first green run is the point to write the CI-repair learning with
+  `6912eaaf6` (43639234220) carries the same code. The pushed fixes cover the defects
+  found at steps 28, 37, 45 and 53; see [Master CI repair](#master-ci-repair). Next:
+  watch the run on the pushed tip. Steps 46 to 53 have not run on GitHub since the
+  port. The first green run is the point to write the CI-repair learning with
   `ce-compound`, which the user confirmed on 2026-11-13.
-- **Web fixes.** On the same branch, a click on the active lyrics effect turns effects
+- **Web fixes.** With the same push, a click on the active lyrics effect turns effects
   off, and the songs view's genre, artist and album panes scroll; see
   [Lyrics effect toggle and song browser panes](#lyrics-effect-toggle-and-song-browser-panes).
 - **Rename landing, remaining steps.** Done: `master`, the FFmpeg pin, the website,
@@ -299,9 +300,9 @@ work since: the CI fixes, two web fixes and this roadmap.
 - **Next plans.** Better compression of material like the failed held-out recording
   (lossless plan KD12) follows the rename. Its fourth held-out set may be read only
   after the benchmark data has moved and its ledger is rewritten.
-- **Cleanup.** GitHub and Forgejo carry only `master`. Left locally on 2026-11-15,
-  beside the unmerged branch: the merged branch `fix/scan-artist-credits`, and two
-  worktrees whose heads are in `master`, `/home/martin/dev/baander-verify`
+- **Cleanup.** GitHub and Forgejo carry only `master`. Left locally on 2026-11-15: the
+  merged branch `fix/scan-artist-credits`, and two worktrees whose heads are in
+  `master`, `/home/martin/dev/baander-verify`
   (`ff68e09f2`) and `~/.codex/worktrees/ba59/baander` (`ba5750533`).
   `/home/martin/dev/baander-baac-lossless` stays, detached at `a97ae0058`, until its
   `bench/work/` has moved. The receipts of the 2026-11-13 cleanup are in
@@ -602,7 +603,10 @@ delivered checkpoints of the capability and size settings, the development contr
 image identities, movie playback on growing presentations, the browser runner release,
 bAAC exact arithmetic and lossless mode, the master CI repair, the playback session
 entities, the Bånder Audio Core rename, scan artist credits, MusicBrainz matching and
-the web fixes of 2026-11-14 with `git show d4a938b74:ROADMAP.md`.
+the web fixes of 2026-11-14 with `git show d4a938b74:ROADMAP.md`. The eight plans
+retired with that cleanup are preserved there too: list them with
+`git ls-tree --name-only d4a938b74 docs/plans/`, then read one with
+`git show d4a938b74:docs/plans/<file>`.
 
 The entries below preserve the installation guides' linked checkpoint and the
 open items left by delivered work.
@@ -731,7 +735,7 @@ Open:
 ### Movie playback on growing presentations
 
 Delivered from the
-[plan](docs/plans/2026-11-09-1635-fix-movie-playback-growing-presentations-plan.md)
+retired plan `2026-11-09-1635-fix-movie-playback-growing-presentations-plan.md`
 on the branch `movie-playback-growing-presentations`, merged to `master` as
 `5957de556` on 2026-11-10 and pushed to both remotes. The defect: on the persistent
 instance a 1080p movie cut forward every few seconds while its encode ladder ran ahead
@@ -768,7 +772,7 @@ Open, known limits:
 ### Releasing a browser runner that went away
 
 Delivered on the branch `session-runner-fence-release` from the
-[plan](docs/plans/2026-11-11-1737-feat-session-runner-fence-release-plan.md), with its
+retired plan `2026-11-11-1737-feat-session-runner-fence-release-plan.md`, with its
 checkpoint on 2026-11-12 at `956ddaa3c`. A tab that was the runner and then reloaded,
 closed or lost its network left the session unknown, and every other tab was refused
 with "Previous playback is unconfirmed" until it came back. The delivery adds one
@@ -800,7 +804,7 @@ Open, known limits:
 
 ### bAAC exact arithmetic
 
-Delivered from the [plan](docs/plans/2026-11-11-1916-fix-baac-exact-arithmetic-plan.md)
+Delivered from the retired plan `2026-11-11-1916-fix-baac-exact-arithmetic-plan.md`
 on the branch `fix-usac-encoder-vector`, by the user's decision of 2026-11-11: every
 compiler writes the same bytes, and nothing on the transcoder's path gets slower
 (`bd175794f`, `4039dff18`, `768802054`, `5210f3e7c`). The Release build had put
@@ -823,14 +827,13 @@ Open:
 
 No `CI` run on `master` has been green on GitHub since 2026-11-05. The fixes up to
 2026-11-13 are on `master`. Those of 2026-11-14, for the defects found at steps 28,
-37, 45 and 53 of the quality gate, are local commits `d1504daa3` to `77bb3c8e4` on the
-branch `chore/roadmap-current`; the pinned revision above gives each cause and its
-evidence.
+37, 45 and 53 of the quality gate, are commits `d1504daa3` to `77bb3c8e4`, pushed on
+2026-11-15; the pinned revision above gives each cause and its evidence.
 
 Open:
 
-- Push the branch and watch its run. Locally, on the host against images built from
-  the branch, steps 28 (Chromium), 37, 45 and 46 to 53 pass. Not run with the fixes:
+- Watch the run on the pushed tip. Locally, on the host against images built from
+  the fixes, steps 28 (Chromium), 37, 45 and 46 to 53 pass. Not run with the fixes:
   the Firefox two-command gate, steps 38 to 44 and 54 onward, and the gate as one job
   in the runner container.
 - Steps 46 to 53 have not run on GitHub since the port.
@@ -844,7 +847,7 @@ Open:
 ### Playback session entities
 
 Delivered from the
-[plan](docs/plans/2026-11-10-2252-refactor-playback-session-entities-plan.md) on the
+retired plan `2026-11-10-2252-refactor-playback-session-entities-plan.md` on the
 branch `playback-session-entities` and merged to `master` on 2026-11-11. Four
 `readOnly` entities map the four playback coordination tables, which left the ORM
 `schema_filter`; `PlaybackStore` reads with DQL, and five statements stay SQL.
@@ -891,7 +894,7 @@ Open:
 
 ### bAAC lossless mode
 
-Delivered from the [plan](docs/plans/2026-11-10-2313-feat-baac-lossless-flac-plan.md)
+Delivered from the retired plan `2026-11-10-2313-feat-baac-lossless-flac-plan.md`
 on the branch `baac-lossless`, by the user's request of 2026-11-10. bAAC writes and
 reads standard FLAC with its own encoder and decoder, written from RFC 9639; the
 package version is 0.2.0.
@@ -926,7 +929,7 @@ Open:
 
 ### Bånder Audio Core rename
 
-Delivered from the [plan](docs/plans/2026-11-12-1934-refactor-rename-baac-to-bac-plan.md)
+Delivered from the retired plan `2026-11-12-1934-refactor-rename-baac-to-bac-plan.md`
 on the branch `rename-audio-core`, by the user's decision of 2026-11-12, and landed
 on `master` on 2026-11-13. bAAC is now Bånder Audio Core, short name `bac`, with no
 aliases; the package lives at `packages/baander-audio-core`. The user chose to land
@@ -955,7 +958,7 @@ Open:
 
 ### Scan artist credits, song lengths and lyrics outcomes
 
-Delivered from the [plan](docs/plans/2026-11-13-2034-fix-scan-artist-credits-plan.md)
+Delivered from the retired plan `2026-11-13-2034-fix-scan-artist-credits-plan.md`
 and on `master` since `a67ed57e4` (2026-11-14): the library scan credits songs and
 albums to their tagged artists, song lengths come from the audio probe, and a lyrics
 fetch reports a missing artist, a missing length and an LRCLIB rejection each as its
@@ -996,7 +999,7 @@ Open:
 
 ### MusicBrainz matching
 
-Delivered from the [plan](docs/plans/2026-11-14-1219-feat-musicbrainz-matching-plan.md)
+Delivered from the retired plan `2026-11-14-1219-feat-musicbrainz-matching-plan.md`
 and on `master` since `435a11639` (2026-11-14): an admin matches an album, song or
 artist to MusicBrainz from a dialog or the console, and a queue matches confident
 albums on its own. The plan's "Implementation Amendments" section records where the
@@ -1031,9 +1034,9 @@ Open:
 
 ### Lyrics effect toggle and song browser panes
 
-Fixed 2026-11-14 in local commits `9ecf84a3d` and `052e8684d` on the branch
-`chore/roadmap-current`: in the fullscreen lyrics view a click on the active effect
-turns effects off, and the songs view's genre, artist and album panes scroll.
+Fixed in `9ecf84a3d` and `052e8684d`, pushed on 2026-11-15: in the fullscreen lyrics
+view a click on the active effect turns effects off, and the songs view's genre,
+artist and album panes scroll.
 
 Open: the pane fix has no automated test, because jsdom computes no layout; a
 Playwright check of the songs view would cover it. Not run: `yarn build`, and Firefox
@@ -1046,16 +1049,21 @@ small-host deployment, the development controller image identities, movie playba
 the browser runner release, bAAC exact arithmetic and lossless mode, the master CI
 repair, the playback session entities, the Bånder Audio Core rename, scan artist
 credits, MusicBrainz matching and the web fixes of 2026-11-14, reducing the roadmap
-from 2,098 to 1,097 lines; open items, limits and release gates stay. Later evidence
+from 2,098 to 1,105 lines; open items, limits and release gates stay. Later evidence
 closed these items, which went with the rest: the hosted runs of the movie and
 two-command gates, full-tree PHPStan and Deptrac (GitHub run 43638221630 passed the
 quality gate's steps 14 to 36 on `435a11639`), the full tooling suite on `master`
 (step 37 passed in run 43584904626 on `a67ed57e4`), the full backend suite after the
 rename merge (12,700 tests at `bc10bbe05`), and the two tests the Audio Core section
 listed as failing. The note that a review ran without a cross-model pass went from
-each section, because the checkout configuration sets that. No plan was retired. The
-roadmap before this cleanup is preserved at `d4a938b74`. All 51 local links resolve,
-and the four incoming anchors (`#application-release-acceptance`,
+each section, because the checkout configuration sets that. Eight delivered plans
+were retired: movie playback, the playback session entities, the browser runner
+release, bAAC exact arithmetic, bAAC lossless mode, the Audio Core rename, scan artist
+credits and MusicBrainz matching; only the roadmap linked them, and it now names each
+file. Nine plans remain: the six July plans and the three with open work (playback
+destinations, the small-host deployment, and the capability and size settings). The
+roadmap and the plans before this cleanup are preserved at `d4a938b74`. All 43 local
+links resolve, and the four incoming anchors (`#application-release-acceptance`,
 `#completed-work-and-evidence`, `#local-development-workflow`,
 `#source-installation-documentation`) are kept.
 
