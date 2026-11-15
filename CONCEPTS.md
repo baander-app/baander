@@ -248,6 +248,23 @@ four kinds; a retag takes the identity keys and the rows of the retagged songs. 
 its locks a writer reads the catalog again and acts on what it finds, because another
 writer may have committed while it waited.
 
+### Artist sync
+
+The fill of an artist's empty fields from MusicBrainz, looked up by the MusicBrainz ID
+the artist already holds: sort name, type, country, disambiguation and the two ends of
+its life span. It leaves the artist's name and ID, every field that holds a value and
+every locked field as they are, and it leaves an artist without an ID alone: nothing
+fills an artist from a search by its name. An administrator's metadata sync queues it
+for every artist with a stored ID and an empty field.
+
+### Duplicate song
+
+In an album merge, a song of the source album whose file hash a song of the target
+album holds. The target's song is kept, the oldest when several hold the hash, and the
+duplicate is folded into it: its playlist entries, lyrics, plays and favorites move to
+the kept song, and the duplicate's own row goes while its file stays on disk. A song
+without a file hash is never a duplicate.
+
 ## Lyrics
 
 ### Bulk lyrics run tally
