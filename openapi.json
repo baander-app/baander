@@ -7638,7 +7638,7 @@
                         }
                     },
                     "409": {
-                        "description": "Nothing was written; `details.reason` is `match_stale` (the item changed since the comparison: compare again), `match_busy` (another change to the same songs or artists ran at the same time: apply again) or `musicbrainz_rejected`",
+                        "description": "Nothing was written; `details.reason` is `match_stale` (the item changed since the comparison: compare again), `match_busy` (another change to the same songs or artists ran at the same time: apply again), `cover_refused` (the Cover Art Archive refused the ticked cover: apply again without the cover row to write the rest) or `musicbrainz_rejected`",
                         "content": {
                             "application/json": {
                                 "schema": {

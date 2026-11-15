@@ -43,6 +43,7 @@ use App\Media\Domain\Model\StoredFile;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtist;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCoverImage;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRecording;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzReleaseGroup;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
@@ -54,7 +55,10 @@ use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Catalog\MatchSelections;
 use App\Tests\Unit\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchQueryFixtures;
 use Closure;
+use PHPUnit\Framework\Attributes\TestWith;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Clock\MockClock;
 use Throwable;
@@ -91,6 +95,9 @@ final class ApplyMatchHandlerTest extends TestCase
 
     /** @var array<string, Image> images saved, by ID */
     private array $savedImages = [];
+
+    /** @var array<string, array<string, mixed>> the context of each entry the apply logged, by its message */
+    private array $logged = [];
 
     /** Runs when the apply locks the album's row, as a writer that committed while the apply waited for it. */
     private ?Closure $whileWaitingForTheAlbum = null;
@@ -221,6 +228,63 @@ final class ApplyMatchHandlerTest extends TestCase
         self::assertNotSame($old->toString(), $album->getCoverImageId()->toString());
     }
 
+    public function testAManualApplyWhoseTickedCoverTheCoverArtArchiveRefusesWritesNothingAndAppliesOnceTheCoverIsUnticked(): void
+    {
+        $album = $this->addAlbum();
+        $release = self::releaseWith($this->countryRelease(), hasFrontCover: true);
+        $this->musicBrainz->releases[$release->id] = $release;
+        $this->addSongsOf($album, $release);
+        $this->lookup->covers[$release->id] = new MusicBrainzRejected(403);
+        $comparison = $this->compare(MatchItemType::Album, $album->getPublicId()->toString(), $release->id);
+        $ticked = MatchSelections::defaults($comparison);
+        self::assertContains(MatchField::Cover, array_column($ticked->fields, 'field'), 'An album without a cover has the cover ticked.');
+
+        $conflict = $this->expectConflict(fn () => ApplyMatchCommand::manual(MatchItemType::Album, $album->getPublicId()->toString(), $release->id, $ticked) |> $this->apply(...));
+
+        self::assertSame('cover_refused', $conflict->details['reason'] ?? null);
+        self::assertSame('The Cover Art Archive refused the cover with HTTP 403. Nothing was written; untick the cover to apply the rest.', $conflict->getMessage());
+        self::assertNull($album->getReleaseMbid());
+        self::assertSame([], array_intersect(['lock album', 'store file'], $this->calls), 'The apply ended before its transaction and wrote no file.');
+
+        $unticked = new MatchSelection(
+            array_filter($ticked->fields, static fn (SeenField $field): bool => $field->field !== MatchField::Cover) |> array_values(...),
+            $ticked->credits,
+            $ticked->artistActions,
+            $ticked->keptArtists,
+        );
+        $applied = ApplyMatchCommand::manual(MatchItemType::Album, $album->getPublicId()->toString(), $release->id, $unticked) |> $this->apply(...);
+
+        self::assertTrue($applied->isApplied());
+        self::assertFalse($applied->coverRefused);
+        self::assertSame($release->id, $album->getReleaseMbid());
+        self::assertNull($album->getCoverImageId());
+    }
+
+    public function testAManualApplyOfTheReleaseAnAlbumHoldsWithOnlyTheCoverTickedSavesTheCover(): void
+    {
+        $album = $this->addAlbum();
+        $release = self::releaseWith($this->countryRelease(), hasFrontCover: true);
+        $this->musicBrainz->releases[$release->id] = $release;
+        $this->addSongsOf($album, $release);
+        $album->recordReleaseMatch(MusicbrainzId::fromString($release->id) ?? throw new \LogicException(), new \DateTimeImmutable('2026-11-01 08:00:00'));
+        $this->lookup->covers[$release->id] = new MusicBrainzCoverImage(base64_decode(self::PIXEL), 'image/png');
+        $comparison = $this->compare(MatchItemType::Album, $album->getPublicId()->toString(), $release->id);
+        self::assertSame([null, true], [$comparison->field(MatchField::Cover)?->current, $comparison->field(MatchField::Cover)?->ticked]);
+
+        $applied = ApplyMatchCommand::manual(
+            MatchItemType::Album,
+            $album->getPublicId()->toString(),
+            $release->id,
+            new MatchSelection([new SeenField(MatchField::Cover, null)]),
+        ) |> $this->apply(...);
+
+        self::assertSame(['cover'], $applied->fields);
+        $coverId = $album->getCoverImageId()?->toString();
+        self::assertNotNull($coverId);
+        self::assertArrayHasKey($coverId, $this->savedImages);
+        self::assertSame($release->id, $album->getReleaseMbid());
+    }
+
     public function testAMergeTheAdminWasNotShownAnswersStale(): void
     {
         $album = $this->addAlbum();
@@ -320,6 +384,38 @@ final class ApplyMatchHandlerTest extends TestCase
         self::assertSame(1, $this->savedImages[$coverId]->getWidth());
         self::assertSame($release->id, $album->getReleaseMbid());
         self::assertEqualsCanonicalizing(['releaseMbid', 'mbid', 'country', 'genres', 'cover'], $applied->fields);
+        self::assertFalse($applied->coverRefused);
+    }
+
+    public function testAMatchWithoutAnAdminIsAppliedWithoutTheCoverTheCoverArtArchiveRefuses(): void
+    {
+        $album = $this->addAlbum();
+        [$release, $songs] = $this->longBed($album);
+        $release = self::releaseWith($release, hasFrontCover: true);
+        $this->lookup->covers[$release->id] = new MusicBrainzRejected(403);
+
+        $applied = ApplyMatchCommand::automatic($album->getId(), $this->candidate($album, $release)) |> $this->apply(...);
+
+        self::assertTrue($applied->isApplied());
+        self::assertTrue($applied->coverRefused);
+        self::assertSame($release->id, $album->getReleaseMbid());
+        self::assertNotNull($album->getMatchedAt());
+        self::assertContains('releaseMbid', $applied->fields);
+        self::assertNotContains('cover', $applied->fields);
+        self::assertSame(self::recordingId(1, 1), $songs[0]->getMbid());
+        self::assertSame(
+            [['Post Malone', 'primary', 'Post Malone, Morgan Wallen'], ['Morgan Wallen', 'featured', 'Morgan Wallen']],
+            $this->creditsOf($songs[0]),
+        );
+        self::assertCount(14, $applied->mergedArtists);
+        self::assertNull($album->getCoverImageId());
+        self::assertSame([], $this->savedImages, 'No image is stored.');
+        self::assertSame([], array_intersect(['store file', 'delete file'], $this->calls), 'No file is written, so none is left.');
+        self::assertEquals(
+            ['public_id' => $album->getPublicId()->toString(), 'candidate_id' => $release->id, 'cover_refused' => true],
+            array_intersect_key($this->logged['Applied a MusicBrainz match'] ?? [], ['public_id' => 0, 'candidate_id' => 0, 'cover_refused' => 0]),
+            'The log entry of the apply names the album and the release whose cover was refused.',
+        );
     }
 
     public function testTheFileOfACoverSavedBeforeTheApplyFailedIsRemovedWithTheRolledBackImage(): void
@@ -410,12 +506,16 @@ final class ApplyMatchHandlerTest extends TestCase
         self::assertContains('delete file', $this->calls, 'The downloaded cover file is removed again.');
     }
 
-    public function testAMatchWithoutAnAdminReportsACoverArchiveOutageAndWritesNothing(): void
+    /** @param string $answer what the Cover Art Archive adapter reports: a server error, a throttled request, or one that timed out */
+    #[TestWith(['HTTP 503'])]
+    #[TestWith(['HTTP 429'])]
+    #[TestWith(['the request failed'])]
+    public function testAMatchWithoutAnAdminReportsACoverArchiveOutageAndWritesNothing(string $answer): void
     {
         $album = $this->addAlbum();
         $release = self::releaseWith(self::release(self::releaseId(1)), hasFrontCover: true);
         $this->addSongsOf($album, $release);
-        $this->lookup->covers[$release->id] = new MusicBrainzUnavailable('HTTP 503');
+        $this->lookup->covers[$release->id] = new MusicBrainzUnavailable($answer);
 
         $result = ApplyMatchCommand::automatic($album->getId(), $this->candidate($album, $release)) |> $this->apply(...);
 
@@ -586,8 +686,28 @@ final class ApplyMatchHandlerTest extends TestCase
             discarder: new CoverImageDiscarder($images, $storage, new NullLogger()),
             transaction: $this->transaction(),
             clock: new MockClock('2026-11-14 12:00:00'),
-            logger: new NullLogger(),
+            logger: $this->logger(),
         );
+    }
+
+    /** Keeps the context of each entry the apply logs, by its message. */
+    private function logger(): LoggerInterface
+    {
+        $record = function (string $message, array $context): void {
+            $this->logged[$message] = $context;
+        };
+
+        return new class ($record) extends AbstractLogger {
+            public function __construct(private readonly Closure $record)
+            {
+            }
+
+            /** @param array<string, mixed> $context */
+            public function log($level, string|\Stringable $message, array $context = []): void
+            {
+                ($this->record)((string) $message, $context);
+            }
+        };
     }
 
     private function snapshotsOverPorts(): MatchSnapshots
@@ -796,9 +916,11 @@ final class ApplyMatchHandlerTest extends TestCase
     private function storage(): StoragePortInterface
     {
         $storage = $this->createStub(StoragePortInterface::class);
-        $storage->method('storeFromBytes')->willReturnCallback(
-            static fn (string $contents, string $path): StoredFile => new StoredFile($path, 'image/png', strlen($contents)),
-        );
+        $storage->method('storeFromBytes')->willReturnCallback(function (string $contents, string $path): StoredFile {
+            $this->calls[] = 'store file';
+
+            return new StoredFile($path, 'image/png', strlen($contents));
+        });
         $storage->method('delete')->willReturnCallback(function (): void {
             $this->calls[] = 'delete file';
         });

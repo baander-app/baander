@@ -54,6 +54,8 @@ A member that is absent counts as an empty list, and other members, such as `can
 
 The apply looks the candidate up in MusicBrainz again and compares it with the item as it is stored. It writes nothing when a row no longer shows the current value it names, or when the match would merge or remove an artist the selection names in neither `artistActions` nor `keptArtists`; compare again and choose anew. The changes land together or not at all. A match can merge and remove artists, so the command asks before it writes; without a terminal it needs `--force`, and `--json` does not imply it.
 
+For a ticked `cover` row the apply downloads the release's front cover from the Cover Art Archive before it writes anything. When the Cover Art Archive refuses the download, with a client error other than 404, 408 or 429, the apply writes nothing and answers `cover_refused`. The default ticks include the cover of an album that has none, so the rest of the match is applied with a `--selection` that leaves the `cover` row out.
+
 The command prints what it wrote: the item's own fields, whether its artist credits changed, how many of an album's songs took fields or credits, and the public IDs of the artists merged and removed. With `--json` the output is an object with `type`, `publicId`, `candidateId`, `fields`, `creditsChanged`, `songsChanged`, `mergedArtists` and `removedArtists`, exactly as the API returns it.
 
 | Failure | API answer | Exit code |
@@ -62,6 +64,7 @@ The command prints what it wrote: the item's own fields, whether its artist cred
 | The item changed since the comparison, or a merge or removal is missing from the selection | 409, reason `match_stale` | 1 |
 | Another change to the same songs or artists ran at the same time; applying again may succeed | 409, reason `match_busy` | 1 |
 | MusicBrainz refused the request | 409, reason `musicbrainz_rejected` | 1 |
+| The Cover Art Archive refused the cover the selection ticks; a selection without the `cover` row applies the rest | 409, reason `cover_refused` | 1 |
 | The type, public ID, candidate ID or selection is malformed; the message lists each malformed entry | 422 | 2 |
 | MusicBrainz or the Cover Art Archive did not answer, or no turn of the shared one-request-per-second budget came free within 10 seconds | 503, reason `musicbrainz_unavailable` | 1 |
 
@@ -70,5 +73,5 @@ The command prints what it wrote: the item's own fields, whether its artist cred
 | Code | Meaning |
 |------|---------|
 | 0 | The match is applied |
-| 1 | Nothing was written: the item or candidate is unknown, the item changed, the apply collided with another change, MusicBrainz refused or did not answer, or the operator declined; the message says which |
+| 1 | Nothing was written: the item or candidate is unknown, the item changed, the apply collided with another change, MusicBrainz refused or did not answer, the Cover Art Archive refused the cover, or the operator declined; the message says which |
 | 2 | Nothing was written: the input is malformed, or no terminal is attached and `--force` was not given |

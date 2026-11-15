@@ -22,9 +22,13 @@ use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Infrastructure\Storage\FlysystemStorage;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtist;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCoverImage;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMedium;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMediumSummary;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRecording;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzReleaseGroup;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzReleaseSummary;
 use App\Metadata\Application\Port\MusicBrainzLookupInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
@@ -41,9 +45,9 @@ use Symfony\Component\Filesystem\Filesystem;
 /**
  * Applies MusicBrainz matches through the container's handler against the migrated PostgreSQL
  * schema, with MusicBrainz answered by a fake: credits, artists, IDs, provenance, genres and covers
- * land together, a failure in the middle leaves everything as it was, and an artist that takes an
- * ID another artist holds merges into it with its cover. Cover files live in a storage directory
- * of the test's own.
+ * land together, a failure in the middle leaves everything as it was, a cover the Cover Art Archive
+ * refuses is left out of an automatic match, and an artist that takes an ID another artist holds
+ * merges into it with its cover. Cover files live in a storage directory of the test's own.
  */
 final class MusicBrainzMatchApplyTest extends KernelTestCase
 {
@@ -124,6 +128,39 @@ final class MusicBrainzMatchApplyTest extends KernelTestCase
             'The missing cover was stored as the album\'s.',
         );
         self::assertSame(1, (int) $this->connection()->fetchOne('SELECT count(*) FROM album_match_states'), 'The queue removes the request it claimed itself.');
+    }
+
+    /**
+     * The queue's matcher searches the album, finds its release confident and applies it, and the
+     * Cover Art Archive answers the download of the release's front cover with 403.
+     */
+    public function testAConfidentAlbumWhoseCoverTheCoverArtArchiveRefusesIsMatchedWithItsIdsAndCreditsAndWithoutACover(): void
+    {
+        $longBed = $this->storeLongBed();
+        $release = $longBed['release'];
+        $this->musicBrainz->releaseSearches[self::ALBUM_TITLE . '|' . self::ALBUM_ARTIST] = [self::summary($release)];
+        $this->musicBrainz->releases[$release->id] = $release;
+        $this->lookup->covers[$release->id] = new MusicBrainzRejected(403);
+
+        $outcome = static::getContainer()->get(AutomaticAlbumMatcherInterface::class)->match(Uuid::fromString($longBed['album']));
+
+        self::assertSame(AutomaticMatchOutcomeKind::Matched, $outcome->kind, 'The refused cover is no outage: the queue goes on.');
+        self::assertContains('fetchFrontCover:' . $release->id, $this->musicBrainz->calls);
+        $album = $this->connection()->fetchAssociative('SELECT release_mbid, matched_at, cover_image_id::text AS cover FROM albums WHERE id = ?', [$longBed['album']]);
+        self::assertSame($release->id, $album['release_mbid'] ?? null);
+        self::assertNotNull($album['matched_at'] ?? null);
+        self::assertNull($album['cover'] ?? null);
+        [$lukeCombsSong] = $longBed['songs'];
+        self::assertSame(
+            [[$longBed['postMalone'], 'primary', 'Post Malone, Luke Combs'], [$this->artistNamed('Luke Combs'), 'featured', 'Luke Combs']],
+            $this->songCredits($lukeCombsSong),
+        );
+        self::assertSame(
+            [self::recordingId(1, 1), self::recordingId(1, 2), self::recordingId(1, 3)],
+            array_map(fn (string $song): mixed => $this->connection()->fetchOne('SELECT mbid FROM songs WHERE id = ?', [$song]), $longBed['songs']),
+        );
+        self::assertSame(0, (int) $this->connection()->fetchOne('SELECT count(*) FROM images'), 'No image is stored.');
+        self::assertSame([], $this->storedFiles(), 'No cover file is left.');
     }
 
     public function testWithTheYearUntickedAndTheGenreTickedTheGenreIsFiledAndTheYearKept(): void
@@ -298,6 +335,26 @@ final class MusicBrainzMatchApplyTest extends KernelTestCase
         return new MusicBrainzRelease(...[...get_object_vars($release), ...$changes]);
     }
 
+    /** The release as a release search lists it. */
+    private static function summary(MusicBrainzRelease $release): MusicBrainzReleaseSummary
+    {
+        return new MusicBrainzReleaseSummary(
+            id: $release->id,
+            title: $release->title,
+            score: 100,
+            artistCredit: $release->artistCredit,
+            date: $release->date,
+            country: $release->country,
+            status: $release->status,
+            disambiguation: $release->disambiguation,
+            barcode: $release->barcode,
+            labels: $release->labels,
+            media: array_map(static fn (MusicBrainzMedium $medium): MusicBrainzMediumSummary => new MusicBrainzMediumSummary($medium->format, count($medium->tracks)), $release->media),
+            trackCount: $release->trackCount(),
+            releaseGroup: $release->releaseGroup,
+        );
+    }
+
     /** A UUID-shaped MusicBrainz release ID numbered `$number`. */
     private static function releaseId(int $number): string
     {
@@ -413,6 +470,17 @@ final class MusicBrainzMatchApplyTest extends KernelTestCase
         $this->connection()->executeStatement('UPDATE artists SET cover_image_id = ? WHERE id = ?', [$id, $artistId]);
 
         return $id;
+    }
+
+    /** @return list<string> the files in the test's storage directory */
+    private function storedFiles(): array
+    {
+        if (!is_dir($this->storageRoot)) {
+            return [];
+        }
+        $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($this->storageRoot, \FilesystemIterator::SKIP_DOTS));
+
+        return array_map(strval(...), iterator_to_array($files, false));
     }
 
     private function artistNamed(string $name): string

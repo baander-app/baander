@@ -39,6 +39,7 @@ use Symfony\Component\Messenger\Stamp\HandledStamp;
  * written when something stands in the way, and the outcome says who waits: a MusicBrainz outage
  * is unavailable, so every album waits; an apply that met changed rows or a deadlock retries this
  * album after a quarter of an hour, and a request MusicBrainz refused retries it after six hours.
+ * A cover the Cover Art Archive refuses stands in no one's way: the match is applied without it.
  */
 final readonly class AutomaticAlbumMatcher implements AutomaticAlbumMatcherInterface
 {

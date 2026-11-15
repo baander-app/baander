@@ -177,6 +177,30 @@ final class MusicBrainzMatchCliParityTest extends TestCase
         self::assertSame(1, $this->artistCount('Post Malone, Luke Combs'));
     }
 
+    public function testARefusedCoverAnswers409AndExits1WithTheSameMessage(): void
+    {
+        $this->lookup->covers[$this->release->id] = new MusicBrainzRejected(403);
+        $comparison = $this->assertJsonResponse($this->get($this->albumPath('comparison') . '?candidate=' . $this->release->id), 200, 'data')['data'];
+        $body = self::defaultTicks($comparison);
+        $body['fields'][] = ['key' => 'cover', 'current' => true];
+
+        $this->entityManager->clear();
+        $error = $this->assertJsonResponse($this->authenticatedRequest('POST', $this->albumPath('apply'), $this->admin, $body), 409);
+        self::assertSame('cover_refused', $error['error']['details']['reason'] ?? null);
+
+        $apply = $this->command('app:metadata:match:apply');
+        self::assertSame(Command::FAILURE, $apply->execute([
+            'type' => 'album',
+            'public-id' => $this->album->getPublicId()->toString(),
+            'candidate' => $this->release->id,
+            '--selection' => json_encode($body, JSON_THROW_ON_ERROR),
+            '--force' => true,
+        ]));
+        self::assertStringContainsString($error['error']['message'], $apply->getDisplay() |> $this->flatten(...));
+        self::assertNull($this->releaseOfAlbum());
+        self::assertSame(1, $this->artistCount('Post Malone, Luke Combs'));
+    }
+
     public function testAMalformedSelectionAnswers422AndExits2WithTheSameMessages(): void
     {
         $body = ['fields' => [['key' => 'colour', 'current' => 'red']]];

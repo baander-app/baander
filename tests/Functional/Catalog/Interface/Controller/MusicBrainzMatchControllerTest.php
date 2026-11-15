@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Catalog\Interface\Controller;
 
 use App\Auth\Domain\Model\User;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
 use App\Shared\Domain\Model\PublicId;
 use App\Tests\Functional\Catalog\Interface\LongBedMatchLibrary;
@@ -174,6 +175,45 @@ final class MusicBrainzMatchControllerTest extends TestCase
         self::assertSame(1, $this->artistCount('Post Malone, Luke Combs'));
     }
 
+    public function testAnApplyWhoseTickedCoverTheCoverArtArchiveRefusesAnswers409AndWritesNothingAndAppliesOnceTheCoverIsUnticked(): void
+    {
+        $this->lookup->covers[$this->release->id] = new MusicBrainzRejected(403);
+        $comparison = $this->get($this->albumPath('comparison') . '?candidate=' . $this->release->id) |> $this->data(...);
+        $unticked = self::defaultTicks($comparison);
+        $ticked = $unticked;
+        $ticked['fields'][] = ['key' => 'cover', 'current' => true];
+
+        $error = $this->assertJsonResponse($this->post($this->albumPath('apply'), $ticked), Response::HTTP_CONFLICT);
+
+        self::assertSame('cover_refused', $error['error']['details']['reason'] ?? null);
+        self::assertSame('The Cover Art Archive refused the cover with HTTP 403. Nothing was written; untick the cover to apply the rest.', $error['error']['message']);
+        self::assertNull($this->releaseOfAlbum());
+        self::assertSame(1, $this->artistCount('Post Malone, Luke Combs'));
+        self::assertSame($this->cover->getId()->toString(), $this->coverOfAlbum());
+
+        $data = $this->post($this->albumPath('apply'), $unticked) |> $this->data(...);
+
+        self::assertSame(
+            ['type', 'publicId', 'candidateId', 'fields', 'creditsChanged', 'songsChanged', 'mergedArtists', 'removedArtists'],
+            array_keys($data),
+            'The answer says what was written and nothing about the cover.',
+        );
+        self::assertEqualsCanonicalizing(['releaseMbid', 'country'], $data['fields']);
+        self::assertSame($this->release->id, $this->releaseOfAlbum());
+        self::assertSame($this->cover->getId()->toString(), $this->coverOfAlbum());
+    }
+
+    public function testAnApplyWhoseReleaseLookupMusicBrainzRefusesAnswers409RejectedAndWritesNothing(): void
+    {
+        $comparison = $this->get($this->albumPath('comparison') . '?candidate=' . $this->release->id) |> $this->data(...);
+        $this->musicBrainz->releases[$this->release->id] = new MusicBrainzRejected(400);
+
+        $error = $this->assertJsonResponse($this->post($this->albumPath('apply'), self::defaultTicks($comparison)), Response::HTTP_CONFLICT);
+
+        self::assertSame('musicbrainz_rejected', $error['error']['details']['reason'] ?? null);
+        self::assertNull($this->releaseOfAlbum());
+    }
+
     public function testAMalformedSelectionOrTypeAnswers422(): void
     {
         $selection = $this->assertJsonResponse(
@@ -211,6 +251,13 @@ final class MusicBrainzMatchControllerTest extends TestCase
         $this->entityManager->clear();
 
         return $this->authenticatedRequest('POST', $path, $this->admin, $body);
+    }
+
+    private function coverOfAlbum(): ?string
+    {
+        $cover = $this->entityManager->getConnection()->fetchOne('SELECT cover_image_id::text FROM albums WHERE id = ?', [$this->album->getId()->toString()]);
+
+        return is_string($cover) ? $cover : null;
     }
 
     /** @return array<string, mixed> the response's data */

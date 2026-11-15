@@ -2,6 +2,7 @@ import { isAxiosError } from 'axios'
 
 export const MATCH_STALE = 'This item changed since you opened the comparison.'
 export const MATCH_BUSY = 'Another change to this item was being saved at the same time. Nothing was written; apply again.'
+export const COVER_REFUSED = 'The Cover Art Archive refused the cover. Nothing was written; untick the cover to apply the rest.'
 export const MUSICBRAINZ_UNAVAILABLE = 'MusicBrainz is unavailable. Try again later.'
 export const MUSICBRAINZ_REJECTED = 'MusicBrainz rejected the request.'
 export const MATCH_CONFLICT = 'The match could not be completed.'
@@ -12,14 +13,15 @@ const STALE_REASON = 'match_stale'
 const CONFLICT_MESSAGES: ReadonlyMap<string, string> = new Map([
   [STALE_REASON, MATCH_STALE],
   ['match_busy', MATCH_BUSY],
+  ['cover_refused', COVER_REFUSED],
   ['musicbrainz_rejected', MUSICBRAINZ_REJECTED],
 ])
 
 /**
  * The message for a failed candidate search, comparison or apply. The API answers 503 when
  * MusicBrainz is unavailable, and 409 with a reason when MusicBrainz rejected the request, the item
- * changed since the comparison, or the apply ran into another writer. A 409 without a reason named
- * here gets a generic message.
+ * changed since the comparison, the apply ran into another writer, or the Cover Art Archive refused
+ * the ticked cover. A 409 without a reason named here gets a generic message.
  */
 export function matchErrorMessage(error: unknown, fallback: string): string {
   if (!isAxiosError(error)) {

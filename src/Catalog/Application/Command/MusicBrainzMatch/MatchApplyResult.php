@@ -19,6 +19,8 @@ final readonly class MatchApplyResult
      * @param int          $songsChanged   how many of an album's songs took fields or credits
      * @param list<string> $mergedArtists  the public IDs of the artists merged into another artist
      * @param list<string> $removedArtists the public IDs of the artists removed
+     * @param bool         $coverRefused   whether an automatic apply left out the album's cover because the
+     *                                     Cover Art Archive refused it; the API resource does not carry it
      */
     private function __construct(
         public MatchApplyOutcome $outcome,
@@ -30,6 +32,7 @@ final readonly class MatchApplyResult
         public int $songsChanged = 0,
         public array $mergedArtists = [],
         public array $removedArtists = [],
+        public bool $coverRefused = false,
     ) {
     }
 
@@ -55,6 +58,12 @@ final readonly class MatchApplyResult
     public static function notApplied(MatchApplyOutcome $outcome, ?string $publicId, string $candidateId): self
     {
         return new self($outcome, MatchItemType::Album, $publicId, $candidateId);
+    }
+
+    /** The same result, saying that the match was applied without the cover the Cover Art Archive refused. */
+    public function withCoverRefused(): self
+    {
+        return clone($this, ['coverRefused' => true]);
     }
 
     public function isApplied(): bool

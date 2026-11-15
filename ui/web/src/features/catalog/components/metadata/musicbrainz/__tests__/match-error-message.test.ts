@@ -1,6 +1,7 @@
 import { AxiosError, AxiosHeaders } from 'axios'
 import { describe, expect, it } from 'vitest'
 import {
+  COVER_REFUSED,
   MATCH_BUSY,
   MATCH_CONFLICT,
   MATCH_STALE,
@@ -26,6 +27,11 @@ describe('matchErrorMessage', () => {
   it('says the item changed when an apply finds it stale', () => {
     expect(matchErrorMessage(apiError(409, 'match_stale'), 'Failed')).toBe(MATCH_STALE)
     expect(MATCH_STALE).toBe('This item changed since you opened the comparison.')
+  })
+
+  it('says the cover was refused and that unticking it applies the rest', () => {
+    expect(matchErrorMessage(apiError(409, 'cover_refused'), 'Failed')).toBe(COVER_REFUSED)
+    expect(COVER_REFUSED).toBe('The Cover Art Archive refused the cover. Nothing was written; untick the cover to apply the rest.')
   })
 
   it('names each other conflict the match routes answer', () => {

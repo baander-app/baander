@@ -9,7 +9,8 @@ enum AutomaticMatchOutcomeKind: string
 {
     /**
      * The album is matched: an unmatched album took a confident candidate, a matched album paired
-     * its new songs against its stored release, or an admin matched the album meanwhile.
+     * its new songs against its stored release, or an admin matched the album meanwhile. A match
+     * whose cover the Cover Art Archive refused is applied without the cover and counts as well.
      */
     case Matched = 'matched';
 

@@ -77,9 +77,11 @@ use Throwable;
  * itself, after an automatic apply returns. Covers the merges and removals free are discarded
  * after the commit.
  *
- * A manual apply that cannot apply answers with an exception. An automatic apply reports every
- * outcome in its result instead, a Cover Art Archive outage included, and fails only on a deadlock,
- * which the queue's message retries.
+ * A manual apply that cannot apply answers with an exception, also when the Cover Art Archive
+ * refuses the cover it ticked. An automatic apply reports every outcome in its result instead, a
+ * Cover Art Archive outage included, and fails only on a deadlock, which the queue's message
+ * retries. A cover the Cover Art Archive refuses does not stop it: the match is applied without
+ * the cover, and its result and log entry say so.
  */
 #[AsMessageHandler]
 final readonly class ApplyMatchHandler
@@ -115,10 +117,11 @@ final readonly class ApplyMatchHandler
      * @throws InvalidInputException        when the public ID or the candidate's MusicBrainz ID is malformed
      * @throws NotFoundException            when no such item exists, or MusicBrainz has no such candidate
      * @throws ServiceUnavailableException  when MusicBrainz or the Cover Art Archive did not answer (`musicbrainz_unavailable`)
-     * @throws ConflictException            when MusicBrainz refused the request (`musicbrainz_rejected`), the item changed
-     *                                      since the comparison (`match_stale`), or the apply deadlocked with another
-     *                                      writer (`match_busy`); nothing is written then. An automatic apply throws none
-     *                                      of these: its result reports the outcome.
+     * @throws ConflictException            when MusicBrainz refused the request (`musicbrainz_rejected`), the Cover Art
+     *                                      Archive refused the ticked cover (`cover_refused`), the item changed since the
+     *                                      comparison (`match_stale`), or the apply deadlocked with another writer
+     *                                      (`match_busy`); nothing is written then. An automatic apply throws none of
+     *                                      these: its result reports the outcome.
      * @throws TransactionDeadlockException when an automatic apply deadlocked with another writer; nothing is written
      */
     public function __invoke(ApplyMatchCommand $command): MatchApplyResult
@@ -150,6 +153,7 @@ final readonly class ApplyMatchHandler
             'public_id' => $applied->publicId,
             'candidate_id' => $applied->candidateId,
             'automatic' => $command->isAutomatic(),
+            'cover_refused' => $applied->coverRefused,
             'fields' => $applied->fields,
             'songs_changed' => $applied->songsChanged,
             'merged_artists' => $applied->mergedArtists,
@@ -178,7 +182,6 @@ final readonly class ApplyMatchHandler
             return match ($conflict->details['reason'] ?? null) {
                 self::ALREADY_MATCHED_REASON => $notApplied(MatchApplyOutcome::AlbumMatchedMeanwhile),
                 MatchTicks::STALE_REASON => $notApplied(MatchApplyOutcome::Stale),
-                MusicBrainzAnswer::REJECTED_REASON => $notApplied(MatchApplyOutcome::Unavailable),
                 default => throw $conflict,
             };
         }
@@ -207,7 +210,9 @@ final readonly class ApplyMatchHandler
         $plan = $this->albumPlan($command, $this->comparisons->album($snapshot, $candidate), $snapshot, $candidate);
         $compared = self::comparedSongIds($candidate);
         $locks = ($plan->artistIds() |> $this->storedIdentities(...) |> $plan->locks(...))->withSongs($compared);
-        $cover = $plan->ticks->field(MatchField::Cover) === null ? null : $this->covers->fetch($albumId, $candidate->release->id, $wait);
+        [$cover, $coverRefused] = $plan->ticks->field(MatchField::Cover) === null
+            ? [null, false]
+            : $this->cover($albumId, $candidate->release->id, $wait, $command->isAutomatic());
 
         $coverSaved = false;
         try {
@@ -241,7 +246,26 @@ final readonly class ApplyMatchHandler
         }
         $this->discardImages($discard);
 
-        return $applied;
+        return $coverRefused ? $applied->withCoverRefused() : $applied;
+    }
+
+    /**
+     * Downloads the release's front cover and stores it as a file. An automatic apply goes on
+     * without a cover the Cover Art Archive refuses; a manual apply ends there, before anything is
+     * written.
+     *
+     * @return array{Image|null, bool} the cover, when the release has one a match can use, and whether it was refused
+     *
+     * @throws ServiceUnavailableException when the Cover Art Archive did not answer
+     * @throws ConflictException           when the Cover Art Archive refused the cover of a manual apply
+     */
+    private function cover(Uuid $albumId, string $releaseId, MusicBrainzSlotWait $wait, bool $automatic): array
+    {
+        try {
+            return [$this->covers->fetch($albumId, $releaseId, $wait), false];
+        } catch (ConflictException $conflict) {
+            return $automatic && ($conflict->details['reason'] ?? null) === MatchCovers::REFUSED_REASON ? [null, true] : throw $conflict;
+        }
     }
 
     private function applySong(ApplyMatchCommand $command): MatchApplyResult

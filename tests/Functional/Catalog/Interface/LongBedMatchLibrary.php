@@ -14,11 +14,13 @@ use App\Media\Infrastructure\Doctrine\Entity\ImageEntity;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Application\Port\MusicBrainzLookupInterface;
 use App\Shared\Domain\Model\PublicId;
+use App\Tests\Unit\Catalog\Application\CommandHandler\MusicBrainzMatch\CoverServingLookup;
 use App\Tests\Unit\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchQueryFixtures;
 
 /**
  * "F-1 Trillion: Long Bed" in PostgreSQL for the MusicBrainz match routes and commands, with
- * MusicBrainz answered by a fake in the container that knows the release the album fits.
+ * MusicBrainz answered by a fake in the container that knows the release the album fits, and the
+ * Cover Art Archive by what a test sets for a release's front cover.
  *
  * The album (2023, with a cover) holds three songs credited to Post Malone; its second song is a
  * duet tagged "Post Malone, Luke Combs" and credited to an artist of that name. The release
@@ -38,10 +40,13 @@ trait LongBedMatchLibrary
 
     private MusicBrainzRelease $release;
 
+    private CoverServingLookup $lookup;
+
     private function storeLongBed(): void
     {
         $this->setUpLibrary();
-        static::getContainer()->set(MusicBrainzLookupInterface::class, $this->musicBrainz);
+        $this->lookup = new CoverServingLookup($this->musicBrainz);
+        static::getContainer()->set(MusicBrainzLookupInterface::class, $this->lookup);
         $this->release = self::releaseWith(
             self::release(self::releaseId(1), [3], ['1-2' => ['artistCredit' => self::credit(self::ALBUM_ARTIST, 'Luke Combs')]]),
             hasFrontCover: true,

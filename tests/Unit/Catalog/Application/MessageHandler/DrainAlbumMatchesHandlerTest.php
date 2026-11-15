@@ -75,6 +75,27 @@ final class DrainAlbumMatchesHandlerTest extends TestCase
         self::assertSame([], $this->queued, 'An empty queue queues no further run.');
     }
 
+    /** The matcher reports an album applied without the cover the Cover Art Archive refused as matched. */
+    public function testAnAlbumMatchedWithoutItsRefusedCoverLeavesTheQueueWhichGoesOnWithTheNextAlbumASecondLater(): void
+    {
+        $withoutCover = Uuid::v7();
+        $next = Uuid::v7();
+        $this->states->has(
+            $this->request($withoutCover, AlbumMatchSource::Ingest, '-2 minutes'),
+            $this->request($next, AlbumMatchSource::Ingest, '-1 minute'),
+        );
+
+        $this->drain();
+
+        self::assertSame([$withoutCover->toString()], $this->matched);
+        self::assertNull($this->states->stateOf($withoutCover));
+        self::assertEquals([[0, 1_000]], $this->queued, 'The queue counts no outage and does not pause.');
+
+        $this->drain(new DrainAlbumMatchesMessage($this->queuedChains[0]));
+
+        self::assertSame([$withoutCover->toString(), $next->toString()], $this->matched);
+    }
+
     public function testAnAlbumWhoseBestCandidateHasAnotherTrackCountIsMarkedForReview(): void
     {
         $album = Uuid::v7();

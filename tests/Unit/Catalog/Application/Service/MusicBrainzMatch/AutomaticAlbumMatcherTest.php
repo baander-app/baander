@@ -240,7 +240,7 @@ final class AutomaticAlbumMatcherTest extends TestCase
         yield 'gone during the lookups' => [MatchApplyOutcome::AlbumGone, AutomaticMatchOutcome::albumGone()];
         yield 'matched by an admin meanwhile' => [MatchApplyOutcome::AlbumMatchedMeanwhile, AutomaticMatchOutcome::matched()];
         yield 'changed while the apply waited' => [MatchApplyOutcome::Stale, AutomaticMatchOutcome::retryLater(900)];
-        yield 'no cover from the Cover Art Archive' => [MatchApplyOutcome::Unavailable, AutomaticMatchOutcome::unavailable()];
+        yield 'no answer from the Cover Art Archive' => [MatchApplyOutcome::Unavailable, AutomaticMatchOutcome::unavailable()];
     }
 
     #[DataProvider('applyOutcomes')]
@@ -251,6 +251,16 @@ final class AutomaticAlbumMatcherTest extends TestCase
         $this->applyResult = static fn (ApplyMatchCommand $command): MatchApplyResult => MatchApplyResult::notApplied($applied, null, $command->candidateId);
 
         self::assertEquals($expected, $this->match($album));
+    }
+
+    public function testAnApplyThatLeftOutTheCoverTheCoverArtArchiveRefusedEndsAsMatched(): void
+    {
+        $album = $this->longBed();
+        $this->found(self::release(self::releaseId(1)));
+        $this->applyResult = static fn (ApplyMatchCommand $command): MatchApplyResult => MatchApplyResult::applied(MatchItemType::Album, 'album', $command->candidateId, [], true, 27, [], [])
+            ->withCoverRefused();
+
+        self::assertEquals(AutomaticMatchOutcome::matched(), $this->match($album));
     }
 
     public function testADeadlockedApplyRetriesThisAlbumAfterAQuarterHour(): void

@@ -10,7 +10,7 @@ namespace App\Catalog\Application\Command\MusicBrainzMatch;
  */
 enum MatchApplyOutcome: string
 {
-    /** The match committed. */
+    /** The match committed. An automatic apply commits without a cover the Cover Art Archive refused. */
     case Applied = 'applied';
 
     /** The album no longer exists; nothing was written. */
@@ -22,6 +22,6 @@ enum MatchApplyOutcome: string
     /** The album, its songs or their artists changed while the apply waited for its locks; nothing was written. */
     case Stale = 'match_stale';
 
-    /** The Cover Art Archive did not answer, throttled or refused the cover; nothing was written. */
+    /** The Cover Art Archive did not answer or throttled the request for the cover; nothing was written. */
     case Unavailable = 'musicbrainz_unavailable';
 }

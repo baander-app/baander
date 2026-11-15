@@ -7,6 +7,7 @@ namespace App\Catalog\Application\CommandHandler\MusicBrainzMatch;
 use App\Catalog\Application\QueryHandler\MusicBrainzMatch\MusicBrainzAnswer;
 use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Domain\Model\Image;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzSlotWait;
 use App\Metadata\Application\Port\MusicBrainzLookupInterface;
 use App\Shared\Application\Exception\ConflictException;
@@ -22,6 +23,9 @@ use Throwable;
  */
 final readonly class MatchCovers
 {
+    /** The Cover Art Archive refused the cover; the rest of the match applies without it. */
+    public const string REFUSED_REASON = 'cover_refused';
+
     public const int MAX_SIZE = 10 * 1024 * 1024;
 
     private const array EXTENSIONS = [
@@ -44,12 +48,16 @@ final readonly class MatchCovers
      * @return Image|null null when the release has no front cover, or one that is not a JPEG, PNG or
      *                    WebP image of at most 10 MB
      *
-     * @throws ServiceUnavailableException when the Cover Art Archive did not answer
-     * @throws ConflictException           when the Cover Art Archive refused the request
+     * @throws ServiceUnavailableException when the Cover Art Archive did not answer or throttled the request
+     * @throws ConflictException           when the Cover Art Archive refused the cover (`cover_refused`); no file is stored
      */
     public function fetch(Uuid $albumId, string $releaseId, MusicBrainzSlotWait $wait): ?Image
     {
-        $cover = $this->musicBrainz->fetchFrontCover($releaseId, $wait) |> MusicBrainzAnswer::unwrap(...);
+        $answer = $this->musicBrainz->fetchFrontCover($releaseId, $wait);
+        if ($answer instanceof MusicBrainzRejected) {
+            throw self::refused($answer);
+        }
+        $cover = MusicBrainzAnswer::unwrap($answer);
         $extension = self::EXTENSIONS[$cover->mimeType ?? ''] ?? null;
         if ($cover === null || $extension === null || $cover->bytes === '' || strlen($cover->bytes) > self::MAX_SIZE) {
             $this->logger->info('The release has no front cover a match can use', [
@@ -89,5 +97,13 @@ final readonly class MatchCovers
                 'error' => $exception->getMessage(),
             ]);
         }
+    }
+
+    private static function refused(MusicBrainzRejected $answer): ConflictException
+    {
+        return new ConflictException(
+            sprintf('The Cover Art Archive refused the cover with HTTP %d. Nothing was written; untick the cover to apply the rest.', $answer->status),
+            ['reason' => self::REFUSED_REASON],
+        );
     }
 }
