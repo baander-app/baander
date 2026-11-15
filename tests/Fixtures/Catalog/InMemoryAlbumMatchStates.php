@@ -17,9 +17,10 @@ use Symfony\Component\Clock\NativeClock;
 
 /**
  * Album match states held in memory, for unit tests of the album match queue. It follows the
- * repository contract the PostgreSQL statements implement; AlbumMatchQueueStatementsTest checks
- * those statements against the same rules. Its own clock stands in for the database clock, which
- * sets a claim's expiry and decides whether the claim still lasts.
+ * repository contract the PostgreSQL statements implement: both pass the one set of cases in
+ * AlbumMatchStatesContractCases. Its own clock stands in for the database clock, which sets a
+ * claim's expiry and decides whether the claim still lasts. Like the repository, it keeps a due
+ * time to the microsecond.
  */
 final class InMemoryAlbumMatchStates implements AlbumMatchStateRepositoryInterface
 {
