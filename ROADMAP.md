@@ -267,16 +267,18 @@ before that push and updates itself from `master`. The last recorded website
 publication is the local build of `57fc9e1e3` from 2026-11-13, before all of these.
 Pushed later on 2026-11-15, on top of `23f899976`: the matching follow-ups
 (`a7d1c7466` to `6991a9f9a` and their roadmap record), with the fix for the CI cleanup
-limit.
+limit. The matching leftovers are on the local branch `fix/matching-leftovers`, on top
+of `8d119f5df`, and not pushed.
 
 - **Master CI.** No `CI` run on `master` has been green since 2026-11-05. Run
   43695574134 on the pushed tip `23f899976` passed steps 1 to 38 of the quality gate
   in its first attempt, among them steps 28 and 37, which the pushed fixes repaired.
   It failed step 39 on a cleanup time limit after the step's checks had passed, and
-  its second attempt failed while building the CI image; see
-  [Master CI repair](#master-ci-repair). The third attempt was running when the
-  matching follow-ups were pushed; that push starts a run on the new tip, which
-  carries the fix for the cleanup limit. Steps 40 onward have not run on GitHub with
+  its second attempt failed while building the CI image. Its third attempt, and run
+  43724380366 on the new tip `8d119f5df`, both passed step 39 and failed step 41, the
+  backend suite: the third attempt on one test that met the PGroonga failure of
+  throwaway schemas, the run on `8d119f5df` on the step's one-hour time budget; see
+  [Master CI repair](#master-ci-repair). Steps 42 onward have not run on GitHub with
   the fixes, among them the repaired steps 45 and 53. The first green run is the point
   to write the CI-repair learning with `ce-compound`, which the user confirmed on
   2026-11-13.
@@ -289,6 +291,11 @@ limit.
   with its next update. A lyrics fetch queued before that update fails to decode, and
   "Ten Thousand Fists" stays on its review list until an admin applies a candidate
   from the match dialog.
+- **Matching leftovers.** On the local branch `fix/matching-leftovers` since
+  2026-11-15, not pushed: hand changes to credits and the album merge under the catalog
+  lock order, the duplicate fold, artist sync by stored MusicBrainz ID and the fill of
+  an artist a match or an import identifies; see
+  [Matching leftovers](#matching-leftovers).
 - **Rename landing, remaining steps.** Done: `master`, the FFmpeg pin, the website,
   the tag `audio-core-v0.2.0` and the persistent instance. Remaining, each checked
   again on 2026-11-14:
@@ -859,12 +866,24 @@ Open:
   - The second attempt failed at "Build CI image" after 12 minutes with
     `docker exited with status 1`. Its build log stayed on the runner, so the cause
     is unknown; the first attempt had built the same revision.
-  - The third attempt was running when the matching follow-ups were pushed. That
-    push starts a run on the new tip.
-- Steps 40 onward have not run on GitHub with the fixes, among them the repaired
+  - The third attempt passed steps 1 to 40 and failed step 41, "PHPUnit with
+    coverage": of 12,702 tests, one errored.
+    `NewAlbumMetadataSyncTest::testIngestRequestsAMatchOfTheAlbumAScanCreatedOnceTheSettlingDelayPasses`
+    got `pgroonga: PGrnLookupWithSize: object isn't found` while an import saved an
+    album. The PGroonga solution page names that message as the symptom, and three
+    migration tests that create and drop throwaway schemas ran earlier in the same
+    lane (`AacImplementationValueMigrationTest`, `ArtistCreditedNameMigrationTest`,
+    `JobMonitorInstantPrecisionMigrationTest`).
+- Run 43724380366 on `8d119f5df` passed steps 1 to 40, step 39 among them, and failed
+  step 41 with exit 124: the step's time budget of 3,600 seconds ran out while lane
+  `stack-1` was still running. Every lane ran slower than in the third attempt above
+  (ordinary 248 s against 153, native 689 s against 496, `stack-2` 2,609 s against
+  1,579), and `stack-1`'s output was lost with the lane. Its PostgreSQL log shows the
+  same PGroonga error in an artist insert about a minute before the budget ran out.
+- Steps 42 onward have not run on GitHub with the fixes, among them the repaired
   steps 45 and 53; steps 46 to 53 have not run there since the port. Locally, on the
   host against images built from the fixes, steps 28 (Chromium), 37, 45 and 46 to 53
-  pass. Not run with the fixes anywhere: steps 40 to 44 and 54 onward, and the gate
+  pass. Not run with the fixes anywhere: steps 42 to 44 and 54 onward, and the gate
   as one job in the runner container.
 - Each run draws a new test-order seed, so another order-dependent test can still
   surface in step 41.
@@ -1030,20 +1049,8 @@ artist to MusicBrainz from a dialog or the console, and a queue matches confiden
 albums on its own. The plan's "Implementation Amendments" section records where the
 build departs from the plan text.
 
-Open:
-
-- From review, not fixed:
-  - a hand change to a song's credits and the drop of its `credits` mark are separate
-    writes, and the three credit handlers take no song row lock, so a hand change can
-    interleave with a match apply. Today a hand-made credit can keep the matched mark
-    and survive one retag. The complete repair joins hand edits to the catalog lock
-    order and needs its own race tests;
-  - artist sync is never queued (predates the branch): `SyncArtistMessage` has no
-    producer, route or payload codec, and the enricher would write the top hit of a
-    name search onto an artist a match already identified. What artist sync should do
-    now that a match gives artists their IDs is a product decision.
-- The other review leftovers and the qualification housekeeping listed here before
-  were delivered by [Matching follow-ups](#matching-follow-ups).
+Its review leftovers were delivered by [Matching follow-ups](#matching-follow-ups)
+and [Matching leftovers](#matching-leftovers).
 
 ### Matching follow-ups
 
@@ -1141,19 +1148,12 @@ Open:
   release recheck keep a second write out.
 - Not run on the preview: an album merge, because its five albums hold no pair to
   merge. `AlbumMergeTest` (14 tests) runs a merge through the real matcher and apply.
-- Deferred, each separate work: album merge atomicity (the merge runs without a
-  transaction and leaves album favorites behind); a manual apply beside a queue run in
-  flight, where two effects were read from the code and not reproduced (a request for
-  a song committed after the apply read the album is dropped, and an automatic match
-  of new songs can overwrite credits an admin kept seconds earlier).
 - Waits that a worker's keepalive alarm can still cut short: the webhook delivery
   back-off (`WebhookDeliveryService`), and the `Retry-After` waits of the Discogs,
   Spotify and TMDB adapters, which no worker reaches today.
-- From the code review, not built: tests for a run of a replaced chain after an
-  outage, a review mark, a failed matcher and the import removal; a test that fails
-  when the MusicBrainz adapter goes back to the interruptible sleep; a dialog-level
-  test of an apply that answers `cover_refused`; one contract test for the in-memory
-  match states and the SQL repository.
+- From the code review, not built: a test that fails when the MusicBrainz adapter
+  goes back to the interruptible sleep. The other test leftovers were delivered by
+  [Matching leftovers](#matching-leftovers).
 - `AlbumMatchClaimMigrationTest` replays the migrations, PGroonga indexes included,
   into a throwaway schema and drops it, as the older migration tests do. The second
   full run above hit the PGroonga failure in a later suite. Isolating its mechanism
@@ -1170,9 +1170,149 @@ Open:
   from the admin sync, since automatic matching is off by default. An album the queue
   leaves for review keeps the count below 100 until the two-hour maintenance deadline,
   and that failure names no album.
-- `app:metadata:status` still counts an artist sync job that nothing queues. A new
-  song without a measured length never pairs on a matched album, as in a searched
-  match; the pages do not say so.
+- The plan file stays until the next cleanup retires it.
+
+### Matching leftovers
+
+Delivered from
+[the matching leftovers plan](docs/plans/2026-11-15-1624-fix-matching-leftovers-plan.md)
+on the local branch `fix/matching-leftovers` (`a822bf362` to `0405c6142`, on top of
+`8d119f5df`), not pushed. The user chose this scope on 2026-11-15 and answered the
+plan's questions the same day: plays as well as favorites follow a merged album, a
+merge folds a duplicate song into the song it keeps, artist sync is rebuilt as a fill
+by stored ID, an artist is filled as soon as it gets an ID, an asked artist is
+remembered for 30 days, an import fills nothing while automatic matching is off, and
+MusicBrainz's redirect for a merged artist ID is reported, not followed.
+
+- **Hand changes** (U2). Adding, removing or changing an artist's credit runs in one
+  transaction under the locks a match apply takes, in the same order: the album's row,
+  the import keys of the artist's name and MusicBrainz ID, the artist's row, the song's
+  row. It writes the credit and drops the song's `credits` mark together. An artist,
+  song or album gone by then is "not found"; a deadlock, or an artist that took another
+  name or ID while the change waited, answers 409 `credit_busy`, exit code 1 on the
+  console. A song edit locks the song's row and edits the song as read under it.
+- **Album merge** (U3, U4, U14). A merge runs in one transaction: the source row
+  `FOR UPDATE`, the target `FOR NO KEY UPDATE`, then every song row of both albums. It
+  moves every source song, so a song an import adds to the source meanwhile waits and
+  fails instead of being deleted with it. The cover goes after the commit; a deadlock
+  answers 409 `merge_busy`, and both web merge dialogs show the API's message. A
+  user's favorite of the source and the source's plays follow the target. A duplicate
+  (a source song whose file hash the target holds) is folded into the target's oldest
+  song of that hash: its playlist entries, lyrics when the kept song has none, plays
+  (counts added, the later play kept, loved when either was) and favorites move, and
+  its row goes while its file stays on disk.
+- **An apply beside the queue** (U5, U6). Each effect was reproduced by a failing test
+  before its repair. An automatic match of a matched album's new songs no longer
+  replaces the album's own credits (effect C), and it writes nothing when another
+  match compared one of those songs (B) or a retag paired them with other tracks (D)
+  since the matcher read the album. A manual album apply requests the album's match
+  after its commit, so a song an import added meanwhile is matched (A).
+- **Artist sync** (U11, U12, U15). An admin metadata sync also queues one
+  `SyncArtistsMessage`, which queues a fill for every artist with a MusicBrainz ID and
+  an empty detail field, two seconds apart on one pace shared with every other
+  producer. A match apply that identifies an artist queues its fill after the commit,
+  and so does an import batch while automatic matching is on. The fill looks the
+  artist up by its stored ID only, fills empty unlocked fields under the artist's row
+  lock, and is not asked again about that ID for 30 days. The name-search enricher,
+  the `includeArtists` flag and the searched-ID assigner are removed.
+- **Tests and harness** (U1, U7, U8, U9, U13). The in-memory match states and the SQL
+  repository pass one set of 19 cases; a queue run of a replaced chain is pinned on
+  every path; the match dialog's refused cover has its test; the qualification
+  transport answers artist lookups and counts artist syncs as metadata work.
+- **Documentation** (U10). The operator pages, context guides, READMEs, the context
+  map, the worker inventory and `CONCEPTS.md` describe the above.
+- **From the code review**: an artist whose fill the message bus refused is no longer
+  left marked as queued for a day (`0405c6142`).
+
+MusicBrainz and a merged artist ID: on 2026-11-15 at 18:28 UTC, one artist comparison
+on the preview with an ID that Wikidata lists as a MusicBrainz redirect
+(`3ec87112-9081-467b-8327-e18286f1b020`) answered "MusicBrainz is unavailable". The
+MusicBrainz server answers a lookup of a merged ID with 301 to the surviving ID
+(`Controller/Role/Load.pm`), and the HTTP client refused every redirect, so the adapter
+reported an outage. `fetchArtist` now asks the client for the redirect and reports
+`MusicBrainzMerged` with both IDs; the 301 and its `Location` were not observed live.
+
+Verification on 2026-11-15:
+
+- Each unit's race, functional and firewall tests ran in disposable containers before
+  its commit; from U4 on, against the commit in a separate worktree. The race classes
+  `HandChangeRaceTest` (9), `AlbumMergeRaceTest` (11), `QueueRunBesideWriterRaceTest`
+  (4) and `ArtistSyncRaceTest` (3) ran, none skipped.
+- The reproductions failed before their repairs: C with the album credits
+  `Post Malone` where the admin had set `Austin Post`; B with the duet credited to Post
+  Malone and Luke Combs although the admin left its credits unticked; D with each
+  song taking the recording of the track it paired with before the retag; A with no
+  match state for the album after the apply.
+- Full backend suite in disposable containers at `e02d023de`: 13,027 tests in 1,179
+  files and four lanes, all passed.
+- PHPStan over the whole project in the CI image at `e02d023de`: no errors. Deptrac 0
+  violations and `lint:container` pass at `b83a12da2`. The OpenAPI specification and
+  the generated web client match the application.
+- Web at `e02d023de`: typecheck passes, lint reports 0 errors and 10 warnings, and all
+  3,583 tests in 286 files pass.
+- Tooling: the qualification transport and qualification tests (12 and 38 cases) and
+  the tooling format, analysis and architecture checks pass on the host. The full
+  tooling suite was not run.
+- Documentation: the command documentation coverage test passes and
+  `make website-build` builds 243 pages.
+- The preview at `afa740518`: `app:artist:song:add` credited a producer on a song
+  whose credits a match had set, and the song's `matched_fields` went from
+  `["credits"]` to `[]`; `app:artist:song:remove` removed the credit again. Not run on
+  the preview: the API half, because the credit routes take a DPoP-bound token and no
+  web screen calls them (the functional `ArtistCreditCommandsTest` runs both entry
+  points), and an album merge, because the preview's five albums hold no pair.
+- Simplification: two passes. Applied: one factory for a stored artist's identity and
+  one source for the pairing tolerance of new songs (`b62a1cd22`), and one helper for
+  releasing loaded holders before a delete (`e02d023de`).
+- Code review: nine reviewers, verdict "Ready with fixes", one moderate finding,
+  applied (`0405c6142`). At that commit the artist sync, merge and metadata admin
+  tests (71, among them `ArtistSyncRaceTest`, `AlbumMergeRaceTest` and
+  `ArtistMergeRaceTest`) pass in disposable containers, the Catalog and Metadata unit
+  tests pass on the host apart from `VideoServiceTest`, which needs `finfo`, and
+  PHPStan over the whole project reports no errors.
+
+Open:
+
+- Writes beside a merge: a play read before the merge and saved after it can
+  overwrite the folded play count (`RecordPlayHandler` reads and writes without a
+  lock), and an existing play saved after the merge loses its album
+  (`MediaActivityRepository::syncToEntity` looks up the deleted source). A favorite of
+  the target added after the merge's statement waits and then fails with 23505, which
+  the add maps to nothing.
+- Artist sync:
+  - an artist whose only empty detail fields are locked is queued by every admin sync;
+    it makes no request but takes a two-second step. The six fields are listed three
+    times (`SyncArtistHandler::DETAILS`, its `missesDetails()` and the query in
+    `ArtistRepository::identifiedWithMissingDetailsAfter()`);
+  - an album artist that only an import's album credit creates is filled by the next
+    admin sync, not by the import;
+  - one outage moves the shared due time of every later fill by its pause of 5, 15 or
+    60 minutes, and a 301 to anything but another artist lookup counts as an outage,
+    tried again three times at every admin sync;
+  - after a cancel, a new admin sync queues none of the cancelled run's artists until
+    their cancelled fills fall due;
+  - a fill whose requeue after an outage could not be sent keeps its queued mark for
+    up to a day once its retries are spent;
+  - `InMemoryQueuedArtistSyncs` shares no contract cases with
+    `RedisQueuedArtistSyncs`;
+  - release and recording lookups of a merged ID still answer as outages; the adapter
+    can report them the same way.
+- Deferred by the plan, each separate work: the other hand edits that save a copy read
+  before a concurrent commit (`UpdateAlbumHandler`, `SetCoverHandler`,
+  `RemoveCoverHandler`); the import's repair of a known song without a row lock;
+  deleting an artist leaves the `credits` mark on the songs it uncredits; one failed
+  match request ends the other requests of the same import; favorites of an album or
+  song deleted outright dangle; `MovieRepository::delete` has the gaps the album
+  delete no longer has.
+- From the simplification passes, left as they are: the credit lock order in a static
+  method of `ArtistCreditInput` with eight parameters; the release loop in each of the
+  four album merge adapters; the job-run records of the artist sync store and the
+  lyrics store; `ArtistMatchWriter::text()` and `ApplyMatchHandler::text()`.
+- Point 2 of
+  `docs/solutions/architecture-patterns/concurrent-imports-find-or-create-identities-under-sorted-advisory-locks.md`
+  cites the removed assigner; it is due at the next learnings refresh.
+- `dev-docs/worker-runtime-inventory.md` holds 15 links that were broken before this
+  branch.
 - The plan file stays until the next cleanup retires it.
 
 ### Lyrics effect toggle and song browser panes
