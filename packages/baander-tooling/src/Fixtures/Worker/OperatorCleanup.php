@@ -200,7 +200,13 @@ final class OperatorCleanup
             }
         }
         try {
-            $this->commands->run(['rm', '-rf', '--', $this->state->work], timeout: 5, cleanup: true);
+            // The same budget as the other removals: a removal that times out fails a drill whose
+            // checks all passed, so the limit has to hold on a loaded host.
+            $this->commands->run(
+                ['rm', '-rf', '--', $this->state->work],
+                timeout: $this->commands->runtime->configuration->budgets->seconds('cleanup'),
+                cleanup: true,
+            );
         } catch (Throwable $error) {
             $this->errors[] = $error->getMessage();
         }
