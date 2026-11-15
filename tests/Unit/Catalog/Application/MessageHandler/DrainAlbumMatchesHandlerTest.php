@@ -164,17 +164,21 @@ final class DrainAlbumMatchesHandlerTest extends TestCase
     /**
      * The newer chain counted the held album from its claim's expiry, so its next run would come
      * late for the album: the run queues one without a chain, which takes the newer chain's place.
-     * A request that falls due first already brings a run that goes on to the album.
+     * A request that falls due first already brings a run that goes on to the album. After an
+     * outage the run queues nothing: the album keeps its earlier due time, and the newer chain
+     * keeps a run on its way while the request waits.
      *
-     * @param ?string            $requestedFor the due time of a request made for the album during the match
-     * @param ?string            $otherDue     the due time of another album's request
+     * @param ?string               $requestedFor the due time of a request made for the album during the match
+     * @param ?string               $otherDue     the due time of another album's request
+     * @param string                $dueAfter     the due time the album waits with once the run ends
      * @param list<array{int, int}> $queued
      */
     #[DataProvider('outcomesThatLeaveTheAlbumWaiting')]
-    public function testARunWhoseChainWasReplacedQueuesARunWithoutAChainForTheAlbumItLeftWaitingUnlessAnotherRequestFallsDueFirst(
+    public function testARunWhoseChainWasReplacedQueuesARunWithoutAChainForTheAlbumItLeftWaitingUnlessAnotherRequestFallsDueFirstOrAnOutageStoppedTheMatch(
         ?string $requestedFor,
         AutomaticMatchOutcome $outcome,
         ?string $otherDue,
+        string $dueAfter,
         array $queued,
     ): void {
         $album = Uuid::v7();
@@ -194,18 +198,67 @@ final class DrainAlbumMatchesHandlerTest extends TestCase
 
         $this->drain();
 
-        self::assertSame(AlbumMatchStatus::Requested, $this->states->stateOf($album)?->status);
+        self::assertEquals($this->request($album, AlbumMatchSource::Ingest, $dueAfter), $this->states->stateOf($album), 'The album waits for a match, with no review.');
+        self::assertEquals(
+            min(new DateTimeImmutable(self::NOW . ' ' . $dueAfter), new DateTimeImmutable(self::NOW . ' ' . ($otherDue ?? $dueAfter))),
+            $this->states->nextRequestDueAt(),
+            'No claim holds the album any more: the queue counts it from its due time.',
+        );
         self::assertEquals($queued, $this->queued);
         self::assertSame(array_fill(0, count($queued), null), $this->queuedChains);
     }
 
-    /** @return iterable<string, array{?string, AutomaticMatchOutcome, ?string, list<array{int, int}>}> */
+    /** @return iterable<string, array{?string, AutomaticMatchOutcome, ?string, string, list<array{int, int}>}> */
     public static function outcomesThatLeaveTheAlbumWaiting(): iterable
     {
-        yield 'a request made during the match' => ['+5 minutes', AutomaticMatchOutcome::matched(), null, [[0, 300_000]]];
-        yield 'an album to retry later' => [null, AutomaticMatchOutcome::retryLater(900), null, [[0, 900_000]]];
-        yield 'a request made during the match, behind another request' => ['+5 minutes', AutomaticMatchOutcome::matched(), '+1 minute', []];
-        yield 'an album to retry later, behind another request' => [null, AutomaticMatchOutcome::retryLater(900), '+1 minute', []];
+        $review = AutomaticMatchOutcome::needsReview(AlbumMatchReviewReason::TrackCountDiffers, 96, 13);
+
+        yield 'a request made during the match' => ['+5 minutes', AutomaticMatchOutcome::matched(), null, '+5 minutes', [[0, 300_000]]];
+        yield 'an album to retry later' => [null, AutomaticMatchOutcome::retryLater(900), null, '+15 minutes', [[0, 900_000]]];
+        yield 'a request made during the match, behind another request' => ['+5 minutes', AutomaticMatchOutcome::matched(), '+1 minute', '+5 minutes', []];
+        yield 'an album to retry later, behind another request' => [null, AutomaticMatchOutcome::retryLater(900), '+1 minute', '+15 minutes', []];
+        yield 'a review with a request made during the match' => ['+5 minutes', $review, null, '+5 minutes', [[0, 300_000]]];
+        yield 'a review with a request made during the match, behind another request' => ['+5 minutes', $review, '+1 minute', '+5 minutes', []];
+        yield 'an outage with a request made during the match' => ['+5 minutes', AutomaticMatchOutcome::unavailable(), null, '-1 minute', []];
+    }
+
+    /**
+     * A failing matcher leaves the album due an hour later, which the newer chain does not know
+     * of: the run queues a run without a chain for that time, unless another request falls due
+     * first and brings a run that goes on to the album.
+     *
+     * @param ?string               $otherDue the due time of another album's request
+     * @param list<array{int, int}> $queued
+     */
+    #[DataProvider('failedMatchesOfAReplacedChain')]
+    public function testARunWhoseChainWasReplacedWhileItsMatcherFailedQueuesARunWithoutAChainForTheAlbumAnHourLaterUnlessAnotherRequestFallsDueFirst(
+        ?string $otherDue,
+        array $queued,
+    ): void {
+        $album = Uuid::v7();
+        $this->states->has($this->request($album, AlbumMatchSource::Ingest, '-1 minute'));
+        if ($otherDue !== null) {
+            $this->states->has($this->request(Uuid::v7(), AlbumMatchSource::Ingest, $otherDue));
+        }
+        $this->outcome = function (): AutomaticMatchOutcome {
+            // A request for another album started a run of its own, and with it a new chain.
+            $this->chains->start(60);
+
+            throw new \RuntimeException('A bug in the apply.');
+        };
+
+        $this->drain();
+
+        self::assertEquals($this->request($album, AlbumMatchSource::Ingest, '+1 hour'), $this->states->stateOf($album));
+        self::assertEquals($queued, $this->queued);
+        self::assertSame(array_fill(0, count($queued), null), $this->queuedChains);
+    }
+
+    /** @return iterable<string, array{?string, list<array{int, int}>}> */
+    public static function failedMatchesOfAReplacedChain(): iterable
+    {
+        yield 'a failed match' => [null, [[0, 3_600_000]]];
+        yield 'a failed match, behind another request' => ['+1 minute', []];
     }
 
     public function testAnImportRequestIsDroppedWhileAutomaticMatchingIsOffAndAnAdminRequestStillMatches(): void
@@ -253,6 +306,35 @@ final class DrainAlbumMatchesHandlerTest extends TestCase
         $this->drain(new DrainAlbumMatchesMessage($this->queuedChains[0]));
 
         self::assertSame([$album->toString()], $this->matched, 'The request holds no claim, so the next run matches it.');
+    }
+
+    /**
+     * The newer chain counted the held album from its claim's expiry, so the run whose chain was
+     * replaced queues a run without a chain for the admin request.
+     */
+    public function testAnAdminRequestMadeDuringTheClaimOfARunWhoseChainWasReplacedOutlivesTheRemovalWithARunWithoutAChainASecondAhead(): void
+    {
+        $this->automaticMatching = false;
+        $album = Uuid::v7();
+        $this->states->has($this->request($album, AlbumMatchSource::Ingest, '-1 minute'));
+        // An admin syncs the album after the run claimed its request and before the run removes
+        // import requests, and the admin's request for another album started a run with a new chain.
+        $this->whenTheSwitchIsRead = function () use ($album): void {
+            $this->states->request($album, AlbumMatchSource::Admin, $this->clock->now());
+            $this->chains->start(60);
+        };
+
+        $this->drain();
+
+        self::assertSame([], $this->matched);
+        self::assertEquals($this->request($album, AlbumMatchSource::Admin, '+0 minutes'), $this->states->stateOf($album));
+        self::assertEquals([[0, 1_000]], $this->queued);
+        self::assertSame([null], $this->queuedChains);
+
+        $this->whenTheSwitchIsRead = null;
+        $this->drain(new DrainAlbumMatchesMessage($this->queuedChains[0]));
+
+        self::assertSame([$album->toString()], $this->matched, 'The run without a chain matches the admin request.');
     }
 
     public function testAMusicBrainzOutageKeepsTheRequestWritesNoReviewAndPausesTheQueue(): void

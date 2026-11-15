@@ -44,9 +44,12 @@ use Symfony\Component\Messenger\Stamp\DelayStamp;
  *
  * The runs form one chain (AlbumMatchQueueChain). A run without a chain starts one in place of any
  * other; a run of a chain that was replaced ends at once, without matching or queuing a successor.
- * A run whose chain was replaced while it matched ends its claim as usual. When that leaves its
- * album waiting, it queues a run without a chain for the album's due time, unless another request
- * falls due at or before it: the newer chain counted the album from its claim's expiry.
+ * A run whose chain was replaced while it held its album ends its claim as usual. When that leaves
+ * its album waiting, it queues a run without a chain for the album's due time, a second ahead at
+ * the soonest, unless another request falls due at or before it: the newer chain counted the album
+ * from its claim's expiry. After an outage such a run queues nothing: the album keeps its earlier
+ * due time and a request made during the claim is dropped, yet the album is not stranded, since the
+ * newer chain keeps a run on its way while any request waits.
  */
 final readonly class DrainAlbumMatchesHandler
 {
