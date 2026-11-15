@@ -6,18 +6,25 @@ namespace App\Tests\Fixtures\Catalog;
 
 use App\Catalog\Application\Command\MusicBrainzMatch\ApplyMatchCommand;
 use App\Catalog\Application\CommandHandler\MusicBrainzMatch\ApplyMatchHandler;
+use App\Catalog\Application\Service\MusicBrainzMatch\AlbumMatchRequester;
 use App\Catalog\Application\Service\MusicBrainzMatch\AlbumReleaseSearch;
 use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticAlbumMatcher;
 use App\Catalog\Application\Service\MusicBrainzMatch\CandidateScorer;
 use App\Catalog\Application\Service\MusicBrainzMatch\MatchConfidence;
 use App\Catalog\Application\Service\MusicBrainzMatch\TrackPairing;
+use App\Catalog\Infrastructure\Doctrine\Repository\AlbumMatchStateRepository;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMedium;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzTrack;
+use App\Metadata\Application\Settings\MetadataSettingDefinitions;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
+use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use App\Tests\Unit\Catalog\Application\QueryHandler\MusicBrainzMatch\FakeMusicBrainzLookup;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManager;
+use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -28,7 +35,8 @@ use Throwable;
  * The album match queue's production matcher and the production apply it dispatches, over the
  * disposable schema, album and release of {@see MatchApplyRace}, for QueueRunBesideWriterRaceTest.
  * The matcher asks MusicBrainz between its read of the album and the apply's locks, so the lookup's
- * hook is where a test lets another session commit.
+ * hook is where a test lets another session commit. For a manual apply beside an import it also
+ * holds the production match requester and what the import commits: a song and its artist.
  */
 final class QueueRunRace
 {
@@ -49,6 +57,71 @@ final class QueueRunRace
             confidence: new MatchConfidence(),
             bus: MatchApplyRace::handler($manager, $lookup) |> self::bus(...),
         );
+    }
+
+    /**
+     * The production match requester over the manager's schema, as an import and a manual apply
+     * call it, with automatic matching on or off. The queue runs it asks for are dispatched on $runs.
+     */
+    public static function requester(EntityManager $manager, bool $automaticMatching, MessageBusInterface $runs): AlbumMatchRequester
+    {
+        $services = MatchApplyRace::services($manager, null);
+        $settings = new readonly class ($automaticMatching) implements SystemSettingsPortInterface {
+            public function __construct(private bool $automaticMatching)
+            {
+            }
+
+            public function get(string $key): bool
+            {
+                return $key === MetadataSettingDefinitions::AUTO_SYNC && $this->automaticMatching;
+            }
+        };
+
+        return new AlbumMatchRequester(
+            new AlbumMatchStateRepository($manager->getConnection()),
+            $services['albums'],
+            $services['songs'],
+            $settings,
+            $runs,
+            new NativeClock(),
+        );
+    }
+
+    /**
+     * Stores an artist without a MusicBrainz ID that no seeded song or album credits.
+     *
+     * @return string the artist's ID
+     */
+    public static function artist(Connection $connection, string $name): string
+    {
+        $id = (new Uuid())->toString();
+        $connection->executeStatement(
+            'INSERT INTO artists (id, public_id, name, created_at, updated_at) VALUES (?, ?, ?, clock_timestamp(), clock_timestamp())',
+            [$id, (new PublicId())->toString(), $name],
+        );
+
+        return $id;
+    }
+
+    /**
+     * Stores a song of the album as an import commits it: tagged with its title, number and length,
+     * credited to the artist as primary, and compared by no match.
+     *
+     * @return string the song's ID
+     */
+    public static function importSong(Connection $connection, string $albumId, string $title, int $track, float $length, string $artistId, string $creditedName): string
+    {
+        $id = (new Uuid())->toString();
+        $connection->executeStatement(
+            "INSERT INTO songs (id, public_id, album_id, title, path, size, mime_type, length, track, disc, hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1000000, 'audio/flac', ?, ?, 1, 'tagged', now(), now())",
+            [$id, (new PublicId())->toString(), $albumId, $title, '/music/' . $id . '.flac', $length, $track],
+        );
+        $connection->executeStatement(
+            "INSERT INTO artist_song (id, artist_id, song_id, role, credited_name) VALUES (?, ?, ?, 'primary', ?)",
+            [(new Uuid())->toString(), $artistId, $id, $creditedName],
+        );
+
+        return $id;
     }
 
     /**

@@ -8,6 +8,7 @@ use App\Catalog\Application\Command\MusicBrainzMatch\ApplyMatchCommand;
 use App\Catalog\Application\Command\MusicBrainzMatch\MatchApplyOutcome;
 use App\Catalog\Application\Command\MusicBrainzMatch\MatchApplyResult;
 use App\Catalog\Application\Command\MusicBrainzMatch\MatchSelection;
+use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistIdentity;
 use App\Catalog\Application\Port\ArtistIdentityResolverInterface;
@@ -77,6 +78,12 @@ use Throwable;
  * itself, after an automatic apply returns. Covers the merges and removals free are discarded
  * after the commit.
  *
+ * A manual album apply that leaves the album with a release then requests the album's match as an
+ * import does. A song an import committed after the apply read the album was not compared, and
+ * the request that import made was removed with the match state. The request does nothing while
+ * automatic matching is off or when a match has compared every song of the album; when it fails,
+ * the failure is logged and the apply stays applied.
+ *
  * An automatic apply to an album that held the release when the matcher read it matches the
  * album's new songs. It never writes the album's own credits, nor a merge or removal that needs
  * them, so credits an admin changed by hand stay. Under the locks it also checks the songs the
@@ -111,6 +118,7 @@ final readonly class ApplyMatchHandler
         private ArtistIdentityResolverInterface $artistIdentities,
         private ArtistMergePortInterface $merges,
         private AlbumMatchStateRepositoryInterface $matchStates,
+        private AlbumMatchRequestInterface $matchRequests,
         private ImagePortInterface $images,
         private CoverImageDiscarder $discarder,
         private TransactionPortInterface $transaction,
@@ -223,7 +231,7 @@ final readonly class ApplyMatchHandler
 
         $coverSaved = false;
         try {
-            [$applied, $discard] = $this->transaction->run(function () use ($command, $albumId, $candidate, $compared, $locks, $cover, &$coverSaved): array {
+            [$applied, $discard, $holdsRelease] = $this->transaction->run(function () use ($command, $albumId, $candidate, $compared, $locks, $cover, &$coverSaved): array {
                 $this->albums->lockInIdOrder([$albumId]);
                 $this->lock($locks);
                 $album = $this->albums->findFreshByUuid($albumId) ?? throw self::gone(MatchItemType::Album);
@@ -239,7 +247,9 @@ final readonly class ApplyMatchHandler
                     throw MatchTicks::stale('The album changed since the comparison.');
                 }
 
-                return $this->writeAlbum($album, $snapshot, $plan, $candidate, $compared, $command->isAutomatic(), $cover, $coverSaved);
+                [$applied, $discard] = $this->writeAlbum($album, $snapshot, $plan, $candidate, $compared, $command->isAutomatic(), $cover, $coverSaved);
+
+                return [$applied, $discard, $album->getReleaseMbid() !== null];
             });
         } catch (Throwable $exception) {
             if ($cover !== null && !$this->coverCommitted($cover)) {
@@ -253,8 +263,34 @@ final readonly class ApplyMatchHandler
             $this->covers->discard($cover);
         }
         $this->discardImages($discard);
+        if (!$command->isAutomatic() && $holdsRelease) {
+            $this->requestMatch($albumId);
+        }
 
         return $coverRefused ? $applied->withCoverRefused() : $applied;
+    }
+
+    /**
+     * Requests an automatic match of an album a manual apply left with a release, once the apply
+     * committed. An import may have committed a song after the apply read the album: the apply did
+     * not compare that song, and it removed the request the import made with the album's match
+     * state. The request decides whether the album holds such a song and does nothing while
+     * automatic matching is off. An album left without a release is not requested: the search for
+     * its release would match over what the admin just chose.
+     *
+     * The request is best-effort: a failure must not fail the committed apply. A metadata sync from
+     * the admin panel requests the album again.
+     */
+    private function requestMatch(Uuid $albumId): void
+    {
+        try {
+            $this->matchRequests->requestAfterImport($albumId);
+        } catch (Throwable $failure) {
+            $this->logger->error('Could not request a MusicBrainz match of album {album_id} after a manual apply; a metadata sync from the admin panel requests it again.', [
+                'album_id' => $albumId->toString(),
+                'exception' => $failure,
+            ]);
+        }
     }
 
     /**

@@ -5,19 +5,29 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Catalog\Interface\Console;
 
 use App\Auth\Domain\Model\User;
+use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
+use App\Catalog\Domain\Repository\AlbumMatchStateRepositoryInterface;
+use App\Catalog\Domain\ValueObject\AlbumMatchSource;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistAlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRecording;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
+use App\Metadata\Application\Settings\MetadataSettingDefinitions;
+use App\Shared\Application\Port\SystemSettingStoreInterface;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\Catalog\Interface\LongBedMatchLibrary;
 use App\Tests\Functional\TestCase;
+use PHPUnit\Framework\Attributes\TestWith;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Stamp\DelayStamp;
+use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 /**
  * app:metadata:match:search, app:metadata:match:compare and app:metadata:match:apply reach the
@@ -185,6 +195,55 @@ final class MusicBrainzMatchCliParityTest extends TestCase
         self::assertSame(0, $this->artistCount('Post Malone, Luke Combs'));
     }
 
+    /**
+     * An import commits a song of the album while the apply asks MusicBrainz, and while automatic
+     * matching is on also its request for the album. The apply compares the songs it read and
+     * removes the album's match state. Both entry points then leave the album alike: waiting for a
+     * match again while automatic matching is on, and without a match state while it is off.
+     *
+     * @param array{state: ?string, source: ?string, dueLater: ?bool, uncomparedSongs: int, queuedRuns: list<int>} $expected
+     */
+    #[TestWith([true, ['state' => 'requested', 'source' => 'ingest', 'dueLater' => true, 'uncomparedSongs' => 1, 'queuedRuns' => [300_000]]], 'automatic matching on')]
+    #[TestWith([false, ['state' => null, 'source' => null, 'dueLater' => null, 'uncomparedSongs' => 1, 'queuedRuns' => []]], 'automatic matching off')]
+    public function testAnApplyBesideAnImportLeavesTheSameMatchStateFromTheApiAndTheConsole(bool $automaticMatching, array $expected): void
+    {
+        static::getContainer()->get(SystemSettingStoreInterface::class)->save([MetadataSettingDefinitions::AUTO_SYNC => $automaticMatching]);
+        $body = $this->assertJsonResponse($this->get($this->albumPath('comparison') . '?candidate=' . $this->release->id), 200, 'data')['data'] |> self::defaultTicks(...);
+        $connection = $this->entityManager->getConnection();
+        $left = [];
+
+        foreach (['api', 'console'] as $entryPoint) {
+            $this->entityManager->clear();
+            $this->asyncTransport()->reset();
+            // Each entry point applies to the album as the fixture stored it: what the other wrote is rolled back.
+            $connection->beginTransaction();
+            $this->musicBrainz->duringReleaseLookup = function () use ($automaticMatching): void {
+                $this->musicBrainz->duringReleaseLookup = null;
+                $this->importSong($automaticMatching);
+            };
+
+            if ($entryPoint === 'api') {
+                $this->assertJsonResponse($this->authenticatedRequest('POST', $this->albumPath('apply'), $this->admin, $body), 200, 'data');
+            } else {
+                $apply = $this->command('app:metadata:match:apply');
+                self::assertSame(Command::SUCCESS, $apply->execute([
+                    'type' => 'album',
+                    'public-id' => $this->album->getPublicId()->toString(),
+                    'candidate' => $this->release->id,
+                    '--selection' => json_encode($body, JSON_THROW_ON_ERROR),
+                    '--force' => true,
+                    '--json' => true,
+                ]), $apply->getDisplay());
+            }
+
+            self::assertSame($this->release->id, $this->releaseOfAlbum(), $entryPoint);
+            $left[$entryPoint] = $this->matchStateLeft();
+            $connection->rollBack();
+        }
+
+        self::assertSame(['api' => $expected, 'console' => $expected], $left);
+    }
+
     public function testAStaleSelectionAnswers409AndExits1WithTheSameMessage(): void
     {
         $comparison = $this->assertJsonResponse($this->get($this->albumPath('comparison') . '?candidate=' . $this->release->id), 200, 'data')['data'];
@@ -294,5 +353,59 @@ final class MusicBrainzMatchCliParityTest extends TestCase
     private function command(string $name): CommandTester
     {
         return new CommandTester(new Application($this->client->getKernel())->find($name));
+    }
+
+    /**
+     * Stores a fourth song of the album as an import commits it, credited to Post Malone and
+     * compared by no match, and, when the import asks for matches, its request for the album, whose
+     * settling delay has passed.
+     */
+    private function importSong(bool $requestsAMatch): void
+    {
+        $connection = $this->entityManager->getConnection();
+        $songId = new Uuid()->toString();
+        $connection->executeStatement(
+            "INSERT INTO songs (id, public_id, album_id, title, path, size, mime_type, length, track, disc, created_at, updated_at) VALUES (?, ?, ?, 'Losers', ?, 1000, 'audio/flac', 181.5, 4, 1, clock_timestamp(), clock_timestamp())",
+            [$songId, new PublicId()->toString(), $this->album->getId()->toString(), '/media/long-bed-match-import/' . $songId . '.flac'],
+        );
+        $connection->executeStatement(
+            "INSERT INTO artist_song (id, artist_id, song_id, role, credited_name) VALUES (?, ?, ?, 'primary', ?)",
+            [new Uuid()->toString(), $this->postMalone->getId()->toString(), $songId, self::ALBUM_ARTIST],
+        );
+        if ($requestsAMatch) {
+            static::getContainer()->get(AlbumMatchStateRepositoryInterface::class)
+                ->request($this->album->getId(), AlbumMatchSource::Ingest, new \DateTimeImmutable('-1 minute'));
+        }
+    }
+
+    /**
+     * What an apply left of the album's place in automatic matching: its match state, whether that
+     * falls due later than now, the songs no match has compared, and the delay in milliseconds of
+     * each album match queue run on its way.
+     *
+     * @return array{state: ?string, source: ?string, dueLater: ?bool, uncomparedSongs: int, queuedRuns: list<int|null>}
+     */
+    private function matchStateLeft(): array
+    {
+        $connection = $this->entityManager->getConnection();
+        $albumId = $this->album->getId()->toString();
+        $state = $connection->fetchAssociative('SELECT state, source, due_at > clock_timestamp() AS due_later FROM album_match_states WHERE album_id = ?', [$albumId]);
+        $runs = array_filter($this->asyncTransport()->getSent(), static fn (Envelope $envelope): bool => $envelope->getMessage() instanceof DrainAlbumMatchesMessage);
+
+        return [
+            'state' => $state === false ? null : (string) $state['state'],
+            'source' => $state === false ? null : (string) $state['source'],
+            'dueLater' => $state === false ? null : (bool) $state['due_later'],
+            'uncomparedSongs' => (int) $connection->fetchOne('SELECT count(*) FROM songs WHERE album_id = ? AND match_checked_at IS NULL', [$albumId]),
+            'queuedRuns' => array_map(static fn (Envelope $run): ?int => $run->last(DelayStamp::class)?->getDelay(), array_values($runs)),
+        ];
+    }
+
+    private function asyncTransport(): InMemoryTransport
+    {
+        $transport = static::getContainer()->get('messenger.transport.async');
+        self::assertInstanceOf(InMemoryTransport::class, $transport);
+
+        return $transport;
     }
 }

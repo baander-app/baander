@@ -12,6 +12,8 @@ use App\Catalog\Application\Command\MusicBrainzMatch\SeenField;
 use App\Catalog\Application\CommandHandler\MusicBrainzMatch\ApplyMatchHandler;
 use App\Catalog\Application\CommandHandler\MusicBrainzMatch\MatchCovers;
 use App\Catalog\Application\CommandHandler\MusicBrainzMatch\MatchTicks;
+use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
+use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistIdentityResolverInterface;
 use App\Catalog\Application\Port\ArtistMergePortInterface;
@@ -28,6 +30,7 @@ use App\Catalog\Application\QueryHandler\MusicBrainzMatch\CompareMatchHandler;
 use App\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchComparisonBuilder;
 use App\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchSnapshots;
 use App\Catalog\Application\Service\CoverImageDiscarder;
+use App\Catalog\Application\Service\MusicBrainzMatch\AlbumMatchRequester;
 use App\Catalog\Application\Service\MusicBrainzMatch\AlbumReleaseSearch;
 use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticAlbumMatcher;
 use App\Catalog\Application\Service\MusicBrainzMatch\MatchCandidate;
@@ -37,6 +40,8 @@ use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Artist;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\AlbumMatchStateRepositoryInterface;
+use App\Catalog\Domain\ValueObject\AlbumMatchSource;
+use App\Catalog\Domain\ValueObject\AlbumMatchStatus;
 use App\Catalog\Domain\ValueObject\ArtistRole;
 use App\Catalog\Domain\ValueObject\MatchedSongField;
 use App\Catalog\Domain\ValueObject\MusicbrainzId;
@@ -51,12 +56,15 @@ use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzReleaseGroup;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
+use App\Metadata\Application\Settings\MetadataSettingDefinitions;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\Exception\TransactionDeadlockException;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Fixtures\Catalog\InMemoryAlbumMatchStates;
 use App\Tests\Fixtures\Catalog\MatchSelections;
 use App\Tests\Unit\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchQueryFixtures;
 use Closure;
@@ -68,6 +76,7 @@ use Psr\Log\NullLogger;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\DelayStamp;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Throwable;
 
@@ -89,6 +98,9 @@ final class ApplyMatchHandlerTest extends TestCase
     ];
 
     private const string HEADHUNTERZ_ID = '6c1e0000-0000-4000-8000-000000000001';
+
+    /** The time on the apply's clock. */
+    private const string NOW = '2026-11-14 12:00:00';
 
     /** A PNG of one pixel. */
     private const string PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
@@ -122,10 +134,22 @@ final class ApplyMatchHandlerTest extends TestCase
     /** Fails the lookup of a saved image, as a database that cannot be reached. */
     private ?Throwable $imageLookupFailure = null;
 
+    /** The album match states the apply removes and its match request writes. */
+    private InMemoryAlbumMatchStates $states;
+
+    private bool $automaticMatching = false;
+
+    /** @var list<int|null> the delay of each album match queue run a request asked for, in milliseconds */
+    private array $queuedRuns = [];
+
+    /** Fails every match request, as an album match queue that cannot be reached. */
+    private ?Throwable $requestFailure = null;
+
     protected function setUp(): void
     {
         $this->setUpLibrary();
         $this->lookup = new CoverServingLookup($this->musicBrainz);
+        $this->states = new InMemoryAlbumMatchStates(new MockClock(self::NOW));
     }
 
     public function testAConfidentMatchOfLongBedCreditsEachDuetToPostMaloneAndItsGuestAndMergesEachCombinedArtistIntoPostMalone(): void
@@ -746,6 +770,117 @@ final class ApplyMatchHandlerTest extends TestCase
         self::assertNull($album->getReleaseMbid());
     }
 
+    public function testAManualApplyAsksForTheAlbumAgainWhenAnImportAddedASongItDidNotCompare(): void
+    {
+        $this->automaticMatching = true;
+
+        [$album, $imported, $applied] = $this->applyByHandBesideAnImport();
+
+        self::assertTrue($applied->isApplied());
+        self::assertNotNull($album->getReleaseMbid());
+        self::assertNull($imported->getMatchCheckedAt(), 'The apply did not compare the song the import added.');
+        $state = $this->states->stateOf($album->getId());
+        self::assertSame([AlbumMatchStatus::Requested, AlbumMatchSource::Ingest], [$state?->status, $state?->source], 'The album waits for a match again, as after an import.');
+        self::assertEquals(new \DateTimeImmutable('2026-11-14 12:05:00'), $state->dueAt, 'The apply removed the import\'s request and asked anew; the request falls due after the settling delay.');
+        self::assertSame([300_000], $this->queuedRuns, 'One queue run is on its way.');
+    }
+
+    public function testWhileAutomaticMatchingIsOffAManualApplyLeavesNoRequestForASongItDidNotCompare(): void
+    {
+        [$album, $imported, $applied] = $this->applyByHandBesideAnImport();
+
+        self::assertTrue($applied->isApplied());
+        self::assertNotNull($album->getReleaseMbid());
+        self::assertNull($imported->getMatchCheckedAt());
+        self::assertNull($this->states->stateOf($album->getId()));
+        self::assertSame([], $this->queuedRuns);
+    }
+
+    public function testAManualApplyThatLeavesTheAlbumWithoutAReleaseLeavesNoRequest(): void
+    {
+        $this->automaticMatching = true;
+
+        [$album, $imported, $applied] = $this->applyByHandBesideAnImport(releaseTicked: false);
+
+        self::assertTrue($applied->isApplied());
+        self::assertNull($album->getReleaseMbid(), 'The admin left the release ID unticked.');
+        self::assertNull($imported->getMatchCheckedAt());
+        self::assertNull($this->states->stateOf($album->getId()), 'A search for the album\'s release would match over the admin\'s choice.');
+        self::assertSame([], $this->queuedRuns);
+    }
+
+    public function testAManualApplyThatComparedEverySongOfTheAlbumLeavesNoRequest(): void
+    {
+        $this->automaticMatching = true;
+        $album = $this->addAlbum();
+        $release = self::release(self::releaseId(1));
+        $this->musicBrainz->releases[$release->id] = $release;
+        $this->addSongsOf($album, $release);
+        $comparison = $this->compare(MatchItemType::Album, $album->getPublicId()->toString(), $release->id);
+
+        $applied = ApplyMatchCommand::manual(MatchItemType::Album, $album->getPublicId()->toString(), $release->id, MatchSelections::defaults($comparison)) |> $this->apply(...);
+
+        self::assertTrue($applied->isApplied());
+        self::assertSame($release->id, $album->getReleaseMbid());
+        self::assertNull($this->states->stateOf($album->getId()));
+        self::assertSame([], $this->queuedRuns);
+    }
+
+    public function testAMatchRequestThatFailsIsLoggedWithTheAlbumAndTheApplyAnswersAsItDoesWithoutIt(): void
+    {
+        $this->automaticMatching = true;
+        $this->requestFailure = new \RuntimeException('The album match queue cannot be reached.');
+
+        [$album, , $applied] = $this->applyByHandBesideAnImport();
+
+        self::assertTrue($applied->isApplied());
+        self::assertSame([$album->getPublicId()->toString(), 26], [$applied->publicId, $applied->songsChanged]);
+        self::assertNotNull($album->getReleaseMbid());
+        self::assertSame(
+            ['album_id' => $album->getId()->toString(), 'exception' => $this->requestFailure],
+            $this->logged['Could not request a MusicBrainz match of album {album_id} after a manual apply; a metadata sync from the admin panel requests it again.'] ?? null,
+        );
+        self::assertArrayHasKey('Applied a MusicBrainz match', $this->logged, 'The apply reports itself as applied.');
+    }
+
+    /**
+     * Applies the release to Long Bed by hand, with the comparison's default ticks, while an import
+     * adds the song of the release's last track and, with automatic matching on, asks for the
+     * album: the import commits after the apply read the album and before the apply holds the
+     * album's row.
+     *
+     * @param bool $releaseTicked false when the admin unticked the release ID, which leaves the album without a release
+     *
+     * @return array{Album, Song, MatchApplyResult} the album, the imported song and the apply's result
+     */
+    private function applyByHandBesideAnImport(bool $releaseTicked = true): array
+    {
+        $album = $this->addAlbum();
+        $release = self::release(self::releaseId(1));
+        $this->musicBrainz->releases[$release->id] = $release;
+        $compared = $this->addSongsOf($album, $release, missing: ['2-9']);
+        $selection = $this->compare(MatchItemType::Album, $album->getPublicId()->toString(), $release->id) |> MatchSelections::defaults(...);
+        if (!$releaseTicked) {
+            $selection = new MatchSelection(
+                array_filter($selection->fields, static fn (SeenField $field): bool => $field->field !== MatchField::ReleaseMbid) |> array_values(...),
+                $selection->credits,
+                $selection->artistActions,
+                $selection->keptArtists,
+            );
+        }
+        $imported = null;
+        $this->whileWaitingForTheAlbum = function () use ($album, $release, $compared, &$imported): void {
+            [$imported] = $this->addSongsOf($album, $release, missing: array_map(self::placeOf(...), $compared));
+            if ($this->automaticMatching) {
+                $this->states->request($album->getId(), AlbumMatchSource::Ingest, new \DateTimeImmutable('2026-11-14 12:04:00'));
+            }
+        };
+
+        $applied = ApplyMatchCommand::manual(MatchItemType::Album, $album->getPublicId()->toString(), $release->id, $selection) |> $this->apply(...);
+
+        return [$album, $imported ?? throw new \LogicException('The import did not run.'), $applied];
+    }
+
     /**
      * Long Bed with its first fourteen songs credited to a "Post Malone, <guest>" artist each and the
      * rest to an ID-less Post Malone, who is also the album's artist.
@@ -956,10 +1091,11 @@ final class ApplyMatchHandlerTest extends TestCase
             artistIdentities: $this->resolver(),
             merges: $this->mergePort(),
             matchStates: $this->matchStates(),
+            matchRequests: $this->matchRequests(),
             images: $images,
             discarder: new CoverImageDiscarder($images, $storage, new NullLogger()),
             transaction: $this->transaction(),
-            clock: new MockClock('2026-11-14 12:00:00'),
+            clock: new MockClock(self::NOW),
             logger: $this->logger(),
         );
     }
@@ -1162,11 +1298,38 @@ final class ApplyMatchHandlerTest extends TestCase
     private function matchStates(): AlbumMatchStateRepositoryInterface
     {
         $states = $this->createStub(AlbumMatchStateRepositoryInterface::class);
-        $states->method('removeByAlbum')->willReturnCallback(function (): void {
+        $states->method('removeByAlbum')->willReturnCallback(function (Uuid $albumId): void {
             $this->calls[] = 'remove match state';
+            $this->states->removeByAlbum($albumId);
         });
 
         return $states;
+    }
+
+    /**
+     * The production match requester over the library and the match states held in memory, with
+     * automatic matching as the test switched it; it counts the queue runs it asks for.
+     */
+    private function matchRequests(): AlbumMatchRequestInterface
+    {
+        if ($this->requestFailure !== null) {
+            $failing = $this->createStub(AlbumMatchRequestInterface::class);
+            $failing->method('requestAfterImport')->willThrowException($this->requestFailure);
+
+            return $failing;
+        }
+        $settings = $this->createStub(SystemSettingsPortInterface::class);
+        $settings->method('get')->willReturnCallback(fn (string $key): bool => $key === MetadataSettingDefinitions::AUTO_SYNC && $this->automaticMatching);
+        $bus = $this->createStub(MessageBusInterface::class);
+        $bus->method('dispatch')->willReturnCallback(function (object $message, array $stamps = []): Envelope {
+            if ($message instanceof DrainAlbumMatchesMessage) {
+                $this->queuedRuns[] = array_find($stamps, static fn (object $stamp): bool => $stamp instanceof DelayStamp)?->getDelay();
+            }
+
+            return new Envelope($message, $stamps);
+        });
+
+        return new AlbumMatchRequester($this->states, $this->albumPort(), $this->songPort(), $settings, $bus, new MockClock(self::NOW));
     }
 
     private function images(): ImagePortInterface

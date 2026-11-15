@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Catalog\Application\Command\MusicBrainzMatch\ApplyMatchCommand;
 use App\Catalog\Application\Command\MusicBrainzMatch\MatchSelection;
 use App\Catalog\Application\Command\MusicBrainzMatch\SeenCredits;
+use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
+use App\Catalog\Application\Query\MusicBrainzMatch\MatchItemType;
 use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticMatchOutcome;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Catalog\ArtistImportIdentityRace;
@@ -14,15 +17,27 @@ use App\Tests\Fixtures\Catalog\MatchSelections;
 use App\Tests\Fixtures\Catalog\QueueRunRace;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Messenger\MessageBus;
+use Symfony\Component\Messenger\Stamp\DelayStamp;
+use Symfony\Component\Messenger\Stamp\StampInterface;
+use Symfony\Component\Messenger\TraceableMessageBus;
 
 /**
  * A run of the album match queue reads a matched album, asks MusicBrainz for its release and only
  * then takes the apply's locks. Another writer that commits while MusicBrainz is asked meets no
  * lock of the run, so nothing waits: each test lets that writer commit from inside the release
  * lookup, between the matcher's read and the apply's locks. The run then writes nothing, the album
- * is matched again later, and that later run acts on the songs as the writer left them. The matcher
- * and the apply are the production ones. The tables copy the migrated ones without their PGroonga
- * indexes or triggers; the foreign keys of credits are added back.
+ * is matched again later, and that later run acts on the songs as the writer left them.
+ *
+ * A manual apply has the same gap between its read of the album and its locks. An import that
+ * commits a song and its match request there loses the request to the apply, which removes the
+ * album's match state; the apply therefore asks for the album again once it committed, and the
+ * run that follows writes the song. An import that commits after the apply removed the state
+ * keeps its request.
+ *
+ * The matcher, the apply and the match requests are the production ones. The tables copy the
+ * migrated ones without their PGroonga indexes or triggers; the foreign keys of credits are added
+ * back.
  */
 final class QueueRunBesideWriterRaceTest extends TestCase
 {
@@ -124,6 +139,106 @@ final class QueueRunBesideWriterRaceTest extends TestCase
     }
 
     /**
+     * The scan has stored the album's first song only when an admin applies the release by hand.
+     * While the apply asks MusicBrainz, an import commits the second song and, automatic matching
+     * being on, its request for the album. The apply compared the first song alone, and it removes
+     * the album's match state and with it that request: the second song would stay uncompared with
+     * nothing asking for the album.
+     */
+    public function testAManualApplyAsksForTheAlbumAgainWhenAnImportAddedASongWhileMusicBrainzWasAskedAndTheNextRunWritesOnlyThatSong(): void
+    {
+        $seed = MatchApplyRace::seed($this->observer, $this->tag);
+        $this->observer->executeStatement('DELETE FROM songs WHERE id = ?', [$seed['soloSong']]);
+        $album = new Uuid($seed['album']);
+        $selection = MatchApplyRace::compare(ArtistImportIdentityRace::entityManager($this->observer), MatchApplyRace::lookup($this->tag), $seed['albumPublicId'])
+            |> MatchSelections::defaults(...);
+        $lookup = MatchApplyRace::lookup($this->tag);
+        $imported = null;
+        $requestOfTheImport = null;
+        $lookup->duringReleaseLookup = function () use ($lookup, $seed, $album, &$imported, &$requestOfTheImport): void {
+            $lookup->duringReleaseLookup = null;
+            $imported = QueueRunRace::importSong($this->observer, $seed['album'], 'Pour Me A Drink', 2, 201.5, $seed['postMalone'], MatchApplyRace::postMalone($this->tag));
+            QueueRunRace::requester(ArtistImportIdentityRace::entityManager($this->observer), true, new MessageBus())->requestAfterImport($album);
+            $requestOfTheImport = $this->matchState($seed['album']);
+        };
+        $manager = ArtistImportIdentityRace::entityManager($this->writer);
+        $runs = new TraceableMessageBus(new MessageBus());
+        $runsBeforeTheCommit = null;
+        $handler = MatchApplyRace::handler(
+            $manager,
+            $lookup,
+            function () use ($runs, &$runsBeforeTheCommit): void {
+                $runsBeforeTheCommit = self::queuedRuns($runs);
+            },
+            QueueRunRace::requester($manager, true, $runs),
+        );
+
+        $applied = ApplyMatchCommand::manual(MatchItemType::Album, $seed['albumPublicId'], MatchApplyRace::RELEASE_ID, $selection) |> $handler(...);
+
+        self::assertTrue($applied->isApplied());
+        self::assertIsString($imported, 'The import committed its song while MusicBrainz was asked.');
+        self::assertSame(['state' => 'requested', 'source' => 'ingest'], $requestOfTheImport, 'The import asked for the album before the apply took its locks.');
+        self::assertSame([], $runsBeforeTheCommit, 'The apply asks for no match before it committed.');
+        $afterApply = QueueRunRace::rows($this->observer, $seed['album']);
+        self::assertSame(MatchApplyRace::RELEASE_ID, $afterApply[$seed['album']]['release_mbid'] ?? null);
+        self::assertNotNull($afterApply[$seed['duetSong']]['match_checked_at'] ?? null, 'The apply compared the song it read.');
+        self::assertSame(['mbid' => null, 'match_checked_at' => null], array_intersect_key($afterApply[$imported], ['mbid' => 0, 'match_checked_at' => 0]), 'No match has compared the imported song.');
+        self::assertSame(['state' => 'requested', 'source' => 'ingest'], $this->matchState($seed['album']), 'The album waits for a match again, as after an import.');
+        self::assertSame([300_000], self::queuedRuns($runs), 'One queue run is on its way, due after the settling delay.');
+
+        $next = QueueRunRace::matcher(ArtistImportIdentityRace::entityManager($this->writer), MatchApplyRace::lookup($this->tag))->match($album);
+
+        self::assertEquals(AutomaticMatchOutcome::matched(), $next);
+        $afterRun = QueueRunRace::rows($this->observer, $seed['album']);
+        self::assertSame(MatchApplyRace::recordingId(2), $afterRun[$imported]['mbid'] ?? null, 'The run that follows pairs the imported song with the release\'s second track.');
+        self::assertNotNull($afterRun[$imported]['match_checked_at'] ?? null);
+        self::assertSame($afterApply[$seed['duetSong']], $afterRun[$seed['duetSong']], 'The run writes nothing to the song the apply compared.');
+    }
+
+    /**
+     * The same apply beside an import of a song by an artist the release does not name, so the
+     * import waits for none of the apply's locks. It commits the song and its request once the
+     * apply has removed the album's match state and before the apply commits. The request did not
+     * exist when the state was removed, so it stands after the apply.
+     */
+    public function testAnImportsRequestCommittedAfterAManualApplyRemovedTheMatchStateAndBeforeItCommittedStandsAfterTheApply(): void
+    {
+        $seed = MatchApplyRace::seed($this->observer, $this->tag);
+        $this->observer->executeStatement('DELETE FROM songs WHERE id = ?', [$seed['soloSong']]);
+        $guest = 'Morgan Wallen ' . $this->tag;
+        $guestId = QueueRunRace::artist($this->observer, $guest);
+        // A wait for a lock of the apply would never end: the apply goes on only once the import returned.
+        $this->observer->executeStatement("SET lock_timeout = '10s'");
+        $selection = MatchApplyRace::compare(ArtistImportIdentityRace::entityManager($this->observer), MatchApplyRace::lookup($this->tag), $seed['albumPublicId'])
+            |> MatchSelections::defaults(...);
+        $imported = null;
+        $seenByTheImport = null;
+        $whileTheApplyHoldsItsLocks = function () use ($seed, $guest, $guestId, &$imported, &$seenByTheImport): void {
+            $imported = QueueRunRace::importSong($this->observer, $seed['album'], 'I Had Some Help', 3, 178.0, $guestId, $guest);
+            QueueRunRace::requester(ArtistImportIdentityRace::entityManager($this->observer), true, new MessageBus())->requestAfterImport(new Uuid($seed['album']));
+            $seenByTheImport = [
+                'release' => $this->observer->fetchOne('SELECT release_mbid FROM albums WHERE id = ?', [$seed['album']]),
+                'request' => $this->matchState($seed['album']),
+            ];
+        };
+        $handler = MatchApplyRace::handler(ArtistImportIdentityRace::entityManager($this->writer), MatchApplyRace::lookup($this->tag), $whileTheApplyHoldsItsLocks);
+
+        $applied = ApplyMatchCommand::manual(MatchItemType::Album, $seed['albumPublicId'], MatchApplyRace::RELEASE_ID, $selection) |> $handler(...);
+
+        self::assertTrue($applied->isApplied());
+        self::assertSame(
+            ['release' => null, 'request' => ['state' => 'requested', 'source' => 'ingest']],
+            $seenByTheImport,
+            'The import committed its request while the apply had written everything and committed nothing.',
+        );
+        $afterApply = QueueRunRace::rows($this->observer, $seed['album']);
+        self::assertSame(MatchApplyRace::RELEASE_ID, $afterApply[$seed['album']]['release_mbid'] ?? null);
+        self::assertIsString($imported);
+        self::assertNull($afterApply[$imported]['match_checked_at'] ?? null, 'No match has compared the imported song.');
+        self::assertSame(['state' => 'requested', 'source' => 'ingest'], $this->matchState($seed['album']), 'The album still waits for the match the import asked for.');
+    }
+
+    /**
      * Both songs arrived after the album was matched, and each is within the pairing tolerance of
      * either track of the release, so its tagged number alone says which track it is. While the run
      * asks MusicBrainz, a retag swaps the two numbers. The run, which paired the songs by their old
@@ -171,5 +286,28 @@ final class QueueRunBesideWriterRaceTest extends TestCase
             MatchApplyRace::songCredits($this->observer, $seed['soloSong']),
             'The song now tagged as the first track takes the duet\'s credits.',
         );
+    }
+
+    /** @return list<int|null> the delay in milliseconds of each album match queue run dispatched on the bus */
+    private static function queuedRuns(TraceableMessageBus $bus): array
+    {
+        $runs = array_filter($bus->getDispatchedMessages(), static fn (array $dispatched): bool => $dispatched['message'] instanceof DrainAlbumMatchesMessage);
+
+        return array_map(
+            static function (array $run): ?int {
+                $delay = array_find($run['stamps'], static fn (StampInterface $stamp): bool => $stamp instanceof DelayStamp);
+
+                return $delay instanceof DelayStamp ? $delay->getDelay() : null;
+            },
+            array_values($runs),
+        );
+    }
+
+    /** @return array{state: string, source: string}|null the album's match state as stored, when it has one */
+    private function matchState(string $albumId): ?array
+    {
+        $state = $this->observer->fetchAssociative('SELECT state, source FROM album_match_states WHERE album_id = ?', [$albumId]);
+
+        return $state === false ? null : ['state' => (string) $state['state'], 'source' => (string) $state['source']];
     }
 }

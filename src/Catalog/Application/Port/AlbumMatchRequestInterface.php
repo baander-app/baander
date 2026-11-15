@@ -17,9 +17,10 @@ use App\Shared\Domain\Model\Uuid;
 interface AlbumMatchRequestInterface
 {
     /**
-     * Request matches for albums an import or rescan touched, while automatic matching is on; does
-     * nothing while it is off. The requests fall due after a settling delay, so that the album's
-     * other discs land first.
+     * Request matches for albums an import or rescan touched, or that an album merge or a manual
+     * apply left with songs no match compared, while automatic matching is on; does nothing while it
+     * is off. The requests fall due after a settling delay, so that the album's other discs land
+     * first.
      */
     public function requestAfterImport(Uuid ...$albumIds): void;
 

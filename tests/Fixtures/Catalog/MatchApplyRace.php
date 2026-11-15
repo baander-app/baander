@@ -6,6 +6,7 @@ namespace App\Tests\Fixtures\Catalog;
 
 use App\Catalog\Application\CommandHandler\MusicBrainzMatch\ApplyMatchHandler;
 use App\Catalog\Application\CommandHandler\MusicBrainzMatch\MatchCovers;
+use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Query\MusicBrainzMatch\CompareMatchQuery;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchComparison;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchItemType;
@@ -194,9 +195,11 @@ final class MatchApplyRace
 
     /**
      * The apply handler over the manager. $beforeCommit runs inside the transaction once the apply
-     * wrote everything, while it holds every lock, before the commit.
+     * wrote everything, while it holds every lock, before the commit. A manual apply asks
+     * $matchRequests for the album's match once it committed; without one it asks for none, as while
+     * automatic matching is off.
      */
-    public static function handler(EntityManager $manager, FakeMusicBrainzLookup $lookup, ?Closure $beforeCommit = null): ApplyMatchHandler
+    public static function handler(EntityManager $manager, FakeMusicBrainzLookup $lookup, ?Closure $beforeCommit = null, ?AlbumMatchRequestInterface $matchRequests = null): ApplyMatchHandler
     {
         $services = self::services($manager, $beforeCommit);
         $storage = new FlysystemStorage(sys_get_temp_dir() . '/baander-match-apply-race');
@@ -214,6 +217,7 @@ final class MatchApplyRace
             artistIdentities: new ArtistIdentityResolver($manager),
             merges: $services['merges'],
             matchStates: new AlbumMatchStateRepository($manager->getConnection()),
+            matchRequests: $matchRequests ?? self::noMatchRequests(),
             images: $services['images'],
             discarder: $services['discarder'],
             transaction: $services['transaction'],
@@ -343,6 +347,21 @@ final class MatchApplyRace
                     }
                     throw $error instanceof DeadlockException ? new TransactionDeadlockException($error) : $error;
                 }
+            }
+        };
+    }
+
+    /** Match requests that request nothing after an import, as the production ones while automatic matching is off. */
+    private static function noMatchRequests(): AlbumMatchRequestInterface
+    {
+        return new class () implements AlbumMatchRequestInterface {
+            public function requestAfterImport(Uuid ...$albumIds): void
+            {
+            }
+
+            public function requestForAdmin(Uuid $albumId): void
+            {
+                throw new \LogicException('An apply requests a match as an import does, never as an admin.');
             }
         };
     }
