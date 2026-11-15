@@ -39,7 +39,9 @@ final readonly class ArtistSyncQueue
 
     /**
      * Queues the artist's sync at the shared pace, unless it is queued already or MusicBrainz
-     * answered about this MusicBrainz ID within 30 days.
+     * answered about this MusicBrainz ID within 30 days. When the bus refuses the message, the
+     * artist's queued mark goes, so that the next producer queues it; the pace step it took stays
+     * spent.
      *
      * @param Uuid|null $runId the admin sync's run that queues it; null for a match or an import
      *
@@ -48,8 +50,14 @@ final readonly class ArtistSyncQueue
     public function queue(Uuid $artistId, string $musicbrainzId, ?Uuid $runId = null): ?int
     {
         $delayMs = $this->marks->reserve($artistId, $musicbrainzId, self::SPACING_MS, self::MARK_GRACE_SECONDS);
-        if ($delayMs !== null) {
+        if ($delayMs === null) {
+            return null;
+        }
+        try {
             $this->bus->dispatch(new SyncArtistMessage($artistId, $runId), [new DelayStamp($delayMs)]);
+        } catch (\Throwable $refused) {
+            $this->marks->clearQueued($artistId);
+            throw $refused;
         }
 
         return $delayMs;

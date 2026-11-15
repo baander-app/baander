@@ -101,6 +101,21 @@ final class ArtistSyncRequesterTest extends TestCase
         self::assertInstanceOf(\RuntimeException::class, $context['exception']);
     }
 
+    public function testAnArtistWhoseFillCouldNotBeSentIsQueuedByTheNextProducerOnceTheTransportAnswers(): void
+    {
+        $this->failFromDispatch = 1;
+        $artist = self::artist(self::HEADHUNTERZ_ID);
+
+        $this->requester()->requestAfterMatch($artist);
+
+        self::assertSame([], $this->queuedArtists(), 'The transport refused the fill.');
+        $this->failFromDispatch = null;
+
+        $this->requester()->requestAfterImport($artist);
+
+        self::assertSame([$artist->artistId->toString()], $this->queuedArtists(), 'Nothing marks the artist as queued while no fill is on its way.');
+    }
+
     public function testFillsAnImportAndAnAdminSyncQueueTogetherFallDueAtLeastTwoSecondsApart(): void
     {
         $catalog = [Uuid::v7()->toString() => '6c1e0000-0000-4000-8000-000000000011', Uuid::v7()->toString() => '6c1e0000-0000-4000-8000-000000000012'];
