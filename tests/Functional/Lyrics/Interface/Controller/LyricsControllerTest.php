@@ -191,7 +191,7 @@ final class LyricsControllerTest extends TestCase
 
         // Handled as a worker handles a queued fetch: no exception means no retry and no failure entry.
         $envelope = static::getContainer()->get(MessageBusInterface::class)
-            ->dispatch(new Envelope(new FetchLyricsCommand($songId), [new ReceivedStamp('async')]));
+            ->dispatch(new Envelope(new FetchLyricsCommand($songId, queued: true), [new ReceivedStamp('async')]));
 
         $this->assertInstanceOf(Envelope::class, $envelope);
         $this->assertSame(['getBySignature'], $this->lrclib->calls);
@@ -290,7 +290,7 @@ final class LyricsControllerTest extends TestCase
 
         // Handled as a worker handles a queued fetch: no exception means no retry and no failure entry.
         $envelope = static::getContainer()->get(MessageBusInterface::class)
-            ->dispatch(new Envelope(new FetchLyricsCommand($songId), [new ReceivedStamp('async')]));
+            ->dispatch(new Envelope(new FetchLyricsCommand($songId, queued: true), [new ReceivedStamp('async')]));
 
         $this->assertInstanceOf(Envelope::class, $envelope);
         $this->assertSame([], $this->lrclib->calls);

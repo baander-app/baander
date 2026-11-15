@@ -16,6 +16,7 @@ use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\JobCancelledException;
 use App\Shared\Application\Port\JobMonitorAdministrationInterface;
+use PHPUnit\Framework\Attributes\TestWith;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -146,6 +147,26 @@ final class LyricsCommandsTest extends TestCase
         $display = (string) preg_replace('/\s+/', ' ', $tester->getDisplay());
         self::assertStringContainsString('Queued 3 lyrics fetch(es)', $display);
         self::assertStringContainsString('Skipped 2 song(s) without an artist and 1 without a length', $display);
+    }
+
+    /**
+     * The run raises a delay below three seconds to that, so the command prints the spacing
+     * the run uses and how long its fetches take at it.
+     *
+     * @param array<string, string> $options
+     */
+    #[TestWith([[], '3000 ms apart', 'over the next 27 s'])]
+    #[TestWith([['--delay' => '500'], '3000 ms apart', 'over the next 27 s'])]
+    #[TestWith([['--delay' => '10000'], '10000 ms apart', 'over the next 2 min'])]
+    public function testTheFetchPrintsTheSpacingTheRunUsesAndTheTimeItsFetchesTake(array $options, string $spacing, string $time): void
+    {
+        $inline = [];
+        $tester = new CommandTester(new LyricsFetchCommand($this->jobs($inline, new BulkFetchLyricsResult(10, 0, 0))));
+
+        self::assertSame(Command::SUCCESS, $tester->execute($options));
+        $display = (string) preg_replace('/\s+/', ' ', $tester->getDisplay());
+        self::assertStringContainsString($spacing, $display);
+        self::assertStringContainsString($time, $display);
     }
 
     public function testARunThatCouldLookUpNoSongSaysWhyNothingWasQueued(): void

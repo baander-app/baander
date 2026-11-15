@@ -22,6 +22,7 @@ use App\Tests\Fixtures\Messaging\CancelAtCheckpoint;
 use App\Tests\Unit\Lyrics\InMemoryQueuedLyricsFetches;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -65,7 +66,7 @@ final class BulkFetchLyricsHandlerTest extends TestCase
                 };
             });
 
-        self::assertSame(99, $this->handler($songs, $this->lyricsFor([$cached]))(new BulkFetchLyricsCommand(delayMs: 0))->queued);
+        self::assertSame(99, $this->handler($songs, $this->lyricsFor([$cached]))(new BulkFetchLyricsCommand())->queued);
         self::assertSame([
             [null, 50],
             [end($firstPage)->toString(), 50],
@@ -83,7 +84,7 @@ final class BulkFetchLyricsHandlerTest extends TestCase
         $songs = $this->createMock(SongLookupInterface::class);
         $songs->expects($this->once())->method('songIdsAfter')->with(null, 3)->willReturn([Uuid::v7(), Uuid::v7()]);
 
-        self::assertSame(2, $this->handler($songs)(new BulkFetchLyricsCommand(limit: 3, delayMs: 0))->queued);
+        self::assertSame(2, $this->handler($songs)(new BulkFetchLyricsCommand(limit: 3))->queued);
         self::assertCount(2, $this->queued);
     }
 
@@ -93,16 +94,53 @@ final class BulkFetchLyricsHandlerTest extends TestCase
         $songs->method('songIdsAfter')->willReturn([Uuid::v7(), Uuid::v7(), Uuid::v7()]);
 
         $started = microtime(true);
-        self::assertSame(3, $this->handler($songs)(new BulkFetchLyricsCommand(limit: 3, delayMs: 2000))->queued);
+        self::assertSame(3, $this->handler($songs)(new BulkFetchLyricsCommand(limit: 3, delayMs: 4000))->queued);
 
         self::assertLessThan(1.0, microtime(true) - $started, 'The handler queues the fetches and returns; it does not wait between them.');
-        self::assertSame([0, 2000, 4000], array_map(
-            static fn (Envelope $envelope): ?int => $envelope->last(DelayStamp::class)?->getDelay(),
-            $this->queued,
-        ));
+        self::assertSame([0, 4000, 8000], $this->queuedDelays());
         foreach ($this->queued as $envelope) {
             self::assertSame(['async'], $envelope->last(TransportNamesStamp::class)?->getTransportNames());
         }
+    }
+
+    /** @return iterable<string, array{BulkFetchLyricsCommand, int}> */
+    public static function runsAndTheirSpacing(): iterable
+    {
+        yield 'no delay' => [new BulkFetchLyricsCommand(limit: 3), 3000];
+        yield 'a delay below the minimum' => [new BulkFetchLyricsCommand(limit: 3, delayMs: 500), 3000];
+        yield 'a longer delay' => [new BulkFetchLyricsCommand(limit: 3, delayMs: 10_000), 10_000];
+        // Built as the scheduler builds a command, from the parameters stored with the schedule.
+        yield 'a schedule that stored a delay below the minimum' => [new BulkFetchLyricsCommand(...['limit' => 3, 'delayMs' => 500]), 3000];
+    }
+
+    /**
+     * A turn under LRCLIB's pace comes every two seconds and a request takes time of its own,
+     * so fetches queued less than three seconds apart pile up on the workers. A run spaces its
+     * fetches three seconds apart unless it is asked for more, logs the spacing it used, and
+     * marks each fetch as queued.
+     */
+    #[DataProvider('runsAndTheirSpacing')]
+    public function testARunSpacesItsFetchesAtLeastThreeSecondsApartAndMarksThemAsQueued(BulkFetchLyricsCommand $command, int $spacing): void
+    {
+        $songs = $this->createStub(SongLookupInterface::class);
+        $songs->method('songIdsAfter')->willReturn([Uuid::v7(), Uuid::v7(), Uuid::v7()]);
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('info')->with(
+            'Bulk lyrics fetch queued',
+            $this->callback(static fn (array $context): bool => $context['delay_ms'] === $spacing),
+        );
+
+        $this->handler($songs, logger: $logger)($command);
+
+        self::assertSame([0, $spacing, 2 * $spacing], $this->queuedDelays());
+        foreach ($this->queued as $envelope) {
+            self::assertTrue($envelope->getMessage()->isQueued());
+        }
+    }
+
+    public function testASchedulesFormOffersTheSpacingARunUsesByDefault(): void
+    {
+        self::assertSame(3000, BulkFetchLyricsCommand::schedulerParameters()['delayMs']['default']);
     }
 
     public function testWithoutALimitEverySongWithoutLyricsIsQueued(): void
@@ -142,14 +180,14 @@ final class BulkFetchLyricsHandlerTest extends TestCase
         $songs->method('songIdsAfter')->willReturn($songIds);
 
         try {
-            $this->handler($songs, cancellation: new CancelAtCheckpoint(passes: 2))(new BulkFetchLyricsCommand(delayMs: 1500));
+            $this->handler($songs, cancellation: new CancelAtCheckpoint(passes: 2))(new BulkFetchLyricsCommand(delayMs: 4500));
             self::fail('A cancelled bulk fetch must stop.');
         } catch (JobCancelledException) {
         }
 
         self::assertSame([$songIds[0]->toString(), $songIds[1]->toString()], $this->queuedSongIds());
         // The fetches it queued are skipped: the run is recorded cancelled until after the last one is due.
-        self::assertSame([$this->queuedRunId()->toString() => 86402], $this->marks->cancelledRuns);
+        self::assertSame([$this->queuedRunId()->toString() => 86405], $this->marks->cancelledRuns);
     }
 
     public function testAnOverlappingRunSkipsTheSongsThatAnEarlierRunQueued(): void
@@ -158,8 +196,8 @@ final class BulkFetchLyricsHandlerTest extends TestCase
         $songs = $this->createStub(SongLookupInterface::class);
         $songs->method('songIdsAfter')->willReturnOnConsecutiveCalls([$songIds[0], $songIds[1]], $songIds);
 
-        self::assertSame(2, $this->handler($songs)(new BulkFetchLyricsCommand(delayMs: 500))->queued);
-        self::assertSame(1, $this->handler($songs)(new BulkFetchLyricsCommand(delayMs: 500))->queued);
+        self::assertSame(2, $this->handler($songs)(new BulkFetchLyricsCommand())->queued);
+        self::assertSame(1, $this->handler($songs)(new BulkFetchLyricsCommand())->queued);
 
         self::assertSame(
             [$songIds[0]->toString(), $songIds[1]->toString(), $songIds[2]->toString()],
@@ -175,12 +213,12 @@ final class BulkFetchLyricsHandlerTest extends TestCase
         $songs = $this->createStub(SongLookupInterface::class);
         $songs->method('songIdsAfter')->willReturn($songIds);
 
-        $this->handler($songs)(new BulkFetchLyricsCommand(limit: 3, delayMs: 2500));
+        $this->handler($songs)(new BulkFetchLyricsCommand(limit: 3, delayMs: 3500));
 
         self::assertSame([
             $songIds[0]->toString() => 86400,
-            $songIds[1]->toString() => 86403,
-            $songIds[2]->toString() => 86405,
+            $songIds[1]->toString() => 86404,
+            $songIds[2]->toString() => 86407,
         ], $this->marks->queued);
     }
 
@@ -207,10 +245,10 @@ final class BulkFetchLyricsHandlerTest extends TestCase
         $songs = $this->createStub(SongLookupInterface::class);
         $songs->method('songIdsAfter')->willReturn([Uuid::v7(), Uuid::v7(), Uuid::v7()]);
 
-        $this->handler($songs, jobId: 'bulk-job')(new BulkFetchLyricsCommand(limit: 3, delayMs: 2500));
+        $this->handler($songs, jobId: 'bulk-job')(new BulkFetchLyricsCommand(limit: 3, delayMs: 3500));
 
         // Cancelling the finished job finds the run, so the fetches still to come are skipped.
-        self::assertSame(['bulk-job' => [$this->queuedRunId()->toString(), 86405]], $this->marks->jobRuns);
+        self::assertSame(['bulk-job' => [$this->queuedRunId()->toString(), 86407]], $this->marks->jobRuns);
     }
 
     public function testARunOutsideAJobOrThatQueuedNothingLeavesNoJobRunToCancel(): void
@@ -259,7 +297,7 @@ final class BulkFetchLyricsHandlerTest extends TestCase
             $songIds[3]->toString() => new SongLyricSignature('Amore Infelice', 'Suspekt', 'Elektra', null),
             // Deleted after its ID page was read: neither queued nor counted.
             $songIds[4]->toString() => null,
-        ])(new BulkFetchLyricsCommand(limit: 1, delayMs: 0));
+        ])(new BulkFetchLyricsCommand(limit: 1));
 
         self::assertEquals(new BulkFetchLyricsResult(queued: 1, skippedNoArtist: 2, skippedNoLength: 2), $result);
         self::assertSame([$songIds[5]->toString()], $this->queuedSongIds());
@@ -273,7 +311,7 @@ final class BulkFetchLyricsHandlerTest extends TestCase
         $songs = $this->createStub(SongLookupInterface::class);
         $songs->method('songIdsAfter')->willReturnOnConsecutiveCalls(...$pages);
 
-        self::assertSame(51, $this->handler($songs)(new BulkFetchLyricsCommand(delayMs: 0))->queued);
+        self::assertSame(51, $this->handler($songs)(new BulkFetchLyricsCommand())->queued);
 
         self::assertSame(
             array_map(static fn (array $page): array => array_map(static fn (Uuid $id): string => $id->toString(), $page), $pages),
@@ -296,7 +334,7 @@ final class BulkFetchLyricsHandlerTest extends TestCase
             // Has lyrics as well as no artist: skipped for its lyrics, not counted.
             $pages[0][4]->toString() => new SongLyricSignature('Rescue Me', null, 'Rescue Me', 200.0),
             $pages[0][5]->toString() => new SongLyricSignature('Avarice', null, 'Ten Thousand Fists', 200.0),
-        ])(new BulkFetchLyricsCommand(delayMs: 0));
+        ])(new BulkFetchLyricsCommand());
 
         self::assertEquals(new BulkFetchLyricsResult(queued: 48, skippedNoArtist: 1, skippedNoLength: 0), $result);
         $notQueued = array_map(static fn (Uuid $id): string => $id->toString(), [...$withLyrics, $pages[0][5]]);
@@ -328,7 +366,7 @@ final class BulkFetchLyricsHandlerTest extends TestCase
 
         $this->handler($songs, jobId: 'bulk-job', signatures: [
             $songIds[0]->toString() => new SongLyricSignature('Rescue Me', null, 'Rescue Me', 200.0),
-        ])(new BulkFetchLyricsCommand(delayMs: 2500));
+        ])(new BulkFetchLyricsCommand(delayMs: 3500));
 
         $tally = $this->marks->latestRun();
         self::assertNotNull($tally);
@@ -338,7 +376,7 @@ final class BulkFetchLyricsHandlerTest extends TestCase
         self::assertSame(0, $tally->skippedNoLength);
         self::assertSame(0, $tally->found);
         // It lasts as long as the run's tracking: a day after its last fetch is due.
-        self::assertSame(86403, $this->marks->runs[$this->queuedRunId()->toString()]['ttl']);
+        self::assertSame(86404, $this->marks->runs[$this->queuedRunId()->toString()]['ttl']);
     }
 
     /** A run that queues nothing is still the latest run, with its skipped counts, for at least the grace period. */
@@ -351,7 +389,7 @@ final class BulkFetchLyricsHandlerTest extends TestCase
         $result = $this->handler($songs, jobId: 'empty-job', signatures: [
             $songIds[0]->toString() => new SongLyricSignature('Rescue Me', null, 'Rescue Me', 200.0),
             $songIds[1]->toString() => new SongLyricSignature('Avarice', null, 'Ten Thousand Fists', 200.0),
-        ])(new BulkFetchLyricsCommand(delayMs: 2000));
+        ])(new BulkFetchLyricsCommand());
 
         self::assertEquals(new BulkFetchLyricsResult(queued: 0, skippedNoArtist: 2, skippedNoLength: 0), $result);
         self::assertSame([], $this->queued);
@@ -375,6 +413,7 @@ final class BulkFetchLyricsHandlerTest extends TestCase
         CancelAtCheckpoint $cancellation = new CancelAtCheckpoint(),
         ?string $jobId = null,
         array $signatures = [],
+        LoggerInterface $logger = new NullLogger(),
     ): BulkFetchLyricsHandler {
         $lyrics ??= $this->lyricsFor();
         $bus = $this->createStub(MessageBusInterface::class);
@@ -400,7 +439,7 @@ final class BulkFetchLyricsHandlerTest extends TestCase
             $this->signatureLookups[] = $songIds;
         });
 
-        return new BulkFetchLyricsHandler($lookup, $lyrics, $bus, new NullLogger(), $cancellation, $this->marks, $currentJob);
+        return new BulkFetchLyricsHandler($lookup, $lyrics, $bus, $logger, $cancellation, $this->marks, $currentJob);
     }
 
     /**
@@ -515,6 +554,15 @@ final class BulkFetchLyricsHandlerTest extends TestCase
         self::assertInstanceOf(Uuid::class, $runId);
 
         return $runId;
+    }
+
+    /** @return list<int|null> the milliseconds each queued fetch is delayed by, in queue order */
+    private function queuedDelays(): array
+    {
+        return array_map(
+            static fn (Envelope $envelope): ?int => $envelope->last(DelayStamp::class)?->getDelay(),
+            $this->queued,
+        );
     }
 
     /** @return list<string> */

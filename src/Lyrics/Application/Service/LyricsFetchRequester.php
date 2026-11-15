@@ -26,7 +26,8 @@ use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
  * Each fetch is delayed so that fetches run at the bulk fetch's pace, one per
  * BulkFetchLyricsCommand::DEFAULT_DELAY_MS. The schedule carries over between
  * calls in the same process, so the albums of one scan queue behind each other
- * instead of all starting at once and getting throttled by LRCLIB.
+ * instead of all starting at once and getting throttled by LRCLIB. Each fetch is
+ * marked as queued, as a bulk run's fetches are.
  */
 final class LyricsFetchRequester implements LyricsFetchRequestInterface
 {
@@ -49,7 +50,7 @@ final class LyricsFetchRequester implements LyricsFetchRequestInterface
         $nowMs = (float) $this->clock->now()->format('U.u') * 1000;
         foreach ($songIds as $songId) {
             $fetchAtMs = max($nowMs, $this->nextFetchAtMs);
-            $this->bus->dispatch(new FetchLyricsCommand($songId), [
+            $this->bus->dispatch(new FetchLyricsCommand($songId, queued: true), [
                 new TransportNamesStamp(['async']),
                 new DelayStamp((int) round($fetchAtMs - $nowMs)),
             ]);

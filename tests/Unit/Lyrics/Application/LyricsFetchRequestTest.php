@@ -34,6 +34,7 @@ final class LyricsFetchRequestTest extends TestCase
             $message = $envelopes[$index]->getMessage();
             self::assertInstanceOf(FetchLyricsCommand::class, $message);
             self::assertTrue($message->getSongId()->equals($songId));
+            self::assertTrue($message->isQueued(), 'A worker handles the fetch, so it may wait as a queued fetch does.');
             self::assertSame(['async'], $envelopes[$index]->last(TransportNamesStamp::class)?->getTransportNames());
         }
     }
@@ -44,8 +45,8 @@ final class LyricsFetchRequestTest extends TestCase
 
         $this->requester([true], $envelopes)->requestFetch(Uuid::v7(), Uuid::v7(), Uuid::v7());
 
-        self::assertSame([0, 500, 1000], $this->delays($envelopes));
-        self::assertSame(500, BulkFetchLyricsCommand::DEFAULT_DELAY_MS);
+        self::assertSame([0, 3000, 6000], $this->delays($envelopes));
+        self::assertSame(3000, BulkFetchLyricsCommand::DEFAULT_DELAY_MS);
     }
 
     public function testPacingCarriesOverToTheNextRequest(): void
@@ -62,7 +63,7 @@ final class LyricsFetchRequestTest extends TestCase
         // Once the queue has drained, the next fetch runs at once.
         $requester->requestFetch(Uuid::v7());
 
-        self::assertSame([0, 500, 800, 0], $this->delays($envelopes));
+        self::assertSame([0, 3000, 5800, 0], $this->delays($envelopes));
     }
 
     public function testToggleOffQueuesNothing(): void

@@ -17,8 +17,11 @@ use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Application\Port\LibraryMediaFilesInterface;
+use App\Lyrics\Application\Command\FetchLyricsCommand;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
+use App\Lyrics\Application\Service\LyricsFetchRequester;
 use App\Metadata\Domain\Model\ExtractedMetadata;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
 use App\Tests\Fixtures\Catalog\PassThroughTransaction;
@@ -28,8 +31,10 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\DelayStamp;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 /**
@@ -161,6 +166,40 @@ final class FilesDiscoveredLyricsRequestTest extends TestCase
         self::assertCount(50, $state->requests[0]);
         self::assertCount(1, $state->requests[1]);
         self::assertSame($this->ids($state->visibleSongs), [...$state->requests[0], ...$state->requests[1]]);
+    }
+
+    /**
+     * With automatic fetching on, the fetches of one import queue behind each other at
+     * LRCLIB's pace, also from one committed batch to the next, and each is marked as queued.
+     */
+    public function testTheFetchesOfOneImportAreQueuedThreeSecondsApartAcrossItsBatches(): void
+    {
+        $state = $this->state();
+        $queued = [];
+        $lyricsBus = $this->createStub(MessageBusInterface::class);
+        $lyricsBus->method('dispatch')->willReturnCallback(static function (FetchLyricsCommand $fetch, array $stamps) use (&$queued): Envelope {
+            return $queued[] = new Envelope($fetch, $stamps);
+        });
+        $settings = $this->createStub(SystemSettingsPortInterface::class);
+        $settings->method('get')->willReturn(true);
+        $files = array_map(
+            fn (int $track): DiscoveredFile => $this->file(sprintf('%02d Track.mp3', $track), 'hash-' . $track),
+            range(1, 51),
+        );
+
+        $this->handler($state, new LyricsFetchRequester($settings, $lyricsBus, new MockClock()))($this->message(...$files));
+
+        self::assertSame($this->ids($state->visibleSongs), array_map(
+            static fn (Envelope $envelope): string => $envelope->getMessage()->getSongId()->toString(),
+            $queued,
+        ));
+        self::assertSame(range(0, 150_000, 3000), array_map(
+            static fn (Envelope $envelope): ?int => $envelope->last(DelayStamp::class)?->getDelay(),
+            $queued,
+        ));
+        foreach ($queued as $envelope) {
+            self::assertTrue($envelope->getMessage()->isQueued());
+        }
     }
 
     public function testFailedRequestIsLoggedAndRetriedWithTheNextFlush(): void

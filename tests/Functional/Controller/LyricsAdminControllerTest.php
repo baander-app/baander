@@ -146,7 +146,7 @@ final class LyricsAdminControllerTest extends TestCase
         $this->assertSame(Command::SUCCESS, $tester->execute(['--limit' => '10']), $tester->getDisplay());
 
         $this->assertSame($web, $this->queuedFetches());
-        $this->assertSame([0, 500, 1000], array_slice(array_map(
+        $this->assertSame([0, 3000, 6000], array_slice(array_map(
             static fn (Envelope $envelope): ?int => $envelope->last(DelayStamp::class)?->getDelay(),
             $this->asyncTransport()->getSent(),
         ), 0, 3));

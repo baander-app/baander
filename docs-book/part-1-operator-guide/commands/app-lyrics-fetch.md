@@ -8,10 +8,10 @@ Queue a lyrics fetch from LRCLIB for every song that has no lyrics yet, or for u
 make exec cmd="php bin/console app:lyrics:fetch"
 ```
 
-Queue at most 500 songs, with the fetches one second apart:
+Queue at most 500 songs, with the fetches five seconds apart:
 
 ```bash
-make exec cmd="php bin/console app:lyrics:fetch --limit=500 --delay=1000"
+make exec cmd="php bin/console app:lyrics:fetch --limit=500 --delay=5000"
 ```
 
 Print the result as JSON, for a script:
@@ -25,7 +25,7 @@ make exec cmd="php bin/console app:lyrics:fetch --limit=500 --json"
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--limit` (`-l`) | none | Most songs to queue; leave it out to queue every song without lyrics. Must be at least 1 |
-| `--delay` (`-d`) | `500` | Milliseconds between the queued fetches. Must not be negative |
+| `--delay` (`-d`) | `3000` | Milliseconds between the queued fetches. A value below 3000 is raised to 3000. Must not be negative |
 | `--json` | off | Print only the result in JSON: the API's `data` payload plus the job ID |
 
 ## Details
@@ -34,7 +34,7 @@ Without `--limit`, the command and the admin page both queue every song without 
 
 LRCLIB matches a song by its artist, title, album and length, so a lookup needs a primary artist credit and a length above zero. The job does not queue a song without lyrics that lacks either. It counts the song as skipped for a missing artist or for a missing length, and the song does not count toward `--limit`. Songs usually lack an artist because their files carry no artist tag, or because the library has not been rescanned since they were imported. Fix the tags or rescan the library with `app:library:scan --rescan`, which credits each song without an artist credit to its tagged artist ([What a rescan repairs](app-library-scan.md#what-a-rescan-repairs)). While `lyrics.auto_fetch` is on, the rescan itself queues a fetch for each such song it repairs. Otherwise, run the command again once the rescan's imports have finished; songs whose import is still queued count as missing an artist.
 
-The command runs the bulk fetch job in its own process and records the run in the job monitor like a queued job, as the admin page does. The job queues one fetch per song on the async queue and returns; the queue workers then fetch the lyrics from LRCLIB and store them. Each fetch waits `--delay` milliseconds longer than the one before it, so LRCLIB sees one request per delay. When the job finishes, the command prints the number of songs queued, how long the workers take to reach the last one, and the job ID, then the number of songs skipped for each cause. Follow the fetches with [app:monitor:jobs](app-monitor-jobs.md), or with [app:lyrics:status](app-lyrics-status.md), which shows what the latest run's fetches found.
+The command runs the bulk fetch job in its own process and records the run in the job monitor like a queued job, as the admin page does. The job queues one fetch per song on the async queue and returns; the queue workers then fetch the lyrics from LRCLIB and store them. Each fetch waits `--delay` milliseconds longer than the one before it, so LRCLIB sees one request per delay. The default of 3000 is also the minimum: Baander sends LRCLIB at most one request every two seconds, and a request takes time of its own, so fetches less than three seconds apart come due faster than the workers can send them. The job raises a smaller `--delay` to 3000, and a smaller `delayMs` in a schedule's parameters likewise. The command prints the spacing in use when it starts. When the job finishes, the command prints the number of songs queued, how long the workers take to reach the last one, and the job ID, then the number of songs skipped for each cause. Follow the fetches with [app:monitor:jobs](app-monitor-jobs.md), or with [app:lyrics:status](app-lyrics-status.md), which shows what the latest run's fetches found.
 
 A song stays marked as queued until its fetch has run, or until a day after the fetch was due if it never runs. A run that starts while an earlier run's fetches are still waiting skips the songs already queued and queues only the rest. This happens with a manual run during a scheduled one, or with a daily schedule whose fetches take longer than a day. Each run spaces its own fetches from its own start, so while two runs both have fetches waiting, LRCLIB receives requests from both.
 

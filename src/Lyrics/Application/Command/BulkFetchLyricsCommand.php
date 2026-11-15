@@ -9,14 +9,20 @@ use App\Scheduler\Domain\Model\SchedulerParameterSchema;
 
 /**
  * Queues a lyrics fetch for each song that has no lyrics yet, up to the limit (null: every
- * such song), with the fetches spaced by the delay.
+ * such song), with the fetches spaced by the delay. The run raises a delay below the default
+ * to the default.
  */
 final readonly class BulkFetchLyricsCommand implements SchedulableCommandInterface
 {
     use SchedulerParameterSchema;
 
-    /** Spacing between the queued lyrics fetches, which keeps LRCLIB from throttling us. */
-    public const int DEFAULT_DELAY_MS = 500;
+    /**
+     * Spacing between the queued lyrics fetches, in milliseconds: the two seconds between two
+     * turns under the pace LRCLIB requests are sent at, plus a request's own time, so the
+     * fetches do not come due faster than a worker sends them. It is the default and the
+     * smallest spacing a run uses.
+     */
+    public const int DEFAULT_DELAY_MS = 3000;
 
     public function __construct(
         private ?int $limit = null,

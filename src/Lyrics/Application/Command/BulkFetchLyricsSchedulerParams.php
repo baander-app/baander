@@ -18,8 +18,8 @@ class BulkFetchLyricsSchedulerParams
 
     #[OA\Property(
         type: 'integer',
-        description: 'Delay in milliseconds between API calls to avoid rate limiting',
+        description: 'Milliseconds between the queued fetches. A value below the default is raised to the default',
         nullable: true,
     )]
-    public ?int $delayMs = 500;
+    public ?int $delayMs = BulkFetchLyricsCommand::DEFAULT_DELAY_MS;
 }

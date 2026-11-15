@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Lyrics\Interface\Console;
 
 use App\Lyrics\Application\Command\BulkFetchLyricsCommand;
+use App\Lyrics\Application\CommandHandler\BulkFetchLyricsHandler;
 use App\Lyrics\Application\DTO\BulkFetchLyricsResult;
 use App\Shared\Application\Port\JobMonitorAdministrationInterface;
 use App\Shared\Interface\Console\AdminCommandSupport;
@@ -21,8 +22,10 @@ use Throwable;
  *
  * Runs BulkFetchLyricsCommand in this process and records the run in the job monitor. The
  * run queues one fetch per song on the async transport; the workers' consumer performs the
- * fetches, which only call LRCLIB and write to the database. The command reports the songs
- * the run skipped because a lookup needs an artist and a length they lack.
+ * fetches, which only call LRCLIB and write to the database. The command prints the spacing
+ * the run uses, which is the default when --delay asks for less, and how long the fetches
+ * take at it. It reports the songs the run skipped because a lookup needs an artist and a
+ * length they lack.
  */
 #[AsCommand(
     name: 'app:lyrics:fetch',
@@ -40,7 +43,13 @@ final class LyricsFetchCommand extends Command
     {
         $this
             ->addOption('limit', 'l', InputOption::VALUE_REQUIRED, 'Most songs to queue; leave it out to queue every song without lyrics')
-            ->addOption('delay', 'd', InputOption::VALUE_REQUIRED, 'Milliseconds between the queued fetches', (string) BulkFetchLyricsCommand::DEFAULT_DELAY_MS);
+            ->addOption(
+                'delay',
+                'd',
+                InputOption::VALUE_REQUIRED,
+                sprintf('Milliseconds between the queued fetches; a value below %d is raised to it', BulkFetchLyricsCommand::DEFAULT_DELAY_MS),
+                (string) BulkFetchLyricsCommand::DEFAULT_DELAY_MS,
+            );
         AdminCommandSupport::addJsonOption($this);
     }
 
@@ -52,12 +61,13 @@ final class LyricsFetchCommand extends Command
         try {
             $limit = AdminCommandSupport::integerOption($input, 'limit');
             $delay = AdminCommandSupport::integerOption($input, 'delay') ?? BulkFetchLyricsCommand::DEFAULT_DELAY_MS;
+            $spacing = BulkFetchLyricsHandler::spacingMs($delay);
 
             if (!$json) {
                 $io->text(sprintf(
                     'Queuing lyrics fetches for %s, %d ms apart...',
                     $limit === null ? 'every song without lyrics' : sprintf('up to %d songs without lyrics', $limit),
-                    $delay,
+                    $spacing,
                 ));
             }
             $run = $this->jobs->runInline(new BulkFetchLyricsCommand(limit: $limit, delayMs: $delay));
@@ -75,7 +85,7 @@ final class LyricsFetchCommand extends Command
             $result->queued > 0 => sprintf(
                 'Queued %d lyrics fetch(es). The workers fetch them from LRCLIB over the next %s. Job ID: %s',
                 $result->queued,
-                self::duration(($result->queued - 1) * $delay),
+                self::duration(($result->queued - 1) * $spacing),
                 $run->jobId,
             ),
             $skipped > 0 => sprintf('Nothing was queued. Job ID: %s', $run->jobId),

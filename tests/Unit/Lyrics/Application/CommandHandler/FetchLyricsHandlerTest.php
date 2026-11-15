@@ -11,6 +11,7 @@ use App\Lyrics\Application\CommandHandler\FetchLyricsHandler;
 use App\Lyrics\Application\DTO\LrclibRejected;
 use App\Lyrics\Application\DTO\LrclibResult;
 use App\Lyrics\Application\DTO\LrclibUnavailable;
+use App\Lyrics\Application\DTO\LrclibWait;
 use App\Lyrics\Application\DTO\LyricsFetchOutcome;
 use App\Lyrics\Application\DTO\LyricsFetchResult;
 use App\Lyrics\Application\Exception\LyricsProviderUnavailableException;
@@ -329,6 +330,83 @@ final class FetchLyricsHandlerTest extends TestCase
         $this->assertSame(LyricsFetchOutcome::Rejected, $result->outcome);
         $this->assertNull($result->lyrics);
         $this->assertConflictReason('lrclib_rejected', $result);
+    }
+
+    // --- How long a fetch may wait for LRCLIB ---
+
+    /** @return iterable<string, array{FetchLyricsCommand, LrclibWait}> */
+    public static function fetchesAndTheirWaits(): iterable
+    {
+        yield 'the per-song route and app:song:lyrics:fetch' => [new FetchLyricsCommand(Uuid::v7()), LrclibWait::Interactive];
+        yield 'an automatic fetch after an import' => [new FetchLyricsCommand(Uuid::v7(), queued: true), LrclibWait::Queued];
+        yield 'a fetch of a bulk run' => [new FetchLyricsCommand(Uuid::v7(), Uuid::v7(), queued: true), LrclibWait::Queued];
+    }
+
+    /** A fetch a worker takes from the queue may wait thirty seconds for its request; one someone waits on, ten. */
+    #[DataProvider('fetchesAndTheirWaits')]
+    public function testAQueuedFetchMayWaitLongerForLrclibThanAFetchSomeoneWaitsOn(FetchLyricsCommand $command, LrclibWait $wait): void
+    {
+        $this->lrclibClient = $this->createMock(LrclibClientInterface::class);
+        $this->handler = $this->createFetchLyricsHandlerFixture();
+        $this->songs->method('findLyricSignature')->willReturn(new SongLyricSignature('Still Alive', 'GLaDOS', 'Portal', 175.0));
+        $this->lyricsRepository->method('findBySongId')->willReturn(null);
+
+        $this->lrclibClient->expects($this->once())->method('getBySignature')
+            ->with('Still Alive', 'GLaDOS', 'Portal', 175.0, $wait)
+            ->willReturn(null);
+
+        ($this->handler)($command);
+    }
+
+    /**
+     * LRCLIB asked every process to pause for twenty seconds. A queued fetch waits that out inside
+     * its one call to the client, so its run counts the song as found and nothing as unavailable.
+     */
+    public function testAQueuedFetchWhoseRequestIsPausedAndThenAnsweredIsCountedAsFoundOnce(): void
+    {
+        $this->lrclibClient = $this->createMock(LrclibClientInterface::class);
+        $this->handler = $this->createFetchLyricsHandlerFixture();
+        $songId = Uuid::v7();
+        $runId = Uuid::v7();
+        $this->marks->startRun($runId, 60);
+        $this->songs->method('findLyricSignature')->willReturn(new SongLyricSignature('Still Alive', 'GLaDOS', 'Portal', 175.0));
+        $this->lyricsRepository->method('findBySongId')->willReturn(null);
+        $this->lyricsRepository->method('add')->willReturn(true);
+
+        // The client answers a call that may wait as long as the pause lasts, and is unavailable to one that may not.
+        $this->lrclibClient->expects($this->once())->method('getBySignature')->willReturnCallback(
+            static fn (string $trackName, string $artistName, string $albumName, float $duration, LrclibWait $wait): LrclibResult|LrclibUnavailable => $wait->seconds() >= 20.0
+                ? new LrclibResult(42, $trackName, $artistName, $albumName, $duration, false, 'This was a triumph', null)
+                : new LrclibUnavailable('paused for another 20 seconds, longer than this call waits'),
+        );
+
+        $result = ($this->handler)(new FetchLyricsCommand($songId, $runId, queued: true));
+
+        $this->assertSame(LyricsFetchOutcome::Found, $result->outcome);
+        $this->assertSame(['found' => 1], $this->marks->runs[$runId->toString()]['counts']);
+    }
+
+    public function testAQueuedFetchThatCannotBeSentWithinItsWaitIsCountedAsUnavailableOnceAndReleasesItsSong(): void
+    {
+        $this->lrclibClient = $this->createMock(LrclibClientInterface::class);
+        $this->handler = $this->createFetchLyricsHandlerFixture();
+        $songId = Uuid::v7();
+        $runId = Uuid::v7();
+        $this->marks->startRun($runId, 60);
+        $this->marks->markQueued($songId, 60);
+        $this->songs->method('findLyricSignature')->willReturn(new SongLyricSignature('Still Alive', 'GLaDOS', 'Portal', 175.0));
+        $this->lyricsRepository->method('findBySongId')->willReturn(null);
+
+        // The handler asks once and does not ask again: the wait is spent inside the client.
+        $this->lrclibClient->expects($this->once())->method('getBySignature')
+            ->with('Still Alive', 'GLaDOS', 'Portal', 175.0, LrclibWait::Queued)
+            ->willReturn(new LrclibUnavailable('no turn within 30 seconds'));
+
+        $result = ($this->handler)(new FetchLyricsCommand($songId, $runId, queued: true));
+
+        $this->assertSame(LyricsFetchOutcome::Unavailable, $result->outcome);
+        $this->assertSame(['unavailable' => 1], $this->marks->runs[$runId->toString()]['counts']);
+        $this->assertSame([], $this->marks->queued);
     }
 
     // --- Fetches queued by a bulk run ---

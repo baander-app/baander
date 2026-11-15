@@ -30,9 +30,13 @@ use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
  * Walks song IDs and queues one FetchLyricsCommand for each song without lyrics, up to
  * the limit, on the durable async transport that the workers consume. The fetches are
  * spaced by the command's delay through DelayStamp, so they reach LRCLIB at that pace
- * while the handler itself returns as soon as they are queued. A song without a primary
- * artist credit, or whose length is missing or not positive, cannot be looked up: the walk
- * counts it per cause instead of queueing it, and it does not count toward the limit.
+ * while the handler itself returns as soon as they are queued. A delay below
+ * BulkFetchLyricsCommand::DEFAULT_DELAY_MS is raised to it, whether it comes from the
+ * admin page, `app:lyrics:fetch` or a schedule's stored parameters. Each fetch is marked
+ * as queued, so its request may wait for LRCLIB as long as a worker's fetch may. A song
+ * without a primary artist credit, or whose length is missing or not positive, cannot be
+ * looked up: the walk counts it per cause instead of queueing it, and it does not count
+ * toward the limit.
  *
  * The run keeps a tally beside its queued marks: the walk's skipped counts, recorded with its
  * job when the walk finishes, also when it queued nothing, and the outcome of each fetch,
@@ -78,13 +82,14 @@ final class BulkFetchLyricsHandler
     public function __invoke(BulkFetchLyricsCommand $command): BulkFetchLyricsResult
     {
         $limit = $command->getLimit();
-        $delayMs = $command->getDelayMs() ?? BulkFetchLyricsCommand::DEFAULT_DELAY_MS;
+        $requestedDelayMs = $command->getDelayMs();
         if ($limit !== null && $limit < 1) {
             throw new InvalidInputException('The limit must be at least 1.', ['limit' => $limit]);
         }
-        if ($delayMs < 0) {
-            throw new InvalidInputException('The delay must not be negative.', ['delayMs' => $delayMs]);
+        if ($requestedDelayMs !== null && $requestedDelayMs < 0) {
+            throw new InvalidInputException('The delay must not be negative.', ['delayMs' => $requestedDelayMs]);
         }
+        $delayMs = self::spacingMs($requestedDelayMs);
 
         $runId = Uuid::v7();
         $queued = 0;
@@ -133,7 +138,7 @@ final class BulkFetchLyricsHandler
                         continue;
                     }
 
-                    $this->bus->dispatch(new FetchLyricsCommand($songId, $runId), [
+                    $this->bus->dispatch(new FetchLyricsCommand($songId, $runId, queued: true), [
                         new TransportNamesStamp(['async']),
                         new DelayStamp($delay),
                     ]);
@@ -174,6 +179,15 @@ final class BulkFetchLyricsHandler
         ]);
 
         return $result;
+    }
+
+    /**
+     * The milliseconds between the fetches of a run asked for the given delay: that delay, or
+     * the default when the run is asked for none or for less.
+     */
+    public static function spacingMs(?int $delayMs): int
+    {
+        return max($delayMs ?? 0, BulkFetchLyricsCommand::DEFAULT_DELAY_MS);
     }
 
     /** Seconds from now until a day after a fetch delayed by the given milliseconds is due. */

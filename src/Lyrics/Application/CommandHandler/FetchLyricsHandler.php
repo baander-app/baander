@@ -8,6 +8,7 @@ use App\Catalog\Application\Port\SongLookupInterface;
 use App\Lyrics\Application\Command\FetchLyricsCommand;
 use App\Lyrics\Application\DTO\LrclibRejected;
 use App\Lyrics\Application\DTO\LrclibUnavailable;
+use App\Lyrics\Application\DTO\LrclibWait;
 use App\Lyrics\Application\DTO\LyricsFetchOutcome;
 use App\Lyrics\Application\DTO\LyricsFetchResult;
 use App\Lyrics\Application\Port\LrclibClientInterface;
@@ -22,7 +23,10 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * Handles FetchLyricsCommand.
  *
  * Orchestrates: resolve song signature → check local cache → fetch from LRCLIB → persist.
- * A fetch sends LRCLIB one request.
+ * A fetch asks the LRCLIB client once. A queued fetch lets its request wait up to thirty
+ * seconds for its turn and for a pause LRCLIB asked for, and a fetch someone waits on ten.
+ * The client spends that wait, and sends the request again after a pause, inside the one
+ * call, so a fetch is handled once.
  *
  * A song that has lyrics keeps them: the fetch returns them without asking LRCLIB. A song
  * without a primary artist credit, or whose length is missing or not positive, is not looked
@@ -54,8 +58,9 @@ final class FetchLyricsHandler
     {
         $songId = $command->getSongId();
         $runId = $command->getBulkRunId();
+        $wait = $command->isQueued() ? LrclibWait::Queued : LrclibWait::Interactive;
         if ($runId === null) {
-            return $this->fetch($songId) ?? LyricsFetchResult::noMatch();
+            return $this->fetch($songId, $wait) ?? LyricsFetchResult::noMatch();
         }
 
         try {
@@ -68,7 +73,7 @@ final class FetchLyricsHandler
                 return LyricsFetchResult::noMatch();
             }
 
-            $result = $this->fetch($songId);
+            $result = $this->fetch($songId, $wait);
             if ($result === null) {
                 return LyricsFetchResult::noMatch();
             }
@@ -80,8 +85,12 @@ final class FetchLyricsHandler
         }
     }
 
-    /** @return LyricsFetchResult|null null when the song no longer exists */
-    private function fetch(Uuid $songId): ?LyricsFetchResult
+    /**
+     * @param LrclibWait $wait how long the request may wait before it is sent
+     *
+     * @return LyricsFetchResult|null null when the song no longer exists
+     */
+    private function fetch(Uuid $songId, LrclibWait $wait): ?LyricsFetchResult
     {
         // 1. Find song
         $signature = $this->songs->findLyricSignature($songId);
@@ -133,9 +142,11 @@ final class FetchLyricsHandler
             $artistName,
             $albumName,
             $duration,
+            $wait,
         );
 
-        // 6. LRCLIB unavailable: nothing is decided, and a later fetch may succeed
+        // 6. LRCLIB unavailable, or the request could not be sent within its wait: nothing is
+        // decided, and a later fetch may succeed
         if ($result instanceof LrclibUnavailable) {
             $this->logger->warning('LRCLIB unavailable, no lyrics fetched for song', [
                 'song_id' => $songId->toString(),
