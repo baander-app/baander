@@ -53,6 +53,7 @@ The bulk fetch, the on-demand fetch and the LRCLIB search are not gated by the s
 | `LyricsAdminPortInterface` | Lyrics coverage and sync status for the admin API and `app:lyrics:coverage` and `app:lyrics:status`; the sync status includes the latest bulk run's tally |
 | `LrclibClientInterface` | LRCLIB HTTP API contract, implemented by `LrclibClient` (anti-corruption layer); each call takes the `LrclibWait` its request may wait before it is sent |
 | `LyricsFetchRequestInterface` | Published contract for Catalog ingest: requests fetches for new and repaired songs while `lyrics.auto_fetch` is on (the `Lyrics Fetch Request Contract` Deptrac layer) |
+| `AlbumLyricsMergePortInterface` | Published contract for Catalog's album merge (the `Lyrics Album Merge Contract` Deptrac layer): inside the merge's transaction, moves a duplicate song's lyrics to the kept song when the kept song has none, with their ID, texts, source, LRCLIB ID, instrumental flag and times; when it has lyrics, also lyrics stored while the statement runs, they stay |
 | `QueuedLyricsFetchesInterface` | Tracks delayed song fetches, cancelled bulk runs and each run's tally, so overlapping bulk runs do not queue a song twice, cancelled bulk runs skip remaining queued `FetchLyricsCommand` messages, and the sync status can report the latest run's outcomes |
 
 ## API Endpoints
@@ -86,6 +87,7 @@ The bulk fetch, the on-demand fetch and the LRCLIB search are not gated by the s
 | `LrclibClient` | Symfony HttpClient adapter for the LRCLIB API; reserves each request's turn under the `lrclib` rate limiter and waits out a stored pause |
 | `RedisLrclibPause` | Implements `LrclibPauseInterface`: the pause LRCLIB asked for, as one Redis key that expires when the pause ends |
 | `LyricsRepository`, `LyricsAdminRepository` | Doctrine persistence and admin statistics |
+| `AlbumLyricsMerge` | Implements `AlbumLyricsMergePortInterface` with one statement on the caller's connection and transaction |
 | `RedisQueuedLyricsFetches` | Implements `QueuedLyricsFetchesInterface` and `QueuedJobWorkInterface` using expiring Redis keys to deduplicate queued songs across bulk runs, cancel remaining queued fetches when a bulk job is cancelled, and keep each run's tally as a hash, with a `latest_run` key naming the run whose walk finished last |
 | `LyricsMessagePayloadCodec` | Encodes `FetchLyricsCommand`, with its bulk run and its `queued` flag, for the `async` transport, and `BulkFetchLyricsCommand` for the job monitor's stored payload |
 
@@ -96,4 +98,4 @@ The bulk fetch, the on-demand fetch and the LRCLIB search are not gated by the s
 | Depends on | Shared | `Uuid`, `PublicId`, `LibraryReadScope`, `QueuedJobWorkInterface`, and `SystemSettingsPortInterface` for `lyrics.auto_fetch` |
 | Depends on | Catalog | `SongLookupInterface`: a visible song by public ID, song-ID pages for the bulk fetch, and the LRCLIB signature of one song or of a page of songs as `SongLyricSignature` |
 | Depends on | Library | `LyricsController` uses `LibraryReadScopeProviderInterface` to scope song lookups to the caller's accessible libraries |
-| Depended on by | Catalog | Ingest requests fetches for new and repaired songs through `LyricsFetchRequestInterface` |
+| Depended on by | Catalog | Ingest requests fetches for new and repaired songs through `LyricsFetchRequestInterface`; `AlbumMergeService` folds a duplicate song's lyrics into the kept song through `AlbumLyricsMergePortInterface` |

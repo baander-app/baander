@@ -16,6 +16,7 @@ The `Playlist` aggregate manages an ordered list of songs. Operations are pure C
 | Port | Purpose |
 |------|---------|
 | `PlaylistPortInterface` | Playlist CRUD and song management |
+| `AlbumPlaylistMergePortInterface` | Lets Catalog's album merge move a duplicate song's entries to the kept song, after locking the playlists that hold one and raising their version, inside the merge's transaction |
 
 ## Events
 
@@ -27,7 +28,7 @@ The `Playlist` aggregate manages an ordered list of songs. Operations are pure C
 ## Interactions
 
 - **Auth** — `PlaylistEntity` and `PlaylistCollaboratorEntity` reference `UserEntity` via Doctrine FK
-- **Catalog** — `PlaylistSongEntity` stores a scalar `song_id`; `PlaylistForeignKeys` declares the `fk_playlist_song_song_id` constraint (`ON DELETE CASCADE`). Scoped song counts ask `Catalog\Application\Port\SongLookupInterface` for the visible subset of the owner's playlist songs
+- **Catalog** — `PlaylistSongEntity` stores a scalar `song_id`; `PlaylistForeignKeys` declares the `fk_playlist_song_song_id` constraint (`ON DELETE CASCADE`). Scoped song counts ask `Catalog\Application\Port\SongLookupInterface` for the visible subset of the owner's playlist songs. An album merge folds a duplicate song's entries into the kept song through `AlbumPlaylistMergePortInterface`
 
 ---
 

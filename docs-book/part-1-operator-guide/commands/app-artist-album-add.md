@@ -32,6 +32,8 @@ make exec cmd="php bin/console app:artist:album:add V1StGXR8_Z5jdHi6B-myT 0192a3
 
 An artist may hold several roles on one album, such as `featured` and `producer`; each is a separate credit. A new credit stores the artist's name at that moment as its credited name; renaming the artist afterwards does not change it. Adding a credit the artist already has succeeds and leaves that one credit as it was, credited name included, so a retry is harmless. An album public ID that names no album fails with `Album "<id>" not found.`, which the API answers with `404`.
 
+The change runs in one transaction. It waits for a MusicBrainz match, an import, an artist merge or removal, an album merge or another credit change that holds the same artist or album, and then acts on what that change left. An artist or album deleted while the change waited fails as an unknown one does. When the database ends the change to break a deadlock, or the artist took another name or MusicBrainz ID while the change waited, nothing is written and the command fails with `Another change to the same artist, song or album ran at the same time. Make the change again.`, which the API answers with `409` and the reason `credit_busy`. Making the change again may succeed.
+
 To change a credit's role, use [app:artist:album:role](app-artist-album-role.md); to remove the artist from the album, use [app:artist:album:remove](app-artist-album-remove.md). [app:artist:song:add](app-artist-song-add.md) credits an artist on a song.
 
 ## Exit codes
@@ -39,5 +41,5 @@ To change a credit's role, use [app:artist:album:role](app-artist-album-role.md)
 | Code | Meaning |
 |------|---------|
 | 0 | The artist has the credit |
-| 1 | No artist has the public ID, no album has the album ID, or another error occurred; the message says why |
+| 1 | No artist has the public ID, no album has the album ID, another change to the same artist or album ran at the same time, or another error occurred; the message says why |
 | 2 | The public ID or the album ID is malformed, or the role is not one of the listed roles |

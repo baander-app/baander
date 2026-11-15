@@ -24,9 +24,9 @@ a running web server.
 ### Routing and synchronous admission
 
 [messenger.php](../config/packages/messenger.php) declares the validated
-asynchronous workload catalog: eighteen production workloads, sixteen with default
+asynchronous workload catalog: twenty production workloads, eighteen with default
 routes and two admitted only through an explicit transport selection:
-`FetchLyricsCommand` and `SendWebhookCommand`. Fifteen default routes use Redis
+`FetchLyricsCommand` and `SendWebhookCommand`. Seventeen default routes use Redis
 `async`; the scheduled occurrence route uses `scheduler`. No `swoole_task`
 transport remains.
 
@@ -40,6 +40,8 @@ transport remains.
 | `SyncSongMessage` | `async` | `io` | Default |
 | `SyncAlbumMessage` | `async` | `io` | Default |
 | `SyncLibraryMessage` | `async` | `coordination` | Default |
+| `SyncArtistsMessage` | `async` | `io` | Default |
+| `SyncArtistMessage` | `async` | `io` | Default |
 | `SendEmailCommand` | `async` | `io` | Default |
 | `SendPushCommand` | `async` | `io` | Default |
 | `PruneMissingImagesCommand` | `async` | `io` | Default |
@@ -258,7 +260,7 @@ All thirteen have explicit version-1 entries in
 | `Library/Application/Message/FilesDiscovered.php` | `async` | [FilesDiscoveredHandler](../src/Catalog/Application/CommandHandler/FilesDiscoveredHandler.php), Any | `library.files_discovered` | Scaled `catalog`; ingestion/probing/persistence, cross-context Catalog handler |
 | `Metadata/Application/Command/ExtractAlbumCoverCommand.php` | `async` | [ExtractAlbumCoverHandler](../src/Metadata/Application/CommandHandler/ExtractAlbumCoverHandler.php), `async` | `metadata.extract_album_cover` | Scaled `media`; file/image conversion with CPU and memory reservation |
 | `Metadata/Application/Message/SyncSongMessage.php` | `swoole_task` | [SyncSongHandler](../src/Metadata/Application/MessageHandler/SyncSongHandler.php), `swoole_task` and `async` | `metadata.sync_song` | Scaled `metadata`; provider I/O |
-| `Metadata/Application/Message/SyncAlbumMessage.php` | `swoole_task` | [SyncAlbumHandler](../src/Metadata/Application/MessageHandler/SyncAlbumHandler.php), `swoole_task` and `async` | `metadata.sync_album` | Scaled `metadata`; provider I/O |
+| `Metadata/Application/Message/SyncAlbumMessage.php` | `swoole_task` | `SyncAlbumHandler`, `swoole_task` and `async` | `metadata.sync_album` | Scaled `metadata`; provider I/O |
 | `Metadata/Application/Message/SyncLibraryMessage.php` | `swoole_task` | [SyncLibraryHandler](../src/Metadata/Application/MessageHandler/SyncLibraryHandler.php), `swoole_task` and `async` | `metadata.sync_library` | Scaled `metadata`; bounded fan-out coordination |
 | `Notification/Application/DTO/SendEmailCommand.php` | `swoole_task` | [SendEmailHandler](../src/Notification/Application/Handler/SendEmailHandler.php), `swoole_task` and `async` | `notification.send_email` | Scaled `notifications`; provider I/O and delivery limits |
 | `Notification/Application/DTO/SendPushCommand.php` | `swoole_task` | [SendPushHandler](../src/Notification/Application/Handler/SendPushHandler.php), `swoole_task` and `async` | `notification.send_push` | Scaled `notifications`; subscription fan-out/provider I/O |
@@ -298,7 +300,10 @@ crash persistence remain release gates.
 | --- | --- | --- |
 | ScanLibraryHandler | Dispatches `FilesDiscovered` per directory; emits `LibraryScanCompleted` after scan dispatch | Scan completion is not downstream ingestion completion; preserve bounded payloads and recover accepted batches |
 | FilesDiscoveredHandler | Processes music/movie files and propagates aggregated file failures; dispatches `ExtractAlbumCoverCommand` for coverless albums after successful final song/genre flushes | Dispatch failure reaches Messenger; retry revisits an existing album and deduplicated songs before retrying cover dispatch |
-| [MetadataSyncOrchestrator](../src/Metadata/Application/MetadataSyncOrchestrator.php) | Dispatches library/album/song routes plus unrouted `SyncArtistMessage` and `SyncGenresMessage` | Artist/genre work currently executes synchronously through unrestricted handlers; do not silently turn them into unsupported wire messages |
+| [MetadataSyncOrchestrator](../src/Metadata/Application/MetadataSyncOrchestrator.php) | Dispatches library/album/song routes, the routed `SyncArtistsMessage`, and the unrouted `SyncGenresMessage` | Genre work executes synchronously through an unrestricted handler; do not silently turn it into an unsupported wire message |
+| [QueueArtistSyncsHandler](../src/Catalog/Application/MessageHandler/QueueArtistSyncsHandler.php) | Dispatches one delayed `SyncArtistMessage` per artist with a MusicBrainz ID and missing details, two seconds apart on a pace shared with every producer, checking cancellation before each artist | Fan-out is bounded by the shared pace, not by the outer job; a cancelled run's queued fills end without a MusicBrainz request |
+| [SyncArtistHandler](../src/Catalog/Application/MessageHandler/SyncArtistHandler.php) | After a MusicBrainz outage, dispatches its own message again, delayed 5, 15 or 60 minutes and at the shared pace, at most three times in a row | A retried fill keeps its run and queued mark; every other outcome ends the message without an exception |
+
 | SyncLibraryHandler / [SyncGenresHandler](../src/Metadata/Application/MessageHandler/SyncGenresHandler.php) | Dispatch album and optionally song messages during iteration | Capacity must account for fan-out, not only outer coordination duration |
 | [NotificationBridgeSubscriber](../src/Shared/Infrastructure/Event/NotificationBridgeSubscriber.php) | Private outbox replay dispatches synchronous `CreateNotificationCommand`; channel commands go to [NotificationDeliveryBus](../src/Shared/Infrastructure/Event/NotificationDeliveryBus.php) | Preserve transactional projection and delivery-intent insertion; do not replace the injected bus with immediate external sends |
 | [RelayNotificationDeliveriesHandler](../src/Shared/Infrastructure/Event/RelayNotificationDeliveriesHandler.php) | Decodes committed email/push/webhook intents and forces `TransportNamesStamp(['async'])` | Route migration must update this explicit override. Webhook is asynchronous through this path despite having no YAML route |

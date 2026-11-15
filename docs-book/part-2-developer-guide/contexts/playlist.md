@@ -38,6 +38,7 @@ The Playlist context manages user-created playlists (manual song collections) an
 | `PlaylistRepositoryInterface` | Domain repository contract for `Playlist` persistence, compare-and-swap writes, and read projections | `PlaylistRepository` |
 | `PlaylistPortInterface` | Playlist CRUD operations | `PlaylistService` |
 | `PlaylistDeletionPreviewPortInterface` | Lists distinct playlists containing given song IDs for catalog deletion previews | `PlaylistService` |
+| `AlbumPlaylistMergePortInterface` | Published contract for Catalog's album merge (the `Playlist Album Merge Contract` Deptrac layer): inside the merge's transaction, locks in ID order the playlists that hold a duplicate song and raises their `persistence_version`, then makes each entry of a duplicate an entry of the kept song with the entry's ID, position and creation time; a playlist that holds both keeps the kept song's entry | `AlbumPlaylistMerge` |
 | `PlaylistAudienceReader` | Resolves readable playlist IDs for a principal during live-update audience routing | `DoctrinePlaylistAudienceReader` |
 | `PlaylistCollaboratorResolverInterface` | Turns a user's public id into the user id, through the Auth user-identifier contract's public-id lookup only | `PlaylistCollaboratorResolver` |
 | `PlaylistSongVisibilityInterface` | Answers whether a song is visible under a read scope, through the Catalog song-lookup contract | `PlaylistSongVisibility` |
@@ -115,6 +116,7 @@ retried as conflicts.
 | Depends on | Auth | Uses `AuthenticatedUserIdentityInterface` and `UserIdentifierResolverInterface` |
 | Depends on | Library | Uses `LibraryReadScopeProviderInterface` to scope visible songs and counts |
 | Depends on | Catalog | References songs and checks visibility and availability (`SongPortInterface`, `SongLookupInterface`, `SongAvailabilityPortInterface`) |
+| Depended on by | Catalog | `AlbumMergeService` folds a duplicate song's entries into the kept song through `AlbumPlaylistMergePortInterface`. A save that read a playlist before the merge raised its version answers its existing 409 |
 
 ## Infrastructure
 
@@ -145,6 +147,7 @@ the in-memory object.
 |---------|---------|
 | `PlaylistRepository` | Doctrine implementation of `PlaylistRepositoryInterface` with compare-and-swap persistence |
 | `PlaylistService` | Implements `PlaylistPortInterface` and `PlaylistDeletionPreviewPortInterface` |
+| `AlbumPlaylistMerge` | Implements `AlbumPlaylistMergePortInterface` with statements on the caller's connection and transaction |
 | `DoctrinePlaylistAudienceReader` | Implements `PlaylistAudienceReader` for live-update audience routing |
 | `PlaylistCollaboratorResolver` | Adapter for the collaborator resolver port |
 | `PlaylistSongVisibility` | Adapter for the song visibility port |

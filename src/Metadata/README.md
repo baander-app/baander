@@ -13,18 +13,19 @@ The enrichment pipeline flows: **extract** → **match** → **enrich**
 - **API adapters** (`Infrastructure/Api/`) wrap six external services behind internal adapters:
   Discogs, Last.fm, MusicBrainz, Spotify, TasteDive, CoverArtArchive
 - **Matching** (`Infrastructure/Matching/`) compares local metadata against API results using validators to score match quality
-- **Enrichers** (`Application/`) — `ArtistMetadataEnricher`, `SongMetadataEnricher` — orchestrate the lookup and write-back to Catalog via port interfaces; the song enricher adds genres only
+- **Enrichers** (`Application/`) — `SongMetadataEnricher` — orchestrates the lookup and write-back to Catalog via port interfaces, and adds genres only
 
-Catalog ingest dispatches `ExtractAlbumCoverCommand` for an album without a cover. Syncs run from Messenger messages (`SyncLibraryMessage`, `SyncSongMessage`, etc.). Nothing dispatches `SyncArtistMessage`: `MetadataSyncOrchestrator::syncArtist()` has no caller, and the message has no transport route and no payload codec, so nothing reaches `SyncArtistHandler` and its `ArtistMetadataEnricher`.
+Catalog ingest dispatches `ExtractAlbumCoverCommand` for an album without a cover. Syncs run from Messenger messages (`SyncLibraryMessage`, `SyncSongMessage`, etc.).
 
-- Albums: Catalog owns MusicBrainz matching. The library and genre syncs dispatch a `SyncAlbumMessage` for each album, which Catalog's `RequestAlbumMatchHandler` turns into a request in its album match queue. `metadata.auto_sync`, defined in `MetadataSettingDefinitions` and labelled "Automatic MusicBrainz matching", is read by Catalog alone; it is off by default and does not gate the admin sync. Catalog reaches both classes through the `Metadata Album Sync Contract` Deptrac layer.
+- Albums: Catalog owns MusicBrainz matching. The library and genre syncs dispatch a `SyncAlbumMessage` for each album, which Catalog's `RequestAlbumMatchHandler` turns into a request in its album match queue. `metadata.auto_sync`, defined in `MetadataSettingDefinitions` and labelled "Automatic MusicBrainz matching", is read by Catalog alone; it is off by default and does not gate the admin sync. Catalog reaches both classes through the `Metadata Sync Contract` Deptrac layer.
+- Artists: Catalog owns the artist sync. The admin sync without a source dispatches one `SyncArtistsMessage`, which Catalog's `QueueArtistSyncsHandler` turns into one `SyncArtistMessage` per artist with a MusicBrainz ID and missing details; Catalog's `SyncArtistHandler` fills the artist by that ID. An album or song match apply and an import queue the same message from Catalog for the artists they identify. Both messages belong to the `Metadata Sync Contract` layer and run on `async`.
 
 ## Ports
 
 | Port | Layer | Purpose |
 |------|-------|---------|
 | `MetadataAdminPortInterface` | Application | Sync status and provider list for the admin API, `app:metadata:status` and `app:metadata:providers`; the admin sync and `app:metadata:sync` dispatch `SyncMetadataCommand` |
-| `MusicBrainzLookupInterface` | Application (contract) | Lets Catalog matching search and look up MusicBrainz releases, recordings and artists and fetch Cover Art Archive front covers, each call under the shared `musicbrainz` rate limit; published as the `Metadata MusicBrainz Lookup Contract` Deptrac layer |
+| `MusicBrainzLookupInterface` | Application (contract) | Lets Catalog matching and the artist sync search and look up MusicBrainz releases, recordings and artists and fetch Cover Art Archive front covers, each call under the shared `musicbrainz` rate limit; an artist lookup reports an ID MusicBrainz merged into another artist as `MusicBrainzMerged`; published as the `Metadata MusicBrainz Lookup Contract` Deptrac layer |
 
 ## Events
 
@@ -32,10 +33,11 @@ None. Metadata neither publishes nor consumes domain events.
 
 ## Interactions
 
-- **Catalog** — reads and writes via `AlbumPortInterface`, `ArtistPortInterface`, `SongPortInterface`, `GenrePortInterface`
+- **Catalog** — reads and writes via `AlbumPortInterface`, `SongPortInterface`, `MoviePortInterface`, `GenrePortInterface`
 - **Catalog ingest** — dispatches `ExtractAlbumCoverCommand`
 - **Catalog album match queue** — handles `SyncAlbumMessage` and reads `metadata.auto_sync` through `MetadataSettingDefinitions`
-- **Catalog matching** — searches and reads MusicBrainz releases through `MusicBrainzLookupInterface`
+- **Catalog artist sync** — handles `SyncArtistsMessage` and `SyncArtistMessage`
+- **Catalog matching and artist sync** — search and read MusicBrainz through `MusicBrainzLookupInterface`
 - **Library** — `MetadataSyncOrchestrator` looks up libraries through `LibraryPortInterface`
 - **Media** — stores cover art via `ImagePortInterface` and `StoragePortInterface`
 
@@ -45,6 +47,6 @@ None. Metadata neither publishes nor consumes domain events.
 
 ## Notes
 
-- No artist sync is dispatched (see Concepts). `ArtistMetadataEnricher`, which `SyncArtistHandler` calls, never writes a MusicBrainz ID itself. It passes the search hit's ID and name to `ArtistPortInterface::assignMusicbrainzId()`, which stores the ID in lowercase only when the artist has no ID, no other artist holds this one, and the hit's name equals the artist's name ignoring case. The name check keeps a hit such as "Hank Williams, Jr." from binding its ID to the artist "Post Malone, Hank Williams Jr.". The call runs in its own transaction and takes the locks an import takes on the artist's name and the ID, so a sync and an import that touch the same artist or the same ID run one after the other. A forced sync never replaces a stored ID, including one read from tags. Each refusal is logged as `Artist MusicBrainz ID not assigned` with its reason, and the hit's other fields still apply.
+- No artist takes a MusicBrainz ID or details from the top hit of a name search: an artist's ID comes from its tags or from a match, and Catalog's artist sync looks the artist up by that ID. MusicBrainz answers the lookup of an artist ID it merged into another with a permanent redirect; `MusicBrainzAdapter::fetchArtist()` does not follow it and answers `MusicBrainzMerged` with both IDs. The sync then writes nothing and keeps the stored ID, and the artist match comparison and apply answer such a candidate with 404 `candidate_not_found`.
 - Every MusicBrainz request, and the Cover Art Archive fetch behind `MusicBrainzLookupInterface::fetchFrontCover()`, first takes a turn under the `musicbrainz` rate limiter: one request per second, kept in Redis and shared by every process. A MusicBrainz search or lookup on the open `/api/metadata/search` and `/api/metadata/browse` routes first spends the user's `musicbrainz_user` allowance of one call per 10 seconds, keyed by user ID, and answers 429 when it is spent. It then waits at most 10 seconds for a turn and answers 503 when none comes. The adapter's wait for a turn and its back-off after a 503 sleep through `Async::sleepThroughSignals()`, so a worker's keepalive alarm does not end them early.
 - An Opus comment header starts with `OpusTags` and has no packet-type byte before it, unlike a Vorbis one; `OggParser` reads both, so a scan reads Opus tags. The admin-only `POST /api/metadata/extract` and `POST /api/metadata/match` routes read files with the scan's readers, so they return WAV and Opus tags too.

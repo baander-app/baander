@@ -31,6 +31,8 @@ The Favorites context lets a user mark catalog entities (songs, albums, artists)
 |------|---------|
 | `FavoritesPortInterface` | Favorite add/remove, lookup by public ID / user-and-entity, paginated listing and counts |
 | `FavoriteTargetAccessInterface` | Assert that a song, album, or artist (`FavoriteType` + `PublicId`) exists in a library visible to the user (`src/Favorites/Application/Port/FavoriteTargetAccessInterface.php`) |
+| `ArtistFavoriteMergePortInterface` | Published contract for Catalog's artist merge (the `Favorites Artist Merge Contract` Deptrac layer): moves a merged artist's favorites to the artist it merges into, and deletes a removed artist's favorites (`ArtistFavoriteMerge`) |
+| `AlbumFavoriteMergePortInterface` | Published contract for Catalog's album merge (the `Favorites Album Merge Contract` Deptrac layer): makes each favorite of the merged album one of the target, and each favorite of a duplicate song one of the kept song, with its ID, public ID and creation time; a user who favorited both keeps the favorite of the target or the kept song (`AlbumFavoriteMerge`) |
 
 ## API Endpoints
 
@@ -48,6 +50,7 @@ All endpoints are prefixed with `/api` and require an authenticated user.
 |-----------|---------|---------|
 | Depends on | Shared | `Uuid`, `PublicId`, `PaginatedResponse`, `NotFoundException` |
 | References | Catalog | Stores `entityPublicId` for songs / albums / artists (no hard import; `FavoriteTargetAccess` checks visibility via SQL) |
+| Depended on by | Catalog | `ArtistMergeService` and `AlbumMergeService` keep favorites on an artist, album or song that exists through the two merge ports, as statements inside the merge's transaction |
 
 ## Infrastructure
 

@@ -187,7 +187,9 @@ as primary under the joined values, the others as featured. Artist credits are n
 lockable fields; a rescan of an unchanged file adds credits only to a song or album
 that has none, and a retagged file replaces its song's credits. Credits a MusicBrainz
 match set are the exception: a retag keeps them unless its tags credit the song's
-artist by MusicBrainz ID.
+artist by MusicBrainz ID. A credit an admin adds, changes or removes on such a song ends
+the exception in the same transaction, so the next retag replaces the song's credits. A
+hand change to credits follows the catalog lock order.
 
 ### MusicBrainz match
 
@@ -203,7 +205,8 @@ credits leave without any credit merges into the artist that took over its prima
 credits, or is removed when it had none, unless an admin applying the match keeps it; an
 artist given an ID another artist holds merges into that artist. A match fills empty
 fields; only an admin's ticks replace a value, and never a locked one. It never writes
-the media file.
+the media file. An album or song match that creates an artist with a MusicBrainz ID, or
+gives an artist its ID, queues that artist's artist sync once it commits.
 
 A match outlives rescans and retags, except that tags crediting the artist by
 MusicBrainz ID replace its credits and a value the new tags carry replaces that field's
@@ -216,7 +219,12 @@ The albums waiting for automatic MusicBrainz matching, which are matched one aft
 another in the background. While automatic matching is on, an import or rescan adds each
 album it touches that has no match yet or that holds songs no match has compared, and an
 album merge adds its target, whose moved songs count as not compared; an admin's
-metadata sync adds them whatever the setting says. A confident match is applied. Any
+metadata sync adds them whatever the setting says. An admin's album match that leaves the
+album with a release adds it again, as an import would, when one of its songs is still
+not compared. A confident match is applied. A matched album's new songs are paired with
+its stored release; that match fills the album's empty fields and a missing cover but
+never writes the album's own artist credits, and it writes nothing when another match
+compared one of those songs, or one pairs differently, after the queue read the album. Any
 other album leaves the queue needing review and stays on the review list until an admin
 applies a match, or until its number of songs changes and it is queued again. An outage
 of MusicBrainz or the Cover Art Archive keeps the requests and pauses the whole queue; a
@@ -244,9 +252,13 @@ it may credit, merge or remove, then the rows of the songs it writes. Rows of on
 are locked in ID order and the identity keys in one sorted pass. A writer takes only the
 kinds it needs and never goes back to an earlier one, so two writers that follow the
 order do not each wait for a lock the other holds. A match apply to an album takes all
-four kinds; a retag takes the identity keys and the rows of the retagged songs. After
-its locks a writer reads the catalog again and acts on what it finds, because another
-writer may have committed while it waited.
+four kinds; a retag takes the identity keys and the rows of the retagged songs. A hand
+change to an artist's credits takes the album's row for an album credit, the keys of the
+artist's name and ID, the artist's row, and the song's row for a song credit. An album
+merge takes both album rows, the source's for deletion, then the rows of every song of
+both albums, and last the rows of the playlists that hold a duplicate song. An artist
+sync takes only the artist's row. After its locks a writer reads the catalog again and
+acts on what it finds, because another writer may have committed while it waited.
 
 ### Artist sync
 
@@ -254,19 +266,24 @@ The fill of an artist's empty fields from MusicBrainz, looked up by the MusicBra
 the artist already holds: sort name, type, country, disambiguation and the two ends of
 its life span. It leaves the artist's name and ID, every field that holds a value and
 every locked field as they are, and it leaves an artist without an ID alone: nothing
-fills an artist from a search by its name. An album or song match queues it as soon as
-it gives an artist its ID, and so does an import while automatic matching is on; an
-administrator's metadata sync queues it for every other artist with a stored ID and an
-empty field. Once MusicBrainz has returned the artist for an ID, or reported the ID
-unknown, Baander does not ask it about that ID again for 30 days.
+fills an artist from a search by its name. An album or song match queues it once it
+commits, for each artist it created with an ID or gave one. An import does the same after
+each batch while automatic matching is on, except for an album artist that only the
+import's album credit creates. An administrator's metadata sync queues it for every
+artist with a stored ID and one of those fields empty. An artist whose sync is queued is
+not queued again, and the syncs of every producer fall due two seconds apart. Once
+MusicBrainz has returned the artist for an ID, reported the ID unknown, or answered with
+the artist it merged the ID into, Baander does not ask it about that ID again for 30
+days; a merged ID is logged and left for an admin to re-identify.
 
 ### Duplicate song
 
 In an album merge, a song of the source album whose file hash a song of the target
 album holds. The target's song is kept, the oldest when several hold the hash, and the
-duplicate is folded into it: its playlist entries, lyrics, plays and favorites move to
-the kept song. The duplicate's own row is deleted, and its file stays on disk. A song
-without a file hash is never a duplicate.
+duplicate is folded into it, inside the merge's transaction: its playlist entries, plays
+and favorites move to the kept song, and its lyrics do when the kept song has none. The
+duplicate's own row is deleted with its credits and genres, and its file stays on disk.
+A song without a file hash is never a duplicate.
 
 ## Lyrics
 

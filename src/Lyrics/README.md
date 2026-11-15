@@ -28,6 +28,7 @@ The `Lyrics` aggregate stores lyrics indexed by song ID, supporting multiple sou
 | `LyricsPortInterface` | Application | Reads the stored lyrics of a song |
 | `LrclibClientInterface` | Application | LRCLIB HTTP API contract (getBySignature, search, getById); null or an empty list for a miss, `LrclibRejected` for a refused request, `LrclibUnavailable` for an outage or a request that could not be sent within its `LrclibWait` |
 | `LyricsFetchRequestInterface` | Application (contract) | Lets Catalog ingest request fetches for new and repaired songs; reads `lyrics.auto_fetch` on every call |
+| `AlbumLyricsMergePortInterface` | Application (contract) | Lets Catalog's album merge move a duplicate song's lyrics to the kept song when it has none, as one statement inside the merge's transaction (`AlbumLyricsMerge`) |
 | `QueuedLyricsFetchesInterface` | Application | Bulk runs' queued marks, cancellations and outcome tallies, in Redis (`RedisQueuedLyricsFetches`, which also cancels a finished job's fetches for the job monitor) |
 | `LyricsAdminPortInterface` | Application | Coverage and sync status behind the admin lyrics routes and their commands; the sync status includes the latest bulk run's tally |
 
@@ -63,7 +64,7 @@ No domain events published yet.
 |------------|-------|---------|
 | `Catalog\Application\Port\SongLookupInterface` | Application, Interface | Visible song ID by public ID and library scope; song-ID pages for the bulk scan; the LRCLIB signature (title, artist name, album title, duration) of one song or of a page of songs, as `SongLyricSignature` |
 
-`LyricsEntity` stores a scalar `song_id`. `LyricsForeignKeys` declares the `fk_lyrics_song_id` constraint (`ON DELETE CASCADE`), so deleting a song still deletes its lyrics.
+`LyricsEntity` stores a scalar `song_id`. `LyricsForeignKeys` declares the `fk_lyrics_song_id` constraint (`ON DELETE CASCADE`), so deleting a song still deletes its lyrics. An album merge moves a duplicate song's lyrics to the kept song before it deletes the duplicate, through `AlbumLyricsMergePortInterface`.
 
 ### Anti-Corruption Layer
 

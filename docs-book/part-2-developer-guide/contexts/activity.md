@@ -24,6 +24,8 @@ No value objects.
 | `ActivityPortInterface` | Application port for activity operations (`ActivityService`) |
 | `ActivityAnalyticsPortInterface` | Summary, top tracks, top artists, and user engagement metrics over a date range (`ActivityAnalyticsRepository`) |
 | `ActivityIdentityProjectionPortInterface` | Resolves library read scopes (`LibraryReadScope`) and user and artist `PublicId` values from UUIDs (`ActivityIdentityProjection`) |
+| `ArtistActivityMergePortInterface` | Published contract for Catalog's artist merge (the `Activity Artist Merge Contract` Deptrac layer): points a merged artist's activities at the artist it merges into (`ArtistActivityMerge`) |
+| `AlbumActivityMergePortInterface` | Published contract for Catalog's album merge (the `Activity Album Merge Contract` Deptrac layer): points every activity of the merged album at the target, and folds the plays of a duplicate song into the kept song, leaving each user one row with the play counts added, the latest last-played time with its platform and player, and loved when any row was (`AlbumActivityMerge`) |
 
 ## API Endpoints
 
@@ -51,6 +53,7 @@ All endpoints are prefixed with `/api` and served by `ActivityController`, `User
 | Depends on | Library | `LibraryReadScopeProviderInterface` in `ActivityEnrichmentService` |
 | Depends on | Media | `ImagePortInterface` in `ActivityEnrichmentService` |
 | Depended on by | Recommendation | Uses activity data (`ActivityPortInterface`) for suggestions |
+| Depended on by | Catalog | `ArtistMergeService` and `AlbumMergeService` keep play history with the artist, album and song that survive a merge, through the two merge ports, as statements inside the merge's transaction |
 
 `ActivityIdentityProjection` (`ActivityIdentityProjectionPortInterface`) resolves user and artist `PublicId` values from database tables without importing foreign repositories, following the same public-identity projection pattern as `Radio` (`RadioPublicIdentityInterface`) and `Party` (`PartyPublicIdentityPortInterface`).
 

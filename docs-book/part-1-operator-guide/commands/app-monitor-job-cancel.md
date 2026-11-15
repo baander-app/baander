@@ -33,9 +33,9 @@ make exec cmd="php bin/console app:monitor:job:cancel <jobId> --json"
 
 ## Details
 
-The command sets the job's cancellation flag in Redis for one hour and returns. The job stops at its next checkpoint, which is between two items of its work, and its status in the monitor becomes `cancelled`. A cancelled job is not retried and does not go to the failure transport. Work it queued before it stopped stays queued, except for a lyrics bulk fetch: its queued fetches are skipped without calling LRCLIB.
+The command sets the job's cancellation flag in Redis for one hour and returns. The job stops at its next checkpoint, which is between two items of its work, and its status in the monitor becomes `cancelled`. A cancelled job is not retried and does not go to the failure transport. Work it queued before it stopped stays queued, except for a lyrics bulk fetch, whose queued fetches are skipped without calling LRCLIB, and the artist sync of a metadata sync, whose queued artist fills end without asking MusicBrainz.
 
-A lyrics bulk fetch finishes queueing in seconds, but its fetches can run for hours. Cancelling the job after it finished cancels the fetches still waiting: they are skipped when they come due, and the job's status changes from `finished` to `cancelled`. This works until a day after the run's last fetch was due. [app:monitor:job:show](app-monitor-job-show.md) and the admin job detail show whether a job can still be cancelled.
+A lyrics bulk fetch finishes queueing in seconds, but its fetches can run for hours. Cancelling the job after it finished cancels the fetches still waiting: they are skipped when they come due, and the job's status changes from `finished` to `cancelled`. This works until a day after the run's last fetch was due. The artist sync of a metadata sync, the `SyncArtistsMessage` job, works the same way: its fills fall due two seconds apart, long after the job finished, and cancelling the job after it finished ends the fills still waiting, until a day after the last one was due. Cancelling the metadata sync's own job, `SyncMetadataCommand`, does not reach them. [app:monitor:job:show](app-monitor-job-show.md) and the admin job detail show whether a job can still be cancelled.
 
 These jobs have checkpoints:
 
@@ -43,6 +43,7 @@ These jobs have checkpoints:
 |--------------------|------------|--------------|
 | `SyncLibraryMessage` | A metadata sync, one job per library | Its next album |
 | `SyncMetadataCommand` | [app:metadata:sync](app-metadata-sync.md) with `--source genres` | Its next album |
+| `SyncArtistsMessage` | A metadata sync without a source, one job | Its next artist. The fills it already queued end without a request when they come due, also when the job is cancelled after it finished |
 | `BulkFetchLyricsCommand` | The admin **Fetch Missing Lyrics** button or [app:lyrics:fetch](app-lyrics-fetch.md) | Its next song. The fetches it already queued are skipped when they come due, also when the job is cancelled after it finished |
 | `BatchExtractCoversCommand` | The admin cover extraction or [app:album:extract-covers](app-album-extract-covers.md) | Its next page of 500 albums |
 | `ScanLibraryCommand` | A library scan from the admin panel, one job per library with **Scan all**, or [app:library:scan](app-library-scan.md) | Its next directory (an album or a movie folder) |

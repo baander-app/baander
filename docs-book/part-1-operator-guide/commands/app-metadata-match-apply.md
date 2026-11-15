@@ -54,13 +54,15 @@ A member that is absent counts as an empty list, and other members, such as `can
 
 The apply looks the candidate up in MusicBrainz again and compares it with the item as it is stored. It writes nothing when a row no longer shows the current value it names, or when the match would merge or remove an artist the selection names in neither `artistActions` nor `keptArtists`; compare again and choose anew. The changes land together or not at all. A match can merge and remove artists, so the command asks before it writes; without a terminal it needs `--force`, and `--json` does not imply it.
 
+An album apply that leaves the album with a release queues the album for automatic matching again when a song of the album has not been compared, such as one imported while the apply ran, but only while the `metadata.auto_sync` setting is on; see [Matching by hand](../media/external-apis.md#matching-by-hand). An album or song apply that creates a credited artist with a MusicBrainz ID, or gives a stored artist its ID, queues the fill of that artist's details whatever the setting says; see [Artist details](../media/external-apis.md#artist-details). An artist apply queues no fill. When a request cannot be queued, the error is logged and the match stays applied.
+
 For a ticked `cover` row the apply downloads the release's front cover from the Cover Art Archive before it writes anything. When the Cover Art Archive refuses the download, with a client error other than 404, 408 or 429, the apply writes nothing and answers `cover_refused`. The default ticks include the cover of an album that has none, so the rest of the match is applied with a `--selection` that leaves the `cover` row out.
 
 The command prints what it wrote: the item's own fields, whether its artist credits changed, how many of an album's songs took fields or credits, and the public IDs of the artists merged and removed. With `--json` the output is an object with `type`, `publicId`, `candidateId`, `fields`, `creditsChanged`, `songsChanged`, `mergedArtists` and `removedArtists`, exactly as the API returns it.
 
 | Failure | API answer | Exit code |
 |---------|------------|-----------|
-| No album, song or artist has the public ID, or MusicBrainz has no such candidate | 404 | 1 |
+| No album, song or artist has the public ID, or MusicBrainz has no such candidate, including an artist ID it merged into another artist | 404 | 1 |
 | The item changed since the comparison, or a merge or removal is missing from the selection | 409, reason `match_stale` | 1 |
 | Another change to the same songs or artists ran at the same time; applying again may succeed | 409, reason `match_busy` | 1 |
 | MusicBrainz refused the request | 409, reason `musicbrainz_rejected` | 1 |

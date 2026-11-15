@@ -403,11 +403,13 @@ graph TD
     Party -->|"playback sync"| Transcode
     Transcode -->|"video lookup"| Catalog
     Lyrics -->|"song/album metadata"| Catalog
-    Catalog -->|"MusicBrainz lookup, album sync message<br/><small>Application</small>"| Metadata
-    Catalog -->|"artist merge<br/><small>Infrastructure</small>"| Favorites
-    Catalog -->|"artist merge<br/><small>Infrastructure</small>"| Activity
+    Catalog -->|"MusicBrainz lookup, album and artist sync messages<br/><small>Application</small>"| Metadata
+    Catalog -->|"artist and album merge<br/><small>Infrastructure</small>"| Favorites
+    Catalog -->|"artist and album merge<br/><small>Infrastructure</small>"| Activity
     Catalog -->|"artist merge<br/><small>Infrastructure</small>"| Recommendation
     Catalog -->|"lyrics fetch request<br/><small>Application</small>"| Lyrics
+    Catalog -->|"album merge<br/><small>Infrastructure</small>"| Lyrics
+    Catalog -->|"album merge<br/><small>Infrastructure</small>"| Playlist
     Auth -->|"settings contract<br/><small>Application, Infrastructure, Interface</small>"| UserPreference
     Notification -->|"settings contract<br/><small>Application</small>"| UserPreference
     Media -->|"audio renditions<br/><small>Interface</small>"| Transcode
@@ -445,13 +447,18 @@ graph TD
 
 ### Catalog -> Metadata (Application layer)
 
-- **What:** Catalog's MusicBrainz matching searches and looks up releases, recordings and artists, and fetches front covers, through `Metadata\Application\Port\MusicBrainzLookupInterface` and its DTOs in `Metadata\Application\DTO\MusicBrainz\`, which form the `Metadata MusicBrainz Lookup Contract` Deptrac layer. `Catalog\Application\MessageHandler\RequestAlbumMatchHandler` handles Metadata's `SyncAlbumMessage`, which the library and genre syncs dispatch for each album, by requesting the album's match in Catalog's album match queue; the queue reads `metadata.auto_sync` by the constant of `MetadataSettingDefinitions`. Those two classes form the `Metadata Album Sync Contract` layer. Ingest requests automatic matches through Catalog's own `AlbumMatchRequestInterface`, without Metadata.
-- **Why:** Every write a match makes is a Catalog write, so Catalog owns matching and Metadata keeps the MusicBrainz client. The narrow layers keep the rest of Metadata out of Catalog's reach, and the admin syncs keep their message while Catalog decides what an album sync does.
+- **What:** Catalog's MusicBrainz matching searches and looks up releases, recordings and artists, and fetches front covers, through `Metadata\Application\Port\MusicBrainzLookupInterface` and its DTOs in `Metadata\Application\DTO\MusicBrainz\`, which form the `Metadata MusicBrainz Lookup Contract` Deptrac layer. `Catalog\Application\MessageHandler\RequestAlbumMatchHandler` handles Metadata's `SyncAlbumMessage`, which the library and genre syncs dispatch for each album, by requesting the album's match in Catalog's album match queue; the queue reads `metadata.auto_sync` by the constant of `MetadataSettingDefinitions`. `Catalog\Application\MessageHandler\QueueArtistSyncsHandler` handles Metadata's `SyncArtistsMessage`, which the admin sync dispatches, by queuing a `SyncArtistMessage` for every artist with a MusicBrainz ID and missing details, and `Catalog\Application\MessageHandler\SyncArtistHandler` handles each `SyncArtistMessage` by filling the artist from MusicBrainz by that ID; an album or song match apply and an import queue the same message from Catalog. `SyncAlbumMessage`, `SyncArtistsMessage`, `SyncArtistMessage` and `MetadataSettingDefinitions` form the `Metadata Sync Contract` layer. Ingest requests automatic matches through Catalog's own `AlbumMatchRequestInterface`, without Metadata.
+- **Why:** Every write a match or an artist sync makes is a Catalog write, so Catalog owns matching and the artist sync, and Metadata keeps the MusicBrainz client. The narrow layers keep the rest of Metadata out of Catalog's reach, and the admin syncs keep their messages while Catalog decides what an album or artist sync does.
 
 ### Catalog -> Favorites, Activity, Recommendation (Infrastructure layer)
 
 - **What:** `Catalog\Infrastructure\ArtistMergeService` moves a merged artist's favorites, play history and artist recommendations to the artist it merges into, and deletes a removed artist's favorites and recommendations, through `ArtistFavoriteMergePortInterface`, `ArtistActivityMergePortInterface` and `ArtistRecommendationMergePortInterface`. The ports form the `Favorites Artist Merge Contract`, `Activity Artist Merge Contract` and `Recommendation Artist Merge Contract` Deptrac layers, and each runs as statements inside the caller's transaction.
 - **Why:** A MusicBrainz match merges artists that turn out to be one performer, so that their favorites and plays follow the surviving artist. Each context writes its own tables; Catalog only orders the steps.
+
+### Catalog -> Playlist, Lyrics, Activity, Favorites (Infrastructure layer)
+
+- **What:** `Catalog\Infrastructure\AlbumMergeService` folds each duplicate song a merge removes into the song the target keeps of the same file, through `AlbumPlaylistMergePortInterface`, `AlbumLyricsMergePortInterface`, `AlbumActivityMergePortInterface` and `AlbumFavoriteMergePortInterface`, and moves the merged album's plays and favorites to the target through the last two. The ports form the `Playlist Album Merge Contract`, `Lyrics Album Merge Contract`, `Activity Album Merge Contract` and `Favorites Album Merge Contract` Deptrac layers, and each runs as statements inside the merge's transaction.
+- **Why:** Playlist entries, lyrics, plays and favorites are what users stored on a song or album, and the merge must not lose them when it deletes a duplicate or the source album. Each context writes its own tables; Catalog only orders the steps and holds the song rows while they run.
 
 ### Catalog -> Lyrics (Application layer)
 
@@ -624,7 +631,7 @@ graph TD
 | Catalog | Full 4-layer | State objects | Core domain. PGroonga search on `SongRepository`. 6 aggregates. |
 | Library | Full 4-layer | No state object | Orchestrates scanning pipeline. Heaviest cross-context coupling. |
 | Media | Full 4-layer | No state object | Storage/streaming abstraction. |
-| Metadata | Partial | No aggregates | Operates on Catalog data. Admin port and the published MusicBrainz lookup and album sync contracts. 6 external APIs. |
+| Metadata | Partial | No aggregates | Operates on Catalog data. Admin port and the published MusicBrainz lookup and sync contracts. 6 external APIs. |
 | Playlist | Full 4-layer | No state object | Manual + smart playlists. |
 | Recommendation | Full 4-layer | Old positional-arg pattern | Has CQRS queries. Candidate for state-object migration. |
 | Activity | Full 4-layer | No state object | Simple record/play model. |

@@ -19,6 +19,8 @@ The aggregate is deliberately simple — it's a log table with Doctrine FKs to b
 | Port | Purpose |
 |------|---------|
 | `ActivityPortInterface` | Record plays, toggle love, query history |
+| `ArtistActivityMergePortInterface` | Lets Catalog's artist merge point a merged artist's activities at the artist it merges into |
+| `AlbumActivityMergePortInterface` | Lets Catalog's album merge point the merged album's activities at the target, and fold each user's plays of a duplicate song into one row of the kept song |
 
 ## Events
 
@@ -27,7 +29,7 @@ None.
 ## Interactions
 
 - **Auth** — `MediaActivityEntity` references `UserEntity`
-- **Catalog** — `MediaActivityEntity` references `SongEntity`, `AlbumEntity`, `ArtistEntity`, `MovieEntity`
+- **Catalog** — `MediaActivityEntity` references `SongEntity`, `AlbumEntity`, `ArtistEntity`, `MovieEntity`; Catalog's artist and album merges move activities through the two merge ports, as statements inside the merge's transaction
 - **Recommendation** — reads activity data for collaborative filtering
 
 ---

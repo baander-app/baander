@@ -60,6 +60,15 @@ A scan works one directory at a time: it reads every file of the directory to te
 
 With `--all`, a cancelled scan stops only its own library: the command goes on with the next one and exits with code 1 at the end.
 
+While the `metadata.auto_sync` [server setting](../configuration/server-settings.md#server-settings)
+is on, ingestion also queues the fill of each artist that a batch of files created with a
+MusicBrainz artist ID from the tags, or gave such an ID, once that batch is committed. The fill
+looks the artist up in MusicBrainz by that ID and fills its empty details, as
+[Artist details](../media/external-apis.md#artist-details) describes. An album artist that only the
+album credit of an import creates, from an album-artist tag no song of the batch credits, is not
+queued; the next administrator's metadata sync, such as [app:metadata:sync](app-metadata-sync.md),
+fills it. While the setting is off, ingestion queues no artist fill.
+
 ### Queued directories and delivery failures
 
 The directory count means that each directory's index updates and ingestion intent
@@ -145,6 +154,9 @@ their own names.
 Credits a MusicBrainz match set stay through a retag, even when the new tags name no artist,
 unless the new tags credit the song's primary artist by MusicBrainz ID: the file gives a single
 artist ID, or one for each artist it names. Picard writes such tags, and they give the credits a match would.
+A credit added, changed or removed by hand, as with [app:artist:song:add](app-artist-song-add.md),
+ends this exception for its song: the next retag replaces the song's credits with the tags'. A
+retag and a hand change to the same song's credits run one after the other, never interleaved.
 
 A retagged file creates no album and no second song, even when its album tag changed.
 
