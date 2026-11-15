@@ -11,23 +11,18 @@ use App\Catalog\Application\Service\CoverImageDiscarder;
 use App\Catalog\Domain\Model\Artist;
 use App\Catalog\Domain\Repository\ArtistRepositoryInterface;
 use App\Catalog\Domain\ValueObject\MusicbrainzId;
-use App\Catalog\Infrastructure\Doctrine\ImportIdentity\ArtistMusicbrainzIdAssigner;
-use App\Catalog\Infrastructure\Doctrine\ImportIdentity\MusicbrainzIdAssignment;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
-use Psr\Log\LoggerInterface;
 
 final class ArtistService implements ArtistPortInterface
 {
     public function __construct(
         private readonly ArtistRepositoryInterface $artistRepository,
         private readonly TransactionPortInterface $transaction,
-        private readonly ArtistMusicbrainzIdAssigner $musicbrainzIds,
-        private readonly LoggerInterface $logger,
         private readonly ArtistMergePortInterface $merges,
         private readonly CoverImageDiscarder $covers,
     ) {
@@ -81,25 +76,6 @@ final class ArtistService implements ArtistPortInterface
     public function findByUuids(array $uuids): array
     {
         return $this->artistRepository->findByUuids($uuids);
-    }
-
-    public function assignMusicbrainzId(Uuid $artistId, string $musicbrainzId, string $matchedName): bool
-    {
-        $id = MusicbrainzId::tryFromString($musicbrainzId);
-        $outcome = $id === null
-            ? MusicbrainzIdAssignment::MalformedId
-            : $this->transaction->run(fn (): MusicbrainzIdAssignment => $this->musicbrainzIds->assign($artistId, $id, $matchedName));
-
-        if ($outcome !== MusicbrainzIdAssignment::Assigned) {
-            $this->logger->info('Artist MusicBrainz ID not assigned', [
-                'artist_id' => $artistId->toString(),
-                'mbid' => $musicbrainzId,
-                'matched_name' => $matchedName,
-                'reason' => $outcome->value,
-            ]);
-        }
-
-        return $outcome === MusicbrainzIdAssignment::Assigned;
     }
 
     public function identifiedWithMissingDetailsAfter(?Uuid $after, int $limit): array

@@ -21,7 +21,6 @@ use App\Catalog\Infrastructure\AlbumService;
 use App\Catalog\Infrastructure\ArtistMergeService;
 use App\Catalog\Infrastructure\ArtistService;
 use App\Catalog\Infrastructure\Doctrine\ImportIdentity\ArtistIdentityResolver;
-use App\Catalog\Infrastructure\Doctrine\ImportIdentity\ArtistMusicbrainzIdAssigner;
 use App\Catalog\Infrastructure\Doctrine\Query\MatchCatalogReadQuery;
 use App\Catalog\Infrastructure\Doctrine\Repository\AlbumMatchStateRepository;
 use App\Catalog\Infrastructure\Doctrine\Repository\AlbumRepository;
@@ -298,7 +297,7 @@ final class MatchApplyRace
         $discarder = new CoverImageDiscarder($images, new FlysystemStorage(sys_get_temp_dir() . '/baander-match-apply-race'), new NullLogger());
         $albums = new AlbumService(new AlbumRepository($manager), $discarder, $transaction, new ArtistIdentityResolver($manager));
         $songs = new SongService(new SongRepository($manager, new CursorPaginator(), new CursorCodec(new JsonEncoder())), $manager->getConnection());
-        $artists = new ArtistService(new ArtistRepository($manager), $transaction, new ArtistMusicbrainzIdAssigner($manager), new NullLogger(), $merges, $discarder);
+        $artists = new ArtistService(new ArtistRepository($manager), $transaction, $merges, $discarder);
         $catalog = new MatchCatalogReadQuery($manager);
 
         return [

@@ -12,14 +12,12 @@ use App\Catalog\Application\Service\CoverImageDiscarder;
 use App\Catalog\Domain\Model\Artist;
 use App\Catalog\Domain\Repository\ArtistRepositoryInterface;
 use App\Catalog\Infrastructure\ArtistService;
-use App\Catalog\Infrastructure\Doctrine\ImportIdentity\ArtistMusicbrainzIdAssigner;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Domain\Model\Image;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Uuid;
-use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -120,12 +118,9 @@ final class DeleteArtistHandlerTest extends TestCase
             return new ArtistRemoval($this->cover === null ? [] : [$this->cover->getId()]);
         });
 
-        $entityManager = $this->createStub(EntityManagerInterface::class);
         $service = new ArtistService(
             $repository,
             $this->transaction(),
-            new ArtistMusicbrainzIdAssigner($entityManager),
-            new NullLogger(),
             $merges,
             $this->discarder(),
         );
