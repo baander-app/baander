@@ -1,18 +1,21 @@
 import { AxiosError, AxiosHeaders } from 'axios'
 import { describe, expect, it } from 'vitest'
 import {
+  CANDIDATE_NOT_FOUND,
   COVER_REFUSED,
+  ITEM_NOT_FOUND,
   MATCH_BUSY,
   MATCH_CONFLICT,
   MATCH_STALE,
   MUSICBRAINZ_REJECTED,
   MUSICBRAINZ_UNAVAILABLE,
+  SELECTION_NOT_ACCEPTED,
   isMatchStale,
   matchErrorMessage,
 } from '../match-error-message'
 
 function apiError(status: number, reason?: string): AxiosError {
-  const body = { error: { code: 'CONFLICT', message: 'Refused.', details: reason === undefined ? {} : { reason } } }
+  const body = { error: { code: status, message: 'Refused.', details: reason === undefined ? {} : { reason } } }
 
   return new AxiosError('Request failed', 'ERR_BAD_RESPONSE', undefined, undefined, {
     status,
@@ -44,7 +47,23 @@ describe('matchErrorMessage', () => {
     expect(matchErrorMessage(apiError(503, 'musicbrainz_unavailable'), 'Failed')).toBe(MUSICBRAINZ_UNAVAILABLE)
   })
 
+  it('says the item no longer exists when a 404 names the item', () => {
+    expect(matchErrorMessage(apiError(404, 'item_not_found'), 'Failed')).toBe(ITEM_NOT_FOUND)
+    expect(ITEM_NOT_FOUND).toBe('This item no longer exists. Close this dialog and reload the page.')
+  })
+
+  it('says to go back and search again when a 404 names the candidate', () => {
+    expect(matchErrorMessage(apiError(404, 'candidate_not_found'), 'Failed')).toBe(CANDIDATE_NOT_FOUND)
+    expect(CANDIDATE_NOT_FOUND).toBe('MusicBrainz no longer has this candidate. Go back and search again.')
+  })
+
+  it('says the server did not accept the selection and to reload the page on a 422', () => {
+    expect(matchErrorMessage(apiError(422), 'Failed')).toBe(SELECTION_NOT_ACCEPTED)
+    expect(SELECTION_NOT_ACCEPTED).toBe('The server did not accept the selection. Reload the page and match again.')
+  })
+
   it('falls back for any other failure', () => {
+    expect(matchErrorMessage(apiError(404), 'Search failed.')).toBe('Search failed.')
     expect(matchErrorMessage(apiError(500), 'Search failed.')).toBe('Search failed.')
     expect(matchErrorMessage(new Error('offline'), 'Search failed.')).toBe('Search failed.')
   })

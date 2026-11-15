@@ -48,6 +48,7 @@ use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzReleaseGroup;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
 use App\Shared\Application\Exception\ConflictException;
+use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\Exception\TransactionDeadlockException;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
@@ -556,6 +557,39 @@ final class ApplyMatchHandlerTest extends TestCase
         ApplyMatchCommand::automatic($album->getId(), $this->candidate($album, $release)) |> $this->apply(...);
     }
 
+    public function testAnApplyForAnAlbumDeletedWhileItWaitedForItsLocksNamesTheItemAsTheCause(): void
+    {
+        $album = $this->addAlbum();
+        $release = self::release(self::releaseId(1));
+        $this->musicBrainz->releases[$release->id] = $release;
+        $this->addSongsOf($album, $release);
+        $comparison = $this->compare(MatchItemType::Album, $album->getPublicId()->toString(), $release->id);
+        $this->whileWaitingForTheAlbum = function () use ($album): void {
+            $this->albums = array_filter($this->albums, static fn (Album $kept): bool => $kept !== $album) |> array_values(...);
+        };
+
+        $notFound = $this->expectNotFound(fn () => ApplyMatchCommand::manual(MatchItemType::Album, $album->getPublicId()->toString(), $release->id, MatchSelections::defaults($comparison)) |> $this->apply(...));
+
+        self::assertSame('The album no longer exists.', $notFound->getMessage());
+        self::assertSame('item_not_found', $notFound->details['reason'] ?? null);
+    }
+
+    public function testAnApplyForACandidateMusicBrainzNoLongerHasNamesTheCandidateAsTheCause(): void
+    {
+        $album = $this->addAlbum();
+        $release = self::release(self::releaseId(1));
+        $this->musicBrainz->releases[$release->id] = $release;
+        $this->addSongsOf($album, $release);
+        $comparison = $this->compare(MatchItemType::Album, $album->getPublicId()->toString(), $release->id);
+        unset($this->musicBrainz->releases[$release->id]);
+
+        $notFound = $this->expectNotFound(fn () => ApplyMatchCommand::manual(MatchItemType::Album, $album->getPublicId()->toString(), $release->id, MatchSelections::defaults($comparison)) |> $this->apply(...));
+
+        self::assertSame('MusicBrainz has no such release.', $notFound->getMessage());
+        self::assertSame('candidate_not_found', $notFound->details['reason'] ?? null);
+        self::assertNull($album->getReleaseMbid());
+    }
+
     /**
      * Long Bed with its first fourteen songs credited to a "Post Malone, <guest>" artist each and the
      * rest to an ID-less Post Malone, who is also the album's artist.
@@ -641,6 +675,18 @@ final class ApplyMatchHandlerTest extends TestCase
         }
 
         self::fail('The apply did not answer with a conflict.');
+    }
+
+    /** @param Closure(): mixed $apply */
+    private function expectNotFound(Closure $apply): NotFoundException
+    {
+        try {
+            $apply();
+        } catch (NotFoundException $notFound) {
+            return $notFound;
+        }
+
+        self::fail('The apply did not answer that something was not found.');
     }
 
     /** @return list<array{string, string|null, string}> artist name, role and credited name of each credit of the song */

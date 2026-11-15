@@ -14,12 +14,14 @@ use App\Shared\Application\Exception\ServiceUnavailableException;
 /**
  * Reports a MusicBrainz outage or refusal as the shared exceptions, told apart by `details.reason`:
  * an outage answers 503 with `musicbrainz_unavailable`, so a caller never mistakes it for an empty
- * result, and a refused request answers 409 with `musicbrainz_rejected`.
+ * result, and a refused request answers 409 with `musicbrainz_rejected`. A candidate MusicBrainz
+ * does not have answers 404 with `candidate_not_found`.
  */
 final class MusicBrainzAnswer
 {
     public const string UNAVAILABLE_REASON = 'musicbrainz_unavailable';
     public const string REJECTED_REASON = 'musicbrainz_rejected';
+    public const string CANDIDATE_NOT_FOUND_REASON = 'candidate_not_found';
 
     /**
      * @template T
@@ -53,6 +55,6 @@ final class MusicBrainzAnswer
      */
     public static function unknownCandidate(MatchItemType $type): NotFoundException
     {
-        return new NotFoundException(sprintf('MusicBrainz has no such %s.', $type->candidateNoun()));
+        return new NotFoundException(sprintf('MusicBrainz has no such %s.', $type->candidateNoun()), ['reason' => self::CANDIDATE_NOT_FOUND_REASON]);
     }
 }

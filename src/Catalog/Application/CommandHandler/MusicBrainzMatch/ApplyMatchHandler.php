@@ -115,7 +115,8 @@ final readonly class ApplyMatchHandler
 
     /**
      * @throws InvalidInputException        when the public ID or the candidate's MusicBrainz ID is malformed
-     * @throws NotFoundException            when no such item exists, or MusicBrainz has no such candidate
+     * @throws NotFoundException            when no such item exists (`item_not_found`), or MusicBrainz has no such
+     *                                      candidate (`candidate_not_found`)
      * @throws ServiceUnavailableException  when MusicBrainz or the Cover Art Archive did not answer (`musicbrainz_unavailable`)
      * @throws ConflictException            when MusicBrainz refused the request (`musicbrainz_rejected`), the Cover Art
      *                                      Archive refused the ticked cover (`cover_refused`), the item changed since the
@@ -751,6 +752,6 @@ final readonly class ApplyMatchHandler
 
     private static function gone(MatchItemType $type): NotFoundException
     {
-        return new NotFoundException(sprintf('The %s no longer exists.', $type->label() |> strtolower(...)));
+        return new NotFoundException(sprintf('The %s no longer exists.', $type->label() |> strtolower(...)), ['reason' => MatchSnapshots::ITEM_NOT_FOUND_REASON]);
     }
 }

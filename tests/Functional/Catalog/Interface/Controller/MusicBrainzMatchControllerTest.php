@@ -109,14 +109,17 @@ final class MusicBrainzMatchControllerTest extends TestCase
         }
     }
 
-    public function testAnUnknownItemOrCandidateAnswers404AndAMalformedIdAnswers422(): void
+    public function testAnUnknownItemOrCandidateAnswers404WithTheReasonAndAMalformedIdAnswers422(): void
     {
         $unknown = new PublicId()->toString();
 
-        $this->assertJsonResponse($this->get(self::BASE . '/album/' . $unknown . '/candidates'), Response::HTTP_NOT_FOUND);
-        $this->assertJsonResponse($this->get(self::BASE . '/song/' . $unknown . '/comparison?candidate=' . $this->release->id), Response::HTTP_NOT_FOUND);
+        $noSuchAlbum = $this->assertJsonResponse($this->get(self::BASE . '/album/' . $unknown . '/candidates'), Response::HTTP_NOT_FOUND);
+        self::assertSame('item_not_found', $noSuchAlbum['error']['details']['reason'] ?? null);
+        $noSuchSong = $this->assertJsonResponse($this->get(self::BASE . '/song/' . $unknown . '/comparison?candidate=' . $this->release->id), Response::HTTP_NOT_FOUND);
+        self::assertSame('item_not_found', $noSuchSong['error']['details']['reason'] ?? null);
         $noSuchRelease = $this->assertJsonResponse($this->get($this->albumPath('comparison') . '?candidate=' . self::releaseId(9)), Response::HTTP_NOT_FOUND);
         self::assertSame('MusicBrainz has no such release.', $noSuchRelease['error']['message']);
+        self::assertSame('candidate_not_found', $noSuchRelease['error']['details']['reason'] ?? null);
 
         $this->assertJsonResponse($this->albumPath('comparison') |> $this->get(...), Response::HTTP_UNPROCESSABLE_ENTITY);
         $this->assertJsonResponse($this->get(self::BASE . '/artist/not-a-public-id/candidates'), Response::HTTP_UNPROCESSABLE_ENTITY);
@@ -212,6 +215,27 @@ final class MusicBrainzMatchControllerTest extends TestCase
 
         self::assertSame('musicbrainz_rejected', $error['error']['details']['reason'] ?? null);
         self::assertNull($this->releaseOfAlbum());
+    }
+
+    public function testAnApplyForACandidateMusicBrainzNoLongerHasOrForADeletedAlbumAnswers404WithTheReasonAndWritesNothing(): void
+    {
+        $comparison = $this->get($this->albumPath('comparison') . '?candidate=' . $this->release->id) |> $this->data(...);
+        $body = self::defaultTicks($comparison);
+
+        unset($this->musicBrainz->releases[$this->release->id]);
+        $noSuchRelease = $this->assertJsonResponse($this->post($this->albumPath('apply'), $body), Response::HTTP_NOT_FOUND);
+
+        self::assertSame('MusicBrainz has no such release.', $noSuchRelease['error']['message']);
+        self::assertSame('candidate_not_found', $noSuchRelease['error']['details']['reason'] ?? null);
+        self::assertNull($this->releaseOfAlbum());
+        self::assertSame(1, $this->artistCount('Post Malone, Luke Combs'));
+
+        $this->entityManager->getConnection()->executeStatement('DELETE FROM albums WHERE id = ?', [$this->album->getId()->toString()]);
+        $noSuchAlbum = $this->assertJsonResponse($this->post($this->albumPath('apply'), $body), Response::HTTP_NOT_FOUND);
+
+        self::assertSame(sprintf('Album "%s" not found.', $this->album->getPublicId()->toString()), $noSuchAlbum['error']['message']);
+        self::assertSame('item_not_found', $noSuchAlbum['error']['details']['reason'] ?? null);
+        self::assertSame(1, $this->artistCount('Post Malone, Luke Combs'));
     }
 
     public function testAMalformedSelectionOrTypeAnswers422(): void

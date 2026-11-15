@@ -214,6 +214,19 @@ describe('MusicBrainzMatchDialog', () => {
     expect(await screen.findByRole('checkbox', { name: 'Year' })).not.toBeChecked()
   })
 
+  it.each([
+    ['item_not_found', 'This item no longer exists. Close this dialog and reload the page.'],
+    ['candidate_not_found', 'MusicBrainz no longer has this candidate. Go back and search again.'],
+  ])('says why the comparison answers 404 with %s', async (reason, message) => {
+    answer(COMPARISON_URL, () => Promise.reject(httpError(404, reason)))
+    mount()
+    await screen.findByRole('list', { name: 'Candidates' })
+    fireEvent.click(within(candidateItems()[0]).getByRole('button', { name: /Compare/ }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(message)
+    expect(screen.getByRole('button', { name: 'Back' })).toBeEnabled()
+  })
+
   it('applies the ticked rows, marks the catalog and review list stale, and closes with a toast naming what changed', async () => {
     answer(APPLY_URL, async () => ({
       data: {
@@ -333,6 +346,24 @@ describe('MusicBrainzMatchDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('MusicBrainz is unavailable. Try again later.'))
+    expect(onOpenChange).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled()
+  })
+
+  it.each([
+    ['404 for an item that is gone', httpError(404, 'item_not_found'), 'This item no longer exists. Close this dialog and reload the page.'],
+    ['404 for a candidate MusicBrainz no longer has', httpError(404, 'candidate_not_found'), 'MusicBrainz no longer has this candidate. Go back and search again.'],
+    ['422', httpError(422), 'The server did not accept the selection. Reload the page and match again.'],
+    ['404 without a reason', httpError(404), 'The match could not be applied.'],
+    ['500', httpError(500), 'The match could not be applied.'],
+  ])('says what went wrong when the apply answers %s, and keeps the comparison open', async (_answer, error, message) => {
+    answer(APPLY_URL, () => Promise.reject(error))
+    const onOpenChange = vi.fn()
+    await openComparison(onOpenChange)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message))
     expect(onOpenChange).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled()
   })

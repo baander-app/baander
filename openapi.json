@@ -7405,7 +7405,7 @@
                         }
                     },
                     "404": {
-                        "description": "No album, song or artist has the public ID",
+                        "description": "No album, song or artist has the public ID; `details.reason` is `item_not_found`",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -7516,7 +7516,7 @@
                         }
                     },
                     "404": {
-                        "description": "No album, song or artist has the public ID, or MusicBrainz has no such candidate",
+                        "description": "`details.reason` is `item_not_found` (no album, song or artist has the public ID) or `candidate_not_found` (MusicBrainz has no such candidate: search again)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -7628,7 +7628,7 @@
                         }
                     },
                     "404": {
-                        "description": "No album, song or artist has the public ID, or MusicBrainz has no such candidate",
+                        "description": "Nothing was written; `details.reason` is `item_not_found` (no album, song or artist has the public ID, or the item was deleted while the apply ran) or `candidate_not_found` (MusicBrainz has no such candidate: search again)",
                         "content": {
                             "application/json": {
                                 "schema": {

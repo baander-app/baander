@@ -21,10 +21,14 @@ use App\Shared\Domain\Model\Uuid;
 
 /**
  * Reads the album, song or artist a match is about, with what scoring and comparing it needs,
- * before anything asks MusicBrainz. Every library is searched: matching is for admins.
+ * before anything asks MusicBrainz. Every library is searched: matching is for admins. An item
+ * that does not exist is reported with `item_not_found` in `details.reason`.
  */
 final readonly class MatchSnapshots
 {
+    /** The reason a not-found answer carries when the item is unknown or was deleted. */
+    public const string ITEM_NOT_FOUND_REASON = 'item_not_found';
+
     public function __construct(
         private AlbumPortInterface $albums,
         private SongPortInterface $songs,
@@ -89,6 +93,6 @@ final readonly class MatchSnapshots
 
     private static function notFound(MatchItemType $type, string $publicId): NotFoundException
     {
-        return new NotFoundException(sprintf('%s "%s" not found.', $type->label(), $publicId));
+        return new NotFoundException(sprintf('%s "%s" not found.', $type->label(), $publicId), ['reason' => self::ITEM_NOT_FOUND_REASON]);
     }
 }
