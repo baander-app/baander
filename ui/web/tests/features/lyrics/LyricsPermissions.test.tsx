@@ -101,7 +101,7 @@ describe('lyrics management permissions', () => {
     expect(screen.queryByRole('button', { name: /Fetch from LRCLIB/ })).not.toBeInTheDocument()
     expect(screen.queryByText('Provider result')).not.toBeInTheDocument()
     expect(api.read).toHaveBeenLastCalledWith(dialogProps.songPublicId, { query: { enabled: true } })
-    expect(api.search).toHaveBeenLastCalledWith({ q: '' }, { query: { enabled: false } })
+    expect(api.search).toHaveBeenLastCalledWith({ q: '' }, { query: { enabled: false, retry: false } })
     expect(api.fetch).not.toHaveBeenCalled()
     expect(api.apply).not.toHaveBeenCalled()
   })
@@ -126,9 +126,9 @@ describe('lyrics management permissions', () => {
     await interaction.click(screen.getByRole('button', { name: /Fetch from LRCLIB/ }))
     expect(api.fetch).toHaveBeenCalledWith({ publicId: dialogProps.songPublicId })
     await interaction.click(screen.getByRole('tab', { name: 'Search' }))
-    expect(api.search).toHaveBeenLastCalledWith({ q: '' }, { query: { enabled: false } })
+    expect(api.search).toHaveBeenLastCalledWith({ q: '' }, { query: { enabled: false, retry: false } })
     await interaction.click(screen.getByRole('button', { name: 'Auto' }))
-    expect(api.search).toHaveBeenLastCalledWith({ q: 'Allowed song Allowed artist' }, { query: { enabled: true } })
+    expect(api.search).toHaveBeenLastCalledWith({ q: 'Allowed song Allowed artist' }, { query: { enabled: true, retry: false } })
     await interaction.click(screen.getByRole('button', { name: /Provider result/ }))
     expect(api.apply).toHaveBeenCalledWith({ resultId: 42, data: { songPublicId: dialogProps.songPublicId } })
   })
@@ -188,14 +188,14 @@ describe('lyrics management permissions', () => {
     const interaction = userEvent.setup()
     await interaction.click(screen.getByRole('tab', { name: 'Search' }))
     await interaction.click(screen.getByRole('button', { name: 'Auto' }))
-    expect(api.search).toHaveBeenLastCalledWith({ q: 'Allowed song Allowed artist' }, { query: { enabled: true } })
+    expect(api.search).toHaveBeenLastCalledWith({ q: 'Allowed song Allowed artist' }, { query: { enabled: true, retry: false } })
 
     view.rerender(
       <QueryClientProvider client={new QueryClient()}>
         <LyricsDialog {...dialogProps} open={false} />
       </QueryClientProvider>,
     )
-    expect(api.search).toHaveBeenLastCalledWith({ q: 'Allowed song Allowed artist' }, { query: { enabled: false } })
+    expect(api.search).toHaveBeenLastCalledWith({ q: 'Allowed song Allowed artist' }, { query: { enabled: false, retry: false } })
     view.rerender(
       <QueryClientProvider client={new QueryClient()}>
         <LyricsDialog {...dialogProps} />
@@ -210,7 +210,7 @@ describe('lyrics management permissions', () => {
     expect(screen.getByText('Visible after demotion')).toBeVisible()
     expect(screen.queryByRole('tab', { name: 'Search' })).not.toBeInTheDocument()
     expect(screen.queryByText('Provider result')).not.toBeInTheDocument()
-    expect(api.search).toHaveBeenLastCalledWith({ q: 'Allowed song Allowed artist' }, { query: { enabled: false } })
+    expect(api.search).toHaveBeenLastCalledWith({ q: 'Allowed song Allowed artist' }, { query: { enabled: false, retry: false } })
     expect(api.apply).not.toHaveBeenCalled()
     expect(api.fetch).not.toHaveBeenCalled()
   })
