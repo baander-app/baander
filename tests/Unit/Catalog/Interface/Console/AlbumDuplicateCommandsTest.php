@@ -13,9 +13,12 @@ use App\Catalog\Interface\Console\AlbumDuplicatesCommand;
 use App\Catalog\Interface\Console\AlbumMergeCommand;
 use App\Catalog\Interface\Resource\AlbumResource;
 use App\Catalog\Interface\Resource\DuplicateGroupResource;
+use App\Shared\Application\Exception\ConflictException;
+use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -188,6 +191,36 @@ final class AlbumDuplicateCommandsTest extends TestCase
             '--force' => true,
         ]));
         self::assertStringContainsString('Albums must be in the same library to merge.', $tester->getDisplay());
+    }
+
+    /** @return iterable<string, array{\RuntimeException}> */
+    public static function mergeOutcomes(): iterable
+    {
+        yield 'an album gone by the time the merge holds its locks' => [new NotFoundException('Source album not found.')];
+        yield 'a merge the database ended to break a deadlock' => [new ConflictException(
+            'Another change to "Blue Train (Remaster)" or "Blue Train" ran at the same time and nothing was merged. Merge the albums again.',
+            ['reason' => 'merge_busy'],
+        )];
+    }
+
+    /** The API answers these with 404 and 409; the command exits with 1 and prints the same message. */
+    #[DataProvider('mergeOutcomes')]
+    public function testAMergeTheMergePortRefusesExitsWithOneAndItsMessage(\RuntimeException $outcome): void
+    {
+        $library = Uuid::fromString(self::LIBRARY);
+        $target = Album::create($library, 'Blue Train', 'album');
+        $source = Album::create($library, 'Blue Train (Remaster)', 'album');
+        $merge = $this->createStub(AlbumMergePortInterface::class);
+        $merge->method('mergeAlbums')->willThrowException($outcome);
+
+        $tester = new CommandTester(new AlbumMergeCommand($this->albums($target, $source), $merge));
+
+        self::assertSame(Command::FAILURE, $tester->execute([
+            'target' => $target->getPublicId()->toString(),
+            'source' => $source->getPublicId()->toString(),
+            '--force' => true,
+        ]));
+        self::assertStringContainsString($outcome->getMessage(), preg_replace('/\s+/', ' ', $tester->getDisplay(true)) ?? '');
     }
 
     private function albums(Album ...$albums): AlbumPortInterface

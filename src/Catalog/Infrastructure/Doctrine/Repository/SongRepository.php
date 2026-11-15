@@ -28,6 +28,7 @@ use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\NonUniqueResultException;
+use Doctrine\ORM\Query;
 
 /**
  * Pure domain repository for songs.
@@ -386,6 +387,42 @@ final class SongRepository implements SongRepositoryInterface
             );
 
         return array_map(fn (SongEntity $entity) => $this->toDomain($entity), $entities);
+    }
+
+    public function findIdsByAlbums(array $albumIds): array
+    {
+        if ($albumIds === []) {
+            return [];
+        }
+
+        /** @var list<Uuid|string> $ids */
+        $ids = $this->entityManager
+            ->createQuery('SELECT song.id FROM ' . SongEntity::class . ' song WHERE song.album IN (:albums) ORDER BY song.id')
+            ->setParameter('albums', array_map(static fn (Uuid $id): string => $id->toString(), $albumIds))
+            ->getSingleColumnResult();
+
+        return array_map(static fn (Uuid|string $id): Uuid => $id instanceof Uuid ? $id : Uuid::fromString($id), $ids);
+    }
+
+    public function findFreshByUuids(array $uuids): array
+    {
+        if ($uuids === []) {
+            return [];
+        }
+
+        /** @var list<SongEntity> $entities */
+        $entities = $this->entityManager
+            ->createQuery('SELECT song FROM ' . SongEntity::class . ' song WHERE song.id IN (:ids) ORDER BY song.id')
+            ->setParameter('ids', array_map(static fn (Uuid $id): string => $id->toString(), $uuids))
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getResult();
+
+        $songs = [];
+        foreach ($entities as $entity) {
+            $songs[$entity->getId()->toString()] = $this->toDomain($entity);
+        }
+
+        return $songs;
     }
 
     public function search(SearchOptions $options): SearchResult

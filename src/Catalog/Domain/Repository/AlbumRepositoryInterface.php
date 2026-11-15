@@ -87,6 +87,13 @@ interface AlbumRepositoryInterface extends Searchable
      */
     public function findAlbumIdsByLibrary(Uuid $libraryId): array;
 
+    /**
+     * Deletes the album's row; the database deletes its songs, credits and genre links with it and
+     * clears its reference from covers and plays. The entities this manager holds loaded for rows
+     * deleted with it leave the unit of work, and the ones whose reference is cleared are read
+     * again, so a later flush in the same process does not refuse them. Pending changes are
+     * flushed first.
+     */
     public function delete(Album $album): void;
 
     /**
@@ -115,6 +122,17 @@ interface AlbumRepositoryInterface extends Searchable
      * @throws \LogicException outside a transaction, before locking anything
      */
     public function lockInIdOrder(array $albumIds): void;
+
+    /**
+     * Locks the rows of a merge's two albums inside the caller's transaction, in ID order: the
+     * source FOR UPDATE, so a row that refers to it and is stored meanwhile waits and then fails on
+     * its foreign key, and the target FOR NO KEY UPDATE, so songs added to it do not wait. An album
+     * that no longer exists is skipped. Read both albums after this call, in statements of their
+     * own.
+     *
+     * @throws \LogicException outside a transaction, before locking anything
+     */
+    public function lockForMerge(Uuid $sourceId, Uuid $targetId): void;
 
     /**
      * Replaces the album's primary and featured artist credits with these, writing only what

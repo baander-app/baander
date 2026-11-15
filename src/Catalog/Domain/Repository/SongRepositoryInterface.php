@@ -100,6 +100,25 @@ interface SongRepositoryInterface extends Searchable
      */
     public function findByAlbumSortedByTrack(Uuid $albumId): array;
 
+    /**
+     * The IDs of every song these albums hold, in one statement and without a limit.
+     *
+     * @param list<Uuid> $albumIds
+     *
+     * @return list<Uuid> in ID order
+     */
+    public function findIdsByAlbums(array $albumIds): array;
+
+    /**
+     * Re-reads these songs from the database, replacing any state this process holds for them. A
+     * song that no longer exists is absent.
+     *
+     * @param list<Uuid> $uuids
+     *
+     * @return array<string, Song> keyed by UUID string, in ID order
+     */
+    public function findFreshByUuids(array $uuids): array;
+
     public function searchWithCursor(SearchOptions $options): CursorPage;
 
     public function count(): int;

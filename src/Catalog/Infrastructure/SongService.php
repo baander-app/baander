@@ -134,6 +134,16 @@ final class SongService implements SongPortInterface
         return $this->songRepository->findByAlbumSortedByTrack($albumId);
     }
 
+    public function findIdsByAlbums(array $albumIds): array
+    {
+        return $this->songRepository->findIdsByAlbums($albumIds);
+    }
+
+    public function findFreshByUuids(array $uuids): array
+    {
+        return $this->songRepository->findFreshByUuids($uuids);
+    }
+
     public function search(SearchOptions $options): SearchResult
     {
         return $this->songRepository->search($options);

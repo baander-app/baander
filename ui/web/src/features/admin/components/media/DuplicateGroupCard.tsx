@@ -17,6 +17,7 @@ import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { toast } from 'sonner'
 import { interactiveTransition, focusVisibleRing, textRole } from '@/shared/theme'
 import { ContentText, ContentTextList } from '@/shared/typography'
+import { parseApiError } from '@/features/auth/lib/parse-api-error'
 
 interface DuplicateGroupCardProps {
   group: DuplicateGroupType
@@ -241,7 +242,8 @@ export function DuplicateGroupCard({ group, onMergeComplete }: DuplicateGroupCar
       onMergeComplete?.()
     },
     onError: (error: unknown) => {
-      toast.error(error instanceof Error ? error.message : 'An error occurred')
+      // The API says why: an album gone meanwhile, or a merge that ran into another change and is to be made again.
+      toast.error(parseApiError(error, error instanceof Error ? error.message : 'An error occurred').message)
     },
   })
 

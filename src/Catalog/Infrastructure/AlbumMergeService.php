@@ -8,88 +8,197 @@ use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumMergePortInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Service\CoverImageDiscarder;
 use App\Catalog\Domain\Model\Album;
-use App\Shared\Domain\Model\PublicId;
+use App\Catalog\Domain\Model\Song;
+use App\Shared\Application\Exception\ConflictException;
+use App\Shared\Application\Exception\NotFoundException;
+use App\Shared\Application\Exception\TransactionDeadlockException;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use InvalidArgumentException;
 use Psr\Log\LoggerInterface;
 
-final class AlbumMergeService implements AlbumMergePortInterface
+/**
+ * Merges a source album into a target in one transaction, under the catalog's lock order: both
+ * album rows in ID order, the source FOR UPDATE and the target FOR NO KEY UPDATE, then the rows of
+ * every song the two albums hold, in ID order. The albums and songs are read only once those locks
+ * are held, so the merge acts on what a match apply, a retag or a hand change that held one first
+ * committed, and it moves or removes every song the source holds: a song stored for the source
+ * meanwhile waits for the source's row and then fails. The source's cover is discarded and a match
+ * of the target requested once the merge committed.
+ */
+final readonly class AlbumMergeService implements AlbumMergePortInterface
 {
+    /** The database ended a merge to break a deadlock with another catalog writer; merging again may succeed. */
+    public const string BUSY_REASON = 'merge_busy';
+
     public function __construct(
-        private readonly AlbumPortInterface $albumPort,
-        private readonly SongPortInterface $songPort,
-        private readonly AlbumMatchRequestInterface $albumMatches,
-        private readonly LoggerInterface $logger,
+        private AlbumPortInterface $albumPort,
+        private SongPortInterface $songPort,
+        private AlbumMatchRequestInterface $albumMatches,
+        private TransactionPortInterface $transaction,
+        private CoverImageDiscarder $covers,
+        private LoggerInterface $logger,
     ) {
     }
 
+    #[\Override]
     public function mergeAlbums(Uuid $targetAlbumId, Uuid $sourceAlbumId): Album
     {
         if ($targetAlbumId->toString() === $sourceAlbumId->toString()) {
             throw new InvalidArgumentException('Cannot merge an album with itself.');
         }
+        // Read for their titles alone, which name the albums should the merge deadlock; the merge
+        // reads both again under its locks and decides on that.
+        $target = $this->albumPort->findByUuid($targetAlbumId) ?? throw self::notFound('Target');
+        $source = $this->albumPort->findByUuid($sourceAlbumId) ?? throw self::notFound('Source');
 
-        $target = $this->albumPort->findByUuid($targetAlbumId);
-        $source = $this->albumPort->findByUuid($sourceAlbumId);
-
-        if ($target === null) {
-            throw new InvalidArgumentException('Target album not found.');
+        try {
+            [$merged, $sourceCoverId] = $this->transaction->run(fn (): array => $this->mergeUnderLocks($targetAlbumId, $sourceAlbumId));
+        } catch (TransactionDeadlockException $deadlock) {
+            throw $this->busy($target, $source, $deadlock);
         }
 
-        if ($source === null) {
-            throw new InvalidArgumentException('Source album not found.');
+        // A rollback would have left the source with its cover, so the image goes only now.
+        if ($sourceCoverId !== null) {
+            $this->covers->discard($sourceCoverId);
         }
+        $this->requestMatch($targetAlbumId);
 
-        if ($target->getLibraryId()->toString() !== $source->getLibraryId()->toString()) {
+        return $merged;
+    }
+
+    /**
+     * @return array{Album, ?Uuid} the merged target, and the source's cover to discard once the merge committed
+     */
+    private function mergeUnderLocks(Uuid $targetAlbumId, Uuid $sourceAlbumId): array
+    {
+        $this->albumPort->lockForMerge($sourceAlbumId, $targetAlbumId);
+        $target = $this->albumPort->findFreshByUuid($targetAlbumId) ?? throw self::notFound('Target');
+        $source = $this->albumPort->findFreshByUuid($sourceAlbumId) ?? throw self::notFound('Source');
+        if (!$target->getLibraryId()->equals($source->getLibraryId())) {
             throw new InvalidArgumentException('Albums must be in the same library to merge.');
         }
 
-        // Get songs from both albums
-        $targetSongs = $this->songPort->findByAlbum($targetAlbumId, limit: 10000);
-        $sourceSongs = $this->songPort->findByAlbum($sourceAlbumId, limit: 10000);
-
-        // Build hash map of target songs for deduplication
-        $targetHashes = [];
-        foreach ($targetSongs as $song) {
-            $targetHashes[$song->getHash()] = true;
-        }
-
-        // Move non-duplicate source songs onto the target and delete duplicates,
-        // all through the ORM. The previous implementation moved songs with a
-        // raw SQL UPDATE and then cleared the entity manager; when the source
-        // album still held (duplicate) songs at deletion time, a stale
-        // SongEntity survived clear() and corrupted the unit of work, failing
-        // the final save with a Doctrine cascade error. Moving through the
-        // aggregate + repository keeps the unit of work consistent.
-        foreach ($sourceSongs as $song) {
-            if (!isset($targetHashes[$song->getHash()])) {
-                $song->moveToAlbum($targetAlbumId);
-                $this->songPort->save($song);
+        // With the source's row held FOR UPDATE no song is added to it, and only a merge moves a
+        // song between albums, so these are all the songs the source holds until it is deleted.
+        $songIds = $this->songPort->findIdsByAlbums([$targetAlbumId, $sourceAlbumId]);
+        $this->songPort->lockInIdOrder($songIds);
+        $songs = $this->songPort->findFreshByUuids($songIds) |> array_values(...);
+        $keptSongs = self::keptSongs(array_filter($songs, static fn (Song $song): bool => $song->getAlbumId()->equals($targetAlbumId)));
+        $moved = [];
+        $duplicates = [];
+        foreach (array_filter($songs, static fn (Song $song): bool => $song->getAlbumId()->equals($sourceAlbumId)) as $song) {
+            $kept = $keptSongs[self::hashOf($song) ?? ''] ?? null;
+            if ($kept === null) {
+                $moved[] = $song;
             } else {
-                $this->songPort->delete($song);
+                $duplicates[] = [$song, $kept];
             }
         }
 
-        // Merge metadata: prefer non-null values from target, then source
+        $this->moveSongs($moved, $targetAlbumId);
+        $this->removeDuplicates($duplicates, $sourceAlbumId);
+
         $metadataChanges = [];
         $this->mergeMetadata($target, $source, $metadataChanges);
-
-        // Handle locked fields
         $this->handleLockedFields($target, $source);
-
-        // Record the merge in the target's audit trail
         $target->addMergeRecord($sourceAlbumId, $source->getTitle());
-
-        // Delete the source album (now empty — every song was moved or removed)
-        $this->albumPort->delete($source);
-
-        // Save the updated target album
+        $this->albumPort->delete($source, deleteCover: false);
         $this->albumPort->save($target);
 
-        $this->requestMatch($targetAlbumId);
+        return [$target, $source->getCoverImageId()];
+    }
 
-        return $target;
+    /**
+     * The target's oldest song of each file hash, which a source song with that hash duplicates.
+     *
+     * @param array<array-key, Song> $targetSongs
+     *
+     * @return array<string, Song> by hash
+     */
+    private static function keptSongs(array $targetSongs): array
+    {
+        $kept = [];
+        foreach ($targetSongs as $song) {
+            $hash = self::hashOf($song);
+            if ($hash !== null && (!isset($kept[$hash]) || self::isOlder($song, $kept[$hash]))) {
+                $kept[$hash] = $song;
+            }
+        }
+
+        return $kept;
+    }
+
+    /** The song's file hash; null when it has none, so that two songs without one are no duplicates. */
+    private static function hashOf(Song $song): ?string
+    {
+        $hash = $song->getHash();
+
+        return $hash === null || $hash === '' ? null : $hash;
+    }
+
+    private static function isOlder(Song $song, Song $than): bool
+    {
+        return ($song->getCreatedAt() <=> $than->getCreatedAt() ?: strcmp($song->getId()->toBinary(), $than->getId()->toBinary())) < 0;
+    }
+
+    /**
+     * Moves the songs onto the target and writes them in one flush, not one per song: each flush
+     * walks every entity the merge holds.
+     *
+     * @param list<Song> $songs
+     */
+    private function moveSongs(array $songs, Uuid $targetAlbumId): void
+    {
+        foreach ($songs as $song) {
+            $song->moveToAlbum($targetAlbumId);
+            $this->songPort->persist($song);
+        }
+        $this->songPort->flush();
+    }
+
+    /**
+     * Removes each source song whose file the target holds already, and logs which target song
+     * holds it: nothing else records where the removed song went.
+     *
+     * @param list<array{Song, Song}> $duplicates each duplicate with the target's song it duplicates
+     */
+    private function removeDuplicates(array $duplicates, Uuid $sourceAlbumId): void
+    {
+        foreach ($duplicates as [$duplicate, $kept]) {
+            $this->songPort->delete($duplicate);
+            $this->logger->info('Removed song {song_id} of the merged album {source_album_id}: song {kept_song_id} of album {target_album_id} holds the same file.', [
+                'song_id' => $duplicate->getId()->toString(),
+                'source_album_id' => $sourceAlbumId->toString(),
+                'kept_song_id' => $kept->getId()->toString(),
+                'target_album_id' => $kept->getAlbumId()->toString(),
+            ]);
+        }
+    }
+
+    /** Logged with both albums, since frequent deadlocks with imports would call for another design. */
+    private function busy(Album $target, Album $source, TransactionDeadlockException $deadlock): ConflictException
+    {
+        $this->logger->warning('An album merge deadlocked with another catalog writer and was rolled back.', [
+            'source_album_id' => $source->getId()->toString(),
+            'target_album_id' => $target->getId()->toString(),
+            'exception' => $deadlock,
+        ]);
+
+        return new ConflictException(
+            sprintf('Another change to "%s" or "%s" ran at the same time and nothing was merged. Merge the albums again.', $source->getTitle(), $target->getTitle()),
+            ['reason' => self::BUSY_REASON],
+            $deadlock,
+        );
+    }
+
+    /** @param 'Target'|'Source' $role */
+    private static function notFound(string $role): NotFoundException
+    {
+        // The message the entry points answer when their lookup finds no such album.
+        return new NotFoundException($role . ' album not found.');
     }
 
     /**

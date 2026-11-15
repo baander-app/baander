@@ -379,6 +379,7 @@ final class AlbumController
             )),
             new OA\Response(response: '400', description: 'Invalid merge request', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
             new OA\Response(response: '404', description: 'Album not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '409', description: 'Another change to the same albums or their songs ran at the same time and nothing was merged; `details.reason` is `merge_busy`: merge again', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: ValidationError::class))),
         ],
     )]

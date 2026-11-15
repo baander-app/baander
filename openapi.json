@@ -5343,6 +5343,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "Another change to the same albums or their songs ran at the same time and nothing was merged; `details.reason` is `merge_busy`: merge again",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Validation error",
                         "content": {

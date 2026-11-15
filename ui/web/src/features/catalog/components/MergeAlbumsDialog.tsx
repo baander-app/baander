@@ -20,6 +20,7 @@ import { Loader2 } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { textRole } from '@/shared/theme'
 import { ContentText } from '@/shared/typography'
+import { parseApiError } from '@/features/auth/lib/parse-api-error'
 
 const MergeInfo = styled.div`
   padding: 1rem 0;
@@ -117,7 +118,8 @@ export function MergeAlbumsDialog() {
       if (current.sourcePublicId === submitted.sourcePublicId && current.targetPublicId === submitted.targetPublicId) closeMerge()
     },
     onError: (error: unknown) => {
-      toast.error(error instanceof Error ? error.message : 'Failed to merge albums')
+      // The API says why: an album gone meanwhile, or a merge that ran into another change and is to be made again.
+      toast.error(parseApiError(error, error instanceof Error ? error.message : 'Failed to merge albums').message)
     },
   })
 

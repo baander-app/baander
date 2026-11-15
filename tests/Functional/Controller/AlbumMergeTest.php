@@ -14,9 +14,14 @@ use App\Catalog\Domain\Repository\AlbumRepositoryInterface;
 use App\Catalog\Domain\Repository\SongRepositoryInterface;
 use App\Catalog\Domain\ValueObject\AlbumMatchSource;
 use App\Catalog\Domain\ValueObject\AlbumMatchStatus;
+use App\Catalog\Infrastructure\Doctrine\Entity\ArtistAlbumEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\GenreAlbumEntity;
+use App\Media\Infrastructure\Doctrine\Entity\ImageEntity;
 use App\Metadata\Application\Port\MusicBrainzLookupInterface;
 use App\Metadata\Application\Settings\MetadataSettingDefinitions;
+use App\Shared\Application\Exception\TransactionDeadlockException;
 use App\Shared\Application\Port\SystemSettingStoreInterface;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
@@ -445,6 +450,84 @@ final class AlbumMergeTest extends TestCase
         $this->assertNotNull($this->songRow($holdsRecording)['match_checked_at']);
     }
 
+    /**
+     * The manager that merges has loaded the source's credit, genre link and cover before: the
+     * database deletes the credit and the link with the source and clears the cover's reference to
+     * it, so the merge releases what the manager holds of them and saves the target. The cover is
+     * discarded once the merge committed.
+     */
+    public function testAMergeSucceedsAfterTheSameManagerLoadedTheSourcesCreditsGenreLinksAndCover(): void
+    {
+        $libraryId = $this->createLibraryFixture();
+        $target = $this->createAlbumFixture($libraryId, 'Target Album');
+        $source = $this->createAlbumFixture($libraryId, 'Source Album');
+        $moved = $this->createSongFixture($source, 'loaded-moved.mp3', 'loaded-moved', 'Song 2', track: 2);
+        $artist = $this->createArtistFixture('Loaded Artist');
+        $this->entityManager->getConnection()->executeStatement(
+            "INSERT INTO artist_album (id, artist_id, album_id, role, credited_name) VALUES (?, ?, ?, 'primary', 'Loaded Artist')",
+            [Uuid::v7()->toString(), $artist->toString(), $source->toString()],
+        );
+        $genre = Uuid::v7();
+        $this->entityManager->getConnection()->executeStatement(
+            "INSERT INTO genres (id, public_id, name, slug, created_at, updated_at) VALUES (?, ?, 'Loaded Genre', ?, clock_timestamp(), clock_timestamp())",
+            [$genre->toString(), (new PublicId())->toString(), 'loaded-genre-' . bin2hex(random_bytes(4))],
+        );
+        $this->entityManager->getConnection()->executeStatement(
+            'INSERT INTO genre_album (id, genre_id, album_id) VALUES (?, ?, ?)',
+            [Uuid::v7()->toString(), $genre->toString(), $source->toString()],
+        );
+        $cover = $this->createCoverFixture($source);
+
+        self::assertCount(1, $this->entityManager->getRepository(ArtistAlbumEntity::class)->findBy(['album' => $source]));
+        self::assertCount(1, $this->entityManager->getRepository(GenreAlbumEntity::class)->findBy(['album' => $source]));
+        self::assertInstanceOf(ImageEntity::class, $this->entityManager->find(ImageEntity::class, $cover));
+
+        static::getContainer()->get(AlbumMergePortInterface::class)->mergeAlbums($target, $source);
+
+        $connection = $this->entityManager->getConnection();
+        $this->assertSame(0, (int) $connection->fetchOne('SELECT count(*) FROM albums WHERE id = ?', [$source->toString()]));
+        $this->assertSame($target->toString(), $this->songRow($moved)['album_id']);
+        $this->assertSame(0, (int) $connection->fetchOne('SELECT count(*) FROM artist_album WHERE album_id = ?', [$source->toString()]));
+        $this->assertSame(0, (int) $connection->fetchOne('SELECT count(*) FROM genre_album WHERE album_id = ?', [$source->toString()]));
+        $this->assertSame(0, (int) $connection->fetchOne('SELECT count(*) FROM images WHERE id = ?', [$cover->toString()]), 'The source\'s cover is discarded.');
+    }
+
+    /**
+     * The database ends a merge to break a deadlock with another catalog writer. The API answers 409
+     * with the reason `merge_busy`, the console exits with 1 and prints the same message, and both
+     * albums stay as they were.
+     */
+    public function testAMergeEndedToBreakADeadlockIsAConflictOnBothPaths(): void
+    {
+        static::getContainer()->set(TransactionPortInterface::class, new class implements TransactionPortInterface {
+            public function run(callable $operation): mixed
+            {
+                throw new TransactionDeadlockException(new \RuntimeException('deadlock detected'));
+            }
+        });
+        $admin = $this->createAdminUser();
+        $libraryId = $this->createLibraryFixture();
+        $target = $this->createAlbumFixture($libraryId, 'Target Album');
+        $source = $this->createAlbumFixture($libraryId, 'Source Album');
+        $moved = $this->createSongFixture($source, 'busy-moved.mp3', 'busy-moved', 'Song 2', track: 2);
+        $message = 'Another change to "Source Album" or "Target Album" ran at the same time and nothing was merged. Merge the albums again.';
+
+        $error = $this->assertJsonResponse($this->mergeThroughTheApi($admin, $target, $source), 409);
+        $this->assertSame('merge_busy', $error['error']['details']['reason'] ?? null);
+        $this->assertSame($message, $error['error']['message'] ?? null);
+
+        $merge = new CommandTester((new Application($this->client->getKernel()))->find('app:album:merge'));
+        $this->assertSame(Command::FAILURE, $merge->execute([
+            'target' => $this->publicIdOf($target),
+            'source' => $this->publicIdOf($source),
+            '--force' => true,
+        ], ['interactive' => false]));
+        $this->assertStringContainsString($message, preg_replace('/\s+/', ' ', $merge->getDisplay(true)) ?? '');
+
+        $this->assertSame($source->toString(), $this->songRow($moved)['album_id']);
+        $this->assertSame(1, (int) $this->entityManager->getConnection()->fetchOne('SELECT count(*) FROM albums WHERE id = ?', [$source->toString()]));
+    }
+
     // --- Fixture helpers ---
 
     private function createLibraryFixture(): Uuid
@@ -578,6 +661,20 @@ final class AlbumMergeTest extends TestCase
             "INSERT INTO album_match_states (album_id, state, source, due_at, reason, checked_song_count, checked_at) VALUES (?, 'needs_review', 'ingest', ?, 'no_candidates', ?, ?)",
             [$albumId->toString(), self::COMPARED_AT, $checkedSongCount, self::COMPARED_AT],
         );
+    }
+
+    /** Gives the album a cover image record, as an import or an apply stores one. */
+    private function createCoverFixture(Uuid $albumId): Uuid
+    {
+        $imageId = Uuid::v7();
+        $connection = $this->entityManager->getConnection();
+        $connection->executeStatement(
+            "INSERT INTO images (id, public_id, path, extension, mime_type, size, width, height, imageable_type, album_id, created_at, updated_at) VALUES (?, ?, ?, 'jpg', 'image/jpeg', 5, 1, 1, 'album', ?, clock_timestamp(), clock_timestamp())",
+            [$imageId->toString(), (new PublicId())->toString(), 'images/album/' . $albumId->toString() . '/cover.jpg', $albumId->toString()],
+        );
+        $connection->executeStatement('UPDATE albums SET cover_image_id = ? WHERE id = ?', [$imageId->toString(), $albumId->toString()]);
+
+        return $imageId;
     }
 
     private function createArtistFixture(string $name, ?string $mbid = null): Uuid

@@ -73,8 +73,11 @@ interface AlbumPortInterface
     public function flush(): void;
 
     /**
-     * Deletes the album and, through the database, its songs. With $deleteCover the cover image is
-     * deleted after the album; the songs' audio files are never touched here.
+     * Deletes the album and, through the database, its songs, credits and genre links. With
+     * $deleteCover the cover image is deleted after the album; the songs' audio files are never
+     * touched here. What this process holds loaded of those rows is released, and what refers to
+     * the album without being deleted with it is read again, so later writes in the same process
+     * go through.
      */
     public function delete(Album $album, bool $deleteCover = true): void;
 
@@ -104,6 +107,17 @@ interface AlbumPortInterface
      * @throws \LogicException outside a transaction, before locking anything
      */
     public function lockInIdOrder(array $albumIds): void;
+
+    /**
+     * Locks the rows of a merge's two albums inside the caller's transaction, in ID order as every
+     * writer of several albums takes them: the source FOR UPDATE, so a song, credit, cover or play
+     * stored for it meanwhile waits and then fails on its foreign key instead of being deleted
+     * with it; the target FOR NO KEY UPDATE, as a match apply takes it, so songs added to it do not
+     * wait. An album that no longer exists is skipped. Read both albums again after this call.
+     *
+     * @throws \LogicException outside a transaction, before locking anything
+     */
+    public function lockForMerge(Uuid $sourceId, Uuid $targetId): void;
 
     /**
      * Replaces the album's primary and featured artist credits with these, writing only the

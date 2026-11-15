@@ -15,7 +15,6 @@ use App\Catalog\Infrastructure\Doctrine\Entity\ArtistAlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\GenreAlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\GenreEntity;
-use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Catalog\Infrastructure\Doctrine\Query\CatalogReadScopeQuery;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Shared\Domain\Model\PublicId;
@@ -27,6 +26,9 @@ use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Infrastructure\Doctrine\Repository\PgroongaSearchTrait;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Mapping\AssociationMapping;
+use Doctrine\ORM\Mapping\JoinColumnMapping;
+use Doctrine\ORM\Mapping\ToOneOwningSideMapping;
 
 /**
  * Pure domain repository for albums.
@@ -423,23 +425,30 @@ final class AlbumRepository implements AlbumRepositoryInterface
 
     public function delete(Album $album): void
     {
-        $entity = $this->entityManager
-            ->getRepository(AlbumEntity::class)
-            ->find($album->getId());
-
+        $entity = $this->entityManager->find(AlbumEntity::class, $album->getId());
         if ($entity === null) {
             return;
         }
 
-        $this->entityManager->remove($entity);
+        // The statement below acts on the database, so the unit of work's pending changes go first.
         $this->entityManager->flush();
-
-        // The database deletes the album's songs (ON DELETE CASCADE). A song this manager still
-        // holds would point at the deleted album and fail the next flush that writes anything.
-        foreach ($this->entityManager->getUnitOfWork()->getIdentityMap()[SongEntity::class] ?? [] as $song) {
-            if ($song instanceof SongEntity && $song->getAlbum() === $entity) {
-                $this->entityManager->detach($song);
+        $stale = [];
+        foreach ($this->holdersOf($entity) as [$holder, $deletedWithAlbum]) {
+            if ($deletedWithAlbum) {
+                $this->entityManager->detach($holder);
+            } else {
+                $stale[] = $holder;
             }
+        }
+        // Once nothing managed holds it; a flush would otherwise refuse the album as new.
+        $this->entityManager->detach($entity);
+
+        $this->entityManager->createQuery('DELETE ' . AlbumEntity::class . ' album WHERE album.id = :id')
+            ->setParameter('id', $album->getId())
+            ->execute();
+
+        foreach ($stale as $holder) {
+            $this->entityManager->refresh($holder);
         }
     }
 
@@ -500,6 +509,27 @@ final class AlbumRepository implements AlbumRepositoryInterface
             ['ids' => array_map(static fn (Uuid $id): string => $id->toString(), $albumIds)],
             ['ids' => ArrayParameterType::STRING],
         )->free();
+    }
+
+    public function lockForMerge(Uuid $sourceId, Uuid $targetId): void
+    {
+        $connection = $this->entityManager->getConnection();
+        // Outside a transaction the row locks would end with their own statement.
+        if (!$connection->isTransactionActive()) {
+            throw new \LogicException('Lock the albums of a merge inside the transaction that merges them.');
+        }
+
+        // SQL because DQL locks rows only FOR UPDATE or FOR SHARE, and one statement locks all its
+        // rows in one strength. The source is deleted at the end of the merge: FOR UPDATE makes the
+        // foreign key of a row inserted for it meanwhile wait, so that insert fails instead of being
+        // deleted with the source. The target only changes, as in a match apply. The binary form
+        // sorts as PostgreSQL sorts uuid values, so the rows are taken in the ID order of
+        // lockInIdOrder() and two writers of the same albums never wait on each other in a cycle.
+        $locks = [[$sourceId, 'FOR UPDATE'], [$targetId, 'FOR NO KEY UPDATE']];
+        usort($locks, static fn (array $a, array $b): int => strcmp($a[0]->toBinary(), $b[0]->toBinary()));
+        foreach ($locks as [$albumId, $strength]) {
+            $connection->executeQuery('SELECT id FROM albums WHERE id = :id ' . $strength, ['id' => $albumId->toString()])->free();
+        }
     }
 
     public function replacePerformerCredits(Uuid $albumId, array $credits): bool
@@ -570,6 +600,53 @@ final class AlbumRepository implements AlbumRepositoryInterface
     }
 
     // --- Internal ---
+
+    /**
+     * Every loaded entity the unit of work manages that holds the album in a to-one association,
+     * with whether the database deletes it with the album: a song, credit, genre link or match
+     * state is deleted, while a cover or a play only loses its reference and is read again after
+     * the delete. An entity still to be loaded reads its row as the delete left it.
+     *
+     * @return list<array{object, bool}>
+     */
+    private function holdersOf(AlbumEntity $album): array
+    {
+        $unitOfWork = $this->entityManager->getUnitOfWork();
+        $holders = [];
+        foreach ($unitOfWork->getIdentityMap() as $class => $entities) {
+            $metadata = $this->entityManager->getClassMetadata($class);
+            $associations = array_filter(
+                $metadata->associationMappings,
+                static fn (AssociationMapping $association): bool => $association instanceof ToOneOwningSideMapping && $album instanceof $association->targetEntity,
+            );
+            if ($associations === []) {
+                continue;
+            }
+            foreach ($entities as $entity) {
+                // Reading an association of a lazy entity would load it.
+                if ($unitOfWork->isUninitializedObject($entity)) {
+                    continue;
+                }
+                $holding = array_find(
+                    $associations,
+                    static fn (AssociationMapping $association): bool => $metadata->getFieldValue($entity, $association->fieldName) === $album,
+                );
+                if ($holding instanceof ToOneOwningSideMapping) {
+                    $holders[] = [$entity, self::deletedWithTarget($holding)];
+                }
+            }
+        }
+
+        return $holders;
+    }
+
+    private static function deletedWithTarget(ToOneOwningSideMapping $association): bool
+    {
+        return array_any(
+            $association->joinColumns,
+            static fn (JoinColumnMapping $column): bool => strtolower($column->onDelete ?? '') === 'cascade',
+        );
+    }
 
     /**
      * Every song of the album with its primary credits, an empty list for a song without one.

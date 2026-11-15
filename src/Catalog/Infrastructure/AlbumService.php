@@ -235,6 +235,11 @@ final class AlbumService implements AlbumPortInterface
         $this->albumRepository->lockInIdOrder($albumIds);
     }
 
+    public function lockForMerge(Uuid $sourceId, Uuid $targetId): void
+    {
+        $this->albumRepository->lockForMerge($sourceId, $targetId);
+    }
+
     public function replacePerformerCredits(Uuid $albumId, array $credits): bool
     {
         return $this->albumRepository->replacePerformerCredits($albumId, $credits);
