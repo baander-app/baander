@@ -33,7 +33,7 @@ The command finds the song in any library; it does not need library access. It f
 
 A song that already has lyrics keeps them: the command reports a conflict and exits with 1, and the API answers 409. No command or API route replaces stored lyrics. A result that another song already has, such as the same recording on a compilation, is stored for this song too.
 
-When LRCLIB has no result with the ID, the command exits with 1 and the API answers 404. When LRCLIB rejects the request with a client error other than 404, 408 or 429, the command reports the rejection and exits with 1; the API answers 409 with the reason `lrclib_rejected`. When LRCLIB cannot be reached, times out, answers 408, 429 or a server error, or returns something unreadable, the command reports that LRCLIB is unavailable and exits with 1; the API answers 503. In each case nothing is stored.
+When LRCLIB has no result with the ID, the command exits with 1 and the API answers 404. When LRCLIB rejects the request with a client error other than 404, 408 or 429, the command reports the rejection and exits with 1; the API answers 409 with the reason `lrclib_rejected`. When LRCLIB cannot be reached, times out, answers 408 or a server error, or returns something unreadable, the command reports that LRCLIB is unavailable and exits with 1; the API answers 503. The same holds when the request cannot be sent within 10 seconds, because LRCLIB asked for a pause or other requests hold the shared turn, and when LRCLIB still answers 429 after the request was sent three times; see [External APIs](../media/external-apis.md#supported-apis). In each case nothing is stored.
 
 ## Exit codes
 

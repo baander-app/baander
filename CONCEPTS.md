@@ -194,13 +194,16 @@ artist by MusicBrainz ID.
 The link between a song, album or artist and its MusicBrainz entity: a recording, a
 release (one edition of the album) or an artist. An admin chooses it from candidates
 ranked by Baander's own fit score, or automatic matching applies it when one album
-candidate clearly fits. A match records MusicBrainz IDs and sets artist credits from
-MusicBrainz, so a tag such as "Post Malone, Luke Combs" becomes a primary and a featured
-artist. An artist the new credits leave without any credit merges into the artist that
-took over its primary credits, or is removed when it had none, unless an admin applying
-the match keeps it; an artist given an ID another artist holds merges into that artist.
-A match fills empty fields; only an admin's ticks replace a value, and never a locked
-one. It never writes the media file.
+candidate clearly fits. An album's own title that finds no release and ends in a
+comma-separated list in square brackets, such as its label, catalogue number and
+country, is searched once more without the list; the stored title stays as it is. A
+match records MusicBrainz IDs and sets artist credits from MusicBrainz, so a tag such as
+"Post Malone, Luke Combs" becomes a primary and a featured artist. An artist the new
+credits leave without any credit merges into the artist that took over its primary
+credits, or is removed when it had none, unless an admin applying the match keeps it; an
+artist given an ID another artist holds merges into that artist. A match fills empty
+fields; only an admin's ticks replace a value, and never a locked one. It never writes
+the media file.
 
 A match outlives rescans and retags, except that tags crediting the artist by
 MusicBrainz ID replace its credits and a value the new tags carry replaces that field's
@@ -210,19 +213,26 @@ review by an admin.
 ### Album match queue
 
 The albums waiting for automatic MusicBrainz matching, which are matched one after
-another in the background. While automatic matching is on, an import or rescan adds
-each album it touches that has no match yet or that holds songs no match has compared;
-an admin's metadata sync adds them whatever the setting says. A confident match is
-applied. Any other album leaves the queue needing review and stays on the review list
-until an admin applies a match, or until its number of songs changes and it is queued
-again. An outage of MusicBrainz or the Cover Art Archive keeps the requests and pauses
-the whole queue; a problem with one album only delays that album.
+another in the background. While automatic matching is on, an import or rescan adds each
+album it touches that has no match yet or that holds songs no match has compared, and an
+album merge adds its target, whose moved songs count as not compared; an admin's
+metadata sync adds them whatever the setting says. A confident match is applied. Any
+other album leaves the queue needing review and stays on the review list until an admin
+applies a match, or until its number of songs changes and it is queued again. An outage
+of MusicBrainz or the Cover Art Archive keeps the requests and pauses the whole queue; a
+problem with one album only delays that album. A cover the Cover Art Archive refuses is
+neither: the match is applied without the cover. A request made for an album while a run
+is matching it waits beside that run's match claim and starts no second run; when the
+run ends its claim, the album waits for a match again from that request's due time,
+except after an outage, which keeps the earlier due time.
 
 ### Match claim
 
-The hold one run of the album match queue has on the request it is matching, so that
-no other run takes the same album. A run records its outcome only while its claim
-holds. A claim whose run died lapses on its own, and the request is then matched
+The hold one run of the album match queue has on the request it is matching, so that no
+other run takes the same album: an ID the run chose and an expiry 15 minutes ahead,
+stored beside the request, whose due time the claim never changes. A request made for
+the album during the claim waits beside it. A run records its outcome only while its
+claim holds. A claim whose run died lapses on its own, and the request is then matched
 again.
 
 ## Lyrics

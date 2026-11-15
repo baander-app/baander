@@ -559,7 +559,7 @@ The Metadata context wraps six external services behind internal adapters. Each 
 
 ### LRCLIB API (Lyrics Context)
 
-The LRCLIB lyrics database API is isolated behind `LrclibClientInterface`. The `LrclibClient` adapter uses Symfony HttpClient to communicate with LRCLIB endpoints (`/api/get`, `/api/get-cached`, `/api/search`, `/api/get/{id}`). Cached-first strategy: tries `/api/get-cached` for predictable latency, falls back to `/api/get` (queries external sources) on 404. No authentication required.
+The LRCLIB lyrics database API is isolated behind `LrclibClientInterface`. The `LrclibClient` adapter uses Symfony HttpClient to communicate with LRCLIB endpoints (`/api/get`, `/api/search`, `/api/get/{id}`). A fetch sends one request, to `/api/get`. Every request first takes a turn under the `lrclib` rate limiter that all processes share, and waits out a pause LRCLIB asked for. No authentication required.
 
 ### FFmpeg (Transcode Context)
 

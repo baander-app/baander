@@ -16,7 +16,7 @@ make exec cmd="php bin/console app:metadata:status"
 
 ## Details
 
-The metadata sync jobs are those that [app:metadata:sync](app-metadata-sync.md) and the admin page run and the library, album, song, artist and genre syncs they queue. The counts cover every such job the job monitor still holds.
+The metadata sync jobs are those that [app:metadata:sync](app-metadata-sync.md) and the admin page run and the library, album, song and genre syncs they queue. The counts cover every such job the job monitor still holds.
 
 | Metric | Content |
 |--------|---------|

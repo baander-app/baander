@@ -62,7 +62,9 @@ When you need a primitive type, async utility, or shared controller, look here f
 
 ### Async Sleep
 
-Use `App\Shared\Infrastructure\Swoole\Async::sleep()` for all sleeping. It auto-detects coroutine context and routes to `Swoole\Coroutine::sleep()` or `usleep()` accordingly. Never call `sleep()`, `usleep()`, or `Swoole\Coroutine::sleep()` directly.
+Use `App\Shared\Infrastructure\Swoole\Async` for all sleeping. `Async::sleep()` auto-detects coroutine context and routes to `Swoole\Coroutine::sleep()` or `usleep()` accordingly. Never call `sleep()`, `usleep()`, or `Swoole\Coroutine::sleep()` directly.
+
+Outside a coroutine a signal ends that `usleep()` early, and a Messenger consumer's keepalive alarm arrives every 30 seconds (`WorkerSupervisorRunner` starts the consumers with `--keepalive=30`). A wait that has to last, such as the wait for a turn under a rate limit or for the end of a pause, sleeps through `Async::sleepThroughSignals()` instead: after each wake it reads a monotonic clock and sleeps again for what is left, while signal handlers still run. In a coroutine it sleeps as `Async::sleep()` does. The MusicBrainz adapter's wait for a turn and its 503 back-off use it, and so do the LRCLIB client's waits for a turn and for a pause to end.
 
 ### Process Pool
 

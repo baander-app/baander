@@ -67,6 +67,8 @@ $this->sleeper->sleep(1.0); // works in both coroutine and non-coroutine context
 
 Infrastructure code may call `Async::sleep()` directly.
 
+Outside a coroutine a signal ends `Async::sleep()` early, and a Messenger consumer's keepalive alarm arrives every 30 seconds. Infrastructure code whose wait has to last its full time, such as the wait for a turn under a rate limit, calls `Async::sleepThroughSignals()`: after each wake it reads a monotonic clock and sleeps again for what is left. `SleeperInterface` offers the plain sleep only.
+
 Never call `sleep()`, `usleep()`, or `Swoole\Coroutine::sleep()` directly.
 
 ### Server Control and Native Execution

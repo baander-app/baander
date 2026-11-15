@@ -183,8 +183,8 @@ owns the occurrence path.
 Most outbound traffic leaves from the execution unit, because the work that
 needs a provider is queued: `SendEmailCommand` and `SendPushCommand` route to
 `async` by default, `SendWebhookCommand` is explicit-only and is handed to
-`async` by the notification relay, and the metadata sync messages call
-MusicBrainz, Discogs and the other providers from their handlers.
+`async` by the notification relay, and the song sync and the album match
+queue call MusicBrainz from their handlers.
 [External APIs](../../part-1-operator-guide/media/external-apis.md) owns the provider
 list and the degradation matrix; [Notifications](../../part-1-operator-guide/administration/notifications.md)
 owns email, push and webhook delivery.
