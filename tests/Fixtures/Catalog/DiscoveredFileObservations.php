@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Fixtures\Catalog;
 
 use App\Catalog\Application\Port\ArtistIdentityResolverInterface;
+use App\Catalog\Application\Port\ArtistResolution;
+use App\Catalog\Application\Port\IdentifiedArtist;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Shared\Domain\Model\Uuid;
@@ -25,18 +27,26 @@ trait DiscoveredFileObservations
         return $probe;
     }
 
-    /** Resolves each identity to an artist of its own, the same artist each time the same key comes back. */
+    /**
+     * Resolves each identity to an artist of its own, the same artist each time the same key comes
+     * back, and reports each artist it creates with a MusicBrainz ID.
+     */
     private function artistIdentitiesStub(): ArtistIdentityResolverInterface
     {
         $artists = [];
         $resolver = $this->createStub(ArtistIdentityResolverInterface::class);
-        $resolver->method('resolve')->willReturnCallback(static function (array $identities) use (&$artists): array {
+        $resolver->method('resolveReporting')->willReturnCallback(static function (array $identities) use (&$artists): ArtistResolution {
             $resolved = [];
+            $identified = [];
             foreach ($identities as $identity) {
-                $resolved[$identity->key()] = $artists[$identity->key()] ??= Uuid::v7();
+                $key = $identity->key();
+                if (!isset($artists[$key]) && $identity->musicbrainzId !== null) {
+                    $identified[] = new IdentifiedArtist($artists[$key] = Uuid::v7(), $identity->musicbrainzId->toString());
+                }
+                $resolved[$key] = $artists[$key] ??= Uuid::v7();
             }
 
-            return $resolved;
+            return new ArtistResolution($resolved, $identified);
         });
 
         return $resolver;

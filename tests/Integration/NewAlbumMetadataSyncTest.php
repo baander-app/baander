@@ -6,8 +6,11 @@ namespace App\Tests\Integration;
 
 use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
 use App\Catalog\Application\MessageHandler\DrainAlbumMatchesHandler;
+use App\Catalog\Application\MessageHandler\QueueArtistSyncsHandler;
 use App\Catalog\Application\MessageHandler\RequestAlbumMatchHandler;
+use App\Catalog\Application\MessageHandler\SyncArtistHandler;
 use App\Catalog\Application\Port\AlbumPortInterface;
+use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticAlbumMatcherInterface;
 use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticMatchOutcome;
 use App\Catalog\Domain\Repository\AlbumMatchStateRepositoryInterface;
@@ -28,7 +31,6 @@ use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCreditedArtist;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzLabel;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMedium;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMediumSummary;
-use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMerged;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRecording;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
@@ -38,11 +40,14 @@ use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzSlotWait;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzTrack;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
 use App\Metadata\Application\Message\SyncAlbumMessage;
+use App\Metadata\Application\Message\SyncArtistMessage;
+use App\Metadata\Application\Message\SyncArtistsMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\MessageHandler\SyncLibraryHandler;
 use App\Metadata\Application\MetadataSyncOrchestrator;
 use App\Metadata\Application\Port\MusicBrainzLookupInterface;
 use App\Metadata\Application\Settings\MetadataSettingDefinitions;
+use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Shared\Application\Port\SystemSettingStoreInterface;
 use App\Shared\Domain\Event\Outbox\RelayOutboxCommand;
 use App\Shared\Domain\Event\Outbox\RelayOutboxHandler;
@@ -67,8 +72,9 @@ use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 /**
  * Runs a real scan through the console, ingests what it discovered, and follows the album match
- * queue from the request to the match, with the switch in PostgreSQL. MusicBrainz is a fake that
- * answers from canned releases.
+ * queue from the request to the match, and an artist fill from the import that queued it to the
+ * admin sync that then leaves the artist alone, with the switch in PostgreSQL. MusicBrainz is a fake
+ * that answers from canned releases and artists.
  */
 final class NewAlbumMetadataSyncTest extends KernelTestCase
 {
@@ -83,6 +89,7 @@ final class NewAlbumMetadataSyncTest extends KernelTestCase
     private const string YOURS_EXPLICIT = '6f5d2f9b-5d6e-4e4a-8e9b-1a7b0c8d3f06';
     private const string YOURS_CLEAN = '7a6e3a0c-6e7f-4f5b-9f0c-2b8c1d9e4a07';
     private const string NEVER_LOVE_YOU_AGAIN = '8b7f4b1d-7f8a-4a6c-8a1d-3c9d2e0f5b08';
+    private const string HEADHUNTERZ = '9c8a5c2e-8a9b-4b7d-9b2e-4d0e3f1a6c09';
 
     private string $libraryDirectory;
     private ?string $schema = null;
@@ -278,6 +285,58 @@ final class NewAlbumMetadataSyncTest extends KernelTestCase
                 [$fixture['album']->toString()],
             ),
         );
+    }
+
+    /**
+     * Three files of one directory credit Headhunterz by a MusicBrainz ID the catalog does not
+     * hold. The import creates the artist with the ID and queues one fill of it once its batch
+     * committed; the fill takes the artist's details from MusicBrainz. An admin sync within 30 days
+     * queues no fill for the artist, although its life span has no end.
+     */
+    public function testAnImportThatCreditsAnArtistByANewIdQueuesOneFillAndAnAdminSyncThenAsksNoMore(): void
+    {
+        $this->setAutomaticMatching(true);
+        file_put_contents($this->libraryDirectory . '/Album/track-2.flac', 'not really audio either');
+        file_put_contents($this->libraryDirectory . '/Album/track-3.flac', 'not really audio at all');
+        $this->tagEveryFile('Headhunterz', self::HEADHUNTERZ);
+        $this->fakeMusicBrainz([], [new MusicBrainzArtist(self::HEADHUNTERZ, 'Headhunterz', 100, 'Headhunterz', 'Person', 'NL', 'Dutch hardstyle DJ', '1985-09-12', null, false)]);
+        $library = $this->createLibrary();
+
+        $this->scanAndIngest($library);
+
+        $artistId = (string) $this->connection()->fetchOne('SELECT id FROM artists WHERE mbid = ?', [self::HEADHUNTERZ]);
+        self::assertSame(3, (int) $this->connection()->fetchOne('SELECT count(*) FROM artist_song WHERE artist_id = ?', [$artistId]));
+        self::assertSame([$artistId], $this->queuedArtistSyncs(), 'One fill of the artist, however many songs credit it.');
+
+        $this->handleQueued(SyncArtistMessage::class, SyncArtistHandler::class);
+
+        self::assertSame(
+            ['Headhunterz', 'Person', 'NL', 'Dutch hardstyle DJ', '1985-09-12', null],
+            $this->connection()->fetchNumeric('SELECT sort_name, type, country, disambiguation, life_span_begin, life_span_end FROM artists WHERE id = ?', [$artistId]),
+        );
+        self::assertSame(0, static::getContainer()->get(QueueArtistSyncsHandler::class)(new SyncArtistsMessage()), 'MusicBrainz answered about the artist\'s ID within 30 days.');
+        self::assertSame([], $this->queuedArtistSyncs());
+    }
+
+    /** Gives every file the scan reads the tags of one song in the directory's album, credited to the artist by its MusicBrainz ID. */
+    private function tagEveryFile(string $artist, string $musicbrainzId): void
+    {
+        $reader = $this->createStub(MetadataContentReaderPortInterface::class);
+        $reader->method('readMetadata')->willReturnCallback(static fn (string $path): ExtractedMetadata => new ExtractedMetadata()
+            ->setTitle(pathinfo($path, PATHINFO_FILENAME))
+            ->setAlbum('Album')
+            ->setArtists([$artist])
+            ->setMbArtistIds([$musicbrainzId]));
+        static::getContainer()->set(MetadataContentReaderPortInterface::class, $reader);
+    }
+
+    /** @return list<string> the artist of each artist fill waiting on the async transport */
+    private function queuedArtistSyncs(): array
+    {
+        return array_map(static fn (Envelope $envelope): object => $envelope->getMessage(), $this->queued())
+            |> (static fn (array $messages): array => array_filter($messages, static fn (object $message): bool => $message instanceof SyncArtistMessage))
+            |> (static fn (array $syncs): array => array_map(static fn (SyncArtistMessage $sync): string => $sync->artistId->toString(), $syncs))
+            |> array_values(...);
     }
 
     private function setAutomaticMatching(bool $enabled): void
@@ -547,20 +606,25 @@ final class NewAlbumMetadataSyncTest extends KernelTestCase
     }
 
     /**
-     * Puts a fake MusicBrainz in the container that finds the given releases for any search.
+     * Puts a fake MusicBrainz in the container that finds the given releases for any search and
+     * answers a lookup of each given artist by its ID.
      *
      * @param list<MusicBrainzRelease> $releases
+     * @param list<MusicBrainzArtist>  $artists
      *
      * @return object{calls: list<string>}
      */
-    private function fakeMusicBrainz(array $releases): object
+    private function fakeMusicBrainz(array $releases, array $artists = []): object
     {
-        $fake = new class ($releases) implements MusicBrainzLookupInterface {
+        $fake = new class ($releases, $artists) implements MusicBrainzLookupInterface {
             /** @var list<string> */
             public array $calls = [];
 
-            /** @param list<MusicBrainzRelease> $releases */
-            public function __construct(private readonly array $releases)
+            /**
+             * @param list<MusicBrainzRelease> $releases
+             * @param list<MusicBrainzArtist>  $artists
+             */
+            public function __construct(private readonly array $releases, private readonly array $artists)
             {
             }
 
@@ -604,11 +668,11 @@ final class NewAlbumMetadataSyncTest extends KernelTestCase
                 return [];
             }
 
-            public function fetchArtist(string $artistId, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): MusicBrainzArtist|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|null
+            public function fetchArtist(string $artistId, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): ?MusicBrainzArtist
             {
                 $this->calls[] = 'fetchArtist:' . $artistId;
 
-                return null;
+                return array_find($this->artists, static fn (MusicBrainzArtist $artist): bool => $artist->id === $artistId);
             }
 
             public function fetchFrontCover(string $releaseId, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): MusicBrainzCoverImage|MusicBrainzRejected|MusicBrainzUnavailable|null

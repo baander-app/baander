@@ -6,6 +6,8 @@ namespace App\Catalog\Infrastructure\Doctrine\ImportIdentity;
 
 use App\Catalog\Application\Port\ArtistIdentity;
 use App\Catalog\Application\Port\ArtistIdentityResolverInterface;
+use App\Catalog\Application\Port\ArtistResolution;
+use App\Catalog\Application\Port\IdentifiedArtist;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity;
 use App\Shared\Domain\Model\PublicId;
 use Doctrine\ORM\EntityManagerInterface;
@@ -25,12 +27,17 @@ final readonly class ArtistIdentityResolver implements ArtistIdentityResolverInt
 
     public function resolve(array $identities): array
     {
+        return $this->resolveReporting($identities)->artistIds;
+    }
+
+    public function resolveReporting(array $identities): ArtistResolution
+    {
         $distinct = [];
         foreach ($identities as $identity) {
             $distinct[$identity->key()] ??= $identity;
         }
         if ($distinct === []) {
-            return [];
+            return new ArtistResolution([]);
         }
 
         ImportIdentityLock::acquire($this->entityManager->getConnection(), self::lockKeys($distinct));
@@ -41,9 +48,8 @@ final readonly class ArtistIdentityResolver implements ArtistIdentityResolverInt
         foreach ($distinct as $key => $identity) {
             $artistIds[$key] = $index->resolve($identity)->id;
         }
-        $this->write($index->artists(), $stored);
 
-        return $artistIds;
+        return new ArtistResolution($artistIds, $this->write($index->artists(), $stored));
     }
 
     /**
@@ -105,11 +111,14 @@ final readonly class ArtistIdentityResolver implements ArtistIdentityResolverInt
 
     /**
      * Persists the artists the index created and the IDs stored artists took on, then flushes once.
+     * The index holds each artist once, so each one written is reported once.
      *
      * @param list<ArtistIdentityCandidate> $resolved
      * @param list<ArtistEntity>            $stored
+     *
+     * @return list<IdentifiedArtist> the artists written that hold a MusicBrainz ID: created with one, or given one
      */
-    private function write(array $resolved, array $stored): void
+    private function write(array $resolved, array $stored): array
     {
         $entities = [];
         foreach ($stored as $entity) {
@@ -117,21 +126,28 @@ final readonly class ArtistIdentityResolver implements ArtistIdentityResolverInt
         }
 
         $changed = false;
+        $identified = [];
         foreach ($resolved as $artist) {
             $entity = $entities[$artist->id->toString()] ?? null;
             if ($entity === null) {
                 $entity = new ArtistEntity(new PublicId(), $artist->name, $artist->id);
                 $entity->setMbid($artist->mbid);
                 $this->entityManager->persist($entity);
-                $changed = true;
             } elseif ($entity->getMbid() !== $artist->mbid) {
                 $entity->setMbid($artist->mbid);
-                $changed = true;
+            } else {
+                continue;
+            }
+            $changed = true;
+            if ($artist->mbid !== null) {
+                $identified[] = new IdentifiedArtist($artist->id, $artist->mbid);
             }
         }
 
         if ($changed) {
             $this->entityManager->flush();
         }
+
+        return $identified;
     }
 }

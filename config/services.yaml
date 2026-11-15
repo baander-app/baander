@@ -650,6 +650,8 @@ services:
         alias: App\Catalog\Infrastructure\AlbumService
     App\Catalog\Application\Port\AlbumMatchRequestInterface:
         alias: App\Catalog\Application\Service\MusicBrainzMatch\AlbumMatchRequester
+    App\Catalog\Application\Port\ArtistSyncRequestInterface:
+        alias: App\Catalog\Application\Service\ArtistSyncRequester
     App\Catalog\Application\Service\MusicBrainzMatch\AutomaticAlbumMatcherInterface:
         alias: App\Catalog\Application\Service\MusicBrainzMatch\AutomaticAlbumMatcher
     App\Catalog\Application\Query\MusicBrainzMatch\MatchReviewReadInterface:

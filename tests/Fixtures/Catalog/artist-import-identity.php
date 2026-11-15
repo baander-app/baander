@@ -8,7 +8,8 @@ declare(strict_types=1);
  *
  * Arguments: schema, application name, mode and a JSON payload. `resolve` takes a list of
  * [tagged name, MusicBrainz IDs] pairs, resolves them in one transaction and prints
- * {"artists": [artist ID of each pair]}. `lock` takes a list of lock keys, locks them in one
+ * {"artists": [artist ID of each pair], "identified": [[artist ID, MusicBrainz ID] of each artist the
+ * resolution created with an ID or gave one]}. `lock` takes a list of lock keys, locks them in one
  * transaction and prints {"locked": true}.
  */
 
@@ -33,9 +34,12 @@ $connection->beginTransaction();
 $result = match ($mode) {
     'resolve' => (static function () use ($connection, $payload): array {
         $identities = ArtistImportIdentityRace::identities($payload);
-        $artists = ArtistImportIdentityRace::resolver(ArtistImportIdentityRace::entityManager($connection))->resolve($identities);
+        $resolution = ArtistImportIdentityRace::resolver(ArtistImportIdentityRace::entityManager($connection))->resolveReporting($identities);
 
-        return ['artists' => array_map(static fn (ArtistIdentity $identity): string => $artists[$identity->key()]->toString(), $identities)];
+        return [
+            'artists' => array_map(static fn (ArtistIdentity $identity): string => $resolution->artistIds[$identity->key()]->toString(), $identities),
+            'identified' => ArtistImportIdentityRace::identified($resolution),
+        ];
     })(),
     'lock' => (static function () use ($connection, $payload): array {
         ImportIdentityLock::acquire($connection, $payload);

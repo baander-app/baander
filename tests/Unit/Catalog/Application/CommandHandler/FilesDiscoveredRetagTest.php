@@ -9,6 +9,8 @@ use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistIdentity;
 use App\Catalog\Application\Port\ArtistIdentityResolverInterface;
+use App\Catalog\Application\Port\ArtistResolution;
+use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
@@ -364,7 +366,7 @@ final class FilesDiscoveredRetagTest extends TestCase
         });
 
         $resolver = $this->createStub(ArtistIdentityResolverInterface::class);
-        $resolver->method('resolve')->willReturnCallback(static function (array $identities) use ($state): array {
+        $resolver->method('resolveReporting')->willReturnCallback(static function (array $identities) use ($state): ArtistResolution {
             $state->calls[] = 'resolve';
             $resolved = [];
             foreach ($identities as $identity) {
@@ -373,7 +375,7 @@ final class FilesDiscoveredRetagTest extends TestCase
                 $resolved[$identity->key()] = $state->artists[$identity->name] ??= Uuid::v7();
             }
 
-            return $resolved;
+            return new ArtistResolution($resolved);
         });
 
         $metadata = $this->createStub(MetadataContentReaderPortInterface::class);
@@ -443,6 +445,7 @@ final class FilesDiscoveredRetagTest extends TestCase
             $transaction,
             $probe,
             $resolver,
+            $this->createStub(ArtistSyncRequestInterface::class),
         );
     }
 

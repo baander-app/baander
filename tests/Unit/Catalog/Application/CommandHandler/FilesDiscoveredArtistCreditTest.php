@@ -9,10 +9,15 @@ use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistIdentity;
 use App\Catalog\Application\Port\ArtistIdentityResolverInterface;
+use App\Catalog\Application\Port\ArtistResolution;
+use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
+use App\Catalog\Application\Port\IdentifiedArtist;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Service\ArtistSyncQueue;
+use App\Catalog\Application\Service\ArtistSyncRequester;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
@@ -20,13 +25,18 @@ use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
+use App\Metadata\Application\Message\SyncArtistMessage;
+use App\Metadata\Application\Settings\MetadataSettingDefinitions;
 use App\Metadata\Domain\Model\ExtractedMetadata;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Catalog\DiscoveredFileObservations;
+use App\Tests\Fixtures\Catalog\InMemoryQueuedArtistSyncs;
 use App\Tests\Fixtures\Catalog\PassThroughTransaction;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\Messenger\Envelope;
@@ -37,7 +47,8 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
  * A batch resolves the artists of all its new songs in one call inside its transaction, before it
  * writes any song or genre, and credits each song to the artist resolved for its own tags under the
  * name it was tagged with. A file that names its artists one by one, with one MusicBrainz ID each,
- * also credits every artist after the first as featured.
+ * also credits every artist after the first as featured. Once the batch committed, and while
+ * automatic matching is on, it queues the fill of each artist it created with a MusicBrainz ID.
  */
 final class FilesDiscoveredArtistCreditTest extends TestCase
 {
@@ -63,6 +74,11 @@ final class FilesDiscoveredArtistCreditTest extends TestCase
             'credits' => [],
             'persistFailures' => [],
             'flushes' => 0,
+            'failingFlush' => null,
+            'automaticMatching' => true,
+            'fillFailure' => null,
+            'fills' => [],
+            'logged' => [],
         ];
         $this->transaction = new PassThroughTransaction();
     }
@@ -260,6 +276,78 @@ final class FilesDiscoveredArtistCreditTest extends TestCase
     }
 
     /**
+     * Sixty files credit Headhunterz by an ID the catalog does not hold, so the message writes them
+     * in two batches. The first batch creates the artist and queues its one fill once it committed;
+     * the second finds the artist and queues none.
+     */
+    public function testABatchThatCreditsAnArtistByANewIdQueuesOneFillOnceItCommittedHoweverManySongsCreditIt(): void
+    {
+        $names = self::trackNames(60);
+        $tags = array_fill_keys($names, ['artists' => ['Headhunterz'], 'ids' => [self::HEADHUNTERZ_ID]]);
+        $tags['02 Track'] = ['artists' => ['Disturbed']];
+
+        $this->handler($tags)($this->message(...$names));
+
+        self::assertSame(2, $this->state->flushes, 'The message is written in two batches.');
+        $headhunterz = $this->state->artists[new ArtistIdentity('Headhunterz', [self::HEADHUNTERZ_ID])->key()]->toString();
+        self::assertSame([[$headhunterz, false, 1]], $this->state->fills, 'One fill, queued after the first batch committed and before the second ran.');
+    }
+
+    /**
+     * The first batch credits Headhunterz and commits; the second credits Krewella and fails as a
+     * whole. Its retry would find Headhunterz holding the ID and report nothing, so the first
+     * batch's fill must be queued already, and the failed batch's must not.
+     */
+    public function testAMessageWhoseSecondBatchFailsHasQueuedTheFillsOfTheArtistsItsFirstBatchIdentified(): void
+    {
+        $names = self::trackNames(51);
+        $tags = array_fill_keys($names, ['artists' => ['Headhunterz'], 'ids' => [self::HEADHUNTERZ_ID]]);
+        $tags['51 Track'] = ['artists' => ['Krewella'], 'ids' => [self::KREWELLA_ID]];
+        $this->state->failingFlush = 2;
+
+        try {
+            $this->handler($tags)($this->message(...$names));
+            self::fail('The failed batch fails the message.');
+        } catch (RuntimeException $failure) {
+            self::assertSame('The batch could not be written.', $failure->getMessage());
+        }
+
+        $headhunterz = $this->state->artists[new ArtistIdentity('Headhunterz', [self::HEADHUNTERZ_ID])->key()]->toString();
+        self::assertArrayHasKey(new ArtistIdentity('Krewella', [self::KREWELLA_ID])->key(), $this->state->artists, 'The failed batch had resolved Krewella.');
+        self::assertSame([[$headhunterz, false, 1]], $this->state->fills);
+    }
+
+    public function testWhileAutomaticMatchingIsOffABatchQueuesNoFill(): void
+    {
+        $this->state->automaticMatching = false;
+
+        $this->handler(['01 Dragonborn' => ['artists' => ['Headhunterz'], 'ids' => [self::HEADHUNTERZ_ID]]])($this->message('01 Dragonborn'));
+
+        self::assertSame(['01 Dragonborn'], $this->state->persisted);
+        self::assertSame([], $this->state->fills);
+    }
+
+    public function testAFillThatCannotBeQueuedIsLoggedAndTheBatchsSongsStayCommitted(): void
+    {
+        $this->state->fillFailure = new RuntimeException('The transport cannot be reached.');
+
+        $this->handler(['01 Dragonborn' => ['artists' => ['Headhunterz'], 'ids' => [self::HEADHUNTERZ_ID]]])($this->message('01 Dragonborn'));
+
+        self::assertSame(['01 Dragonborn'], $this->state->persisted);
+        self::assertSame(1, $this->state->flushes);
+        $headhunterz = $this->state->artists[new ArtistIdentity('Headhunterz', [self::HEADHUNTERZ_ID])->key()]->toString();
+        $logged = $this->state->logged['Could not queue the MusicBrainz fill of {count} artist(s); a later metadata sync from the admin panel queues them.'] ?? [];
+        self::assertSame([1, [$headhunterz]], [$logged['count'] ?? null, $logged['artist_ids'] ?? null]);
+        self::assertSame($this->state->fillFailure, $logged['exception'] ?? null);
+    }
+
+    /** @return list<string> the names of tracks 1 to $count, in file order */
+    private static function trackNames(int $count): array
+    {
+        return array_map(static fn (int $track): string => sprintf('%02d Track', $track), range(1, $count));
+    }
+
+    /**
      * @param array<string, array{artists?: list<string>, individualArtists?: list<string>, ids?: list<string>, genres?: list<string>}> $tags     the tags of each file, by file name
      * @param (\Closure(ArtistIdentity): string)|null                                                                                   $artistOf which identities the fake resolver gives one artist; by default, those with one key
      * @param string|null                                                                                                               $replaced a file that changes on disk while its tags are read
@@ -291,18 +379,27 @@ final class FilesDiscoveredArtistCreditTest extends TestCase
         });
         $songs->method('flush')->willReturnCallback(static function () use ($state): void {
             $state->flushes++;
+            if ($state->flushes === $state->failingFlush) {
+                throw new RuntimeException('The batch could not be written.');
+            }
         });
 
         $resolver = $this->createStub(ArtistIdentityResolverInterface::class);
-        $resolver->method('resolve')->willReturnCallback(static function (array $identities) use ($state, $transaction, $artistOf): array {
+        $resolver->method('resolveReporting')->willReturnCallback(static function (array $identities) use ($state, $transaction, $artistOf): ArtistResolution {
             $state->resolved[] = [$identities, $transaction->active];
             $state->events[] = 'artists resolved';
             $resolved = [];
+            $identified = [];
             foreach ($identities as $identity) {
-                $resolved[$identity->key()] = $state->artists[$artistOf($identity)] ??= Uuid::v7();
+                $artist = $artistOf($identity);
+                // As the real resolver does, it reports an artist it creates with an ID, once.
+                if (!isset($state->artists[$artist]) && $identity->musicbrainzId !== null) {
+                    $identified[] = new IdentifiedArtist($state->artists[$artist] = Uuid::v7(), $identity->musicbrainzId->toString());
+                }
+                $resolved[$identity->key()] = $state->artists[$artist] ??= Uuid::v7();
             }
 
-            return $resolved;
+            return new ArtistResolution($resolved, $identified);
         });
 
         $genres = $this->createStub(GenrePortInterface::class);
@@ -352,7 +449,44 @@ final class FilesDiscoveredArtistCreditTest extends TestCase
             $transaction,
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $resolver,
+            artistSyncs: $this->artistSyncs(),
         );
+    }
+
+    /**
+     * The production artist fill requester over marks held in memory. It keeps the artist of each
+     * fill queued with whether a transaction was open and how many batches had written their songs
+     * then, and the context of each entry it logs.
+     */
+    private function artistSyncs(): ArtistSyncRequestInterface
+    {
+        $state = $this->state;
+        $transaction = $this->transaction;
+        $bus = $this->createStub(MessageBusInterface::class);
+        $bus->method('dispatch')->willReturnCallback(static function (object $message, array $stamps = []) use ($state, $transaction): Envelope {
+            if ($state->fillFailure !== null) {
+                throw $state->fillFailure;
+            }
+            self::assertInstanceOf(SyncArtistMessage::class, $message);
+            $state->fills[] = [$message->artistId->toString(), $transaction->active, $state->flushes];
+
+            return new Envelope($message, $stamps);
+        });
+        $settings = $this->createStub(SystemSettingsPortInterface::class);
+        $settings->method('get')->willReturnCallback(static fn (string $key): bool => $key === MetadataSettingDefinitions::AUTO_SYNC && $state->automaticMatching);
+        $logger = new class ($state) extends AbstractLogger {
+            public function __construct(private readonly \stdClass $state)
+            {
+            }
+
+            /** @param array<string, mixed> $context */
+            public function log($level, string|\Stringable $message, array $context = []): void
+            {
+                $this->state->logged[(string) $message] = $context;
+            }
+        };
+
+        return new ArtistSyncRequester(new ArtistSyncQueue(new InMemoryQueuedArtistSyncs(), $bus), $settings, $logger);
     }
 
     private function message(string ...$names): FilesDiscovered

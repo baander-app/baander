@@ -7,6 +7,8 @@ namespace App\Tests\Unit\Catalog\Application\CommandHandler;
 use App\Catalog\Application\CommandHandler\FilesDiscoveredHandler;
 use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\ArtistIdentityResolverInterface;
+use App\Catalog\Application\Port\ArtistResolution;
+use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
@@ -251,8 +253,8 @@ final class FilesDiscoveredAlbumCreditTest extends TestCase
         $state = $this->state;
         $transaction = $this->transaction;
 
-        $resolver = $this->createStub(ArtistIdentityResolverInterface::class);
-        $resolver->method('resolve')->willReturnCallback(static function (array $identities) use ($state, $transaction): array {
+        // The import resolves its songs' artists with a report, the album service its album artist without one.
+        $resolve = static function (array $identities) use ($state, $transaction): array {
             self::assertTrue($transaction->active, 'Artists resolve inside the transaction that writes their credits.');
             $resolved = [];
             foreach ($identities as $identity) {
@@ -266,7 +268,10 @@ final class FilesDiscoveredAlbumCreditTest extends TestCase
             }
 
             return $resolved;
-        });
+        };
+        $resolver = $this->createStub(ArtistIdentityResolverInterface::class);
+        $resolver->method('resolve')->willReturnCallback($resolve);
+        $resolver->method('resolveReporting')->willReturnCallback(static fn (array $identities): ArtistResolution => new ArtistResolution($resolve($identities)));
 
         $albums = $this->createStub(AlbumRepositoryInterface::class);
         $albums->method('findByTitleAndLibrary')->willReturnCallback(
@@ -374,6 +379,7 @@ final class FilesDiscoveredAlbumCreditTest extends TestCase
             $transaction,
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $resolver,
+            artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
         );
     }
 

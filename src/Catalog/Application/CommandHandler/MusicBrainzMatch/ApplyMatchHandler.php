@@ -15,7 +15,10 @@ use App\Catalog\Application\Port\ArtistIdentityResolverInterface;
 use App\Catalog\Application\Port\ArtistMergePortInterface;
 use App\Catalog\Application\Port\ArtistPortInterface;
 use App\Catalog\Application\Port\ArtistRemoval;
+use App\Catalog\Application\Port\ArtistResolution;
+use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
+use App\Catalog\Application\Port\IdentifiedArtist;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Query\MusicBrainzMatch\AlbumSnapshot;
 use App\Catalog\Application\Query\MusicBrainzMatch\ArtistActionKind;
@@ -85,6 +88,11 @@ use Throwable;
  * automatic matching is off or when a match has compared every song of the album; when it fails,
  * the failure is logged and the apply stays applied.
  *
+ * An album or song apply that created a credited artist with a MusicBrainz ID, or gave a stored
+ * artist without one its ID, queues the fill of each such artist from MusicBrainz once it committed
+ * and after the steps above, whether automatic matching is on or off. A failure to queue is logged
+ * and the apply stays applied. An artist apply queues no fill: the admin chose that artist's fields.
+ *
  * An automatic apply to an album that held the release when the matcher read it matches the
  * album's new songs. It never writes the album's own credits, nor a merge or removal that needs
  * them, so credits an admin changed by hand stay. Under the locks it also checks the songs the
@@ -121,6 +129,7 @@ final readonly class ApplyMatchHandler
         private ArtistMergePortInterface $merges,
         private AlbumMatchStateRepositoryInterface $matchStates,
         private AlbumMatchRequestInterface $matchRequests,
+        private ArtistSyncRequestInterface $artistSyncs,
         private ImagePortInterface $images,
         private CoverImageDiscarder $discarder,
         private TransactionPortInterface $transaction,
@@ -233,7 +242,7 @@ final readonly class ApplyMatchHandler
 
         $coverSaved = false;
         try {
-            [$applied, $discard, $holdsRelease] = $this->transaction->run(function () use ($command, $albumId, $candidate, $compared, $locks, $cover, &$coverSaved): array {
+            [$applied, $discard, $identified, $holdsRelease] = $this->transaction->run(function () use ($command, $albumId, $candidate, $compared, $locks, $cover, &$coverSaved): array {
                 $this->albums->lockInIdOrder([$albumId]);
                 $this->lock($locks);
                 $album = $this->albums->findFreshByUuid($albumId) ?? throw self::gone(MatchItemType::Album);
@@ -249,9 +258,9 @@ final readonly class ApplyMatchHandler
                     throw MatchTicks::stale('The album changed since the comparison.');
                 }
 
-                [$applied, $discard] = $this->writeAlbum($album, $snapshot, $plan, $candidate, $compared, $command->isAutomatic(), $cover, $coverSaved);
+                [$applied, $discard, $identified] = $this->writeAlbum($album, $snapshot, $plan, $candidate, $compared, $command->isAutomatic(), $cover, $coverSaved);
 
-                return [$applied, $discard, $album->getReleaseMbid() !== null];
+                return [$applied, $discard, $identified, $album->getReleaseMbid() !== null];
             });
         } catch (Throwable $exception) {
             if ($cover !== null && !$this->coverCommitted($cover)) {
@@ -268,6 +277,7 @@ final readonly class ApplyMatchHandler
         if (!$command->isAutomatic() && $holdsRelease) {
             $this->requestMatch($albumId);
         }
+        $this->artistSyncs->requestAfterMatch(...$identified);
 
         return $coverRefused ? $applied->withCoverRefused() : $applied;
     }
@@ -326,7 +336,7 @@ final readonly class ApplyMatchHandler
         $plan = $this->songPlan($selection, $this->comparisons->song($snapshot, $recording), $snapshot, $recording->artistCredit);
         $locks = ($plan->artistIds() |> $this->storedIdentities(...) |> $plan->locks(...))->withSongs([$songId]);
 
-        [$applied, $discard] = $this->transaction->run(function () use ($selection, $songId, $recording, $locks): array {
+        [$applied, $discard, $identified] = $this->transaction->run(function () use ($selection, $songId, $recording, $locks): array {
             $this->lock($locks);
             $song = $this->songs->findFreshByUuid($songId) ?? throw self::gone(MatchItemType::Song);
             $snapshot = $this->snapshots->ofSong($song);
@@ -335,7 +345,8 @@ final readonly class ApplyMatchHandler
                 throw MatchTicks::stale('The song changed since the comparison.');
             }
 
-            $resolved = $this->resolve($plan);
+            $resolution = $this->resolve($plan);
+            $resolved = $resolution->artistIds;
             $publicId = $song->getPublicId()->toString();
             $song->markMatchChecked($this->now());
             $creditsChanged = $this->writeSong($song, $plan->ticks->fields, $plan->ticks->creditsOf($publicId), $plan, $resolved);
@@ -354,9 +365,11 @@ final readonly class ApplyMatchHandler
                     removedArtists: $removed,
                 ),
                 $discard,
+                $resolution->identified,
             ];
         });
         $this->discardImages($discard);
+        $this->artistSyncs->requestAfterMatch(...$identified);
 
         return $applied;
     }
@@ -416,12 +429,14 @@ final readonly class ApplyMatchHandler
      *
      * @param-out bool $coverSaved
      *
-     * @return array{MatchApplyResult, list<Uuid>} what the apply wrote, and the images to discard after the commit
+     * @return array{MatchApplyResult, list<Uuid>, list<IdentifiedArtist>} what the apply wrote, the images to discard
+     *                                                                      after the commit, and the artists it identified
      */
     private function writeAlbum(Album $album, AlbumSnapshot $snapshot, MatchPlan $plan, MatchCandidate $candidate, array $compared, bool $automatic, ?Image $cover, bool &$coverSaved): array
     {
         $ticks = $plan->ticks;
-        $resolved = $this->resolve($plan);
+        $resolution = $this->resolve($plan);
+        $resolved = $resolution->artistIds;
         $discard = [];
         $now = $this->now();
 
@@ -489,6 +504,7 @@ final readonly class ApplyMatchHandler
                 removedArtists: $removed,
             ),
             [...$discard, ...$freed],
+            $resolution->identified,
         ];
     }
 
@@ -718,12 +734,12 @@ final readonly class ApplyMatchHandler
         return array_values($credits);
     }
 
-    /** @return array<string, Uuid> the artist of each credited identity, by its key */
-    private function resolve(MatchPlan $plan): array
+    /** The artist of each credited identity, by its key, and the artists the resolution identified. */
+    private function resolve(MatchPlan $plan): ArtistResolution
     {
         $identities = $plan->identities();
 
-        return $identities === [] ? [] : $this->artistIdentities->resolve($identities);
+        return $identities === [] ? new ArtistResolution([]) : $this->artistIdentities->resolveReporting($identities);
     }
 
     /** Takes the import keys, then the artist rows, then the song rows, inside the transaction. */

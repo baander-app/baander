@@ -8,7 +8,10 @@ use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistIdentity;
 use App\Catalog\Application\Port\ArtistIdentityResolverInterface;
+use App\Catalog\Application\Port\ArtistResolution;
+use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
+use App\Catalog\Application\Port\IdentifiedArtist;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
@@ -69,6 +72,7 @@ final class FilesDiscoveredHandler
         private readonly TransactionPortInterface $transaction,
         private readonly AudioProbePortInterface $audioProbe,
         private readonly ArtistIdentityResolverInterface $artistIdentities,
+        private readonly ArtistSyncRequestInterface $artistSyncs,
     ) {
     }
 
@@ -101,7 +105,9 @@ final class FilesDiscoveredHandler
      * Reads the metadata of each batch of files first, then writes the batch's songs, artist
      * credits and genres in one transaction during which no delete with files can claim the
      * library. When a delete claimed it before that transaction, the import stops and the files
-     * whose songs no transaction committed go back to the queue, as a held import does. After the
+     * whose songs no transaction committed go back to the queue, as a held import does. Once a batch
+     * committed, its songs' lyrics are requested and, while automatic matching is on, the fill of
+     * each artist the batch created with a MusicBrainz ID or gave its ID is queued. After the
      * last batch, and before the import requeues or reports a failed file, each album the message
      * touched is given an artist credit when it has none, and then asked for an automatic
      * MusicBrainz match.
@@ -178,8 +184,8 @@ final class FilesDiscoveredHandler
                 continue;
             }
 
-            $written = $this->writeSongs($libraryId, $songs, $failures);
-            if ($written === null) {
+            $committed = $this->writeSongs($libraryId, $songs, $failures);
+            if ($committed === null) {
                 // A delete with files claimed the library since the import began. The songs
                 // committed so far stay, and the requeued import carries the other files only.
                 $heldRemainder = new FilesDiscovered(
@@ -191,6 +197,7 @@ final class FilesDiscoveredHandler
                 break;
             }
 
+            [$written, $identified] = $committed;
             foreach ($written as $song) {
                 $committedPaths[$song['song']->getPath()] = true;
                 // A known song is fetched for once it gained a primary credit or a length.
@@ -200,8 +207,10 @@ final class FilesDiscoveredHandler
                 }
             }
             // A retry finds these songs credited and measured already and requests no lyrics for
-            // them, so request their lyrics now, before any failed file is reported.
+            // them, and finds these artists holding their IDs, so request the lyrics and the
+            // artists' fills now, before a later batch can fail or a failed file is reported.
             $this->requestLyricsFetch($songsAwaitingLyrics);
+            $this->artistSyncs->requestAfterImport(...$identified);
         }
 
         // A message may carry only part of an album, such as one disc, so each credit is decided
@@ -588,12 +597,14 @@ final class FilesDiscoveredHandler
      * @param list<PreparedSong>                       $songs
      * @param list<array{path: string, error: string}> $failures
      *
-     * @return list<PreparedSong>|null the songs the transaction committed; null when a delete holds the library and nothing was written
+     * @return array{list<PreparedSong>, list<IdentifiedArtist>}|null the songs the transaction committed and the artists it
+     *                                                                created with a MusicBrainz ID or gave one; null when a
+     *                                                                delete holds the library and nothing was written
      */
     private function writeSongs(Uuid $libraryId, array $songs, array &$failures): ?array
     {
         $songFailures = [];
-        $written = $this->transaction->run(function () use ($libraryId, $songs, &$songFailures): ?array {
+        $committed = $this->transaction->run(function () use ($libraryId, $songs, &$songFailures): ?array {
             if ($this->mediaFiles->isHeldByDeleteForImport($libraryId)) {
                 return null;
             }
@@ -626,7 +637,8 @@ final class FilesDiscoveredHandler
             $current = $this->withTagCreditsOfUncreditedSongsOnly(array_values($current));
             $current = $this->withRetaggedSongsLocked($current, $songFailures);
             // Artist keys sort before genre keys, so the artists are locked first.
-            $artistIds = $this->resolveArtists($current);
+            $artists = $this->resolveArtists($current);
+            $artistIds = $artists->artistIds;
             // Read again under the artist locks: an import of the same file that held them first may
             // have credited a known song since.
             $current = $this->withTagCreditsOfUncreditedSongsOnly($current);
@@ -650,11 +662,11 @@ final class FilesDiscoveredHandler
             $this->songService->flush();
             $this->genreService->flush();
 
-            return $written;
+            return [$written, $artists->identified];
         });
         array_push($failures, ...$songFailures);
 
-        return $written;
+        return $committed;
     }
 
     /**
@@ -906,17 +918,15 @@ final class FilesDiscoveredHandler
 
     /**
      * Finds or creates the credited artists of the batch's songs in one call that locks them all,
-     * before the batch writes any song.
+     * before the batch writes any song. The resolution also names the artists it identified.
      *
      * @param list<PreparedSong> $songs
-     *
-     * @return array<string, Uuid> the artist of each identity, by its key
      */
-    private function resolveArtists(array $songs): array
+    private function resolveArtists(array $songs): ArtistResolution
     {
         $identities = self::creditedIdentities($songs);
 
-        return $identities === [] ? [] : $this->artistIdentities->resolve($identities);
+        return $identities === [] ? new ArtistResolution([]) : $this->artistIdentities->resolveReporting($identities);
     }
 
     /**

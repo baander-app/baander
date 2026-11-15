@@ -36,4 +36,18 @@ interface ArtistIdentityResolverInterface
      * @throws \LogicException outside a transaction, before locking or writing anything
      */
     public function resolve(array $identities): array;
+
+    /**
+     * Resolves the identities as {@see resolve()} does, with the same locks and the same single
+     * call per transaction, and also reports the artists this call identified: those it created
+     * with a MusicBrainz ID, and those that took on an ID they did not hold. An artist that held
+     * its ID already, also one another transaction gave it while this one waited for its locks, is
+     * not reported. The report holds once the caller's transaction commits; a writer that queues
+     * work for these artists does so after that commit.
+     *
+     * @param list<ArtistIdentity> $identities
+     *
+     * @throws \LogicException outside a transaction, before locking or writing anything
+     */
+    public function resolveReporting(array $identities): ArtistResolution;
 }

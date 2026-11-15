@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Catalog\Application\CommandHandler;
 use App\Catalog\Application\CommandHandler\FilesDiscoveredHandler;
 use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
+use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
@@ -64,7 +65,7 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
             $this->createStub(VideoProbePortInterface::class), $this->createStub(MessageBusInterface::class),
             $this->createStub(LyricsFetchRequestInterface::class), $this->createStub(AlbumMatchRequestInterface::class), new NullLogger(),
             $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)), new PassThroughTransaction(), $probe,
-            $this->artistIdentitiesStub());
+            $this->artistIdentitiesStub(), $this->createStub(ArtistSyncRequestInterface::class));
 
         $handler(new FilesDiscovered($library, 'music', '/music/Album', [$file]));
     }
@@ -107,7 +108,7 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
             $this->createStub(VideoProbePortInterface::class), $this->createStub(MessageBusInterface::class), $lyrics,
             $this->createStub(AlbumMatchRequestInterface::class), new NullLogger(),
             $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)), new PassThroughTransaction(), $probe,
-            $this->artistIdentitiesStub());
+            $this->artistIdentitiesStub(), $this->createStub(ArtistSyncRequestInterface::class));
 
         $handler(new FilesDiscovered($library, 'music', '/music/Album', [$file]));
 
@@ -152,7 +153,7 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
             $probe, $this->createStub(MessageBusInterface::class), $this->createStub(LyricsFetchRequestInterface::class),
             $this->createStub(AlbumMatchRequestInterface::class), new NullLogger(),
             $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)), new PassThroughTransaction(),
-            $this->createStub(AudioProbePortInterface::class), $this->artistIdentitiesStub());
+            $this->createStub(AudioProbePortInterface::class), $this->artistIdentitiesStub(), $this->createStub(ArtistSyncRequestInterface::class));
 
         $handler(new FilesDiscovered($library, 'movie', '/movies/Movie', [$file]));
 

@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Catalog\Application\CommandHandler;
 use App\Catalog\Application\CommandHandler\FilesDiscoveredHandler;
 use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
+use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
@@ -98,6 +99,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             new PassThroughTransaction(),
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $this->artistIdentitiesStub(),
+            artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
         );
 
         $message = new FilesDiscovered($libraryId, 'music', $directory, [$file]);
@@ -173,6 +175,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             new PassThroughTransaction(),
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $this->artistIdentitiesStub(),
+            artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
         );
 
         $message = new FilesDiscovered($libraryId, 'music', $directory, [$fileOne, $fileTwo]);
@@ -349,6 +352,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             new PassThroughTransaction(),
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $this->artistIdentitiesStub(),
+            artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
         );
         $file = $this->observedFile(new DiscoveredFile('/music/Test Album/01-track.mp3', 'Test Album/01-track.mp3', 'mp3', 1_000_000, time(), 'cover-fanout-hash'));
         $message = new FilesDiscovered($libraryId, 'music', '/music/Test Album', [$file]);

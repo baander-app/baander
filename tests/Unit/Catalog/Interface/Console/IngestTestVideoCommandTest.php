@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Catalog\Interface\Console;
 use App\Catalog\Application\CommandHandler\FilesDiscoveredHandler;
 use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
+use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
@@ -117,6 +118,7 @@ final class IngestTestVideoCommandTest extends TestCase
             new PassThroughTransaction(),
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $this->artistIdentitiesStub(),
+            artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
         );
 
         return new IngestTestVideoCommand(new MovieLibraryIngest($provisioning, $handler, $videos));

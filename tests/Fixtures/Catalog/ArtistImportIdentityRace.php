@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Fixtures\Catalog;
 
 use App\Catalog\Application\Port\ArtistIdentity;
+use App\Catalog\Application\Port\ArtistResolution;
+use App\Catalog\Application\Port\IdentifiedArtist;
 use App\Catalog\Infrastructure\Doctrine\ImportIdentity\ArtistIdentityResolver;
 use App\Shared\Infrastructure\Doctrine\Platform\BaanderDriverMiddleware;
 use App\Shared\Infrastructure\Doctrine\Type\CustomTypesRegistrar;
@@ -85,8 +87,19 @@ final class ArtistImportIdentityRace
     }
 
     /**
+     * The artists a resolution identified, as the child prints them.
+     *
+     * @return list<array{string, string}> the artist ID and MusicBrainz ID of each
+     */
+    public static function identified(ArtistResolution $resolution): array
+    {
+        return array_map(static fn (IdentifiedArtist $artist): array => [$artist->artistId->toString(), $artist->musicbrainzId], $resolution->identified);
+    }
+
+    /**
      * Starts the child session: `resolve` resolves identities in one transaction and prints the
-     * artist ID of each; `lock` takes import identity locks on keys in one transaction.
+     * artist ID of each and the artists the resolution identified; `lock` takes import identity
+     * locks on keys in one transaction.
      *
      * @param 'resolve'|'lock' $mode
      * @param list<mixed>      $payload identities as for identities(), or lock keys

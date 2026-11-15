@@ -7,6 +7,8 @@ namespace App\Tests\Fixtures\Catalog;
 use App\Catalog\Application\CommandHandler\MusicBrainzMatch\ApplyMatchHandler;
 use App\Catalog\Application\CommandHandler\MusicBrainzMatch\MatchCovers;
 use App\Catalog\Application\Port\AlbumMatchRequestInterface;
+use App\Catalog\Application\Port\ArtistSyncRequestInterface;
+use App\Catalog\Application\Port\IdentifiedArtist;
 use App\Catalog\Application\Query\MusicBrainzMatch\CompareMatchQuery;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchComparison;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchItemType;
@@ -197,7 +199,7 @@ final class MatchApplyRace
      * The apply handler over the manager. $beforeCommit runs inside the transaction once the apply
      * wrote everything, while it holds every lock, before the commit. A manual apply asks
      * $matchRequests for the album's match once it committed; without one it asks for none, as while
-     * automatic matching is off.
+     * automatic matching is off. The fills of the artists an apply identifies are queued nowhere.
      */
     public static function handler(EntityManager $manager, FakeMusicBrainzLookup $lookup, ?Closure $beforeCommit = null, ?AlbumMatchRequestInterface $matchRequests = null): ApplyMatchHandler
     {
@@ -219,6 +221,7 @@ final class MatchApplyRace
             merges: $services['merges'],
             matchStates: new AlbumMatchStateRepository($manager->getConnection()),
             matchRequests: $matchRequests ?? self::noMatchRequests(),
+            artistSyncs: self::noArtistSyncs(),
             images: $services['images'],
             discarder: $services['discarder'],
             transaction: $services['transaction'],
@@ -353,6 +356,20 @@ final class MatchApplyRace
     }
 
     /** Match requests that request nothing after an import, as the production ones while automatic matching is off. */
+    private static function noArtistSyncs(): ArtistSyncRequestInterface
+    {
+        return new class () implements ArtistSyncRequestInterface {
+            public function requestAfterImport(IdentifiedArtist ...$artists): void
+            {
+                throw new \LogicException('An apply queues its fills as a match does, never as an import.');
+            }
+
+            public function requestAfterMatch(IdentifiedArtist ...$artists): void
+            {
+            }
+        };
+    }
+
     private static function noMatchRequests(): AlbumMatchRequestInterface
     {
         return new class () implements AlbumMatchRequestInterface {

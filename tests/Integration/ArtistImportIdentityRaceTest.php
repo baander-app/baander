@@ -20,9 +20,10 @@ use PHPUnit\Framework\TestCase;
  * Imports resolve their artists under advisory locks on every tagged name and MusicBrainz ID.
  * The test session holds a resolution open while a second session, a child process, resolves a
  * competing identity: the second waits on a lock and, once the first commits, reads its artist
- * instead of creating another. The artists table copies the migrated one with uniq_artists_mbid
- * and its B-tree indexes but not its PGroonga index. Advisory locks span the database, so every
- * name and ID is random.
+ * instead of creating another. Of two sessions that resolve one new artist, only the one that
+ * created it or gave it its ID reports it as identified, so its fill is queued once. The artists
+ * table copies the migrated one with uniq_artists_mbid and its B-tree indexes but not its PGroonga
+ * index. Advisory locks span the database, so every name and ID is random.
  */
 final class ArtistImportIdentityRaceTest extends TestCase
 {
@@ -32,6 +33,8 @@ final class ArtistImportIdentityRaceTest extends TestCase
     private ArtistIdentityResolver $resolver;
     private string $schema;
     private string $tag;
+    /** @var list<array{string, string}> the artist ID and MusicBrainz ID of each artist the test session's resolutions identified */
+    private array $identified = [];
 
     protected function setUp(): void
     {
@@ -88,7 +91,13 @@ final class ArtistImportIdentityRaceTest extends TestCase
         ArtistImportIdentityRace::awaitAdvisoryLockWait($this->observer, $child);
         $this->writer->commit();
 
-        self::assertSame(['artists' => [$held->toString()]], ArtistImportIdentityRace::finish($child, $this->observer));
+        // The session that stores the ID first reports the artist; the other finds it holding the ID.
+        $reportedHeld = [[$held->toString(), $id]];
+        self::assertSame(
+            ['artists' => [$held->toString()], 'identified' => $idFirst ? [] : $reportedHeld],
+            ArtistImportIdentityRace::finish($child, $this->observer),
+        );
+        self::assertSame($idFirst ? $reportedHeld : [], $this->identified);
         self::assertSame([[$held->toString(), $name, $id]], $this->storedArtists());
     }
 
@@ -102,7 +111,8 @@ final class ArtistImportIdentityRaceTest extends TestCase
         ArtistImportIdentityRace::awaitAdvisoryLockWait($this->observer, $child);
         $this->writer->commit();
 
-        self::assertSame(['artists' => [$held->toString()]], ArtistImportIdentityRace::finish($child, $this->observer));
+        self::assertSame(['artists' => [$held->toString()], 'identified' => []], ArtistImportIdentityRace::finish($child, $this->observer));
+        self::assertSame([[$held->toString(), $id]], $this->identified, 'Only the session that created the artist reports it.');
         self::assertSame([[$held->toString(), $this->tagged('Headhunterz'), $id]], $this->storedArtists());
     }
 
@@ -118,7 +128,8 @@ final class ArtistImportIdentityRaceTest extends TestCase
         ArtistImportIdentityRace::awaitAdvisoryLockWait($this->observer, $child);
         $this->writer->commit();
 
-        self::assertSame(['artists' => [$first]], ArtistImportIdentityRace::finish($child, $this->observer));
+        self::assertSame(['artists' => [$first], 'identified' => []], ArtistImportIdentityRace::finish($child, $this->observer));
+        self::assertSame([[$first, $id]], $this->identified, 'Only the session that gave the artist its ID reports it.');
         self::assertSame(
             [[$first, $this->tagged('Headhunterz'), $id], [$second, $this->tagged('HeadHunterz'), null]],
             $this->storedArtists(),
@@ -192,7 +203,7 @@ final class ArtistImportIdentityRaceTest extends TestCase
         $created = $this->resolveOne($name, []);
         $this->writer->commit();
 
-        self::assertSame(['artists' => [$created->toString()]], ArtistImportIdentityRace::finish(
+        self::assertSame(['artists' => [$created->toString()], 'identified' => [[$created->toString(), $adopted]]], ArtistImportIdentityRace::finish(
             ArtistImportIdentityRace::start($this->schema, 'resolve', [[$name, [$adopted]]]),
             $this->observer,
         ));
@@ -203,10 +214,40 @@ final class ArtistImportIdentityRaceTest extends TestCase
         $this->writer->commit();
 
         self::assertNotSame($created->toString(), $second->toString());
+        self::assertSame([[$second->toString(), $later]], $this->identified, 'The first batch created the artist without an ID.');
         self::assertSame(
             [[$created->toString(), $name, $adopted], [$second->toString(), $name, $later]],
             $this->storedArtists(),
         );
+    }
+
+    /**
+     * One batch creates Headhunterz under two spellings of one ID, creates Disturbed without an ID,
+     * gives a name-only Krewella its ID and credits a Sound Rush that holds its ID already. It
+     * reports Headhunterz once and Krewella; neither the artist without an ID nor the one that held
+     * its ID is reported.
+     */
+    public function testABatchReportsEachArtistItCreatedWithAnIdOrGaveOneOnce(): void
+    {
+        [$headhunterzId, $krewellaId, $soundRushId] = [$this->mbid(), $this->mbid(), $this->mbid()];
+        $krewella = $this->storeArtist($this->tagged('Krewella'), null, '2026-10-01 10:00:00+00');
+        $this->storeArtist($this->tagged('Sound Rush'), $soundRushId, '2026-10-01 10:00:00+00');
+        $identities = [
+            new ArtistIdentity($this->tagged('Headhunterz'), [$headhunterzId]),
+            new ArtistIdentity($this->tagged('HeadHunterz'), [$headhunterzId]),
+            new ArtistIdentity($this->tagged('Disturbed')),
+            new ArtistIdentity($this->tagged('Krewella'), [$krewellaId]),
+            new ArtistIdentity($this->tagged('Sound Rush'), [$soundRushId]),
+        ];
+
+        $this->writer->beginTransaction();
+        $resolution = $this->resolver->resolveReporting($identities);
+        $this->writer->commit();
+
+        $headhunterz = $resolution->artistIds[$identities[0]->key()]->toString();
+        self::assertSame($headhunterz, $resolution->artistIds[$identities[1]->key()]->toString());
+        self::assertEqualsCanonicalizing([[$headhunterz, $headhunterzId], [$krewella, $krewellaId]], ArtistImportIdentityRace::identified($resolution));
+        self::assertCount(4, $this->storedArtists(), 'Headhunterz and Disturbed were created beside the two stored artists.');
     }
 
     /**
@@ -240,12 +281,18 @@ final class ArtistImportIdentityRaceTest extends TestCase
         self::assertSame([], $this->storedArtists());
     }
 
-    /** @param list<string> $mbids */
+    /**
+     * Resolves one identity in the test session and keeps what the resolution identified.
+     *
+     * @param list<string> $mbids
+     */
     private function resolveOne(string $name, array $mbids): Uuid
     {
         $identity = new ArtistIdentity($name, $mbids);
+        $resolution = $this->resolver->resolveReporting([$identity]);
+        array_push($this->identified, ...ArtistImportIdentityRace::identified($resolution));
 
-        return $this->resolver->resolve([$identity])[$identity->key()];
+        return $resolution->artistIds[$identity->key()];
     }
 
     private function tagged(string $base): string

@@ -9,6 +9,8 @@ use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistIdentity;
 use App\Catalog\Application\Port\ArtistIdentityResolverInterface;
+use App\Catalog\Application\Port\ArtistResolution;
+use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
@@ -393,7 +395,7 @@ final class FilesDiscoveredGapFillTest extends TestCase
         });
 
         $resolver = $this->createStub(ArtistIdentityResolverInterface::class);
-        $resolver->method('resolve')->willReturnCallback(static function (array $identities) use ($state, $transaction): array {
+        $resolver->method('resolveReporting')->willReturnCallback(static function (array $identities) use ($state, $transaction): ArtistResolution {
             $state->resolverCalls[] = array_map(static fn (ArtistIdentity $identity): array => [$identity->name, $transaction->active], $identities);
             $resolved = [];
             foreach ($identities as $identity) {
@@ -405,7 +407,7 @@ final class FilesDiscoveredGapFillTest extends TestCase
             }
             $state->creditsCommittedDuringResolve = [];
 
-            return $resolved;
+            return new ArtistResolution($resolved);
         });
 
         $metadata = $this->createStub(MetadataContentReaderPortInterface::class);
@@ -472,6 +474,7 @@ final class FilesDiscoveredGapFillTest extends TestCase
             $transaction,
             $probe,
             $resolver,
+            $this->createStub(ArtistSyncRequestInterface::class),
         );
     }
 

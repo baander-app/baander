@@ -19,7 +19,10 @@ use App\Catalog\Application\Port\ArtistIdentityResolverInterface;
 use App\Catalog\Application\Port\ArtistMergePortInterface;
 use App\Catalog\Application\Port\ArtistPortInterface;
 use App\Catalog\Application\Port\ArtistRemoval;
+use App\Catalog\Application\Port\ArtistResolution;
+use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
+use App\Catalog\Application\Port\IdentifiedArtist;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Query\MusicBrainzMatch\CatalogCredit;
 use App\Catalog\Application\Query\MusicBrainzMatch\CompareMatchQuery;
@@ -29,6 +32,8 @@ use App\Catalog\Application\Query\MusicBrainzMatch\MatchField;
 use App\Catalog\Application\QueryHandler\MusicBrainzMatch\CompareMatchHandler;
 use App\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchComparisonBuilder;
 use App\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchSnapshots;
+use App\Catalog\Application\Service\ArtistSyncQueue;
+use App\Catalog\Application\Service\ArtistSyncRequester;
 use App\Catalog\Application\Service\CoverImageDiscarder;
 use App\Catalog\Application\Service\MusicBrainzMatch\AlbumMatchRequester;
 use App\Catalog\Application\Service\MusicBrainzMatch\AlbumReleaseSearch;
@@ -57,6 +62,7 @@ use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzReleaseGroup;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
+use App\Metadata\Application\Message\SyncArtistMessage;
 use App\Metadata\Application\Settings\MetadataSettingDefinitions;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\NotFoundException;
@@ -66,6 +72,7 @@ use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Catalog\InMemoryAlbumMatchStates;
+use App\Tests\Fixtures\Catalog\InMemoryQueuedArtistSyncs;
 use App\Tests\Fixtures\Catalog\MatchSelections;
 use App\Tests\Unit\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchQueryFixtures;
 use Closure;
@@ -146,11 +153,24 @@ final class ApplyMatchHandlerTest extends TestCase
     /** Fails every match request, as an album match queue that cannot be reached. */
     private ?Throwable $requestFailure = null;
 
+    /** The marks every producer of artist fills shares. */
+    private InMemoryQueuedArtistSyncs $fillMarks;
+
+    /** @var list<array{string, bool}> the artist of each fill queued, and whether the apply's transaction was open then */
+    private array $queuedFills = [];
+
+    /** Fails queuing every artist fill, as a transport that cannot be reached. */
+    private ?Throwable $fillFailure = null;
+
+    /** Whether the apply's transaction is running. */
+    private bool $inTransaction = false;
+
     protected function setUp(): void
     {
         $this->setUpLibrary();
         $this->lookup = new CoverServingLookup($this->musicBrainz);
         $this->states = new InMemoryAlbumMatchStates(new MockClock(self::NOW));
+        $this->fillMarks = new InMemoryQueuedArtistSyncs();
     }
 
     public function testAConfidentMatchOfLongBedCreditsEachDuetToPostMaloneAndItsGuestAndMergesEachCombinedArtistIntoPostMalone(): void
@@ -844,6 +864,114 @@ final class ApplyMatchHandlerTest extends TestCase
         self::assertArrayHasKey('Applied a MusicBrainz match', $this->logged, 'The apply reports itself as applied.');
     }
 
+    public function testAnAlbumApplyQueuesOneFillForEachArtistItCreatedWithAnIdOrGaveOneOnceItCommittedWhileAutomaticMatchingIsOff(): void
+    {
+        $album = $this->addAlbum();
+        [$release, , $postMalone] = $this->longBed($album);
+        $comparison = $this->compare(MatchItemType::Album, $album->getPublicId()->toString(), $release->id);
+
+        $applied = ApplyMatchCommand::manual(MatchItemType::Album, $album->getPublicId()->toString(), $release->id, MatchSelections::defaults($comparison)) |> $this->apply(...);
+
+        self::assertTrue($applied->isApplied());
+        self::assertSame(self::artistId('Post Malone'), $postMalone->getMbid(), 'The ID-less Post Malone took on the ID.');
+        $guests = array_map(fn (string $guest): string => $this->onlyArtistNamed($guest)->getId()->toString(), self::GUESTS) |> array_values(...);
+        self::assertEqualsCanonicalizing(
+            [$postMalone->getId()->toString(), ...$guests],
+            array_column($this->queuedFills, 0),
+            'One fill each for the artist that took on its ID and the fourteen guests created with theirs.',
+        );
+        self::assertNotContains(true, array_column($this->queuedFills, 1), 'Every fill is queued after the commit.');
+    }
+
+    public function testAnArtistThatAlreadyHeldItsIdQueuesNoFill(): void
+    {
+        [$album] = $this->matchedLongBedWithANewDuet();
+
+        $applied = $this->matcherApplyOf($album) |> $this->apply(...);
+
+        self::assertTrue($applied->isApplied());
+        self::assertSame(
+            [[$this->onlyArtistNamed('Tim McGraw')->getId()->toString(), false]],
+            $this->queuedFills,
+            'Tim McGraw was created with his ID; Post Malone held his already.',
+        );
+    }
+
+    public function testASongApplyQueuesTheFillOfEachArtistItIdentifiedOnceItCommitted(): void
+    {
+        $album = $this->addAlbum();
+        [$song] = $this->addSongsOf($album, self::release(self::releaseId(1)));
+        $postMalone = $this->catalog->artist('Post Malone');
+        $this->catalog->creditSong($song, $postMalone, ArtistRole::Primary);
+        $recording = new MusicBrainzRecording('5ec0bd00-1111-4000-8000-000000000001', 'Wrong Ones', 100, 150_000, null, self::credit('Post Malone', 'Tim McGraw'), []);
+        $this->musicBrainz->recordings[$recording->id] = $recording;
+        $comparison = $this->compare(MatchItemType::Song, $song->getPublicId()->toString(), $recording->id);
+
+        ApplyMatchCommand::manual(MatchItemType::Song, $song->getPublicId()->toString(), $recording->id, MatchSelections::defaults($comparison)) |> $this->apply(...);
+
+        self::assertSame(
+            [[$postMalone->getId()->toString(), false], [$this->onlyArtistNamed('Tim McGraw')->getId()->toString(), false]],
+            $this->queuedFills,
+        );
+    }
+
+    public function testAnApplyWhoseTransactionFailsQueuesNoFill(): void
+    {
+        $album = $this->addAlbum();
+        [$release] = $this->longBed($album);
+        $this->mergeFailure = new \RuntimeException('The merge failed after the credits were written.');
+
+        try {
+            ApplyMatchCommand::automatic($album->getId(), $this->candidate($album, $release)) |> $this->apply(...);
+            self::fail('The failed merge fails the apply.');
+        } catch (\RuntimeException $failure) {
+            self::assertSame($this->mergeFailure, $failure);
+        }
+
+        self::assertContains('resolve', $this->calls, 'The apply had resolved its artists when it failed.');
+        self::assertSame([], $this->queuedFills);
+        self::assertSame([], $this->fillMarks->queued);
+    }
+
+    public function testAFillThatCannotBeQueuedIsLoggedWithTheArtistsAndTheApplyAnswersAsItDoesWithoutIt(): void
+    {
+        $this->fillFailure = new \RuntimeException('The transport cannot be reached.');
+        $album = $this->addAlbum();
+        [$release, $songs, $postMalone] = $this->longBed($album);
+        $comparison = $this->compare(MatchItemType::Album, $album->getPublicId()->toString(), $release->id);
+
+        $applied = ApplyMatchCommand::manual(MatchItemType::Album, $album->getPublicId()->toString(), $release->id, MatchSelections::defaults($comparison)) |> $this->apply(...);
+
+        self::assertTrue($applied->isApplied());
+        self::assertSame([$album->getPublicId()->toString(), count($songs)], [$applied->publicId, $applied->songsChanged]);
+        $logged = $this->logged['Could not queue the MusicBrainz fill of {count} artist(s); a later metadata sync from the admin panel queues them.'] ?? [];
+        self::assertSame(15, $logged['count'] ?? null);
+        self::assertContains($postMalone->getId()->toString(), $logged['artist_ids'] ?? []);
+        self::assertSame($this->fillFailure, $logged['exception'] ?? null);
+        self::assertArrayHasKey('Applied a MusicBrainz match', $this->logged, 'The apply reports itself as applied.');
+    }
+
+    public function testAnArtistApplyThatGivesTheArtistItsIdQueuesNoFill(): void
+    {
+        $headhunterz = $this->catalog->artist('Headhunterz');
+        $this->musicBrainz->artists[self::HEADHUNTERZ_ID] = self::headhunterz();
+        $comparison = $this->compare(MatchItemType::Artist, $headhunterz->getPublicId()->toString(), self::HEADHUNTERZ_ID);
+
+        $applied = ApplyMatchCommand::manual(MatchItemType::Artist, $headhunterz->getPublicId()->toString(), self::HEADHUNTERZ_ID, MatchSelections::defaults($comparison)) |> $this->apply(...);
+
+        self::assertTrue($applied->isApplied());
+        self::assertSame(self::HEADHUNTERZ_ID, $headhunterz->getMbid());
+        self::assertSame([], $this->queuedFills, 'The admin chose the artist\'s fields.');
+    }
+
+    private function onlyArtistNamed(string $name): Artist
+    {
+        $artists = $this->artistsNamed($name);
+        self::assertCount(1, $artists);
+
+        return $artists[0];
+    }
+
     /**
      * Applies the release to Long Bed by hand, with the comparison's default ticks, while an import
      * adds the song of the release's last track and, with automatic matching on, asks for the
@@ -1094,6 +1222,7 @@ final class ApplyMatchHandlerTest extends TestCase
             merges: $this->mergePort(),
             matchStates: $this->matchStates(),
             matchRequests: $this->matchRequests(),
+            artistSyncs: $this->artistSyncs(),
             images: $images,
             discarder: new CoverImageDiscarder($images, $storage, new NullLogger()),
             transaction: $this->transaction(),
@@ -1224,29 +1353,41 @@ final class ApplyMatchHandlerTest extends TestCase
         return $genres;
     }
 
-    /** Resolves identities as the import does, through the catalog fake's prediction, creating artists and giving IDs as predicted. */
+    /**
+     * Resolves identities as the import does, through the catalog fake's prediction, creating
+     * artists and giving IDs as predicted, and reports each artist it created with an ID or gave one.
+     */
     private function resolver(): ArtistIdentityResolverInterface
     {
         $resolver = $this->createStub(ArtistIdentityResolverInterface::class);
-        $resolver->method('resolve')->willReturnCallback(function (array $identities): array {
+        $resolver->method('resolveReporting')->willReturnCallback(function (array $identities): ArtistResolution {
             $this->calls[] = 'resolve';
             $predicted = $this->catalog->predictArtists($identities);
             $created = [];
             $resolved = [];
+            $identified = [];
             foreach ($identities as $identity) {
                 $artist = $predicted[$identity->key()];
+                $mbid = $identity->musicbrainzId?->toString();
                 if ($artist->id === null) {
-                    $made = $created[spl_object_id($artist)] ??= $this->catalog->artist($identity->name, $identity->musicbrainzId?->toString());
-                    $resolved[$identity->key()] = $made->getId();
+                    if (!isset($created[spl_object_id($artist)])) {
+                        $made = $created[spl_object_id($artist)] = $this->catalog->artist($identity->name, $mbid);
+                        if ($mbid !== null) {
+                            $identified[] = new IdentifiedArtist($made->getId(), $mbid);
+                        }
+                    }
+                    $resolved[$identity->key()] = $created[spl_object_id($artist)]->getId();
                     continue;
                 }
-                if ($artist->takesId) {
-                    $this->catalogArtist($artist->id)?->updateExternalIds(mbid: $identity->musicbrainzId?->toString());
+                $stored = $this->catalogArtist($artist->id);
+                if ($artist->takesId && $mbid !== null && $stored !== null && $stored->getMbid() === null) {
+                    $stored->updateExternalIds(mbid: $mbid);
+                    $identified[] = new IdentifiedArtist($artist->id, $mbid);
                 }
                 $resolved[$identity->key()] = $artist->id;
             }
 
-            return $resolved;
+            return new ArtistResolution($resolved, $identified);
         });
 
         return $resolver;
@@ -1320,8 +1461,6 @@ final class ApplyMatchHandlerTest extends TestCase
 
             return $failing;
         }
-        $settings = $this->createStub(SystemSettingsPortInterface::class);
-        $settings->method('get')->willReturnCallback(fn (string $key): bool => $key === MetadataSettingDefinitions::AUTO_SYNC && $this->automaticMatching);
         $bus = $this->createStub(MessageBusInterface::class);
         $bus->method('dispatch')->willReturnCallback(function (object $message, array $stamps = []): Envelope {
             if ($message instanceof DrainAlbumMatchesMessage) {
@@ -1331,7 +1470,36 @@ final class ApplyMatchHandlerTest extends TestCase
             return new Envelope($message, $stamps);
         });
 
-        return new AlbumMatchRequester($this->states, $this->albumPort(), $this->songPort(), $settings, $bus, new MockClock(self::NOW));
+        return new AlbumMatchRequester($this->states, $this->albumPort(), $this->songPort(), $this->settings(), $bus, new MockClock(self::NOW));
+    }
+
+    /**
+     * The production artist fill requester over marks held in memory, with automatic matching as
+     * the test switched it; it keeps each fill it queues and whether a transaction was open then.
+     */
+    private function artistSyncs(): ArtistSyncRequestInterface
+    {
+        $bus = $this->createStub(MessageBusInterface::class);
+        $bus->method('dispatch')->willReturnCallback(function (object $message, array $stamps = []): Envelope {
+            if ($this->fillFailure !== null) {
+                throw $this->fillFailure;
+            }
+            self::assertInstanceOf(SyncArtistMessage::class, $message);
+            $this->queuedFills[] = [$message->artistId->toString(), $this->inTransaction];
+
+            return new Envelope($message, $stamps);
+        });
+
+        return new ArtistSyncRequester(new ArtistSyncQueue($this->fillMarks, $bus), $this->settings(), $this->logger());
+    }
+
+    /** Automatic matching, on or off as the test switched it. */
+    private function settings(): SystemSettingsPortInterface
+    {
+        $settings = $this->createStub(SystemSettingsPortInterface::class);
+        $settings->method('get')->willReturnCallback(fn (string $key): bool => $key === MetadataSettingDefinitions::AUTO_SYNC && $this->automaticMatching);
+
+        return $settings;
     }
 
     private function images(): ImagePortInterface
@@ -1379,11 +1547,14 @@ final class ApplyMatchHandlerTest extends TestCase
                 throw $this->transactionFailure;
             }
             $images = $this->savedImages;
+            $this->inTransaction = true;
             try {
                 $result = $operation();
             } catch (Throwable $failure) {
                 $this->savedImages = $images;
                 throw $failure;
+            } finally {
+                $this->inTransaction = false;
             }
 
             return $this->commitFailure === null ? $result : throw $this->commitFailure;
