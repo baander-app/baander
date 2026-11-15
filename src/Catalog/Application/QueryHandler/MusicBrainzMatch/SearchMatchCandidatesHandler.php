@@ -10,10 +10,12 @@ use App\Catalog\Application\Query\MusicBrainzMatch\MatchItemType;
 use App\Catalog\Application\Query\MusicBrainzMatch\RecordingCandidate;
 use App\Catalog\Application\Query\MusicBrainzMatch\ReleaseCandidate;
 use App\Catalog\Application\Query\MusicBrainzMatch\SearchMatchCandidatesQuery;
+use App\Catalog\Application\Service\MusicBrainzMatch\AlbumReleaseSearch;
 use App\Catalog\Application\Service\MusicBrainzMatch\CandidateScorer;
 use App\Catalog\Application\Service\MusicBrainzMatch\LocalAlbum;
 use App\Catalog\Application\Service\MusicBrainzMatch\LocalArtist;
 use App\Catalog\Application\Service\MusicBrainzMatch\LocalSong;
+use App\Catalog\Application\Service\MusicBrainzMatch\ReleaseSearchHits;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtist;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRecording;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
@@ -31,9 +33,12 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * MusicBrainz request. Candidates are scored by their fit to the item, compared with the title and
  * artist searched: the admin's edited ones when given, the item's own otherwise.
  *
- * - An album runs one release search on its title and primary artist (the title alone when it has
+ * - An album runs a release search on its title and primary artist (the title alone when it has
  *   none), ranks the hits by title, artist and track count, looks up the best five and scores them
- *   by their tracks too.
+ *   by their tracks too. A title the admin typed is searched as typed, once. The album's own title
+ *   is searched once more without the comma-separated list in square brackets at its end when it
+ *   has one and finds no release; the candidates are then scored against that shortened title,
+ *   which the answer names as the title searched.
  * - A song runs one recording search on its title and the artist text it shows.
  * - An artist runs one artist search on its name.
  *
@@ -51,6 +56,7 @@ final readonly class SearchMatchCandidatesHandler
         private MusicBrainzLookupInterface $musicBrainz,
         private CandidateScorer $scorer,
         private MatchSnapshots $snapshots,
+        private AlbumReleaseSearch $releaseSearch,
     ) {
     }
 
@@ -72,19 +78,29 @@ final readonly class SearchMatchCandidatesHandler
     private function albumCandidates(SearchMatchCandidatesQuery $query): MatchCandidates
     {
         $snapshot = $this->snapshots->album($query->publicId);
-        $title = self::edited($query->title) ?? $snapshot->album->getTitle();
         $artist = self::searchedArtist($query->artist, $snapshot->primaryArtistName());
-        $album = $snapshot->localAlbum($title, self::edited($query->artist));
+        $found = $this->releaseHits(self::edited($query->title), $snapshot->album->getTitle(), $artist);
+        $album = $snapshot->localAlbum($found->title, self::edited($query->artist));
 
-        $hits = $this->musicBrainz->findReleases($title, $artist) |> MusicBrainzAnswer::unwrap(...);
-        $candidates = self::best($hits, fn (MusicBrainzReleaseSummary $hit): int => $this->scorer->scoreReleaseSummary($hit, $album))
+        $candidates = self::best($found->hits, fn (MusicBrainzReleaseSummary $hit): int => $this->scorer->scoreReleaseSummary($hit, $album))
             |> (fn (array $best): array => array_map($this->lookUpRelease(...), $best))
             |> array_filter(...)
             |> (fn (array $releases): array => array_map(fn (MusicBrainzRelease $release): ReleaseCandidate => $this->releaseCandidate($release, $album), $releases))
             |> array_values(...)
             |> (static fn (array $scored): array => self::best($scored, static fn (ReleaseCandidate $candidate): int => $candidate->score));
 
-        return new MatchCandidates(MatchItemType::Album, $query->publicId, $title, $artist, $candidates);
+        return new MatchCandidates(MatchItemType::Album, $query->publicId, $found->title, $artist, $candidates);
+    }
+
+    /**
+     * The release hits for a title the admin typed, searched as typed and once, or else for the
+     * album's own title, which is searched again in its shortened form when it finds no release.
+     */
+    private function releaseHits(?string $typed, string $own, ?string $artist): ReleaseSearchHits
+    {
+        return $typed === null
+            ? $this->releaseSearch->find($own, $artist)
+            : new ReleaseSearchHits($typed, $this->musicBrainz->findReleases($typed, $artist) |> MusicBrainzAnswer::unwrap(...));
     }
 
     private function songCandidates(SearchMatchCandidatesQuery $query): MatchCandidates

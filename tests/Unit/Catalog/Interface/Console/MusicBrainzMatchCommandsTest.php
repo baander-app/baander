@@ -9,6 +9,7 @@ use App\Catalog\Application\Query\MusicBrainzMatch\SearchMatchCandidatesQuery;
 use App\Catalog\Application\QueryHandler\MusicBrainzMatch\CompareMatchHandler;
 use App\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchComparisonBuilder;
 use App\Catalog\Application\QueryHandler\MusicBrainzMatch\SearchMatchCandidatesHandler;
+use App\Catalog\Application\Service\MusicBrainzMatch\AlbumReleaseSearch;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Artist;
 use App\Catalog\Domain\Model\Song;
@@ -281,7 +282,7 @@ final class MusicBrainzMatchCommandsTest extends TestCase
     private function bus(): MessageBus
     {
         return new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
-            SearchMatchCandidatesQuery::class => [new SearchMatchCandidatesHandler($this->musicBrainz, $this->scorer(), $this->snapshots())],
+            SearchMatchCandidatesQuery::class => [new SearchMatchCandidatesHandler($this->musicBrainz, $this->scorer(), $this->snapshots(), new AlbumReleaseSearch($this->musicBrainz))],
             CompareMatchQuery::class => [new CompareMatchHandler(
                 $this->musicBrainz,
                 $this->scorer(),

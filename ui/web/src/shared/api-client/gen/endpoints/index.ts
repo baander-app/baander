@@ -2468,7 +2468,7 @@ export interface MatchCandidatesResource {
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   publicId: string;
-  /** The title searched, or for an artist the name: the item's own unless the request edited it */
+  /** The title searched last, or for an artist the name: the item's own unless the request edited it, or an album's own title without the comma-separated list in square brackets at its end when the full title found no release */
   title: string;
   /**
      * The artist searched; null for an artist search, or when the item has no primary artist and the request named none
@@ -18221,7 +18221,7 @@ export const getGetAdminMetadataMatchCandidatesUrl = (type: 'album' | 'song' | '
 }
 
 /**
- * Searches MusicBrainz for the item's title (an artist's name) and primary artist, or for the edited `title` and `artist`, and lists at most five candidates with a fit score from 0 to 100, best first: releases for an album, recordings for a song, artists for an artist. A blank `title` counts as none; an empty `artist` searches by the title alone, while the score still compares each candidate with the item's own artist.
+ * Searches MusicBrainz for the item's title (an artist's name) and primary artist, or for the edited `title` and `artist`, and lists at most five candidates with a fit score from 0 to 100, best first: releases for an album, recordings for a song, artists for an artist. A blank `title` counts as none; an empty `artist` searches by the title alone, while the score still compares each candidate with the item's own artist. An album's own title that finds no release and ends in a comma-separated list in square brackets is searched once more without the list; an edited `title` is searched as given, once.
  * @summary List MusicBrainz candidates for an album, song or artist
  */
 export const getAdminMetadataMatchCandidates = async (type: 'album' | 'song' | 'artist',

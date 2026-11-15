@@ -11,6 +11,7 @@ use App\Catalog\Application\Query\MusicBrainzMatch\RecordingCandidate;
 use App\Catalog\Application\Query\MusicBrainzMatch\ReleaseCandidate;
 use App\Catalog\Application\Query\MusicBrainzMatch\SearchMatchCandidatesQuery;
 use App\Catalog\Application\QueryHandler\MusicBrainzMatch\SearchMatchCandidatesHandler;
+use App\Catalog\Application\Service\MusicBrainzMatch\AlbumReleaseSearch;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\ValueObject\ArtistRole;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtist;
@@ -19,6 +20,7 @@ use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzLabel;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRecording;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRecordingRelease;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzReleaseGroup;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
 use App\Shared\Application\Exception\ConflictException;
@@ -33,6 +35,12 @@ final class SearchMatchCandidatesHandlerTest extends TestCase
     use MatchQueryFixtures;
 
     private const string SEARCH = self::ALBUM_TITLE . '|' . self::ALBUM_ARTIST;
+
+    private const string RELEASE_TEXT_TITLE = 'Ten Thousand Fists [Reprise Records,9362-49433-2,EU]';
+    private const string SHORTENED_TITLE = 'Ten Thousand Fists';
+    private const string DISTURBED = 'Disturbed';
+    private const string RELEASE_TEXT_SEARCH = self::RELEASE_TEXT_TITLE . '|' . self::DISTURBED;
+    private const string SHORTENED_SEARCH = self::SHORTENED_TITLE . '|' . self::DISTURBED;
 
     protected function setUp(): void
     {
@@ -148,7 +156,7 @@ final class SearchMatchCandidatesHandlerTest extends TestCase
         $song = $this->addSongsOf($album, self::release(self::releaseId(1), [4]))[3];
         $this->catalog->creditSong($song, $this->catalog->artist('Post Malone, Luke Combs'), ArtistRole::Primary);
 
-        $result = new SearchMatchCandidatesHandler($this->musicBrainz, $this->scorer(), $this->snapshots())(
+        $result = $this->handler()(
             new SearchMatchCandidatesQuery(MatchItemType::Song, $song->getPublicId()->toString(), artist: ''),
         );
 
@@ -214,9 +222,65 @@ final class SearchMatchCandidatesHandlerTest extends TestCase
         self::assertSame(['reason' => 'musicbrainz_rejected'], $exception->details);
     }
 
+    public function testAnAlbumWhoseOwnTitleFindsNoReleaseIsSearchedAgainByItsShortenedTitleAndScoredAgainstIt(): void
+    {
+        $release = self::tenThousandFistsRelease();
+        $album = $this->tenThousandFists($release);
+        $this->musicBrainz->releaseSearches[self::SHORTENED_SEARCH] = [self::summary($release)];
+        $this->musicBrainz->releases[$release->id] = $release;
+
+        $result = $this->search($album);
+
+        self::assertSame(
+            ['findReleases:' . self::RELEASE_TEXT_SEARCH, 'findReleases:' . self::SHORTENED_SEARCH, 'fetchRelease:' . $release->id],
+            $this->musicBrainz->calls,
+        );
+        self::assertSame(self::SHORTENED_TITLE, $result->title, 'The list reports the title it searched last.');
+        self::assertSame(self::DISTURBED, $result->artist);
+        self::assertSame([$release->id], self::ids($result->candidates));
+        self::assertSame(100, $result->candidates[0]->score, 'The candidate is scored against the title that found it.');
+        self::assertSame(self::RELEASE_TEXT_TITLE, $album->getTitle(), 'The stored title stays.');
+    }
+
+    public function testAnAlbumNeitherSearchFindsAReleaseForListsNothingAndReportsItsShortenedTitle(): void
+    {
+        $album = self::tenThousandFistsRelease() |> $this->tenThousandFists(...);
+
+        $result = $this->search($album);
+
+        self::assertSame(['findReleases:' . self::RELEASE_TEXT_SEARCH, 'findReleases:' . self::SHORTENED_SEARCH], $this->musicBrainz->calls);
+        self::assertSame(self::SHORTENED_TITLE, $result->title);
+        self::assertSame([], $result->candidates);
+    }
+
+    public function testATitleTheAdminTypedIsSearchedOnceAsTypedThoughItFindsNothingAndEndsInAList(): void
+    {
+        $release = self::tenThousandFistsRelease();
+        $album = $this->tenThousandFists($release);
+        $this->musicBrainz->releaseSearches[self::SHORTENED_SEARCH] = [self::summary($release)];
+        $this->musicBrainz->releases[$release->id] = $release;
+
+        $result = $this->search($album, self::RELEASE_TEXT_TITLE);
+
+        self::assertSame(['findReleases:' . self::RELEASE_TEXT_SEARCH], $this->musicBrainz->calls);
+        self::assertSame(self::RELEASE_TEXT_TITLE, $result->title);
+        self::assertSame([], $result->candidates);
+    }
+
+    public function testMusicBrainzUnavailableForTheSecondSearchAnswers503(): void
+    {
+        $album = self::tenThousandFistsRelease() |> $this->tenThousandFists(...);
+        $this->musicBrainz->releaseSearches[self::SHORTENED_SEARCH] = new MusicBrainzUnavailable('HTTP 503');
+
+        $exception = $this->searchFailure($album);
+
+        self::assertInstanceOf(ServiceUnavailableException::class, $exception);
+        self::assertSame(['reason' => 'musicbrainz_unavailable'], $exception->details);
+    }
+
     public function testAnUnknownAlbumAnswers404WithoutAskingMusicBrainz(): void
     {
-        $handler = new SearchMatchCandidatesHandler($this->musicBrainz, $this->scorer(), $this->snapshots());
+        $handler = $this->handler();
 
         try {
             $handler(new SearchMatchCandidatesQuery(MatchItemType::Album, new PublicId()->toString()));
@@ -228,7 +292,7 @@ final class SearchMatchCandidatesHandlerTest extends TestCase
 
     public function testAMalformedPublicIdAnswers422WithoutAskingMusicBrainz(): void
     {
-        $handler = new SearchMatchCandidatesHandler($this->musicBrainz, $this->scorer(), $this->snapshots());
+        $handler = $this->handler();
 
         $this->expectException(InvalidInputException::class);
 
@@ -251,7 +315,7 @@ final class SearchMatchCandidatesHandlerTest extends TestCase
         $cover = self::recording(3, 'Track 1-4', self::credit('Someone Else'), null);
         $this->musicBrainz->recordingSearch = [$cover, $live, $duet];
 
-        $result = new SearchMatchCandidatesHandler($this->musicBrainz, $this->scorer(), $this->snapshots())(
+        $result = $this->handler()(
             new SearchMatchCandidatesQuery(MatchItemType::Song, $song->getPublicId()->toString()),
         );
 
@@ -272,7 +336,7 @@ final class SearchMatchCandidatesHandlerTest extends TestCase
         $near = self::musicBrainzArtist('6c1e0000-0000-4000-8000-000000000002', 'Head Hunters', 'jazz-funk band');
         $this->musicBrainz->artistSearch = [$near, $exact];
 
-        $result = new SearchMatchCandidatesHandler($this->musicBrainz, $this->scorer(), $this->snapshots())(
+        $result = $this->handler()(
             new SearchMatchCandidatesQuery(MatchItemType::Artist, $artist->getPublicId()->toString()),
         );
 
@@ -298,9 +362,33 @@ final class SearchMatchCandidatesHandlerTest extends TestCase
         return $album;
     }
 
+    /**
+     * "Ten Thousand Fists" by Disturbed with a song per track of the release, stored with its label,
+     * catalogue number and country at the end of its title.
+     */
+    private function tenThousandFists(MusicBrainzRelease $release): Album
+    {
+        $album = $this->addAlbum(self::RELEASE_TEXT_TITLE);
+        $this->addSongsOf($album, $release);
+        $this->catalog->creditAlbum($album, $this->catalog->artist(self::DISTURBED), ArtistRole::Primary);
+
+        return $album;
+    }
+
+    /** The release as MusicBrainz titles it: "Ten Thousand Fists" by Disturbed, 14 tracks. */
+    private static function tenThousandFistsRelease(): MusicBrainzRelease
+    {
+        return self::releaseWith(self::release(self::releaseId(1), [14], title: self::SHORTENED_TITLE), artistCredit: self::credit(self::DISTURBED));
+    }
+
+    private function handler(): SearchMatchCandidatesHandler
+    {
+        return new SearchMatchCandidatesHandler($this->musicBrainz, $this->scorer(), $this->snapshots(), new AlbumReleaseSearch($this->musicBrainz));
+    }
+
     private function search(Album $album, ?string $title = null, ?string $artist = null): MatchCandidates
     {
-        return new SearchMatchCandidatesHandler($this->musicBrainz, $this->scorer(), $this->snapshots())(
+        return $this->handler()(
             new SearchMatchCandidatesQuery(MatchItemType::Album, $album->getPublicId()->toString(), $title, $artist),
         );
     }

@@ -29,11 +29,14 @@ use Symfony\Component\Messenger\Stamp\HandledStamp;
 /**
  * Matches one album without an admin for the album match queue.
  *
- * An unmatched album runs the search an admin's candidate list runs: one release search on its
- * title and primary artist, the hits ranked by title, artist and track count, the best five looked
- * up and scored by their tracks too. MatchConfidence decides; a confident candidate is applied in
- * fill-only automatic mode. A matched album looks up its stored release only and pairs the songs
- * no match has compared yet, the album's other songs holding the tracks they pair with.
+ * An unmatched album runs the search an admin's candidate list runs for the album's own title: a
+ * release search on its title and primary artist, repeated once without the comma-separated list
+ * in square brackets at the title's end when it has one and finds no release. The hits are ranked
+ * by title, artist and track count, and the best five are looked up and scored by their tracks
+ * too, all against the title that found them. MatchConfidence decides; a confident candidate is
+ * applied in fill-only automatic mode, which leaves the stored title as it is. A matched album
+ * looks up its stored release only and pairs the songs no match has compared yet, the album's
+ * other songs holding the tracks they pair with.
  *
  * Every MusicBrainz call waits for its turn as long as the queue ahead of it needs. Nothing is
  * written when something stands in the way, and the outcome says who waits: a MusicBrainz outage
@@ -56,6 +59,7 @@ final readonly class AutomaticAlbumMatcher implements AutomaticAlbumMatcherInter
         private AlbumPortInterface $albums,
         private MatchSnapshots $snapshots,
         private MusicBrainzLookupInterface $musicBrainz,
+        private AlbumReleaseSearch $releaseSearch,
         private CandidateScorer $scorer,
         private MatchConfidence $confidence,
         private MessageBusInterface $bus,
@@ -96,9 +100,9 @@ final readonly class AutomaticAlbumMatcher implements AutomaticAlbumMatcherInter
     /** Searches MusicBrainz for the album's release and decides whether the best one is confident. */
     private function search(AlbumSnapshot $snapshot): MatchDecision
     {
-        $album = $snapshot->localAlbum();
-        $hits = $this->musicBrainz->findReleases($snapshot->album->getTitle(), $snapshot->primaryArtistName(), MusicBrainzSlotWait::Unbounded)
-            |> MusicBrainzAnswer::unwrap(...);
+        $found = $this->releaseSearch->find($snapshot->album->getTitle(), $snapshot->primaryArtistName(), MusicBrainzSlotWait::Unbounded);
+        $album = $snapshot->localAlbum($found->title);
+        $hits = $found->hits;
         $scores = array_map(fn (MusicBrainzReleaseSummary $hit): int => $this->scorer->scoreReleaseSummary($hit, $album), $hits);
         $ranked = array_keys($hits);
         usort($ranked, static fn (int $one, int $other): int => $scores[$other] <=> $scores[$one]);

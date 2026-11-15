@@ -19,7 +19,7 @@ use OpenApi\Attributes as OA;
     properties: [
         new OA\Property(property: 'type', description: 'What was searched for: an album matches a release, a song a recording, an artist an artist', type: 'string', enum: ['album', 'song', 'artist']),
         new OA\Property(property: 'publicId', description: 'The album\'s, song\'s or artist\'s public ID', type: 'string', maxLength: 21, minLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
-        new OA\Property(property: 'title', description: 'The title searched, or for an artist the name: the item\'s own unless the request edited it', type: 'string'),
+        new OA\Property(property: 'title', description: 'The title searched last, or for an artist the name: the item\'s own unless the request edited it, or an album\'s own title without the comma-separated list in square brackets at its end when the full title found no release', type: 'string'),
         new OA\Property(property: 'artist', description: 'The artist searched; null for an artist search, or when the item has no primary artist and the request named none', type: 'string', nullable: true),
         new OA\Property(property: 'candidates', description: 'At most five candidates, best fit first: releases for an album, recordings for a song, artists for an artist', type: 'array', items: new OA\Items(oneOf: [
             new OA\Schema(ref: new Model(type: MatchReleaseCandidateResource::class)),

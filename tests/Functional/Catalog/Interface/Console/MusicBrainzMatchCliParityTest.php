@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Catalog\Interface\Console;
 
 use App\Auth\Domain\Model\User;
+use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\ArtistAlbumEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRecording;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
+use App\Shared\Domain\Model\PublicId;
 use App\Tests\Functional\Catalog\Interface\LongBedMatchLibrary;
 use App\Tests\Functional\TestCase;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -56,6 +60,33 @@ final class MusicBrainzMatchCliParityTest extends TestCase
             self::assertSame($api, $this->json($search));
             self::assertSame([$this->release->id], array_column($api['candidates'], 'id'));
         }
+    }
+
+    public function testSearchOfAnAlbumWhoseOwnTitleFindsNoReleasePrintsTheApiDataOfItsShortenedTitle(): void
+    {
+        $stored = 'Ten Thousand Fists [Reprise Records,9362-49433-2,EU]';
+        $album = new AlbumEntity(new PublicId(), $this->album->getLibrary(), $stored, 'album');
+        $disturbed = new ArtistEntity(new PublicId(), 'Disturbed');
+        foreach ([$album, $disturbed, new ArtistAlbumEntity($disturbed, $album, 'primary', 'Disturbed')] as $entity) {
+            $this->entityManager->persist($entity);
+        }
+        $this->entityManager->flush();
+        $release = self::releaseWith(self::release(self::releaseId(2), [14], title: 'Ten Thousand Fists'), artistCredit: self::credit('Disturbed'));
+        $this->musicBrainz->releaseSearches['Ten Thousand Fists|Disturbed'] = [self::summary($release)];
+        $this->musicBrainz->releases[$release->id] = $release;
+        $publicId = $album->getPublicId()->toString();
+
+        $api = $this->assertJsonResponse($this->get(sprintf('/api/admin/metadata/match/album/%s/candidates', $publicId)), 200, 'data')['data'];
+
+        $search = $this->command('app:metadata:match:search');
+        self::assertSame(Command::SUCCESS, $search->execute(['type' => 'album', 'public-id' => $publicId, '--json' => true]), $search->getDisplay());
+
+        self::assertSame($api, $this->json($search));
+        self::assertSame('Ten Thousand Fists', $api['title'], 'The list reports the title it searched last.');
+        self::assertSame([$release->id], array_column($api['candidates'], 'id'));
+        $searches = ['findReleases:' . $stored . '|Disturbed', 'findReleases:Ten Thousand Fists|Disturbed', 'fetchRelease:' . $release->id];
+        self::assertSame([...$searches, ...$searches], $this->musicBrainz->calls, 'The route and the command each search twice.');
+        self::assertSame($stored, $this->entityManager->getConnection()->fetchOne('SELECT title FROM albums WHERE id = ?', [$album->getId()->toString()]));
     }
 
     public function testCompareAnAlbumPrintsTheApiData(): void

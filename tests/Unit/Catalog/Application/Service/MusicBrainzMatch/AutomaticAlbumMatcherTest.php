@@ -9,6 +9,7 @@ use App\Catalog\Application\Command\MusicBrainzMatch\MatchApplyOutcome;
 use App\Catalog\Application\Command\MusicBrainzMatch\MatchApplyResult;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchItemType;
+use App\Catalog\Application\Service\MusicBrainzMatch\AlbumReleaseSearch;
 use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticAlbumMatcher;
 use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticMatchOutcome;
 use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticMatchOutcomeKind;
@@ -43,6 +44,12 @@ final class AutomaticAlbumMatcherTest extends TestCase
     use MatchQueryFixtures;
 
     private const string SEARCH = self::ALBUM_TITLE . '|' . self::ALBUM_ARTIST;
+
+    private const string RELEASE_TEXT_TITLE = 'Ten Thousand Fists [Reprise Records,9362-49433-2,EU]';
+    private const string SHORTENED_TITLE = 'Ten Thousand Fists';
+    private const string DISTURBED = 'Disturbed';
+    private const string RELEASE_TEXT_SEARCH = self::RELEASE_TEXT_TITLE . '|' . self::DISTURBED;
+    private const string SHORTENED_SEARCH = self::SHORTENED_TITLE . '|' . self::DISTURBED;
 
     /** @var list<ApplyMatchCommand> */
     private array $applied = [];
@@ -124,6 +131,43 @@ final class AutomaticAlbumMatcherTest extends TestCase
 
         self::assertEquals(AutomaticMatchOutcome::needsReview(AlbumMatchReviewReason::NoCandidates, null, 27), $outcome);
         self::assertSame([self::SEARCH], $this->searches());
+    }
+
+    public function testAnAlbumFoundByItsShortenedTitleIsScoredAgainstThatTitleAndKeepsItsStoredOne(): void
+    {
+        $release = self::tenThousandFistsRelease();
+        $album = $this->tenThousandFists($release);
+        $this->musicBrainz->releaseSearches[self::SHORTENED_SEARCH] = [self::summary($release)];
+        $this->musicBrainz->releases[$release->id] = $release;
+
+        $outcome = $this->match($album);
+
+        self::assertSame([self::RELEASE_TEXT_SEARCH, self::SHORTENED_SEARCH], $this->searches());
+        self::assertSame(AutomaticMatchOutcomeKind::Matched, $outcome->kind);
+        self::assertCount(1, $this->applied);
+        self::assertSame($release->id, $this->applied[0]->candidateId);
+        self::assertSame(100, $this->applied[0]->candidate->score, 'The candidate is scored against the title that found it.');
+        self::assertSame(self::RELEASE_TEXT_TITLE, $album->getTitle(), 'The stored title stays.');
+    }
+
+    public function testAnAlbumNeitherSearchFindsAReleaseForIsLeftForReviewWithoutCandidates(): void
+    {
+        $album = self::tenThousandFistsRelease() |> $this->tenThousandFists(...);
+
+        $outcome = $this->match($album);
+
+        self::assertSame([self::RELEASE_TEXT_SEARCH, self::SHORTENED_SEARCH], $this->searches());
+        self::assertEquals(AutomaticMatchOutcome::needsReview(AlbumMatchReviewReason::NoCandidates, null, 14), $outcome);
+        self::assertSame([], $this->applied);
+    }
+
+    public function testASecondSearchMusicBrainzRefusesRetriesThisAlbumAfterSixHours(): void
+    {
+        $album = self::tenThousandFistsRelease() |> $this->tenThousandFists(...);
+        $this->musicBrainz->releaseSearches[self::SHORTENED_SEARCH] = new MusicBrainzRejected(400);
+
+        self::assertEquals(AutomaticMatchOutcome::retryLater(21_600), $this->match($album));
+        self::assertSame([], $this->applied);
     }
 
     public function testASearchMusicBrainzDoesNotAnswerIsUnavailableAndAppliesNothing(): void
@@ -227,8 +271,7 @@ final class AutomaticAlbumMatcherTest extends TestCase
 
     public function testADeletedAlbumIsGoneWithoutAskingMusicBrainz(): void
     {
-        $outcome = new AutomaticAlbumMatcher($this->albumPort(), $this->snapshots(), $this->musicBrainz, $this->scorer(), new MatchConfidence(), $this->bus())
-            ->match(new Uuid());
+        $outcome = $this->matcher()->match(new Uuid());
 
         self::assertSame(AutomaticMatchOutcomeKind::AlbumGone, $outcome->kind);
         self::assertSame([], $this->musicBrainz->calls);
@@ -286,6 +329,25 @@ final class AutomaticAlbumMatcherTest extends TestCase
         return $album;
     }
 
+    /**
+     * "Ten Thousand Fists" by Disturbed with a song per track of the release, stored with its label,
+     * catalogue number and country at the end of its title.
+     */
+    private function tenThousandFists(MusicBrainzRelease $release): Album
+    {
+        $album = $this->addAlbum(self::RELEASE_TEXT_TITLE);
+        $this->addSongsOf($album, $release);
+        $this->catalog->creditAlbum($album, $this->catalog->artist(self::DISTURBED), ArtistRole::Primary);
+
+        return $album;
+    }
+
+    /** The release as MusicBrainz titles it: "Ten Thousand Fists" by Disturbed, 14 tracks. */
+    private static function tenThousandFistsRelease(): MusicBrainzRelease
+    {
+        return self::releaseWith(self::release(self::releaseId(1), [14], title: self::SHORTENED_TITLE), artistCredit: self::credit(self::DISTURBED));
+    }
+
     private function found(MusicBrainzRelease ...$releases): void
     {
         $this->musicBrainz->releaseSearches[self::SEARCH] = array_map(static fn (MusicBrainzRelease $release): MusicBrainzReleaseSummary => self::summary($release), $releases);
@@ -296,8 +358,20 @@ final class AutomaticAlbumMatcherTest extends TestCase
 
     private function match(Album $album): AutomaticMatchOutcome
     {
-        return new AutomaticAlbumMatcher($this->albumPort(), $this->snapshots(), $this->musicBrainz, $this->scorer(), new MatchConfidence(), $this->bus())
-            ->match($album->getId());
+        return $this->matcher()->match($album->getId());
+    }
+
+    private function matcher(): AutomaticAlbumMatcher
+    {
+        return new AutomaticAlbumMatcher(
+            $this->albumPort(),
+            $this->snapshots(),
+            $this->musicBrainz,
+            new AlbumReleaseSearch($this->musicBrainz),
+            $this->scorer(),
+            new MatchConfidence(),
+            $this->bus(),
+        );
     }
 
     /** @return list<string> the title and artist of each release search */
