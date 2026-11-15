@@ -4,12 +4,19 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Tests;
 
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
+use App\Metadata\Infrastructure\Api\CoverArtArchive\CoverArtArchiveAdapter;
+use App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter;
 use App\Shared\Infrastructure\Http\PublicDestinationPolicy;
 use App\Shared\Infrastructure\Http\PublicHttpClient;
 use Baander\Tooling\Fixtures\Qualification\Dataset;
 use Baander\Tooling\Fixtures\Qualification\MetadataTransport;
 use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
+use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 /**
  * The tests that drive the application's PublicHttpClient require the curl extension: the client
@@ -98,6 +105,87 @@ final class QualificationMetadataTransportTest extends TestCase
         self::assertSame($movie['title'], $tmdb->lookupMovie($movie['metadata']['tmdbId'])->title);
     }
 
+    #[RequiresPhpExtension('curl')]
+    public function testReleaseSearchAnswersTheOneReleaseOfAnAlbum(): void
+    {
+        $plan = Dataset::plan('metadata-test');
+        $song = $plan['files'][0];
+        // The adapter escapes the hyphen of the run name, and the transport reads the escape back.
+        self::assertStringContainsString('-', $song['album']);
+        $music = $this->musicBrainz();
+
+        $hits = $music->findReleases($song['album'], $song['artist']);
+
+        self::assertIsArray($hits);
+        self::assertCount(1, $hits);
+        self::assertSame($song['album'], $hits[0]->title);
+        self::assertSame(20, $hits[0]->trackCount);
+        self::assertSame($plan['albums'][$song['album']], $hits[0]->releaseGroup?->id);
+        self::assertNotSame($plan['albums'][$song['album']], $hits[0]->id);
+        self::assertSame([$plan['artists'][$song['artist']]], array_column($hits[0]->artistCredit->artists, 'artistId'));
+        self::assertEquals($hits, $music->findReleases($song['album'], null));
+        self::assertSame(
+            array_fill(0, 2, ['path' => '/ws/2/release', 'identity' => $plan['albums'][$song['album']], 'outcome' => 'matched']),
+            $this->audited(),
+        );
+    }
+
+    #[RequiresPhpExtension('curl')]
+    public function testReleaseLookupAnswersTheTracksOfTheAlbum(): void
+    {
+        $plan = Dataset::plan('metadata-test');
+        $songs = array_slice($plan['files'], 0, 20);
+        $album = $songs[0]['album'];
+        $music = $this->musicBrainz();
+        $hits = $music->findReleases($album, $songs[0]['artist']);
+        self::assertIsArray($hits);
+
+        $release = $music->fetchRelease($hits[0]->id);
+
+        self::assertInstanceOf(MusicBrainzRelease::class, $release);
+        self::assertSame($hits[0]->id, $release->id);
+        self::assertSame($album, $release->title);
+        self::assertSame($plan['albums'][$album], $release->releaseGroup?->id);
+        self::assertFalse($release->hasFrontCover);
+        self::assertSame([$plan['artists'][$songs[0]['artist']]], array_column($release->artistCredit->artists, 'artistId'));
+        self::assertCount(1, $release->media);
+        $tracks = $release->tracks();
+        self::assertSame(array_column(array_column($songs, 'metadata'), 'id'), array_column($tracks, 'recordingId'));
+        self::assertSame(array_column($songs, 'title'), array_column($tracks, 'title'));
+        self::assertSame(range(1, 20), array_column($tracks, 'position'));
+        self::assertCount(20, array_unique(array_column($tracks, 'id')));
+        foreach ($tracks as $index => $track) {
+            self::assertLessThanOrEqual(3000, abs((int) $track->lengthMs - $songs[$index]['duration'] * 1000));
+            self::assertSame([$plan['artists'][$songs[$index]['artist']]], array_column($track->artistCredit->artists, 'artistId'));
+        }
+        self::assertSame(
+            ['path' => '/ws/2/release/' . $release->id, 'identity' => $plan['albums'][$album], 'outcome' => 'matched'],
+            $this->audited()[1],
+        );
+    }
+
+    #[RequiresPhpExtension('curl')]
+    public function testReleaseSearchForATitleOutsideTheDatasetFindsNoRelease(): void
+    {
+        $artist = Dataset::plan('metadata-test')['files'][0]['artist'];
+
+        self::assertSame([], $this->musicBrainz()->findReleases('Qualification metadata-test Album 101', $artist));
+        self::assertSame([['path' => '/ws/2/release', 'identity' => null, 'outcome' => 'matched']], $this->audited());
+    }
+
+    public function testReleaseSearchOfAnotherShapeStaysUnmatched(): void
+    {
+        $album = Dataset::plan('metadata-test')['files'][0]['album'];
+        $transport = MetadataTransport::create($this->directory . '/manifest.json', $this->directory . '/audit.jsonl');
+        try {
+            $transport->request('GET', 'https://musicbrainz.org/ws/2/release?' . http_build_query(['query' => $album, 'fmt' => 'json']))->getContent();
+            self::fail('A release search by bare title succeeded.');
+        } catch (\Throwable $error) {
+            self::assertStringContainsString('Unmatched qualification metadata request', $error->getMessage());
+        }
+        self::assertSame([['path' => '/ws/2/release', 'identity' => null, 'outcome' => 'unmatched']], $this->audited());
+    }
+
     public function testAuditStopsAtItsBoundInsteadOfDroppingEvidence(): void
     {
         $path = $this->directory . '/audit.jsonl';
@@ -119,5 +207,34 @@ final class QualificationMetadataTransportTest extends TestCase
         $detail = $transport->request('GET', 'https://api.themoviedb.org/3/movie/' . $movie['metadata']['tmdbId'])->toArray();
         self::assertSame($search['results'][0]['id'], $detail['id']);
         self::assertSame($movie['title'], $detail['title']);
+    }
+
+    /** The application's MusicBrainz adapter over the recorded transport, with no limit on its pace. */
+    private function musicBrainz(): MusicBrainzAdapter
+    {
+        $client = new PublicHttpClient(MetadataTransport::create($this->directory . '/manifest.json', $this->directory . '/audit.jsonl'), new PublicDestinationPolicy(MetadataTransport::dnsResolver()));
+        $logger = new NullLogger();
+        $encoder = new JsonEncoder();
+
+        return new MusicBrainzAdapter(
+            $logger,
+            $encoder,
+            $client,
+            new RateLimiterFactory(['id' => 'musicbrainz', 'policy' => 'no_limit'], new InMemoryStorage()),
+            new CoverArtArchiveAdapter($logger, $encoder, $client),
+        );
+    }
+
+    /** @return list<array{path: string, identity: string|int|null, outcome: string}> the audited requests, oldest first */
+    private function audited(): array
+    {
+        return array_map(
+            static function (string $line): array {
+                $entry = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
+
+                return ['path' => $entry['path'], 'identity' => $entry['identity'], 'outcome' => $entry['outcome']];
+            },
+            file($this->directory . '/audit.jsonl', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [],
+        );
     }
 }
