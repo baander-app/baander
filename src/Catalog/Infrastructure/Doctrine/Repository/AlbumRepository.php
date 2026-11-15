@@ -15,6 +15,7 @@ use App\Catalog\Infrastructure\Doctrine\Entity\ArtistAlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\GenreAlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\GenreEntity;
+use App\Catalog\Infrastructure\Doctrine\ManagedHolders;
 use App\Catalog\Infrastructure\Doctrine\Query\CatalogReadScopeQuery;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Shared\Domain\Model\PublicId;
@@ -26,9 +27,6 @@ use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Infrastructure\Doctrine\Repository\PgroongaSearchTrait;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\Mapping\AssociationMapping;
-use Doctrine\ORM\Mapping\JoinColumnMapping;
-use Doctrine\ORM\Mapping\ToOneOwningSideMapping;
 
 /**
  * Pure domain repository for albums.
@@ -432,16 +430,9 @@ final class AlbumRepository implements AlbumRepositoryInterface
 
         // The statement below acts on the database, so the unit of work's pending changes go first.
         $this->entityManager->flush();
-        $stale = [];
-        foreach ($this->holdersOf($entity) as [$holder, $deletedWithAlbum]) {
-            if ($deletedWithAlbum) {
-                $this->entityManager->detach($holder);
-            } else {
-                $stale[] = $holder;
-            }
-        }
-        // Once nothing managed holds it; a flush would otherwise refuse the album as new.
-        $this->entityManager->detach($entity);
+        // A song, credit, genre link or match state is deleted with the album; a cover or a play
+        // only loses its reference and is read again after the delete.
+        $stale = ManagedHolders::release($this->entityManager, $entity);
 
         $this->entityManager->createQuery('DELETE ' . AlbumEntity::class . ' album WHERE album.id = :id')
             ->setParameter('id', $album->getId())
@@ -600,53 +591,6 @@ final class AlbumRepository implements AlbumRepositoryInterface
     }
 
     // --- Internal ---
-
-    /**
-     * Every loaded entity the unit of work manages that holds the album in a to-one association,
-     * with whether the database deletes it with the album: a song, credit, genre link or match
-     * state is deleted, while a cover or a play only loses its reference and is read again after
-     * the delete. An entity still to be loaded reads its row as the delete left it.
-     *
-     * @return list<array{object, bool}>
-     */
-    private function holdersOf(AlbumEntity $album): array
-    {
-        $unitOfWork = $this->entityManager->getUnitOfWork();
-        $holders = [];
-        foreach ($unitOfWork->getIdentityMap() as $class => $entities) {
-            $metadata = $this->entityManager->getClassMetadata($class);
-            $associations = array_filter(
-                $metadata->associationMappings,
-                static fn (AssociationMapping $association): bool => $association instanceof ToOneOwningSideMapping && $album instanceof $association->targetEntity,
-            );
-            if ($associations === []) {
-                continue;
-            }
-            foreach ($entities as $entity) {
-                // Reading an association of a lazy entity would load it.
-                if ($unitOfWork->isUninitializedObject($entity)) {
-                    continue;
-                }
-                $holding = array_find(
-                    $associations,
-                    static fn (AssociationMapping $association): bool => $metadata->getFieldValue($entity, $association->fieldName) === $album,
-                );
-                if ($holding instanceof ToOneOwningSideMapping) {
-                    $holders[] = [$entity, self::deletedWithTarget($holding)];
-                }
-            }
-        }
-
-        return $holders;
-    }
-
-    private static function deletedWithTarget(ToOneOwningSideMapping $association): bool
-    {
-        return array_any(
-            $association->joinColumns,
-            static fn (JoinColumnMapping $column): bool => strtolower($column->onDelete ?? '') === 'cascade',
-        );
-    }
 
     /**
      * Every song of the album with its primary credits, an empty list for a song without one.

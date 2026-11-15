@@ -11,6 +11,7 @@ use App\Catalog\Domain\ValueObject\ArtistRole;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistAlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistSongEntity;
+use App\Catalog\Infrastructure\Doctrine\ManagedHolders;
 use App\Favorites\Application\Port\ArtistFavoriteMergePortInterface;
 use App\Recommendation\Application\Port\ArtistRecommendationMergePortInterface;
 use App\Shared\Application\Exception\NotFoundException;
@@ -18,9 +19,6 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\Mapping\AssociationMapping;
-use Doctrine\ORM\Mapping\JoinColumnMapping;
-use Doctrine\ORM\Mapping\ToOneOwningSideMapping;
 
 /**
  * Merges and removes artists through DQL statements on the caller's connection and transaction,
@@ -217,17 +215,7 @@ final readonly class ArtistMergeService implements ArtistMergePortInterface
     {
         [$artistId, $survivorId] |> array_filter(...) |> $this->detachCredits(...);
         $artist = $this->managedArtist($artistId);
-        $stale = [];
-        if ($artist !== null) {
-            foreach ($this->holdersOf($artist) as [$holder, $deletedWithArtist]) {
-                if ($deletedWithArtist) {
-                    $this->entityManager->detach($holder);
-                } else {
-                    $stale[] = $holder;
-                }
-            }
-            $this->entityManager->detach($artist);
-        }
+        $stale = $artist === null ? [] : ManagedHolders::release($this->entityManager, $artist);
 
         $deleted = $this->execute('DELETE ' . ArtistEntity::class . ' artist WHERE artist.id = :id', ['id' => $artistId]);
         if ($deleted !== 1) {
@@ -267,51 +255,6 @@ final readonly class ArtistMergeService implements ArtistMergePortInterface
         );
 
         return $artist instanceof ArtistEntity ? $artist : null;
-    }
-
-    /**
-     * Every loaded entity the unit of work manages that holds the artist in a to-one association,
-     * with whether the database deletes it with the artist. An entity still to be loaded reads the
-     * row as the statements left it.
-     *
-     * @return list<array{object, bool}>
-     */
-    private function holdersOf(ArtistEntity $artist): array
-    {
-        $unitOfWork = $this->entityManager->getUnitOfWork();
-        $holders = [];
-        foreach ($unitOfWork->getIdentityMap() as $class => $entities) {
-            $metadata = $this->entityManager->getClassMetadata($class);
-            $associations = array_filter(
-                $metadata->associationMappings,
-                static fn (AssociationMapping $association): bool => $association instanceof ToOneOwningSideMapping && $artist instanceof $association->targetEntity,
-            );
-            if ($associations === []) {
-                continue;
-            }
-            foreach ($entities as $entity) {
-                if ($unitOfWork->isUninitializedObject($entity)) {
-                    continue;
-                }
-                $holding = array_find(
-                    $associations,
-                    static fn (AssociationMapping $association): bool => $metadata->getFieldValue($entity, $association->fieldName) === $artist,
-                );
-                if ($holding instanceof ToOneOwningSideMapping) {
-                    $holders[] = [$entity, self::deletedWithTarget($holding)];
-                }
-            }
-        }
-
-        return $holders;
-    }
-
-    private static function deletedWithTarget(ToOneOwningSideMapping $association): bool
-    {
-        return array_any(
-            $association->joinColumns,
-            static fn (JoinColumnMapping $column): bool => strtolower($column->onDelete ?? '') === 'cascade',
-        );
     }
 
     /** Reads the artist again when this manager holds it loaded, after a statement changed its row. */
