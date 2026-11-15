@@ -11,9 +11,9 @@ use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
 
 /**
- * The album merge's favorites statement against the migrated schema, inside the test's
- * transaction as inside a merge's. Favorites name an album by its public ID and have no foreign
- * key to it, so no album rows are needed.
+ * The album merge's favorites statements against the migrated schema, inside the test's
+ * transaction as inside a merge's. Favorites name an album or song by its public ID and have no
+ * foreign key to it, so no album or song rows are needed.
  */
 final class AlbumFavoriteMergeTest extends TestCase
 {
@@ -107,6 +107,56 @@ final class AlbumFavoriteMergeTest extends TestCase
             ],
             $this->favoritesOf($fanOfBoth),
         );
+    }
+
+    /**
+     * A user who favorited the source's copy of a target song only holds a favorite of the target's
+     * song, the copy's own with its ID, public ID and creation time. A user who favorited both
+     * keeps the favorite of the target's song. An album favorite carrying the copy's public ID as
+     * text is left as it was.
+     */
+    public function testAFavoriteOfTheDuplicateNamesTheKeptSongAndAUserWhoFavoritedBothHoldsOne(): void
+    {
+        $duplicate = new PublicId();
+        $kept = new PublicId();
+        $copyFan = $this->createTestUser()->getId();
+        $moved = $this->favorite($copyFan, 'song', $duplicate->toString(), self::FAVORITED_AT);
+        $publicId = $this->publicIdOf($moved);
+        $album = $this->favorite($copyFan, 'album', $duplicate->toString(), self::FAVORITED_AT);
+        $fanOfBoth = $this->createTestUser()->getId();
+        $this->favorite($fanOfBoth, 'song', $duplicate->toString(), self::FAVORITED_AT);
+        $keptFavorite = $this->favorite($fanOfBoth, 'song', $kept->toString(), self::TARGET_FAVORITED_AT);
+
+        new AlbumFavoriteMerge($this->entityManager)->foldSong($duplicate, $kept);
+
+        $this->assertSame(
+            [
+                [$album->toString(), 'album', $duplicate->toString(), self::FAVORITED_AT],
+                [$moved->toString(), 'song', $kept->toString(), self::FAVORITED_AT],
+            ],
+            $this->favoritesOf($copyFan),
+        );
+        $this->assertSame($publicId, $this->publicIdOf($moved), 'The favorite keeps its public ID.');
+        $this->assertSame([[$keptFavorite->toString(), 'song', $kept->toString(), self::TARGET_FAVORITED_AT]], $this->favoritesOf($fanOfBoth));
+    }
+
+    /**
+     * The manager has loaded a favorite of the copy. After the fold it reads it as naming the
+     * target's song, and a flush leaves the row as the fold wrote it.
+     */
+    public function testTheFavoritesTheManagerHoldsOfTheDuplicateLeaveIt(): void
+    {
+        $duplicate = new PublicId();
+        $kept = new PublicId();
+        $listener = $this->createTestUser()->getId();
+        $favorite = $this->favorite($listener, 'song', $duplicate->toString(), self::FAVORITED_AT);
+        self::assertSame($duplicate->toString(), $this->entityManager->find(UserFavoriteEntity::class, $favorite)?->getEntityPublicId());
+
+        new AlbumFavoriteMerge($this->entityManager)->foldSong($duplicate, $kept);
+
+        $this->assertSame($kept->toString(), $this->entityManager->find(UserFavoriteEntity::class, $favorite)?->getEntityPublicId());
+        $this->entityManager->flush();
+        $this->assertSame([[$favorite->toString(), 'song', $kept->toString(), self::FAVORITED_AT]], $this->favoritesOf($listener));
     }
 
     private function merge(): void

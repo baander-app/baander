@@ -9,7 +9,9 @@ use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Service\CoverImageDiscarder;
 use App\Catalog\Infrastructure\AlbumMergeService;
 use App\Favorites\Infrastructure\Doctrine\AlbumFavoriteMerge;
+use App\Lyrics\Infrastructure\Doctrine\AlbumLyricsMerge;
 use App\Media\Infrastructure\Storage\FlysystemStorage;
+use App\Playlist\Infrastructure\Doctrine\AlbumPlaylistMerge;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\Model\PublicId;
@@ -28,14 +30,24 @@ use Psr\Log\NullLogger;
 final class AlbumMergeRace
 {
     /**
-     * Copies the tables a merge reads or writes, as {@see MatchApplyRace::copyTables()} does, and adds
-     * back the foreign key of songs to their album: an insert into an album the merge holds waits
-     * on it, and the database deletes a deleted album's songs through it.
+     * Copies the tables a merge reads or writes, as {@see MatchApplyRace::copyTables()} does, with
+     * the playlists and lyrics a fold of a duplicate writes, and adds back the foreign keys onto
+     * songs and albums the race meets on. An insert into an album the merge holds waits on the
+     * album's key, and the database deletes a deleted album's songs through it. A playlist entry,
+     * lyrics or a play stored for a song takes the song's key, which the merge needs before it
+     * deletes a duplicate, and the database deletes the duplicate's entries and lyrics with it and
+     * clears its plays of it.
      */
     public static function copyTables(Connection $connection): void
     {
         MatchApplyRace::copyTables($connection);
+        foreach (['playlists', 'playlist_song', 'playlist_collaborators', 'lyrics'] as $table) {
+            ArtistImportIdentityRace::copyTableWithoutPgroonga($connection, $table);
+        }
         $connection->executeStatement('ALTER TABLE songs ADD CONSTRAINT fk_songs_album_id FOREIGN KEY (album_id) REFERENCES albums (id) ON DELETE CASCADE');
+        $connection->executeStatement('ALTER TABLE playlist_song ADD CONSTRAINT fk_playlist_song_song_id FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE CASCADE');
+        $connection->executeStatement('ALTER TABLE lyrics ADD CONSTRAINT fk_lyrics_song_id FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE CASCADE');
+        $connection->executeStatement('ALTER TABLE media_activities ADD CONSTRAINT fk_media_activities_song_id FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE SET NULL');
     }
 
     /** The directory the merge's cover discarder deletes cover files from. */
@@ -59,6 +71,8 @@ final class AlbumMergeRace
             self::noMatchRequests(),
             $services['transaction'],
             new CoverImageDiscarder($services['images'], new FlysystemStorage(self::storage()), new NullLogger()),
+            new AlbumPlaylistMerge($manager),
+            new AlbumLyricsMerge($manager),
             new AlbumFavoriteMerge($manager),
             new AlbumActivityMerge($manager),
             new NullLogger(),
@@ -163,13 +177,63 @@ final class AlbumMergeRace
         return $id;
     }
 
-    /** Stores the user's plays of the song on the album, as the player records them. Returns the activity's ID. */
-    public static function play(Connection $connection, string $user, string $song, string $album): string
+    /**
+     * Stores the user's plays of the song on the album, as the player records them: $count plays,
+     * the last at $lastPlayedAt from the web player. Returns the activity's ID.
+     */
+    public static function play(Connection $connection, string $user, string $song, string $album, int $count = 3, bool $love = false, string $lastPlayedAt = '2026-11-02 21:15:00.254321+00'): string
     {
         $id = (new Uuid())->toString();
         $connection->executeStatement(
-            "INSERT INTO media_activities (id, public_id, user_id, activity_type, song_id, album_id, play_count, love, last_played_at, created_at, updated_at) VALUES (?, ?, ?, 'play', ?, ?, 3, false, now(), now(), now())",
-            [$id, (new PublicId())->toString(), $user, $song, $album],
+            "INSERT INTO media_activities (id, public_id, user_id, activity_type, song_id, album_id, play_count, love, last_played_at, last_platform, last_player, created_at, updated_at) VALUES (?, ?, ?, 'play', ?, ?, ?, ?, ?, 'web', 'Firefox', now(), now())",
+            [$id, (new PublicId())->toString(), $user, $song, $album, $count, $love ? 'true' : 'false', $lastPlayedAt],
+        );
+
+        return $id;
+    }
+
+    /**
+     * Stores the user's playlist with these entries, song ID => position, as a save of the playlist
+     * commits it. Returns the playlist's ID.
+     *
+     * @param array<string, int> $entries
+     */
+    public static function playlist(Connection $connection, string $user, array $entries): string
+    {
+        $id = (new Uuid())->toString();
+        $connection->executeStatement(
+            "INSERT INTO playlists (id, public_id, user_id, name, created_at, updated_at) VALUES (?, ?, ?, 'Road trip', now(), now())",
+            [$id, (new PublicId())->toString(), $user],
+        );
+        foreach ($entries as $song => $position) {
+            $connection->executeStatement(
+                'INSERT INTO playlist_song (id, playlist_id, song_id, position, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())',
+                [(new Uuid())->toString(), $id, $song, $position],
+            );
+        }
+
+        return $id;
+    }
+
+    /** Stores lyrics of the song, as a fetch from LRCLIB does. Returns the lyrics' ID. */
+    public static function lyrics(Connection $connection, string $song, string $text): string
+    {
+        $id = (new Uuid())->toString();
+        $connection->executeStatement(
+            "INSERT INTO lyrics (id, song_id, plain_lyrics, source, lrclib_id, created_at, updated_at) VALUES (?, ?, ?, 'lrclib', 4711, now(), now()) ON CONFLICT (song_id) DO NOTHING",
+            [$id, $song, $text],
+        );
+
+        return $id;
+    }
+
+    /** Stores the user's favorite of the song, as Favorites stores one: by the song's public ID. Returns the favorite's ID. */
+    public static function songFavorite(Connection $connection, string $user, string $song): string
+    {
+        $id = (new Uuid())->toString();
+        $connection->executeStatement(
+            "INSERT INTO user_favorites (id, public_id, user_id, entity_type, entity_public_id, created_at, updated_at) SELECT ?, ?, ?, 'song', public_id, now(), now() FROM songs WHERE id = ?",
+            [$id, (new PublicId())->toString(), $user, $song],
         );
 
         return $id;

@@ -825,6 +825,9 @@ services:
     App\Playlist\Application\Port\PlaylistDeletionPreviewPortInterface:
         alias: App\Playlist\Infrastructure\PlaylistService
 
+    App\Playlist\Application\Port\AlbumPlaylistMergePortInterface:
+        alias: App\Playlist\Infrastructure\Doctrine\AlbumPlaylistMerge
+
     # --- Notification Domain Repository Aliases ---
     App\Notification\Domain\Repository\NotificationRepositoryInterface:
         alias: App\Notification\Infrastructure\Doctrine\Repository\NotificationRepository
@@ -1300,6 +1303,9 @@ services:
 
     App\Lyrics\Application\Port\LyricsFetchRequestInterface:
         alias: App\Lyrics\Application\Service\LyricsFetchRequester
+
+    App\Lyrics\Application\Port\AlbumLyricsMergePortInterface:
+        alias: App\Lyrics\Infrastructure\Doctrine\AlbumLyricsMerge
 
     # Every LRCLIB request reserves a turn under one shared limit.
     App\Lyrics\Infrastructure\Api\LrclibClient:

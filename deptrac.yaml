@@ -34,12 +34,12 @@ deptrac:
         Catalog: ['Catalog Video Contract', 'Catalog Song Availability Contract', 'Catalog Song Lookup Contract', 'Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Resources', 'Catalog Interface']
         Filesystem: ['Filesystem Infrastructure', 'Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
         Library: ['Library Live Audience Contract', 'Library File Availability Contract', 'Library Read Scope Contract', 'Library Content Stats Contract', 'Library Files Discovered Contract', 'Library Provisioning Contract', 'Library Media Files Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
-        Lyrics: ['Lyrics Fetch Request Contract', 'Lyrics Domain', 'Lyrics Application', 'Lyrics Infrastructure', 'Lyrics Resources', 'Lyrics Interface']
+        Lyrics: ['Lyrics Fetch Request Contract', 'Lyrics Album Merge Contract', 'Lyrics Domain', 'Lyrics Application', 'Lyrics Infrastructure', 'Lyrics Resources', 'Lyrics Interface']
         Media: ['Media Playback Access Contract', 'Media Image Contract', 'Media Domain', 'Media Application', 'Media Infrastructure', 'Media Resources', 'Media Interface']
         Metadata: ['Metadata Sync Contract', 'Metadata MusicBrainz Lookup Contract', 'Metadata Domain', 'Metadata Application', 'Metadata Infrastructure', 'Metadata Interface']
         Notification: ['Notification Domain', 'Notification Application', 'Notification Infrastructure', 'Notification Resources', 'Notification Interface']
         Party: ['Party Domain', 'Party Application', 'Party Infrastructure', 'Party Resources', 'Party Interface']
-        Playlist: ['Playlist Live Audience Contract', 'Playlist Deletion Preview Contract', 'Playlist Domain', 'Playlist Application', 'Playlist Infrastructure', 'Playlist Resources', 'Playlist Interface']
+        Playlist: ['Playlist Live Audience Contract', 'Playlist Deletion Preview Contract', 'Playlist Album Merge Contract', 'Playlist Domain', 'Playlist Application', 'Playlist Infrastructure', 'Playlist Resources', 'Playlist Interface']
         Recommendation: ['Recommendation Artist Merge Contract', 'Recommendation Domain', 'Recommendation Application', 'Recommendation Infrastructure', 'Recommendation Resources', 'Recommendation Interface']
         Transcode: ['Transcode Playback Access Contract', 'Transcode Audio Rendition Contract', 'Transcode Delivery Contract', 'Transcode Probe Contract', 'Transcode Domain', 'Transcode Application', 'Transcode Infrastructure', 'Transcode Resources', 'Transcode Interface']
         UserPreference: ['UserPreference Settings Contract', 'UserPreference Domain', 'UserPreference Application', 'UserPreference Infrastructure', 'UserPreference Resources', 'UserPreference Interface']
@@ -584,6 +584,11 @@ deptrac:
         - type: classLike
           value: '^App\\Playlist\\Application\\Port\\PlaylistAudienceReader$'
 
+    - name: 'Playlist Album Merge Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Playlist\\Application\\Port\\AlbumPlaylistMergePortInterface$'
+
     - name: 'Playlist Application'
       collectors:
         - type: bool
@@ -595,6 +600,8 @@ deptrac:
               value: '^App\\Playlist\\Application\\Port\\PlaylistDeletionPreviewPortInterface$'
             - type: classLike
               value: '^App\\Playlist\\Application\\Port\\PlaylistAudienceReader$'
+            - type: classLike
+              value: '^App\\Playlist\\Application\\Port\\AlbumPlaylistMergePortInterface$'
 
     - name: 'Playlist Infrastructure'
       collectors:
@@ -1034,6 +1041,11 @@ deptrac:
         - type: classLike
           value: '^App\\Lyrics\\Application\\Port\\LyricsFetchRequestInterface$'
 
+    - name: 'Lyrics Album Merge Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Lyrics\\Application\\Port\\AlbumLyricsMergePortInterface$'
+
     - name: 'Lyrics Application'
       collectors:
         - type: bool
@@ -1043,6 +1055,8 @@ deptrac:
           must_not:
             - type: classLike
               value: '^App\\Lyrics\\Application\\Port\\LyricsFetchRequestInterface$'
+            - type: classLike
+              value: '^App\\Lyrics\\Application\\Port\\AlbumLyricsMergePortInterface$'
 
     - name: 'Lyrics Resources'
       collectors:
@@ -1211,6 +1225,8 @@ deptrac:
       - 'Activity Album Merge Contract'
       - 'Favorites Artist Merge Contract'
       - 'Favorites Album Merge Contract'
+      - 'Playlist Album Merge Contract'
+      - 'Lyrics Album Merge Contract'
       - 'Recommendation Artist Merge Contract'
       - 'Catalog Video Contract'
       - 'Catalog Song Availability Contract'
@@ -1317,6 +1333,7 @@ deptrac:
     'Lyrics Domain':
       - 'Shared Domain'
     'Lyrics Infrastructure':
+      - 'Lyrics Album Merge Contract'
       - 'Catalog Song Lookup Contract'
       - 'Shared Application'
       - 'Lyrics Application'
@@ -1462,6 +1479,8 @@ deptrac:
       - 'Shared Domain'
     'Playlist Deletion Preview Contract':
       - 'Shared Domain'
+    'Playlist Album Merge Contract':
+      - 'Shared Domain'
     'Playlist Domain':
       - 'Shared Domain'
     'Playlist Application':
@@ -1474,6 +1493,7 @@ deptrac:
       - 'Auth User Identifier Contract'
       - 'Catalog Song Lookup Contract'
       - 'Playlist Deletion Preview Contract'
+      - 'Playlist Album Merge Contract'
       - 'Shared Application'
       - 'Playlist Domain'
       - 'Playlist Application'
@@ -1813,6 +1833,8 @@ deptrac:
       - 'Shared Interface'
 
     'Lyrics Fetch Request Contract':
+      - 'Shared Domain'
+    'Lyrics Album Merge Contract':
       - 'Shared Domain'
     'Lyrics Application':
       - 'Lyrics Fetch Request Contract'

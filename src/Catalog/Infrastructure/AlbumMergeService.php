@@ -13,6 +13,8 @@ use App\Catalog\Application\Service\CoverImageDiscarder;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Favorites\Application\Port\AlbumFavoriteMergePortInterface;
+use App\Lyrics\Application\Port\AlbumLyricsMergePortInterface;
+use App\Playlist\Application\Port\AlbumPlaylistMergePortInterface;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\Exception\TransactionDeadlockException;
@@ -27,9 +29,11 @@ use Psr\Log\LoggerInterface;
  * every song the two albums hold, in ID order. The albums and songs are read only once those locks
  * are held, so the merge acts on what a match apply, a retag or a hand change that held one first
  * committed, and it moves or removes every song the source holds: a song stored for the source
- * meanwhile waits for the source's row and then fails. The source's favorites and plays move to the
- * target in the same transaction, through the ports of Favorites and Activity. The source's cover is
- * discarded and a match of the target requested once the merge committed.
+ * meanwhile waits for the source's row and then fails. A source song whose file the target holds
+ * already is removed, and what users hold on it, playlist entries, lyrics, plays and favorites, is
+ * first folded into the target's song of that file, through the ports of Playlist, Lyrics, Activity
+ * and Favorites. The source's favorites and plays move to the target in the same transaction. The
+ * source's cover is discarded and a match of the target requested once the merge committed.
  */
 final readonly class AlbumMergeService implements AlbumMergePortInterface
 {
@@ -42,6 +46,8 @@ final readonly class AlbumMergeService implements AlbumMergePortInterface
         private AlbumMatchRequestInterface $albumMatches,
         private TransactionPortInterface $transaction,
         private CoverImageDiscarder $covers,
+        private AlbumPlaylistMergePortInterface $playlists,
+        private AlbumLyricsMergePortInterface $lyrics,
         private AlbumFavoriteMergePortInterface $favorites,
         private AlbumActivityMergePortInterface $activities,
         private LoggerInterface $logger,
@@ -103,7 +109,10 @@ final readonly class AlbumMergeService implements AlbumMergePortInterface
             }
         }
 
+        usort($duplicates, static fn (array $one, array $other): int => strcmp($one[0]->getId()->toBinary(), $other[0]->getId()->toBinary()));
+
         $this->moveSongs($moved, $targetAlbumId);
+        $this->foldDuplicates($duplicates);
         $this->removeDuplicates($duplicates, $sourceAlbumId);
         $this->moveFavoritesAndPlays($source, $target);
 
@@ -163,6 +172,28 @@ final readonly class AlbumMergeService implements AlbumMergePortInterface
             $this->songPort->persist($song);
         }
         $this->songPort->flush();
+    }
+
+    /**
+     * Folds what users hold on each duplicate into its kept song before the duplicate is deleted,
+     * whose foreign keys would otherwise take its playlist entries and lyrics with it and leave its
+     * plays without a song. The playlists that hold a duplicate are locked first, once the songs
+     * are held; then the duplicates are folded one by one in ID order, so that two duplicates of
+     * one song fold into it one after the other.
+     *
+     * @param list<array{Song, Song}> $duplicates each duplicate with the target's song it duplicates, in ID order
+     */
+    private function foldDuplicates(array $duplicates): void
+    {
+        if ($duplicates === []) {
+            return;
+        }
+        $this->playlists->foldSongs(array_map(static fn (array $duplicate): array => [$duplicate[0]->getId(), $duplicate[1]->getId()], $duplicates));
+        foreach ($duplicates as [$duplicate, $kept]) {
+            $this->lyrics->foldSong($duplicate->getId(), $kept->getId());
+            $this->activities->foldSong($duplicate->getId(), $kept->getId());
+            $this->favorites->foldSong($duplicate->getPublicId(), $kept->getPublicId());
+        }
     }
 
     /**

@@ -13,9 +13,11 @@ use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Infrastructure\AlbumMergeService;
 use App\Favorites\Application\Port\AlbumFavoriteMergePortInterface;
+use App\Lyrics\Application\Port\AlbumLyricsMergePortInterface;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Domain\Model\Image;
+use App\Playlist\Application\Port\AlbumPlaylistMergePortInterface;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\Exception\TransactionDeadlockException;
@@ -168,8 +170,56 @@ final class AlbumMergeServiceTest extends TestCase
 
         self::assertSame(
             ['move Something', 'flush songs', 'delete Come Together (Remaster)', 'move favorites of source to target', 'move plays of source to target', 'delete source', 'save target', 'commit'],
-            array_slice($this->calls, array_search('move Something', $this->calls, true) ?: 0, 8),
+            array_slice(array_values(array_filter(
+                array_slice($this->calls, array_search('move Something', $this->calls, true) ?: 0),
+                static fn (string $call): bool => !str_starts_with($call, 'fold '),
+            )), 0, 8),
         );
+    }
+
+    /**
+     * Two source songs duplicate one target song, and the song port returns the one with the
+     * higher ID first. Once the moves are written, the playlists of both are folded in one call,
+     * and then each duplicate's lyrics, plays and favorites, the lower ID first; only then is
+     * either deleted.
+     */
+    public function testEachDuplicateIsFoldedIntoItsKeptSongInIdOrderAfterTheMovesAndBeforeAnyIsDeleted(): void
+    {
+        $this->targetSongs = [$this->song($this->target, 'Come Together', 'come-together')];
+        $lower = $this->song($this->source, 'Come Together (Remaster)', 'come-together');
+        $higher = $this->song($this->source, 'Come Together (Mono)', 'come-together');
+        self::assertLessThan(0, strcmp($lower->getId()->toBinary(), $higher->getId()->toBinary()));
+        $this->sourceSongs = [$higher, $this->song($this->source, 'Something', 'something'), $lower];
+
+        $this->merge();
+
+        self::assertSame(
+            [
+                'move Something',
+                'flush songs',
+                'fold playlist entries of Come Together (Remaster) into Come Together, Come Together (Mono) into Come Together',
+                'fold lyrics of Come Together (Remaster) into Come Together',
+                'fold plays of Come Together (Remaster) into Come Together',
+                'fold favorites of Come Together (Remaster) into Come Together',
+                'fold lyrics of Come Together (Mono) into Come Together',
+                'fold plays of Come Together (Mono) into Come Together',
+                'fold favorites of Come Together (Mono) into Come Together',
+                'delete Come Together (Remaster)',
+                'delete Come Together (Mono)',
+                'move favorites of source to target',
+            ],
+            array_slice($this->calls, array_search('move Something', $this->calls, true) ?: 0, 12),
+        );
+    }
+
+    public function testAMergeWithoutDuplicatesFoldsNothing(): void
+    {
+        $this->targetSongs = [$this->song($this->target, 'Come Together', 'come-together')];
+        $this->sourceSongs = [$this->song($this->source, 'Something', 'something')];
+
+        $this->merge();
+
+        self::assertSame([], array_values(array_filter($this->calls, static fn (string $call): bool => str_starts_with($call, 'fold '))));
     }
 
     public function testAnAlbumGoneByTheTimeTheMergeHoldsItsLocksIsNotFoundAndNothingIsWritten(): void
@@ -212,10 +262,35 @@ final class AlbumMergeServiceTest extends TestCase
             $requests ?? $this->requests(),
             $transaction ?? $this->transaction(),
             new CoverImageDiscarder($this->images(), $this->createStub(StoragePortInterface::class), $this->logger()),
+            $this->playlists(),
+            $this->lyrics(),
             $this->favorites(),
             $this->activities(),
             $this->logger(),
         )->mergeAlbums($this->target->getId(), $this->source->getId());
+    }
+
+    private function playlists(): AlbumPlaylistMergePortInterface
+    {
+        $playlists = $this->createStub(AlbumPlaylistMergePortInterface::class);
+        $playlists->method('foldSongs')->willReturnCallback(function (array $duplicates): void {
+            $this->calls[] = 'fold playlist entries of ' . implode(', ', array_map(
+                fn (array $duplicate): string => sprintf('%s into %s', $this->songNamed($duplicate[0]), $this->songNamed($duplicate[1])),
+                $duplicates,
+            ));
+        });
+
+        return $playlists;
+    }
+
+    private function lyrics(): AlbumLyricsMergePortInterface
+    {
+        $lyrics = $this->createStub(AlbumLyricsMergePortInterface::class);
+        $lyrics->method('foldSong')->willReturnCallback(function (Uuid $duplicate, Uuid $kept): void {
+            $this->calls[] = sprintf('fold lyrics of %s into %s', $this->songNamed($duplicate), $this->songNamed($kept));
+        });
+
+        return $lyrics;
     }
 
     private function favorites(): AlbumFavoriteMergePortInterface
@@ -223,6 +298,9 @@ final class AlbumMergeServiceTest extends TestCase
         $favorites = $this->createStub(AlbumFavoriteMergePortInterface::class);
         $favorites->method('merge')->willReturnCallback(function (PublicId $source, PublicId $target): void {
             $this->calls[] = sprintf('move favorites of %s to %s', $this->albumNamed($source), $this->albumNamed($target));
+        });
+        $favorites->method('foldSong')->willReturnCallback(function (PublicId $duplicate, PublicId $kept): void {
+            $this->calls[] = sprintf('fold favorites of %s into %s', $this->songNamed($duplicate), $this->songNamed($kept));
         });
 
         return $favorites;
@@ -234,8 +312,22 @@ final class AlbumMergeServiceTest extends TestCase
         $activities->method('merge')->willReturnCallback(function (Uuid $source, Uuid $target): void {
             $this->calls[] = sprintf('move plays of %s to %s', $this->albumNamed($source), $this->albumNamed($target));
         });
+        $activities->method('foldSong')->willReturnCallback(function (Uuid $duplicate, Uuid $kept): void {
+            $this->calls[] = sprintf('fold plays of %s into %s', $this->songNamed($duplicate), $this->songNamed($kept));
+        });
 
         return $activities;
+    }
+
+    /** The title of the song of either album with this ID or public ID. */
+    private function songNamed(PublicId|Uuid $id): string
+    {
+        $song = array_find(
+            [...$this->targetSongs, ...$this->sourceSongs],
+            static fn (Song $song): bool => $id instanceof PublicId ? $id->equals($song->getPublicId()) : $id->equals($song->getId()),
+        );
+
+        return $song?->getTitle() ?? $id->toString();
     }
 
     /** "source" or "target" for either album's ID or public ID. */

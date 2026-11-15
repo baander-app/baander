@@ -22,7 +22,8 @@ use PHPUnit\Framework\TestCase;
  * source's cover is discarded only after the commit. Each test holds one side open in the test
  * session while the other runs in a child process, waits until the child waits on a lock, then
  * commits. The tables copy the migrated ones without their PGroonga indexes or triggers; the
- * foreign keys of credits and of songs to their album are added back.
+ * foreign keys of credits, of songs to their album and of playlist entries, lyrics and plays to
+ * their song are added back.
  */
 final class AlbumMergeRaceTest extends TestCase
 {
@@ -141,6 +142,153 @@ final class AlbumMergeRaceTest extends TestCase
 
         self::assertSame(['merged' => $seed['target']], $this->finish($merge));
         self::assertSame([$favoriteOfTarget => $this->publicIdOf($seed['target'])], $this->albumFavoritesOf($listener));
+    }
+
+    /**
+     * The merge fails in its transaction after it folded the source's copy of the target's song into
+     * that song and removed the copy, before the commit. The copy is still there, and with it the
+     * entry a user's playlist holds of it beside the target's song, its lyrics, the user's plays of
+     * it and the user's favorite of it; the playlist, the target song's plays and the favorites
+     * are as they were.
+     */
+    public function testAMergeThatFailsBeforeItsCommitLeavesWhatUsersHoldOnTheCopyWithIt(): void
+    {
+        $seed = AlbumMergeRace::seed($this->observer, $this->tag);
+        $listener = (new Uuid())->toString();
+        $playlist = AlbumMergeRace::playlist($this->observer, $listener, [$seed['duplicate'] => 0, $seed['kept'] => 1]);
+        AlbumMergeRace::lyrics($this->observer, $seed['duplicate'], 'Here come old flat-top');
+        AlbumMergeRace::play($this->observer, $listener, $seed['duplicate'], $seed['source'], love: true);
+        AlbumMergeRace::play($this->observer, $listener, $seed['kept'], $seed['target'], count: 2);
+        AlbumMergeRace::songFavorite($this->observer, $listener, $seed['duplicate']);
+        $before = $this->holdingsOf($listener, $playlist, $seed['duplicate'], $seed['kept']);
+        $failure = null;
+
+        try {
+            AlbumMergeRace::service(ArtistImportIdentityRace::entityManager($this->writer), static function (): never {
+                throw new \RuntimeException('The merge failed before its commit.');
+            })->mergeAlbums(Uuid::fromString($seed['target']), Uuid::fromString($seed['source']));
+        } catch (\RuntimeException $caught) {
+            $failure = $caught;
+        }
+
+        self::assertSame('The merge failed before its commit.', $failure?->getMessage());
+        self::assertSame([$seed['duplicate'] => $seed['source']], $this->albumsOfSongs([$seed['duplicate']]), 'The copy is still there.');
+        self::assertSame($before, $this->holdingsOf($listener, $playlist, $seed['duplicate'], $seed['kept']));
+    }
+
+    /**
+     * A save of a playlist that holds the source's copy of the target's song holds the playlist's
+     * row and its entries, as every save does, and has moved the copy's entry to position 4 when
+     * the merge comes to lock the playlist. The merge waits in that lock. Once the save committed,
+     * it folds the entries the save left: the playlist holds the target's song at position 4, and
+     * its version counts the save and the merge.
+     */
+    public function testAPlaylistSaveInFlightWhenTheMergeReachesThePlaylistCompletesFirstAndTheFoldActsOnWhatItLeft(): void
+    {
+        $seed = AlbumMergeRace::seed($this->observer, $this->tag);
+        $playlist = AlbumMergeRace::playlist($this->observer, (new Uuid())->toString(), [$seed['duplicate'] => 0, $seed['moved'] => 1]);
+        $this->writer->beginTransaction();
+        $this->writer->executeStatement('UPDATE playlists SET persistence_version = persistence_version + 1 WHERE id = ? AND persistence_version = 0', [$playlist]);
+        $this->writer->executeQuery('SELECT song_id FROM playlist_song WHERE playlist_id = ? ORDER BY position, song_id FOR UPDATE', [$playlist])->free();
+        $this->writer->executeStatement('UPDATE playlist_song SET position = 4 WHERE playlist_id = ? AND song_id = ?', [$playlist, $seed['duplicate']]);
+
+        $merge = $this->startChild('merge', ['target' => $seed['target'], 'source' => $seed['source']]);
+        $waiting = RetagLockRace::awaitLockWait($this->observer, $merge);
+
+        self::assertStringContainsString('FROM playlists', $this->statementOf($waiting['pid']), 'The merge waits to lock the playlist.');
+        $this->writer->commit();
+
+        self::assertSame(['merged' => $seed['target']], $this->finish($merge));
+        self::assertSame([$seed['moved'] => 1, $seed['kept'] => 4], $this->entriesOf($playlist));
+        self::assertSame(2, (int) $this->observer->fetchOne('SELECT persistence_version FROM playlists WHERE id = ?', [$playlist]));
+    }
+
+    /**
+     * A fetch stores lyrics for the target's song, which had none, and has not committed when the
+     * merge moves the lyrics of the source's copy to that song. The merge waits for the fetch, and
+     * once it committed leaves the song the fetched lyrics as its one lyrics row and completes,
+     * rather than failing on the key that allows a song one lyrics row.
+     */
+    public function testAFetchThatStoresLyricsForTheKeptSongWhileTheMergeMovesTheCopysLeavesItOneRowAndTheMergeCompletes(): void
+    {
+        $seed = AlbumMergeRace::seed($this->observer, $this->tag);
+        AlbumMergeRace::lyrics($this->observer, $seed['duplicate'], 'Here come old flat-top');
+        $this->writer->beginTransaction();
+        $fetched = AlbumMergeRace::lyrics($this->writer, $seed['kept'], 'Come together, right now');
+
+        $merge = $this->startChild('merge', ['target' => $seed['target'], 'source' => $seed['source']]);
+        $waiting = RetagLockRace::awaitLockWait($this->observer, $merge);
+
+        self::assertSame('transactionid', $waiting['waitsOn'], 'The merge waits for the fetch to commit.');
+        $this->writer->commit();
+
+        self::assertSame(['merged' => $seed['target']], $this->finish($merge));
+        self::assertSame(
+            [[$fetched, $seed['kept'], 'Come together, right now']],
+            $this->observer->fetchAllNumeric('SELECT id, song_id, plain_lyrics FROM lyrics ORDER BY id'),
+        );
+    }
+
+    /**
+     * A play of the target's song is being recorded, which holds the user's play row of it, when
+     * the merge locks the user's plays of the source's copy and of that song. The merge waits for
+     * it, and once it committed counts it: the user's one play row of the song adds the copy's three
+     * plays to the song's two and the one just recorded, with the time, platform and player of that
+     * last one.
+     */
+    public function testAPlayOfTheKeptSongThatCommitsWhileTheMergeWaitsForItsPlayRowIsCounted(): void
+    {
+        $seed = AlbumMergeRace::seed($this->observer, $this->tag);
+        $listener = (new Uuid())->toString();
+        AlbumMergeRace::play($this->observer, $listener, $seed['duplicate'], $seed['source'], count: 3, love: true);
+        $keptPlay = AlbumMergeRace::play($this->observer, $listener, $seed['kept'], $seed['target'], count: 2, lastPlayedAt: '2026-11-01 08:00:00+00');
+        $this->writer->beginTransaction();
+        $this->writer->executeStatement(
+            "UPDATE media_activities SET play_count = play_count + 1, last_played_at = '2026-11-15 12:00:00.5+00', last_platform = 'ios', last_player = 'Baander' WHERE id = ?",
+            [$keptPlay],
+        );
+
+        $merge = $this->startChild('merge', ['target' => $seed['target'], 'source' => $seed['source']]);
+        $waiting = RetagLockRace::awaitLockWait($this->observer, $merge);
+
+        self::assertStringContainsString('FROM media_activities', $this->statementOf($waiting['pid']), 'The merge waits to lock the plays.');
+        $this->writer->commit();
+
+        self::assertSame(['merged' => $seed['target']], $this->finish($merge));
+        self::assertSame(
+            [[$keptPlay, $seed['kept'], 6, true, '2026-11-15 12:00:00.5+00', 'ios', 'Baander']],
+            array_map(
+                static fn (array $row): array => [(string) $row[0], (string) $row[1], (int) $row[2], (bool) $row[3], (string) $row[4], (string) $row[5], (string) $row[6]],
+                $this->observer->fetchAllNumeric('SELECT id, song_id, play_count, love, last_played_at, last_platform, last_player FROM media_activities WHERE user_id = ?', [$listener]),
+            ),
+        );
+    }
+
+    /**
+     * A user who favorited the source's copy of the target's song favorites that song while the
+     * merge runs, and has not committed when the merge moves the favorite of the copy. The merge
+     * waits for that favorite, and once it is committed leaves the user the one favorite of the
+     * song and completes, rather than failing on the key that allows a user one favorite of a song.
+     */
+    public function testAUserWhoFavoritesTheKeptSongWhileTheMergeMovesTheirFavoriteOfTheCopyEndsWithOneAndTheMergeCompletes(): void
+    {
+        $seed = AlbumMergeRace::seed($this->observer, $this->tag);
+        $listener = (new Uuid())->toString();
+        AlbumMergeRace::songFavorite($this->observer, $listener, $seed['duplicate']);
+        $this->writer->beginTransaction();
+        $favoriteOfKept = AlbumMergeRace::songFavorite($this->writer, $listener, $seed['kept']);
+
+        $merge = $this->startChild('merge', ['target' => $seed['target'], 'source' => $seed['source']]);
+        $waiting = RetagLockRace::awaitLockWait($this->observer, $merge);
+
+        self::assertSame('transactionid', $waiting['waitsOn'], 'The merge waits for the favorite of the kept song to commit.');
+        $this->writer->commit();
+
+        self::assertSame(['merged' => $seed['target']], $this->finish($merge));
+        self::assertSame(
+            [[$favoriteOfKept, $this->songPublicIdOf($seed['kept'])]],
+            $this->observer->fetchAllNumeric("SELECT id, entity_public_id FROM user_favorites WHERE user_id = ? AND entity_type = 'song'", [$listener]),
+        );
     }
 
     /**
@@ -314,6 +462,46 @@ final class AlbumMergeRaceTest extends TestCase
     private function publicIdOf(string $albumId): string
     {
         return (string) $this->observer->fetchOne('SELECT public_id FROM albums WHERE id = ?', [$albumId]);
+    }
+
+    /** The statement the session with this process ID runs. */
+    private function statementOf(int $pid): string
+    {
+        return (string) $this->observer->fetchOne('SELECT query FROM pg_stat_activity WHERE pid = ?', [$pid]);
+    }
+
+    /** @return array<string, int> the position of each song the playlist holds, by song ID */
+    private function entriesOf(string $playlistId): array
+    {
+        $entries = [];
+        foreach ($this->observer->fetchAllNumeric('SELECT song_id, position FROM playlist_song WHERE playlist_id = ? ORDER BY position', [$playlistId]) as [$song, $position]) {
+            $entries[(string) $song] = (int) $position;
+        }
+
+        return $entries;
+    }
+
+    /**
+     * @return array<string, mixed> the playlist's version and entries, the lyrics and the user's plays of both songs and favorites
+     *                              of either, as PostgreSQL holds them
+     */
+    private function holdingsOf(string $userId, string $playlistId, string ...$songIds): array
+    {
+        return [
+            'version' => (int) $this->observer->fetchOne('SELECT persistence_version FROM playlists WHERE id = ?', [$playlistId]),
+            'entries' => $this->entriesOf($playlistId),
+            'lyrics' => $this->observer->fetchAllNumeric('SELECT id, song_id, plain_lyrics FROM lyrics ORDER BY id'),
+            'plays' => $this->observer->fetchAllNumeric('SELECT id, song_id, album_id, play_count, love FROM media_activities WHERE user_id = ? ORDER BY id', [$userId]),
+            'favorites' => $this->observer->fetchAllNumeric(
+                "SELECT id, entity_public_id FROM user_favorites WHERE user_id = ? AND entity_type = 'song' AND entity_public_id IN (SELECT public_id FROM songs WHERE id IN (?, ?)) ORDER BY id",
+                [$userId, ...$songIds],
+            ),
+        ];
+    }
+
+    private function songPublicIdOf(string $songId): string
+    {
+        return (string) $this->observer->fetchOne('SELECT public_id FROM songs WHERE id = ?', [$songId]);
     }
 
     /** Whether another session holds a lock on the row that a lock of $strength conflicts with. */
