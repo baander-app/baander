@@ -28,9 +28,9 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * that they come too fast. Every request therefore first takes a turn under the shared
  * `lrclib` rate limit, which all processes keep in Redis, and no request is sent during a
  * pause LRCLIB asked for. A request answered with 429, or with 503 and a `Retry-After`
- * header, pauses every process and is sent again after the pause, three times at most. A
- * call has one deadline for all of this, its caller's wait: what cannot be sent before it
- * answers unavailable.
+ * header, pauses every process, for an hour at most, and is sent again after the pause,
+ * three times at most. A call has one deadline for all of this, its caller's wait: what
+ * cannot be sent before it answers unavailable.
  *
  * API docs: https://lrclib.net/docs
  */
@@ -49,6 +49,11 @@ final readonly class LrclibClient implements LrclibClientInterface
     private const int MAX_SENDS = 3;
     /** Seconds to pause after a call's first and later rate-limit answers that name no wait. */
     private const array UNNAMED_PAUSE_SECONDS = [5, 15];
+    /**
+     * The longest pause one answer stores: a wait LRCLIB names above an hour is stored as an
+     * hour, so no answer stops every process's lookups for longer.
+     */
+    private const int MAX_PAUSE_SECONDS = 3600;
 
     /** @var \Closure(float): void */
     private \Closure $sleep;
@@ -172,7 +177,8 @@ final readonly class LrclibClient implements LrclibClientInterface
             return $status < 300 ? $body : $this->errorAnswer($endpoint, $status);
         }
 
-        $notStored = $this->pauseEveryProcess($endpoint, $status, self::pauseSeconds($retryAfter, $send));
+        $named = self::namedSeconds($retryAfter);
+        $notStored = $this->pauseEveryProcess($endpoint, $status, self::pauseSeconds($named, $send), $named);
         if ($notStored !== null) {
             return $notStored;
         }
@@ -246,20 +252,32 @@ final readonly class LrclibClient implements LrclibClientInterface
     }
 
     /**
-     * Seconds to pause after a rate-limit answer: the whole seconds its Retry-After header
-     * names, or a fallback that grows with the call's sends when it names none.
+     * The whole seconds a Retry-After header names, or null when it is missing or gives
+     * anything else, such as a date. A number too large for an integer is the largest one.
+     */
+    private static function namedSeconds(?string $retryAfter): ?int
+    {
+        return $retryAfter !== null && ctype_digit($retryAfter) ? (int) $retryAfter : null;
+    }
+
+    /**
+     * Seconds to pause after a rate-limit answer: the seconds it names, an hour at most, or a
+     * fallback that grows with the call's sends when it names none.
      *
      * @param positive-int $send
      */
-    private static function pauseSeconds(?string $retryAfter, int $send): int
+    private static function pauseSeconds(?int $named, int $send): int
     {
-        return $retryAfter !== null && ctype_digit($retryAfter)
-            ? (int) $retryAfter
+        return $named !== null
+            ? min($named, self::MAX_PAUSE_SECONDS)
             : self::UNNAMED_PAUSE_SECONDS[min($send, count(self::UNNAMED_PAUSE_SECONDS)) - 1];
     }
 
-    /** Store the pause for every process and log when it ends; answers unavailable when it cannot be stored. */
-    private function pauseEveryProcess(string $endpoint, int $status, int $seconds): ?LrclibUnavailable
+    /**
+     * Store the pause for every process and log when it ends, with the wait LRCLIB named when
+     * the pause is shorter than that; answers unavailable when the pause cannot be stored.
+     */
+    private function pauseEveryProcess(string $endpoint, int $status, int $seconds, ?int $named): ?LrclibUnavailable
     {
         try {
             $left = $this->pause->pauseFor($seconds);
@@ -271,6 +289,7 @@ final readonly class LrclibClient implements LrclibClientInterface
             'endpoint' => $endpoint,
             'status' => $status,
             'pause_seconds' => $seconds,
+            ...($named !== null && $named > $seconds ? ['retry_after_seconds' => $named] : []),
             'paused_until' => $this->clock->now()->modify(sprintf('+%d seconds', (int) ceil($left)))->format(\DATE_ATOM),
         ]);
 

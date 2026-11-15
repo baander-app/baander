@@ -21091,6 +21091,8 @@ export const getGetLyricsSearchUrl = (params: GetLyricsSearchParams,) => {
 }
 
 /**
+ * The route requires the administrator role, as fetch and apply do: the whole server
+ * sends LRCLIB one request every two seconds, and each search is one of them.
  * @summary Search LRCLIB for lyrics
  */
 export const getLyricsSearch = async (params: GetLyricsSearchParams, options?: Parameters<typeof customInstance>[1]): Promise<GetLyricsSearch200> => {

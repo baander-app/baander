@@ -498,6 +498,68 @@ final class LrclibClientTest extends TestCase
         $this->assertSame($this->requests[0]['url'], $this->requests[1]['url']);
         $this->assertSame([0.0, 20.0], array_column($this->requests, 'at'));
         $this->assertSame(['2026-11-15T12:00:20+00:00'], $this->pausesLogged());
+        $this->assertSame(20, $this->pauseWarnings()[0]['pause_seconds']);
+        $this->assertArrayNotHasKey('retry_after_seconds', $this->pauseWarnings()[0]);
+    }
+
+    /**
+     * No answer stops the lookups for longer than an hour, whatever wait it names. A number
+     * too large for an integer counts as the largest one.
+     */
+    #[TestWith(['3601', 3601])]
+    #[TestWith(['31536000', 31536000])]
+    #[TestWith(['99999999999999999999999', PHP_INT_MAX])]
+    public function testANamedWaitAboveAnHourIsStoredAsAnHourAndTheWarningNamesBoth(string $retryAfter, int $named): void
+    {
+        $this->logger = $this->recordingLogger();
+        $client = $this->clientAnswering(self::rateLimited($retryAfter));
+
+        $result = $client->getById(123, LrclibWait::Queued);
+
+        $this->assertInstanceOf(LrclibUnavailable::class, $result);
+        $this->assertStringContainsString('paused', $result->reason);
+        $this->assertSame([3600], $this->pauses);
+        $this->assertCount(1, $this->requests);
+        $this->assertSame(['2026-11-15T13:00:00+00:00'], $this->pausesLogged());
+        $this->assertSame(3600, $this->pauseWarnings()[0]['pause_seconds']);
+        $this->assertSame($named, $this->pauseWarnings()[0]['retry_after_seconds'] ?? null);
+    }
+
+    public function testANamedWaitOfAnHourIsStoredAsNamed(): void
+    {
+        $this->logger = $this->recordingLogger();
+        $client = $this->clientAnswering(self::rateLimited('3600'));
+
+        $client->getById(123, LrclibWait::Queued);
+
+        $this->assertSame([3600], $this->pauses);
+        $this->assertArrayNotHasKey('retry_after_seconds', $this->pauseWarnings()[0]);
+    }
+
+    /** Only whole seconds name a wait: a Retry-After that gives a date pauses as one that names none. */
+    public function testARetryAfterGivingADateTakesTheFallbackPause(): void
+    {
+        // Ten minutes after the call starts.
+        $client = $this->clientAnswering(self::rateLimited('Sun, 15 Nov 2026 12:10:00 GMT'), self::lyrics());
+
+        $result = $client->getById(123);
+
+        $this->assertInstanceOf(LrclibResult::class, $result);
+        $this->assertSame([5], $this->pauses);
+        $this->assertSame([0.0, 5.0], array_column($this->requests, 'at'));
+    }
+
+    public function testANamedWaitOfZeroSecondsLeavesNoPauseInEffectAndTheRequestIsSentAgainAtOnce(): void
+    {
+        $client = $this->clientAnswering(self::rateLimited('0'), self::lyrics());
+
+        $result = $client->getById(123);
+
+        $this->assertInstanceOf(LrclibResult::class, $result);
+        $this->assertSame([0], $this->pauses);
+        $this->assertSame(0.0, $this->secondsPaused());
+        $this->assertSame([0.0, 0.0], array_column($this->requests, 'at'));
+        $this->assertCount(2, $this->turns, 'The request sent again takes a turn of its own.');
     }
 
     public function testRateLimitAnswersNamingNoWaitPauseFiveThenFifteenSecondsAndTheThirdIsUnavailable(): void
@@ -914,9 +976,18 @@ final class LrclibClientTest extends TestCase
     /** @return list<mixed> the end time of every pause logged as a warning */
     private function pausesLogged(): array
     {
-        $warnings = array_filter($this->logs, static fn (array $log): bool => $log['level'] === LogLevel::WARNING);
+        return array_column($this->pauseWarnings(), 'paused_until');
+    }
 
-        return array_column(array_column($warnings, 'context'), 'paused_until');
+    /** @return list<array<array-key, mixed>> the context of every warning that logs a pause */
+    private function pauseWarnings(): array
+    {
+        $warnings = array_filter(
+            $this->logs,
+            static fn (array $log): bool => $log['level'] === LogLevel::WARNING && isset($log['context']['paused_until']),
+        );
+
+        return array_column($warnings, 'context');
     }
 
     /** Seconds the test's clock has moved since the test started. */

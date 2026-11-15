@@ -299,21 +299,33 @@ final class LyricsControllerTest extends TestCase
 
     public function testSearchLyricsWithValidQuery(): void
     {
-        $user = $this->createTestUser();
+        $admin = $this->createAdminUser();
         $this->lrclib->searchAnswer = [new LrclibSearchResult(912345, 'Still Alive', 'GLaDOS', 'Portal', 175.0, false, 'This was a triumph', null)];
 
-        $data = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/lyrics/search?q=Still+Alive+Portal', $user), 200, 'data');
+        $data = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/lyrics/search?q=Still+Alive+Portal', $admin), 200, 'data');
 
         $this->assertSame(912345, $data['data'][0]['id']);
         $this->assertSame('Still Alive', $data['data'][0]['trackName']);
     }
 
+    /** A search takes a turn of the pace every LRCLIB request shares, so only an administrator starts one. */
+    public function testSearchLyricsAsAMemberAnswers403WithoutAskingLrclib(): void
+    {
+        $member = $this->createTestUser();
+        $this->lrclib->searchAnswer = [new LrclibSearchResult(912345, 'Still Alive', 'GLaDOS', 'Portal', 175.0, false, 'This was a triumph', null)];
+
+        foreach (['/api/lyrics/search?q=Still+Alive+Portal', '/api/lyrics/search'] as $uri) {
+            $this->assertSame(403, $this->authenticatedRequest('GET', $uri, $member)->getStatusCode(), $uri);
+        }
+        $this->assertSame([], $this->lrclib->calls);
+    }
+
     public function testSearchLyricsWithoutAQueryIsInvalidInput(): void
     {
-        $user = $this->createTestUser();
+        $admin = $this->createAdminUser();
 
         foreach (['/api/lyrics/search', '/api/lyrics/search?q=', '/api/lyrics/search?q=+'] as $uri) {
-            $error = $this->assertJsonResponse($this->authenticatedRequest('GET', $uri, $user), 422);
+            $error = $this->assertJsonResponse($this->authenticatedRequest('GET', $uri, $admin), 422);
             $this->assertSame('Search query is required.', $error['error']['message'], $uri);
         }
         $this->assertSame([], $this->lrclib->calls);
@@ -323,7 +335,7 @@ final class LyricsControllerTest extends TestCase
     {
         $this->lrclib->unavailable();
 
-        $error = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/lyrics/search?q=Still+Alive', $this->createTestUser()), 503);
+        $error = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/lyrics/search?q=Still+Alive', $this->createAdminUser()), 503);
 
         $this->assertSame(LyricsProviderUnavailableException::MESSAGE, $error['error']['message']);
     }

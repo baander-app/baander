@@ -9672,6 +9672,7 @@
                     "Lyrics"
                 ],
                 "summary": "Search LRCLIB for lyrics",
+                "description": "The route requires the administrator role, as fetch and apply do: the whole server\nsends LRCLIB one request every two seconds, and each search is one of them.",
                 "operationId": "get_lyrics_search",
                 "parameters": [
                     {
@@ -9703,6 +9704,9 @@
                                 }
                             }
                         }
+                    },
+                    "403": {
+                        "description": "Administrator role required"
                     },
                     "401": {
                         "description": "Authentication required"

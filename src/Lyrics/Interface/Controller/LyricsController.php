@@ -133,6 +133,9 @@ final class LyricsController
 
     /**
      * Search LRCLIB for lyrics.
+     *
+     * The route requires the administrator role, as fetch and apply do: the whole server
+     * sends LRCLIB one request every two seconds, and each search is one of them.
      */
     #[OA\Get(
         path: '/api/lyrics/search',
@@ -146,6 +149,7 @@ final class LyricsController
                     new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: LrclibSearchResource::class))),
                 ],
             )),
+            new OA\Response(response: '403', description: 'Administrator role required'),
             new OA\Response(response: '401', description: 'Authentication required'),
             new OA\Response(response: '409', description: 'LRCLIB rejected the search; `details.reason` is `lrclib_rejected`', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
             new OA\Response(response: '422', description: 'The search query is blank', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
@@ -153,6 +157,8 @@ final class LyricsController
         ],
     )]
     #[Route('/lyrics/search', name: 'search', methods: ['GET'])]
+    #[IsGranted('ROLE_ADMIN')]
+    #[CliCounterpart('app:lyrics:search')]
     public function search(
         #[MapQueryString(validationFailedStatusCode: 422)]
         SearchLyricsRequest $request = new SearchLyricsRequest(),

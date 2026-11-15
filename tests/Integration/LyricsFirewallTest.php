@@ -17,6 +17,7 @@ use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Library\Infrastructure\Doctrine\Entity\UserLibraryAccessEntity;
 use App\Lyrics\Application\DTO\LrclibResult;
+use App\Lyrics\Application\DTO\LrclibSearchResult;
 use App\Lyrics\Application\Port\LrclibClientInterface;
 use App\Lyrics\Infrastructure\Doctrine\Entity\LyricsEntity;
 use App\Shared\Domain\Model\Email;
@@ -276,6 +277,40 @@ final class LyricsFirewallTest extends TestCase
         self::assertSame('Cached lyrics', $stored->getPlainLyrics());
     }
 
+    /** @return iterable<string, array{string, int}> */
+    public static function nonAdminSearches(): iterable
+    {
+        yield 'owner' => ['owner', 403];
+        yield 'unrelated' => ['unrelated', 403];
+        yield 'anonymous' => ['anonymous', 401];
+    }
+
+    #[DataProvider('nonAdminSearches')]
+    public function testSearchIsDeniedBeforeTheProvider(string $actor, int $status): void
+    {
+        $this->expectNoRemoteCalls();
+        if ($actor !== 'anonymous') {
+            $this->authenticate($actor);
+        }
+
+        self::assertSame($status, $this->request('/api/lyrics/search?q=Still+Alive')->getStatusCode());
+    }
+
+    public function testAdministratorCanSearchTheProvider(): void
+    {
+        $this->authenticate('admin');
+        $this->remote->expects(self::once())->method('search')->with('Still Alive')
+            ->willReturn([new LrclibSearchResult(912345, 'Still Alive', 'GLaDOS', 'Portal', 175.0, false, 'This was a triumph', null)]);
+        $this->remote->expects(self::never())->method('getBySignature');
+        $this->remote->expects(self::never())->method('getById');
+
+        $response = $this->request('/api/lyrics/search?q=Still+Alive');
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame(912345, json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR)['data'][0]['id']);
+        $this->assertLyricsCount(0);
+    }
+
     private function expectNoRemoteCalls(): void
     {
         foreach (['getBySignature', 'getById', 'search'] as $method) {
@@ -352,7 +387,8 @@ final class LyricsFirewallTest extends TestCase
         $request->headers->set('Content-Type', 'application/json');
         if ($this->jwt !== null) {
             $request->headers->set('Authorization', 'DPoP ' . $this->jwt);
-            $request->headers->set('DPoP', $this->proof->create($method, $uri, $this->jwt));
+            // A proof names its target without the query.
+            $request->headers->set('DPoP', $this->proof->create($method, 'https://baander.app' . parse_url($uri, PHP_URL_PATH), $this->jwt));
         }
         $response = $this->kernel->handle($request);
         $this->kernel->terminate($request, $response);

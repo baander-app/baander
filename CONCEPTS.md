@@ -249,6 +249,17 @@ show the tally of the run whose walk finished last. It lives in Redis with the r
 other tracking and expires with it, a day after the run's last fetch was due, or a day
 after it finished when it queued nothing.
 
+### LRCLIB pace and pause
+
+The two limits on requests to LRCLIB that all web and worker processes share. The pace
+is one request every two seconds for all of them together: each request first takes a
+turn under the `lrclib` rate limit and waits for it. The pause is what LRCLIB asks for
+when it answers that requests come too fast: no process sends until it ends, after the
+seconds the answer names, one hour at most, or after 5 and then 15 seconds when it names
+none. A request that cannot be sent within its caller's wait, 10 seconds for a request
+someone waits on and 30 for a queued fetch, is not sent and counts as LRCLIB being
+unavailable.
+
 ## Playback destinations
 
 ### Playback destination

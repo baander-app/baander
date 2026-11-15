@@ -121,9 +121,9 @@ export const catalogLiveCoverage = [
     family: "lyrics",
     policy: {
       kind: "demand",
-      reason: "External provider search is an explicit user action and has no local durable change producer.",
+      reason: "External provider search is an explicit administrator action and has no local durable change producer.",
     },
-    audiences: ["user"],
+    audiences: ["admin"],
     sourceTables: [],
     deploymentTables: [],
     sources: ["LrclibClient external search", "[ `/api/lyrics/search`, ...(params ? [params] : []) ]"],
