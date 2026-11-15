@@ -27,6 +27,7 @@ final class ReferentialIntegrityTest extends TestCase
     private const UNCONSTRAINED = [
         'audio_rendition_runtime.worker_boot_id' => 'validated supervisor boot token; mutable deployment leases do not model individual worker launches',
         'audio_rendition_runtime.worker_id' => 'worker role label within a launch, not a row identifier',
+        'album_match_states.claim_id' => 'the match claim\'s own identifier, which the queue run holding the claim chose',
         'albums.discogs_id' => 'external Discogs identifier',
         'albums.spotify_id' => 'external Spotify identifier',
         'artists.discogs_id' => 'external Discogs identifier',
