@@ -30,6 +30,7 @@ use App\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchComparisonBuilder
 use App\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchSnapshots;
 use App\Catalog\Application\QueryHandler\MusicBrainzMatch\MusicBrainzAnswer;
 use App\Catalog\Application\Service\CoverImageDiscarder;
+use App\Catalog\Application\Service\MusicBrainzMatch\ArtistMatchWriter;
 use App\Catalog\Application\Service\MusicBrainzMatch\CandidateScorer;
 use App\Catalog\Application\Service\MusicBrainzMatch\LocalTrack;
 use App\Catalog\Application\Service\MusicBrainzMatch\MatchCandidate;
@@ -114,6 +115,7 @@ final readonly class ApplyMatchHandler
         private AlbumPortInterface $albums,
         private SongPortInterface $songs,
         private ArtistPortInterface $artists,
+        private ArtistMatchWriter $artistWriter,
         private GenrePortInterface $genres,
         private ArtistIdentityResolverInterface $artistIdentities,
         private ArtistMergePortInterface $merges,
@@ -390,7 +392,7 @@ final readonly class ApplyMatchHandler
                     $this->mergeArtist($artistId, $holder)->imagesToDiscard,
                 ];
             }
-            $this->writeArtist($artist, $ticks->fields);
+            $this->artistWriter->write($artist, $ticks->fields);
 
             return [
                 MatchApplyResult::applied(MatchItemType::Artist, $artist->getPublicId()->toString(), $candidate->id, self::fieldNames($ticks->fields), false, 0, [], []),
@@ -522,23 +524,6 @@ final readonly class ApplyMatchHandler
         $this->songs->persist($song);
 
         return $changed;
-    }
-
-    /** @param list<MatchFieldRow> $fields */
-    private function writeArtist(Artist $artist, array $fields): void
-    {
-        $field = static fn (MatchField $name): ?MatchFieldRow => array_find($fields, static fn (MatchFieldRow $row): bool => $row->field === $name);
-        $artist->updateMetadata(
-            name: self::text($field(MatchField::Name)),
-            country: self::text($field(MatchField::Country)),
-            type: self::text($field(MatchField::Type)),
-            lifeSpanBegin: self::date($field(MatchField::LifeSpanBegin)),
-            lifeSpanEnd: self::date($field(MatchField::LifeSpanEnd)),
-            disambiguation: self::text($field(MatchField::Disambiguation)),
-            sortName: self::text($field(MatchField::SortName)),
-        );
-        $artist->updateExternalIds(mbid: self::text($field(MatchField::Mbid)));
-        $this->artists->save($artist);
     }
 
     /**
@@ -817,13 +802,6 @@ final readonly class ApplyMatchHandler
     private static function number(?MatchFieldRow $row): ?int
     {
         return is_int($row?->proposed) ? $row->proposed : null;
-    }
-
-    private static function date(?MatchFieldRow $row): ?DateTimeImmutable
-    {
-        $text = self::text($row);
-
-        return $text === null ? null : (DateTimeImmutable::createFromFormat('!Y-m-d', $text) ?: null);
     }
 
     private function now(): DateTimeImmutable

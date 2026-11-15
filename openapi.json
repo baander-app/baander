@@ -10784,7 +10784,7 @@
                             "schema": {
                                 "properties": {
                                     "source": {
-                                        "description": "genres for the genre sync only; null or absent for one sync per library",
+                                        "description": "genres for the genre sync only; null or absent for one sync per library and one artist sync",
                                         "type": "string",
                                         "nullable": true,
                                         "enum": [
@@ -10807,7 +10807,7 @@
                                         "data": {
                                             "properties": {
                                                 "jobsDispatched": {
-                                                    "description": "Jobs queued: one per library, or one per album and song for the genre sync",
+                                                    "description": "Jobs queued: one per library and one for the artist sync, or one per album and song for the genre sync",
                                                     "type": "integer"
                                                 }
                                             },

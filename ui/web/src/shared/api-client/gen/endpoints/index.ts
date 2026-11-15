@@ -6082,7 +6082,7 @@ export type GetAdminMetadataSyncStatus200 = {
 };
 
 /**
- * genres for the genre sync only; null or absent for one sync per library
+ * genres for the genre sync only; null or absent for one sync per library and one artist sync
  * @nullable
  */
 export type PostAdminMetadataTriggerSyncBodySource = typeof PostAdminMetadataTriggerSyncBodySource[keyof typeof PostAdminMetadataTriggerSyncBodySource] | null;
@@ -6094,14 +6094,14 @@ export const PostAdminMetadataTriggerSyncBodySource = {
 
 export type PostAdminMetadataTriggerSyncBody = {
   /**
-     * genres for the genre sync only; null or absent for one sync per library
+     * genres for the genre sync only; null or absent for one sync per library and one artist sync
      * @nullable
      */
   source?: PostAdminMetadataTriggerSyncBodySource;
 };
 
 export type PostAdminMetadataTriggerSync200Data = {
-  /** Jobs queued: one per library, or one per album and song for the genre sync */
+  /** Jobs queued: one per library and one for the artist sync, or one per album and song for the genre sync */
   jobsDispatched?: number;
 };
 

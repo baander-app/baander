@@ -7,6 +7,8 @@ namespace App\Metadata\Infrastructure\Messaging;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Metadata\Application\Command\SyncMetadataCommand;
 use App\Metadata\Application\Message\SyncAlbumMessage;
+use App\Metadata\Application\Message\SyncArtistMessage;
+use App\Metadata\Application\Message\SyncArtistsMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
 use App\Shared\Application\Messaging\MessagePayloadCodecInterface;
@@ -18,7 +20,9 @@ final readonly class MetadataMessagePayloadCodec implements MessagePayloadCodecI
         'metadata.extract_album_cover' => ['album_id'],
         'metadata.sync_song' => ['song_id', 'force_update'],
         'metadata.sync_album' => ['album_id', 'force_update'],
-        'metadata.sync_library' => ['library_id', 'force_update', 'include_songs', 'include_artists'],
+        'metadata.sync_library' => ['library_id', 'force_update', 'include_songs'],
+        'metadata.sync_artists' => [],
+        'metadata.sync_artist' => ['artist_id', 'run_id', 'outages'],
         'metadata.sync' => ['source'],
     ];
 
@@ -29,6 +33,8 @@ final readonly class MetadataMessagePayloadCodec implements MessagePayloadCodecI
             'metadata.sync_song' => SyncSongMessage::class,
             'metadata.sync_album' => SyncAlbumMessage::class,
             'metadata.sync_library' => SyncLibraryMessage::class,
+            'metadata.sync_artists' => SyncArtistsMessage::class,
+            'metadata.sync_artist' => SyncArtistMessage::class,
             'metadata.sync' => SyncMetadataCommand::class,
         ];
     }
@@ -44,7 +50,9 @@ final readonly class MetadataMessagePayloadCodec implements MessagePayloadCodecI
             $message instanceof ExtractAlbumCoverCommand => [$message->getAlbumId()->toString()],
             $message instanceof SyncSongMessage => [$message->songId->toString(), $message->forceUpdate],
             $message instanceof SyncAlbumMessage => [$message->albumId->toString(), $message->forceUpdate],
-            $message instanceof SyncLibraryMessage => [$message->libraryId->toString(), $message->forceUpdate, $message->includeSongs, $message->includeArtists],
+            $message instanceof SyncLibraryMessage => [$message->libraryId->toString(), $message->forceUpdate, $message->includeSongs],
+            $message instanceof SyncArtistsMessage => [],
+            $message instanceof SyncArtistMessage => [$message->artistId->toString(), $message->runId?->toString(), $message->outages],
             $message instanceof SyncMetadataCommand => [$message->source],
             default => throw new \InvalidArgumentException('Unsupported message type.'),
         };
@@ -56,7 +64,13 @@ final readonly class MetadataMessagePayloadCodec implements MessagePayloadCodecI
             'metadata.extract_album_cover' => new ExtractAlbumCoverCommand(Uuid::fromString($p['album_id'])),
             'metadata.sync_song' => new SyncSongMessage(Uuid::fromString($p['song_id']), $p['force_update']),
             'metadata.sync_album' => new SyncAlbumMessage(Uuid::fromString($p['album_id']), $p['force_update']),
-            'metadata.sync_library' => new SyncLibraryMessage(Uuid::fromString($p['library_id']), $p['force_update'], $p['include_songs'], $p['include_artists']),
+            'metadata.sync_library' => new SyncLibraryMessage(Uuid::fromString($p['library_id']), $p['force_update'], $p['include_songs']),
+            'metadata.sync_artists' => new SyncArtistsMessage(),
+            'metadata.sync_artist' => new SyncArtistMessage(
+                Uuid::fromString($p['artist_id']),
+                $p['run_id'] === null ? null : Uuid::fromString($p['run_id']),
+                $p['outages'],
+            ),
             'metadata.sync' => new SyncMetadataCommand($p['source']),
             default => throw new \InvalidArgumentException('Unsupported message type.'),
         };

@@ -8,9 +8,17 @@ use App\Tests\Fixtures\Messaging\CancelAtCheckpoint;
 use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
 use App\Catalog\Application\MessageHandler\DrainAlbumMatchesHandler;
+use App\Catalog\Application\MessageHandler\QueueArtistSyncsHandler;
 use App\Catalog\Application\MessageHandler\RequestAlbumMatchHandler;
+use App\Catalog\Application\MessageHandler\SyncArtistHandler;
 use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
+use App\Catalog\Application\Port\ArtistMergePortInterface;
+use App\Catalog\Application\Port\ArtistPortInterface;
+use App\Catalog\Application\Query\MusicBrainzMatch\MatchCatalogReadInterface;
+use App\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchComparisonBuilder;
+use App\Catalog\Application\Service\ArtistSyncQueue;
+use App\Catalog\Application\Service\MusicBrainzMatch\ArtistMatchWriter;
 use App\Catalog\Application\Service\MusicBrainzMatch\AlbumMatchQueueChain;
 use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticAlbumMatcherInterface;
 use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticMatchOutcome;
@@ -21,6 +29,8 @@ use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Metadata\Application\SongMetadataEnricher;
 use App\Metadata\Application\Message\SyncAlbumMessage;
+use App\Metadata\Application\Message\SyncArtistMessage;
+use App\Metadata\Application\Message\SyncArtistsMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
 use App\Metadata\Application\MessageHandler\SyncLibraryHandler;
@@ -32,9 +42,12 @@ use App\Radio\Application\CommandHandler\SyncCountryStationsHandler;
 use App\Radio\Application\Port\RadioStationPortInterface;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Scheduler\Application\Command\ExecuteScheduledJobCommand;
+use App\Shared\Application\Port\CurrentJobInterface;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Catalog\InMemoryAlbumMatchStates;
+use App\Tests\Fixtures\Catalog\InMemoryQueuedArtistSyncs;
+use App\Tests\Fixtures\Catalog\PassThroughTransaction;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -212,6 +225,8 @@ final class MessengerJsonDeliveryTest extends TestCase
             'album' => SyncAlbumMessage::class,
             'album match queue' => DrainAlbumMatchesMessage::class,
             'library' => SyncLibraryMessage::class,
+            'artists' => SyncArtistsMessage::class,
+            'artist' => SyncArtistMessage::class,
             'country stations' => SyncCountryStationsCommand::class,
         ];
         foreach ($messages as $name => $messageType) {
@@ -264,13 +279,43 @@ final class MessengerJsonDeliveryTest extends TestCase
             $nestedBus->expects($this->never())->method('dispatch');
             $handler = new DrainAlbumMatchesHandler($states, $matcher, new AlbumMatchQueueChain(new ArrayAdapter()), $this->createStub(SystemSettingsPortInterface::class), $nestedBus, $clock, $logger);
         } elseif ($messageType === SyncLibraryMessage::class) {
-            $message = new SyncLibraryMessage($id, true, true, true);
+            $message = new SyncLibraryMessage($id, true, true);
             $albums = $this->createMock(AlbumPortInterface::class);
             $albums->expects($this->once())->method('findByLibrary')->with($id)
                 ->willReturnCallback(static function () use (&$effects): array { ++$effects; return []; });
             $nestedBus = $this->createMock(MessageBusInterface::class);
             $nestedBus->expects($this->never())->method('dispatch');
             $handler = new SyncLibraryHandler($albums, $nestedBus, $logger, new CancelAtCheckpoint());
+        } elseif ($messageType === SyncArtistsMessage::class) {
+            $message = new SyncArtistsMessage();
+            $artists = $this->createMock(ArtistPortInterface::class);
+            $artists->expects($this->once())->method('identifiedWithMissingDetailsAfter')
+                ->willReturnCallback(static function () use (&$effects): array { ++$effects; return []; });
+            $nestedBus = $this->createMock(MessageBusInterface::class);
+            $nestedBus->expects($this->never())->method('dispatch');
+            $marks = new InMemoryQueuedArtistSyncs();
+            $currentJob = $this->createStub(CurrentJobInterface::class);
+            $handler = new QueueArtistSyncsHandler($artists, new ArtistSyncQueue($marks, $nestedBus), $marks, new CancelAtCheckpoint(), $currentJob, $logger);
+        } elseif ($messageType === SyncArtistMessage::class) {
+            $message = new SyncArtistMessage($id, Uuid::v7(), 1);
+            // The artist is gone, so the real handler ends without asking MusicBrainz.
+            $artists = $this->createMock(ArtistPortInterface::class);
+            $artists->expects($this->once())->method('findFreshByUuid')->with($id)
+                ->willReturnCallback(static function () use (&$effects): null { ++$effects; return null; });
+            $nestedBus = $this->createMock(MessageBusInterface::class);
+            $nestedBus->expects($this->never())->method('dispatch');
+            $marks = new InMemoryQueuedArtistSyncs();
+            $handler = new SyncArtistHandler(
+                $artists,
+                $this->createStub(ArtistMergePortInterface::class),
+                $musicBrainz,
+                new MatchComparisonBuilder($this->createStub(MatchCatalogReadInterface::class), $artists),
+                new ArtistMatchWriter($artists),
+                $marks,
+                new ArtistSyncQueue($marks, $nestedBus),
+                new PassThroughTransaction(),
+                $logger,
+            );
         } else {
             $message = new SyncCountryStationsCommand($id, 'DK');
             $stations = $this->createMock(RadioStationPortInterface::class);

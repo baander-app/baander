@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Metadata\Infrastructure\Api\MusicBrainz;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtist;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCoverImage;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCreditedArtist;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMerged;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRecording;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
@@ -237,6 +238,63 @@ final class MusicBrainzAdapterTest extends TestCase
             new MusicBrainzArtist(self::POST_MALONE, 'Post Malone', 0, 'Malone, Post', 'Person', 'US', 'US rapper', '1995-07-04', null, false),
             $fetched,
         );
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function mergedArtistLocations(): iterable
+    {
+        yield 'an absolute HTTPS location' => ['https://musicbrainz.org/ws/2/artist/' . self::BLAKE_SHELTON . '?fmt=json'];
+        yield 'an absolute HTTP location' => ['http://musicbrainz.org/ws/2/artist/' . self::BLAKE_SHELTON . '?fmt=json'];
+        yield 'a relative location' => ['/ws/2/artist/' . self::BLAKE_SHELTON . '?fmt=json'];
+    }
+
+    /**
+     * MusicBrainz answers the lookup of an artist ID it merged with a permanent redirect to the
+     * surviving artist's lookup. The lookup reports the surviving ID without following it, so no
+     * second request is sent.
+     */
+    #[DataProvider('mergedArtistLocations')]
+    public function testAnArtistLookupThatMusicBrainzRedirectsToAnotherArtistReportsTheMergeWithoutFollowingIt(string $location): void
+    {
+        $this->respond(new MockResponse('{}', ['http_code' => 301, 'response_headers' => ['location: ' . $location]]));
+
+        $answer = $this->adapter()->fetchArtist(self::POST_MALONE);
+
+        self::assertEquals(new MusicBrainzMerged(self::POST_MALONE, self::BLAKE_SHELTON), $answer);
+        self::assertCount(1, $this->urls);
+    }
+
+    /** @return iterable<string, array{int, string}> */
+    public static function otherArtistRedirects(): iterable
+    {
+        yield 'a temporary redirect' => [302, 'https://musicbrainz.org/ws/2/artist/' . self::BLAKE_SHELTON . '?fmt=json'];
+        yield 'to another kind of record' => [301, 'https://musicbrainz.org/ws/2/release/' . self::BLAKE_SHELTON . '?fmt=json'];
+        yield 'to another host' => [301, 'https://example.baander.app/ws/2/artist/' . self::BLAKE_SHELTON];
+        yield 'to the same artist' => [301, 'https://musicbrainz.org/ws/2/artist/' . self::POST_MALONE . '?fmt=json'];
+        yield 'to no ID' => [301, 'https://musicbrainz.org/ws/2/artist/not-an-id'];
+    }
+
+    /** Any other redirect stays an answer MusicBrainz did not give, as every redirect was before. */
+    #[DataProvider('otherArtistRedirects')]
+    public function testAnyOtherRedirectOfAnArtistLookupIsUnavailable(int $status, string $location): void
+    {
+        $this->respond(new MockResponse('{}', ['http_code' => $status, 'response_headers' => ['location: ' . $location]]));
+
+        self::assertInstanceOf(MusicBrainzUnavailable::class, $this->adapter()->fetchArtist(self::POST_MALONE));
+        self::assertCount(1, $this->urls);
+    }
+
+    public function testReleaseAndRecordingLookupsFollowNoRedirectAndCallItUnavailable(): void
+    {
+        $redirect = static fn(string $kind, string $id): MockResponse => new MockResponse('{}', ['http_code' => 301, 'response_headers' => [
+            'location: https://musicbrainz.org/ws/2/' . $kind . '/' . $id . '?fmt=json',
+        ]]);
+        $this->respond($redirect('release', self::RECORDING_ID), $redirect('recording', self::RELEASE_ID));
+        $adapter = $this->adapter();
+
+        self::assertInstanceOf(MusicBrainzUnavailable::class, $adapter->fetchRelease(self::RELEASE_ID));
+        self::assertInstanceOf(MusicBrainzUnavailable::class, $adapter->fetchRecording(self::RECORDING_ID));
+        self::assertCount(2, $this->urls);
     }
 
     /** @return iterable<string, array{string, int, class-string|null}> */

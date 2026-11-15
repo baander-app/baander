@@ -216,6 +216,32 @@ final class ArtistRepository implements ArtistRepositoryInterface
         return $entity !== null ? $this->toDomain($entity) : null;
     }
 
+    public function identifiedWithMissingDetailsAfter(?Uuid $after, int $limit): array
+    {
+        $query = $this->entityManager->createQueryBuilder()
+            ->select('artist.id AS id', 'artist.mbid AS mbid')
+            ->from(ArtistEntity::class, 'artist')
+            ->where('artist.mbid IS NOT NULL')
+            ->andWhere(
+                'artist.sortName IS NULL OR artist.type IS NULL OR artist.country IS NULL'
+                . ' OR artist.disambiguation IS NULL OR artist.lifeSpanBegin IS NULL OR artist.lifeSpanEnd IS NULL',
+            )
+            ->orderBy('artist.id')
+            ->setMaxResults($limit);
+        if ($after !== null) {
+            $query->andWhere('artist.id > :after')->setParameter('after', $after, 'uuid');
+        }
+
+        /** @var list<array{id: Uuid|string, mbid: string}> $rows */
+        $rows = $query->getQuery()->getArrayResult();
+
+        return array_column(
+            array_map(static fn (array $row): array => [(string) $row['id'], $row['mbid']], $rows),
+            1,
+            0,
+        );
+    }
+
     public function count(): int
     {
         return (int) $this->entityManager

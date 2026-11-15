@@ -102,6 +102,11 @@ final class ArtistService implements ArtistPortInterface
         return $outcome === MusicbrainzIdAssignment::Assigned;
     }
 
+    public function identifiedWithMissingDetailsAfter(?Uuid $after, int $limit): array
+    {
+        return $this->artistRepository->identifiedWithMissingDetailsAfter($after, $limit);
+    }
+
     public function search(SearchOptions $options): SearchResult
     {
         return $this->artistRepository->search($options);

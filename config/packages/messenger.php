@@ -22,6 +22,8 @@ return static function (ContainerConfigurator $container): void {
         \App\Metadata\Application\Message\SyncSongMessage::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => true],
         \App\Metadata\Application\Message\SyncAlbumMessage::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => true],
         \App\Metadata\Application\Message\SyncLibraryMessage::class => ['transport' => 'async', 'resource_class' => 'coordination', 'default' => true],
+        \App\Metadata\Application\Message\SyncArtistsMessage::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => true],
+        \App\Metadata\Application\Message\SyncArtistMessage::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => true],
         \App\Notification\Application\DTO\SendEmailCommand::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => true],
         \App\Notification\Application\DTO\SendPushCommand::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => true],
         \App\Media\Application\Command\PruneMissingImagesCommand::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => true],

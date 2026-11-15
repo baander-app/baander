@@ -19,6 +19,7 @@ use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Artist;
 use App\Catalog\Domain\ValueObject\ArtistRole;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtist;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMerged;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRecording;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzReleaseGroup;
@@ -281,6 +282,25 @@ final class CompareMatchHandlerTest extends TestCase
         self::assertRow(MatchField::Country, null, 'NL', ticked: true, row: $comparison->field(MatchField::Country));
         self::assertRow(MatchField::LifeSpanBegin, null, '1985-09-12', ticked: true, row: $comparison->field(MatchField::LifeSpanBegin));
         self::assertNull($comparison->field(MatchField::LifeSpanEnd));
+    }
+
+    /**
+     * MusicBrainz answers the lookup of an artist ID it merged with the surviving artist's ID. An
+     * admin who compares with the merged ID is told MusicBrainz has no artist under it, as for an
+     * ID it never had.
+     */
+    public function testAnArtistCandidateMusicBrainzMergedIntoAnotherAnswers404(): void
+    {
+        $artist = $this->catalog->artist('HeadHunterz');
+        $this->musicBrainz->artists['6c1e0000-0000-4000-8000-000000000001'] = new MusicBrainzMerged('6c1e0000-0000-4000-8000-000000000001', '6c1e0000-0000-4000-8000-000000000002');
+
+        try {
+            $this->compareArtist($artist, '6c1e0000-0000-4000-8000-000000000001');
+            self::fail('A merged candidate is not found.');
+        } catch (NotFoundException $exception) {
+            self::assertSame(['reason' => 'candidate_not_found'], $exception->details);
+            self::assertSame(['fetchArtist:6c1e0000-0000-4000-8000-000000000001'], $this->musicBrainz->calls);
+        }
     }
 
     public function testMusicBrainzUnavailableAnswers503(): void

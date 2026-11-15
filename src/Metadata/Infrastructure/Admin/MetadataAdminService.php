@@ -7,6 +7,7 @@ namespace App\Metadata\Infrastructure\Admin;
 use App\Metadata\Application\Command\SyncMetadataCommand;
 use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\Message\SyncArtistMessage;
+use App\Metadata\Application\Message\SyncArtistsMessage;
 use App\Metadata\Application\Message\SyncGenresMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
@@ -25,6 +26,7 @@ final class MetadataAdminService implements MetadataAdminPortInterface
         SyncGenresMessage::class,
         SyncAlbumMessage::class,
         SyncSongMessage::class,
+        SyncArtistsMessage::class,
         SyncArtistMessage::class,
     ];
 

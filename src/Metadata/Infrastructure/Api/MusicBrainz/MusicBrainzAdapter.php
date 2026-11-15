@@ -11,6 +11,7 @@ use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCreditedArtist;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzLabel;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMedium;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMediumSummary;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMerged;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRecording;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRecordingRelease;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
@@ -30,6 +31,8 @@ use App\Shared\Application\Exception\RateLimiterUnavailableException;
 use App\Shared\Application\Exception\ServiceUnavailableException;
 use App\Shared\Infrastructure\Http\PublicHttpClient;
 use App\Shared\Infrastructure\Swoole\Async;
+use GuzzleHttp\Psr7\Uri;
+use GuzzleHttp\Psr7\UriResolver;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\RateLimiter\Exception\MaxWaitDurationExceededException;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
@@ -47,11 +50,16 @@ use Symfony\Component\Serializer\Exception\NotEncodableValueException;
  * address. Every request, including the Cover Art Archive requests made for the port, first
  * takes a turn under the shared `musicbrainz` rate limit, which all processes keep in Redis.
  * MusicBrainz also answers 503 now and then when it is busy, so a MusicBrainz request that gets
- * one is asked again after a back-off, on a fresh turn.
+ * one is asked again after a back-off, on a fresh turn. It answers the lookup of an ID it merged
+ * into another record with a permanent redirect to that record; an artist lookup reports the
+ * surviving ID without following it, and every other redirect counts as no answer.
  */
 final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
 {
     private const string BASE_URL = 'https://musicbrainz.org/ws/2';
+    /** The host and path of BASE_URL. */
+    private const string HOST = 'musicbrainz.org';
+    private const string LOOKUP_PATH = '/ws/2';
     private const string USER_AGENT = 'Baander/1.0 (https://baander.app; contact@baander.app)';
     /** Seconds a request may take before MusicBrainz counts as unavailable. */
     private const int TIMEOUT_SECONDS = 10;
@@ -63,6 +71,10 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
     private const array NOT_REJECTIONS = [408, 429];
     /** MusicBrainz's documented answer to a client that is too fast, and its answer when busy. */
     private const int SLOW_DOWN = 503;
+    /** MusicBrainz's answer to the lookup of a merged ID: a permanent redirect to the surviving record. */
+    private const int MERGED = 301;
+    /** A MusicBrainz ID in a lookup path. */
+    private const string MBID_PATTERN = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
     /** Seconds to wait before each retry of a request answered with 503. */
     private const array RETRY_BACK_OFF_SECONDS = [1.0, 3.0];
     private const string RELEASE_INCLUDES = 'recordings+artist-credits+labels+release-groups+genres';
@@ -127,8 +139,8 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
     public function fetchArtist(
         string $artistId,
         MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded,
-    ): MusicBrainzArtist|MusicBrainzRejected|MusicBrainzUnavailable|null {
-        return $this->lookup('/artist/' . rawurlencode($artistId), null, self::artist(...), $wait);
+    ): MusicBrainzArtist|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|null {
+        return $this->lookup('/artist/' . rawurlencode($artistId), null, self::artist(...), $wait, reportsMerges: true);
     }
 
     #[\Override]
@@ -246,12 +258,14 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
      * @template T
      *
      * @param \Closure(array<array-key, mixed>): T $map
+     * @param bool $reportsMerges whether a redirect to the lookup of another record of the same kind is
+     *                            reported as a merge into that record; any other redirect is unavailable
      *
-     * @return T|MusicBrainzRejected|MusicBrainzUnavailable|null
+     * @return T|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|null
      */
-    private function lookup(string $endpoint, ?string $includes, \Closure $map, MusicBrainzSlotWait $wait): mixed
+    private function lookup(string $endpoint, ?string $includes, \Closure $map, MusicBrainzSlotWait $wait, bool $reportsMerges = false): mixed
     {
-        $data = $this->fetch($endpoint, $includes === null ? [] : ['inc' => $includes], $wait);
+        $data = $this->fetch($endpoint, $includes === null ? [] : ['inc' => $includes], $wait, $reportsMerges);
 
         return match (true) {
             !is_array($data) => $data,
@@ -265,13 +279,13 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
      *
      * @param array<string, string|int> $params query parameters besides the response format
      *
-     * @return array<array-key, mixed>|MusicBrainzRejected|MusicBrainzUnavailable|null null on 404
+     * @return array<array-key, mixed>|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|null null on 404
      */
-    private function fetch(string $endpoint, array $params, MusicBrainzSlotWait $wait): array|MusicBrainzRejected|MusicBrainzUnavailable|null
+    private function fetch(string $endpoint, array $params, MusicBrainzSlotWait $wait, bool $reportsMerges = false): array|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|null
     {
         $deadline = self::deadline($wait);
 
-        return $this->takeTurn($wait, $deadline) ?? $this->get($endpoint, $params, $wait, $deadline, $this->retryBackOffSeconds);
+        return $this->takeTurn($wait, $deadline) ?? $this->get($endpoint, $params, $wait, $deadline, $this->retryBackOffSeconds, $reportsMerges);
     }
 
     /**
@@ -333,11 +347,11 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
      * @param array<string, string|int> $params
      * @param list<float> $backOffs seconds to wait before each retry still allowed
      *
-     * @return array<array-key, mixed>|MusicBrainzRejected|MusicBrainzUnavailable|null null on 404
+     * @return array<array-key, mixed>|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|null null on 404
      */
-    private function get(string $endpoint, array $params, MusicBrainzSlotWait $wait, ?float $deadline, array $backOffs): array|MusicBrainzRejected|MusicBrainzUnavailable|null
+    private function get(string $endpoint, array $params, MusicBrainzSlotWait $wait, ?float $deadline, array $backOffs, bool $reportsMerges = false): array|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|null
     {
-        $response = $this->send($endpoint, $params);
+        $response = $this->send($endpoint, $params, $reportsMerges);
         if (!is_array($response) || $response[0] !== self::SLOW_DOWN || $backOffs === []) {
             return is_array($response) ? $this->answer($endpoint, ...$response) : $response;
         }
@@ -346,7 +360,7 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
 
         return $this->backOff($endpoint, $backOff, $deadline)
             ?? $this->takeTurn($wait, $deadline)
-            ?? $this->get($endpoint, $params, $wait, $deadline, $backOffs);
+            ?? $this->get($endpoint, $params, $wait, $deadline, $backOffs, $reportsMerges);
     }
 
     /** Wait before a retry, or answer unavailable at once when the wait would end after the deadline. */
@@ -362,13 +376,14 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
 
     /**
      * Send one GET. Destination validation and connection pinning are handled by the public
-     * provider transport, which follows no redirect here.
+     * provider transport, which follows no redirect here. A redirect fails the request, unless
+     * $returnRedirects asks for the redirect itself, with its Location.
      *
      * @param array<string, string|int> $params
      *
-     * @return array{int, string}|MusicBrainzUnavailable the status and body
+     * @return array{int, string, string|null}|MusicBrainzUnavailable the status, body and Location of a redirect
      */
-    private function send(string $endpoint, array $params): array|MusicBrainzUnavailable
+    private function send(string $endpoint, array $params, bool $returnRedirects = false): array|MusicBrainzUnavailable
     {
         $url = self::BASE_URL . $endpoint . '?' . http_build_query([...$params, 'fmt' => 'json'], encoding_type: PHP_QUERY_RFC3986);
         $response = null;
@@ -376,9 +391,11 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
             $response = $this->httpClient->request('GET', $url, ['musicbrainz.org'], [
                 'headers' => ['User-Agent' => self::USER_AGENT, 'Accept' => 'application/json'],
                 'timeout' => self::TIMEOUT_SECONDS,
-            ]);
+            ], returnRedirects: $returnRedirects);
+            $status = $response->getStatusCode();
+            $location = $status >= 300 && $status < 400 ? ($response->getHeaders(false)['location'][0] ?? null) : null;
 
-            return [$response->getStatusCode(), $response->getContent(false)];
+            return [$status, $response->getContent(false), $location];
         } catch (\Throwable) {
             return $this->unavailable($endpoint, 'the request failed');
         } finally {
@@ -386,10 +403,31 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
         }
     }
 
-    /** @return array<array-key, mixed>|MusicBrainzRejected|MusicBrainzUnavailable|null null on 404 */
-    private function answer(string $endpoint, int $status, string $body): array|MusicBrainzRejected|MusicBrainzUnavailable|null
+    /** @return array<array-key, mixed>|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|null null on 404 */
+    private function answer(string $endpoint, int $status, string $body, ?string $location): array|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|null
     {
-        return $status === 200 ? $this->decode($endpoint, $body) : $this->errorAnswer($endpoint, $status);
+        return match (true) {
+            $status === 200 => $this->decode($endpoint, $body),
+            $status === self::MERGED && $location !== null => $this->merged($endpoint, $location),
+            default => $this->errorAnswer($endpoint, $status),
+        };
+    }
+
+    /**
+     * A lookup MusicBrainz redirected permanently to the lookup of another record of the same kind:
+     * it merged the requested record into that one. The redirect is never followed, only read, so
+     * its scheme does not matter and a relative one counts. Any other target is no answer.
+     */
+    private function merged(string $endpoint, string $location): MusicBrainzMerged|MusicBrainzUnavailable
+    {
+        $target = UriResolver::resolve(new Uri(self::BASE_URL . $endpoint), new Uri($location));
+        $lookup = '#^' . preg_quote(self::LOOKUP_PATH . dirname($endpoint) . '/', '#') . '(' . self::MBID_PATTERN . ')$#';
+        $requestedId = basename($endpoint) |> rawurldecode(...);
+        $onMusicBrainz = in_array($target->getScheme(), ['http', 'https'], true) && strtolower($target->getHost()) === self::HOST;
+
+        return $onMusicBrainz && preg_match($lookup, $target->getPath(), $surviving) === 1 && $surviving[1] !== strtolower($requestedId)
+            ? new MusicBrainzMerged($requestedId, $surviving[1])
+            : $this->unavailable($endpoint, sprintf('HTTP %d to %s', self::MERGED, (string) $target));
     }
 
     /** @return array<array-key, mixed>|MusicBrainzUnavailable */

@@ -16,6 +16,7 @@ use App\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchSnapshots;
 use App\Catalog\Application\Service\CoverImageDiscarder;
 use App\Catalog\Application\Service\MusicBrainzMatch\CandidateScorer;
 use App\Catalog\Application\Service\MusicBrainzMatch\TrackPairing;
+use App\Catalog\Application\Service\MusicBrainzMatch\ArtistMatchWriter;
 use App\Catalog\Infrastructure\AlbumService;
 use App\Catalog\Infrastructure\ArtistMergeService;
 use App\Catalog\Infrastructure\ArtistService;
@@ -213,6 +214,7 @@ final class MatchApplyRace
             albums: $services['albums'],
             songs: $services['songs'],
             artists: $services['artists'],
+            artistWriter: new ArtistMatchWriter($services['artists']),
             genres: new GenreService(new GenreRepository($manager), new GenreMovieRepository($manager)),
             artistIdentities: new ArtistIdentityResolver($manager),
             merges: $services['merges'],

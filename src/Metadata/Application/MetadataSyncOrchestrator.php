@@ -6,7 +6,7 @@ namespace App\Metadata\Application;
 
 use App\Library\Application\Port\LibraryPortInterface;
 use App\Metadata\Application\Message\SyncAlbumMessage;
-use App\Metadata\Application\Message\SyncArtistMessage;
+use App\Metadata\Application\Message\SyncArtistsMessage;
 use App\Metadata\Application\Message\SyncGenresMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
@@ -27,7 +27,6 @@ final class MetadataSyncOrchestrator
         string $libraryId,
         bool $forceUpdate = false,
         bool $includeSongs = false,
-        bool $includeArtists = false,
     ): SyncLibraryResult {
         $uuid = new \App\Shared\Domain\Model\Uuid($libraryId);
         $library = $this->libraryService->findByUuid($uuid);
@@ -35,14 +34,13 @@ final class MetadataSyncOrchestrator
         if ($library === null) {
             $this->logger->warning('Library not found for sync', ['library_id' => $libraryId]);
 
-            return new SyncLibraryResult(albumsDispatched: 0, songsDispatched: 0, artistsDispatched: 0);
+            return new SyncLibraryResult(albumsDispatched: 0, songsDispatched: 0);
         }
 
         $this->logger->info('Starting library metadata sync', [
             'library_id' => $libraryId,
             'force_update' => $forceUpdate,
             'include_songs' => $includeSongs,
-            'include_artists' => $includeArtists,
         ]);
 
         // Dispatch library sync message for async processing
@@ -50,24 +48,15 @@ final class MetadataSyncOrchestrator
             $library->getId(),
             $forceUpdate,
             $includeSongs,
-            $includeArtists,
         ));
 
-        return new SyncLibraryResult(albumsDispatched: 0, songsDispatched: 0, artistsDispatched: 0);
+        return new SyncLibraryResult(albumsDispatched: 0, songsDispatched: 0);
     }
 
     public function syncAlbum(string $albumId, bool $forceUpdate = false): void
     {
         $this->bus->dispatch(new SyncAlbumMessage(
             new \App\Shared\Domain\Model\Uuid($albumId),
-            $forceUpdate,
-        ));
-    }
-
-    public function syncArtist(string $artistId, bool $forceUpdate = false): void
-    {
-        $this->bus->dispatch(new SyncArtistMessage(
-            new \App\Shared\Domain\Model\Uuid($artistId),
             $forceUpdate,
         ));
     }
@@ -116,5 +105,19 @@ final class MetadataSyncOrchestrator
         }
 
         return count($libraries);
+    }
+
+    /**
+     * Queues the fill of every artist that holds a MusicBrainz ID and misses details, which
+     * Catalog walks when the message runs.
+     *
+     * @return int the one job queued
+     */
+    public function syncArtists(): int
+    {
+        $this->bus->dispatch(new SyncArtistsMessage());
+        $this->logger->info('Artist sync dispatched');
+
+        return 1;
     }
 }

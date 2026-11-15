@@ -58,6 +58,15 @@ interface ArtistPortInterface
      */
     public function assignMusicbrainzId(Uuid $artistId, string $musicbrainzId, string $matchedName): bool;
 
+    /**
+     * A keyset page of the artists that hold a MusicBrainz ID and miss one of the details an artist
+     * sync fills: sort name, type, country, disambiguation, or either end of the life span.
+     *
+     * @return array<string, string> the MusicBrainz ID of each, by artist ID, at most $limit in ascending ID
+     *                               order after $after; empty once the walk is complete
+     */
+    public function identifiedWithMissingDetailsAfter(?Uuid $after, int $limit): array;
+
     public function search(SearchOptions $options): SearchResult;
 
     public function count(): int;

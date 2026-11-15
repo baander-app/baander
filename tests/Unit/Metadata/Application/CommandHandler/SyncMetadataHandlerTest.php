@@ -12,6 +12,7 @@ use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Metadata\Application\Command\SyncMetadataCommand;
 use App\Metadata\Application\CommandHandler\SyncMetadataHandler;
+use App\Metadata\Application\Message\SyncArtistsMessage;
 use App\Metadata\Application\Message\SyncGenresMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\MetadataSyncOrchestrator;
@@ -28,20 +29,22 @@ final class SyncMetadataHandlerTest extends TestCase
     /** @var list<object> */
     private array $dispatched = [];
 
-    public function testWithoutASourceEveryLibraryIsSyncedAndTheLibrarySyncsAreCounted(): void
+    public function testWithoutASourceEveryLibraryAndTheArtistsAreSyncedAndEverySyncIsCounted(): void
     {
         $libraries = [self::library('rock'), self::library('jazz'), self::library('audiobooks')];
 
         $queued = $this->handler($libraries)(new SyncMetadataCommand());
 
-        self::assertSame(3, $queued);
-        self::assertCount(3, $this->dispatched);
-        foreach ($this->dispatched as $index => $message) {
-            self::assertInstanceOf(SyncLibraryMessage::class, $message);
+        self::assertSame(4, $queued, 'One sync per library and one for the artists.');
+        self::assertCount(4, $this->dispatched);
+        $librarySyncs = array_filter($this->dispatched, static fn (object $message): bool => $message instanceof SyncLibraryMessage) |> array_values(...);
+        self::assertCount(3, $librarySyncs);
+        foreach ($librarySyncs as $index => $message) {
             self::assertTrue($message->libraryId->equals($libraries[$index]->getId()));
             self::assertFalse($message->forceUpdate);
             self::assertTrue($message->includeSongs);
         }
+        self::assertEquals([new SyncArtistsMessage()], array_filter($this->dispatched, static fn (object $message): bool => $message instanceof SyncArtistsMessage) |> array_values(...));
     }
 
     public function testTheGenreSourceDispatchesOnlyTheGenreSyncAndReportsTheJobsItQueued(): void

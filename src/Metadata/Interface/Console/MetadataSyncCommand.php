@@ -24,7 +24,7 @@ use Throwable;
  */
 #[AsCommand(
     name: 'app:metadata:sync',
-    description: 'Queue a metadata sync for every library, or with --source=genres only the genre sync.',
+    description: 'Queue a metadata sync for every library and an artist sync, or with --source=genres only the genre sync.',
 )]
 final class MetadataSyncCommand extends Command
 {
@@ -54,7 +54,7 @@ final class MetadataSyncCommand extends Command
         $json = AdminCommandSupport::wantsJson($input);
 
         if (!$json && $source === null) {
-            $io->text('Queuing a metadata sync for every library...');
+            $io->text('Queuing a metadata sync for every library and an artist sync...');
         } elseif (!$json && $source === SyncMetadataCommand::SOURCE_GENRES) {
             $io->text('Queuing a forced sync of every album and song for the genre sync...');
         }

@@ -22,8 +22,10 @@ final class PublicHttpClient
      * @param list<string> $allowedHosts Exact initial provider hosts
      * @param array<string, mixed> $options Headers, body and time budgets only
      * @param list<string> $redirectDomains Allowed redirect domains and their subdomains
+     * @param bool $returnRedirects Return a redirect response as it is, unfollowed, for a caller that reads its
+     *                              Location itself; it cannot be combined with $redirectDomains
      */
-    public function request(string $method, string $url, array $allowedHosts, array $options = [], array $redirectDomains = []): ResponseInterface
+    public function request(string $method, string $url, array $allowedHosts, array $options = [], array $redirectDomains = [], bool $returnRedirects = false): ResponseInterface
     {
         if (array_diff(array_keys($options), ['headers', 'body', 'timeout', 'max_duration']) !== []) {
             throw new \InvalidArgumentException('Unsupported provider request option.');
@@ -31,6 +33,9 @@ final class PublicHttpClient
         $method = strtoupper($method);
         if ($redirectDomains !== [] && ($method !== 'GET' || isset($options['body']))) {
             throw new \InvalidArgumentException('Only bodyless GET requests may follow provider redirects.');
+        }
+        if ($returnRedirects && $redirectDomains !== []) {
+            throw new \InvalidArgumentException('A provider redirect is either followed or returned, not both.');
         }
         $headers = $this->headers($options['headers'] ?? []);
         $timeout = $this->duration($options['timeout'] ?? 10);
@@ -60,7 +65,7 @@ final class PublicHttpClient
                     'extra' => ['curl' => [CURLOPT_FRESH_CONNECT => true, CURLOPT_FORBID_REUSE => true]],
                 ]);
                 $status = $response->getStatusCode();
-                if ($status < 300 || $status >= 400) {
+                if ($status < 300 || $status >= 400 || $returnRedirects) {
                     return $response;
                 }
                 $locations = $response->getHeaders(false)['location'] ?? [];

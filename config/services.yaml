@@ -644,6 +644,8 @@ services:
         alias: App\Catalog\Infrastructure\ArtistService
     App\Catalog\Application\Port\ArtistIdentityResolverInterface:
         alias: App\Catalog\Infrastructure\Doctrine\ImportIdentity\ArtistIdentityResolver
+    App\Catalog\Application\Port\QueuedArtistSyncsInterface:
+        alias: App\Catalog\Infrastructure\Redis\RedisQueuedArtistSyncs
     App\Catalog\Application\Port\AlbumPortInterface:
         alias: App\Catalog\Infrastructure\AlbumService
     App\Catalog\Application\Port\AlbumMatchRequestInterface:

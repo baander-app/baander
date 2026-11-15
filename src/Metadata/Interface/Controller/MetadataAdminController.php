@@ -73,7 +73,7 @@ final class MetadataAdminController
         requestBody: new OA\RequestBody(
             content: new OA\JsonContent(
                 properties: [
-                    new OA\Property(property: 'source', description: 'genres for the genre sync only; null or absent for one sync per library', type: 'string', nullable: true, enum: ['genres']),
+                    new OA\Property(property: 'source', description: 'genres for the genre sync only; null or absent for one sync per library and one artist sync', type: 'string', nullable: true, enum: ['genres']),
                 ],
             ),
         ),
@@ -84,7 +84,7 @@ final class MetadataAdminController
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'jobsDispatched', description: 'Jobs queued: one per library, or one per album and song for the genre sync', type: 'integer'),
+                            new OA\Property(property: 'jobsDispatched', description: 'Jobs queued: one per library and one for the artist sync, or one per album and song for the genre sync', type: 'integer'),
                         ], type: 'object'),
                     ],
                 ),

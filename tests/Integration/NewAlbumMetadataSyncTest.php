@@ -28,6 +28,7 @@ use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCreditedArtist;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzLabel;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMedium;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMediumSummary;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMerged;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRecording;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
@@ -603,7 +604,7 @@ final class NewAlbumMetadataSyncTest extends KernelTestCase
                 return [];
             }
 
-            public function fetchArtist(string $artistId, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): MusicBrainzArtist|MusicBrainzRejected|MusicBrainzUnavailable|null
+            public function fetchArtist(string $artistId, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): MusicBrainzArtist|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|null
             {
                 $this->calls[] = 'fetchArtist:' . $artistId;
 

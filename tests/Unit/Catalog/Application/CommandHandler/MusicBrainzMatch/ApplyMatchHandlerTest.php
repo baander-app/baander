@@ -36,6 +36,7 @@ use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticAlbumMatcher;
 use App\Catalog\Application\Service\MusicBrainzMatch\MatchCandidate;
 use App\Catalog\Application\Service\MusicBrainzMatch\MatchConfidence;
 use App\Catalog\Application\Service\MusicBrainzMatch\TrackPairs;
+use App\Catalog\Application\Service\MusicBrainzMatch\ArtistMatchWriter;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Artist;
 use App\Catalog\Domain\Model\Song;
@@ -1087,6 +1088,7 @@ final class ApplyMatchHandlerTest extends TestCase
             albums: $this->albumPort(),
             songs: $this->songPort(),
             artists: $artists,
+            artistWriter: new ArtistMatchWriter($artists),
             genres: $this->genrePort(),
             artistIdentities: $this->resolver(),
             merges: $this->mergePort(),

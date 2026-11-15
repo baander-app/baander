@@ -6,6 +6,7 @@ namespace App\Metadata\Application\Port;
 
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtist;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCoverImage;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMerged;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRecording;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
@@ -77,11 +78,14 @@ interface MusicBrainzLookupInterface
         MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded,
     ): array|MusicBrainzRejected|MusicBrainzUnavailable;
 
-    /** Look up an artist. */
+    /**
+     * Look up an artist. An ID MusicBrainz merged into another artist answers MusicBrainzMerged
+     * with the surviving artist's ID, without a request for that artist.
+     */
     public function fetchArtist(
         string $artistId,
         MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded,
-    ): MusicBrainzArtist|MusicBrainzRejected|MusicBrainzUnavailable|null;
+    ): MusicBrainzArtist|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|null;
 
     /**
      * Fetch a release's front cover from the Cover Art Archive, at most 1200 pixels wide.

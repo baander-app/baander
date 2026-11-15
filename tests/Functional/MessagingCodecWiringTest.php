@@ -45,13 +45,15 @@ final class MessagingCodecWiringTest extends KernelTestCase
             new \App\Library\Application\Message\FilesDiscovered($id, 'music', '/media/music', []),
             new \App\Metadata\Application\Message\SyncSongMessage($id, true),
             new \App\Metadata\Application\Message\SyncAlbumMessage($id, true),
-            new \App\Metadata\Application\Message\SyncLibraryMessage($id, true, true, true),
+            new \App\Metadata\Application\Message\SyncLibraryMessage($id, true, true),
+            new \App\Metadata\Application\Message\SyncArtistsMessage(),
+            new \App\Metadata\Application\Message\SyncArtistMessage($id, Uuid::generate(), 2),
             new \App\Lyrics\Application\Command\FetchLyricsCommand($id),
             new \App\Notification\Application\DTO\SendEmailCommand($id, 'listener@baander.app', NotificationCategory::Security, 'title', [], 'body', [], new \DateTimeImmutable('2026-10-18T04:00:00Z')),
             new UpdateTranscodePositionCommand($id, 12.5, 'seek'),
         ];
 
-        self::assertCount(19, $messages);
+        self::assertCount(21, $messages);
         $catalog = self::getContainer()->get(\App\Shared\Infrastructure\Messaging\AsyncWorkloadCatalog::class);
         self::assertInstanceOf(\App\Shared\Infrastructure\Messaging\AsyncWorkloadCatalog::class, $catalog);
         $covered = array_fill_keys(array_map(static fn (object $message): string => $message::class, $messages), true);

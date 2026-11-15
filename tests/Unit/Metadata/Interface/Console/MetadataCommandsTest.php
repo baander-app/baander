@@ -85,7 +85,7 @@ final class MetadataCommandsTest extends TestCase
 
         self::assertEquals([new SyncMetadataCommand()], $this->dispatched);
         self::assertEquals($this->dispatched, $inline);
-        self::assertStringContainsString('Queuing a metadata sync for every library', $tester->getDisplay());
+        self::assertStringContainsString('Queuing a metadata sync for every library and an artist sync', $tester->getDisplay());
         self::assertStringContainsString('Queued 3 metadata sync job(s). Job ID: inline-job-1', $tester->getDisplay());
     }
 

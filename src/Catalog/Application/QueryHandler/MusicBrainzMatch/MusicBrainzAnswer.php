@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Application\QueryHandler\MusicBrainzMatch;
 
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchItemType;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMerged;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
 use App\Shared\Application\Exception\ConflictException;
@@ -15,7 +16,8 @@ use App\Shared\Application\Exception\ServiceUnavailableException;
  * Reports a MusicBrainz outage or refusal as the shared exceptions, told apart by `details.reason`:
  * an outage answers 503 with `musicbrainz_unavailable`, so a caller never mistakes it for an empty
  * result, and a refused request answers 409 with `musicbrainz_rejected`. A candidate MusicBrainz
- * does not have answers 404 with `candidate_not_found`.
+ * does not have answers 404 with `candidate_not_found`, and so does one it merged into another:
+ * it has no candidate under that ID any more.
  */
 final class MusicBrainzAnswer
 {
@@ -26,9 +28,9 @@ final class MusicBrainzAnswer
     /**
      * @template T
      *
-     * @param T|MusicBrainzRejected|MusicBrainzUnavailable $answer
+     * @param T|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable $answer
      *
-     * @return T the answer itself when MusicBrainz gave one
+     * @return T|null the answer itself when MusicBrainz gave one; null for an ID it merged into another
      *
      * @throws ServiceUnavailableException when MusicBrainz gave no usable answer
      * @throws ConflictException           when MusicBrainz refused the request
@@ -44,6 +46,7 @@ final class MusicBrainzAnswer
                 sprintf('MusicBrainz rejected the request with HTTP %d.', $answer->status),
                 ['reason' => self::REJECTED_REASON],
             ),
+            $answer instanceof MusicBrainzMerged => null,
             default => $answer,
         };
     }

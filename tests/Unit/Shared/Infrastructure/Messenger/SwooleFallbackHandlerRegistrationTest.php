@@ -6,8 +6,12 @@ namespace App\Tests\Unit\Shared\Infrastructure\Messenger;
 
 use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
 use App\Catalog\Application\MessageHandler\DrainAlbumMatchesHandler;
+use App\Catalog\Application\MessageHandler\QueueArtistSyncsHandler;
 use App\Catalog\Application\MessageHandler\RequestAlbumMatchHandler;
+use App\Catalog\Application\MessageHandler\SyncArtistHandler;
 use App\Metadata\Application\Message\SyncAlbumMessage;
+use App\Metadata\Application\Message\SyncArtistMessage;
+use App\Metadata\Application\Message\SyncArtistsMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
 use App\Metadata\Application\MessageHandler\SyncLibraryHandler;
@@ -56,6 +60,8 @@ final class SwooleFallbackHandlerRegistrationTest extends TestCase
             RequestAlbumMatchHandler::class => new SyncAlbumMessage(Uuid::v7()),
             DrainAlbumMatchesHandler::class => new DrainAlbumMatchesMessage(),
             SyncLibraryHandler::class => new SyncLibraryMessage(Uuid::v7()),
+            QueueArtistSyncsHandler::class => new SyncArtistsMessage(),
+            SyncArtistHandler::class => new SyncArtistMessage(Uuid::v7()),
             SyncCountryStationsHandler::class => new SyncCountryStationsCommand(Uuid::v7(), 'DK'),
         ];
         foreach ($messages as $handler => $message) {

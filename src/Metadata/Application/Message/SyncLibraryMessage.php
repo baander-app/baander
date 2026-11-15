@@ -12,7 +12,6 @@ final readonly class SyncLibraryMessage
         public readonly Uuid $libraryId,
         public readonly bool $forceUpdate = false,
         public readonly bool $includeSongs = false,
-        public readonly bool $includeArtists = false,
     ) {
     }
 }

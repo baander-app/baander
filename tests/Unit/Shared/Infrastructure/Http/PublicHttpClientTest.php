@@ -98,6 +98,25 @@ final class PublicHttpClientTest extends TestCase
         $this->client($transport)->request('GET', 'https://api.baander.app/start', ['api.baander.app']);
     }
 
+    public function testACallerThatAsksForRedirectsGetsTheRedirectItselfWithoutFollowingIt(): void
+    {
+        $transport = new MockHttpClient(new MockResponse('{}', ['http_code' => 301, 'response_headers' => ['location: https://api.baander.app/next']]));
+
+        $response = $this->client($transport)->request('GET', 'https://api.baander.app/start', ['api.baander.app'], returnRedirects: true);
+
+        self::assertSame(301, $response->getStatusCode());
+        self::assertSame(['https://api.baander.app/next'], $response->getHeaders(false)['location']);
+        self::assertSame(1, $transport->getRequestsCount());
+    }
+
+    public function testACallerCannotBothFollowAndReturnRedirects(): void
+    {
+        $transport = $this->createMock(HttpClientInterface::class);
+        $transport->expects(self::never())->method('request');
+        $this->expectException(\InvalidArgumentException::class);
+        $this->client($transport)->request('GET', 'https://api.baander.app/start', ['api.baander.app'], [], ['api.baander.app'], returnRedirects: true);
+    }
+
     public function testRedirectLoopStopsAfterThreeHops(): void
     {
         $transport = new MockHttpClient(static fn (): MockResponse => new MockResponse('', ['http_code' => 307, 'response_headers' => ['location: /loop']]));

@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Catalog\Application\QueryHandler\MusicBrainzMatch;
 
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtist;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCoverImage;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMerged;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRecording;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
@@ -36,7 +37,7 @@ final class FakeMusicBrainzLookup implements MusicBrainzLookupInterface
     /** @var list<MusicBrainzArtist>|MusicBrainzRejected|MusicBrainzUnavailable */
     public array|MusicBrainzRejected|MusicBrainzUnavailable $artistSearch = [];
 
-    /** @var array<string, MusicBrainzArtist|MusicBrainzRejected|MusicBrainzUnavailable> by artist ID */
+    /** @var array<string, MusicBrainzArtist|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable> by artist ID; an ID not listed is a 404 */
     public array $artists = [];
 
     /**
@@ -46,6 +47,14 @@ final class FakeMusicBrainzLookup implements MusicBrainzLookupInterface
      * @var (Closure(string): void)|null given the release ID looked up
      */
     public ?Closure $duringReleaseLookup = null;
+
+    /**
+     * Runs during an artist lookup, before the answer, as {@see $duringReleaseLookup} does for a
+     * release.
+     *
+     * @var (Closure(string): void)|null given the artist ID looked up
+     */
+    public ?Closure $duringArtistLookup = null;
 
     #[\Override]
     public function findReleases(string $title, ?string $artist, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): array|MusicBrainzRejected|MusicBrainzUnavailable
@@ -90,9 +99,10 @@ final class FakeMusicBrainzLookup implements MusicBrainzLookupInterface
     }
 
     #[\Override]
-    public function fetchArtist(string $artistId, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): MusicBrainzArtist|MusicBrainzRejected|MusicBrainzUnavailable|null
+    public function fetchArtist(string $artistId, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): MusicBrainzArtist|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|null
     {
         $this->calls[] = 'fetchArtist:' . $artistId;
+        $this->duringArtistLookup?->__invoke($artistId);
 
         return $this->artists[$artistId] ?? null;
     }

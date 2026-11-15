@@ -12,8 +12,8 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 /**
  * The metadata sync the admin page and `app:metadata:sync` start.
  *
- * Returns the number of jobs queued: one per library for the full sync, and one per
- * album and song for the genre sync.
+ * Returns the number of jobs queued: for the full sync one per library and one for the
+ * artists, and for the genre sync one per album and song.
  */
 #[AsMessageHandler]
 final readonly class SyncMetadataHandler
@@ -27,7 +27,7 @@ final readonly class SyncMetadataHandler
     public function __invoke(SyncMetadataCommand $command): int
     {
         return match ($command->source) {
-            null => $this->orchestrator->syncAll(includeSongs: true),
+            null => $this->orchestrator->syncAll(includeSongs: true) + $this->orchestrator->syncArtists(),
             SyncMetadataCommand::SOURCE_GENRES => $this->orchestrator->syncGenres(forceUpdate: true, includeSongs: true),
             default => throw new InvalidInputException(
                 sprintf(

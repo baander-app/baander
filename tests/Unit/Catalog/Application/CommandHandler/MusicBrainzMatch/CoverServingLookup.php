@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Catalog\Application\CommandHandler\MusicBrainzMatch;
 
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtist;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCoverImage;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMerged;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRecording;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
@@ -56,7 +57,7 @@ final class CoverServingLookup implements MusicBrainzLookupInterface
     }
 
     #[\Override]
-    public function fetchArtist(string $artistId, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): MusicBrainzArtist|MusicBrainzRejected|MusicBrainzUnavailable|null
+    public function fetchArtist(string $artistId, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): MusicBrainzArtist|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|null
     {
         return $this->lookup->fetchArtist($artistId, $wait);
     }

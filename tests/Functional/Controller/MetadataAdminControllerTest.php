@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Controller;
 
 use App\Metadata\Application\Message\SyncAlbumMessage;
+use App\Metadata\Application\Message\SyncArtistsMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
 use App\Shared\Domain\Model\PublicId;
@@ -76,7 +77,7 @@ final class MetadataAdminControllerTest extends TestCase
         $this->assertArrayHasKey('jobsDispatched', $data['data']);
     }
 
-    public function testSyncAllQueuesOneLibrarySyncPerLibraryAndReportsTheirCount(): void
+    public function testSyncAllQueuesOneLibrarySyncPerLibraryAndOneArtistSyncOnBothPathsAndReportsTheirCount(): void
     {
         $this->createLibraryWithSongs(1);
         $this->createLibraryWithSongs(1);
@@ -86,13 +87,22 @@ final class MetadataAdminControllerTest extends TestCase
         $response = $this->authenticatedRequest('POST', '/api/admin/metadata/trigger-sync', $this->createAdminUser(), ['source' => null]);
 
         $data = $this->assertJsonResponse($response, 200, 'data');
-        $this->assertSame(count($libraries), $data['data']['jobsDispatched']);
+        $this->assertSame(count($libraries) + 1, $data['data']['jobsDispatched'], 'One job per library and one for the artists.');
         $queued = $this->queued(SyncLibraryMessage::class);
         $this->assertCount(count($libraries), $queued);
         $queuedIds = array_map(static fn (SyncLibraryMessage $message): string => $message->libraryId->toString(), $queued);
         sort($queuedIds);
         $this->assertSame($libraries, $queuedIds);
+        $this->assertEquals([new SyncArtistsMessage()], $this->queued(SyncArtistsMessage::class));
         $this->assertSame([], $this->queued(SyncAlbumMessage::class), 'The library syncs queue the album syncs when they run.');
+        $this->swooleTasks()->reset();
+
+        $tester = new CommandTester((new Application(static::$kernel))->find('app:metadata:sync'));
+        $this->assertSame(Command::SUCCESS, $tester->execute([]), $tester->getDisplay());
+
+        $this->assertStringContainsString(sprintf('Queued %d metadata sync job(s)', $data['data']['jobsDispatched']), $tester->getDisplay());
+        $this->assertCount(count($libraries), $this->queued(SyncLibraryMessage::class));
+        $this->assertEquals([new SyncArtistsMessage()], $this->queued(SyncArtistsMessage::class));
     }
 
     public function testGenreSyncQueuesOnlyAlbumAndSongSyncsOnBothPaths(): void
@@ -110,6 +120,7 @@ final class MetadataAdminControllerTest extends TestCase
         $this->assertGreaterThanOrEqual(2, count($songs));
         $this->assertSame(count($albums) + count($songs), $data['data']['jobsDispatched']);
         $this->assertSame([], $this->queued(SyncLibraryMessage::class));
+        $this->assertSame([], $this->queued(SyncArtistsMessage::class), 'The genre sync queues no artist sync.');
         $this->swooleTasks()->reset();
 
         $tester = new CommandTester((new Application(static::$kernel))->find('app:metadata:sync'));
@@ -139,10 +150,12 @@ final class MetadataAdminControllerTest extends TestCase
     public function testStatusAndProvidersCommandsPrintTheEndpointsData(): void
     {
         $admin = $this->createAdminUser();
-        $this->entityManager->getConnection()->executeStatement(
-            "INSERT INTO job_monitors (id, job_id, name, status, created_at, updated_at) VALUES (?, ?, 'SyncAlbumMessage', 'failed', ?, ?)",
-            [Uuid::v7()->toString(), (new PublicId())->toString(), '2099-01-02 03:04:05', '2099-01-02 03:04:05'],
-        );
+        foreach (['SyncAlbumMessage' => 'failed', 'SyncArtistsMessage' => 'finished', 'SyncArtistMessage' => 'finished'] as $name => $status) {
+            $this->entityManager->getConnection()->executeStatement(
+                'INSERT INTO job_monitors (id, job_id, name, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+                [Uuid::v7()->toString(), (new PublicId())->toString(), $name, $status, '2099-01-02 03:04:05', '2099-01-02 03:04:05'],
+            );
+        }
         $application = new Application(static::$kernel);
 
         foreach (['/api/admin/metadata/sync-status' => 'app:metadata:status', '/api/admin/metadata/providers' => 'app:metadata:providers'] as $path => $command) {
@@ -155,6 +168,9 @@ final class MetadataAdminControllerTest extends TestCase
                 $this->assertSame((new \DateTimeImmutable('2099-01-02 03:04:05'))->format(\DateTimeInterface::ATOM), $endpoint['lastSyncAt']);
                 $this->assertGreaterThanOrEqual(1, $endpoint['failedTracks']);
                 $this->assertContains('SyncAlbumMessage', array_column($endpoint['sources'], 'name'));
+                $sources = array_column($endpoint['sources'], null, 'name');
+                $this->assertGreaterThanOrEqual(1, $sources['SyncArtistsMessage']['synced'] ?? 0);
+                $this->assertGreaterThanOrEqual(1, $sources['SyncArtistMessage']['synced'] ?? 0);
             }
         }
     }
