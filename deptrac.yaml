@@ -29,7 +29,7 @@ deptrac:
     graphviz:
       groups:
         Shared: ['Shared Domain', 'Shared Application', 'Shared Infrastructure', 'Shared Live Snapshot Infrastructure', 'Shared Interface']
-        Activity: ['Activity Artist Merge Contract', 'Activity Domain', 'Activity Application', 'Activity Infrastructure', 'Activity Resources', 'Activity Interface']
+        Activity: ['Activity Artist Merge Contract', 'Activity Album Merge Contract', 'Activity Domain', 'Activity Application', 'Activity Infrastructure', 'Activity Resources', 'Activity Interface']
         Auth: ['Auth Live Authority Contract', 'Auth Domain', 'Auth Identity Contract', 'Auth User Identifier Contract', 'Auth Device Approval Event Contract', 'Auth WebSocket Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
         Catalog: ['Catalog Video Contract', 'Catalog Song Availability Contract', 'Catalog Song Lookup Contract', 'Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Resources', 'Catalog Interface']
         Filesystem: ['Filesystem Infrastructure', 'Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
@@ -44,7 +44,7 @@ deptrac:
         Transcode: ['Transcode Playback Access Contract', 'Transcode Audio Rendition Contract', 'Transcode Delivery Contract', 'Transcode Probe Contract', 'Transcode Domain', 'Transcode Application', 'Transcode Infrastructure', 'Transcode Resources', 'Transcode Interface']
         UserPreference: ['UserPreference Settings Contract', 'UserPreference Domain', 'UserPreference Application', 'UserPreference Infrastructure', 'UserPreference Resources', 'UserPreference Interface']
         Discovery: ['Discovery Domain', 'Discovery Application', 'Discovery Infrastructure', 'Discovery Resources', 'Discovery Interface']
-        Favorites: ['Favorites Artist Merge Contract', 'Favorites Domain', 'Favorites Application', 'Favorites Infrastructure', 'Favorites Resources', 'Favorites Interface']
+        Favorites: ['Favorites Artist Merge Contract', 'Favorites Album Merge Contract', 'Favorites Domain', 'Favorites Application', 'Favorites Infrastructure', 'Favorites Resources', 'Favorites Interface']
         Radio: ['Radio Domain', 'Radio Application', 'Radio Infrastructure', 'Radio Resources', 'Radio Interface']
         Scheduler: ['Scheduler Schedulable Contract', 'Scheduler Domain', 'Scheduler Application', 'Scheduler Infrastructure', 'Scheduler Resources', 'Scheduler Interface']
         Session: ['Session Domain', 'Session Application', 'Session Infrastructure', 'Session Resources', 'Session Interface']
@@ -98,6 +98,11 @@ deptrac:
         - type: classLike
           value: '^App\\Activity\\Application\\Port\\ArtistActivityMergePortInterface$'
 
+    - name: 'Activity Album Merge Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Activity\\Application\\Port\\AlbumActivityMergePortInterface$'
+
     - name: 'Activity Application'
       collectors:
         - type: bool
@@ -107,6 +112,8 @@ deptrac:
           must_not:
             - type: classLike
               value: '^App\\Activity\\Application\\Port\\ArtistActivityMergePortInterface$'
+            - type: classLike
+              value: '^App\\Activity\\Application\\Port\\AlbumActivityMergePortInterface$'
 
     - name: 'Activity Infrastructure'
       collectors:
@@ -814,6 +821,11 @@ deptrac:
         - type: classLike
           value: '^App\\Favorites\\Application\\Port\\ArtistFavoriteMergePortInterface$'
 
+    - name: 'Favorites Album Merge Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Favorites\\Application\\Port\\AlbumFavoriteMergePortInterface$'
+
     - name: 'Favorites Application'
       collectors:
         - type: bool
@@ -823,6 +835,8 @@ deptrac:
           must_not:
             - type: classLike
               value: '^App\\Favorites\\Application\\Port\\ArtistFavoriteMergePortInterface$'
+            - type: classLike
+              value: '^App\\Favorites\\Application\\Port\\AlbumFavoriteMergePortInterface$'
 
     - name: 'Favorites Infrastructure'
       collectors:
@@ -1084,6 +1098,8 @@ deptrac:
     # --- Activity ---
     'Activity Artist Merge Contract':
       - 'Shared Domain'
+    'Activity Album Merge Contract':
+      - 'Shared Domain'
     'Activity Domain':
       - 'Shared Domain'
     'Activity Application':
@@ -1092,6 +1108,7 @@ deptrac:
       - 'Shared Application'
     'Activity Infrastructure':
       - 'Activity Artist Merge Contract'
+      - 'Activity Album Merge Contract'
       - 'Library Read Scope Contract'
       - 'Catalog Song Availability Contract'
       - 'Shared Application'
@@ -1191,7 +1208,9 @@ deptrac:
       - 'Shared Application'
     'Catalog Infrastructure':
       - 'Activity Artist Merge Contract'
+      - 'Activity Album Merge Contract'
       - 'Favorites Artist Merge Contract'
+      - 'Favorites Album Merge Contract'
       - 'Recommendation Artist Merge Contract'
       - 'Catalog Video Contract'
       - 'Catalog Song Availability Contract'
@@ -1626,6 +1645,8 @@ deptrac:
     # --- Favorites ---
     'Favorites Artist Merge Contract':
       - 'Shared Domain'
+    'Favorites Album Merge Contract':
+      - 'Shared Domain'
     'Favorites Domain':
       - 'Shared Domain'
     'Favorites Application':
@@ -1633,6 +1654,7 @@ deptrac:
       - 'Shared Domain'
     'Favorites Infrastructure':
       - 'Favorites Artist Merge Contract'
+      - 'Favorites Album Merge Contract'
       - 'Shared Application'
       - 'Favorites Application'
       - 'Favorites Domain'

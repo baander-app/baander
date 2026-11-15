@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Controller;
 
+use App\Activity\Infrastructure\Doctrine\Entity\MediaActivityEntity;
 use App\Auth\Domain\Model\User;
 use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumMergePortInterface;
@@ -16,6 +17,7 @@ use App\Catalog\Domain\ValueObject\AlbumMatchSource;
 use App\Catalog\Domain\ValueObject\AlbumMatchStatus;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistAlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\GenreAlbumEntity;
+use App\Favorites\Infrastructure\Doctrine\Entity\UserFavoriteEntity;
 use App\Media\Infrastructure\Doctrine\Entity\ImageEntity;
 use App\Metadata\Application\Port\MusicBrainzLookupInterface;
 use App\Metadata\Application\Settings\MetadataSettingDefinitions;
@@ -228,6 +230,11 @@ final class AlbumMergeTest extends TestCase
         $this->assertSame(404, $response->getStatusCode());
     }
 
+    /**
+     * The API and the console answer a merge alike and leave the same albums, songs, favorites and
+     * plays: a user who favorited the source alone, and one who favorited both albums, each hold
+     * one favorite of the target, and the plays of a moved song count for the target.
+     */
     public function testConsoleMergeMatchesTheApiMerge(): void
     {
         $user = $this->createAdminUser();
@@ -239,7 +246,14 @@ final class AlbumMergeTest extends TestCase
             $sourceAlbumId = $this->createAlbumFixture($libraryId, 'Source Album');
             $this->createSongFixture($targetAlbumId, $path . '-1.mp3', $path . '-shared', 'Song 1');
             $this->createSongFixture($sourceAlbumId, $path . '-1-dup.mp3', $path . '-shared', 'Song 1 Duplicate');
-            $this->createSongFixture($sourceAlbumId, $path . '-2.mp3', $path . '-2', 'Song 2');
+            $moved = $this->createSongFixture($sourceAlbumId, $path . '-2.mp3', $path . '-2', 'Song 2');
+            $sourceFan = $this->createTestUser()->getId();
+            $this->createFavoriteFixture($sourceFan, $sourceAlbumId);
+            $play = $this->createPlayFixture($sourceFan, $moved, $sourceAlbumId);
+            $fanOfBoth = $this->createTestUser()->getId();
+            $this->createFavoriteFixture($fanOfBoth, $sourceAlbumId);
+            $this->createFavoriteFixture($fanOfBoth, $targetAlbumId);
+            $albumNames = [$this->publicIdOf($targetAlbumId) => 'target', $this->publicIdOf($sourceAlbumId) => 'source'];
             $target = $this->albumRepository->findByUuid($targetAlbumId);
             $source = $this->albumRepository->findByUuid($sourceAlbumId);
             $this->assertNotNull($target);
@@ -269,10 +283,21 @@ final class AlbumMergeTest extends TestCase
                     static fn (array $record): array => [$record['id'] === $sourceAlbumId->toString(), $record['title']],
                     $merged->getMergedFrom(),
                 ),
+                'favorites' => [
+                    'sourceFan' => array_map(static fn (string $album): string => $albumNames[$album] ?? $album, $this->albumFavoritesOf($sourceFan)),
+                    'fanOfBoth' => array_map(static fn (string $album): string => $albumNames[$album] ?? $album, $this->albumFavoritesOf($fanOfBoth)),
+                ],
+                'play' => $this->playAlbumOf($play) === $targetAlbumId->toString() ? 'target' : $this->playAlbumOf($play),
             ];
         }
 
-        $this->assertSame(['sourceDeleted' => true, 'songs' => 2, 'mergedFrom' => [[true, 'Source Album']]], $outcomes['api']);
+        $this->assertSame([
+            'sourceDeleted' => true,
+            'songs' => 2,
+            'mergedFrom' => [[true, 'Source Album']],
+            'favorites' => ['sourceFan' => ['target'], 'fanOfBoth' => ['target']],
+            'play' => 'target',
+        ], $outcomes['api']);
         $this->assertSame($outcomes['api'], $outcomes['console']);
     }
 
@@ -493,6 +518,47 @@ final class AlbumMergeTest extends TestCase
     }
 
     /**
+     * The manager that runs the merge has loaded two favorites of the source, one of a user who
+     * favorited the target as well, and a play of the source's song. The merge moves favorites and
+     * plays with statements and lets go of what the manager held of them: the manager reads the
+     * moved favorite and the play as naming the target, finds no favorite the merge dropped, and a
+     * flush afterwards leaves the rows as the merge wrote them.
+     */
+    public function testAMergeReleasesTheFavoritesAndPlaysOfTheSourceTheSameManagerLoaded(): void
+    {
+        $libraryId = $this->createLibraryFixture();
+        $target = $this->createAlbumFixture($libraryId, 'Target Album');
+        $source = $this->createAlbumFixture($libraryId, 'Source Album');
+        $moved = $this->createSongFixture($source, 'loaded-play.mp3', 'loaded-play', 'Song 2', track: 2);
+        $sourceFan = $this->createTestUser()->getId();
+        $movedFavorite = $this->createFavoriteFixture($sourceFan, $source);
+        $play = $this->createPlayFixture($sourceFan, $moved, $source);
+        $fanOfBoth = $this->createTestUser()->getId();
+        $droppedFavorite = $this->createFavoriteFixture($fanOfBoth, $source);
+        $keptFavorite = $this->createFavoriteFixture($fanOfBoth, $target);
+        $sourcePublicId = $this->publicIdOf($source);
+        $targetPublicId = $this->publicIdOf($target);
+        foreach ([$movedFavorite, $droppedFavorite] as $favorite) {
+            self::assertSame($sourcePublicId, $this->entityManager->find(UserFavoriteEntity::class, $favorite)?->getEntityPublicId());
+        }
+        self::assertSame($source->toString(), $this->entityManager->find(MediaActivityEntity::class, $play)?->getAlbum()?->getId()->toString());
+
+        static::getContainer()->get(AlbumMergePortInterface::class)->mergeAlbums($target, $source);
+
+        $this->assertSame($targetPublicId, $this->entityManager->find(UserFavoriteEntity::class, $movedFavorite)?->getEntityPublicId());
+        $this->assertNull($this->entityManager->find(UserFavoriteEntity::class, $droppedFavorite), 'The merge dropped the favorite of a user who favorited both albums.');
+        $this->assertSame($target->toString(), $this->entityManager->find(MediaActivityEntity::class, $play)?->getAlbum()?->getId()->toString());
+        $this->entityManager->flush();
+        $this->assertSame([$targetPublicId], $this->albumFavoritesOf($sourceFan));
+        $this->assertSame(
+            [$keptFavorite->toString()],
+            $this->entityManager->getConnection()->fetchFirstColumn("SELECT id FROM user_favorites WHERE user_id = ? AND entity_type = 'album'", [$fanOfBoth->toString()]),
+            'The user who favorited both albums keeps the favorite of the target.',
+        );
+        $this->assertSame($target->toString(), $this->playAlbumOf($play));
+    }
+
+    /**
      * The database ends a merge to break a deadlock with another catalog writer. The API answers 409
      * with the reason `merge_busy`, the console exits with 1 and prints the same message, and both
      * albums stay as they were.
@@ -694,6 +760,47 @@ final class AlbumMergeTest extends TestCase
             "INSERT INTO artist_song (id, artist_id, song_id, role, credited_name) VALUES (?, ?, ?, 'primary', ?)",
             [Uuid::v7()->toString(), $artistId->toString(), $songId->toString(), $creditedName],
         );
+    }
+
+    /** Stores the user's favorite of the album, by the album's public ID as Favorites stores it. */
+    private function createFavoriteFixture(Uuid $userId, Uuid $albumId): Uuid
+    {
+        $favoriteId = Uuid::v7();
+        $this->entityManager->getConnection()->executeStatement(
+            "INSERT INTO user_favorites (id, public_id, user_id, entity_type, entity_public_id, created_at, updated_at) SELECT ?, ?, ?, 'album', public_id, clock_timestamp(), clock_timestamp() FROM albums WHERE id = ?",
+            [$favoriteId->toString(), (new PublicId())->toString(), $userId->toString(), $albumId->toString()],
+        );
+
+        return $favoriteId;
+    }
+
+    /** Stores the user's plays of the song on the album, as the player records them. */
+    private function createPlayFixture(Uuid $userId, Uuid $songId, Uuid $albumId): Uuid
+    {
+        $playId = Uuid::v7();
+        $this->entityManager->getConnection()->executeStatement(
+            "INSERT INTO media_activities (id, public_id, user_id, activity_type, song_id, album_id, play_count, love, last_played_at, created_at, updated_at) VALUES (?, ?, ?, 'play', ?, ?, 3, false, clock_timestamp(), clock_timestamp(), clock_timestamp())",
+            [$playId->toString(), (new PublicId())->toString(), $userId->toString(), $songId->toString(), $albumId->toString()],
+        );
+
+        return $playId;
+    }
+
+    /** @return list<string> the public IDs of the albums the user favorited */
+    private function albumFavoritesOf(Uuid $userId): array
+    {
+        return $this->entityManager->getConnection()->fetchFirstColumn(
+            "SELECT entity_public_id FROM user_favorites WHERE user_id = ? AND entity_type = 'album' ORDER BY entity_public_id",
+            [$userId->toString()],
+        ) |> (static fn (array $albums): array => array_map(strval(...), $albums));
+    }
+
+    /** The album the play counts for, as PostgreSQL holds it. */
+    private function playAlbumOf(Uuid $playId): ?string
+    {
+        $album = $this->entityManager->getConnection()->fetchOne('SELECT album_id FROM media_activities WHERE id = ?', [$playId->toString()]);
+
+        return is_string($album) ? $album : null;
     }
 
     private function setAutomaticMatching(bool $enabled): void

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Fixtures\Catalog;
 
+use App\Activity\Infrastructure\Doctrine\AlbumActivityMerge;
 use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Service\CoverImageDiscarder;
 use App\Catalog\Infrastructure\AlbumMergeService;
+use App\Favorites\Infrastructure\Doctrine\AlbumFavoriteMerge;
 use App\Media\Infrastructure\Storage\FlysystemStorage;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\NotFoundException;
@@ -57,6 +59,8 @@ final class AlbumMergeRace
             self::noMatchRequests(),
             $services['transaction'],
             new CoverImageDiscarder($services['images'], new FlysystemStorage(self::storage()), new NullLogger()),
+            new AlbumFavoriteMerge($manager),
+            new AlbumActivityMerge($manager),
             new NullLogger(),
         );
     }
@@ -139,6 +143,33 @@ final class AlbumMergeRace
         $connection->executeStatement(
             "INSERT INTO songs (id, public_id, album_id, title, path, size, mime_type, length, track, disc, hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1000000, 'audio/flac', 180.0, 1, 1, ?, clock_timestamp(), clock_timestamp())",
             [$id, (new PublicId())->toString(), $album, $title, '/music/' . $id . '.flac', $hash],
+        );
+
+        return $id;
+    }
+
+    /**
+     * Stores the user's favorite of the album, as Favorites stores one: by the album's public ID,
+     * created at $createdAt. Returns the favorite's ID.
+     */
+    public static function favorite(Connection $connection, string $user, string $album, string $createdAt = '2026-11-01 10:00:00.123456+00'): string
+    {
+        $id = (new Uuid())->toString();
+        $connection->executeStatement(
+            "INSERT INTO user_favorites (id, public_id, user_id, entity_type, entity_public_id, created_at, updated_at) SELECT ?, ?, ?, 'album', public_id, ?, ? FROM albums WHERE id = ?",
+            [$id, (new PublicId())->toString(), $user, $createdAt, $createdAt, $album],
+        );
+
+        return $id;
+    }
+
+    /** Stores the user's plays of the song on the album, as the player records them. Returns the activity's ID. */
+    public static function play(Connection $connection, string $user, string $song, string $album): string
+    {
+        $id = (new Uuid())->toString();
+        $connection->executeStatement(
+            "INSERT INTO media_activities (id, public_id, user_id, activity_type, song_id, album_id, play_count, love, last_played_at, created_at, updated_at) VALUES (?, ?, ?, 'play', ?, ?, 3, false, now(), now(), now())",
+            [$id, (new PublicId())->toString(), $user, $song, $album],
         );
 
         return $id;

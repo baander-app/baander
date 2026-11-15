@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Catalog\Infrastructure;
 
+use App\Activity\Application\Port\AlbumActivityMergePortInterface;
 use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
@@ -11,6 +12,7 @@ use App\Catalog\Application\Service\CoverImageDiscarder;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Infrastructure\AlbumMergeService;
+use App\Favorites\Application\Port\AlbumFavoriteMergePortInterface;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Domain\Model\Image;
@@ -18,6 +20,7 @@ use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\Exception\TransactionDeadlockException;
 use App\Shared\Application\Port\TransactionPortInterface;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
@@ -148,6 +151,27 @@ final class AlbumMergeServiceTest extends TestCase
         self::assertSame($older->getId()->toString(), $removal[2]['kept_song_id']);
     }
 
+    /**
+     * The favorites and plays of the source name the target once the songs are moved and the
+     * duplicates removed, and before the source is deleted, whose foreign key would otherwise take
+     * its plays' album away first.
+     */
+    public function testTheSourcesFavoritesAndPlaysMoveToTheTargetBeforeTheSourceIsDeleted(): void
+    {
+        $this->targetSongs = [$this->song($this->target, 'Come Together', 'come-together')];
+        $this->sourceSongs = [
+            $this->song($this->source, 'Something', 'something'),
+            $this->song($this->source, 'Come Together (Remaster)', 'come-together'),
+        ];
+
+        $this->merge();
+
+        self::assertSame(
+            ['move Something', 'flush songs', 'delete Come Together (Remaster)', 'move favorites of source to target', 'move plays of source to target', 'delete source', 'save target', 'commit'],
+            array_slice($this->calls, array_search('move Something', $this->calls, true) ?: 0, 8),
+        );
+    }
+
     public function testAnAlbumGoneByTheTimeTheMergeHoldsItsLocksIsNotFoundAndNothingIsWritten(): void
     {
         $this->sourceSongs = [$this->song($this->source, 'Something', 'something')];
@@ -188,8 +212,42 @@ final class AlbumMergeServiceTest extends TestCase
             $requests ?? $this->requests(),
             $transaction ?? $this->transaction(),
             new CoverImageDiscarder($this->images(), $this->createStub(StoragePortInterface::class), $this->logger()),
+            $this->favorites(),
+            $this->activities(),
             $this->logger(),
         )->mergeAlbums($this->target->getId(), $this->source->getId());
+    }
+
+    private function favorites(): AlbumFavoriteMergePortInterface
+    {
+        $favorites = $this->createStub(AlbumFavoriteMergePortInterface::class);
+        $favorites->method('merge')->willReturnCallback(function (PublicId $source, PublicId $target): void {
+            $this->calls[] = sprintf('move favorites of %s to %s', $this->albumNamed($source), $this->albumNamed($target));
+        });
+
+        return $favorites;
+    }
+
+    private function activities(): AlbumActivityMergePortInterface
+    {
+        $activities = $this->createStub(AlbumActivityMergePortInterface::class);
+        $activities->method('merge')->willReturnCallback(function (Uuid $source, Uuid $target): void {
+            $this->calls[] = sprintf('move plays of %s to %s', $this->albumNamed($source), $this->albumNamed($target));
+        });
+
+        return $activities;
+    }
+
+    /** "source" or "target" for either album's ID or public ID. */
+    private function albumNamed(PublicId|Uuid $id): string
+    {
+        foreach (['source' => $this->source, 'target' => $this->target] as $name => $album) {
+            if ($id instanceof PublicId ? $id->equals($album->getPublicId()) : $id->equals($album->getId())) {
+                return $name;
+            }
+        }
+
+        return $id->toString();
     }
 
     private function song(Album $album, string $title, ?string $hash): Song

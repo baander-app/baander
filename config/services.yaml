@@ -813,6 +813,9 @@ services:
     App\Activity\Application\Port\ArtistActivityMergePortInterface:
         alias: App\Activity\Infrastructure\Doctrine\ArtistActivityMerge
 
+    App\Activity\Application\Port\AlbumActivityMergePortInterface:
+        alias: App\Activity\Infrastructure\Doctrine\AlbumActivityMerge
+
     # --- Playlist Application Ports ---
     App\Playlist\Application\Port\PlaylistPortInterface:
         alias: App\Playlist\Infrastructure\PlaylistService
@@ -1494,6 +1497,8 @@ services:
         alias: App\Favorites\Infrastructure\FavoritesService
     App\Favorites\Application\Port\ArtistFavoriteMergePortInterface:
         alias: App\Favorites\Infrastructure\Doctrine\ArtistFavoriteMerge
+    App\Favorites\Application\Port\AlbumFavoriteMergePortInterface:
+        alias: App\Favorites\Infrastructure\Doctrine\AlbumFavoriteMerge
 
     # --- Outbox Wiring ---
     App\Shared\Domain\Event\Outbox\OutboxRepository: ~

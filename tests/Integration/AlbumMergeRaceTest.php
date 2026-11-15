@@ -85,13 +85,17 @@ final class AlbumMergeRaceTest extends TestCase
     }
 
     /**
-     * The merge fails in its transaction after it moved the songs, removed the duplicate, deleted
-     * the source and saved the target, before the commit. The source keeps its songs and its cover,
-     * whose record and file are both still there, and the target is as it was.
+     * The merge fails in its transaction after it moved the songs, removed the duplicate, moved the
+     * source's favorites and plays, deleted the source and saved the target, before the commit. The
+     * source keeps its songs, its cover, whose record and file are both still there, the favorite a
+     * user holds of it and the plays of its song, and the target is as it was.
      */
-    public function testAMergeThatFailsBeforeItsCommitLeavesTheAlbumsTheirSongsAndTheCoverAsTheyWere(): void
+    public function testAMergeThatFailsBeforeItsCommitLeavesTheAlbumsTheirSongsTheCoverFavoritesAndPlaysAsTheyWere(): void
     {
         $seed = AlbumMergeRace::seed($this->observer, $this->tag);
+        $listener = (new Uuid())->toString();
+        $favorite = AlbumMergeRace::favorite($this->observer, $listener, $seed['source']);
+        $play = AlbumMergeRace::play($this->observer, $listener, $seed['moved'], $seed['source']);
         $failure = null;
 
         try {
@@ -110,7 +114,33 @@ final class AlbumMergeRaceTest extends TestCase
         self::assertSame(1, (int) $this->observer->fetchOne('SELECT count(*) FROM images WHERE id = ?', [$seed['cover']]), 'The cover\'s record is there.');
         self::assertFileExists($seed['coverFile'], 'The cover\'s file is there.');
         self::assertSame('[]', $this->observer->fetchOne('SELECT merged_from::text FROM albums WHERE id = ?', [$seed['target']]), 'The target records no merge.');
+        self::assertSame([$favorite => $this->publicIdOf($seed['source'])], $this->albumFavoritesOf($listener), 'The favorite still names the source.');
+        self::assertSame($seed['source'], $this->observer->fetchOne('SELECT album_id FROM media_activities WHERE id = ?', [$play]), 'The plays still count for the source.');
         self::assertSame('The merge failed before its commit.', $failure?->getMessage());
+    }
+
+    /**
+     * A user who favorited the source favorites the target while the merge runs, and has not
+     * committed when the merge moves the favorites. The merge waits for that favorite, and once it
+     * is committed leaves the user the one favorite of the target and completes, rather than
+     * failing on the key that allows a user one favorite of an album.
+     */
+    public function testAUserWhoFavoritesTheTargetWhileTheMergeMovesTheirFavoriteOfTheSourceEndsWithOneAndTheMergeCompletes(): void
+    {
+        $seed = AlbumMergeRace::seed($this->observer, $this->tag);
+        $listener = (new Uuid())->toString();
+        AlbumMergeRace::favorite($this->observer, $listener, $seed['source']);
+        $this->writer->beginTransaction();
+        $favoriteOfTarget = AlbumMergeRace::favorite($this->writer, $listener, $seed['target'], '2026-11-15 12:00:00+00');
+
+        $merge = $this->startChild('merge', ['target' => $seed['target'], 'source' => $seed['source']]);
+        $waiting = RetagLockRace::awaitLockWait($this->observer, $merge);
+
+        self::assertSame('transactionid', $waiting['waitsOn'], 'The merge waits for the favorite of the target to commit.');
+        $this->writer->commit();
+
+        self::assertSame(['merged' => $seed['target']], $this->finish($merge));
+        self::assertSame([$favoriteOfTarget => $this->publicIdOf($seed['target'])], $this->albumFavoritesOf($listener));
     }
 
     /**
@@ -268,6 +298,22 @@ final class AlbumMergeRaceTest extends TestCase
         }
 
         return $albums;
+    }
+
+    /** @return array<string, string> the public ID of the album each of the user's album favorites names, by favorite ID */
+    private function albumFavoritesOf(string $userId): array
+    {
+        $favorites = [];
+        foreach ($this->observer->fetchAllNumeric("SELECT id, entity_public_id FROM user_favorites WHERE user_id = ? AND entity_type = 'album' ORDER BY id", [$userId]) as [$id, $album]) {
+            $favorites[(string) $id] = (string) $album;
+        }
+
+        return $favorites;
+    }
+
+    private function publicIdOf(string $albumId): string
+    {
+        return (string) $this->observer->fetchOne('SELECT public_id FROM albums WHERE id = ?', [$albumId]);
     }
 
     /** Whether another session holds a lock on the row that a lock of $strength conflicts with. */

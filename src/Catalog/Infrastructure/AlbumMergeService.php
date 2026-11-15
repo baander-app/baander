@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Infrastructure;
 
+use App\Activity\Application\Port\AlbumActivityMergePortInterface;
 use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumMergePortInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
@@ -11,6 +12,7 @@ use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Service\CoverImageDiscarder;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
+use App\Favorites\Application\Port\AlbumFavoriteMergePortInterface;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\Exception\TransactionDeadlockException;
@@ -25,8 +27,9 @@ use Psr\Log\LoggerInterface;
  * every song the two albums hold, in ID order. The albums and songs are read only once those locks
  * are held, so the merge acts on what a match apply, a retag or a hand change that held one first
  * committed, and it moves or removes every song the source holds: a song stored for the source
- * meanwhile waits for the source's row and then fails. The source's cover is discarded and a match
- * of the target requested once the merge committed.
+ * meanwhile waits for the source's row and then fails. The source's favorites and plays move to the
+ * target in the same transaction, through the ports of Favorites and Activity. The source's cover is
+ * discarded and a match of the target requested once the merge committed.
  */
 final readonly class AlbumMergeService implements AlbumMergePortInterface
 {
@@ -39,6 +42,8 @@ final readonly class AlbumMergeService implements AlbumMergePortInterface
         private AlbumMatchRequestInterface $albumMatches,
         private TransactionPortInterface $transaction,
         private CoverImageDiscarder $covers,
+        private AlbumFavoriteMergePortInterface $favorites,
+        private AlbumActivityMergePortInterface $activities,
         private LoggerInterface $logger,
     ) {
     }
@@ -100,6 +105,7 @@ final readonly class AlbumMergeService implements AlbumMergePortInterface
 
         $this->moveSongs($moved, $targetAlbumId);
         $this->removeDuplicates($duplicates, $sourceAlbumId);
+        $this->moveFavoritesAndPlays($source, $target);
 
         $metadataChanges = [];
         $this->mergeMetadata($target, $source, $metadataChanges);
@@ -176,6 +182,17 @@ final readonly class AlbumMergeService implements AlbumMergePortInterface
                 'target_album_id' => $kept->getAlbumId()->toString(),
             ]);
         }
+    }
+
+    /**
+     * Makes the users' favorites of the source favorites of the target, and lets the plays recorded
+     * for the source count for the target. It runs before the source is deleted, whose foreign key
+     * would otherwise clear the album of those plays.
+     */
+    private function moveFavoritesAndPlays(Album $source, Album $target): void
+    {
+        $this->favorites->merge($source->getPublicId(), $target->getPublicId());
+        $this->activities->merge($source->getId(), $target->getId());
     }
 
     /** Logged with both albums, since frequent deadlocks with imports would call for another design. */
