@@ -307,7 +307,8 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
     /**
      * Wait for this call's turn under the limit every process shares, answering unavailable at
      * once when the turn comes after the deadline. Sleeping yields the coroutine, so a web worker
-     * keeps serving other requests meanwhile.
+     * keeps serving other requests meanwhile. No signal ends the wait early, so a queue worker
+     * waits its full time although its keepalive alarm arrives.
      */
     private function takeTurn(MusicBrainzSlotWait $wait, ?float $deadline): ?MusicBrainzUnavailable
     {
@@ -319,10 +320,7 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
         } catch (RateLimiterUnavailableException) {
             return $this->unavailable('rate limit', 'the shared rate limiter is unavailable');
         }
-        $seconds = $reservation->getWaitDuration();
-        if ($seconds > 0) {
-            Async::sleep($seconds);
-        }
+        Async::sleepThroughSignals($reservation->getWaitDuration());
 
         return null;
     }
@@ -357,9 +355,7 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
         if ($deadline !== null && microtime(true) + $seconds >= $deadline) {
             return $this->unavailable($endpoint, 'HTTP 503, and no time is left to ask again');
         }
-        if ($seconds > 0) {
-            Async::sleep($seconds);
-        }
+        Async::sleepThroughSignals($seconds);
 
         return null;
     }
