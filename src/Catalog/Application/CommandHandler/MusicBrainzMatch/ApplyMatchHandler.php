@@ -685,10 +685,8 @@ final readonly class ApplyMatchHandler
         }
 
         $then = self::trackOfEachSong($candidate->pairs->pairs);
-        $now = array_filter(
-            $this->scorer->scoreRelease($candidate->release, $snapshot->localAlbum())->pairs->pairs,
-            static fn (TrackPair $pair): bool => $pair->isWithinLengthTolerance(),
-        ) |> self::trackOfEachSong(...);
+        $now = $this->scorer->scoreRelease($candidate->release, $snapshot->localAlbum())->pairs->withinLengthTolerance()
+            |> self::trackOfEachSong(...);
         $track = static fn (array $tracks, Song $song): ?string => $tracks[$song->getId()->toString()] ?? null;
         if (array_any($songs, static fn (Song $song): bool => $track($now, $song) !== $track($then, $song))) {
             throw MatchTicks::stale('The album\'s new songs pair with other tracks of the release than when the matcher read them.');
@@ -784,7 +782,7 @@ final readonly class ApplyMatchHandler
     private static function artistLocks(Artist $artist, MusicBrainzArtist $candidate, MatchTicks $ticks): MatchLocks
     {
         $holder = array_first($ticks->actions)?->target;
-        $identities = [self::storedIdentity($artist), new ArtistIdentity($candidate->name, [$candidate->id])];
+        $identities = [ArtistIdentity::ofStored($artist), new ArtistIdentity($candidate->name, [$candidate->id])];
         if ($holder !== null) {
             $identities[] = new ArtistIdentity($holder->name, [$candidate->id]);
         }
@@ -799,14 +797,8 @@ final readonly class ApplyMatchHandler
      */
     private function storedIdentities(array $artistIds): array
     {
-        return $artistIds === [] ? [] : $this->artists->findByUuids($artistIds) |> array_values(...) |> (static fn (array $artists): array => array_map(self::storedIdentity(...), $artists));
+        return $artistIds === [] ? [] : $this->artists->findByUuids($artistIds) |> array_values(...) |> (static fn (array $artists): array => array_map(ArtistIdentity::ofStored(...), $artists));
     }
-
-    private static function storedIdentity(Artist $artist): ArtistIdentity
-    {
-        return new ArtistIdentity($artist->getName(), $artist->getMbid() === null ? [] : [$artist->getMbid()]);
-    }
-
     /**
      * @param array<MatchFieldRow> $rows
      *

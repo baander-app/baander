@@ -143,7 +143,7 @@ final class ArtistCreditInput
         if ($target === CreditTarget::Album) {
             $albums->lockInIdOrder([$targetId]);
         }
-        $songs->lockImportIdentities([self::storedIdentity($artist)], []);
+        $songs->lockImportIdentities([ArtistIdentity::ofStored($artist)], []);
         $merges->lock([$artistId]);
         if ($target === CreditTarget::Song) {
             $songs->lockInIdOrder([$targetId]);
@@ -186,12 +186,6 @@ final class ArtistCreditInput
     public static function targetNotFound(CreditTarget $target, string $publicId): NotFoundException
     {
         return new NotFoundException(sprintf('%s "%s" not found.', $target->label(), $publicId));
-    }
-
-    /** The identity an import names the artist by: its stored name, and its MusicBrainz ID when it holds one. */
-    private static function storedIdentity(Artist $artist): ArtistIdentity
-    {
-        return new ArtistIdentity($artist->getName(), $artist->getMbid() === null ? [] : [$artist->getMbid()]);
     }
 
     private static function artistNotFound(string $publicId): NotFoundException

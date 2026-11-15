@@ -390,7 +390,8 @@ final class MatchApplyRace
         return [$id, $publicId];
     }
 
-    private static function insertArtist(Connection $connection, string $name): string
+    /** Stores an artist without a MusicBrainz ID; returns its ID. */
+    public static function insertArtist(Connection $connection, string $name): string
     {
         $id = (new Uuid())->toString();
         $connection->executeStatement(
@@ -401,8 +402,12 @@ final class MatchApplyRace
         return $id;
     }
 
-    /** @param array{string, string}|null $primary the primary artist's ID and the credited name */
-    private static function insertSong(Connection $connection, string $album, string $title, int $track, float $length, ?array $primary): string
+    /**
+     * Stores a song of the album as an import commits it, compared by no match; returns its ID.
+     *
+     * @param array{string, string}|null $primary the primary artist's ID and the credited name
+     */
+    public static function insertSong(Connection $connection, string $album, string $title, int $track, float $length, ?array $primary): string
     {
         $id = (new Uuid())->toString();
         $connection->executeStatement(

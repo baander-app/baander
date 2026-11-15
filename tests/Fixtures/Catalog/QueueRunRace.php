@@ -18,8 +18,6 @@ use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzTrack;
 use App\Metadata\Application\Settings\MetadataSettingDefinitions;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
-use App\Shared\Domain\Model\PublicId;
-use App\Shared\Domain\Model\Uuid;
 use App\Tests\Unit\Catalog\Application\QueryHandler\MusicBrainzMatch\FakeMusicBrainzLookup;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
@@ -85,43 +83,6 @@ final class QueueRunRace
             $runs,
             new NativeClock(),
         );
-    }
-
-    /**
-     * Stores an artist without a MusicBrainz ID that no seeded song or album credits.
-     *
-     * @return string the artist's ID
-     */
-    public static function artist(Connection $connection, string $name): string
-    {
-        $id = (new Uuid())->toString();
-        $connection->executeStatement(
-            'INSERT INTO artists (id, public_id, name, created_at, updated_at) VALUES (?, ?, ?, clock_timestamp(), clock_timestamp())',
-            [$id, (new PublicId())->toString(), $name],
-        );
-
-        return $id;
-    }
-
-    /**
-     * Stores a song of the album as an import commits it: tagged with its title, number and length,
-     * credited to the artist as primary, and compared by no match.
-     *
-     * @return string the song's ID
-     */
-    public static function importSong(Connection $connection, string $albumId, string $title, int $track, float $length, string $artistId, string $creditedName): string
-    {
-        $id = (new Uuid())->toString();
-        $connection->executeStatement(
-            "INSERT INTO songs (id, public_id, album_id, title, path, size, mime_type, length, track, disc, hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1000000, 'audio/flac', ?, ?, 1, 'tagged', now(), now())",
-            [$id, (new PublicId())->toString(), $albumId, $title, '/music/' . $id . '.flac', $length, $track],
-        );
-        $connection->executeStatement(
-            "INSERT INTO artist_song (id, artist_id, song_id, role, credited_name) VALUES (?, ?, ?, 'primary', ?)",
-            [(new Uuid())->toString(), $artistId, $id, $creditedName],
-        );
-
-        return $id;
     }
 
     /**

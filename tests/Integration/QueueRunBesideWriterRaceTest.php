@@ -157,7 +157,7 @@ final class QueueRunBesideWriterRaceTest extends TestCase
         $requestOfTheImport = null;
         $lookup->duringReleaseLookup = function () use ($lookup, $seed, $album, &$imported, &$requestOfTheImport): void {
             $lookup->duringReleaseLookup = null;
-            $imported = QueueRunRace::importSong($this->observer, $seed['album'], 'Pour Me A Drink', 2, 201.5, $seed['postMalone'], MatchApplyRace::postMalone($this->tag));
+            $imported = MatchApplyRace::insertSong($this->observer, $seed['album'], 'Pour Me A Drink', 2, 201.5, [$seed['postMalone'], MatchApplyRace::postMalone($this->tag)]);
             QueueRunRace::requester(ArtistImportIdentityRace::entityManager($this->observer), true, new MessageBus())->requestAfterImport($album);
             $requestOfTheImport = $this->matchState($seed['album']);
         };
@@ -206,7 +206,7 @@ final class QueueRunBesideWriterRaceTest extends TestCase
         $seed = MatchApplyRace::seed($this->observer, $this->tag);
         $this->observer->executeStatement('DELETE FROM songs WHERE id = ?', [$seed['soloSong']]);
         $guest = 'Morgan Wallen ' . $this->tag;
-        $guestId = QueueRunRace::artist($this->observer, $guest);
+        $guestId = MatchApplyRace::insertArtist($this->observer, $guest);
         // A wait for a lock of the apply would never end: the apply goes on only once the import returned.
         $this->observer->executeStatement("SET lock_timeout = '10s'");
         $selection = MatchApplyRace::compare(ArtistImportIdentityRace::entityManager($this->observer), MatchApplyRace::lookup($this->tag), $seed['albumPublicId'])
@@ -214,7 +214,7 @@ final class QueueRunBesideWriterRaceTest extends TestCase
         $imported = null;
         $seenByTheImport = null;
         $whileTheApplyHoldsItsLocks = function () use ($seed, $guest, $guestId, &$imported, &$seenByTheImport): void {
-            $imported = QueueRunRace::importSong($this->observer, $seed['album'], 'I Had Some Help', 3, 178.0, $guestId, $guest);
+            $imported = MatchApplyRace::insertSong($this->observer, $seed['album'], 'I Had Some Help', 3, 178.0, [$guestId, $guest]);
             QueueRunRace::requester(ArtistImportIdentityRace::entityManager($this->observer), true, new MessageBus())->requestAfterImport(new Uuid($seed['album']));
             $seenByTheImport = [
                 'release' => $this->observer->fetchOne('SELECT release_mbid FROM albums WHERE id = ?', [$seed['album']]),

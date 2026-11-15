@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Application\Port;
 
+use App\Catalog\Domain\Model\Artist;
 use App\Catalog\Domain\ValueObject\MusicbrainzId;
 use InvalidArgumentException;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
@@ -34,6 +35,15 @@ final readonly class ArtistIdentity
             throw new InvalidArgumentException('An artist identity needs a name.');
         }
         $this->musicbrainzId = self::onlyValidId($musicbrainzIds);
+    }
+
+    /**
+     * The identity an import names a stored artist by: its name, and its MusicBrainz ID when it
+     * holds one. A writer that locks the artist takes the import keys of this identity first.
+     */
+    public static function ofStored(Artist $artist): self
+    {
+        return new self($artist->getName(), $artist->getMbid() === null ? [] : [$artist->getMbid()]);
     }
 
     /** Equal for two identities exactly when they resolve to the same artist. */

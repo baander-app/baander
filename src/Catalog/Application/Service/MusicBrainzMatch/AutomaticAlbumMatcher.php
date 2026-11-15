@@ -140,7 +140,7 @@ final readonly class AutomaticAlbumMatcher implements AutomaticAlbumMatcherInter
         $isNew = static fn (LocalTrack $track): bool => isset($new[$track->id]);
         $album = $snapshot->localAlbum();
         $scored = $this->scorer->scoreRelease($release, $album);
-        $kept = array_filter($scored->pairs->pairs, static fn (TrackPair $pair): bool => $isNew($pair->local) && $pair->isWithinLengthTolerance())
+        $kept = array_filter($scored->pairs->withinLengthTolerance(), static fn (TrackPair $pair): bool => $isNew($pair->local))
             |> array_values(...);
         $paired = array_map(static fn (TrackPair $pair): string => $pair->local->id, $kept) |> array_flip(...);
         $pairs = new TrackPairs(

@@ -21,4 +21,15 @@ final readonly class TrackPairs
         public array $unpairedRelease,
     ) {
     }
+
+    /**
+     * The pairs whose lengths agree within the pairing tolerance. A song of a matched album that no
+     * match has compared keeps its pair only when it is among them.
+     *
+     * @return list<TrackPair> in release order
+     */
+    public function withinLengthTolerance(): array
+    {
+        return array_filter($this->pairs, static fn (TrackPair $pair): bool => $pair->isWithinLengthTolerance()) |> array_values(...);
+    }
 }
