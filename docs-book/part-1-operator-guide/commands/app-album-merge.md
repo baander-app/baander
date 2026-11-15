@@ -42,6 +42,8 @@ On a terminal the command names both albums and asks before it merges. Without a
 
 The merge moves the source album's songs to the target. A source song whose file hash matches a target song is deleted instead. Metadata the target lacks is taken from the source. The target records the merge in its merge history, and the source album is deleted. The merge cannot be undone.
 
+A moved song keeps its MusicBrainz recording ID and artist credits, and counts again as a song no match has compared yet. While the `metadata.auto_sync` setting is on, the merge queues the target for [automatic matching](../media/external-apis.md#automatic-matching) as an import does for an album it touches, and the request falls due five minutes later. The match of a matched target compares the moved songs with the target's release: a moved song takes a track's recording ID and credits only when its length is within 3 seconds of the track's, and otherwise stays as it is. While the setting is off, the merge queues nothing; an administrator's metadata sync, such as [app:metadata:sync](app-metadata-sync.md), queues the match. If the request cannot be recorded, the merge still succeeds and the error is logged.
+
 Both albums must be in the same library, and an album cannot be merged into itself.
 
 With `--json` the command prints only the merged album as the API's `data` object, the same album resource `POST /api/albums/merge` returns. `--json` does not stand in for `--force`.

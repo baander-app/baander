@@ -408,11 +408,14 @@ final class Song
     }
 
     /**
-     * Move the song to a different album (used by album merge).
+     * Move the song to a different album (used by album merge). The song keeps its recording ID and
+     * the parts a match set, and no longer counts as compared with a release: the match that
+     * compared it knew another album, so the new album's next match compares it with its own.
      */
     public function moveToAlbum(Uuid $albumId): void
     {
         $this->state->album = $albumId;
+        $this->state->matchCheckedAt = null;
         $this->state->updatedAt = new DateTimeImmutable();
     }
 

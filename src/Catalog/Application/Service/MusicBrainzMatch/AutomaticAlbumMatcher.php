@@ -36,7 +36,8 @@ use Symfony\Component\Messenger\Stamp\HandledStamp;
  * too, all against the title that found them. MatchConfidence decides; a confident candidate is
  * applied in fill-only automatic mode, which leaves the stored title as it is. A matched album
  * looks up its stored release only and pairs the songs no match has compared yet, the album's
- * other songs holding the tracks they pair with.
+ * other songs holding the tracks they pair with. A song pairs this way only when its length is
+ * within the pairing tolerance of the track.
  *
  * Every MusicBrainz call waits for its turn as long as the queue ahead of it needs. Nothing is
  * written when something stands in the way, and the outcome says who waits: a MusicBrainz outage
@@ -117,8 +118,13 @@ final readonly class AutomaticAlbumMatcher implements AutomaticAlbumMatcherInter
 
     /**
      * Pairs the songs of a matched album that no match has compared yet against its stored release.
-     * The album's other songs pair first, so a new song takes only a track no older song holds. When
-     * MusicBrainz no longer has the release, the album is left for review without candidates.
+     * TrackPairing pairs all the album's songs with the release together: a song takes the track
+     * at its disc and number unless another song is tagged the same, and otherwise the free track
+     * its length fits when each is the other's only fit. The first step pairs whatever the
+     * lengths, so a new song keeps its pair only within the pairing tolerance, as a confident
+     * searched match demands of every pair. A new song outside it is left unpaired: the apply
+     * marks it as compared and writes nothing to it. When MusicBrainz no longer has the release,
+     * the album is left for review without candidates.
      */
     private function newSongs(AlbumSnapshot $snapshot, string $releaseId): MatchDecision
     {
@@ -132,10 +138,14 @@ final readonly class AutomaticAlbumMatcher implements AutomaticAlbumMatcherInter
             |> (static fn (array $songs): array => array_map(static fn (Song $song): string => $song->getId()->toString(), $songs))
             |> array_flip(...);
         $isNew = static fn (LocalTrack $track): bool => isset($new[$track->id]);
-        $scored = $this->scorer->scoreRelease($release, $snapshot->localAlbum());
+        $album = $snapshot->localAlbum();
+        $scored = $this->scorer->scoreRelease($release, $album);
+        $kept = array_filter($scored->pairs->pairs, static fn (TrackPair $pair): bool => $isNew($pair->local) && $pair->isWithinLengthTolerance())
+            |> array_values(...);
+        $paired = array_map(static fn (TrackPair $pair): string => $pair->local->id, $kept) |> array_flip(...);
         $pairs = new TrackPairs(
-            pairs: array_filter($scored->pairs->pairs, static fn (TrackPair $pair): bool => $isNew($pair->local)) |> array_values(...),
-            unpairedLocal: array_filter($scored->pairs->unpairedLocal, $isNew) |> array_values(...),
+            pairs: $kept,
+            unpairedLocal: array_filter($album->tracks, static fn (LocalTrack $track): bool => $isNew($track) && !isset($paired[$track->id])) |> array_values(...),
             unpairedRelease: $scored->pairs->unpairedRelease,
         );
 

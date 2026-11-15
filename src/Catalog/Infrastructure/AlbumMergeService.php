@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Infrastructure;
 
+use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumMergePortInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
@@ -11,12 +12,15 @@ use App\Catalog\Domain\Model\Album;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use InvalidArgumentException;
+use Psr\Log\LoggerInterface;
 
 final class AlbumMergeService implements AlbumMergePortInterface
 {
     public function __construct(
         private readonly AlbumPortInterface $albumPort,
         private readonly SongPortInterface $songPort,
+        private readonly AlbumMatchRequestInterface $albumMatches,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -83,7 +87,29 @@ final class AlbumMergeService implements AlbumMergePortInterface
         // Save the updated target album
         $this->albumPort->save($target);
 
+        $this->requestMatch($targetAlbumId);
+
         return $target;
+    }
+
+    /**
+     * Requests an automatic MusicBrainz match of the target once the moved songs are committed: no
+     * match has compared them with the target's release. The request decides whether the album
+     * needs a match and does nothing while automatic matching is off.
+     *
+     * The request is best-effort: a failure must not fail the finished merge. A metadata sync from
+     * the admin panel requests the album again.
+     */
+    private function requestMatch(Uuid $targetAlbumId): void
+    {
+        try {
+            $this->albumMatches->requestAfterImport($targetAlbumId);
+        } catch (\Throwable $e) {
+            $this->logger->error('Could not request a MusicBrainz match of album {album_id} after a merge; a metadata sync from the admin panel requests it again.', [
+                'album_id' => $targetAlbumId->toString(),
+                'exception' => $e,
+            ]);
+        }
     }
 
     /**

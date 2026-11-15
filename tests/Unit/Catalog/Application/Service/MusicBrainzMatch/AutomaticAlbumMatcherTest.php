@@ -224,6 +224,34 @@ final class AutomaticAlbumMatcherTest extends TestCase
         );
     }
 
+    public function testANewSongOfAMatchedAlbumPairsWithTheTrackAtItsNumberOnlyWithinTheLengthTolerance(): void
+    {
+        $release = self::release(self::releaseId(1));
+        $album = $this->longBed(missing: ['2-8', '2-9']);
+        $album->recordReleaseMatch(MusicbrainzId::fromString($release->id) ?? throw new \LogicException(), new DateTimeImmutable('-1 hour'));
+        $this->checkAll();
+        [$fits, $differs] = $this->addSongsOf($album, $release, missing: [
+            ...array_map(static fn (int $position): string => '1-' . $position, range(1, 18)),
+            ...array_map(static fn (int $position): string => '2-' . $position, range(1, 7)),
+        ]);
+        $differs->updateLength(($release->media[1]->tracks[8]->lengthMs ?? 0) / 1000 + 40.0);
+        $this->musicBrainz->releases[$release->id] = $release;
+
+        $outcome = $this->match($album);
+
+        self::assertSame(AutomaticMatchOutcomeKind::Matched, $outcome->kind);
+        $pairs = $this->applied[0]->candidate->pairs;
+        self::assertSame(
+            [[$fits->getId()->toString(), '2-8']],
+            array_map(static fn (TrackPair $pair): array => [$pair->local->id, $pair->release->key()], $pairs->pairs),
+        );
+        self::assertSame(
+            [$differs->getId()->toString()],
+            array_column($pairs->unpairedLocal, 'id'),
+            'The song is left unpaired, so the apply marks it checked and writes nothing to it.',
+        );
+    }
+
     public function testAMatchedAlbumWithoutNewSongsTakesItsMatchTimeFromAnEmptyApply(): void
     {
         $release = self::release(self::releaseId(1));

@@ -15,6 +15,7 @@ use PHPUnit\Framework\TestCase;
 final class SongTest extends TestCase
 {
     private const array EVERY_TAG_FIELD = [MatchedSongField::Title, MatchedSongField::Track, MatchedSongField::Disc, MatchedSongField::Year];
+    private const string RECORDING_ID = '5ec0bd00-0000-4000-8000-000100000003';
 
     private Uuid $albumId;
 
@@ -733,6 +734,24 @@ final class SongTest extends TestCase
 
         self::assertSame([MatchedSongField::Title, MatchedSongField::Credits], $song->getMatchedFields());
         self::assertTrue($song->isFieldMatched(MatchedSongField::Credits));
+    }
+
+    public function testASongMovedToAnotherAlbumLosesItsMatchMarkAndKeepsItsMatchedFieldsAndRecordingId(): void
+    {
+        $song = $this->matchedSong();
+        $song->updateExternalIds(mbid: self::RECORDING_ID);
+        $song->markMatchChecked(new \DateTimeImmutable('2026-11-14 12:00:00'));
+        $target = Uuid::v7();
+
+        $song->moveToAlbum($target);
+
+        self::assertTrue($song->getAlbumId()->equals($target));
+        self::assertNull($song->getMatchCheckedAt(), 'No match has compared the song with its new album\'s release.');
+        self::assertSame(
+            [MatchedSongField::Title, MatchedSongField::Track, MatchedSongField::Disc, MatchedSongField::Year, MatchedSongField::Credits],
+            $song->getMatchedFields(),
+        );
+        self::assertSame(self::RECORDING_ID, $song->getMbid());
     }
 
     /** A song whose title, track, disc, year and credits a MusicBrainz match set. */
