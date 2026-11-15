@@ -254,15 +254,18 @@ The fill of an artist's empty fields from MusicBrainz, looked up by the MusicBra
 the artist already holds: sort name, type, country, disambiguation and the two ends of
 its life span. It leaves the artist's name and ID, every field that holds a value and
 every locked field as they are, and it leaves an artist without an ID alone: nothing
-fills an artist from a search by its name. An administrator's metadata sync queues it
-for every artist with a stored ID and an empty field.
+fills an artist from a search by its name. An album or song match queues it as soon as
+it gives an artist its ID, and so does an import while automatic matching is on; an
+administrator's metadata sync queues it for every other artist with a stored ID and an
+empty field. Once MusicBrainz has returned the artist for an ID, or reported the ID
+unknown, Baander does not ask it about that ID again for 30 days.
 
 ### Duplicate song
 
 In an album merge, a song of the source album whose file hash a song of the target
 album holds. The target's song is kept, the oldest when several hold the hash, and the
 duplicate is folded into it: its playlist entries, lyrics, plays and favorites move to
-the kept song, and the duplicate's own row goes while its file stays on disk. A song
+the kept song. The duplicate's own row is deleted, and its file stays on disk. A song
 without a file hash is never a duplicate.
 
 ## Lyrics

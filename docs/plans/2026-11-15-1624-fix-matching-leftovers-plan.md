@@ -12,13 +12,13 @@ execution: code
 
 ## Goal Capsule
 
-- **Objective:** A change an admin makes by hand to a song's or album's credits, and a merge of two albums, take effect whole or not at all, whatever a match, an import or another admin does at the same moment. What users hold on a merged album, or on a duplicate song the merge removes, follows the kept album and song: favorites, plays, playlist entries and lyrics. On an album that holds a release, the album match queue leaves the album's own credits and every song a match has already compared as an admin left them, and it still matches a song that arrived while an admin applied a match. An artist that holds a MusicBrainz ID gets its missing details from MusicBrainz by that ID, and never another artist's by name.
-- **Product authority:** The open items under "MusicBrainz matching" and "Matching follow-ups" in `ROADMAP.md`, and "Deferred to Follow-Up Work" in `docs/plans/2026-11-15-1038-fix-matching-follow-ups-plan.md`. On 2026-11-15 the user chose them as the next roadmap item, named the first two (hand changes to credits, album merge atomicity) and asked for the others to be weighed. On the same day the user answered the plan's five questions (Key Decisions): artist sync is rebuilt as a fill by stored ID, and a duplicate song is folded into the kept copy.
-- **Means:** Hand changes and merges take the catalog lock order inside one transaction (KTD1, KTD5). Each effect of an apply beside the queue is reproduced by a test before it is repaired (KTD8). Artist sync looks an artist up by its stored ID and writes under the artist's row lock (KTD14, KTD16). A merge folds each duplicate through ports of Playlist, Lyrics, Activity and Favorites inside its transaction (KTD19).
-- **Execution profile:** One branch named after this plan, fourteen units in four phases (Sequencing). Units land as local commits. The lock design, the statements and the two-session tests of U2 to U6, U11 and U14 go to the postgres specialist (`.agents/agents/postgres.md`). The plan holds no migration. U13 changes `packages/baander-tooling`, which has gates of its own.
-- **Authority and stop conditions:** Follow `AGENTS.md`, then the Product Contract, then the Planning Contract. Stop and ask the user when a race test shows a deadlock between writers that KTD1 or KTD5 says cannot wait on each other in a cycle, when a reproduction of U5 or U6 shows an effect this plan does not list, when MusicBrainz answers the lookup of a merged ID in a way KTD16 does not cover, or when the user answers an Outstanding Question against its default.
+- **Objective:** A change an admin makes by hand to a song's or album's credits, and a merge of two albums, take effect whole or not at all, whatever a match, an import or another admin does at the same moment. What users hold on a merged album, or on a duplicate song the merge removes, follows the kept album and song: favorites, plays, playlist entries and lyrics. On an album that holds a release, the album match queue leaves the album's own credits and every song a match has already compared as an admin left them, and it still matches a song that arrived while an admin applied a match. An artist that holds a MusicBrainz ID gets its missing details from MusicBrainz by that ID, as soon as an album or song match or an import gives it the ID, and never another artist's by name.
+- **Product authority:** The open items under "MusicBrainz matching" and "Matching follow-ups" in `ROADMAP.md`, and "Deferred to Follow-Up Work" in `docs/plans/2026-11-15-1038-fix-matching-follow-ups-plan.md`. On 2026-11-15 the user chose them as the next roadmap item, named the first two (hand changes to credits, album merge atomicity) and asked for the others to be weighed. On the same day the user answered the plan's questions in two rounds (Key Decisions): artist sync is rebuilt as a fill by stored ID that starts as soon as an artist gets its ID and asks about an artist at most once in 30 days, and a duplicate song is folded into the kept copy.
+- **Means:** Hand changes and merges take the catalog lock order inside one transaction (KTD1, KTD5). Each effect of an apply beside the queue is reproduced by a test before it is repaired (KTD8). Artist sync looks an artist up by its stored ID and writes under the artist's row lock (KTD14, KTD16); a match, an import and the admin sync queue it through one store of marks and one shared pace (KTD15, KTD21, KTD22). A merge folds each duplicate through ports of Playlist, Lyrics, Activity and Favorites inside its transaction (KTD19).
+- **Execution profile:** One branch named after this plan, fifteen units in four phases (Sequencing). Units land as local commits. The lock design, the statements and the two-session tests of U2 to U6, U11, U14 and U15 go to the postgres specialist (`.agents/agents/postgres.md`). The plan holds no migration. U13 changes `packages/baander-tooling`, which has gates of its own.
+- **Authority and stop conditions:** Follow `AGENTS.md`, then the Product Contract, then the Planning Contract. Stop and ask the user when a race test shows a deadlock between writers that KTD1 or KTD5 says cannot wait on each other in a cycle, when a reproduction of U5 or U6 shows an effect this plan does not list, when MusicBrainz answers the lookup of a merged ID in a way KTD16 does not cover.
 - **Finishing:** `ce-work` implements the units, with `ce-simplify-code` at phase boundaries. `ce-code-review` runs before shipping and its justified findings are applied. Push only when the user asks.
-- **Open blockers:** None. The three Outstanding Questions for the user each carry a default and block nothing.
+- **Open blockers:** None. No question for the user is open.
 
 ---
 
@@ -26,7 +26,7 @@ execution: code
 
 ### Summary
 
-This plan closes what the matching follow-ups deferred. A hand change to credits runs in one transaction under the locks a match apply takes, so it waits for an apply, a retag or a merge and then acts on what they committed. An album merge commits whole or not at all, moves every song the source holds, deletes the source's cover only after the commit, and carries the source's favorites and plays to the target. Four effects of a match apply beside a queue run are reproduced first and repaired only where the reproduction fails. Test leftovers of the match queue and the match dialog are added, and the pages describe the result. Artist sync becomes a fill by stored ID that an administrator's metadata sync queues, and the name search behind the old path goes. A merge folds each duplicate song into the kept copy, so its playlist entries, lyrics, plays and favorites move instead of being lost.
+This plan closes what the matching follow-ups deferred. A hand change to credits runs in one transaction under the locks a match apply takes, so it waits for an apply, a retag or a merge and then acts on what they committed. An album merge commits whole or not at all, moves every song the source holds, deletes the source's cover only after the commit, and carries the source's favorites and plays to the target. Four effects of a match apply beside a queue run are reproduced first and repaired only where the reproduction fails. Test leftovers of the match queue and the match dialog are added, and the pages describe the result. Artist sync becomes a fill by stored ID that a match or an import queues as soon as it gives an artist its ID, and that an administrator's metadata sync queues for the rest; an artist is asked about at most once in 30 days, and the name search behind the old path goes. A merge folds each duplicate song into the kept copy, so its playlist entries, lyrics, plays and favorites move instead of being lost.
 
 ### Problem Frame
 
@@ -44,12 +44,15 @@ This plan closes what the matching follow-ups deferred. A hand change to credits
 
 ### Key Decisions
 
-The user decided the first four on 2026-11-15, each against the alternatives this plan had set out.
+The user decided all but the last on 2026-11-15, in two rounds, each against the alternatives this plan had set out.
 
-- **Artist sync is rebuilt in this plan as a fill by stored ID.** Governs R20 to R24, R32. (session-settled: user-directed — chosen over keeping the unreachable path as groundwork, and over removing it: a match gives artists their IDs but not their details, and the old path fills an identified artist from the top hit of a name search)
+- **Artist sync is rebuilt in this plan as a fill by stored ID.** Governs R20 to R24, R32, R35. (session-settled: user-directed — chosen over keeping the unreachable path as groundwork, and over removing it: a match gives artists their IDs but not their details, and the old path fills an identified artist from the top hit of a name search)
 - **Favorites and plays follow a merged album; recommendations stay as they are.** Governs R9, R10. (session-settled: user-directed — chosen over favorites only, and over moving recommendations as well: plays cannot be regenerated, and the recommendation job rewrites its rows)
 - **A duplicate song is folded into the kept copy during the merge.** Governs R25 to R31. (session-settled: user-directed — chosen over deleting it as today and stating the loss on the merge page: playlist entries, lyrics, plays and favorites are what users stored)
 - **An automatic match of a matched album's new songs fills gaps and never writes the album's credits.** Governs R12. (session-settled: user-directed — chosen over writing nothing on the album, which ends the second try for a refused cover, and over today's behaviour)
+- **An artist is filled as soon as a match or an import gives it a MusicBrainz ID.** Governs R33. (session-settled: user-directed — chosen over leaving the fill to the next admin sync: on a library without tagged artist IDs every artist ID comes from a match, and an admin's first sync would fill none of the artists its own matches identify)
+- **A playlist entry, lyrics or a first play that names no album, stored for a duplicate while its merge runs, goes with the duplicate.** Governs R36. (session-settled: user-directed — chosen over locking the duplicates so that such a write fails: the window is the merge's length, and the failure would reach the user as an error Playlist and Lyrics do not map)
+- **An artist asked about is not asked again for 30 days.** Governs R21, R34. (session-settled: user-directed — chosen over asking every identified artist again at every sync: MusicBrainz has no disambiguation and no end of life span for most artists, so nearly every identified artist would be asked again each time)
 - **The song field edit rides in this plan.** Governs R4. Settled by `AGENTS.md`: a defect beside code a plan touches joins the plan's units.
 
 ### Requirements
@@ -88,11 +91,14 @@ The user decided the first four on 2026-11-15, each against the alternatives thi
 **Artist sync**
 
 - R20. An artist that holds a MusicBrainz ID takes its empty, unlocked fields from a lookup by that stored ID: sort name, type, country, disambiguation and the two ends of its life span. Its name, its ID and every field that holds a value stay as they are. An artist without a stored ID is left alone, and nothing fills an artist from a search by its name.
-- R21. An administrator's metadata sync, from the admin page or `app:metadata:sync`, queues that fill for every artist with a stored ID and an empty field among those six. The lookups are spaced so that other queued work and the album match queue run between them.
-- R22. An artist that was removed, merged or given another ID while its lookup ran is not written, and neither is a field that was filled or locked meanwhile. A stored ID MusicBrainz no longer has, a refusal, an outage and an answer for another ID each write nothing and are logged; the next sync asks again.
+- R21. An administrator's metadata sync, from the admin page or `app:metadata:sync`, queues that fill for every artist with a stored ID and an empty field among those six, except an artist asked about that ID within the last 30 days (R34).
+- R22. An artist that was removed, merged or given another ID while its lookup ran is not written, and neither is a field that was filled or locked meanwhile. A stored ID MusicBrainz no longer has, a refusal, an outage and an answer for another ID each write nothing and are logged. A fill that meets an outage queues itself again after a pause, up to three times in a row, and after that the next admin sync asks again; a refusal is asked again by the next producer that queues the artist.
 - R23. `app:metadata:status` and the admin page count the artist syncs that ran.
 - R24. A qualification run still completes its metadata work once the admin sync queues artist syncs.
-- R32. A sync started while another sync's artist lookups are still queued queues none of those artists again, and cancelling a sync's job, also after it finished, ends the lookups it queued without a request.
+- R32. An artist whose fill is queued is not queued again, whether a match, an import or an admin sync would queue it, and cancelling an admin sync's job, also after it finished, ends the lookups it queued without a request.
+- R33. An artist is filled as soon as an album or song match apply gives it a MusicBrainz ID or creates it with one, and as soon as an import batch does while automatic matching is on. The fill is queued after their commit, and a failure to queue it is logged and changes nothing they wrote.
+- R34. An artist whose stored ID MusicBrainz answered within the last 30 days, with a record or a 404, is not asked about that ID again by any producer; a refusal and an outage do not count as answers. An artist given another ID is asked about the new one.
+- R35. Artist fills fall due at least two seconds apart, whoever queued them, so the album match queue keeps at least every other MusicBrainz turn and a backlog of fills waits in the queue rather than in a worker. Right after an admin sync is cancelled two fills may fall due closer together; the shared MusicBrainz limit still keeps their requests a second apart.
 
 **Duplicate songs**
 
@@ -103,6 +109,7 @@ The user decided the first four on 2026-11-15, each against the alternatives thi
 - R29. A user's favorite of the duplicate becomes a favorite of the kept song; a user who favorited both keeps one.
 - R30. Everything else of the duplicate goes with it: its own fields, credits, genres and matched marks, and the recommendations, queue entries and cached renditions that name it. Its audio file stays on disk untouched.
 - R31. The fold is part of the merge's transaction: a merge that fails leaves the duplicate, and everything users hold on it, as before.
+- R36. A playlist entry, lyrics or a first play that names no album, stored for a duplicate while its merge runs, goes with the duplicate. A first play that names the source album, as every play from the web player does, waits for the merge and then fails.
 
 ### Acceptance Examples
 
@@ -113,6 +120,7 @@ The user decided the first four on 2026-11-15, each against the alternatives thi
 - AE5. **Covers R15.** Given automatic matching on and a manual apply that has read its album, when an import commits a new song and its match request before the apply removes the album's match state, the album waits for a match again after the apply, and the run that follows writes only the new song.
 - AE6. **Covers R20, R22.** Given an artist with a MusicBrainz ID, no country, a type an admin set and a locked sort name, when an artist sync runs and MusicBrainz answers that ID with a country, another type and a sort name, the artist has the country and keeps its type, its sort name, its name and its ID. An artist without an ID causes no request.
 - AE7. **Covers R26, R28.** Given a playlist that holds a duplicate and the target's copy, and a user who played the duplicate three times and the copy twice and loved only the duplicate, when the merge commits, the playlist holds the copy once at the position the copy had, and the user has one play of the copy with five plays, the later of the two last-played times and the loved flag.
+- AE8. **Covers R33, R34.** Given automatic matching on, when an import batch credits an artist by a MusicBrainz ID new to the catalog, one fill of that artist is queued after the batch commits, and its lookup fills the artist's empty fields. When a later admin sync runs within 30 days, it queues no fill for that artist. Had the lookup met an outage, the fill would have queued itself again five minutes later.
 
 ### Success Criteria
 
@@ -125,8 +133,10 @@ Out by the user's choice of scope: the PGroonga failure of throwaway test schema
 
 Considered and not built:
 
-- **Artist sync is not queued where an artist gets its ID** (Outstanding Questions). An artist identified by automatic matching, by an import, or by the album matches an admin sync itself requests keeps its empty fields until the next admin sync: a sync selects its artists when it starts, before the album match queue has applied those matches.
-- **No lasting record that an artist was asked about** (Outstanding Questions). MusicBrainz has no disambiguation and no end of life span for most artists, so after a fill nearly every identified artist still has an empty field among the six, and every admin sync asks about it again: on a library of 3,000 identified artists, about 100 minutes of every other MusicBrainz turn per sync. A song LRCLIB has no lyrics for is asked about again by every bulk run in the same way.
+- **An artist match apply queues no fill and records no answer.** The admin compared the artist's fields with the candidate in the same dialog and chose; a field meant to stay empty is locked (R20), or the next admin sync fills it.
+- **An album artist that only the album credit decision of an import creates is filled by the next admin sync.** `AlbumService::creditArtistIfUncredited` resolves it in a transaction of its own after the batch, and reports nothing; an album artist that a song of the batch also credits is filled with the batch.
+- **No import queues a fill while automatic matching is off**, as no import requests an album match then. An operator who keeps the switch off gets no MusicBrainz request from a scan; the admin sync and an admin's apply still queue fills.
+- **No way to ask about an artist again before its 30 days end.** The artist match dialog, and `app:metadata:match:compare` with `app:metadata:match:apply`, show and write MusicBrainz's current values for one artist at any time. An answer mark ends early only when its Redis key is deleted. No admin action is added, so the console counterpart rule is unaffected.
 - **Biography, Discogs ID and gender are not filled.** A lookup by ID gives none of them: the old path took the biography from its Discogs name search only, and the MusicBrainz port carries no gender.
 - **A MusicBrainz ID that MusicBrainz merged into another artist is not followed.** The sync writes nothing and logs both IDs; an admin re-identifies the artist from the match dialog, which handles the merge it can cause.
 - **No sync of one artist from the admin page or the console.** The admin sync reaches every artist; a route for one artist needs a command and an operator page of its own.
@@ -151,13 +161,9 @@ Considered and not built:
 
 ### Outstanding Questions
 
-**For the user, each with the default this plan builds**
+**For the user**
 
-The five questions this plan first asked are answered (Key Decisions). The two additions raise these:
-
-- **Whether an artist is filled as soon as a match or an import gives it an ID.** Default: no. The administrator's metadata sync queues the fill (R21), so an artist identified by automatic matching keeps empty fields until the next admin sync. That covers the matches a sync itself requests: the sync selects its artists when it starts, and the album match queue applies its matches one album a second afterwards. On a library whose files carry no MusicBrainz artist IDs, as on the persistent instance, every artist ID comes from a match: artists matched before this ships are filled at the first sync, and artists the queue identifies later wait for the next one. Answering "yes" adds a producer after the commit of an apply and of an import batch. It needs the artists that gained an ID carried out of the transaction and a filter so that each is queued once, it changes `ApplyMatchHandler` and `FilesDiscoveredHandler`, and it adds one MusicBrainz request per identified artist to a library-wide match.
-- **What happens to a playlist entry, lyrics or a first play that names no album, stored for a duplicate while its merge runs.** Default: it goes with the duplicate, as today; the window is the merge's length (KTD18). The alternative fails the user's request instead. The merge then locks the duplicates `FOR UPDATE`, and Playlist and Lyrics each need an answer for a foreign-key failure and for a deadlock, which neither maps today. A first play that names the source album, as every play from the web player does, waits on the album's row and fails on `fk_media_activities_album_id` for the merge's length whatever the answer (KTD5).
-- **Whether an artist is asked about again at every admin sync.** Default: yes, as today's design does (KTD15): nearly every identified artist at every sync, since disambiguation and the end of a life span stay empty for most (Scope Boundaries). The alternative remembers an asked artist for a period, such as 30 days, with the per-artist mark of R32 kept that long in the same Redis store; it needs no migration. It then fills a field MusicBrainz gains only after the period.
+None is open. The user answered every question this plan asked on 2026-11-15 (Key Decisions).
 
 **Deferred to implementation**
 
@@ -166,7 +172,9 @@ The five questions this plan first asked are answered (Key Decisions). The two a
 - The statement form that moves favorites (KTD7): it must not fail on `uniq_user_favorites_user_id_entity_type_entity_public_id` when a user favorites the target between two statements.
 - How MusicBrainz answers the lookup of an ID it merged into another artist (KTD16). The adapter follows no redirect and no fixture covers the case; one live request in U11 settles it.
 - The statement forms of the fold (KTD19). Each has to hold for several duplicates of one kept song and must not fail on `uniq_playlist_song_playlist_id_song_id`, the unique index on `lyrics.song_id` or the favorites index when a user writes beside the merge.
-- The spacing of queued artist syncs (KTD15): 2,000 ms unless the preview shows the album match queue held back.
+- The spacing of artist fills (KTD22): 2,000 ms unless the preview shows the album match queue held back.
+- Whether the resolver reports the artists it identified through a second port method or a result its `resolve()` returns (KTD21). The callers that build or stub the resolver are listed under U15's guards.
+- The atomic form of the shared due time in Redis (KTD22).
 
 ### Sources / Research
 
@@ -204,12 +212,20 @@ The five questions this plan first asked are answered (Key Decisions). The two a
 - KTD12. **An automatic apply to a matched album pairs again under the locks.** It pairs the songs as read under the locks against the release, without a MusicBrainz call, and answers stale when the pairs differ from the candidate's. Effect D reproduced in U5, so the check is built. Covers R14.
 - KTD13. **The contract cases are one abstract case class with two subclasses.** The in-memory subclass runs in the unit lane and the SQL subclass in the functional lane. Cases use whole-second instants and real album rows, the rows because `fk_album_match_states_album_id` requires them; both stores keep a due time to the microsecond. A lapsed claim is a live claim followed by one abstract hook of the shared class that makes live claims lapse: the SQL subclass runs the update of the statements test's `lapse()` helper, and the in-memory subclass advances its clock. A lease of zero seconds was rejected: the interface documents the lease as at least one second, and it cannot produce a request parked beside a claim that then lapses. What the double cannot express stays where it is: `SKIP LOCKED`, the `MERGE` evaluated again after a wait and the check constraints, in `AlbumMatchQueueStatementsTest` and `AlbumMatchClaimRaceTest`. Covers R17.
 - KTD14. **Artist sync lives in Catalog and fills with the match's own rule.** A Catalog Application handler handles `SyncArtistMessage`, which joins the Metadata contract layer that holds `SyncAlbumMessage`. Metadata's `SyncArtistHandler` and `ArtistMetadataEnricher` go, and with them their two blocks in `deptrac.baseline.yaml`. The fill is `MatchTicks::automatic` over `MatchComparisonBuilder::artist`. The handler writes those field rows through the writer an artist match uses and ignores the comparison's actions, so a sync never merges an artist. Rejected: a handler in Metadata, where every use of a Catalog port is baseline debt and a new one is a violation. Covers R20.
-- KTD15. **The administrator's metadata sync queues it, once for the catalog.** `SyncMetadataHandler` dispatches one `SyncArtistsMessage`, a second message in the same contract layer. Its Catalog handler reads, through a new Catalog query, the IDs of the artists that hold a MusicBrainz ID and an empty field among the six, and dispatches one `SyncArtistMessage` each, 2,000 ms apart, with a cancellation check between artists. It keeps the run records of the lyrics bulk fetch (`QueuedLyricsFetchesInterface`): each message names its run, an artist stays marked as queued until its sync has run, so a sync started meanwhile skips it, and the job is recorded against its run, so cancelling the job, also after it finished, makes the syncs still queued end without a request. The cancellation check alone would cover only the seconds the dispatch takes. Two seconds is one turn of the shared MusicBrainz limit plus the request's own time, so the backlog drains while the album match queue gets every other turn; queued lyrics fetches are spaced on the same reasoning. No route, option or command is added, so the admin page and `app:metadata:sync` stay alike. Rejected: making `includeArtists` of `SyncLibraryMessage` real. `SyncLibraryHandler` may use no further Catalog port, a second handler on that message ties two contexts to one delivery, and an artist credited in two libraries would be asked about twice. Not built: queuing where an artist gets its ID (Outstanding Questions). Covers R21, R32.
-- KTD16. **The sync looks up first, writes under the artist's row lock, and ends quietly on every expected outcome.** It sends no request for an artist without an ID or without an empty, unlocked field among the six, and it asks with `MusicBrainzSlotWait::Unbounded`, as the matcher does. Then, in one transaction, it locks the artist's row and reads the artist through the refreshing finder. It writes only when the artist exists, still holds the ID that was looked up and the answer carries that same ID, and it decides the fill from that read (KTD2). The row is its only lock, so it cannot wait in a cycle and needs no conflict answer. A missing artist, another stored ID, an answer for another ID, a 404, a refusal and an outage each end the message with a log entry and without a retry, as a queued lyrics fetch ends: a handler that throws on an outage would add one failed job per artist to the status' failed count. Covers R22.
+- KTD15. **The administrator's metadata sync queues the fills of the artists no producer reached, once for the catalog.** `SyncMetadataHandler` dispatches one `SyncArtistsMessage`, a second message in the same contract layer. Its Catalog handler reads, through a new Catalog query, the IDs and MusicBrainz IDs of the artists that hold a MusicBrainz ID and an empty field among the six, skips those with a queued or an answer mark (KTD22), and dispatches one `SyncArtistMessage` each, due at the shared pace, with a cancellation check between artists. It keeps run records, as the lyrics bulk fetch does: each message it queues names its run, and the job is recorded against its run, so cancelling the job, also after it finished, makes the syncs still queued end without a request. The cancellation check alone would cover only the seconds the dispatch takes. No route, option or command is added, so the admin page and `app:metadata:sync` stay alike. Rejected: making `includeArtists` of `SyncLibraryMessage` real. `SyncLibraryHandler` may use no further Catalog port, a second handler on that message ties two contexts to one delivery, and an artist credited in two libraries would be asked about twice. Covers R21, R32.
+- KTD16. **The sync looks up first, writes under the artist's row lock, and ends quietly on every expected outcome.** It sends no request for an artist without an ID, without an empty, unlocked field among the six, or with an answer mark for its stored ID, and it asks with `MusicBrainzSlotWait::Unbounded`, as the matcher does. Then, in one transaction, it locks the artist's row and reads the artist through the refreshing finder. It writes only when the artist exists, still holds the ID that was looked up and the answer carries that same ID, and it decides the fill from that read (KTD2). The row is its only lock, so it cannot wait in a cycle and needs no conflict answer. When MusicBrainz answered with a record or a 404, the handler sets the answer mark once its outcome is settled: after its write commits, or at once when it writes nothing. A write that rolls back sets none, so the retry of its message asks again. A refusal sets none, since a 401 or a 403 can end when a ban is lifted, and a mark would stop every fill for 30 days. An outage, or a lookup that got no turn, sets none either: the handler dispatches its message again, due at the shared pace and no sooner than a pause of 5, then 15, then 60 minutes, as the album match queue pauses, and the message counts the outages in a row. It queues itself again at most three times in a row; at a fourth outage it ends, and the next admin sync asks again. The fill queued again keeps its run and its artist's queued mark, renewed to the new due time, so a cancel still ends it and no producer queues the artist twice. Every other outcome clears the queued mark. A missing artist, another stored ID, an answer for another ID, a 404, a refusal and an outage each end the message with a log entry and without an exception: a handler that throws would add one failed job per artist to the status' failed count. Covers R22, R34.
 - KTD17. **The name search path is removed.** With the enricher go `ArtistPortInterface::assignMusicbrainzId()`, `ArtistMusicbrainzIdAssigner` and `MusicbrainzIdAssignment`, whose one purpose was to guard an ID a name search found, `MetadataSyncOrchestrator::syncArtist()`, and the `includeArtists` flag with its wire field. `SyncArtistMessage` loses `forceUpdate`, since a fill has nothing to force. Both `searchArtist` adapters stay: the open search routes call them. Covers R20.
-- KTD18. **A merge keeps every song row `FOR NO KEY UPDATE`.** The fold moves what exists when its statements run. A playlist entry, a lyrics row or a first play that names no album, stored for a duplicate after that, commits beside the merge and goes with the duplicate, as today. A first play that names the source album already waits on the album's row and fails (KTD5), whichever way the song is locked. Rejected: locking the duplicates `FOR UPDATE` so that the other writes wait and fail. A playlist save takes the playlist's row, then its entries, then the song through the entry's foreign key, the reverse of a merge that holds the song and then takes playlist rows, so the two could wait in a cycle. Playlist and Lyrics map neither a foreign-key failure nor a deadlock, so the user would get a 500. And one statement cannot lock some songs in one mode and the rest in another, which gives up the single ID order across both albums. Covers R31.
+- KTD18. **A merge keeps every song row `FOR NO KEY UPDATE`.** (session-settled: user-directed — chosen over locking the duplicates `FOR UPDATE` so that a write stored for one during the merge fails: the user kept today's behaviour for that window) The fold moves what exists when its statements run. A playlist entry, a lyrics row or a first play that names no album, stored for a duplicate after that, commits beside the merge and goes with the duplicate, as today. A first play that names the source album already waits on the album's row and fails (KTD5), whichever way the song is locked. Rejected: locking the duplicates `FOR UPDATE` so that the other writes wait and fail. A playlist save takes the playlist's row, then its entries, then the song through the entry's foreign key, the reverse of a merge that holds the song and then takes playlist rows, so the two could wait in a cycle. Playlist and Lyrics map neither a foreign-key failure nor a deadlock, so the user would get a 500. And one statement cannot lock some songs in one mode and the rest in another, which gives up the single ID order across both albums. Covers R31, R36.
 - KTD19. **The fold runs through each context's album merge port, as statements, before the duplicate is deleted.** The ports of KTD7 in Favorites and Activity gain the fold of one song into another, and Playlist and Lyrics each gain a port in a single-class contract layer of the same shape. Inside the transaction, once the songs are loaded and the moves flushed, the Playlist port first locks, in one pass and in ID order, the rows of every playlist that holds a duplicate of this merge and raises their `persistence_version`, so a save that began earlier answers its existing 409. Then each duplicate is folded into its kept song, duplicates in ID order, and then the duplicates are deleted. Playlist rows are the merge's last lock kind, after its song rows; a playlist save never waits on a song a merge holds `FOR NO KEY UPDATE`, so the two cannot wait in a cycle. The Activity port locks the play rows of both songs before it adds them up, so a play that commits meanwhile is counted. Each port releases what the unit of work holds for the duplicate. Rejected for playlists: the aggregate's `save`, which flushes the whole unit of work and clears the entity manager on a conflict. Covers R26 to R29, R31.
 - KTD20. **The kept song is chosen once, under the locks.** The merge maps each hash to the target's oldest song that holds it and treats a source song as a duplicate only when its hash is set and in the map. Several duplicates of one kept song are folded pair by pair. Covers R25.
+- KTD21. **An album or song apply and an import batch queue the fill of the artists they identify, after their commit.** (session-settled: user-directed — chosen over leaving the fill to the next admin sync; instantiates the Key Decision that governs R33) The artist identity resolver is the one writer that creates an artist with an ID or gives an artist without one an ID, inside its caller's transaction (`ArtistIdentityResolver::write`), so it reports those artists at that moment; no second read is made. `ApplyMatchHandler` carries them out of its transaction closure beside the images to discard, and passes them on after its commit and its existing post-commit steps. `FilesDiscoveredHandler` carries them out of each batch's `writeSongs` and passes them on right after that batch commits, beside its lyrics request: a later batch of the same message can fail, and its retry finds these artists holding their IDs and reports none. Both pass them to one Catalog Application requester, which checks the marks of KTD22 and dispatches one `SyncArtistMessage` each, without a run. An import's call does nothing while automatic matching is off, as its album match requests do; an apply's call queues whatever the switch says, as an admin's sync does. The switch is read when a fill is queued: a fill an import queued still runs after the switch is turned off, where the queue drops an import's album match request. A rolled-back transaction reports nothing, since its closure never returns. A failure to queue is logged with the artist IDs and changes nothing the apply or batch wrote, as a merge's match request; an artist whose fill was never queued, such as one identified just before its process died, is filled by the next admin sync. The requester runs outside any transaction and reads no catalog row, so it takes no lock and changes no lock order. Rejected: reading the artists back after the commit, which cannot tell an ID the transaction gave from one the artist already held. Rejected: dispatching inside the transaction, which could queue a fill for a rollback and run it before the commit. Covers R33.
+- KTD22. **One Catalog store in Redis keeps the queued marks, the answer marks and the shared pace.** (session-settled: user-directed — chosen over asking every identified artist again at every sync; instantiates the Key Decision that governs R34) It has the shape of the lyrics bulk fetch's run records (`QueuedLyricsFetchesInterface`) and is Catalog's own, behind a Catalog Application port. It holds:
+  - a queued mark per artist, from queuing until its sync has run, plus a margin, so no producer queues an artist twice (R32);
+  - an answer mark per artist and MusicBrainz ID, for 30 days from the lookup MusicBrainz answered, keyed by the ID so that an artist given another ID is asked about the new one (R34);
+  - the run records of KTD15, for the admin sync's cancel;
+  - one shared due time: each fill falls due two seconds after the latest fill queued before it, or at once when none is pending, whoever queues it (R35). Two seconds is one turn of the shared MusicBrainz limit plus the request's own time, so the album match queue keeps every other turn, and a backlog waits in the transport instead of in a worker that holds its consumer while it waits for a turn.
+
+  The 30 days count from the answered lookup and not from a write, since a lookup that finds nothing new is still an answer; a 404 counts, since MusicBrainz answers it the same way the next time. Cancelling an admin sync's run sets the shared due time back to now, since the run's fills still queued make no request; a fill another producer queued meanwhile may then share a two-second step with a new one, which the shared MusicBrainz limit still spaces a second apart. Every entry expires on its own. A lost store asks every artist again at its next producer, which costs requests and writes nothing wrong. Rejected: a column on `artists` for the time of the last answer, which needs a migration and a capture exclusion for bookkeeping. Rejected: spacing each producer's dispatches on their own, which lets an import and an admin sync together exceed the pace. Covers R32, R34, R35.
 
 ### High-Level Technical Design
 
@@ -227,7 +243,7 @@ What each writer locks, left to right. A writer takes only the kinds it needs an
 | Album merge (U3, U14) | source `FOR UPDATE`, target `FOR NO KEY UPDATE`, in ID order | | | the songs of both albums, `FOR NO KEY UPDATE` |
 | Artist sync (U11) | | | the artist, `FOR UPDATE` | |
 
-A merge that folds duplicates takes one more kind after its song rows: the rows of the playlists that hold a duplicate, in ID order (KTD19). No other writer in this table takes a playlist row.
+The fill requesters of KTD15 and KTD21 run after their producers' commits, outside any transaction, and take no catalog lock. A merge that folds duplicates takes one more kind after its song rows: the rows of the playlists that hold a duplicate, in ID order (KTD19). No other writer in this table takes a playlist row.
 
 The merge:
 
@@ -269,32 +285,37 @@ The four effects:
 
 ### Assumptions
 
-These are this plan's own choices. The user has confirmed none of them; the one on MusicBrainz requests per sync and the last one are also Outstanding Questions.
+These are this plan's own choices. The user has confirmed none of them.
 
 - A hand change may wait a few seconds for an import batch that names the same artist, and such a batch for a hand change (KTD1).
 - A merge during a rescan of the same albums may answer `merge_busy`, or end the import's batch, whose retry files new files of the source's directory under a new album of the source's title (KTD5). A rescan after any merge already does that for new files.
 - A request restored after a manual apply follows an import's rules: only while automatic matching is on, and due after the settling delay (KTD11). A request an admin's sync made is then restored only while the setting is on.
 - Adding a credit of another role, such as producer, keeps counting as a hand change that drops the `credits` mark, as today.
-- An admin sync may spend one MusicBrainz request on nearly every identified artist each time it runs, since disambiguation and the end of a life span stay empty for most (KTD15).
 - A fill never replaces a value, also when a sync is forced; only an admin's ticks in the artist match dialog replace one (R20).
 - When the kept song and the duplicate both have lyrics, the kept song's stay (R27). Nothing records which of the two an admin chose, and no code path replaces a stored lyrics row.
 - A playlist that held both songs keeps the kept song's entry at its own position (R26), which is what the cascade leaves today.
 - The duplicate's own row goes with it, the lyrics text stored on the song row included (R30). That text comes from a sidecar file or a hand edit, and no API serves it.
-- A playlist entry, lyrics or a first play that names no album, stored for a duplicate while its merge runs, goes with the duplicate (KTD18).
+- The 30 days count from the answered lookup, a 404 counts as an answer and a refusal does not (KTD16, KTD22).
+- A fill queued while an admin sync's backlog is pending waits behind it, two seconds per artist ahead of it (KTD22).
+- A fill that meets four outages in a row is left to the next admin sync (KTD16).
+- An import queues fills only while automatic matching is on, and an admin's apply queues them whatever the switch says (KTD21).
+- An artist match apply queues no fill and records no answer (Scope Boundaries).
 
 ### Sequencing
 
 1. Groundwork: U1.
 2. Side by side: U2; U3, then U4, then U14; U5 then U6; U8 then U7; U9; U13.
-3. After U6: U11, then U12.
+3. After U6: U11, then U12, then U15.
 4. Documentation: U10, after every other unit.
 
 Files that more than one unit touches:
 
 - `openapi.json` and `ui/web/src/shared/api-client/gen`: U2 and U3 each add a 409 to routes. The lead regenerates both once, after both units.
 - `src/Catalog/Infrastructure/AlbumMergeService.php` and `tests/Fixtures/Catalog/AlbumMergeRace.php`: U3, then U4, then U14. U14 also changes the two ports U4 creates.
-- `src/Catalog/Application/CommandHandler/MusicBrainzMatch/ApplyMatchHandler.php` and its unit test: U5, then U6, then U11, which shares the apply's artist field writer and builds on the mode U5 gives `MatchTicks::automatic`.
-- `tests/Fixtures/Catalog/MatchApplyRace.php`: U1, then U6, then U12, which drops an argument of the `ArtistService` it builds. U2, U3, U5 and U14 call it and do not change it.
+- `src/Catalog/Application/CommandHandler/MusicBrainzMatch/ApplyMatchHandler.php` and its unit test: U5, then U6, then U11, which shares the apply's artist field writer and builds on the mode U5 gives `MatchTicks::automatic`, then U15, which adds the fill requester after the commit.
+- `src/Catalog/Application/CommandHandler/FilesDiscoveredHandler.php` and the unit tests that build it: U15 only.
+- `tests/Fixtures/Catalog/MatchApplyRace.php`: U1, then U6, then U12, which drops an argument of the `ArtistService` it builds, then U15, which adds the requester to the `ApplyMatchHandler` it builds. U2, U3, U5 and U14 call it and do not change it; `QueueRunRace.php` builds its apply through it.
+- `tests/Integration/ArtistImportIdentityRaceTest.php`: U12 removes its two assigner cases, then U15 adds the race on the resolver's report.
 - `tests/Fixtures/Catalog/InMemoryAlbumMatchStates.php`: U8 may change it; U7 only uses it, so U7 follows U8.
 - `deptrac.yaml` and `config/services.yaml`: U4, then U14, in one chain; U11 changes other lines of `deptrac.yaml` (the Metadata contract layer) and of `config/packages/messenger.php`. The lead merges them.
 
@@ -307,7 +328,8 @@ Files that more than one unit touches:
 - **Live updates:** `user_favorites`, `media_activities`, `playlist_song` and `lyrics` are captured tables, so what a merge moves reaches clients through the capture and needs no web change. A raised `persistence_version` alone publishes nothing; the changed entry does.
 - **Messages:** `SyncArtistsMessage` and `SyncArtistMessage` are routed on `async` with payload codecs, which moves the pinned counts U11 lists. `SyncLibraryMessage` loses a wire field: a library sync queued before the update fails to decode, and its albums are requested by the next sync. A manual album apply can dispatch a `DrainAlbumMatchesMessage` through the requester (KTD11), which starts a new chain when no other request is due; the cases of U7 are then ordinary.
 - **Documented behaviour:** the catalog guide's sentence that an automatic apply writes every credits row that changes gains the exception of R12.
-- **MusicBrainz traffic:** an admin sync adds one request per artist with a stored ID and an empty field, two seconds apart, on the limit the album match queue shares.
+- **MusicBrainz traffic:** a match or an import adds one request per artist it identifies, and an admin sync one per identified artist with an empty field that no lookup answered within 30 days; all fall due at least two seconds apart, on the limit the album match queue shares.
+- **Redis:** a Catalog store of queued marks, answer marks and one shared due time; every entry expires on its own.
 - **Playlists:** a merge holds the rows of the playlists that hold a duplicate until it commits. A playlist save that meets it waits and then answers its existing 409.
 - **Tooling package:** U13 changes `packages/baander-tooling`, which has its own format, analysis, architecture and test gates (Verification Contract).
 
@@ -321,7 +343,9 @@ Files that more than one unit touches:
 | A constructor change breaks a hand-built construction in a test or fixture. | PHPStan analyses `tests/` without a baseline; each unit lists its constructions under Guards. |
 | The deadlock between a merge and an import (KTD5) proves frequent. | The log entry of each `merge_busy` names both albums; the library claim is the recorded alternative. |
 | The post-commit request of KTD11 fails or the process dies before it. | As with a merge's request: logged, and a metadata sync from the admin panel requests the album again. |
-| An admin sync's artist lookups hold the album match queue back on a large library. | The spacing of KTD15 leaves every other turn to the queue; a marker column is the recorded alternative. |
+| Artist fills hold the album match queue back on a large library, such as at the first import of a library tagged with artist IDs. | The shared pace of KTD22 leaves every other turn to the queue, and the answer marks keep later syncs from asking again for 30 days. |
+| The fill of an artist identified just before its process died is never queued. | The next admin sync queues it (KTD21). |
+| A MusicBrainz outage outlasts a fill's three pauses. | The fill ends at its fourth outage in a row and the next admin sync asks again (KTD16). |
 | MusicBrainz answers the lookup of a merged ID in a way the sync does not expect. | One live request in U11; the Goal Capsule's stop condition applies. |
 | A user holds several play rows for one song, since no unique index forbids it. | The fold's statement adds up every row of the user for both songs; U14 has the scenario. |
 | A fold race test on copied tables passes without testing anything. | The fixture adds back the three foreign keys onto `songs` that the copy drops (U14, Guards). |
@@ -344,6 +368,7 @@ Files that more than one unit touches:
 | U11 | Artist sync fills an artist by its stored ID | `src/Catalog/Application/MessageHandler/`, `src/Metadata/Application/`, `config/packages/messenger.php` | U6 |
 | U12 | The guard of a searched ID goes | `src/Catalog/Application/Port/ArtistPortInterface.php`, `ArtistService.php` | U11 |
 | U13 | The qualification harness answers artist lookups | `packages/baander-tooling/src/Fixtures/Qualification/` | none |
+| U15 | An artist is filled as soon as it gets an ID | `ArtistIdentityResolver.php`, `ApplyMatchHandler.php`, `FilesDiscoveredHandler.php` | U11 |
 | U14 | A merge folds a duplicate into the kept song | `src/Playlist/`, `src/Lyrics/`, `src/Activity/`, `src/Favorites/`, `AlbumMergeService.php` | U4 |
 | U10 | Documentation, vocabulary and roadmap | `docs-book/`, `src/*/README.md`, `CONCEPTS.md`, `ROADMAP.md` | every other unit |
 
@@ -557,39 +582,44 @@ Files that more than one unit touches:
 
 ### U11. Artist sync fills an artist by its stored ID
 
-- **Goal:** an administrator's metadata sync fills every identified artist's empty fields from MusicBrainz by ID, and nothing fills an artist from a name search.
-- **Requirements:** R20 to R23, R32; KTD14 to KTD17. Covers AE6.
+- **Goal:** an administrator's metadata sync fills every identified artist's empty fields from MusicBrainz by ID, at most once in 30 days, and nothing fills an artist from a name search.
+- **Requirements:** R20 to R23, R32, R34, R35; KTD14 to KTD17, KTD22. Covers AE6.
 - **Dependencies:** U6.
 - **Files:**
   - modify `src/Metadata/Application/Message/SyncArtistMessage.php` and create `src/Metadata/Application/Message/SyncArtistsMessage.php`;
   - create the two handlers under `src/Catalog/Application/MessageHandler/`, and the query for the artist IDs through `src/Catalog/Application/Port/ArtistPortInterface.php`, `src/Catalog/Infrastructure/ArtistService.php`, `src/Catalog/Domain/Repository/ArtistRepositoryInterface.php` and `src/Catalog/Infrastructure/Doctrine/Repository/ArtistRepository.php`;
   - modify `src/Catalog/Application/CommandHandler/MusicBrainzMatch/ApplyMatchHandler.php` (its artist field writer becomes a class both callers use);
+  - create the store of KTD22: its port under `src/Catalog/Application/Port/`, its Redis adapter under `src/Catalog/Infrastructure/Redis/`, and its alias in `config/services.yaml`;
   - modify `src/Metadata/Application/CommandHandler/SyncMetadataHandler.php`, `src/Metadata/Application/MetadataSyncOrchestrator.php`, `src/Metadata/Application/Message/SyncLibraryMessage.php`, `src/Metadata/Infrastructure/Messaging/MetadataMessagePayloadCodec.php`, `src/Metadata/Infrastructure/Admin/MetadataAdminService.php`, `config/packages/messenger.php`, `deptrac.yaml` and `deptrac.baseline.yaml`;
   - delete `src/Metadata/Application/MessageHandler/SyncArtistHandler.php`, `src/Metadata/Application/ArtistMetadataEnricher.php`, `tests/Unit/Metadata/Application/ArtistMetadataEnricherTest.php`, `tests/Unit/Metadata/Application/MetadataEnricherLockedFieldsTest.php` and the five artist cases of `tests/Integration/EnrichmentFreshStateTest.php`;
   - tests: new unit tests for the two handlers under `tests/Unit/Catalog/Application/MessageHandler/`, `tests/Unit/Metadata/Application/CommandHandler/SyncMetadataHandlerTest.php`, `tests/Unit/Metadata/Application/MessageHandler/SyncLibraryHandlerTest.php`, `tests/Functional/Controller/MetadataAdminControllerTest.php`, `tests/Unit/Metadata/Interface/Console/MetadataCommandsTest.php`, new `tests/Integration/ArtistSyncRaceTest.php`, and the messenger and boundary pins named under Guards.
 - **Approach:**
-  1. The per-artist handler follows KTD16 in its order: decide from the stored artist whether to ask, ask, then lock, read again and write. It saves nothing when nothing is filled, so a sync does not move the artist's update time.
-  2. The enumeration handler follows KTD15, run records included. It queues an artist once, however many libraries credit it, and records the run against its job.
+  1. The per-artist handler follows KTD16 in its order: decide from the stored artist and its answer mark whether to ask, ask, then lock, read again and write, and set the mark when MusicBrainz answered once that write committed, or at once when nothing is written. It saves nothing when nothing is filled, so a sync does not move the artist's update time.
+  2. The enumeration handler follows KTD15, run records included. It queues an artist once, however many libraries credit it, takes each due time from the shared pace, and records the run against its job.
   3. `SyncMetadataHandler` dispatches the enumeration beside the library syncs when no source is named, and the sync's answer counts it as one more queued job. The `genres` source queues none.
   4. `SyncArtistsMessage` joins `JOB_CLASSES`, so the status lists both artist jobs.
-  5. Both messages are routed like `SyncAlbumMessage`: `async`, resource class `io`, default route, wire names `metadata.sync_artists` and `metadata.sync_artist`; the artist message carries the artist's ID and its run's ID.
+  5. Both messages are routed like `SyncAlbumMessage`: `async`, resource class `io`, default route, wire names `metadata.sync_artists` and `metadata.sync_artist`; the artist message carries the artist's ID and, for a fill an admin sync queued, its run's ID. A fill a match or an import queued has no run, so that wire field may be null. The message also counts the outages its fill met in a row.
   6. One request against MusicBrainz for an ID it merged, made by hand on the preview, is recorded in the roadmap with what the adapter returned.
-- **Patterns to follow:** `RequestAlbumMatchHandler` and commit `28b76872a` for the move into Catalog; `ApplyMatchHandler::applyArtist` for the write; `BulkFetchLyricsHandler` with `QueuedLyricsFetchesInterface` for spaced dispatch, the queued marks and cancelling a run after its job finished; `FetchLyricsHandler` for a handler that ends on every outcome.
+- **Patterns to follow:** `RequestAlbumMatchHandler` and commit `28b76872a` for the move into Catalog; `ApplyMatchHandler::applyArtist` for the write; `BulkFetchLyricsHandler` with `QueuedLyricsFetchesInterface` and `RedisQueuedLyricsFetches` for spaced dispatch, the queued marks, expiring entries and cancelling a run after its job finished; `FetchLyricsHandler` for a handler that ends on every outcome.
 - **Test scenarios:**
   - Covers AE6: an empty, unlocked field takes MusicBrainz's value; a field that holds a value, a locked field, the name and the ID stay.
   - An artist whose six fields all hold a value, and an artist without an ID, cause no request and no write.
   - A 404, a refusal and an outage each write nothing, end the handler without an exception and are logged with the artist's ID.
+  - An outage queues the same fill again five minutes later at the earliest, with its run and its queued mark kept and no failed job; the second and third outages in a row wait 15 and 60 minutes, and the fourth queues nothing.
   - An answer whose ID differs from the stored one writes nothing and logs both IDs, also when another artist holds the answer's ID: no artist is merged.
   - An artist deleted before the write is not created again; an artist given another ID meanwhile, and a field filled or locked meanwhile, are not written.
-  - The enumeration queues one sync per artist with an ID and an empty field among the six, in two-second steps, none for other artists, one for an artist two libraries credit, and stops between artists when the job is cancelled.
-  - Covers R32: a second sync started while the first one's syncs are queued queues none of those artists again; cancelling the first sync's job after it finished makes its queued syncs end without a request.
+  - An artist with an answer mark for its stored ID causes no request; a record and a 404 set the mark for 30 days, and a refusal and an outage set none.
+  - An artist with an answer mark for an earlier ID is asked about its new one.
+  - A write that fails after an answered lookup leaves no mark, and the retry of the message fills the artist.
+  - The enumeration queues one sync per artist with an ID and an empty field among the six, in two-second steps, none for other artists, none for an artist with a queued or an answer mark, one for an artist two libraries credit, and stops between artists when the job is cancelled.
+  - Covers R32: a second sync started while the first one's syncs are queued queues none of those artists again; cancelling the first sync's job after it finished makes its queued syncs end without a request, and a fill queued after the cancel falls due at once.
   - The admin route and `app:metadata:sync` each queue one enumeration beside the library syncs and report the same number of jobs; the `genres` source queues none.
   - `GET /api/admin/metadata/sync-status` and `app:metadata:status` list a finished `SyncArtistMessage` job alike.
   - Both messages survive the codec round trip and reach their Catalog handlers from `async`.
   - Race, with the competing commit at the lookup (KTD8): an artist merged into another while the lookup runs is not written and its row does not come back; a manual artist match that gives the artist another ID meanwhile leaves that match's values.
   - Race: a sync that starts while an apply holds the artist's row waits, then reads the artist as the apply left it.
 - **Guards likely to trip:** `MessengerRoutingTest` (16 routes, 15 on `async`, 18 workloads become 18, 17 and 20); `AsyncWorkloadWiringTest` (19 and 17 become 21 and 19); `MessagingCodecWiringTest` (a list of 19 becomes 21); `JsonMessageCodecTest`, `SwooleFallbackHandlerRegistrationTest` and `MessengerJsonDeliveryTest` each take the new messages, and the last three build `SyncLibraryMessage` with the removed flag; `MetadataContractBoundaryTest`; a baseline entry for a deleted class fails Deptrac; `MetadataAdminControllerTest` pins the number of queued jobs; `NewAlbumMetadataSyncTest` calls `syncLibrary()`; `InstantBindConventionTest` allows `MetadataAdminService` one output format use.
-- **Verification:** the AE6 test fails against a handler that writes a field holding a value, and the first race scenario fails when the write runs without the row lock and the second read.
+- **Verification:** the AE6 test fails against a handler that writes a field holding a value, the answer mark scenario fails against a handler that asks again, and the first race scenario fails when the write runs without the row lock and the second read.
 
 ### U12. The guard of a searched ID goes
 
@@ -622,10 +652,39 @@ Files that more than one unit touches:
 - **Guards likely to trip:** the tooling format check (`.php-cs-fixer.tooling.php`), the tooling analysis and architecture checks.
 - **Verification:** the tooling gates of the Verification Contract pass.
 
+### U15. An artist is filled as soon as it gets an ID
+
+- **Goal:** an artist a match or an import identifies gets its details without waiting for an admin sync.
+- **Requirements:** R33; KTD21. Covers AE8.
+- **Dependencies:** U11, for the message, its handler and the store; U6, for `ApplyMatchHandler.php`; U12, for `MatchApplyRace.php` and `ArtistImportIdentityRaceTest.php`.
+- **Files:**
+  - modify `src/Catalog/Application/Port/ArtistIdentityResolverInterface.php` and `src/Catalog/Infrastructure/Doctrine/ImportIdentity/ArtistIdentityResolver.php`;
+  - create the requester and its interface under `src/Catalog/Application/Service/` and `src/Catalog/Application/Port/`;
+  - modify `src/Catalog/Application/CommandHandler/MusicBrainzMatch/ApplyMatchHandler.php` and `src/Catalog/Application/CommandHandler/FilesDiscoveredHandler.php`;
+  - tests: a new unit test of the requester, `tests/Unit/Catalog/Application/CommandHandler/MusicBrainzMatch/ApplyMatchHandlerTest.php`, `tests/Unit/Catalog/Application/CommandHandler/FilesDiscoveredArtistCreditTest.php`, `tests/Integration/ArtistImportIdentityRaceTest.php`, `tests/Integration/NewAlbumMetadataSyncTest.php`, and the constructions named under Guards.
+- **Approach:**
+  1. The resolver reports the artists it created with an ID and those it gave an ID, from its write; an artist that already held its ID is not reported.
+  2. Album and song applies carry the report out of their transaction and pass it to the requester after the commit and their existing post-commit steps, the cover discard and the album match request. The import passes each batch's report right after that batch commits, beside its lyrics request (KTD21).
+  3. The requester follows KTD21 and KTD22 and logs a failure with the artist IDs.
+- **Patterns to follow:** `AlbumMatchRequester` with `requestAfterImport` and `requestForAdmin` for two entry points that differ by the switch; `FilesDiscoveredHandler::requestAlbumMatches` and `AlbumMergeService::requestMatch` for best-effort steps after a commit.
+- **Test scenarios:**
+  - Covers AE8: an import batch that credits an artist by an ID new to the catalog queues one fill for it after the commit, however many songs of the batch credit it; a later batch crediting the same artist queues none.
+  - An album apply that creates a credited artist with its ID, and one that gives a stored artist without an ID its ID, each queue one fill; an artist that already held the ID queues none.
+  - An apply or a batch whose transaction fails queues nothing.
+  - A message whose second batch fails after its first batch committed has queued the fills of the artists the first batch identified.
+  - With automatic matching off, an import batch queues no fill and an admin's apply still does.
+  - A requester that fails is logged; the apply answers as it would without it, and the batch's songs are committed.
+  - An artist with a queued fill, or with an answer mark for that ID, is not queued.
+  - An artist match apply queues no fill.
+  - Fills queued by an import and by an admin sync at the same time fall due at least two seconds apart.
+  - Race: two import batches that resolve the same new artist at once report it once, from the batch that created it, so one fill is queued.
+- **Guards likely to trip:** the resolver is stubbed in `ApplyMatchHandlerTest`, `FilesDiscoveredGapFillTest`, `FilesDiscoveredArtistCreditTest`, `FilesDiscoveredRetagTest`, `FilesDiscoveredAlbumCreditTest` and `tests/Fixtures/Catalog/DiscoveredFileObservations.php`, and called in `tests/Fixtures/Catalog/match-apply.php` and `MusicBrainzMatchApplyRaceTest`; `FilesDiscoveredHandler` is built in 18 places under `tests/`, and `ApplyMatchHandler` by name in `ApplyMatchHandlerTest` and `MatchApplyRace.php`; `MusicBrainzMatchFirewallTest` and `CatalogMutationFirewallTest` assert what an apply or a merge queues; `MessengerJsonDeliveryTest` delivers a `FilesDiscovered` message to its real handler.
+- **Verification:** the AE8 scenario fails on the tree of U11, and the failing-transaction scenario fails against a requester called inside the transaction.
+
 ### U14. A merge folds a duplicate into the kept song
 
 - **Goal:** what users hold on a duplicate song is on the kept song after a merge.
-- **Requirements:** R25 to R31; KTD18, KTD19, KTD20. Covers AE7 and completes AE2.
+- **Requirements:** R25 to R31, R36; KTD18, KTD19, KTD20. Covers AE7 and completes AE2.
 - **Dependencies:** U4.
 - **Files:**
   - modify the two ports U4 creates and their adapters: `src/Favorites/Application/Port/AlbumFavoriteMergePortInterface.php`, `src/Favorites/Infrastructure/Doctrine/AlbumFavoriteMerge.php`, `src/Activity/Application/Port/AlbumActivityMergePortInterface.php`, `src/Activity/Infrastructure/Doctrine/AlbumActivityMerge.php`;
@@ -664,7 +723,7 @@ Files that more than one unit touches:
 - **Files:**
   - modify `docs-book/part-1-operator-guide/commands/app-album-merge.md` (all or nothing, favorites and plays, what follows a duplicate to the kept song and what goes with it, the copy left on disk, the conflict, the exit codes), `app-artist-song-add.md`, `app-artist-song-remove.md`, `app-artist-song-role.md` and the three `app-artist-album-*` pages (the conflict), and `app-library-scan.md` where it describes hand-made credits;
   - modify `docs-book/part-1-operator-guide/media/external-apis.md` (a song without a measured length never pairs on a matched album; album credits and a later automatic match; the request after a manual apply) and `commands/app-metadata-match-apply.md`;
-  - modify `docs-book/part-1-operator-guide/commands/app-metadata-sync.md`, `app-metadata-status.md` and `app-monitor-job-cancel.md` (what an admin sync queues for artists, that artists the same sync's album matches identify are filled by the next sync, what an artist sync writes and never writes, the job types counted, and that cancelling a sync's job, also after it finished, ends the artist lookups it queued), and the artist sync passages of `media/external-apis.md`;
+  - modify `docs-book/part-1-operator-guide/commands/app-metadata-sync.md`, `app-metadata-status.md` and `app-monitor-job-cancel.md` (what an admin sync queues for artists and that a match or an import queues the fill of an artist it identifies, that an artist is asked about at most once in 30 days and how an admin sees MusicBrainz's current values sooner, what an artist sync writes and never writes, the job types counted, and that cancelling a sync's job, also after it finished, ends the artist lookups it queued), and `app-library-scan.md` (an import queues the fill of the artists it identifies while automatic matching is on), and the artist sync passages of `media/external-apis.md`;
   - modify `docs-book/part-2-developer-guide/contexts/metadata.md`, `contexts/playlist.md`, `contexts/lyrics.md`, `docs-book/part-2-developer-guide/testing/workers-and-messaging.md`, `src/Metadata/README.md`, `src/Lyrics/README.md` and `dev-docs/worker-runtime-inventory.md` (the artist sync as built, the merge's ports, the workload counts, and the inventory's link to the deleted `SyncAlbumHandler.php`);
   - modify `docs-book/part-2-developer-guide/contexts/catalog.md` (hand changes and the merge in the lock order, the apply's new checks, the merge's ports), `contexts/favorites.md`, `contexts/activity.md`, `src/Catalog/README.md`, `src/Activity/README.md` and `dev-docs/context-map.md`;
   - modify `CONCEPTS.md`: "Catalog lock order" (hand changes, merges and the artist sync), "Artist sync", "Duplicate song", "Artist credit", "MusicBrainz match" and "Album match queue";
@@ -680,16 +739,16 @@ Files that more than one unit touches:
 | Gate | Command | Applies to |
 |---|---|---|
 | Unit tests | `bash scripts/test-unit-container.sh <path>` or `vendor/bin/phpunit -c phpunit.xml.dist <path>` on the host | every unit's unit tests |
-| Functional and integration files | `BAANDER_TEST_IMAGE=<ci image> bash scripts/test-functional-container.sh <files>` | U1 to U8, U11, U12, U14 |
+| Functional and integration files | `BAANDER_TEST_IMAGE=<ci image> bash scripts/test-functional-container.sh <files>` | U1 to U8, U11, U12, U14, U15 |
 | Full backend suite | `BAANDER_TEST_IMAGE=<ci image> bash scripts/test-backend-container.sh` | each phase boundary and before review |
 | PHPStan | `make phpstan` | each phase boundary |
 | Deptrac | `php scripts/check-backend-container.php --image <ci image> -- vendor/bin/deptrac analyse --no-cache --no-progress` | each phase boundary; U4, U11, U14 |
-| Container lint | `php scripts/check-backend-container.php --image <ci image> -- php bin/console lint:container --env=test --no-debug` | each phase boundary; U4, U6, U11, U12, U14 |
+| Container lint | `php scripts/check-backend-container.php --image <ci image> -- php bin/console lint:container --env=test --no-debug` | each phase boundary; U4, U6, U11, U12, U14, U15 |
 | API contract | `composer openapi`, then `php scripts/check-backend-container.php --image <ci image> -- php bin/console app:export-openapi-spec --env=test --no-debug --check`, then `yarn --cwd ui/web generate` and `generate:check` | U2, U3 |
 | Web | `yarn --cwd ui/web typecheck`, `lint`, `test` | U3, U9, and after the client is regenerated |
 | Tooling package | `composer tooling:autoload`, then `composer run-script --timeout=7200 test:tooling`, `composer analyse:tooling`, `composer check:tooling-architecture`, `composer check:tooling-format` | U13 |
 | Documentation | `make website-build` | U10 |
-| Preview | `make preview-up`; one credit added and removed through the console and the API; one album merge when the preview's library holds a pair, else recorded as not run; one metadata sync from the admin page and one from `app:metadata:sync` with an artist that holds an ID and no country, after which the artist has MusicBrainz's country and `app:metadata:status` lists `SyncArtistMessage` jobs; one lookup of a merged MusicBrainz ID | before merge |
+| Preview | `make preview-up`; one credit added and removed through the console and the API; one album merge when the preview's library holds a pair, else recorded as not run; one metadata sync from the admin page and one from `app:metadata:sync` with an artist that holds an ID and no country, after which the artist has MusicBrainz's country and `app:metadata:status` lists `SyncArtistMessage` jobs, and a second sync right after it queues no fill for that artist; one manual album apply that identifies a new artist, after which the artist's fill runs without an admin sync; one lookup of a merged MusicBrainz ID | before merge |
 | Simplification | `ce-simplify-code` | each phase boundary |
 | Review | `ce-code-review` on the branch | before shipping |
 
