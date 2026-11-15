@@ -292,19 +292,43 @@ final class QualificationTest extends TestCase
         }
     }
 
-    public function testMetadataCoverageRequiresFreshMatchedRequestsNotOldEnrichmentEvidence(): void
+    public function testMetadataCoverageNeedsEverySongIdentityInsideItsWindowAndNoAlbumIdentity(): void
+    {
+        $dataset = ['albums' => ['album' => 'album-id'], 'files' => [
+            ['kind' => 'song', 'metadata' => ['id' => 'first-song-id']],
+            ['kind' => 'song', 'metadata' => ['id' => 'second-song-id']],
+        ]];
+        $path = tempnam(sys_get_temp_dir(), 'baander.app-metadata-proof-');
+        try {
+            // The album was matched before the window opened and is not requested again; one song was last requested then too.
+            file_put_contents($path, self::metadataRequest(8, 'album-id') . self::metadataRequest(9, 'second-song-id') . self::metadataRequest(11, 'first-song-id'));
+            $coverage = Qualification::metadataCoverage($path, $dataset, 10, 20);
+            self::assertSame(['second-song-id'], $coverage['missingIdentities']);
+            self::assertFalse($coverage['complete']);
+            file_put_contents($path, self::metadataRequest(12, 'second-song-id'), FILE_APPEND);
+            $coverage = Qualification::metadataCoverage($path, $dataset, 10, 20);
+            self::assertSame([], $coverage['missingIdentities']);
+            self::assertSame(2, $coverage['requiredIdentities']);
+            self::assertTrue($coverage['complete']);
+        } finally {
+            unlink($path);
+        }
+    }
+
+    public function testAnUnmatchedRequestInsideTheWindowFailsMetadataCoverage(): void
     {
         $dataset = ['albums' => ['album' => 'album-id'], 'files' => [['kind' => 'song', 'metadata' => ['id' => 'song-id']]]];
         $path = tempnam(sys_get_temp_dir(), 'baander.app-metadata-proof-');
-        $lines = [json_encode(['at' => 9, 'outcome' => 'matched', 'identity' => 'song-id'], JSON_THROW_ON_ERROR),
-            json_encode(['at' => 11, 'outcome' => 'matched', 'identity' => 'album-id'], JSON_THROW_ON_ERROR)];
         try {
-            file_put_contents($path, implode("\n", $lines) . "\n");
-            self::assertFalse(Qualification::metadataCoverage($path, $dataset, 10, 20)['complete']);
-            file_put_contents($path, json_encode(['at' => 12, 'outcome' => 'matched', 'identity' => 'song-id'], JSON_THROW_ON_ERROR) . "\n", FILE_APPEND);
-            self::assertTrue(Qualification::metadataCoverage($path, $dataset, 10, 20)['complete']);
-            file_put_contents($path, json_encode(['at' => 13, 'outcome' => 'unmatched', 'identity' => null], JSON_THROW_ON_ERROR) . "\n", FILE_APPEND);
-            self::assertFalse(Qualification::metadataCoverage($path, $dataset, 10, 20)['complete']);
+            // A search the fixture answers with no result is matched and names no identity.
+            file_put_contents($path, self::metadataRequest(11, 'song-id') . self::metadataRequest(12, null));
+            $answered = Qualification::metadataCoverage($path, $dataset, 10, 20);
+            self::assertTrue($answered['complete']);
+            file_put_contents($path, self::metadataRequest(13, null, 'unmatched'), FILE_APPEND);
+            $refused = Qualification::metadataCoverage($path, $dataset, 10, 20);
+            self::assertSame([], $refused['missingIdentities']);
+            self::assertSame(['Unmatched metadata request within observation window.'], $refused['errors']);
+            self::assertFalse($refused['complete']);
         } finally {
             unlink($path);
         }
@@ -342,6 +366,15 @@ final class QualificationTest extends TestCase
         self::assertFalse(Qualification::maintenanceEvidence($snapshot, $queues, 45)['metadata']['completed']);
         $snapshot['libraries']['movies']['missingCatalogFiles'] = 1;
         self::assertFalse(Qualification::maintenanceEvidence($snapshot, $queues, 45)['scan']['completed']);
+    }
+
+    public function testMetadataMaintenanceNeedsAMusicBrainzIdOnEveryAlbum(): void
+    {
+        $snapshot = $this->snapshot();
+        $snapshot['libraries']['music']['albumsWithMbid'] = 99;
+        $evidence = Qualification::maintenanceEvidence($snapshot, ['async' => $this->emptyQueue(), 'scheduler' => $this->emptyQueue()], 45);
+        self::assertTrue($evidence['scan']['completed']);
+        self::assertFalse($evidence['metadata']['completed']);
     }
 
     public function testNormalVideoIngestionDoesNotRequireUnintegratedMovieEnrichment(): void
@@ -481,6 +514,31 @@ final class QualificationTest extends TestCase
             self::assertFalse(Qualification::copyOverlapProof($directory, 30, 2)['observed']);
             file_put_contents($directory . '/database.jsonl', json_encode(['epochSeconds' => 25, 'snapshot' => ['jobs' => ['groups' => [['name' => 'SyncSongMessage', 'status' => 'completed', 'count' => 1]]]]], JSON_THROW_ON_ERROR) . "\n");
             self::assertFalse(Qualification::copyOverlapProof($directory, 30, 2)['observed']);
+        } finally {
+            Collector::remove($directory);
+        }
+    }
+
+    public function testAQueuedAlbumMatchRunKeepsMetadataWorkPendingAndAFinishedOneDoesNot(): void
+    {
+        $directory = sys_get_temp_dir() . '/baander.app-copy-match-queue-' . bin2hex(random_bytes(8));
+        mkdir($directory, 0700);
+        file_put_contents($directory . '/maintenance.stdout', "BAANDER_MAINTENANCE_START:10.0\nBAANDER_MAINTENANCE_FINISH:20.0\n");
+        $launch = ['executable' => 'ffmpeg', 'arguments' => ['-c:v', 'copy', '-c:a', 'copy']];
+        file_put_contents($directory . '/native.jsonl', json_encode($launch + ['at' => 21], JSON_THROW_ON_ERROR) . "\n" . json_encode($launch + ['at' => 22], JSON_THROW_ON_ERROR) . "\n");
+        file_put_contents($directory . '/samples.jsonl', json_encode(['epochSeconds' => 23, 'processes' => []], JSON_THROW_ON_ERROR) . "\n");
+        $songSync = self::jobObservation(15, 'SyncSongMessage', 'running');
+        try {
+            file_put_contents($directory . '/database.jsonl', $songSync . self::jobObservation(25, 'DrainAlbumMatchesMessage', 'queued'));
+            $proof = Qualification::copyOverlapProof($directory, 30, 2);
+            self::assertSame(25.0, $proof['lastPendingMetadataEpoch']);
+            self::assertSame(2, $proof['copyLaunchesDuringMaintenance']);
+            self::assertTrue($proof['observed']);
+            file_put_contents($directory . '/database.jsonl', $songSync . self::jobObservation(25, 'DrainAlbumMatchesMessage', 'finished'));
+            $proof = Qualification::copyOverlapProof($directory, 30, 2);
+            self::assertSame(15.0, $proof['lastPendingMetadataEpoch']);
+            self::assertSame(0, $proof['copyLaunchesDuringMaintenance']);
+            self::assertFalse($proof['observed']);
         } finally {
             Collector::remove($directory);
         }
@@ -668,5 +726,17 @@ final class QualificationTest extends TestCase
     private function emptyQueue(): array
     {
         return ['state' => 'known', 'unreadCount' => 0, 'pendingCount' => 0, 'dueCount' => 0];
+    }
+
+    /** One line of the metadata audit journal: a request the fixture answered, or one it refused. */
+    private static function metadataRequest(float $at, ?string $identity, string $outcome = 'matched'): string
+    {
+        return json_encode(['at' => $at, 'outcome' => $outcome, 'identity' => $identity], JSON_THROW_ON_ERROR) . "\n";
+    }
+
+    /** One line of the database observations: a sample that saw one monitored job of the name in the status. */
+    private static function jobObservation(float $epochSeconds, string $name, string $status): string
+    {
+        return json_encode(['epochSeconds' => $epochSeconds, 'snapshot' => ['jobs' => ['groups' => [['name' => $name, 'status' => $status, 'count' => 1]]]]], JSON_THROW_ON_ERROR) . "\n";
     }
 }

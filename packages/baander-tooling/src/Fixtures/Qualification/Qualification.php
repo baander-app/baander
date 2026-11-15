@@ -20,6 +20,11 @@ final class Qualification
     private const int HEALTH_DEADLINE_SECONDS = 120;
     /** Player failures that show playback stopped advancing, as opposed to a run that never measured. */
     private const array STALL_FAILURES = ['continuous-stall', 'post-ready-waiting-or-stalled'];
+    /**
+     * Monitored jobs that are metadata work while queued or running: the sync jobs, and the runs of
+     * the album match queue, which write the albums' MusicBrainz IDs.
+     */
+    private const array METADATA_JOBS = ['SyncLibraryMessage', 'SyncAlbumMessage', 'SyncSongMessage', 'DrainAlbumMatchesMessage'];
     /** @var array<string,int> */
     private array $observedRoles = [];
     /** @var list<string> */
@@ -1140,7 +1145,7 @@ CODE;
                         continue;
                     }
                     foreach ($observation['snapshot']['jobs']['groups'] ?? [] as $group) {
-                        if (in_array($group['name'] ?? null, ['SyncLibraryMessage', 'SyncAlbumMessage', 'SyncSongMessage'], true)
+                        if (in_array($group['name'] ?? null, self::METADATA_JOBS, true)
                             && in_array($group['status'] ?? null, ['queued', 'running'], true) && ($group['count'] ?? 0) > 0) {
                             $lastPending = max($lastPending ?? $from, (float) $epoch);
                         }
@@ -1502,17 +1507,18 @@ CODE;
         return self::metadataCoverage($path, $this->dataset(), $from, $until);
     }
 
-    /** @param array<string,mixed> $dataset
+    /**
+     * Whether the window holds a matched request for every song of the dataset and no request the
+     * fixture refused. A metadata sync requests every song again, so each run's window holds them
+     * all. An album is requested only until it is matched, so a window needs no album identity: the
+     * albums holding a MusicBrainz ID, which the maintenance evidence counts, prove their matches.
+     *
+     * @param array<string,mixed> $dataset
      * @return array<string,mixed>
      */
     public static function metadataCoverage(string $path, array $dataset, float $from, float $until): array
     {
-        $required = array_fill_keys(array_values($dataset['albums']), 'album');
-        foreach ($dataset['files'] as $file) {
-            if ($file['kind'] === 'song') {
-                $required[$file['metadata']['id']] = 'song';
-            }
-        }
+        $required = self::songIdentities($dataset);
         $seen = [];
         $errors = [];
         $requests = 0;
@@ -1549,6 +1555,20 @@ CODE;
         return ['complete' => $missing === [] && $errors === [], 'fromEpochSeconds' => $from, 'untilEpochSeconds' => $until,
             'requests' => $requests, 'requiredIdentities' => count($required), 'matchedIdentities' => count($seen),
             'missingIdentities' => array_keys($missing), 'errors' => array_values(array_unique($errors)), 'journalSha256' => hash_file('sha256', $path)];
+    }
+
+    /**
+     * The MusicBrainz ID of every song of the dataset, as keys.
+     *
+     * @param array<string,mixed> $dataset
+     * @return array<string,true>
+     */
+    private static function songIdentities(array $dataset): array
+    {
+        return $dataset['files']
+            |> (static fn(array $files): array => array_filter($files, static fn(array $file): bool => $file['kind'] === 'song'))
+            |> (static fn(array $songs): array => array_map(static fn(array $song): string => $song['metadata']['id'], $songs))
+            |> (static fn(array $identities): array => array_fill_keys($identities, true));
     }
 
     /** @param array<string,mixed> $state */
@@ -1736,6 +1756,7 @@ CODE;
                 && ($library['indexedAvailableFiles'] ?? null) === $count
                 && ($library['indexedFiles'] ?? null) === $count + ($library['indexedUnavailableFiles'] ?? -1) && ($library[$role === 'music' ? 'songs' : 'videos'] ?? null) === $count;
             if ($role === 'music') {
+                // Only an album match writes an album's ID, so the album count proves that every album was matched.
                 $metadata = $metadata && ($library['songsWithMbid'] ?? null) === 2000 && ($library['albumsWithMbid'] ?? null) === 100;
             }
         }
