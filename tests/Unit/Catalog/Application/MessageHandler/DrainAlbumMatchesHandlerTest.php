@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Catalog\Application\MessageHandler;
 
+use App\Catalog\Application\Command\RecoverAlbumMatchQueueCommand;
+use App\Catalog\Application\CommandHandler\RecoverAlbumMatchQueueHandler;
 use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
 use App\Catalog\Application\MessageHandler\DrainAlbumMatchesHandler;
 use App\Catalog\Application\Service\MusicBrainzMatch\AlbumMatchQueueChain;
@@ -18,6 +20,7 @@ use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Catalog\InMemoryAlbumMatchStates;
 use DateTimeImmutable;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -30,7 +33,8 @@ use Symfony\Component\Messenger\Stamp\DelayStamp;
 /**
  * The album match queue matches one album per run: it applies a confident match, marks the rest
  * for review, drops an import's request while automatic matching is off, waits out a MusicBrainz
- * outage, and keeps one run queued while requests wait.
+ * outage, and keeps one run queued while requests wait. A run holds its album from claim to
+ * outcome: a request made meanwhile is kept and takes effect when the run ends.
  */
 final class DrainAlbumMatchesHandlerTest extends TestCase
 {
@@ -48,12 +52,14 @@ final class DrainAlbumMatchesHandlerTest extends TestCase
     /** @var \Closure(Uuid): AutomaticMatchOutcome */
     private \Closure $outcome;
     private bool $automaticMatching = true;
+    /** @var (\Closure(): void)|null runs when the handler reads the automatic matching switch, which it does once it holds an import's request */
+    private ?\Closure $whenTheSwitchIsRead = null;
 
     protected function setUp(): void
     {
-        $this->states = new InMemoryAlbumMatchStates();
         $this->clock = new MockClock(self::NOW);
-        $this->chains = new AlbumMatchQueueChain(new ArrayAdapter());
+        $this->states = new InMemoryAlbumMatchStates($this->clock);
+        $this->chains = new AlbumMatchQueueChain(new ArrayAdapter(clock: $this->clock));
         $this->outcome = static fn (): AutomaticMatchOutcome => AutomaticMatchOutcome::matched();
     }
 
@@ -108,6 +114,79 @@ final class DrainAlbumMatchesHandlerTest extends TestCase
         self::assertEquals([[0, 300_000]], $this->queued);
     }
 
+    public function testAnAlbumAnAdminRequestsWhileARunMatchesItIsSearchedOnceAndThenWaitsFromThatRequest(): void
+    {
+        $album = Uuid::v7();
+        $this->states->has($this->request($album, AlbumMatchSource::Ingest, '-1 minute'));
+        $chain = $this->chains->start(60);
+        $this->outcome = function (Uuid $albumId) use ($chain): AutomaticMatchOutcome {
+            // Two seconds into the search an admin syncs the album, and the queue's run is delivered again.
+            $this->clock->sleep(2);
+            self::assertFalse($this->states->request($albumId, AlbumMatchSource::Admin, $this->clock->now()), 'The run that holds the album brings the next run.');
+            $this->drain(new DrainAlbumMatchesMessage($chain));
+
+            return AutomaticMatchOutcome::matched();
+        };
+
+        $this->drain(new DrainAlbumMatchesMessage($chain));
+
+        self::assertSame([$album->toString()], $this->matched, 'No second run took the album, so MusicBrainz was searched once.');
+        self::assertEquals($this->request($album, AlbumMatchSource::Admin, '+2 seconds'), $this->states->stateOf($album));
+        self::assertEquals(
+            [[0, 898_000], [0, 1_000]],
+            $this->queued,
+            'The run that found the album held waits for its claim to lapse; the run that matched it comes back for the request.',
+        );
+        self::assertSame([$chain, $chain], $this->queuedChains);
+    }
+
+    /**
+     * The newer chain counted the held album from its claim's expiry, so its next run would come
+     * late for the album: the run queues one without a chain, which takes the newer chain's place.
+     * A request that falls due first already brings a run that goes on to the album.
+     *
+     * @param ?string            $requestedFor the due time of a request made for the album during the match
+     * @param ?string            $otherDue     the due time of another album's request
+     * @param list<array{int, int}> $queued
+     */
+    #[DataProvider('outcomesThatLeaveTheAlbumWaiting')]
+    public function testARunWhoseChainWasReplacedQueuesARunWithoutAChainForTheAlbumItLeftWaitingUnlessAnotherRequestFallsDueFirst(
+        ?string $requestedFor,
+        AutomaticMatchOutcome $outcome,
+        ?string $otherDue,
+        array $queued,
+    ): void {
+        $album = Uuid::v7();
+        $this->states->has($this->request($album, AlbumMatchSource::Ingest, '-1 minute'));
+        if ($otherDue !== null) {
+            $this->states->has($this->request(Uuid::v7(), AlbumMatchSource::Ingest, $otherDue));
+        }
+        $this->outcome = function (Uuid $albumId) use ($requestedFor, $outcome): AutomaticMatchOutcome {
+            if ($requestedFor !== null) {
+                $this->states->request($albumId, AlbumMatchSource::Ingest, new DateTimeImmutable(self::NOW . ' ' . $requestedFor));
+            }
+            // A request for another album started a run of its own, and with it a new chain.
+            $this->chains->start(60);
+
+            return $outcome;
+        };
+
+        $this->drain();
+
+        self::assertSame(AlbumMatchStatus::Requested, $this->states->stateOf($album)?->status);
+        self::assertEquals($queued, $this->queued);
+        self::assertSame(array_fill(0, count($queued), null), $this->queuedChains);
+    }
+
+    /** @return iterable<string, array{?string, AutomaticMatchOutcome, ?string, list<array{int, int}>}> */
+    public static function outcomesThatLeaveTheAlbumWaiting(): iterable
+    {
+        yield 'a request made during the match' => ['+5 minutes', AutomaticMatchOutcome::matched(), null, [[0, 300_000]]];
+        yield 'an album to retry later' => [null, AutomaticMatchOutcome::retryLater(900), null, [[0, 900_000]]];
+        yield 'a request made during the match, behind another request' => ['+5 minutes', AutomaticMatchOutcome::matched(), '+1 minute', []];
+        yield 'an album to retry later, behind another request' => [null, AutomaticMatchOutcome::retryLater(900), '+1 minute', []];
+    }
+
     public function testAnImportRequestIsDroppedWhileAutomaticMatchingIsOffAndAnAdminRequestStillMatches(): void
     {
         $this->automaticMatching = false;
@@ -133,17 +212,48 @@ final class DrainAlbumMatchesHandlerTest extends TestCase
         self::assertSame([], $this->states->states);
     }
 
+    public function testAnImportRequestAnAdminRequestedDuringItsClaimOutlivesTheRemovalWithoutAClaim(): void
+    {
+        $this->automaticMatching = false;
+        $album = Uuid::v7();
+        $this->states->has($this->request($album, AlbumMatchSource::Ingest, '-1 minute'));
+        // An admin syncs the album after the run claimed its request and before the run removes import requests.
+        $this->whenTheSwitchIsRead = function () use ($album): void {
+            $this->states->request($album, AlbumMatchSource::Admin, $this->clock->now());
+        };
+
+        $this->drain();
+
+        self::assertSame([], $this->matched);
+        self::assertEquals($this->request($album, AlbumMatchSource::Admin, '+0 minutes'), $this->states->stateOf($album));
+        self::assertEquals([[0, 1_000]], $this->queued);
+
+        $this->whenTheSwitchIsRead = null;
+        $this->drain(new DrainAlbumMatchesMessage($this->queuedChains[0]));
+
+        self::assertSame([$album->toString()], $this->matched, 'The request holds no claim, so the next run matches it.');
+    }
+
     public function testAMusicBrainzOutageKeepsTheRequestWritesNoReviewAndPausesTheQueue(): void
     {
         $album = Uuid::v7();
         $request = $this->request($album, AlbumMatchSource::Ingest, '-1 minute');
         $this->states->has($request);
-        $this->outcome = static fn (): AutomaticMatchOutcome => AutomaticMatchOutcome::unavailable();
+        $this->outcome = function (Uuid $albumId): AutomaticMatchOutcome {
+            // The album's second disc lands while MusicBrainz does not answer.
+            $this->states->request($albumId, AlbumMatchSource::Ingest, new DateTimeImmutable(self::NOW . ' +5 minutes'));
+
+            return AutomaticMatchOutcome::unavailable();
+        };
 
         $this->drain();
 
-        self::assertEquals($request, $this->states->stateOf($album));
+        self::assertEquals($request, $this->states->stateOf($album), 'The album keeps the earlier due time.');
         self::assertEquals([[1, 300_000]], $this->queued);
+
+        $this->drain(new DrainAlbumMatchesMessage($this->queuedChains[0], 1));
+
+        self::assertSame([$album->toString(), $album->toString()], $this->matched, 'The request holds no claim, so the run after the pause takes it.');
     }
 
     public function testOutagesInARowPauseTheQueueForFifteenMinutesThenAnHourThenHourly(): void
@@ -202,19 +312,22 @@ final class DrainAlbumMatchesHandlerTest extends TestCase
         self::assertSame([], $this->queued);
     }
 
-    public function testTwoRunsAtOnceNeverTakeTheSameAlbum(): void
+    public function testRunsAtOnceNeverTakeTheSameAlbumAndWaitForAHeldAlbumsClaimToLapse(): void
     {
         $first = Uuid::v7();
         $second = Uuid::v7();
+        $third = Uuid::v7();
         $this->states->has(
-            $this->request($first, AlbumMatchSource::Admin, '-2 minutes'),
-            $this->request($second, AlbumMatchSource::Admin, '-1 minute'),
+            $this->request($first, AlbumMatchSource::Admin, '-3 minutes'),
+            $this->request($second, AlbumMatchSource::Admin, '-2 minutes'),
+            $this->request($third, AlbumMatchSource::Admin, '-1 minute'),
         );
         $started = false;
         $this->outcome = function () use (&$started): AutomaticMatchOutcome {
             if (!$started) {
                 $started = true;
-                // A second run starts while the first waits for MusicBrainz.
+                // Three more runs start while the first waits for MusicBrainz.
+                $this->drain();
                 $this->drain();
                 $this->drain();
             }
@@ -224,11 +337,16 @@ final class DrainAlbumMatchesHandlerTest extends TestCase
 
         $this->drain();
 
-        self::assertSame([$first->toString(), $second->toString()], $this->matched, 'Each album is matched once; the third run finds both taken.');
+        self::assertSame([$first->toString(), $second->toString(), $third->toString()], $this->matched, 'Each album is matched once; the fourth run finds the last one held.');
         self::assertSame([], $this->states->states);
+        self::assertEquals(
+            [[0, 1_000], [0, 900_000], [0, 900_000]],
+            $this->queued,
+            'While another request is due the next run comes a second later; with only the held album left, when its claim lapses.',
+        );
     }
 
-    public function testAFailingMatcherLeavesItsAlbumClaimedForAnHourAndTheQueueGoesOn(): void
+    public function testAFailingMatcherLeavesItsAlbumDueAnHourLaterAndTheQueueGoesOn(): void
     {
         $failing = Uuid::v7();
         $next = Uuid::v7();
@@ -236,7 +354,9 @@ final class DrainAlbumMatchesHandlerTest extends TestCase
             $this->request($failing, AlbumMatchSource::Admin, '-2 minutes'),
             $this->request($next, AlbumMatchSource::Admin, '-1 minute'),
         );
-        $this->outcome = static fn (): AutomaticMatchOutcome => throw new \RuntimeException('A bug in the apply.');
+        $this->outcome = static fn (Uuid $albumId): AutomaticMatchOutcome => $albumId->equals($failing)
+            ? throw new \RuntimeException('A bug in the apply.')
+            : AutomaticMatchOutcome::matched();
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects(self::once())->method('error')->with(
             self::stringContains('Automatic matching of album {album_id} failed'),
@@ -245,8 +365,13 @@ final class DrainAlbumMatchesHandlerTest extends TestCase
 
         $this->drain(logger: $logger);
 
-        self::assertEquals(new DateTimeImmutable(self::NOW . ' +1 hour'), $this->states->stateOf($failing)?->dueAt);
+        self::assertEquals($this->request($failing, AlbumMatchSource::Admin, '+1 hour'), $this->states->stateOf($failing));
         self::assertEquals([[0, 1_000]], $this->queued);
+
+        $this->drain(new DrainAlbumMatchesMessage($this->queuedChains[0]));
+
+        self::assertSame([$failing->toString(), $next->toString()], $this->matched);
+        self::assertEquals([[0, 1_000], [0, 3_600_000]], $this->queued, 'The failing album is given back, not held: the queue waits for its due time, not for a claim to lapse.');
     }
 
     public function testAnAlbumToRetryLaterWaitsItsDelayWhileTheQueueGoesOnWithTheNextAlbum(): void
@@ -318,6 +443,41 @@ final class DrainAlbumMatchesHandlerTest extends TestCase
         self::assertCount(1, $this->queued);
     }
 
+    public function testARunThatDiedHoldsItsChainAndItsAlbumForFifteenMinutesAndTheRecoveryThenStartsTheQueue(): void
+    {
+        $album = Uuid::v7();
+        $this->states->has($this->request($album, AlbumMatchSource::Ingest, '-1 minute'));
+        // The run dies once it holds the album: its read of the switch fails, and it queues no successor.
+        $this->whenTheSwitchIsRead = static fn () => throw new \RuntimeException('The database went away.');
+
+        try {
+            $this->drain();
+            self::fail('The run died.');
+        } catch (\RuntimeException $death) {
+            self::assertSame('The database went away.', $death->getMessage());
+        }
+        self::assertSame([], $this->queued);
+
+        $this->clock->sleep(899);
+        self::assertTrue($this->chains->isRunning(), 'The dead run still holds its chain.');
+        self::assertSame('no match due', $this->recover(), 'The dead run still holds its album.');
+
+        $this->clock->sleep(1);
+        self::assertFalse($this->chains->isRunning());
+        self::assertSame('queue started', $this->recover());
+    }
+
+    /** Runs the queue's scheduled recovery and returns what it did. */
+    private function recover(): string
+    {
+        $bus = $this->createStub(MessageBusInterface::class);
+        $bus->method('dispatch')->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
+
+        return new RecoverAlbumMatchQueueHandler($this->states, $this->chains, $bus, $this->clock, new NullLogger())(
+            new RecoverAlbumMatchQueueCommand(),
+        );
+    }
+
     private function drain(DrainAlbumMatchesMessage $message = new DrainAlbumMatchesMessage(), ?LoggerInterface $logger = null): void
     {
         $matcher = new class ($this) implements AutomaticAlbumMatcherInterface {
@@ -331,7 +491,11 @@ final class DrainAlbumMatchesHandlerTest extends TestCase
             }
         };
         $settings = $this->createStub(SystemSettingsPortInterface::class);
-        $settings->method('get')->willReturnCallback(fn (string $key): bool => $key === MetadataSettingDefinitions::AUTO_SYNC && $this->automaticMatching);
+        $settings->method('get')->willReturnCallback(function (string $key): bool {
+            ($this->whenTheSwitchIsRead ?? static fn () => null)();
+
+            return $key === MetadataSettingDefinitions::AUTO_SYNC && $this->automaticMatching;
+        });
         $bus = $this->createStub(MessageBusInterface::class);
         $bus->method('dispatch')->willReturnCallback(function (object $message, array $stamps): Envelope {
             self::assertInstanceOf(DrainAlbumMatchesMessage::class, $message);

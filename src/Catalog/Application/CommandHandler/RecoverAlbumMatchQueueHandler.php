@@ -18,6 +18,10 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * failed dispatch or a message that used up its retries would leave every request waiting: when a
  * request is due and no chain holds the queue, this queues a run that starts a new chain. A chain
  * that is only late gives way to the new one at its next run.
+ *
+ * A request a run holds is due only once that run's claim has lapsed. A run that died while it
+ * matched an album held its chain as long as its claim, 15 minutes, so the recovery starts the
+ * queue for that album at its first run after both have lapsed.
  */
 final readonly class RecoverAlbumMatchQueueHandler
 {

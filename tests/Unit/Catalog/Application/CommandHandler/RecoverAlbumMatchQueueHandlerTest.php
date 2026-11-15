@@ -30,6 +30,7 @@ final class RecoverAlbumMatchQueueHandlerTest extends TestCase
 {
     private const string NOW = '2026-11-14 12:00:00.000000 UTC';
 
+    private MockClock $clock;
     private InMemoryAlbumMatchStates $states;
     private AlbumMatchQueueChain $chains;
     /** @var list<object> */
@@ -37,7 +38,8 @@ final class RecoverAlbumMatchQueueHandlerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->states = new InMemoryAlbumMatchStates();
+        $this->clock = new MockClock(self::NOW);
+        $this->states = new InMemoryAlbumMatchStates($this->clock);
         $this->chains = new AlbumMatchQueueChain(new ArrayAdapter());
     }
 
@@ -67,6 +69,18 @@ final class RecoverAlbumMatchQueueHandlerTest extends TestCase
         self::assertSame([], $this->dispatched);
     }
 
+    public function testARequestARunHoldsFallsDueOnlyOnceItsClaimHasLapsed(): void
+    {
+        $this->states->has($this->request('-30 minutes'));
+        $this->states->claimOldestDueRequest($this->clock->now(), Uuid::v7(), 900);
+
+        self::assertSame('no match due', $this->recover(), 'The run that holds the only due request is matching it.');
+
+        $this->clock->sleep(900);
+
+        self::assertSame('queue started', $this->recover(), 'The run died: its claim has lapsed and no chain holds the queue.');
+    }
+
     private function recover(): string
     {
         $bus = $this->createStub(MessageBusInterface::class);
@@ -76,7 +90,7 @@ final class RecoverAlbumMatchQueueHandlerTest extends TestCase
             return new Envelope($message);
         });
 
-        return new RecoverAlbumMatchQueueHandler($this->states, $this->chains, $bus, new MockClock(self::NOW), new NullLogger())(
+        return new RecoverAlbumMatchQueueHandler($this->states, $this->chains, $bus, $this->clock, new NullLogger())(
             new RecoverAlbumMatchQueueCommand(),
         );
     }

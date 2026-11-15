@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Infrastructure\Doctrine\Entity;
 
+use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\Mapping as ORM;
 
 /**
@@ -44,6 +45,18 @@ class AlbumMatchStateEntity
 
     #[ORM\Column(type: 'smallint', nullable: true)]
     private ?int $bestScore = null;
+
+    /** The claim of the queue run that matches the album; only a request holds one. */
+    #[ORM\Column(type: 'uuid', nullable: true)]
+    private ?Uuid $claimId = null;
+
+    /** When the claim lapses, on the database clock; another run may take the request from then on. */
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $claimExpiresAt = null;
+
+    /** The earliest due time a request asked for while the claim held the album. */
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $nextDueAt = null;
 
     public function __construct(AlbumEntity $album, string $state, string $source, \DateTimeImmutable $dueAt)
     {
@@ -91,5 +104,20 @@ class AlbumMatchStateEntity
     public function getBestScore(): ?int
     {
         return $this->bestScore;
+    }
+
+    public function getClaimId(): ?Uuid
+    {
+        return $this->claimId;
+    }
+
+    public function getClaimExpiresAt(): ?\DateTimeImmutable
+    {
+        return $this->claimExpiresAt;
+    }
+
+    public function getNextDueAt(): ?\DateTimeImmutable
+    {
+        return $this->nextDueAt;
     }
 }

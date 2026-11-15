@@ -7,12 +7,11 @@ namespace App\Tests\Functional\Catalog\Interface\Controller;
 use App\Auth\Domain\Model\User;
 use App\Catalog\Domain\ValueObject\AlbumMatchReviewReason;
 use App\Catalog\Domain\ValueObject\AlbumMatchSource;
-use App\Catalog\Domain\ValueObject\AlbumMatchState;
-use App\Catalog\Domain\ValueObject\AlbumMatchStatus;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Repository\AlbumMatchStateRepository;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -44,12 +43,7 @@ final class MusicBrainzMatchReviewsTest extends TestCase
         $waiting = $this->album('Still Waiting');
         $this->review($older, AlbumMatchReviewReason::NoCandidates, '2026-11-14 09:00:00.000000 UTC', null);
         $this->review($newer, AlbumMatchReviewReason::TrackCountDiffers, '2026-11-14 12:36:07.500000 UTC', 84);
-        $this->matchStates->save(new AlbumMatchState(
-            albumId: $waiting->getId(),
-            status: AlbumMatchStatus::Requested,
-            source: AlbumMatchSource::Ingest,
-            dueAt: new \DateTimeImmutable('2026-11-14 13:00:00 UTC'),
-        ));
+        $this->matchStates->request($waiting->getId(), AlbumMatchSource::Ingest, new \DateTimeImmutable('2026-11-14 13:00:00 UTC'));
 
         $data = $this->reviews('', $this->createAdminUser());
 
@@ -134,17 +128,13 @@ final class MusicBrainzMatchReviewsTest extends TestCase
         return $album;
     }
 
+    /** Leaves the album for review as the queue does: a run takes its request and marks it. */
     private function review(AlbumEntity $album, AlbumMatchReviewReason $reason, string $checkedAt, ?int $bestScore): void
     {
-        $this->matchStates->save(new AlbumMatchState(
-            albumId: $album->getId(),
-            status: AlbumMatchStatus::NeedsReview,
-            source: AlbumMatchSource::Ingest,
-            dueAt: new \DateTimeImmutable('2026-11-14 08:00:00 UTC'),
-            reason: $reason,
-            checkedSongCount: 12,
-            checkedAt: new \DateTimeImmutable($checkedAt),
-            bestScore: $bestScore,
-        ));
+        $due = new \DateTimeImmutable('2026-11-14 08:00:00 UTC');
+        $claim = Uuid::v7();
+        $this->matchStates->request($album->getId(), AlbumMatchSource::Ingest, $due);
+        self::assertTrue($this->matchStates->claimOldestDueRequest($due, $claim, 900)?->albumId->equals($album->getId()));
+        $this->matchStates->markClaimedForReview($album->getId(), $claim, $reason, $bestScore, 12, new \DateTimeImmutable($checkedAt));
     }
 }

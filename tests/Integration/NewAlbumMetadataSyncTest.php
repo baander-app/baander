@@ -13,7 +13,6 @@ use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticMatchOutcome;
 use App\Catalog\Domain\Repository\AlbumMatchStateRepositoryInterface;
 use App\Catalog\Domain\ValueObject\AlbumMatchReviewReason;
 use App\Catalog\Domain\ValueObject\AlbumMatchSource;
-use App\Catalog\Domain\ValueObject\AlbumMatchState;
 use App\Catalog\Domain\ValueObject\AlbumMatchStatus;
 use App\Catalog\Application\CommandHandler\FilesDiscoveredHandler;
 use App\Library\Application\Message\FilesDiscovered;
@@ -169,7 +168,7 @@ final class NewAlbumMetadataSyncTest extends KernelTestCase
 
         // An import queued this request, in another library, while automatic matching was still on.
         $imported = $this->storeAlbum($this->storeLibrary(), 'Austin');
-        $this->states()->save(new AlbumMatchState($imported, AlbumMatchStatus::Requested, AlbumMatchSource::Ingest, new DateTimeImmutable('-1 minute')));
+        $this->states()->request($imported, AlbumMatchSource::Ingest, new DateTimeImmutable('-1 minute'));
         static::getContainer()->get(MetadataSyncOrchestrator::class)->syncLibrary($library->getId()->toString());
         $this->handleQueued(SyncLibraryMessage::class, SyncLibraryHandler::class);
         $this->handleQueued(SyncAlbumMessage::class, RequestAlbumMatchHandler::class);
@@ -193,7 +192,7 @@ final class NewAlbumMetadataSyncTest extends KernelTestCase
         $this->setAutomaticMatching(true);
         $musicBrainz = $this->fakeMusicBrainz([$this->longBed(self::EXPLICIT_EDITION, self::YOURS_EXPLICIT), $this->longBed(self::CLEAN_EDITION, self::YOURS_CLEAN)]);
         $fixture = $this->storeLongBed();
-        $this->states()->save(new AlbumMatchState($fixture['album'], AlbumMatchStatus::Requested, AlbumMatchSource::Ingest, new DateTimeImmutable('-1 minute')));
+        $this->states()->request($fixture['album'], AlbumMatchSource::Ingest, new DateTimeImmutable('-1 minute'));
 
         static::getContainer()->get(DrainAlbumMatchesHandler::class)(new DrainAlbumMatchesMessage());
 
@@ -216,7 +215,7 @@ final class NewAlbumMetadataSyncTest extends KernelTestCase
         $this->setAutomaticMatching(true);
         $this->fakeMusicBrainz([$this->longBed(self::EXPLICIT_EDITION, self::YOURS_EXPLICIT, withBonusTrack: true)]);
         $fixture = $this->storeLongBed();
-        $this->states()->save(new AlbumMatchState($fixture['album'], AlbumMatchStatus::Requested, AlbumMatchSource::Ingest, new DateTimeImmutable('-1 minute')));
+        $this->states()->request($fixture['album'], AlbumMatchSource::Ingest, new DateTimeImmutable('-1 minute'));
 
         static::getContainer()->get(DrainAlbumMatchesHandler::class)(new DrainAlbumMatchesMessage());
 
@@ -234,7 +233,7 @@ final class NewAlbumMetadataSyncTest extends KernelTestCase
         $this->setAutomaticMatching(true);
         $musicBrainz = $this->fakeMusicBrainz([$this->longBed(self::EXPLICIT_EDITION, self::YOURS_EXPLICIT)]);
         $fixture = $this->storeLongBed(matchedBefore: 1);
-        $this->states()->save(new AlbumMatchState($fixture['album'], AlbumMatchStatus::Requested, AlbumMatchSource::Ingest, new DateTimeImmutable('-1 minute')));
+        $this->states()->request($fixture['album'], AlbumMatchSource::Ingest, new DateTimeImmutable('-1 minute'));
 
         static::getContainer()->get(DrainAlbumMatchesHandler::class)(new DrainAlbumMatchesMessage());
 

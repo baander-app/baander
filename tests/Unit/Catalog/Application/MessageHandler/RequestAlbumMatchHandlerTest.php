@@ -46,7 +46,7 @@ final class RequestAlbumMatchHandlerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->states = new InMemoryAlbumMatchStates();
+        $this->states = new InMemoryAlbumMatchStates(new MockClock(self::NOW));
     }
 
     #[TestWith([false])]
@@ -92,6 +92,28 @@ final class RequestAlbumMatchHandlerTest extends TestCase
 
         self::assertEquals(new DateTimeImmutable(self::NOW . ' -1 minute'), $this->states->stateOf($album->getId())?->dueAt);
         self::assertSame([], $this->queued, 'The run that waits for the earlier request takes this one.');
+    }
+
+    public function testAnAlbumAQueueRunIsMatchingKeepsItsDueTimeAndItsRequestWaitsForThatRunToEnd(): void
+    {
+        $album = $this->album();
+        $this->states->has(new AlbumMatchState($album->getId(), AlbumMatchStatus::Requested, AlbumMatchSource::Ingest, new DateTimeImmutable(self::NOW . ' -1 minute')));
+        $claim = Uuid::v7();
+        $this->states->claimOldestDueRequest(new DateTimeImmutable(self::NOW), $claim, 900);
+
+        $this->handle(new SyncAlbumMessage($album->getId()));
+
+        self::assertEquals(
+            new AlbumMatchState($album->getId(), AlbumMatchStatus::Requested, AlbumMatchSource::Admin, new DateTimeImmutable(self::NOW . ' -1 minute')),
+            $this->states->stateOf($album->getId()),
+            'The run keeps the album; the request only makes it an admin request.',
+        );
+        self::assertSame([], $this->queued, 'The run that matches the album brings the next run.');
+        self::assertEquals(
+            new AlbumMatchState($album->getId(), AlbumMatchStatus::Requested, AlbumMatchSource::Admin, new DateTimeImmutable(self::NOW)),
+            $this->states->removeClaimedRequest($album->getId(), $claim),
+            'Once the run has matched the album, it waits for a match again from the admin\'s request.',
+        );
     }
 
     #[TestWith(['-1 minute'])]

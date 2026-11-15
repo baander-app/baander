@@ -11,16 +11,16 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
  * How matching one album without an admin ended: for an album that needs review, what the matcher
  * checked, and for an album to be matched again later, how much later.
  *
- * The album match queue acts on each kind:
- * - matched: removes the request it took, unless a request made while the album was matched ended
- *   the claim;
+ * The album match queue acts on each kind when it ends its claim on the album. A request made for
+ * the album meanwhile waits beside that claim, and the album then waits for a match again from
+ * that request's due time instead, except after an outage:
+ * - matched: removes the request it took;
  * - needs review: marks the album for review with the reason, best score, checked song count and
- *   the time of the check, unless a request made while the album was matched ended the claim, in
- *   which case that request stays and the album is matched again;
- * - retry later: gives the request back due after the outcome's delay, unless a request made while
- *   the album was matched ended the claim, and goes on with the next album;
- * - unavailable: gives the request back with its due time and waits 5, 15 and 60 minutes, then
- *   hourly, before it matches anything again;
+ *   the time of the check;
+ * - retry later: gives the request back due after the outcome's delay and goes on with the next
+ *   album;
+ * - unavailable: gives the request back with its due time, drops a request made meanwhile, and
+ *   waits 5, 15 and 60 minutes, then hourly, before it matches anything again;
  * - album gone: removes the request, as for matched.
  */
 #[Exclude]

@@ -22,13 +22,17 @@ use Symfony\Component\Messenger\Stamp\DelayStamp;
 /**
  * Records album match requests and makes sure an album match queue run is on its way to each.
  *
- * While requests wait, each queue run queues the next one for when the earliest of them falls due.
- * A request that brings an album's due time forward therefore queues a run only when no other
- * request falls due at or before its own; a request that falls due later, such as an album to try
- * again in hours, brings no run in time. The request writes itself first and then looks for others,
- * and the run removes or marks its album first and then looks for what is left. Of a request and a
- * finishing run that overlap, at least one therefore sees the other's write and the queue keeps its
- * run.
+ * While requests wait, each queue run queues the next one for when the earliest of them can be
+ * taken. A request that brings an album's due time forward therefore queues a run only when no
+ * other request falls due at or before its own; a request that falls due later, such as an album
+ * to try again in hours, brings no run in time. A request a run holds counts from the expiry of
+ * that run's claim. The request writes itself first and then looks for others, and the run ends
+ * its claim first and then looks for what is left. Of a request and a finishing run that overlap,
+ * at least one therefore sees the other's write and the queue keeps its run.
+ *
+ * A request for an album a run is matching queues no run. It waits beside that run's claim, and
+ * the run, when it ends the claim, leaves the album waiting for a match from the request's due
+ * time and queues the run that comes for it.
  */
 final readonly class AlbumMatchRequester implements AlbumMatchRequestInterface
 {

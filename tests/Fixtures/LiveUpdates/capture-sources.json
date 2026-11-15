@@ -823,7 +823,7 @@
       "classification": "capture",
       "operations": ["INSERT", "UPDATE", "DELETE"],
       "relevant_columns": ["album_id", "state", "source", "due_at", "reason", "checked_song_count", "checked_at", "best_score"],
-      "excluded_columns": [],
+      "excluded_columns": ["claim_id", "claim_expires_at", "next_due_at"],
       "families": ["admin-metadata"],
       "scope_routes": ["admin"],
       "readers": ["src/Catalog/Infrastructure/Doctrine/Repository/AlbumMatchStateRepository.php"],

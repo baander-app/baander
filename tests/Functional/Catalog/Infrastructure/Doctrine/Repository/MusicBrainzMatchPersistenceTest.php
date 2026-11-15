@@ -108,7 +108,7 @@ final class MusicBrainzMatchPersistenceTest extends TestCase
             source: AlbumMatchSource::Ingest,
             dueAt: new \DateTimeImmutable('2026-11-14 12:35:00.250000 UTC'),
         );
-        $this->matchStates->save($requested);
+        $this->matchStates->request($requested->albumId, $requested->source, $requested->dueAt);
         $this->entityManager->clear();
 
         self::assertSame(self::described($requested), self::described($this->matchStates->findByAlbum($album->getId())));
@@ -117,13 +117,15 @@ final class MusicBrainzMatchPersistenceTest extends TestCase
             albumId: $album->getId(),
             status: AlbumMatchStatus::NeedsReview,
             source: AlbumMatchSource::Ingest,
-            dueAt: $requested->dueAt,
+            dueAt: new \DateTimeImmutable('2026-11-14 12:36:07.500000 UTC'),
             reason: AlbumMatchReviewReason::TrackCountDiffers,
             checkedSongCount: 26,
             checkedAt: new \DateTimeImmutable('2026-11-14 12:36:07.500000 UTC'),
             bestScore: 84,
         );
-        $this->matchStates->save($review);
+        $claim = Uuid::v7();
+        $this->matchStates->claimOldestDueRequest($requested->dueAt, $claim, 900);
+        $this->matchStates->markClaimedForReview($album->getId(), $claim, AlbumMatchReviewReason::TrackCountDiffers, 84, 26, $review->dueAt);
         $this->entityManager->clear();
 
         self::assertSame(self::described($review), self::described($this->matchStates->findByAlbum($album->getId())));
