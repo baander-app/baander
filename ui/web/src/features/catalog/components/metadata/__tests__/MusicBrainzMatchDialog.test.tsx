@@ -5,6 +5,7 @@ import { ThemeProvider } from 'styled-components'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { toast } from 'sonner'
 import { customInstance } from '@/shared/api-client/axios-instance'
+import type { ApplyMatchRequest } from '@/shared/api-client/gen/endpoints'
 import { resolveTheme } from '@/shared/theme'
 import { MusicBrainzMatchDialog } from '../MusicBrainzMatchDialog'
 import { ALBUM_CANDIDATES, ALBUM_ID, DUET_ARTIST, DUET_ID, albumComparison, fieldRow, release } from '../musicbrainz/__tests__/match-fixtures'
@@ -54,11 +55,16 @@ function mount(onOpenChange: (open: boolean) => void = () => {}) {
   )
 }
 
+/** The body of each apply request sent, the first one first. */
+function appliedBodies(): ApplyMatchRequest[] {
+  return request.mock.calls
+    .filter(([url]) => url === APPLY_URL)
+    .map(([, options]) => JSON.parse(String(options?.body)))
+}
+
 /** The body of the one apply request sent. */
 function appliedBody(): unknown {
-  const call = request.mock.calls.find(([url]) => url === APPLY_URL)
-
-  return JSON.parse(String(call?.[1]?.body))
+  return appliedBodies()[0]
 }
 
 function candidateItems(): HTMLElement[] {
@@ -348,6 +354,48 @@ describe('MusicBrainzMatchDialog', () => {
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('MusicBrainz is unavailable. Try again later.'))
     expect(onOpenChange).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled()
+  })
+
+  it('says the Cover Art Archive refused the cover when the apply answers 409, keeps the ticks, and applies the rest once the cover is unticked', async () => {
+    const comparison = albumComparison()
+    const cover = fieldRow({ field: 'cover', current: null, proposed: 'release-digital', ticked: true })
+    answer(COMPARISON_URL, async () => ({ data: { ...comparison, fields: [...comparison.fields, cover] } }))
+    answer(APPLY_URL, () => Promise.reject(httpError(409, 'cover_refused')))
+    const onOpenChange = vi.fn()
+    await openComparison(onOpenChange)
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Year' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('The Cover Art Archive refused the cover. Nothing was written; untick the cover to apply the rest.')
+    })
+    expect(onOpenChange).not.toHaveBeenCalled()
+    expect(screen.getByRole('checkbox', { name: 'Year' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Cover' })).toBeChecked()
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled()
+
+    answer(APPLY_URL, async () => ({
+      data: {
+        type: 'album',
+        publicId: ALBUM_ID,
+        candidateId: 'release-digital',
+        fields: ['releaseMbid', 'year', 'genres'],
+        creditsChanged: false,
+        songsChanged: 1,
+        mergedArtists: [DUET_ARTIST],
+        removedArtists: [],
+      },
+    }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Cover' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+
+    const [refused, applied] = appliedBodies()
+
+    expect(refused.fields).toContainEqual({ key: 'cover', current: null })
+    expect(applied).toEqual({ ...refused, fields: refused.fields?.filter((row) => row.key !== 'cover') })
   })
 
   it.each([
