@@ -218,6 +218,13 @@ until an admin applies a match, or until its number of songs changes and it is q
 again. An outage of MusicBrainz or the Cover Art Archive keeps the requests and pauses
 the whole queue; a problem with one album only delays that album.
 
+### Match claim
+
+The hold one run of the album match queue has on the request it is matching, so that
+no other run takes the same album. A run records its outcome only while its claim
+holds. A claim whose run died lapses on its own, and the request is then matched
+again.
+
 ## Lyrics
 
 ### Bulk lyrics run tally
