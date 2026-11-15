@@ -7,7 +7,6 @@ namespace App\Lyrics\Application\CommandHandler;
 use App\Catalog\Application\Port\SongLookupInterface;
 use App\Lyrics\Application\Command\FetchLyricsCommand;
 use App\Lyrics\Application\DTO\LrclibRejected;
-use App\Lyrics\Application\DTO\LrclibResult;
 use App\Lyrics\Application\DTO\LrclibUnavailable;
 use App\Lyrics\Application\DTO\LyricsFetchOutcome;
 use App\Lyrics\Application\DTO\LyricsFetchResult;
@@ -23,6 +22,7 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * Handles FetchLyricsCommand.
  *
  * Orchestrates: resolve song signature → check local cache → fetch from LRCLIB → persist.
+ * A fetch sends LRCLIB one request.
  *
  * A song that has lyrics keeps them: the fetch returns them without asking LRCLIB. A song
  * without a primary artist credit, or whose length is missing or not positive, is not looked
@@ -127,22 +127,13 @@ final class FetchLyricsHandler
         // 4. Album name is optional
         $albumName = $signature->albumTitle ?? '';
 
-        // 5. Try cached endpoint first, then full endpoint, which also answers when the cached one failed
-        $result = $this->lrclibClient->getBySignatureCached(
+        // 5. Ask LRCLIB once
+        $result = $this->lrclibClient->getBySignature(
             $signature->title,
             $artistName,
             $albumName,
             $duration,
         );
-
-        if (!$result instanceof LrclibResult) {
-            $result = $this->lrclibClient->getBySignature(
-                $signature->title,
-                $artistName,
-                $albumName,
-                $duration,
-            );
-        }
 
         // 6. LRCLIB unavailable: nothing is decided, and a later fetch may succeed
         if ($result instanceof LrclibUnavailable) {

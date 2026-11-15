@@ -1,6 +1,6 @@
 import { useLiveCoordinator } from '@/shared/live/context'
 import styled from 'styled-components'
-import { Fragment, useState, useCallback } from 'react'
+import { Fragment, useState, useCallback, type FormEvent } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -72,7 +72,7 @@ const NoLyricsText = styled.p`
   color: var(--color-muted-foreground);
 `
 
-const SearchRow = styled.div`
+const SearchForm = styled.form`
   display: flex;
   gap: 0.5rem;
 `
@@ -179,6 +179,8 @@ export function LyricsDialog({
 }: LyricsDialogProps) {
   const isAdmin = useIsAdmin()
   const [tab, setTab] = useState<'lyrics' | 'search'>('lyrics')
+  // What the admin types stays a draft: LRCLIB is asked only for a query that was submitted.
+  const [draft, setDraft] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const activeTab = isAdmin ? tab : 'lyrics'
 
@@ -224,11 +226,11 @@ export function LyricsDialog({
 
   // Search LRCLIB
   const searchEnabled = open && isAdmin && activeTab === 'search' && searchQuery.length >= 2
-  const { data: searchData, isPending: searchPending, error: searchError } = useGetLyricsSearch(
+  const { data: searchData, isFetching: searchFetching, error: searchError, refetch: searchAgain } = useGetLyricsSearch(
     { q: searchQuery },
     { query: { enabled: searchEnabled } },
   )
-  const searchLoading = searchEnabled && searchPending
+  const searchLoading = searchEnabled && searchFetching
 
   const searchResults = extractSearchResults(searchData)
 
@@ -263,13 +265,36 @@ export function LyricsDialog({
     fetchMutation.mutate({ publicId: songPublicId })
   }, [fetchMutation, isAdmin, songPublicId])
 
-  const handleSearch = useCallback(() => {
-    if (!isAdmin) return
+  const defaultQuery = [songTitle, artistName].filter(Boolean).join(' ')
 
-    const q = [songTitle, artistName].filter(Boolean).join(' ')
-    setSearchQuery(q)
-    setTab('search')
-  }, [isAdmin, songTitle, artistName])
+  const search = useCallback(
+    (query: string) => {
+      if (!isAdmin) return
+
+      setDraft(query)
+      setTab('search')
+      if (query !== searchQuery) {
+        setSearchQuery(query)
+        return
+      }
+
+      // The same query again, such as after a failed search: its key is unchanged, so ask again.
+      // The answer, a failure included, arrives through the query's own state.
+      if (searchEnabled) {
+        searchAgain()
+      }
+    },
+    [isAdmin, searchQuery, searchEnabled, searchAgain],
+  )
+
+  const canSearch = !searchLoading && draft.trim().length >= 2
+
+  const handleSubmitSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!canSearch) return
+
+    search(draft.trim())
+  }
 
   const handleApply = useCallback(
     (resultId: number) => {
@@ -279,8 +304,6 @@ export function LyricsDialog({
     },
     [applyMutation, isAdmin, songPublicId],
   )
-
-  const defaultQuery = [songTitle, artistName].filter(Boolean).join(' ')
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -356,27 +379,33 @@ export function LyricsDialog({
           {isAdmin && (
             <TabsContent value="search">
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <SearchRow>
+                <SearchForm onSubmit={handleSubmitSearch}>
                   <Input
                     placeholder="Search lyrics\u2026"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && searchQuery.length >= 2) {
-                        // refetch happens via react-query enabled
-                      }
-                    }}
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
                   />
                   <Button
+                    type="submit"
+                    size="sm"
+                    variant="secondary"
+                    disabled={!canSearch}
+                    style={{ flexShrink: 0 }}
+                  >
+                    Search
+                  </Button>
+                  <Button
+                    type="button"
                     size="sm"
                     variant="outline"
-                    onClick={handleSearch}
+                    onClick={() => search(defaultQuery)}
+                    disabled={searchLoading}
                     style={{ flexShrink: 0 }}
                   >
                     <Search size={14} />
                     Auto
                   </Button>
-                </SearchRow>
+                </SearchForm>
 
                 {searchLoading ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

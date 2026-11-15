@@ -187,13 +187,11 @@ final class LyricsAdminControllerTest extends TestCase
         /** @var list<string> $lrclibRequests the titles LRCLIB was asked for */
         $lrclibRequests = [];
         $lrclib = $this->createStub(LrclibClientInterface::class);
-        foreach (['getBySignatureCached', 'getBySignature'] as $method) {
-            $lrclib->method($method)->willReturnCallback(static function (string $title) use (&$lrclibRequests): null {
-                $lrclibRequests[] = $title;
+        $lrclib->method('getBySignature')->willReturnCallback(static function (string $title) use (&$lrclibRequests): null {
+            $lrclibRequests[] = $title;
 
-                return null;
-            });
-        }
+            return null;
+        });
         static::getContainer()->set(LrclibClientInterface::class, $lrclib);
         $this->createSongs(2);
         $admin = $this->createSuperAdminUser();
@@ -236,7 +234,7 @@ final class LyricsAdminControllerTest extends TestCase
         $this->assertSame(Command::SUCCESS, $cancel->execute(['jobId' => $consoleJob]), $cancel->getDisplay());
         $lastJob = $this->consoleRun();
         $this->assertSame(2, $this->handleQueuedFetches());
-        $this->assertSame(['Track 0', 'Track 0', 'Track 1', 'Track 1'], $lrclibRequests);
+        $this->assertSame(['Track 0', 'Track 1'], $lrclibRequests);
         $tally = $this->latestRun($admin);
         $this->assertSame($lastJob, $tally['jobId']);
         $this->assertSame(2, $tally['noMatch']);
@@ -246,13 +244,11 @@ final class LyricsAdminControllerTest extends TestCase
     public function testABulkRunReportsTheSongsItSkippedAndWhatItsFetchesFound(): void
     {
         $lrclib = $this->createStub(LrclibClientInterface::class);
-        foreach (['getBySignatureCached', 'getBySignature'] as $method) {
-            $lrclib->method($method)->willReturnCallback(
-                static fn (string $title): ?LrclibResult => $title === 'Track 0'
-                    ? new LrclibResult(912345, 'Track 0', 'Lyrics admin artist', 'Lyrics admin album', 180.0, false, 'Found lyrics', null)
-                    : null,
-            );
-        }
+        $lrclib->method('getBySignature')->willReturnCallback(
+            static fn (string $title): ?LrclibResult => $title === 'Track 0'
+                ? new LrclibResult(912345, 'Track 0', 'Lyrics admin artist', 'Lyrics admin album', 180.0, false, 'Found lyrics', null)
+                : null,
+        );
         static::getContainer()->set(LrclibClientInterface::class, $lrclib);
         $this->createSongs(1);
         $this->createSongs(1, credited: false);

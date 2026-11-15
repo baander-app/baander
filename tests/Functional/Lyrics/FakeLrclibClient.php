@@ -8,6 +8,7 @@ use App\Lyrics\Application\DTO\LrclibRejected;
 use App\Lyrics\Application\DTO\LrclibResult;
 use App\Lyrics\Application\DTO\LrclibSearchResult;
 use App\Lyrics\Application\DTO\LrclibUnavailable;
+use App\Lyrics\Application\DTO\LrclibWait;
 use App\Lyrics\Application\Port\LrclibClientInterface;
 
 /** Answers every LRCLIB call with what the test set, so no request leaves the test. */
@@ -39,34 +40,27 @@ final class FakeLrclibClient implements LrclibClientInterface
         $this->searchAnswer = $rejection;
     }
 
-    public function getBySignatureCached(string $trackName, string $artistName, string $albumName, float $duration): LrclibResult|LrclibRejected|LrclibUnavailable|null
-    {
-        $this->calls[] = 'getBySignatureCached';
-
-        return $this->delegate !== null ? $this->delegate->getBySignatureCached($trackName, $artistName, $albumName, $duration) : $this->signatureAnswer;
-    }
-
-    public function getBySignature(string $trackName, string $artistName, string $albumName, float $duration): LrclibResult|LrclibRejected|LrclibUnavailable|null
+    public function getBySignature(string $trackName, string $artistName, string $albumName, float $duration, LrclibWait $wait = LrclibWait::Interactive): LrclibResult|LrclibRejected|LrclibUnavailable|null
     {
         $this->calls[] = 'getBySignature';
 
-        return $this->delegate !== null ? $this->delegate->getBySignature($trackName, $artistName, $albumName, $duration) : $this->signatureAnswer;
+        return $this->delegate !== null ? $this->delegate->getBySignature($trackName, $artistName, $albumName, $duration, $wait) : $this->signatureAnswer;
     }
 
-    public function getById(int $id): LrclibResult|LrclibRejected|LrclibUnavailable|null
+    public function getById(int $id, LrclibWait $wait = LrclibWait::Interactive): LrclibResult|LrclibRejected|LrclibUnavailable|null
     {
         $this->calls[] = 'getById';
         if ($this->delegate !== null) {
-            return $this->delegate->getById($id);
+            return $this->delegate->getById($id, $wait);
         }
 
         return $this->byIdAnswer instanceof LrclibResult && $this->byIdAnswer->id !== $id ? null : $this->byIdAnswer;
     }
 
-    public function search(string $query): array|LrclibRejected|LrclibUnavailable
+    public function search(string $query, LrclibWait $wait = LrclibWait::Interactive): array|LrclibRejected|LrclibUnavailable
     {
         $this->calls[] = 'search';
 
-        return $this->delegate !== null ? $this->delegate->search($query) : $this->searchAnswer;
+        return $this->delegate !== null ? $this->delegate->search($query, $wait) : $this->searchAnswer;
     }
 }

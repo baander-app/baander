@@ -14,6 +14,7 @@ use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Lyrics\Application\Port\LrclibClientInterface;
 use App\Lyrics\Infrastructure\Api\LrclibClient;
+use App\Lyrics\Infrastructure\Api\LrclibPauseInterface;
 use App\Shared\Domain\Event\Outbox\RelayOutboxCommand;
 use App\Shared\Domain\Event\Outbox\RelayOutboxHandler;
 use App\Shared\Domain\ValueObject\FilesystemType;
@@ -24,6 +25,7 @@ use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Psr\Log\NullLogger;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
@@ -31,6 +33,8 @@ use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 
 /**
  * Imports FLAC and MP3 files that FFmpeg encodes and that carry tags as tagging tools write them,
@@ -70,16 +74,23 @@ final class ScannedArtistCreditsTest extends TestCase
 
         // The real client builds each request, so a test sees the query a lyrics fetch sends with
         // the length as the client rounds it. Its transport is mocked: nothing leaves the test, and
-        // LRCLIB finds no record.
+        // LRCLIB finds no record. Its turns come at once, and it keeps no pause.
         $lrclib = new FakeLrclibClient();
-        $lrclib->delegate = new LrclibClient(new MockHttpClient(function (string $method, string $url): MockResponse {
-            $query = [];
-            parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
-            ksort($query);
-            $this->lrclibRequests[] = ['path' => (string) parse_url($url, PHP_URL_PATH), 'query' => $query];
+        $lrclib->delegate = new LrclibClient(
+            new MockHttpClient(function (string $method, string $url): MockResponse {
+                $query = [];
+                parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+                ksort($query);
+                $this->lrclibRequests[] = ['path' => (string) parse_url($url, PHP_URL_PATH), 'query' => $query];
 
-            return new MockResponse('{"code":404,"name":"TrackNotFound"}', ['http_code' => 404]);
-        }), new NullLogger(), 'https://lrclib.baander.app');
+                return new MockResponse('{"code":404,"name":"TrackNotFound"}', ['http_code' => 404]);
+            }),
+            new NullLogger(),
+            new RateLimiterFactory(['id' => 'lrclib', 'policy' => 'no_limit'], new InMemoryStorage()),
+            self::createStub(LrclibPauseInterface::class),
+            new NativeClock(),
+            'https://lrclib.baander.app',
+        );
         static::getContainer()->set(LrclibClientInterface::class, $lrclib);
 
         $this->library = Library::create(
@@ -207,7 +218,7 @@ final class ScannedArtistCreditsTest extends TestCase
 
         // The alias song is looked up under the name it was tagged with.
         $this->fetchLyrics('Headhunterz/02 - Orange Heart.flac');
-        self::assertSame(['HeadHunterz', 'HeadHunterz'], array_map(
+        self::assertSame(['HeadHunterz'], array_map(
             static fn (array $request): mixed => $request['query']['artist_name'] ?? null,
             $this->lrclibRequests,
         ));
@@ -396,10 +407,7 @@ final class ScannedArtistCreditsTest extends TestCase
         $this->fetchLyrics($file);
 
         $query = ['album_name' => 'Rescue Me', 'artist_name' => 'Headhunterz; Sound Rush; Eurielle', 'duration' => '3', 'track_name' => 'Rescue Me'];
-        self::assertSame([
-            ['path' => '/api/get-cached', 'query' => $query],
-            ['path' => '/api/get', 'query' => $query],
-        ], $this->lrclibRequests);
+        self::assertSame([['path' => '/api/get', 'query' => $query]], $this->lrclibRequests);
     }
 
     /** @param list<array{string, string}> $comments */

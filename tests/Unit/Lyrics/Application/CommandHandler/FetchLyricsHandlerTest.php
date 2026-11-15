@@ -82,13 +82,12 @@ final class FetchLyricsHandlerTest extends TestCase
         $this->songs->expects($this->once())->method('findLyricSignature')->with($songId)
             ->willReturn(new SongLyricSignature('Test Song', 'Test Artist', 'Test Album', 233.0));
         $this->lyricsRepository->expects($this->once())->method('findBySongId')->with($songId)->willReturn(null);
-        $this->lrclibClient->expects($this->once())->method('getBySignatureCached')->with(
+        $this->lrclibClient->expects($this->once())->method('getBySignature')->with(
             'Test Song',
             'Test Artist',
             'Test Album',
             233.0,
         )->willReturn($result);
-        $this->lrclibClient->expects($this->never())->method('getBySignature');
 
         $this->lyricsRepository->expects($this->once())->method('add')->with($this->isInstanceOf(Lyrics::class))->willReturn(true);
 
@@ -101,44 +100,6 @@ final class FetchLyricsHandlerTest extends TestCase
         $this->assertSame('lrclib', $lyrics->getSource());
         $this->assertSame(123, $lyrics->getLrclibId());
         $this->assertFalse($lyrics->isInstrumental());
-    }
-
-    public function testFallsBackToFullEndpointWhenCachedReturnsNull(): void
-    {
-        $this->lrclibClient = $this->createMock(LrclibClientInterface::class);
-        $this->lyricsRepository = $this->createMock(LyricsRepositoryInterface::class);
-        $this->handler = $this->createFetchLyricsHandlerFixture();
-
-        $songId = Uuid::v7();
-
-        $result = new LrclibResult(
-            id: 456,
-            trackName: 'Test Song',
-            artistName: 'Test Artist',
-            albumName: 'Test Album',
-            duration: 200.0,
-            instrumental: false,
-            plainLyrics: 'Lyrics here',
-            syncedLyrics: null,
-        );
-
-        $this->songs->method('findLyricSignature')->willReturn(new SongLyricSignature('Test Song', 'Test Artist', 'Test Album', 200.0));
-        $this->lyricsRepository->expects($this->once())->method('findBySongId')->with($songId)->willReturn(null);
-        $this->lrclibClient->method('getBySignatureCached')->willReturn(null);
-        $this->lrclibClient->expects($this->once())->method('getBySignature')->with(
-            'Test Song',
-            'Test Artist',
-            'Test Album',
-            200.0,
-        )->willReturn($result);
-
-        $this->lyricsRepository->expects($this->once())->method('add')->willReturn(true);
-
-        $lyrics = ($this->handler)(new FetchLyricsCommand($songId))->lyrics;
-
-        $this->assertNotNull($lyrics);
-        $this->assertSame('Lyrics here', $lyrics->getLyrics());
-        $this->assertNull($lyrics->getSyncedLyrics());
     }
 
     public function testHandlesInstrumentalTrack(): void
@@ -161,7 +122,7 @@ final class FetchLyricsHandlerTest extends TestCase
 
         $this->songs->method('findLyricSignature')->willReturn(new SongLyricSignature('Instrumental Track', 'Test Artist', 'Test Album', 180.0));
         $this->lyricsRepository->expects($this->once())->method('findBySongId')->with($songId)->willReturn(null);
-        $this->lrclibClient->method('getBySignatureCached')->willReturn($result);
+        $this->lrclibClient->method('getBySignature')->willReturn($result);
 
         $this->lyricsRepository->expects($this->once())->method('add')->willReturn(true);
 
@@ -184,7 +145,7 @@ final class FetchLyricsHandlerTest extends TestCase
 
         $this->songs->expects($this->once())->method('findLyricSignature')->with($songId)->willReturn(null);
         $this->lyricsRepository->expects($this->never())->method('findBySongId');
-        $this->lrclibClient->expects($this->never())->method('getBySignatureCached');
+        $this->lrclibClient->expects($this->never())->method('getBySignature');
         $this->lyricsRepository->expects($this->never())->method('add');
 
         $lyrics = ($this->handler)(new FetchLyricsCommand($songId))->lyrics;
@@ -204,7 +165,7 @@ final class FetchLyricsHandlerTest extends TestCase
 
         $this->songs->method('findLyricSignature')->willReturn(new SongLyricSignature('Test', 'Test Artist', 'Test Album', 200.0));
         $this->lyricsRepository->expects($this->once())->method('findBySongId')->with($songId)->willReturn($existingLyrics);
-        $this->lrclibClient->expects($this->never())->method('getBySignatureCached');
+        $this->lrclibClient->expects($this->never())->method('getBySignature');
         $this->lyricsRepository->expects($this->never())->method('add');
 
         $result = ($this->handler)(new FetchLyricsCommand($songId))->lyrics;
@@ -221,7 +182,7 @@ final class FetchLyricsHandlerTest extends TestCase
         $stored = Lyrics::create($songId, 'Applied meanwhile', 'lrclib', lrclibId: 912345);
 
         $this->songs->method('findLyricSignature')->willReturn(new SongLyricSignature('Test Song', 'Test Artist', 'Test Album', 200.0));
-        $this->lrclibClient->method('getBySignatureCached')->willReturn(
+        $this->lrclibClient->method('getBySignature')->willReturn(
             new LrclibResult(123, 'Test Song', 'Test Artist', 'Test Album', 200.0, false, 'Fetched lyrics', null),
         );
         $this->lyricsRepository->expects($this->exactly(2))->method('findBySongId')->with($songId)
@@ -272,8 +233,9 @@ final class FetchLyricsHandlerTest extends TestCase
         $this->assertSame([], $this->marks->queued);
     }
 
-    public function testReturnsNullWhenNoLyricsFoundOnLrclib(): void
+    public function testAFetchAsksLrclibOnceAndAMissIsNoMatch(): void
     {
+        $this->lrclibClient = $this->createMock(LrclibClientInterface::class);
         $this->lyricsRepository = $this->createMock(LyricsRepositoryInterface::class);
         $this->handler = $this->createFetchLyricsHandlerFixture();
 
@@ -281,8 +243,7 @@ final class FetchLyricsHandlerTest extends TestCase
 
         $this->songs->method('findLyricSignature')->willReturn(new SongLyricSignature('Obscure Song', 'Unknown Artist', 'Obscure Album', 300.0));
         $this->lyricsRepository->expects($this->once())->method('findBySongId')->with($songId)->willReturn(null);
-        $this->lrclibClient->method('getBySignatureCached')->willReturn(null);
-        $this->lrclibClient->method('getBySignature')->willReturn(null);
+        $this->lrclibClient->expects($this->once())->method('getBySignature')->willReturn(null);
         $this->lyricsRepository->expects($this->never())->method('add');
 
         $result = ($this->handler)(new FetchLyricsCommand($songId));
@@ -312,7 +273,7 @@ final class FetchLyricsHandlerTest extends TestCase
 
         $this->songs->method('findLyricSignature')->willReturn(new SongLyricSignature('Test Song', 'Test Artist', null, 200.0));
         $this->lyricsRepository->expects($this->once())->method('findBySongId')->with($songId)->willReturn(null);
-        $this->lrclibClient->expects($this->once())->method('getBySignatureCached')->with(
+        $this->lrclibClient->expects($this->once())->method('getBySignature')->with(
             'Test Song',
             'Test Artist',
             '',
@@ -337,7 +298,6 @@ final class FetchLyricsHandlerTest extends TestCase
 
         $this->songs->method('findLyricSignature')->willReturn(new SongLyricSignature('Test Song', 'Test Artist', 'Test Album', 200.0));
         $this->lyricsRepository->method('findBySongId')->willReturn(null);
-        $this->lrclibClient->expects($this->once())->method('getBySignatureCached')->willReturn(new LrclibUnavailable('HTTP 503'));
         $this->lrclibClient->expects($this->once())->method('getBySignature')->willReturn(new LrclibUnavailable('HTTP 503'));
         $this->lyricsRepository->expects($this->never())->method('add');
 
@@ -361,7 +321,6 @@ final class FetchLyricsHandlerTest extends TestCase
 
         $this->songs->method('findLyricSignature')->willReturn(new SongLyricSignature('Amore Infelice', 'Suspekt', 'Elektra', 0.238));
         $this->lyricsRepository->method('findBySongId')->willReturn(null);
-        $this->lrclibClient->expects($this->once())->method('getBySignatureCached')->willReturn(new LrclibRejected(400));
         $this->lrclibClient->expects($this->once())->method('getBySignature')->willReturn(new LrclibRejected(400));
         $this->lyricsRepository->expects($this->never())->method('add');
 
@@ -370,40 +329,6 @@ final class FetchLyricsHandlerTest extends TestCase
         $this->assertSame(LyricsFetchOutcome::Rejected, $result->outcome);
         $this->assertNull($result->lyrics);
         $this->assertConflictReason('lrclib_rejected', $result);
-    }
-
-    public function testACachedEndpointOutageFallsBackToTheFullEndpoint(): void
-    {
-        $this->lyricsRepository = $this->createMock(LyricsRepositoryInterface::class);
-        $this->handler = $this->createFetchLyricsHandlerFixture();
-        $songId = Uuid::v7();
-
-        $this->songs->method('findLyricSignature')->willReturn(new SongLyricSignature('Test Song', 'Test Artist', 'Test Album', 200.0));
-        $this->lyricsRepository->method('findBySongId')->willReturn(null);
-        $this->lrclibClient->method('getBySignatureCached')->willReturn(new LrclibUnavailable('timeout'));
-        $this->lrclibClient->method('getBySignature')->willReturn(
-            new LrclibResult(7, 'Test Song', 'Test Artist', 'Test Album', 200.0, false, 'Full endpoint lyrics', null),
-        );
-        $this->lyricsRepository->expects($this->once())->method('add')->willReturn(true);
-
-        $result = ($this->handler)(new FetchLyricsCommand($songId));
-
-        $this->assertSame(LyricsFetchOutcome::Found, $result->outcome);
-        $this->assertSame('Full endpoint lyrics', $result->lyricsOrFail()?->getLyrics());
-    }
-
-    public function testAMissOnTheFullEndpointAfterACachedOutageIsNotFound(): void
-    {
-        $songId = Uuid::v7();
-        $this->songs->method('findLyricSignature')->willReturn(new SongLyricSignature('Test Song', 'Test Artist', 'Test Album', 200.0));
-        $this->lyricsRepository->method('findBySongId')->willReturn(null);
-        $this->lrclibClient->method('getBySignatureCached')->willReturn(new LrclibUnavailable('timeout'));
-        $this->lrclibClient->method('getBySignature')->willReturn(null);
-
-        $result = ($this->handler)(new FetchLyricsCommand($songId));
-
-        $this->assertSame(LyricsFetchOutcome::NoMatch, $result->outcome);
-        $this->assertNull($result->lyricsOrFail());
     }
 
     // --- Fetches queued by a bulk run ---
@@ -419,7 +344,6 @@ final class FetchLyricsHandlerTest extends TestCase
         $this->marks->markRunCancelled($runId, 60);
 
         $this->songs->expects($this->never())->method('findLyricSignature');
-        $this->lrclibClient->expects($this->never())->method('getBySignatureCached');
         $this->lrclibClient->expects($this->never())->method('getBySignature');
 
         $this->assertNull(($this->handler)(new FetchLyricsCommand($songId, $runId))->lyrics);
@@ -435,7 +359,6 @@ final class FetchLyricsHandlerTest extends TestCase
 
         $this->songs->method('findLyricSignature')->willReturn(new SongLyricSignature('Test Song', 'Test Artist', 'Test Album', 200.0));
         $this->lyricsRepository->method('findBySongId')->willReturn(null);
-        $this->lrclibClient->expects($this->once())->method('getBySignatureCached')->willReturn(null);
         $this->lrclibClient->expects($this->once())->method('getBySignature')->willReturn(null);
 
         $this->assertNull(($this->handler)(new FetchLyricsCommand($songId, Uuid::v7()))->lyrics);
@@ -474,7 +397,6 @@ final class FetchLyricsHandlerTest extends TestCase
         $this->songs->method('findLyricSignature')->willReturn($signature);
         $this->lyricsRepository->method('findBySongId')->willReturn(null);
         $this->lyricsRepository->method('add')->willReturn(true);
-        $this->lrclibClient->method('getBySignatureCached')->willReturn($answer);
         $this->lrclibClient->method('getBySignature')->willReturn($answer);
 
         ($this->handler)(new FetchLyricsCommand($songId, $runId));
@@ -489,7 +411,6 @@ final class FetchLyricsHandlerTest extends TestCase
         $this->marks->startRun($runId, 60);
         $this->songs->method('findLyricSignature')->willReturn(new SongLyricSignature('Avarice', 'Disturbed', 'Ten Thousand Fists', 200.0));
         $this->lyricsRepository->method('findBySongId')->willReturn(null);
-        $this->lrclibClient->method('getBySignatureCached')->willReturn(null);
         $this->lrclibClient->method('getBySignature')->willReturn(null);
 
         ($this->handler)(new FetchLyricsCommand($songId, $runId));
@@ -534,7 +455,6 @@ final class FetchLyricsHandlerTest extends TestCase
 
         $this->songs->method('findLyricSignature')->willReturn($signature);
         $this->lyricsRepository->expects($this->once())->method('findBySongId')->with($songId)->willReturn(null);
-        $this->lrclibClient->expects($this->never())->method('getBySignatureCached');
         $this->lrclibClient->expects($this->never())->method('getBySignature');
         $this->lyricsRepository->expects($this->never())->method('add');
 

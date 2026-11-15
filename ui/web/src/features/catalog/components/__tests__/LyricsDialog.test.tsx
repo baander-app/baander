@@ -86,6 +86,14 @@ async function applyFirstSearchResult() {
   await user.click(await screen.findByRole('button', { name: /Still Alive/ }))
 }
 
+/** The query of every search request the dialog sent, in order. */
+function searchesSent(): string[] {
+  return mockRequest.mock.calls
+    .map(([url]) => String(url))
+    .filter(url => url.startsWith('/api/lyrics/search?'))
+    .map(url => new URLSearchParams(url.slice(url.indexOf('?') + 1)).get('q') ?? '')
+}
+
 describe('LyricsDialog', () => {
   it('leaves disabled search usable and shows an empty result only after the requested search finishes', async () => {
     let finish!: (value: unknown) => void
@@ -95,13 +103,71 @@ describe('LyricsDialog', () => {
     await user.click(await screen.findByRole('tab', { name: 'Search' }))
     const panel = screen.getByRole('tabpanel', { name: 'Search' })
     expect(panel.querySelector('[data-slot="skeleton"]')).toBeNull()
-    expect(mockRequest.mock.calls.some(([url]) => String(url).startsWith('/api/lyrics/search?'))).toBe(false)
-    await user.type(screen.getByRole('textbox'), 'zz')
+    expect(searchesSent()).toEqual([])
+    await user.type(screen.getByRole('textbox'), 'zz{Enter}')
     await waitFor(() => expect(finish).toBeDefined())
     expect(panel.querySelector('[data-slot="skeleton"]')).not.toBeNull()
     expect(screen.queryByText(/No results found for/)).toBeNull()
     await act(async () => { finish({ data: [] }) })
     await screen.findByText(/No results found for/)
+  })
+
+  it('sends no search while the admin types, and one for the typed text on Enter', async () => {
+    const user = userEvent.setup()
+    mount()
+    await user.click(await screen.findByRole('tab', { name: 'Search' }))
+
+    await user.type(screen.getByRole('textbox'), 'Still Alive')
+    // Long enough for a search per keystroke to have left.
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(searchesSent()).toEqual([])
+
+    await user.keyboard('{Enter}')
+
+    expect(await screen.findByRole('button', { name: /Still Alive/ })).toBeInTheDocument()
+    expect(searchesSent()).toEqual(['Still Alive'])
+  })
+
+  it('searches for the typed text with the search button', async () => {
+    const user = userEvent.setup()
+    mount()
+    await user.click(await screen.findByRole('tab', { name: 'Search' }))
+    await user.type(screen.getByRole('textbox'), 'Want You Gone')
+    expect(searchesSent()).toEqual([])
+
+    await user.click(screen.getByRole('button', { name: 'Search' }))
+
+    expect(await screen.findByRole('button', { name: /Still Alive/ })).toBeInTheDocument()
+    expect(searchesSent()).toEqual(['Want You Gone'])
+  })
+
+  it('searches for the title and artist of the song at once with "Auto"', async () => {
+    const user = userEvent.setup()
+    mount()
+    await user.click(await screen.findByRole('tab', { name: 'Search' }))
+
+    await user.click(screen.getByRole('button', { name: 'Auto' }))
+
+    expect(await screen.findByRole('button', { name: /Still Alive/ })).toBeInTheDocument()
+    expect(searchesSent()).toEqual(['Still Alive GLaDOS'])
+    expect(screen.getByRole('textbox')).toHaveValue('Still Alive GLaDOS')
+  })
+
+  it('keeps the typed text after a failed search, and searches for it again when it is submitted again', async () => {
+    answers.search = () => Promise.reject(httpError(503, 'The lyrics provider LRCLIB is unavailable. Try again later.'))
+    const user = userEvent.setup()
+    mount()
+    await user.click(await screen.findByRole('tab', { name: 'Search' }))
+    await user.type(screen.getByRole('textbox'), 'Still Alive{Enter}')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(LYRICS_PROVIDER_UNAVAILABLE)
+    expect(screen.getByRole('textbox')).toHaveValue('Still Alive')
+
+    answers.search = () => Promise.resolve({ data: [STILL_ALIVE] })
+    await user.click(screen.getByRole('button', { name: 'Search' }))
+
+    expect(await screen.findByRole('button', { name: /Still Alive/ })).toBeInTheDocument()
+    expect(searchesSent()).toEqual(['Still Alive', 'Still Alive'])
   })
 
   beforeEach(() => {

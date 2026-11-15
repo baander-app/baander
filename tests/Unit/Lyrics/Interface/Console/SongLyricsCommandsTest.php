@@ -94,7 +94,7 @@ final class SongLyricsCommandsTest extends TestCase
 
     public function testFetchStoresAndPrintsTheLyricsOfASongInAnyLibrary(): void
     {
-        $this->lrclib->method('getBySignatureCached')->willReturn($this->providerLyrics());
+        $this->lrclib->method('getBySignature')->willReturn($this->providerLyrics());
 
         $tester = $this->fetch();
         self::assertSame(Command::SUCCESS, $tester->execute(['song' => self::SONG]), $tester->getDisplay());
@@ -106,7 +106,7 @@ final class SongLyricsCommandsTest extends TestCase
 
     public function testFetchJsonIsTheLyricsResource(): void
     {
-        $this->lrclib->method('getBySignatureCached')->willReturn($this->providerLyrics());
+        $this->lrclib->method('getBySignature')->willReturn($this->providerLyrics());
 
         $tester = $this->fetch();
         self::assertSame(Command::SUCCESS, $tester->execute(['song' => self::SONG, '--json' => true]));
@@ -130,7 +130,6 @@ final class SongLyricsCommandsTest extends TestCase
 
     public function testFetchDuringAnOutageFails(): void
     {
-        $this->lrclib->method('getBySignatureCached')->willReturn(new LrclibUnavailable('HTTP 503'));
         $this->lrclib->method('getBySignature')->willReturn(new LrclibUnavailable('HTTP 503'));
 
         $tester = $this->fetch();

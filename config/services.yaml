@@ -1296,8 +1296,10 @@ services:
     App\Lyrics\Application\Port\LyricsFetchRequestInterface:
         alias: App\Lyrics\Application\Service\LyricsFetchRequester
 
+    # Every LRCLIB request reserves a turn under one shared limit.
     App\Lyrics\Infrastructure\Api\LrclibClient:
         arguments:
+            $lrclibLimiter: '@limiter.lrclib'
             $baseUrl: '%env(LRCLIB_BASE_URL)%'
 
     App\Shared\Application\Port\SystemSettingsPortInterface:

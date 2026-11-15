@@ -6,12 +6,16 @@ namespace App\Tests\Unit\Lyrics\Infrastructure\Api;
 
 use App\Lyrics\Application\DTO\LrclibUnavailable;
 use App\Lyrics\Infrastructure\Api\LrclibClient;
+use App\Lyrics\Infrastructure\Api\LrclibPauseInterface;
 use App\Tests\Support\Outbound\LocalTlsServer;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\HttpClient\NativeHttpClient;
 use Symfony\Component\HttpClient\CurlHttpClient;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -69,7 +73,15 @@ final class LrclibTransportSecurityTest extends TestCase
     #[DataProvider('transports')]
     public function testLyricsRedirectCannotDowngradeToPrivateHttpDestination(bool $curl): void
     {
-        $adapter = new LrclibClient($this->client($curl), new NullLogger(), $this->url(''));
+        // Turns come at once and no pause is in effect, so the request goes straight to the transport.
+        $adapter = new LrclibClient(
+            $this->client($curl),
+            new NullLogger(),
+            new RateLimiterFactory(['id' => 'lrclib', 'policy' => 'no_limit'], new InMemoryStorage()),
+            self::createStub(LrclibPauseInterface::class),
+            new NativeClock(),
+            $this->url(''),
+        );
         $result = $adapter->search('a song');
         self::assertSame(['https /api/search?q=a%20song'], $this->server->requests());
         self::assertInstanceOf(LrclibUnavailable::class, $result);

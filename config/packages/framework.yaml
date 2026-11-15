@@ -22,6 +22,7 @@ parameters:
         batch_cover_extract: 'Album cover batch extraction'
         musicbrainz: 'MusicBrainz and Cover Art Archive requests from every process together (one per second)'
         musicbrainz_user: 'MusicBrainz searches and lookups per user on the open metadata routes'
+        lrclib: 'LRCLIB requests from every process together (one every two seconds)'
         discovery_endpoint_ip: 'Discovery registration and pairing requests per IP'
         # Email verification
         auth_email_verification_ip: 'Email verification attempts and resend requests per IP'
@@ -148,6 +149,16 @@ framework:
             policy: fixed_window
             limit: 1
             interval: '10 seconds'
+        # LRCLIB allows an address it cannot identify about 45 requests a minute. Every LRCLIB
+        # request, from workers and web requests alike, reserves a turn here first. The atomic
+        # store refills this one-token bucket two seconds after each turn is taken, so all
+        # processes together send at most 30 requests a minute.
+        lrclib:
+            policy: token_bucket
+            limit: 1
+            rate:
+                interval: '2 seconds'
+                amount: 1
 
         # Discovery endpoint rate limiter (public registration/pairing endpoints)
         discovery_endpoint_ip:
@@ -204,6 +215,8 @@ when@test:
             musicbrainz:
                 limit: 10000
             musicbrainz_user:
+                limit: 10000
+            lrclib:
                 limit: 10000
             config_check:
                 limit: 10000

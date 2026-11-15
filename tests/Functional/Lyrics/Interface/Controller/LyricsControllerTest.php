@@ -13,17 +13,21 @@ use App\Lyrics\Application\Port\LrclibClientInterface;
 use App\Lyrics\Domain\Model\Lyrics;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
 use App\Lyrics\Infrastructure\Api\LrclibClient;
+use App\Lyrics\Infrastructure\Api\LrclibPauseInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\Lyrics\FakeLrclibClient;
 use App\Tests\Functional\TestCase;
 use PHPUnit\Framework\Attributes\TestWith;
 use Psr\Log\NullLogger;
+use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\ReceivedStamp;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 
 final class LyricsControllerTest extends TestCase
 {
@@ -137,7 +141,7 @@ final class LyricsControllerTest extends TestCase
         $data = $this->assertJsonResponse($this->authenticatedRequest('POST', "/api/songs/{$songPublicId}/lyrics/fetch", $admin), 200, 'data');
 
         $this->assertSame([], $data['data']);
-        $this->assertSame(['getBySignatureCached', 'getBySignature'], $this->lrclib->calls);
+        $this->assertSame(['getBySignature'], $this->lrclib->calls);
         $this->assertNull($this->lyricsRepository->findBySongId($songId));
     }
 
@@ -190,7 +194,7 @@ final class LyricsControllerTest extends TestCase
             ->dispatch(new Envelope(new FetchLyricsCommand($songId), [new ReceivedStamp('async')]));
 
         $this->assertInstanceOf(Envelope::class, $envelope);
-        $this->assertSame(['getBySignatureCached', 'getBySignature'], $this->lrclib->calls);
+        $this->assertSame(['getBySignature'], $this->lrclib->calls);
         $this->assertNull($this->lyricsRepository->findBySongId($songId));
     }
 
@@ -403,12 +407,18 @@ final class LyricsControllerTest extends TestCase
         $this->assertJsonResponse($apply(), 503);
     }
 
-    /** The real LRCLIB client, with every request answered by the given status and no request leaving the test. */
+    /**
+     * The real LRCLIB client, with every request answered by the given status and no request
+     * leaving the test. Its turns come at once, and it keeps no pause, so no test waits.
+     */
     private function lrclibAnswering(int $status): void
     {
         $this->lrclib->delegate = new LrclibClient(
             new MockHttpClient(static fn(): MockResponse => new MockResponse('', ['http_code' => $status])),
             new NullLogger(),
+            new RateLimiterFactory(['id' => 'lrclib', 'policy' => 'no_limit'], new InMemoryStorage()),
+            self::createStub(LrclibPauseInterface::class),
+            new NativeClock(),
         );
     }
 

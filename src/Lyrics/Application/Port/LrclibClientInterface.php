@@ -8,6 +8,7 @@ use App\Lyrics\Application\DTO\LrclibRejected;
 use App\Lyrics\Application\DTO\LrclibResult;
 use App\Lyrics\Application\DTO\LrclibSearchResult;
 use App\Lyrics\Application\DTO\LrclibUnavailable;
+use App\Lyrics\Application\DTO\LrclibWait;
 
 /**
  * Port interface for the LRCLIB API client.
@@ -21,41 +22,33 @@ use App\Lyrics\Application\DTO\LrclibUnavailable;
  * LrclibUnavailable when LRCLIB gave no usable answer, so callers can tell a miss, a refused
  * request and an outage apart. Signature lookups send the duration rounded to the nearest
  * second.
+ *
+ * Every call says how long its request may wait before it is sent: ten seconds unless the
+ * caller passes another wait. A call that cannot send within its wait, because LRCLIB asked
+ * for a pause or the turns ahead of it take longer, returns LrclibUnavailable.
  */
 interface LrclibClientInterface
 {
     /**
-     * Fetch lyrics by track signature using LRCLIB's cached (internal DB only) endpoint.
-     *
-     * Fast and predictable latency, but may miss lyrics that exist on external sources.
-     */
-    public function getBySignatureCached(
-        string $trackName,
-        string $artistName,
-        string $albumName,
-        float $duration,
-    ): LrclibResult|LrclibRejected|LrclibUnavailable|null;
-
-    /**
-     * Fetch lyrics by track signature from LRCLIB's full endpoint, which also queries
-     * external sources.
+     * Fetch lyrics by track signature.
      */
     public function getBySignature(
         string $trackName,
         string $artistName,
         string $albumName,
         float $duration,
+        LrclibWait $wait = LrclibWait::Interactive,
     ): LrclibResult|LrclibRejected|LrclibUnavailable|null;
 
     /**
      * Fetch a lyrics record by its LRCLIB ID.
      */
-    public function getById(int $id): LrclibResult|LrclibRejected|LrclibUnavailable|null;
+    public function getById(int $id, LrclibWait $wait = LrclibWait::Interactive): LrclibResult|LrclibRejected|LrclibUnavailable|null;
 
     /**
      * Search for lyrics records using keywords.
      *
      * @return list<LrclibSearchResult>|LrclibRejected|LrclibUnavailable an empty list when nothing matches
      */
-    public function search(string $query): array|LrclibRejected|LrclibUnavailable;
+    public function search(string $query, LrclibWait $wait = LrclibWait::Interactive): array|LrclibRejected|LrclibUnavailable;
 }

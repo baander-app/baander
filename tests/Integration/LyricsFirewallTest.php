@@ -237,15 +237,14 @@ final class LyricsFirewallTest extends TestCase
         $song = $allowed ? $this->allowedSong : $this->deniedSong;
         $result = new LrclibResult(912345, $song->getTitle(), 'Provider artist', 'Provider album', 233.0, false, 'Provider lyrics', '[00:02.00] Provider lyrics');
         $this->remote->expects(self::never())->method('search');
-        $this->remote->expects(self::never())->method('getBySignature');
         if ($operation === 'fetch') {
-            $this->remote->expects(self::once())->method('getBySignatureCached')
+            $this->remote->expects(self::once())->method('getBySignature')
                 ->with($song->getTitle(), $allowed ? 'allowed artist' : 'denied artist', $allowed ? 'allowed album' : 'denied album', 233.0)
                 ->willReturn($result);
             $this->remote->expects(self::never())->method('getById');
         } else {
             $this->remote->expects(self::once())->method('getById')->with(912345)->willReturn($result);
-            $this->remote->expects(self::never())->method('getBySignatureCached');
+            $this->remote->expects(self::never())->method('getBySignature');
         }
         $response = $this->mutation($song, $operation);
         self::assertSame(200, $response->getStatusCode());
@@ -279,7 +278,7 @@ final class LyricsFirewallTest extends TestCase
 
     private function expectNoRemoteCalls(): void
     {
-        foreach (['getBySignatureCached', 'getBySignature', 'getById', 'search'] as $method) {
+        foreach (['getBySignature', 'getById', 'search'] as $method) {
             $this->remote->expects(self::never())->method($method);
         }
     }
