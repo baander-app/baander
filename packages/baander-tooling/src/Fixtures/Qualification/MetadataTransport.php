@@ -74,9 +74,10 @@ final class MetadataTransport
             parse_str($parts['query'] ?? '', $query);
             $body = null;
             $identity = null;
+            $status = 200;
             if ($method === 'GET' && ($parts['scheme'] ?? '') === 'https' && !isset($parts['user']) && !isset($parts['pass']) && !isset($parts['port']) && !isset($parts['fragment'])) {
                 if ($host === 'musicbrainz.org') {
-                    [$body, $identity] = self::musicbrainz($path, $query, $recordings, $albums, $artists, $releases);
+                    [$body, $identity, $status] = self::musicbrainz($path, $query, $recordings, $albums, $artists, $releases) + [2 => 200];
                 } elseif ($host === 'api.themoviedb.org') {
                     [$body, $identity] = self::tmdb($path, $query, $movies);
                 }
@@ -86,7 +87,7 @@ final class MetadataTransport
             if ($body === null) {
                 throw new RuntimeException('Unmatched qualification metadata request.');
             }
-            return new MockResponse(json_encode($body, JSON_THROW_ON_ERROR), ['http_code' => 200, 'response_headers' => ['Content-Type: application/json']]);
+            return new MockResponse(json_encode($body, JSON_THROW_ON_ERROR), ['http_code' => $status, 'response_headers' => ['Content-Type: application/json']]);
         });
     }
 
@@ -169,12 +170,15 @@ final class MetadataTransport
     }
 
     /**
+     * The answer to a MusicBrainz request and the identity it records; a third element is the
+     * answer's status when it is not 200.
+     *
      * @param array<string,mixed> $query
      * @param array<string,array<string,mixed>> $recordings
      * @param array<string,array<string,mixed>> $albums
      * @param array<string,array<string,mixed>> $artists
      * @param array<string,array<string,mixed>> $releases
-     * @return array{?array<string,mixed>,string|int|null}
+     * @return array{0: ?array<string,mixed>, 1: string|int|null, 2?: int}
      */
     private static function musicbrainz(string $path, array $query, array $recordings, array $albums, array $artists, array $releases): array
     {
@@ -191,6 +195,9 @@ final class MetadataTransport
         }
         if (str_starts_with($path, '/ws/2/release/') && ($query['inc'] ?? null) === self::RELEASE_INCLUDES && array_diff(array_keys($query), ['fmt', 'inc']) === []) {
             return self::releaseLookup(substr($path, strlen('/ws/2/release/')), $releases);
+        }
+        if (array_keys($query) === ['fmt'] && preg_match('#\A/ws/2/artist/([^/]+)\z#', $path, $segment) === 1) {
+            return self::artistLookup($segment[1], $artists);
         }
         foreach (['recording' => ['recordings', $recordings], 'release-group' => ['release-groups', $albums], 'artist' => ['artists', $artists]] as $kind => [$key, $entries]) {
             if ($path === '/ws/2/' . $kind && is_string($query['query'] ?? null) && !isset($query['inc'])) {
@@ -248,6 +255,22 @@ final class MetadataTransport
     {
         $release = array_find($releases, static fn(array $release): bool => $release['id'] === $id);
         return [$release, $release['release-group']['id'] ?? null];
+    }
+
+    /**
+     * An artist lookup by ID with no includes. An artist the releases credit is answered without
+     * the score a search adds and the tags only an include adds. Any other ID answers 404, as
+     * MusicBrainz answers an ID it does not know; that answer records no identity.
+     *
+     * @param array<string,array<string,mixed>> $artists
+     * @return array{0: array<string,mixed>, 1: ?string, 2?: int}
+     */
+    private static function artistLookup(string $id, array $artists): array
+    {
+        $artist = array_find($artists, static fn(array $artist): bool => $artist['id'] === $id);
+        return $artist === null
+            ? [['error' => 'Not Found'], null, 404]
+            : [array_diff_key($artist, ['score' => true, 'tags' => true]), $id];
     }
 
     /**

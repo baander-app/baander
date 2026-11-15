@@ -24,7 +24,14 @@ final class Qualification
      * Monitored jobs that are metadata work while queued or running: the sync jobs, and the runs of
      * the album match queue, which write the albums' MusicBrainz IDs.
      */
-    private const array METADATA_JOBS = ['SyncLibraryMessage', 'SyncAlbumMessage', 'SyncSongMessage', 'DrainAlbumMatchesMessage'];
+    private const array METADATA_JOBS = [
+        'SyncLibraryMessage',
+        'SyncAlbumMessage',
+        'SyncSongMessage',
+        'DrainAlbumMatchesMessage',
+        'SyncArtistsMessage',
+        'SyncArtistMessage',
+    ];
     /** @var array<string,int> */
     private array $observedRoles = [];
     /** @var list<string> */

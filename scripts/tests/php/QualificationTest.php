@@ -13,6 +13,7 @@ use Baander\Tooling\Inventory\Collector;
 use Baander\Tooling\Filesystem\PrivateDirectory;
 use Baander\Tooling\Process\{EngineExecutor, ExecutionContext, ProcessResult, ProcessSpec, CommandExecutor, CompletionPolicy};
 use Baander\Tooling\Fixtures\Qualification\{Observer, Qualification};
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class QualificationTest extends TestCase
@@ -535,6 +536,39 @@ final class QualificationTest extends TestCase
             self::assertSame(2, $proof['copyLaunchesDuringMaintenance']);
             self::assertTrue($proof['observed']);
             file_put_contents($directory . '/database.jsonl', $songSync . self::jobObservation(25, 'DrainAlbumMatchesMessage', 'finished'));
+            $proof = Qualification::copyOverlapProof($directory, 30, 2);
+            self::assertSame(15.0, $proof['lastPendingMetadataEpoch']);
+            self::assertSame(0, $proof['copyLaunchesDuringMaintenance']);
+            self::assertFalse($proof['observed']);
+        } finally {
+            Collector::remove($directory);
+        }
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function artistSyncJobs(): iterable
+    {
+        yield 'the enumeration of the admin sync' => ['SyncArtistsMessage'];
+        yield 'the fill of one artist' => ['SyncArtistMessage'];
+    }
+
+    #[DataProvider('artistSyncJobs')]
+    public function testAQueuedArtistSyncKeepsMetadataWorkPendingAndAFinishedOneDoesNot(string $job): void
+    {
+        $directory = sys_get_temp_dir() . '/baander.app-copy-artist-sync-' . bin2hex(random_bytes(8));
+        mkdir($directory, 0700);
+        file_put_contents($directory . '/maintenance.stdout', "BAANDER_MAINTENANCE_START:10.0\nBAANDER_MAINTENANCE_FINISH:20.0\n");
+        $launch = ['executable' => 'ffmpeg', 'arguments' => ['-c:v', 'copy', '-c:a', 'copy']];
+        file_put_contents($directory . '/native.jsonl', json_encode($launch + ['at' => 21], JSON_THROW_ON_ERROR) . "\n" . json_encode($launch + ['at' => 22], JSON_THROW_ON_ERROR) . "\n");
+        file_put_contents($directory . '/samples.jsonl', json_encode(['epochSeconds' => 23, 'processes' => []], JSON_THROW_ON_ERROR) . "\n");
+        $songSync = self::jobObservation(15, 'SyncSongMessage', 'running');
+        try {
+            file_put_contents($directory . '/database.jsonl', $songSync . self::jobObservation(25, $job, 'queued'));
+            $proof = Qualification::copyOverlapProof($directory, 30, 2);
+            self::assertSame(25.0, $proof['lastPendingMetadataEpoch']);
+            self::assertSame(2, $proof['copyLaunchesDuringMaintenance']);
+            self::assertTrue($proof['observed']);
+            file_put_contents($directory . '/database.jsonl', $songSync . self::jobObservation(25, $job, 'finished'));
             $proof = Qualification::copyOverlapProof($directory, 30, 2);
             self::assertSame(15.0, $proof['lastPendingMetadataEpoch']);
             self::assertSame(0, $proof['copyLaunchesDuringMaintenance']);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Tests;
 
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtist;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Infrastructure\Api\CoverArtArchive\CoverArtArchiveAdapter;
 use App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter;
@@ -184,6 +185,33 @@ final class QualificationMetadataTransportTest extends TestCase
             self::assertStringContainsString('Unmatched qualification metadata request', $error->getMessage());
         }
         self::assertSame([['path' => '/ws/2/release', 'identity' => null, 'outcome' => 'unmatched']], $this->audited());
+    }
+
+    #[RequiresPhpExtension('curl')]
+    public function testArtistLookupAnswersACreditedArtistByItsId(): void
+    {
+        $plan = Dataset::plan('metadata-test');
+        $name = $plan['files'][1999]['artist'];
+        $id = $plan['artists'][$name];
+
+        $artist = $this->musicBrainz()->fetchArtist($id);
+
+        self::assertInstanceOf(MusicBrainzArtist::class, $artist);
+        self::assertSame($id, $artist->id);
+        self::assertSame($name, $artist->name);
+        self::assertSame($name, $artist->sortName);
+        self::assertSame('Person', $artist->type);
+        self::assertSame([['path' => '/ws/2/artist/' . $id, 'identity' => $id, 'outcome' => 'matched']], $this->audited());
+    }
+
+    #[RequiresPhpExtension('curl')]
+    public function testArtistLookupOfAnIdOutsideTheDatasetAnswersNotFound(): void
+    {
+        $id = 'a2f6b7c1-0d4e-4f3a-9b8c-5e6d7f8a9b0c';
+        self::assertNotContains($id, Dataset::plan('metadata-test')['artists']);
+
+        self::assertNull($this->musicBrainz()->fetchArtist($id));
+        self::assertSame([['path' => '/ws/2/artist/' . $id, 'identity' => null, 'outcome' => 'matched']], $this->audited());
     }
 
     public function testAuditStopsAtItsBoundInsteadOfDroppingEvidence(): void
