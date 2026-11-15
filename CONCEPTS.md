@@ -235,6 +235,19 @@ the album during the claim waits beside it. A run records its outcome only while
 claim holds. A claim whose run died lapses on its own, and the request is then matched
 again.
 
+### Catalog lock order
+
+The order in which a catalog writer takes its locks inside one transaction: the rows of
+the albums it writes, then the import identity keys of every artist and genre it names
+(an artist's name, its MusicBrainz ID and a genre's slug), then the rows of the artists
+it may credit, merge or remove, then the rows of the songs it writes. Rows of one kind
+are locked in ID order and the identity keys in one sorted pass. A writer takes only the
+kinds it needs and never goes back to an earlier one, so two writers that follow the
+order do not each wait for a lock the other holds. A match apply to an album takes all
+four kinds; a retag takes the identity keys and the rows of the retagged songs. After
+its locks a writer reads the catalog again and acts on what it finds, because another
+writer may have committed while it waited.
+
 ## Lyrics
 
 ### Bulk lyrics run tally
