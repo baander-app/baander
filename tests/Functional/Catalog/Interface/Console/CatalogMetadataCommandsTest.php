@@ -155,6 +155,37 @@ final class CatalogMetadataCommandsTest extends TestCase
         self::assertStringContainsString('Field "title" is locked and cannot be updated.', $locked->getDisplay());
     }
 
+    /**
+     * This process read the song while a match's marks for its title and credits stood. Another
+     * process has since dropped the credits mark, as a hand change to the song's credits does. A
+     * title edit writes the song as the database holds it: the replaced title's mark goes and the
+     * credits mark stays dropped, where an edit of the song as read earlier would write it back.
+     */
+    public function testASongEditWritesTheSongAsStoredNotAsThisProcessReadItEarlierOnBothPaths(): void
+    {
+        $admin = $this->createAdminUser();
+        $connection = $this->entityManager->getConnection();
+        $edits = [
+            'api' => fn (string $song) => $this->assertJsonResponse($this->authenticatedRequest('PATCH', '/api/songs/' . $song, $admin, ['title' => 'Something']), 200),
+            'console' => function (string $song): void {
+                $update = $this->command('app:song:update');
+                self::assertSame(Command::SUCCESS, $update->execute(['public-id' => $song, '--title' => 'Something']), $update->getDisplay());
+            },
+        ];
+
+        foreach ($edits as $path => $edit) {
+            $song = $this->song(['title', 'credits']);
+            $connection->executeStatement("UPDATE songs SET matched_fields = '[\"title\"]' WHERE public_id = ?", [$song]);
+
+            $edit($song);
+
+            $stored = $connection->fetchAssociative('SELECT title, matched_fields FROM songs WHERE public_id = ?', [$song]);
+            self::assertIsArray($stored, $path);
+            self::assertSame('Something', $stored['title'], $path);
+            self::assertSame([], json_decode((string) $stored['matched_fields'], true, flags: JSON_THROW_ON_ERROR), $path);
+        }
+    }
+
     public function testAMovieUpdateTakesTitleYearAndSummaryAndPrintsTheApiData(): void
     {
         $admin = $this->createAdminUser();
@@ -229,11 +260,13 @@ final class CatalogMetadataCommandsTest extends TestCase
         return $album->getPublicId()->toString();
     }
 
-    private function song(): string
+    /** @param list<string> $matched the fields a match set */
+    private function song(array $matched = []): string
     {
         $library = $this->library();
         $album = new AlbumEntity(new PublicId(), $library, 'Fixture album', 'album');
         $song = new SongEntity(new PublicId(), $album, 'Fixture song', $library->getPath() . '/song.flac', 1, 'audio/flac');
+        $song->setMatchedFields($matched);
         $this->entityManager->persist($album);
         $this->entityManager->persist($song);
         $this->entityManager->flush();

@@ -10,6 +10,8 @@ use App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistSongEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
+use App\Shared\Application\Exception\TransactionDeadlockException;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Tests\Functional\TestCase;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -208,6 +210,54 @@ final class ArtistCreditCommandsTest extends TestCase
         self::assertSame(Command::INVALID, $malformed->execute(['public-id' => $this->publicId(), 'album-id' => 'not-a-uuid']));
 
         self::assertSame([[], []], [$this->songRoles(), $this->albumRoles()]);
+    }
+
+    /**
+     * The database ends a credit change to break a deadlock with another catalog writer. Every
+     * credit route answers 409 with the reason `credit_busy`, its command exits with 1 and prints
+     * the same message, and no credit changes.
+     */
+    public function testACreditChangeEndedToBreakADeadlockIsAConflictOnBothPaths(): void
+    {
+        $admin = $this->createAdminUser();
+        $this->link('song', 'primary');
+        $this->link('album', 'primary');
+        static::getContainer()->set(TransactionPortInterface::class, new class implements TransactionPortInterface {
+            public function run(callable $operation): mixed
+            {
+                throw new TransactionDeadlockException(new \RuntimeException('deadlock detected'));
+            }
+        });
+        $base = '/api/artists/' . $this->artist->getPublicId();
+        $message = 'Another change to the same artist, song or album ran at the same time. Make the change again.';
+
+        foreach ([
+            ['POST', $base . '/songs', ['songId' => $this->songId(), 'role' => 'featured']],
+            ['PATCH', $base . '/songs/' . $this->songId(), ['role' => 'featured']],
+            ['DELETE', $base . '/songs/' . $this->songId(), []],
+            ['POST', $base . '/albums', ['albumId' => $this->albumId(), 'role' => 'featured']],
+            ['PATCH', $base . '/albums/' . $this->albumId(), ['role' => 'featured']],
+            ['DELETE', $base . '/albums/' . $this->albumId(), []],
+        ] as [$method, $path, $body]) {
+            $error = $this->assertJsonResponse($this->authenticatedRequest($method, $path, $admin, $body), 409);
+            self::assertSame('credit_busy', $error['error']['details']['reason'] ?? null, $method . ' ' . $path);
+            self::assertSame($message, $error['error']['message'], $method . ' ' . $path);
+        }
+
+        foreach ([
+            'app:artist:song:add' => ['song-id' => $this->songId(), 'role' => 'featured'],
+            'app:artist:song:role' => ['song-id' => $this->songId(), 'role' => 'featured'],
+            'app:artist:song:remove' => ['song-id' => $this->songId()],
+            'app:artist:album:add' => ['album-id' => $this->albumId(), 'role' => 'featured'],
+            'app:artist:album:role' => ['album-id' => $this->albumId(), 'role' => 'featured'],
+            'app:artist:album:remove' => ['album-id' => $this->albumId()],
+        ] as $name => $arguments) {
+            $command = $this->command($name);
+            self::assertSame(Command::FAILURE, $command->execute(['public-id' => $this->publicId(), ...$arguments]), $name);
+            self::assertStringContainsString($message, $this->normalized($command->getDisplay()), $name);
+        }
+
+        self::assertSame([['primary'], ['primary']], [$this->songRoles(), $this->albumRoles()]);
     }
 
     private function link(string $kind, string $role): void

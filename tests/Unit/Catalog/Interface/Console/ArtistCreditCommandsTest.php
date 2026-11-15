@@ -10,6 +10,7 @@ use App\Catalog\Application\Command\Artist\RemoveArtistCreditCommand;
 use App\Catalog\Application\CommandHandler\Artist\AddArtistCreditHandler;
 use App\Catalog\Application\CommandHandler\Artist\ChangeArtistCreditRoleHandler;
 use App\Catalog\Application\CommandHandler\Artist\RemoveArtistCreditHandler;
+use App\Catalog\Application\Port\ArtistMergePortInterface;
 use App\Catalog\Application\Port\ArtistPortInterface;
 use App\Catalog\Domain\Model\Artist;
 use App\Catalog\Interface\Console\ArtistAlbumAddCommand;
@@ -21,6 +22,7 @@ use App\Catalog\Interface\Console\ArtistSongRoleCommand;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Console\AdminCommandSupport;
+use App\Tests\Fixtures\Catalog\PassThroughTransaction;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -45,10 +47,12 @@ final class ArtistCreditCommandsTest extends TestCase
         $this->targetId = $song->getId();
         $this->songs = $this->createStub(\App\Catalog\Application\Port\SongPortInterface::class);
         $this->songs->method('findByPublicId')->willReturn($song);
+        $this->songs->method('findFreshByUuid')->willReturn($song);
         $this->albums = $this->createStub(\App\Catalog\Application\Port\AlbumPortInterface::class);
         $state = $album->getState();
         $album = \App\Catalog\Domain\Model\Album::reconstitute(new \App\Catalog\Domain\Model\AlbumState(...array_replace(get_object_vars($state), ['id' => $song->getId(), 'publicId' => $song->getPublicId()])));
         $this->albums->method('findByPublicId')->willReturn($album);
+        $this->albums->method('findFreshByUuid')->willReturn($album);
     }
 
     public function testSongAddCreditsTheArtistAndPrintsNothingWithJson(): void
@@ -129,16 +133,19 @@ final class ArtistCreditCommandsTest extends TestCase
         $artists->method('findByPublicId')->willReturnCallback(
             fn (PublicId $id): ?Artist => $id->equals($this->artist->getPublicId()) ? $this->artist : null,
         );
+        $artists->method('findFreshByUuid')->willReturn($this->artist);
 
         return $artists;
     }
 
     private function support(ArtistPortInterface $artists): AdminCommandSupport
     {
+        $ports = [$artists, $this->songs, $this->albums, $this->createStub(ArtistMergePortInterface::class), new PassThroughTransaction()];
+
         return new AdminCommandSupport(new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
-            AddArtistCreditCommand::class => [new AddArtistCreditHandler($artists, $this->songs, $this->albums)],
-            RemoveArtistCreditCommand::class => [new RemoveArtistCreditHandler($artists, $this->songs, $this->albums)],
-            ChangeArtistCreditRoleCommand::class => [new ChangeArtistCreditRoleHandler($artists, $this->songs, $this->albums)],
+            AddArtistCreditCommand::class => [new AddArtistCreditHandler(...$ports)],
+            RemoveArtistCreditCommand::class => [new RemoveArtistCreditHandler(...$ports)],
+            ChangeArtistCreditRoleCommand::class => [new ChangeArtistCreditRoleHandler(...$ports)],
         ]))]));
     }
 

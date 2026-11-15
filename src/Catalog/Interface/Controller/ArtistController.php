@@ -295,6 +295,7 @@ final class ArtistController
         responses: [
             new OA\Response(response: '204', description: 'Song added to artist, or the artist already had the credit'),
             new OA\Response(response: '404', description: 'Artist or song not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '409', description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Malformed public ID or song ID, or an unknown role', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
@@ -321,6 +322,7 @@ final class ArtistController
         responses: [
             new OA\Response(response: '204', description: "Every one of the artist's credits on the song removed"),
             new OA\Response(response: '404', description: 'Artist not found, or the artist has no credit on the song', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '409', description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Malformed public ID or song ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
@@ -351,6 +353,7 @@ final class ArtistController
         responses: [
             new OA\Response(response: '204', description: 'Role updated; a credit changed to a role the artist already holds on the song is removed'),
             new OA\Response(response: '404', description: 'Artist not found, or the artist has no such credit on the song', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '409', description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Malformed public ID or song ID, an unknown role, or no current role while the artist holds several', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
@@ -380,6 +383,7 @@ final class ArtistController
         responses: [
             new OA\Response(response: '204', description: 'Album added to artist, or the artist already had the credit'),
             new OA\Response(response: '404', description: 'Artist or album not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '409', description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Malformed public ID or album ID, or an unknown role', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
@@ -406,6 +410,7 @@ final class ArtistController
         responses: [
             new OA\Response(response: '204', description: "Every one of the artist's credits on the album removed"),
             new OA\Response(response: '404', description: 'Artist not found, or the artist has no credit on the album', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '409', description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Malformed public ID or album ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
@@ -436,6 +441,7 @@ final class ArtistController
         responses: [
             new OA\Response(response: '204', description: 'Role updated; a credit changed to a role the artist already holds on the album is removed'),
             new OA\Response(response: '404', description: 'Artist not found, or the artist has no such credit on the album', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '409', description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Malformed public ID or album ID, an unknown role, or no current role while the artist holds several', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]

@@ -33,6 +33,7 @@ use App\Catalog\Interface\Resource\SongResource;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Console\AdminCommandSupport;
+use App\Tests\Fixtures\Catalog\PassThroughTransaction;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -125,6 +126,7 @@ final class CatalogMetadataCommandsTest extends TestCase
         $song = Song::reconstitute(new \App\Catalog\Domain\Model\SongState(...array_replace(get_object_vars($song->getState()), ['albumPublicId' => new PublicId()])));
         $songs = $this->createMock(SongPortInterface::class);
         $songs->method('findByPublicId')->willReturn($song);
+        $songs->method('findFreshByUuid')->willReturn($song);
         $songs->expects(self::exactly(2))->method('save')->with($song);
         $songs->method('getArtistNamesForSongs')->willReturn([$song->getId()->toString() => 'The Beatles']);
         $songs->method('getAlbumTitlesAndLanguagesByIds')->willReturn([$song->getAlbumId()->toString() => ['title' => 'Abbey Road', 'language' => 'eng']]);
@@ -217,7 +219,7 @@ final class CatalogMetadataCommandsTest extends TestCase
 
         return new AdminCommandSupport(new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
             UpdateAlbumCommand::class => [new UpdateAlbumHandler($albums ?? $this->createStub(AlbumPortInterface::class))],
-            UpdateSongCommand::class => [new UpdateSongHandler($songs ?? $this->createStub(SongPortInterface::class))],
+            UpdateSongCommand::class => [new UpdateSongHandler($songs ?? $this->createStub(SongPortInterface::class), new PassThroughTransaction())],
             UpdateMovieCommand::class => [new UpdateMovieHandler($movies ?? $this->createStub(MoviePortInterface::class))],
             CreateArtistCommand::class => [new CreateArtistHandler($artists)],
             UpdateArtistCommand::class => [new UpdateArtistHandler($artists)],

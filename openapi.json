@@ -5832,6 +5832,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Malformed public ID or song ID, or an unknown role",
                         "content": {
@@ -5884,6 +5894,16 @@
                     },
                     "404": {
                         "description": "Artist not found, or the artist has no credit on the song",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5970,6 +5990,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Malformed public ID or song ID, an unknown role, or no current role while the artist holds several",
                         "content": {
@@ -6039,6 +6069,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Malformed public ID or album ID, or an unknown role",
                         "content": {
@@ -6091,6 +6131,16 @@
                     },
                     "404": {
                         "description": "Artist not found, or the artist has no credit on the album",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -6169,6 +6219,16 @@
                     },
                     "404": {
                         "description": "Artist not found, or the artist has no such credit on the album",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again",
                         "content": {
                             "application/json": {
                                 "schema": {
