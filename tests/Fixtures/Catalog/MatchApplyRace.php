@@ -16,6 +16,7 @@ use App\Catalog\Application\Service\CoverImageDiscarder;
 use App\Catalog\Application\Service\MusicBrainzMatch\CandidateScorer;
 use App\Catalog\Application\Service\MusicBrainzMatch\TrackPairing;
 use App\Catalog\Infrastructure\AlbumService;
+use App\Catalog\Infrastructure\ArtistMergeService;
 use App\Catalog\Infrastructure\ArtistService;
 use App\Catalog\Infrastructure\Doctrine\ImportIdentity\ArtistIdentityResolver;
 use App\Catalog\Infrastructure\Doctrine\ImportIdentity\ArtistMusicbrainzIdAssigner;
@@ -211,7 +212,7 @@ final class MatchApplyRace
             artists: $services['artists'],
             genres: new GenreService(new GenreRepository($manager), new GenreMovieRepository($manager)),
             artistIdentities: new ArtistIdentityResolver($manager),
-            merges: ArtistMergeRace::merges($manager),
+            merges: $services['merges'],
             matchStates: new AlbumMatchStateRepository($manager->getConnection()),
             images: $services['images'],
             discarder: $services['discarder'],
@@ -277,24 +278,28 @@ final class MatchApplyRace
     }
 
     /**
-     * The production catalog services over the manager.
+     * The production catalog services over the manager, for this fixture and for the fixtures of
+     * other catalog writers that race an apply. Their transaction port is the one transaction()
+     * returns for $beforeCommit.
      *
-     * @return array{albums: AlbumService, songs: SongService, artists: ArtistService, images: ImageService, discarder: CoverImageDiscarder, transaction: TransactionPortInterface, snapshots: MatchSnapshots, comparisons: MatchComparisonBuilder}
+     * @return array{albums: AlbumService, songs: SongService, artists: ArtistService, merges: ArtistMergeService, images: ImageService, discarder: CoverImageDiscarder, transaction: TransactionPortInterface, snapshots: MatchSnapshots, comparisons: MatchComparisonBuilder}
      */
-    private static function services(EntityManager $manager, ?Closure $beforeCommit): array
+    public static function services(EntityManager $manager, ?Closure $beforeCommit): array
     {
         $transaction = self::transaction($manager, $beforeCommit);
+        $merges = ArtistMergeRace::merges($manager);
         $images = new ImageService(new ImageRepository($manager));
         $discarder = new CoverImageDiscarder($images, new FlysystemStorage(sys_get_temp_dir() . '/baander-match-apply-race'), new NullLogger());
         $albums = new AlbumService(new AlbumRepository($manager), $discarder, $transaction, new ArtistIdentityResolver($manager));
         $songs = new SongService(new SongRepository($manager, new CursorPaginator(), new CursorCodec(new JsonEncoder())), $manager->getConnection());
-        $artists = new ArtistService(new ArtistRepository($manager), $transaction, new ArtistMusicbrainzIdAssigner($manager), new NullLogger(), ArtistMergeRace::merges($manager), $discarder);
+        $artists = new ArtistService(new ArtistRepository($manager), $transaction, new ArtistMusicbrainzIdAssigner($manager), new NullLogger(), $merges, $discarder);
         $catalog = new MatchCatalogReadQuery($manager);
 
         return [
             'albums' => $albums,
             'songs' => $songs,
             'artists' => $artists,
+            'merges' => $merges,
             'images' => $images,
             'discarder' => $discarder,
             'transaction' => $transaction,
@@ -306,8 +311,10 @@ final class MatchApplyRace
     /**
      * Runs an operation as the production transaction port does: in one transaction, flushed at the
      * end, the manager cleared when it fails, and a deadlock reported as TransactionDeadlockException.
+     * $beforeCommit runs inside the outermost transaction once the operation's writes are flushed,
+     * while every lock is held, before the commit.
      */
-    private static function transaction(EntityManager $manager, ?Closure $beforeCommit): TransactionPortInterface
+    public static function transaction(EntityManager $manager, ?Closure $beforeCommit): TransactionPortInterface
     {
         return new readonly class ($manager, $beforeCommit) implements TransactionPortInterface {
             public function __construct(
