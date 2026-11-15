@@ -224,11 +224,12 @@ export function LyricsDialog({
     },
   })
 
-  // Search LRCLIB
+  // Search LRCLIB. A search takes a turn of the pace every LRCLIB request shares, so a failed one is
+  // not retried: the admin submits again.
   const searchEnabled = open && isAdmin && activeTab === 'search' && searchQuery.length >= 2
   const { data: searchData, isFetching: searchFetching, error: searchError, refetch: searchAgain } = useGetLyricsSearch(
     { q: searchQuery },
-    { query: { enabled: searchEnabled } },
+    { query: { enabled: searchEnabled, retry: false } },
   )
   const searchLoading = searchEnabled && searchFetching
 

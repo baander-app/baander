@@ -65,8 +65,9 @@ function httpError(status: number, message: string, reason?: string): AxiosError
   })
 }
 
-function mount() {
-  client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+/** @param queryRetry how often the client retries a failed query; the web app's own client retries once */
+function mount(queryRetry: false | number = false) {
+  client = new QueryClient({ defaultOptions: { queries: { retry: queryRetry, retryDelay: 0 }, mutations: { retry: false } } })
 
   return render(
     <QueryClientProvider client={client}>
@@ -158,6 +159,17 @@ describe('LyricsDialog', () => {
     expect(await screen.findByRole('button', { name: /Still Alive/ })).toBeInTheDocument()
     expect(searchesSent()).toEqual(['Still Alive GLaDOS'])
     expect(screen.getByRole('textbox')).toHaveValue('Still Alive GLaDOS')
+  })
+
+  it('sends a failed search once, although the client retries other failed queries', async () => {
+    answers.search = () => Promise.reject(httpError(503, 'The lyrics provider LRCLIB is unavailable. Try again later.'))
+    const user = userEvent.setup()
+    mount(1)
+    await user.click(await screen.findByRole('tab', { name: 'Search' }))
+    await user.type(screen.getByRole('textbox'), 'Still Alive{Enter}')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(LYRICS_PROVIDER_UNAVAILABLE)
+    expect(searchesSent()).toEqual(['Still Alive'])
   })
 
   it('keeps the typed text after a failed search, and searches for it again when it is submitted again', async () => {
