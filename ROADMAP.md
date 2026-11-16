@@ -268,17 +268,18 @@ publication is the local build of `57fc9e1e3` from 2026-11-13, before all of the
 Pushed later on 2026-11-15, on top of `23f899976`: the matching follow-ups
 (`a7d1c7466` to `6991a9f9a` and their roadmap record), with the fix for the CI cleanup
 limit. Pushed on 2026-11-16, on top of `8d119f5df`: the matching leftovers
-(`a822bf362` to `98a89db8a`). On the local branch `fix/pgroonga-cleanup-race`, not
-pushed: the PGroonga cleanup race fix (`8a3cd708b` to `9e7d164bd`, on top of
-`44e315ee3`).
+(`a822bf362` to `98a89db8a`). Pushed later on 2026-11-16, on top of `44e315ee3`: the
+PGroonga cleanup race fix, `7c2deaa24` first and the rest up to this record once
+GitHub had published the PGroonga 4.1.0 database image.
 
 - **Master CI.** No `CI` run on `master` has been green since 2026-11-05. Run
   43826408058 on `44e315ee3` passed the whole quality gate on 2026-11-16, step 41 in
   2,276 of its 3,600 seconds, and failed the `build-and-push` job at its check that
   the application image cannot be pulled anonymously. The user decided the same day
-  that every image is public; the PGroonga branch removes that check (`9e7d164bd`).
-  Run 43826369096 on `98a89db8a` failed step 39 on a DPoP key with a short
-  coordinate, fixed on the same branch. See
+  that every image is public, and `9e7d164bd` removes that check. Run 43826369096 on
+  `98a89db8a` failed step 39 on a DPoP key with a short coordinate, fixed by
+  `41bc3d439`. The runs on the PGroonga push have not been checked yet; the user
+  checks in on CI from time to time rather than waiting for it. See
   [Master CI repair](#master-ci-repair). The first green run is the point to write the
   CI-repair learning with `ce-compound`, which the user confirmed on 2026-11-13.
 - **Web fixes.** With the same push, a click on the active lyrics effect turns effects
@@ -318,24 +319,23 @@ pushed: the PGroonga cleanup race fix (`8a3cd708b` to `9e7d164bd`, on top of
 - **Next plans.** Better compression of material like the failed held-out recording
   (lossless plan KD12) follows the rename. Its fourth held-out set may be read only
   after the benchmark data has moved and its ledger is rewritten.
-- **PGroonga cleanup race.** The item the user chose on 2026-11-16 as "PGroonga
-  isolation of throwaway test schemas" is built on the local branch
-  `fix/pgroonga-cleanup-race` and not pushed; its cause was PGroonga 4.0.5, not the
-  schema drops. See [PGroonga cleanup race](#pgroonga-cleanup-race). When the user
-  asks for the push: push `master` up to `7c2deaa24` first, wait until "Build
-  PostgreSQL Image" has published `baander-postgres:latest`, then push the rest,
-  since CI pulls that image at the start of each run. The persistent instance moves
-  to the new image after the push.
-- **Cleanup.** GitHub and Forgejo carry only `master`. Left locally on 2026-11-16: the
-  merged branches `fix/scan-artist-credits`, `fix/matching-follow-ups` and
-  `fix/matching-leftovers`, the verification worktree `/home/martin/dev/baander-ml-verify`
-  (detached at `0405c6142`), the PGroonga worktrees `/home/martin/dev/baander-pgrn-diag`
-  (detached at `8a3cd708b`, with an uncommitted autovacuum logging setting in
-  `compose.test.yaml`) and `/home/martin/dev/baander-pgrn-verify` (detached at
-  `dfbd5684d`), the images `baander-database:pgroonga-4.0.5` and
-  `baander-database:pgroonga-4.1.0`, and two
-  worktrees whose heads are in `master`, `/home/martin/dev/baander-verify`
-  (`ff68e09f2`) and `~/.codex/worktrees/ba59/baander` (`ba5750533`).
+- **PGroonga cleanup race.** On `master` since 2026-11-16: the item the user chose
+  that day as "PGroonga isolation of throwaway test schemas". Its cause was PGroonga
+  4.0.5, not the schema drops. The database image and the persistent instance run
+  PGroonga 4.1.0. See [PGroonga cleanup race](#pgroonga-cleanup-race).
+- **Cleanup.** GitHub and Forgejo carry only `master`. Left locally on 2026-11-16:
+  - the merged branches `fix/scan-artist-credits`, `fix/matching-follow-ups`,
+    `fix/matching-leftovers` and `fix/pgroonga-cleanup-race`;
+  - the verification worktree `/home/martin/dev/baander-ml-verify` (detached at
+    `0405c6142`), and the PGroonga worktrees `/home/martin/dev/baander-pgrn-diag`
+    (detached at `8a3cd708b`, with an uncommitted autovacuum logging setting in
+    `compose.test.yaml`) and `/home/martin/dev/baander-pgrn-verify` (detached at
+    `dfbd5684d`);
+  - the images `baander-database:pgroonga-4.0.5` and `baander-database:pgroonga-4.1.0`;
+  - the persistent instance's pre-move dump and saved 4.0.5 database image (404 MB) in
+    `~/.local/state/baander/backups/2026-11-16-pgroonga-4.1.0/`;
+  - two worktrees whose heads are in `master`, `/home/martin/dev/baander-verify`
+    (`ff68e09f2`) and `~/.codex/worktrees/ba59/baander` (`ba5750533`).
   `/home/martin/dev/baander-baac-lossless` stays, detached at `a97ae0058`, until its
   `bench/work/` has moved. The receipts of the 2026-11-13 cleanup are in
   `~/.local/state/baander/receipts/2026-11-13/`.
@@ -906,14 +906,12 @@ Open:
   fetch with an empty configuration from the development host succeeded for that
   image and for `ghcr.io/baander-app/baander-postgres:latest` the same day. The user
   decided on 2026-11-16 that every image is public, so the check had become wrong;
-  `9e7d164bd` on the PGroonga branch removes it from the application and Nginx
-  workflows.
+  `9e7d164bd` removes it from the application and Nginx workflows.
 - Run 43826369096 on `98a89db8a` failed step 39 in
   `DevelopmentAcceptanceTest::testDpopProofHasVerifiableEs256SignatureAndBoundClaims`
   (`openssl_verify(): Supplied key param cannot be coerced into a public key`). The
   development acceptance client's DPoP key took OpenSSL's coordinates without their
-  leading zero bytes, which about one key in 128 has; the fix is `41bc3d439` on the
-  PGroonga branch.
+  leading zero bytes, which about one key in 128 has; `41bc3d439` fixes it.
 - Each run draws a new test-order seed, so another order-dependent test can still
   surface in step 41.
 - The registry release job failed once on a load-smoke lookup that answered 503; it
@@ -1344,8 +1342,10 @@ Open:
 
 Delivered from
 [the PGroonga cleanup race plan](docs/plans/2026-11-16-0919-fix-pgroonga-cleanup-race-plan.md)
-on the local branch `fix/pgroonga-cleanup-race` (`8a3cd708b` to `9e7d164bd`, on top
-of `44e315ee3`), not pushed. The user chose the item on 2026-11-16 as "PGroonga
+and on `master` since 2026-11-16 (`8a3cd708b` to this record, on top of `44e315ee3`).
+`7c2deaa24` went first, so that GitHub published the 4.1.0 image as
+`ghcr.io/baander-app/baander-postgres:latest` (16:36 UTC) before the CI run that
+carries the new version check. The user chose the item on 2026-11-16 as "PGroonga
 isolation of throwaway test schemas" and answered the plan's questions the same day:
 the database image moves to PGroonga 4.1.0, and the persistent instance moves to it
 with its data in this work, after the push.
@@ -1447,13 +1447,34 @@ Verification on 2026-11-16:
   `PoolSafeSqlScanner`'s literal reading and line counting, which only a shared helper
   that edits that scanner would remove; the two new integration tests each define the
   project's PGroonga index options and their own throwaway schema.
+- Code review of `44e315ee3..9e7d164bd`, focused depth, the correctness pass and one
+  adversarial reviewer (the checkout turns the cross-model pass off): verdict "Ready
+  to merge", no findings. Its residual risks are under Open.
+- The persistent instance (U7), 16:43 to 16:57 UTC: a dump taken in one snapshot
+  restored with `--exit-on-error --single-transaction` into a scratch container of
+  its 4.0.5 image, with the six row counts (users 2, libraries 2, artists 19, albums
+  5, songs 77, playlists 0) equal to the snapshot's; the same update passed first on
+  a copy of the stopped instance's volume. After `make dev-down`, removal of the
+  retained 4.0.5 image (`c7edb4291502`) and `make dev-up`, the instance runs image
+  `971daf64233b` (PGroonga 4.1.0-1, PostgreSQL 18.7) on its own cluster
+  (`system_identifier` unchanged); `ALTER EXTENSION pgroonga UPDATE` moved
+  `extversion` from 4.0.5 to 4.1.0, `pgroonga_list_broken_indexes()` returned no rows,
+  so no `REINDEX` ran, and each of the five PGroonga indexes answered a search through
+  the index. The server log shows no collation, PGroonga or other error. The new image
+  was built by the updater's timer, which `make dev-up` enables before its own update.
 
 Open:
 
-- The persistent instance moves to the 4.1.0 image after the push: a verified dump, a
-  rehearsal on a copy of its volume, then `make dev-up` on the new image,
-  `ALTER EXTENSION pgroonga UPDATE`, `pgroonga_list_broken_indexes()` and `REINDEX` of
-  any index it names. On 4.1.0 that probe was not tried against a broken index.
+- From the code review: `PgroongaLeftovers::clear()` sets no `lock_timeout`, so a
+  lock holder that PostgreSQL does not cancel (an anti-wraparound autovacuum, or a
+  connection of the same test process holding uncommitted DDL on a PGroonga table)
+  would hang the lane until the step's budget instead of failing at once; and the
+  guard exempts a whole file once it calls the helper, so a later cleanup in that file
+  after new leftovers would pass it.
+- `pgroonga_list_broken_indexes()` was not tried against a broken index on 4.1.0;
+  on 4.0.5 it raises "object isn't found" instead of listing the index.
+- The persistent instance's pre-move dump and saved 4.0.5 image can go once the user
+  no longer wants a way back; see Cleanup under [Resume here](#resume-here).
 - `AudioRenditionWorkerHandoffTest` failed in the 4.0.5 run above with
   `Audio transcoding failed: Cannot safely resolve filesystem path` on the `.part` path
   of a rendition (`AudioRenditionCache::validatePaths`), as another of its tests did on

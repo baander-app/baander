@@ -24,8 +24,14 @@ on [PGroonga's upgrade table](https://pgroonga.github.io/upgrade/); its extensio
 scripts add only `pgroonga_physical_table_names()` (4.0.9), which the application
 does not call, so no migration runs the update. A retained database therefore keeps
 the `extversion` it recorded until its owner runs `ALTER EXTENSION pgroonga UPDATE`.
-Fresh disposable databases on the new image establish nothing about the persistent
-development instance, whose database image held PGroonga 4.0.5-1 on 2026-11-16.
+Fresh disposable databases on the new image establish nothing about a retained
+database. On 2026-11-16 the persistent development instance moved from its 4.0.5-1
+build to a 4.1.0 build of the Dockerfile (image `971daf64233b`: Debian 13.7,
+`postgresql-18` 18.7-1.pgdg13+2, `libgroonga0` 16.1.5-1, PGroonga 4.1.0-1) with its
+data volume. `ALTER EXTENSION pgroonga UPDATE` ran over a direct owner connection and
+`extversion` reads 4.1.0. The cluster's `system_identifier` is unchanged,
+`pgroonga_list_broken_indexes()` returned no rows, and each of the five PGroonga
+indexes answered a `&@~` search through the index.
 
 [Version20261017000000](../../../../migrations/Version20261017000000.php)
 creates `citext`, `ltree`, `pg_stat_statements`, `pg_trgm`, `pgcrypto`, `pgroonga`
