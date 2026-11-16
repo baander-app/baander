@@ -267,8 +267,8 @@ before that push and updates itself from `master`. The last recorded website
 publication is the local build of `57fc9e1e3` from 2026-11-13, before all of these.
 Pushed later on 2026-11-15, on top of `23f899976`: the matching follow-ups
 (`a7d1c7466` to `6991a9f9a` and their roadmap record), with the fix for the CI cleanup
-limit. The matching leftovers are on the local branch `fix/matching-leftovers`, on top
-of `8d119f5df`, and not pushed.
+limit. Pushed on 2026-11-16, on top of `8d119f5df`: the matching leftovers
+(`a822bf362` to `98a89db8a`).
 
 - **Master CI.** No `CI` run on `master` has been green since 2026-11-05. Run
   43695574134 on the pushed tip `23f899976` passed steps 1 to 38 of the quality gate
@@ -291,8 +291,7 @@ of `8d119f5df`, and not pushed.
   with its next update. A lyrics fetch queued before that update fails to decode, and
   "Ten Thousand Fists" stays on its review list until an admin applies a candidate
   from the match dialog.
-- **Matching leftovers.** On the local branch `fix/matching-leftovers` since
-  2026-11-15, not pushed: hand changes to credits and the album merge under the catalog
+- **Matching leftovers.** On `master` since 2026-11-16: hand changes to credits and the album merge under the catalog
   lock order, the duplicate fold, artist sync by stored MusicBrainz ID and the fill of
   an artist a match or an import identifies; see
   [Matching leftovers](#matching-leftovers).
@@ -320,8 +319,13 @@ of `8d119f5df`, and not pushed.
 - **Next plans.** Better compression of material like the failed held-out recording
   (lossless plan KD12) follows the rename. Its fourth held-out set may be read only
   after the benchmark data has moved and its ledger is rewritten.
-- **Cleanup.** GitHub and Forgejo carry only `master`. Left locally on 2026-11-15: the
-  merged branches `fix/scan-artist-credits` and `fix/matching-follow-ups`, and two
+- **Next.** PGroonga isolation of throwaway test schemas, chosen by the user on
+  2026-11-16 as the next item, since it fails step 41 in any order that puts a
+  schema-dropping test first.
+- **Cleanup.** GitHub and Forgejo carry only `master`. Left locally on 2026-11-16: the
+  merged branches `fix/scan-artist-credits`, `fix/matching-follow-ups` and
+  `fix/matching-leftovers`, the verification worktree `/home/martin/dev/baander-ml-verify`
+  (detached at `0405c6142`), and two
   worktrees whose heads are in `master`, `/home/martin/dev/baander-verify`
   (`ff68e09f2`) and `~/.codex/worktrees/ba59/baander` (`ba5750533`).
   `/home/martin/dev/baander-baac-lossless` stays, detached at `a97ae0058`, until its
@@ -1176,8 +1180,8 @@ Open:
 
 Delivered from
 [the matching leftovers plan](docs/plans/2026-11-15-1624-fix-matching-leftovers-plan.md)
-on the local branch `fix/matching-leftovers` (`a822bf362` to `0405c6142`, on top of
-`8d119f5df`), not pushed. The user chose this scope on 2026-11-15 and answered the
+and on `master` since 2026-11-16 (`a822bf362` to `0405c6142` and this record, on top
+of `8d119f5df`). The user chose this scope on 2026-11-15 and answered the
 plan's questions the same day: plays as well as favorites follow a merged album, a
 merge folds a duplicate song into the song it keeps, artist sync is rebuilt as a fill
 by stored ID, an artist is filled as soon as it gets an ID, an asked artist is
