@@ -264,8 +264,8 @@ that limitation is recorded for follow-up, with no runtime change in the 2026-10
 `052e8684d`) and the roadmap cleanup with its plan retirement. Landed on 2026-11-14:
 scan artist credits and MusicBrainz matching. The persistent instance ran `6912eaaf6`
 before that push and updates itself from `master`. The website was last published on
-2026-11-16: a local build of `7fe638cec`, deployed to production as
-`baander-mbw74s9r5` and aliased to `https://baander.app`.
+2026-11-16: a local build of `0d017641f`, deployed to production as
+`baander-cqu4pnh8z` and aliased to `https://baander.app`.
 Pushed later on 2026-11-15, on top of `23f899976`: the matching follow-ups
 (`a7d1c7466` to `6991a9f9a` and their roadmap record), with the fix for the CI cleanup
 limit. Pushed on 2026-11-16, on top of `8d119f5df`: the matching leftovers
@@ -273,7 +273,9 @@ limit. Pushed on 2026-11-16, on top of `8d119f5df`: the matching leftovers
 PGroonga cleanup race fix, `7c2deaa24` first and the rest up to this record once
 GitHub had published the PGroonga 4.1.0 database image. Pushed later on 2026-11-16,
 on top of `e99e748a6`: the prose-fix presentation register and the homepage hero
-(`ba5cbce6b` to `7fe638cec` and their roadmap record).
+(`ba5cbce6b` to `7fe638cec` and their roadmap record). Pushed later on 2026-11-16, on
+top of `c47af96fb`: the docs-book rewrite (`20be3f1df` to `0d017641f` and its roadmap
+record).
 
 - **Master CI.** No `CI` run on `master` has been green since 2026-11-05. Run
   43826408058 on `44e315ee3` passed the whole quality gate on 2026-11-16, step 41 in
@@ -294,6 +296,10 @@ on top of `e99e748a6`: the prose-fix presentation register and the homepage hero
   record) and published to `https://baander.app`: prose-fix gains a Jobs register for
   website feature introductions, and the homepage hero uses it; see
   [Presentation register and homepage hero](#presentation-register-and-homepage-hero).
+- **docs-book rewrite.** On `master` since 2026-11-16 and published to
+  `https://baander.app`: every manual page passed through prose-fix and outdated claims
+  were corrected against the code; the code and configuration defects found on the way
+  are open items; see [docs-book rewrite](#docs-book-rewrite).
 - **Web fixes.** With the same push, a click on the active lyrics effect turns effects
   off, and the songs view's genre, artist and album panes scroll; see
   [Lyrics effect toggle and song browser panes](#lyrics-effect-toggle-and-song-browser-panes).
@@ -544,6 +550,68 @@ Open:
 - The user chose the hero from three candidates. No other page uses the register yet;
   the Bånder Audio Core lead, the `README.md` opening and the docs-book introductions
   can follow on request.
+
+## docs-book rewrite
+
+Delivered on `master` on 2026-11-16, fast-forwarded from `docs/prose-fix-docs-book`
+(`20be3f1df` to `0d017641f`): all 243 pages of `docs-book/` went through prose-fix in
+the house registers, eight parallel workers each owning one chapter group, and 131
+pages changed. Each worker checked every page's claims against the code and fixed the
+outdated ones with `path:line` evidence; each group's commit message lists them. The
+larger corrections: the removed Swoole task-worker transport, the 24-hour cap on
+signed video URLs, health alerts as in-app rows only, public IDs instead of UUIDs on
+admin routes and commands, the pooler in the production `.env` template, the six health
+components, `debug:hw-transcode` reading the worker's published observation, the
+real-time patterns and live families, domain events no code raises, and code examples
+that no longer compiled. The pages also say where configuration is not read: the
+`SCANNER_*`, `DISCOVERY_*`, `ARGON2ID_*` and `TOKEN_BINDING_*` variables in
+`.env.example` reach no code.
+
+Verification on 2026-11-16:
+
+- Every rewritten page was audited against its baseline with `audit_rewrite.php`;
+  every relative link and anchor in the 243 pages resolves; no plan identifiers or
+  placeholder domains.
+- `CommandDocsCoverageTest` passed (4 tests); the commands index lists all 153
+  commands once.
+- `make website-build` built 243 pages; `corepack yarn test:browser` in `ui/site/`
+  passed 93 tests on the build of `0d017641f`, after updating the one test that pins
+  the `app:user:enable` page's opening sentence; `node --test scripts/*.test.mjs`
+  passed 11.
+- Code review: `ce-code-review` at full depth with correctness, adversarial
+  (in-process; cross-model is off in this checkout), project-standards and testing
+  reviewers; verdict "Ready with fixes". Its one confirmed finding, a promised
+  `APP_SECRET` length check that does not exist, and two residual risks on the
+  database credential steps are fixed in `0d017641f`. Reviewers sampled the changed
+  claims; the transcoding slot arithmetic and some test counts were not re-derived.
+- Published: a local build of `0d017641f`, previewed as `baander-ljsgl7olj` and
+  deployed to production as `baander-cqu4pnh8z`, aliased to `https://baander.app`.
+
+Open (found during the rewrite; code and configuration, not docs):
+
+- Security: `GET /ws/party/{sessionPublicId}/` sits outside the `^/api/` firewall
+  (`config/packages/security.yaml`), so anyone holding a party's public ID reads its
+  session details without signing in.
+- Watch parties: the info route returns a `wsUrl` the handshake refuses, host playback
+  is never broadcast, and a full session refuses its own reconnecting member.
+- `.env` and `.env.example` carry 29 variables no code reads, plus
+  `MUSICBRAINZ_VERSION`, `MUSICBRAINZ_CONTACT` and `LASTFM_API_SECRET`; Compose
+  publishes UDP 41234, on which nothing listens.
+- `VIDEO_ENCODER` is not in the worker runtime environment, so the transcoding guide's
+  hardware-encoder setting cannot reach the media worker.
+- Four Prometheus gauges are never emitted; `app:watch-files` without `--path`
+  watches nothing; `app:monitor:prune` casts `--days` with `(int)` against the console
+  rules; `app:album:duplicates` takes a library UUID that no command prints.
+- Domain events mapped to notification categories (`AlbumCreated`,
+  `TranscodeJobCompleted`, `TranscodeJobFailed`) are never raised.
+- Stale descriptions outside the book: code comments and `.agents/rules/admin-cli-parity.md`
+  still name the removed `swoole_task` transport; several `#[AsCommand]` and OpenAPI
+  descriptions, the `src/*/README.md` files and `dev-docs/context-map.md` repeat
+  claims the book now corrects.
+- Policy questions the workers left open: the playback snapshot exposes UUID
+  primary keys although public payloads use public IDs; the Electron tests run on Node
+  24 in CI while pages say 26; the database rotation step that reruns
+  `pooler-credentials` is derived from the script and has not been drilled.
 
 ## Cohesive operator manual
 
