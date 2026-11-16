@@ -195,6 +195,53 @@ export function observeReads(page: Page, path: string) {
   return receipts
 }
 
+/** Test id of the toast the application raises when live updates stay unavailable. */
+export const LIVE_OUTAGE_TOAST_TEST_ID = 'live-updates-outage'
+
+/** Reads the page's live-update outage state from the application's own outage store. */
+export async function liveOutage(page: Page): Promise<{ active: boolean; toastRaised: boolean }> {
+  return page.evaluate(async () => {
+    const modulePath = '/src/shared/live/outage-store.ts'
+    const { useLiveOutageStore } = await import(/* @vite-ignore */ modulePath) as {
+      useLiveOutageStore: { getState: () => { since: number | null; toastRaised: boolean } }
+    }
+    const { since, toastRaised } = useLiveOutageStore.getState()
+    return { active: since !== null, toastRaised }
+  })
+}
+
+interface LiveOutageHistory {
+  began: boolean
+  toastRaised: boolean
+}
+
+/**
+ * Records in the page, from now on, whether an outage began or raised its toast. A later read
+ * proves no outage happened at all, which reading the current state cannot: an outage that
+ * starts and ends before the read leaves the store looking untouched.
+ */
+export async function recordOutageHistory(page: Page) {
+  await page.evaluate(async () => {
+    const modulePath = '/src/shared/live/outage-store.ts'
+    const { useLiveOutageStore } = await import(/* @vite-ignore */ modulePath) as {
+      useLiveOutageStore: {
+        subscribe: (listener: (state: { since: number | null; toastRaised: boolean }) => void) => () => void
+      }
+    }
+    const history: LiveOutageHistory = { began: false, toastRaised: false }
+    const target = window as unknown as { __liveOutageHistory: LiveOutageHistory }
+    target.__liveOutageHistory = history
+    useLiveOutageStore.subscribe(state => {
+      if (state.since !== null) history.began = true
+      if (state.toastRaised) history.toastRaised = true
+    })
+  })
+}
+
+export async function liveOutageHistory(page: Page): Promise<LiveOutageHistory> {
+  return page.evaluate(() => (window as unknown as { __liveOutageHistory: LiveOutageHistory }).__liveOutageHistory)
+}
+
 export async function interruptDelivery(page: Page) {
   await page.route('**/api/ws/tickets', route => route.abort('connectionfailed'))
   await page.evaluate(async () => {
@@ -204,6 +251,6 @@ export async function interruptDelivery(page: Page) {
     }
     authenticatedTransport.reconnect()
   })
-  await expect(page.getByRole('status').filter({ hasText: 'Updates unavailable' })).toBeVisible({ timeout: 20_000 })
+  await expect.poll(async () => (await liveOutage(page)).active, { timeout: 20_000 }).toBe(true)
   return async () => { await page.unroute('**/api/ws/tickets') }
 }

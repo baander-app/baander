@@ -1,7 +1,10 @@
 import { authenticatedGet } from './capacity-fixtures'
 import { CapacityObserver } from './capacity-observers'
 import { RESTART_QUALIFICATION_MS } from './managed-lifecycle'
-import { test, expect, navigate, paint, holdResponse, interruptDelivery, observeReads } from './recovery-fixtures'
+import {
+  test, expect, navigate, paint, holdResponse, interruptDelivery, observeReads, liveOutage, LIVE_OUTAGE_TOAST_TEST_ID,
+  recordOutageHistory, liveOutageHistory,
+} from './recovery-fixtures'
 
 test.describe('Live recovery through the authenticated application', () => {
   test.setTimeout(180_000)
@@ -150,12 +153,13 @@ test.describe('Live recovery through the authenticated application', () => {
     await run.fixture.request({ op: 'projector', hold: true })
     try {
       await run.fixture.request({ op: 'ordinary' })
-      await expect(page.getByRole('status').filter({ hasText: 'Updates unavailable' })).toBeVisible({ timeout: 45_000 })
+      await expect.poll(async () => (await liveOutage(page)).active, { timeout: 45_000 }).toBe(true)
       expect(closed).toEqual([])
+      await expect(page.getByTestId(LIVE_OUTAGE_TOAST_TEST_ID)).toBeVisible({ timeout: 20_000 })
       run.evidence.push({ kind: 'projection-stalled', sample: (await run.fixture.request({ op: 'sample' })).receipt })
     } finally { await run.fixture.request({ op: 'projector', hold: false }) }
     await observer.waitForCount(1, undefined, 30_000)
-    await expect(page.getByRole('status').filter({ hasText: 'Updates unavailable' })).toHaveCount(0, { timeout: 30_000 })
+    await expect.poll(async () => (await liveOutage(page)).active, { timeout: 30_000 }).toBe(false)
     run.evidence.push({ kind: 'projection-recovered', observer: observer.snapshot() })
   })
 
@@ -229,6 +233,7 @@ test.describe('Live recovery through the authenticated application', () => {
     const page = await run.open(1)
     await navigate(page, `/music/playlists/${run.manifest.playlist.publicId}`)
     await expect(page.locator('main h1')).toBeVisible()
+    await recordOutageHistory(page)
     const session = await page.context().newCDPSession(page)
     const frozenAt = Date.now()
     const name = `After browser wake ${run.fixture.run}`
@@ -242,7 +247,8 @@ test.describe('Live recovery through the authenticated application', () => {
       await session.detach()
     }
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible({ timeout: 35_000 })
-    await expect(page.getByRole('status').filter({ hasText: 'Updates unavailable' })).toHaveCount(0, { timeout: 35_000 })
+    expect(await liveOutageHistory(page)).toEqual({ began: false, toastRaised: false })
+    await expect(page.getByTestId(LIVE_OUTAGE_TOAST_TEST_ID)).toHaveCount(0)
     const authoritative = await authenticatedGet<{ data: { name: string } }>(page,
       `/api/playlists/${run.manifest.playlist.publicId}`)
     expect(authoritative.data.name).toBe(name)
