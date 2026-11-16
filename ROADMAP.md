@@ -263,8 +263,9 @@ that limitation is recorded for follow-up, with no runtime change in the 2026-10
 2026-11-15: the CI fixes (`d1504daa3` to `77bb3c8e4`), two web fixes (`9ecf84a3d`,
 `052e8684d`) and the roadmap cleanup with its plan retirement. Landed on 2026-11-14:
 scan artist credits and MusicBrainz matching. The persistent instance ran `6912eaaf6`
-before that push and updates itself from `master`. The last recorded website
-publication is the local build of `57fc9e1e3` from 2026-11-13, before all of these.
+before that push and updates itself from `master`. The website was last published on
+2026-11-16: a local build of `65a1d6d95`, deployed to production as
+`baander-ke69f0cpd` and aliased to `https://baander.app`.
 Pushed later on 2026-11-15, on top of `23f899976`: the matching follow-ups
 (`a7d1c7466` to `6991a9f9a` and their roadmap record), with the fix for the CI cleanup
 limit. Pushed on 2026-11-16, on top of `8d119f5df`: the matching leftovers
@@ -1031,7 +1032,19 @@ Open:
   repeated on the live site.
 - **Held-out recordings disclosure (2026-11-13):** on `/bac/`, the long "Held-out
   recordings" text in the lossless section now sits in a disclosure that starts
-  closed. Not yet published.
+  closed. Published with the website release of 2026-11-16.
+- **Website release (2026-11-16):** a local build of `65a1d6d95` (243 manual pages)
+  went to a preview (`baander-6xfxjrv7k`) and then, unchanged, to production
+  (`baander-ke69f0cpd`, aliased to `https://baander.app`). On the preview, through
+  `vercel curl`, and again on `https://baander.app`: the homepage and a nested manual
+  page answer 200, an unknown URL 404, the search index and sitemap load, canonical
+  links name `https://baander.app`, and the new testing-conventions section is
+  present. On production, HTTPS verifies, a source link to `65a1d6d95` answers 200 on
+  GitHub, and `www.baander.app` redirects. The site's browser suite passed 92 of 93
+  against the artifact; the one failure was `net::ERR_NETWORK_CHANGED` while loading
+  the typography page, and its four typography cases passed on a rerun. Search,
+  themes and narrow-screen layout were checked by that suite, not by hand on the
+  live site.
 
 ### Scan artist credits, song lengths and lyrics outcomes
 
