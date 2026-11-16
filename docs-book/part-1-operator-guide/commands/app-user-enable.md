@@ -1,6 +1,6 @@
 # app:user:enable
 
-Enable a previously disabled user account. The user can authenticate again. Use this to restore access after an account was disabled with `app:user:disable`. The command runs the same use case as enabling a user in the admin panel (`POST /api/admin/users/{publicId}/enable` in the admin API).
+Enable a user account that was disabled with [app:user:disable](app-user-disable.md), so the user can sign in again. The command runs the same use case as enabling a user in the admin panel (`POST /api/admin/users/{publicId}/enable` in the admin API).
 
 ## Quick start
 
@@ -39,11 +39,11 @@ With `--json` the command prints only the user as the API's `data` object, the s
 
 | Code | Meaning |
 |------|---------|
-| 0 | User enabled successfully |
+| 0 | User enabled, or the account was not disabled |
 | 1 | The user was not found, or another error occurred; the message says why |
 
 ## Tips
 
-- This is the inverse of `app:user:disable`.
-- The identifier can be either the email or the public ID; the command resolves it on the backend.
-- Enabling an account that was never disabled is a no-op that still reports success.
+- The identifier can be the email address or the public ID.
+- Enabling an account that is not disabled changes nothing and still succeeds.
+- Enabling restores none of the tokens the disable revoked, so the user signs in again.

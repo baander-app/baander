@@ -4,6 +4,8 @@ Delete a scheduled job. The command does what **Delete** on the admin **Schedule
 
 ## Quick start
 
+Delete a job without the confirmation prompt. The deletion cannot be undone:
+
 ```bash
 make exec cmd="php bin/console app:scheduler:delete aB3dE5fG7hJ9kL1mN3pQr --force"
 ```

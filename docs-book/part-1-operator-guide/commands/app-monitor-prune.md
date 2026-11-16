@@ -1,19 +1,19 @@
 # app:monitor:prune
 
-Prune completed job monitors older than a given age. Removes finished, failed, and cancelled job monitor records to keep the monitor table from growing unbounded. The command does what `POST /api/monitor/prune` does in the admin API, with the same rules.
+Delete the job monitor records of finished, failed and cancelled jobs older than a given number of days, so that the monitor table does not grow without bound. The command does what `POST /api/monitor/prune` does in the admin API, with the same rules.
 
 ## Quick start
 
-Prune monitors older than the default 7 days:
-
-```bash
-make exec cmd="php bin/console app:monitor:prune"
-```
-
-Preview what would be pruned without deleting:
+Count the records older than the default 7 days, without deleting them:
 
 ```bash
 make exec cmd="php bin/console app:monitor:prune --dry-run"
+```
+
+Delete them. The command does not ask first, and a deleted record cannot be restored:
+
+```bash
+make exec cmd="php bin/console app:monitor:prune"
 ```
 
 Print the result as JSON, for a script:
@@ -46,6 +46,6 @@ With `--json` the command prints only `{"pruned": 42, "olderThan": "2026-09-08T1
 
 ## Tips
 
-- Schedule this as a recurring cleanup to keep the monitor table bounded.
-- Run with `--dry-run` first to gauge volume before deleting.
-- Only terminal-state monitors (finished, failed, cancelled) are eligible — running jobs are never pruned.
+- Run the command on a recurring schedule, such as a host cron job, to keep the monitor table bounded. It is not one of the commands [app:scheduler:create](app-scheduler-create.md) can schedule.
+- Run with `--dry-run` first to see how many records a prune would delete.
+- Only records of finished, failed and cancelled jobs are deleted; queued and running jobs are never pruned.

@@ -32,11 +32,6 @@ Every option is optional. Like the edit dialog, the command starts from the job'
 | `--command` | The command to run, as [app:scheduler:commands](app-scheduler-commands.md) lists it under its type |
 | `--description` | Free-text description; an empty value (`--description=`) removes it |
 | `--parameters` | The command's parameters as a JSON object; replaces all current parameters |
-
-## Options
-
-| Option | Description |
-|--------|-------------|
 | `--json` | Print only the result, as the admin API's `data` payload, in JSON |
 
 ## Details

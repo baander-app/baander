@@ -90,6 +90,12 @@ Deletes the stored value, so the setting follows its default again, and prints t
 |----------|----------|-------------|
 | `key` | Yes | Setting key, for example `metadata.auto_sync` |
 
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--json` | off | Print the setting after the reset, as `DELETE /api/admin/settings/{key}` returns it |
+
+With `--json`, stdout holds only the API's `data` object for the setting, with the same fields as one entry of the `app:settings:set` output.
+
 Resetting a setting that has no stored value succeeds and changes nothing.
 
 ## Details

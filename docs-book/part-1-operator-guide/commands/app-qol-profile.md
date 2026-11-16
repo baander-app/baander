@@ -28,7 +28,7 @@ make exec cmd="php bin/console app:qol:profile balanced --json"
 
 ## Details
 
-Run the command in the web container: it talks to the web server running there. The profile is saved to `var/qol_state/algorithm_profile.json` and held in memory that every HTTP worker shares, so it stays in force after a server reload or restart. Saving the learning model never writes the profile.
+Run the command in the web container: it talks to the web server running there. The profile is saved to `CONVERT_STORAGE_PATH/qol-state/algorithm_profile.json` and held in memory that every HTTP worker shares, so it stays in force after a server reload or restart. Saving the learning model never writes the profile.
 
 The command prints each worker's status after the change, in the table `app:qol:status` prints, and confirms when every worker uses the new profile. Setting the profile already in force succeeds.
 

@@ -10,7 +10,7 @@ make exec cmd="php bin/console app:oauth:generate-keys"
 
 ## Details
 
-The command has no arguments or options. Key paths come from the container parameters `oauth_keys.private_key_path` and `oauth_keys.public_key_path`. Missing parent directories are created for both targets.
+The command has no arguments or options. Key paths come from the container parameters `auth.private_key_path` and `auth.public_key_path`, which read the `OAUTH_PRIVATE_KEY_PATH` and `OAUTH_PUBLIC_KEY_PATH` environment variables. Missing parent directories are created for both targets.
 
 The command refuses either existing target, including a symlink, and does not prompt or overwrite in interactive or non-interactive mode. It also refuses identical private and public paths. To replace a key pair, use the [staged offline rotation procedure](app-auth-rotate-secrets.md). Pass `--skip-keys` to `app:dev:setup` when reusing initialized keys.
 

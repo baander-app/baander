@@ -81,12 +81,15 @@ startup admission deadline. A `worker_supervisor_stopped` log entry is neither
 a readiness result nor a containment receipt.
 
 Under `transcode`, the media coordinator admits at most the profile's video and
-audio slots, 8 and 12 by default; see [Media slots](../configuration/deployment-profiles.md#media-slots).
+audio slots: by default 8 video slots, or 12 with a hardware encoder, and 12 audio
+slots; see [Media slots](../configuration/deployment-profiles.md#media-slots).
 Under `remux`, audio and video copy jobs share the configured copy slots. Completed artifacts can
 be delivered without a producer, but their reuse never authorizes re-encoding.
 Each job uses a fresh kernel in control and sends bounded native requests over
 the private Unix socket to execution. Hardware probing, FFmpeg, video CPU helpers
-and scheduled console children belong to execution; no devices are admitted.
+and scheduled console children belong to execution. Execution receives no device
+except the hardware encoder the deployment profile names: its device node, or the
+host's NVIDIA GPUs for an encoder that uses no device node; control receives none.
 Native requests carry deployment, boot, epoch, client generation and attempt
 identity. Uncertain completion retains ownership until containment or a confirmed
 release; caller cancellation alone does not free a native slot. The native daemon

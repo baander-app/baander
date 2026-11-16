@@ -11,17 +11,18 @@ For an installed instance, use the host shell and `dc` function established in
 dc exec app php bin/console app:user:create --help
 ```
 
-A plain `php bin/console …` example assumes a shell inside the application
-container, in its application directory. Some reference pages retain
-`make exec cmd="php bin/console …"` development examples. Those select the
-checkout's preview, not the installed instance. For installed-instance work, run
-the same console arguments with `dc exec app php bin/console …`. See
+Most reference pages show development examples in the form
+`make exec cmd="php bin/console …"`. Those run against the checkout's preview, not
+an installed instance. On an installed instance, run the same console arguments
+with `dc exec app php bin/console …`, and read
 [Which installation a command targets](../getting-started/understanding-baander.md#which-installation-a-command-targets)
-before changing targets. Paths used by a console command are container paths.
+before changing targets. A plain `php bin/console …` example assumes a shell inside
+the application container, in its application directory. Paths a console command
+takes are container paths.
 
 ## Worker deployment
 
-Application console commands run inside `app`, while the control/execution worker pair is provisioned and operated from the host through `bin/worker-deployment.php` (or `scripts/deploy-preset.php`). See [Worker Deployment](../workers/worker-deployment.md) for how the worker pair functions, the version 9 manifest and credentials format, and the host lifecycle commands, and [Background Work](../workers/background-work.md) for queue flow, observation and recovery.
+Application console commands run inside `app`. The control and execution worker pair is provisioned and operated from the host, through `bin/worker-deployment.php` or `scripts/deploy-preset.php`. [Worker Deployment](../workers/worker-deployment.md) explains how the pair works, the version 9 manifest and credentials format, and the host lifecycle commands; [Background Work](../workers/background-work.md) covers queue flow, observation and recovery.
 
 ## Auth & Users
 
@@ -170,7 +171,7 @@ Application console commands run inside `app`, while the control/execution worke
 | [app:qol:status](app-qol-status.md) | Show the stream governor status of every web server worker |
 | [app:qol:streams](app-qol-streams.md) | List the streams every web server worker has admitted, with their predicted cost |
 | [app:transcode:cache-sweep](app-transcode-cache-sweep.md) | Delete old transcode cache directories by age and size budget |
-| [app:transcode:job:cleanup](app-transcode-job-cleanup.md) | Remove transcode jobs that no session uses, with their output |
+| [app:transcode:job:cleanup](app-transcode-job-cleanup.md) | Expire stale transcode sessions and remove the transcode jobs no session uses, with their output |
 | [app:transcode:session:list](app-transcode-session-list.md) | List the active transcode sessions of every user, or of one user |
 | [app:transcode:session:show](app-transcode-session-show.md) | Show one transcode session |
 
@@ -225,14 +226,14 @@ Application console commands run inside `app`, while the control/execution worke
 | [app:monitor:analytics](app-monitor-analytics.md) | Show background job analytics for a time range: summary, timing or failures |
 | [app:monitor:job:cancel](app-monitor-job-cancel.md) | Cancel a running background job, or the work a finished job queued |
 | [app:monitor:job:retry](app-monitor-job-retry.md) | Dispatch a failed background job's message again under a new job ID |
-| [app:monitor:job:show](app-monitor-job-show.md) | Show one background job with its error, stored message and run time |
+| [app:monitor:job:show](app-monitor-job-show.md) | Show one background job with its status, timing and error class |
 | [app:monitor:jobs](app-monitor-jobs.md) | List background jobs with the job monitor's filters, sorting and pages |
 | [app:monitor:prune](app-monitor-prune.md) | Prune completed job monitors older than a given age |
 | [app:monitor:status](app-monitor-status.md) | Show background job counts by status and the jobs running now |
 | [app:monitor:transport](app-monitor-transport.md) | Show the async queue depth, the failed message count and the consumer's registration |
 | [app:rate-limiter:clear](app-rate-limiter-clear.md) | Clear the stored state of one rate limiter, or of all of them |
 | [app:rate-limiter:list](app-rate-limiter-list.md) | List every configured rate limiter with its effective configuration |
-| [debug:hw-transcode](debug-hw-transcode.md) | Show resolved hardware encoder profile and sample FFmpeg commands |
+| [debug:hw-transcode](debug-hw-transcode.md) | Show the hardware encoder profile the media worker last resolved, with sample FFmpeg commands |
 
 ### Failed messages
 

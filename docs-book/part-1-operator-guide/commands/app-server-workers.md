@@ -23,11 +23,10 @@ Run the command in the web container: it talks to the web server running there. 
 | HTTP workers | Total, idle and active workers, requests and dispatches handled, connections, coroutines, start time, and bytes received and sent |
 | User workers | Number of user processes added to the server |
 
-
-The web server has no background task or transcoding pool. This command does not
-report the independent worker deployment. Host deployment `status` reports
-committed observations with readiness `not_checked`; it is not an application
-readiness probe.
+The web server has no background task or transcoding pool, and this command does
+not report the independent worker deployment. For that deployment, the host's
+`bin/worker-deployment.php status` reports committed observations with readiness
+`not_checked`; it is not an application readiness probe.
 
 With `--json`, stdout holds the API response.
 

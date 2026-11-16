@@ -1,6 +1,6 @@
 # debug:hw-transcode
 
-Show the resolved hardware encoder profile and sample FFmpeg commands. Boots the hardware capabilities prober, prints the active `EncoderProfile`, the FFmpeg input/decoder flags it produces, per-source-codec decoder resolution, sample encode commands for each quality tier, and a reference table of all hardware accelerators. Use this to verify that GPU detection and hardware transcoding are configured correctly.
+Show the hardware encoder profile the media worker resolved, with sample FFmpeg commands. The command does not probe hardware itself. A media worker with video encoder slots probes the hardware when it starts and publishes what it found to `CONVERT_STORAGE_PATH/worker-encoder-capabilities.json`; the command reads that last observation and names the worker that made it and when. From it the command prints the active `EncoderProfile`, the FFmpeg input/decoder flags it produces, per-source-codec decoder resolution, sample encode commands for each quality tier, and a reference table of all hardware accelerators. Use this to verify that GPU detection and hardware transcoding are configured correctly.
 
 ## Quick start
 
@@ -23,10 +23,11 @@ The output is organized into sections:
 
 | Code | Meaning |
 |------|---------|
-| 0 | Prober booted and profile resolved successfully |
+| 0 | The worker's last observation was read and printed |
+| 1 | No worker observation is available, for example because no media worker with video encoder slots has started; the command prints `Worker encoder capabilities are unavailable` |
 
 ## Tips
 
 - This is a diagnostics command in the `debug:` namespace — it makes no changes and is safe to run any time.
-- Run it on-metal (or inside the container that has GPU access) to confirm the prober actually detects the hardware. A software profile where you expect hardware indicates a detection or configuration problem.
-- The command takes no arguments; everything it reports comes from the resolved configuration and the prober's environment.
+- The profile is the media worker's observation, so it reflects the GPU access of the worker container, not of the container the command runs in. The observation is not a live measurement: restart the worker after a hardware or configuration change. A software profile where you expect hardware indicates a detection or configuration problem.
+- The command takes no arguments. Everything it reports comes from the worker's last observation and the resolved configuration, except the AAC rows: those come from the FFmpeg binary of the container the command runs in.

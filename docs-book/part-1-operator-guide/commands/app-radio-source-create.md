@@ -33,7 +33,7 @@ The options are checked with the API request's constraints. A missing name, type
 
 `app:radio:sync --init` creates the default IPRD source when none exists, so a fresh install does not need this command.
 
-With `--json` the command prints only the new source as the API's `data` object, with `publicId`, `name` and `type`.
+With `--json` the command prints only the new source as the API's `data` object: `publicId`, `name`, `type`, `syncUrl`, `syncConfig`, `syncSchedule`, `isActive`, `createdAt` and `updatedAt`.
 
 ## Exit codes
 

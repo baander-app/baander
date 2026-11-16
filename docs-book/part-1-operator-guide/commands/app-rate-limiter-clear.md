@@ -9,6 +9,8 @@ installed instance, use the `dc` function from
 [Getting started](../getting-started/installation.md#command-context) and replace
 `make exec cmd="php bin/console …"` with `dc exec app php bin/console …`.
 
+Reset the budget of every client of one limiter. The command clears at once, without asking:
+
 ```bash
 make exec cmd="php bin/console app:rate-limiter:clear auth_login_ip"
 ```

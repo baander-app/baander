@@ -13,6 +13,12 @@ installed instance, use the `dc` function from
 make exec cmd="php bin/console app:oauth:client:list"
 ```
 
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--json` | Print the clients as the admin API's `data` payload, a JSON array, instead of a table |
+
 ## Details
 
 The command prints a table with one row per client:

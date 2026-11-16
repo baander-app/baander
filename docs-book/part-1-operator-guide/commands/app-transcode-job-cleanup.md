@@ -28,7 +28,7 @@ A client that closes without cancelling leaves its session behind, and the sessi
 
 A job whose worker has not yet stopped the cancelled encode stays for the next run, so a job released by expiry is usually removed one run later. The worker stops within seconds.
 
-The command runs the same use case as the API's cleanup endpoint; nothing schedules it, so run it from the console, the admin panel or your own scheduler. A job whose output directory is still retained stays for a later run. A job whose output or record cannot be deleted is logged with its id and also stays; the run removes every other job and then exits 1. After a job is removed, a later session for the same video and tier transcodes it again.
+The command runs the same use case as the API's cleanup endpoint. No scheduled job runs it on install: run it from the console or the admin panel, or schedule it as a `messenger` job with [app:scheduler:create](app-scheduler-create.md). A job whose output directory is still retained stays for a later run. A job whose output or record cannot be deleted is logged with its id and also stays; the run removes every other job and then exits 1. After a job is removed, a later session for the same video and tier transcodes it again.
 
 The command asks for no confirmation: it ends only sessions no client can still be playing, and removes only output that no session uses and that a new session can rebuild.
 

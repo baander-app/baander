@@ -4,6 +4,8 @@ Discard the stream governor's learning data in every worker of the running web s
 
 ## Quick start
 
+The reset discards what every worker has learned and cannot be undone. `--force` skips the confirmation prompt:
+
 ```bash
 make exec cmd="php bin/console app:qol:reset --force"
 ```
@@ -25,7 +27,7 @@ make exec cmd="php bin/console app:qol:reset --force --json"
 
 Run the command in the web container: it talks to the web server running there. On a terminal the command asks for confirmation first. Without a terminal it refuses to run unless `--force` is given, and exits with code 2.
 
-Each worker empties its learning model, returns to the Learning state and forgets its active streams. The reset is saved to `var/qol_state/governor_state.json` at once, so a server reload does not bring the old model back. The algorithm profile is not changed.
+Each worker empties its learning model, returns to the Learning state and forgets its active streams. The reset is saved to `CONVERT_STORAGE_PATH/qol-state/governor_state.json` at once, so a server reload does not bring the old model back. The algorithm profile is not changed.
 
 The command prints each worker's status after the reset, in the table `app:qol:status` prints. A worker that does not answer within two seconds is named on stderr, as is a worker where the reset failed, and the command exits with code 1. The admin API answers 503 in the same case.
 

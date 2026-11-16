@@ -212,7 +212,7 @@ test('manual pages describe themselves to search engines and link previews', asy
   expect(head.ogUrl).toBe(head.canonical);
   expect(head.ogTitle).toBe(await page.title());
   expect(head.twitter).toBe('summary_large_image');
-  expect(head.description).toMatch(/^Enable a previously disabled user account/);
+  expect(head.description).toMatch(/^Enable a user account that was disabled with app:user:disable/);
   expect(head.graph.map((node: { '@type': string }) => node['@type'])).toEqual(['TechArticle', 'BreadcrumbList']);
   const listed = head.graph[1].itemListElement.map((item: { name: string }) => item.name);
   expect(listed).toEqual([...head.crumbs, 'app:user:enable']);
