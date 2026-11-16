@@ -324,18 +324,20 @@ GitHub had published the PGroonga 4.1.0 database image.
   4.0.5, not the schema drops. The database image and the persistent instance run
   PGroonga 4.1.0. See [PGroonga cleanup race](#pgroonga-cleanup-race).
 - **Cleanup.** GitHub and Forgejo carry only `master`. Left locally on 2026-11-16:
-  - the merged branches `fix/scan-artist-credits`, `fix/matching-follow-ups`,
-    `fix/matching-leftovers` and `fix/pgroonga-cleanup-race`;
+  - the merged branches `fix/scan-artist-credits`, `fix/matching-follow-ups` and
+    `fix/matching-leftovers`;
   - the verification worktree `/home/martin/dev/baander-ml-verify` (detached at
-    `0405c6142`), and the PGroonga worktrees `/home/martin/dev/baander-pgrn-diag`
-    (detached at `8a3cd708b`, with an uncommitted autovacuum logging setting in
-    `compose.test.yaml`) and `/home/martin/dev/baander-pgrn-verify` (detached at
-    `dfbd5684d`);
-  - the images `baander-database:pgroonga-4.0.5` and `baander-database:pgroonga-4.1.0`;
-  - the persistent instance's pre-move dump and saved 4.0.5 database image (404 MB) in
-    `~/.local/state/baander/backups/2026-11-16-pgroonga-4.1.0/`;
+    `0405c6142`);
   - two worktrees whose heads are in `master`, `/home/martin/dev/baander-verify`
     (`ff68e09f2`) and `~/.codex/worktrees/ba59/baander` (`ba5750533`).
+
+  Removed on 2026-11-16 with the user's approval: the branch
+  `fix/pgroonga-cleanup-race`, the PGroonga worktrees `baander-pgrn-diag` and
+  `baander-pgrn-verify`, the images `baander-database:pgroonga-4.0.5` and
+  `:pgroonga-4.1.0`, and the persistent instance's pre-move dump and saved 4.0.5
+  image. The receipts of the six PGroonga full runs are in
+  `~/.local/state/baander/receipts/2026-11-16-pgroonga.tar.zst`.
+
   `/home/martin/dev/baander-baac-lossless` stays, detached at `a97ae0058`, until its
   `bench/work/` has moved. The receipts of the 2026-11-13 cleanup are in
   `~/.local/state/baander/receipts/2026-11-13/`.
@@ -1473,8 +1475,6 @@ Open:
   after new leftovers would pass it.
 - `pgroonga_list_broken_indexes()` was not tried against a broken index on 4.1.0;
   on 4.0.5 it raises "object isn't found" instead of listing the index.
-- The persistent instance's pre-move dump and saved 4.0.5 image can go once the user
-  no longer wants a way back; see Cleanup under [Resume here](#resume-here).
 - `AudioRenditionWorkerHandoffTest` failed in the 4.0.5 run above with
   `Audio transcoding failed: Cannot safely resolve filesystem path` on the `.part` path
   of a rendition (`AudioRenditionCache::validatePaths`), as another of its tests did on
