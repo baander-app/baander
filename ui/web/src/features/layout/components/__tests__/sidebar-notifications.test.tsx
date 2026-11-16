@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthenticatedClientProvider } from '@/shared/live/provider'
@@ -10,6 +10,7 @@ import { notificationApi, type NotificationItem } from '@/features/notification/
 import { notificationsKey } from '@/features/notification/hooks/use-notifications'
 import { NotificationReader } from '@/features/notification/components/NotificationReader'
 import { useNotificationStore } from '@/features/notification/stores/notification-store'
+import { useLiveOutageStore } from '@/shared/live/outage-store'
 import { useMediaModeStore, type MediaType } from '../../stores/media-mode-store'
 import { SidebarPinnedFooter } from '../SidebarPinnedFooter'
 
@@ -38,6 +39,18 @@ const notification: NotificationItem = {
   createdAt: '2026-11-01T10:00:00Z',
 }
 
+const OUTAGE_ENTRY = /Live updates unavailable/
+
+function serverAlert(publicId: string, title: string): NotificationItem {
+  return { ...notification, publicId, title }
+}
+
+function listOutageEntry() {
+  const outage = useLiveOutageStore.getState()
+  outage.begin(Date.now() - 3 * 60_000)
+  outage.listEntry()
+}
+
 function Reader({ collapsed = false }: { collapsed?: boolean }) {
   return <NotificationReader><SidebarPinnedFooter collapsed={collapsed} /></NotificationReader>
 }
@@ -51,12 +64,14 @@ function setup(collapsed = false) {
 beforeEach(() => {
   vi.resetAllMocks()
   useNotificationStore.getState().resetForPrincipal()
+  useLiveOutageStore.getState().end()
   useMediaModeStore.setState({ activeMedia: 'music' })
   vi.mocked(notificationApi.list).mockResolvedValue({ data: [notification], nextCursor: null })
   vi.mocked(notificationApi.unreadCount).mockResolvedValue(1)
 })
 afterEach(() => {
   cleanup()
+  useLiveOutageStore.getState().end()
   useAuthStore.setState({ isAuthenticated: false, principalSessionId: null })
   synchronizeOwnership(null)
 })
@@ -123,5 +138,142 @@ describe('sidebar notifications', () => {
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
     expect(screen.queryByRole('link', { name: 'Equalizer' }) !== null).toBe(media === 'music')
     expect(await screen.findByRole('button', { name: '1 unread notifications' })).toBeVisible()
+  })
+})
+
+describe('live outage entry in the notification bell', () => {
+  beforeEach(() => {
+    vi.mocked(notificationApi.list).mockResolvedValue({
+      data: [serverAlert('first-alert', 'First alert'), serverAlert('second-alert', 'Second alert')],
+      nextCursor: null,
+    })
+    vi.mocked(notificationApi.unreadCount).mockResolvedValue(2)
+    listOutageEntry()
+  })
+
+  it('keeps the entry listed and counted when the server list and count refresh', async () => {
+    const { client, user } = setup()
+    const trigger = await screen.findByRole('button', { name: '3 unread notifications' })
+
+    await act(async () => {
+      await client.invalidateQueries()
+    })
+
+    expect(notificationApi.list).toHaveBeenCalledTimes(2)
+    expect(notificationApi.unreadCount).toHaveBeenCalledTimes(2)
+    expect(trigger).toHaveAccessibleName('3 unread notifications')
+    await user.click(trigger)
+    const items = within(await screen.findByRole('dialog', { name: 'Notifications' }))
+      .getAllByRole('button')
+      .map((button) => button.textContent)
+    expect(items).toEqual([
+      'Mark all read',
+      expect.stringMatching(OUTAGE_ENTRY),
+      expect.stringContaining('First alert'),
+      expect.stringContaining('Second alert'),
+    ])
+  })
+
+  it('marks the entry read when selected, without a request, and keeps it listed in the open popout', async () => {
+    const { user } = setup()
+    const trigger = await screen.findByRole('button', { name: '3 unread notifications' })
+    await user.click(trigger)
+
+    await user.click(await screen.findByRole('button', { name: OUTAGE_ENTRY }))
+
+    expect(trigger).toHaveAccessibleName('2 unread notifications')
+    expect(screen.getByRole('dialog', { name: 'Notifications' })).toBeVisible()
+    expect(screen.getByRole('button', { name: OUTAGE_ENTRY })).toBeVisible()
+    expect(notificationApi.markRead).not.toHaveBeenCalled()
+    expect(notificationApi.markAllRead).not.toHaveBeenCalled()
+  })
+
+  it('offers mark all read for the entry alone and marks it read without a request', async () => {
+    vi.mocked(notificationApi.list).mockResolvedValue({ data: [{ ...notification, isRead: true }], nextCursor: null })
+    vi.mocked(notificationApi.unreadCount).mockResolvedValue(0)
+    const { user } = setup()
+    const trigger = await screen.findByRole('button', { name: '1 unread notifications' })
+    await user.click(trigger)
+    await screen.findByText('New security alert')
+
+    await user.click(screen.getByRole('button', { name: 'Mark all read' }))
+
+    expect(trigger).toHaveAccessibleName('0 unread notifications')
+    expect(screen.getByRole('button', { name: OUTAGE_ENTRY })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Mark all read' })).not.toBeInTheDocument()
+    expect(notificationApi.markAllRead).not.toHaveBeenCalled()
+  })
+
+  it('marks the entry read before asking the server, and keeps it read when the request fails', async () => {
+    vi.mocked(notificationApi.markAllRead).mockRejectedValue(new Error('temporary'))
+    const { user } = setup()
+    const trigger = await screen.findByRole('button', { name: '3 unread notifications' })
+    await user.click(trigger)
+
+    await user.click(await screen.findByRole('button', { name: 'Mark all read' }))
+
+    expect(await screen.findByText('Could not mark notifications as read. Try again.')).toBeVisible()
+    expect(notificationApi.markAllRead).toHaveBeenCalledTimes(1)
+    expect(trigger).toHaveAccessibleName('2 unread notifications')
+    expect(screen.getByRole('button', { name: OUTAGE_ENTRY })).toBeVisible()
+  })
+
+  it('lists the entry while the server list is still loading', async () => {
+    vi.mocked(notificationApi.list).mockImplementation(() => new Promise(() => {}))
+    const { user } = setup()
+
+    await user.click(await screen.findByRole('button', { name: '3 unread notifications' }))
+
+    expect(await screen.findByText('Loading notifications…')).toBeVisible()
+    expect(screen.getByRole('button', { name: OUTAGE_ENTRY })).toBeVisible()
+  })
+
+  it('lists the entry when the server list fails to load', async () => {
+    vi.mocked(notificationApi.list).mockRejectedValue(new Error('temporary'))
+    const { user } = setup()
+
+    await user.click(await screen.findByRole('button', { name: '3 unread notifications' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load notifications.')
+    expect(screen.getByRole('button', { name: OUTAGE_ENTRY })).toBeVisible()
+  })
+
+  it('shows the entry instead of the empty message when the server has no notifications', async () => {
+    vi.mocked(notificationApi.list).mockResolvedValue({ data: [], nextCursor: null })
+    vi.mocked(notificationApi.unreadCount).mockResolvedValue(0)
+    const { user } = setup()
+
+    await user.click(await screen.findByRole('button', { name: '1 unread notifications' }))
+
+    expect(await screen.findByRole('button', { name: OUTAGE_ENTRY })).toBeVisible()
+    await waitFor(() => expect(notificationApi.list).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.queryByText('Loading notifications…')).not.toBeInTheDocument())
+    expect(screen.queryByText('No notifications')).not.toBeInTheDocument()
+  })
+
+  it('drops the entry and its count when the outage ends, moving focus from the entry to the popout', async () => {
+    const { user } = setup()
+    const trigger = await screen.findByRole('button', { name: '3 unread notifications' })
+    await user.click(trigger)
+    const entry = await screen.findByRole('button', { name: OUTAGE_ENTRY })
+    act(() => entry.focus())
+
+    act(() => useLiveOutageStore.getState().end())
+
+    expect(entry).not.toBeInTheDocument()
+    expect(trigger).toHaveAccessibleName('2 unread notifications')
+    expect(screen.getByRole('dialog', { name: 'Notifications' })).toHaveFocus()
+  })
+
+  it('keeps the entry and its count when the notification mirror is reset', async () => {
+    const { user } = setup()
+    const trigger = await screen.findByRole('button', { name: '3 unread notifications' })
+
+    act(() => useNotificationStore.getState().resetForPrincipal())
+
+    expect(trigger).toHaveAccessibleName('1 unread notifications')
+    await user.click(trigger)
+    expect(await screen.findByRole('button', { name: OUTAGE_ENTRY })).toBeVisible()
+    expect(screen.queryByText('No notifications')).not.toBeInTheDocument()
   })
 })

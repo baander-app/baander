@@ -1,8 +1,12 @@
+import { useRef } from 'react'
 import { Popover } from 'radix-ui'
 import styled from 'styled-components'
 import { useNotificationReader } from '../hooks/use-notification-reader'
 import { useNotificationActions } from '../hooks/use-notification-actions'
+import { useUnreadOutageCount } from '../stores/unread-count'
 import { Button } from '@/shared/components/ui/button'
+import { useLiveOutageStore } from '@/shared/live/outage-store'
+import { LiveOutageItem } from './LiveOutageItem'
 import { NotificationItem } from './NotificationItem'
 import { textRole } from '@/shared/theme'
 
@@ -55,28 +59,40 @@ const EmptyState = styled.div`
 export function NotificationPopout() {
   const { notifications, unreadCount, isLoading, isError, hasNextPage, isFetchingNextPage, isFetchNextPageError, loadMore, refetch } = useNotificationReader()
   const { markAllRead } = useNotificationActions()
+  const outageEntry = useLiveOutageStore((s) => s.entry)
+  const markOutageEntryRead = useLiveOutageStore((s) => s.markEntryRead)
+  const outageUnread = useUnreadOutageCount()
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  const markEverythingRead = () => {
+    markOutageEntryRead()
+    if (unreadCount > 0) markAllRead.mutate()
+  }
 
   return (
     <Popover.Portal>
-      <PopoutContent side="top" align="start" sideOffset={8} collisionPadding={8} aria-label="Notifications">
+      <PopoutContent ref={contentRef} side="top" align="start" sideOffset={8} collisionPadding={8} aria-label="Notifications">
         <Header>
           <HeaderLabel>
             Notifications
           </HeaderLabel>
-          {unreadCount > 0 && (
-            <MarkAllButton onClick={() => markAllRead.mutate()} disabled={markAllRead.isPending}>
+          {unreadCount + outageUnread > 0 && (
+            <MarkAllButton onClick={markEverythingRead} disabled={markAllRead.isPending}>
               Mark all read
             </MarkAllButton>
           )}
         </Header>
 
         <ScrollArea>
+          {outageEntry && <LiveOutageItem entry={outageEntry} returnFocusTo={contentRef} />}
           {isLoading ? <EmptyState role="status">Loading notifications…</EmptyState> : isError && notifications.length === 0 ? (
             <EmptyState role="alert">Could not load notifications. <Button variant="ghost" onClick={() => { refetch().catch(() => {}) }}>Retry</Button></EmptyState>
           ) : notifications.length === 0 ? (
-            <EmptyState>
-              No notifications
-            </EmptyState>
+            !outageEntry && (
+              <EmptyState>
+                No notifications
+              </EmptyState>
+            )
           ) : (
             notifications.map((notification) => (
               <NotificationItem key={notification.publicId} notification={notification} />

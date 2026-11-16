@@ -4,6 +4,9 @@ import styled, { css } from 'styled-components'
 import { Bell } from 'lucide-react'
 import { useAdminNotifications } from '../../hooks/use-admin-notifications'
 import { useNotificationStore } from '@/features/notification/stores/notification-store'
+import { useUnreadOutageCount } from '@/features/notification/stores/unread-count'
+import { LiveOutageItem } from '@/features/notification/components/LiveOutageItem'
+import { useLiveOutageStore } from '@/shared/live/outage-store'
 import { interactiveTransition, focusVisibleRing, textRole } from '@/shared/theme'
 
 function relativeTime(dateStr: string): string {
@@ -72,6 +75,7 @@ const Popout = styled.div`
   border: 1px solid var(--color-border);
   background-color: var(--color-card);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  outline: none;
 `
 
 const PopoutHeader = styled.div`
@@ -158,10 +162,20 @@ const UnreadDot = styled.span`
 export function AdminNotificationBell() {
   const [open, setOpen] = useState(false)
   const popoutRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
   const { notifications, unreadCount, isLoading, markRead, markAllRead, isMarkingAll } = useAdminNotifications()
+  const outageEntry = useLiveOutageStore((s) => s.entry)
+  const markOutageEntryRead = useLiveOutageStore((s) => s.markEntryRead)
 
   const storeUnread = useNotificationStore((s) => s.unreadCount)
-  const displayCount = unreadCount > 0 ? unreadCount : storeUnread
+  const outageUnread = useUnreadOutageCount()
+  const displayCount = (unreadCount > 0 ? unreadCount : storeUnread) + outageUnread
+  const hasAdminNotifications = notifications.length > 0
+
+  const markEverythingRead = () => {
+    markOutageEntryRead()
+    if (hasAdminNotifications) markAllRead()
+  }
 
   useEffect(() => {
     if (!open) return
@@ -188,19 +202,20 @@ export function AdminNotificationBell() {
       </BellButton>
 
       {open && (
-        <Popout>
+        <Popout ref={contentRef} tabIndex={-1}>
           <PopoutHeader>
             <PopoutTitle>Admin Notifications</PopoutTitle>
-            {notifications.length > 0 && (
-              <MarkAllButton type="button" onClick={() => markAllRead()} disabled={isMarkingAll}>
+            {(hasAdminNotifications || outageUnread > 0) && (
+              <MarkAllButton type="button" onClick={markEverythingRead} disabled={isMarkingAll}>
                 Mark all read
               </MarkAllButton>
             )}
           </PopoutHeader>
 
           <PopoutBody>
+            {outageEntry && <LiveOutageItem entry={outageEntry} returnFocusTo={contentRef} />}
             {notifications.length === 0 ? (
-              isLoading ? <EmptyState role="status">Loading notifications…</EmptyState> : <EmptyState>No admin notifications</EmptyState>
+              isLoading ? <EmptyState role="status">Loading notifications…</EmptyState> : !outageEntry && <EmptyState>No admin notifications</EmptyState>
             ) : (
               notifications.map((n) => (
                 <NotificationItem

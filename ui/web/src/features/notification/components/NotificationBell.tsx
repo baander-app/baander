@@ -1,7 +1,7 @@
 import { Button } from '@/shared/components/ui/button'
 import styled from 'styled-components'
 import { Bell } from 'lucide-react'
-import { useNotificationStore } from '../stores/notification-store'
+import { useCombinedUnreadCount } from '../stores/unread-count'
 import { textRole } from '@/shared/theme'
 
 const BellButton = styled(Button).attrs({ variant: 'ghost', size: 'icon-xs' })`
@@ -44,7 +44,7 @@ const UnreadBadge = styled.span`
 `
 
 export function NotificationBell(props: React.ComponentProps<typeof Button>) {
-  const unreadCount = useNotificationStore((s) => s.unreadCount)
+  const unreadCount = useCombinedUnreadCount()
 
   return (
     <BellButton
