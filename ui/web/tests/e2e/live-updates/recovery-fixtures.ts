@@ -198,16 +198,18 @@ export function observeReads(page: Page, path: string) {
 /** Test id of the toast the application raises when live updates stay unavailable. */
 export const LIVE_OUTAGE_TOAST_TEST_ID = 'live-updates-outage'
 
+/** The application's outage store, imported inside the page from the preview's dev server. */
+const OUTAGE_STORE_MODULE = '/src/shared/live/outage-store.ts'
+
 /** Reads the page's live-update outage state from the application's own outage store. */
 export async function liveOutage(page: Page): Promise<{ active: boolean; toastRaised: boolean }> {
-  return page.evaluate(async () => {
-    const modulePath = '/src/shared/live/outage-store.ts'
+  return page.evaluate(async (modulePath) => {
     const { useLiveOutageStore } = await import(/* @vite-ignore */ modulePath) as {
       useLiveOutageStore: { getState: () => { since: number | null; toastRaised: boolean } }
     }
     const { since, toastRaised } = useLiveOutageStore.getState()
     return { active: since !== null, toastRaised }
-  })
+  }, OUTAGE_STORE_MODULE)
 }
 
 interface LiveOutageHistory {
@@ -221,8 +223,7 @@ interface LiveOutageHistory {
  * starts and ends before the read leaves the store looking untouched.
  */
 export async function recordOutageHistory(page: Page) {
-  await page.evaluate(async () => {
-    const modulePath = '/src/shared/live/outage-store.ts'
+  await page.evaluate(async (modulePath) => {
     const { useLiveOutageStore } = await import(/* @vite-ignore */ modulePath) as {
       useLiveOutageStore: {
         subscribe: (listener: (state: { since: number | null; toastRaised: boolean }) => void) => () => void
@@ -235,7 +236,7 @@ export async function recordOutageHistory(page: Page) {
       if (state.since !== null) history.began = true
       if (state.toastRaised) history.toastRaised = true
     })
-  })
+  }, OUTAGE_STORE_MODULE)
 }
 
 export async function liveOutageHistory(page: Page): Promise<LiveOutageHistory> {

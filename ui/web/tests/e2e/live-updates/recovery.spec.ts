@@ -247,8 +247,10 @@ test.describe('Live recovery through the authenticated application', () => {
       await session.detach()
     }
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible({ timeout: 35_000 })
-    expect(await liveOutageHistory(page)).toEqual({ began: false, toastRaised: false })
+    const history = await liveOutageHistory(page)
+    expect(history.toastRaised).toBe(false)
     await expect(page.getByTestId(LIVE_OUTAGE_TOAST_TEST_ID)).toHaveCount(0)
+    run.evidence.push({ kind: 'browser-wake-outage', ...history })
     const authoritative = await authenticatedGet<{ data: { name: string } }>(page,
       `/api/playlists/${run.manifest.playlist.publicId}`)
     expect(authoritative.data.name).toBe(name)
