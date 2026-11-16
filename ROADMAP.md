@@ -264,14 +264,16 @@ that limitation is recorded for follow-up, with no runtime change in the 2026-10
 `052e8684d`) and the roadmap cleanup with its plan retirement. Landed on 2026-11-14:
 scan artist credits and MusicBrainz matching. The persistent instance ran `6912eaaf6`
 before that push and updates itself from `master`. The website was last published on
-2026-11-16: a local build of `65a1d6d95`, deployed to production as
-`baander-ke69f0cpd` and aliased to `https://baander.app`.
+2026-11-16: a local build of `7fe638cec`, deployed to production as
+`baander-mbw74s9r5` and aliased to `https://baander.app`.
 Pushed later on 2026-11-15, on top of `23f899976`: the matching follow-ups
 (`a7d1c7466` to `6991a9f9a` and their roadmap record), with the fix for the CI cleanup
 limit. Pushed on 2026-11-16, on top of `8d119f5df`: the matching leftovers
 (`a822bf362` to `98a89db8a`). Pushed later on 2026-11-16, on top of `44e315ee3`: the
 PGroonga cleanup race fix, `7c2deaa24` first and the rest up to this record once
-GitHub had published the PGroonga 4.1.0 database image.
+GitHub had published the PGroonga 4.1.0 database image. Pushed later on 2026-11-16,
+on top of `e99e748a6`: the prose-fix presentation register and the homepage hero
+(`ba5cbce6b` to `7fe638cec` and their roadmap record).
 
 - **Master CI.** No `CI` run on `master` has been green since 2026-11-05. Run
   43826408058 on `44e315ee3` passed the whole quality gate on 2026-11-16, step 41 in
@@ -287,6 +289,11 @@ GitHub had published the PGroonga 4.1.0 database image.
   `feat/quiet-live-update-status` (`5e7db8e96` to this record): the web shell no longer shows the
   top-right live-update label, and lasting outages raise a toast and a bell entry;
   see [Quiet live-update status](#quiet-live-update-status).
+- **Presentation register and homepage hero.** On `master` since 2026-11-16,
+  fast-forwarded from `feat/prose-fix-presentation-register` (`ba5cbce6b` to this
+  record) and published to `https://baander.app`: prose-fix gains a Jobs register for
+  website feature introductions, and the homepage hero uses it; see
+  [Presentation register and homepage hero](#presentation-register-and-homepage-hero).
 - **Web fixes.** With the same push, a click on the active lyrics effect turns effects
   off, and the songs view's genre, artist and album panes scroll; see
   [Lyrics effect toggle and song browser panes](#lyrics-effect-toggle-and-song-browser-panes).
@@ -487,6 +494,55 @@ Open:
   not investigated.
 - The admin bell keeps its own relative-time helper, which has no date fallback
   after 30 days, beside the shared one; consolidating it changes old admin rows.
+
+## Presentation register and homepage hero
+
+Delivered on `master` on 2026-11-16, fast-forwarded from
+`feat/prose-fix-presentation-register`: all four units of
+`docs/plans/2026-11-16-2100-feat-prose-fix-presentation-register-plan.md`
+(`37ec73ce1`, `6cf261d39`, `c8843d801`, `b7f7f3f7d`) and the code review's fixes
+(`7fe638cec`). prose-fix has a fourth register, Jobs, built from the 2001 iPod, 2007
+iPhone and 2008 MacBook Air introductions. It presents a feature in the opening of a
+website template page and applies elsewhere only on request. It can rewrite or draft;
+every claim it adds goes into a claim ledger with its source, planned features read as
+planned, no competing product is named, and limits move out of the lead but stay on
+the page. Its first use rewrote the homepage hero description to "Point Bånder at your
+music and movies. Browse and play them in your browser, from a server you run.", and
+the homepage search description and the social card carry the new text.
+
+Verification on 2026-11-16:
+
+- Sheet: all 16 quotes match the English caption tracks of the three recordings
+  (YouTube `utlT57WK8a8`, `7l-Pa0uCod0`, `i9XU6wk_mWY`), ignoring case and
+  punctuation.
+- Site: `make website-build` built 243 manual pages. `corepack yarn test:browser` in
+  `ui/site/` passed 93 tests, including the 18 stability tests that compare hero line
+  heights in the fallback faces and Geist at 1440 px and 390 px. `node --test
+  scripts/*.test.mjs` passed 11.
+- Tooling: `phpunit-tooling.xml.dist` on `scripts/tests/php/Website` passed 105 tests
+  and 1,312 assertions, including the new homepage title and description length
+  checks. `composer analyse:tooling` reported no errors and
+  `composer check:tooling-format` found nothing to fix. The full tooling suite was not
+  run.
+- Code review: `ce-code-review` at full depth (forced by the regenerated social-card
+  image) with correctness, project-standards, testing and agent-native reviewers;
+  verdict "Ready with fixes". Its two confirmed findings, the playback example's
+  missing signed-in qualifier and this record, and the agent-native reviewer's three
+  warnings (where the ledger goes, framing sentences, where to look for limits) are
+  fixed in `7fe638cec` and here.
+- Published: a local build of `7fe638cec`, previewed as `baander-cpycalj30` (the
+  homepage, a nested manual page, the search index, the sitemap and the social card
+  returned 200, an unknown URL 404) and deployed to production as `baander-mbw74s9r5`,
+  aliased to `https://baander.app`, which serves the new hero and search description
+  with valid HTTPS.
+
+Open:
+
+- The hero's copies in the homepage template, the search description and the social
+  card are paraphrases kept in step by hand; no test compares their content.
+- The user chose the hero from three candidates. No other page uses the register yet;
+  the Bånder Audio Core lead, the `README.md` opening and the docs-book introductions
+  can follow on request.
 
 ## Cohesive operator manual
 
