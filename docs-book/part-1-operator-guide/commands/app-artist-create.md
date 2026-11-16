@@ -30,7 +30,7 @@ make exec cmd="php bin/console app:artist:create 'The Beatles' --country=GB --ty
 
 The command does not check for an existing artist with the same name; creating the same name twice creates two artists.
 
-The command prints the new artist's public ID, which [app:artist:update](app-artist-update.md) takes. With `--json` it prints only the new artist as the API's `data` object, with `uuid`, `publicId`, `name`, `country`, `type`, `disambiguation`, `sortName` and `createdAt`. The API answers `201` with the same object.
+The command prints the new artist's public ID, which [app:artist:update](app-artist-update.md) takes. With `--json` it prints only the new artist as the API's `data` object, with `publicId`, `name`, `country`, `type`, `disambiguation`, `sortName`, `mbid`, `lockedFields` and `createdAt`. The API answers `201` with the same object.
 
 ## Exit codes
 

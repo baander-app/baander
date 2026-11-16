@@ -1,6 +1,6 @@
 # app:generate-docs
 
-Generate the documentation site from the source code and `docs-book/`. It scans bounded contexts, converts markdown pages, renders per-context HTML, and writes a CSS file and index page to the output directory.
+Generate the documentation site from the source code and `docs-book/`. The command scans the bounded contexts, converts the markdown pages, renders HTML for each context, and writes a CSS file and an index page to the output directory.
 
 ## Quick start
 
@@ -25,7 +25,7 @@ make exec cmd="php bin/console app:generate-docs --output-dir public/docs"
 
 ## Details
 
-The command first cleans the output directory (recursively deleting its contents) and recreates it with `css/` and `contexts/` subdirectories. It then:
+The command first deletes the output directory with its contents and recreates it with `css/` and `contexts/` subdirectories. It then:
 
 1. Scans the source directory for bounded contexts, routes, and domain models.
 2. Converts markdown pages from the docs-book directory (skipped with a warning if the directory is missing).
@@ -44,5 +44,5 @@ If the source directory does not exist, the command fails immediately. If the ph
 ## Tips
 
 - Run phpDocumentor first (`--phpdoc-dir` defaults to `.phpdoc/build`) if you want source-level cross-links.
-- The output directory is wiped on every run — don't store anything else there.
+- Every run deletes the output directory, so keep nothing else there.
 - Defaults assume the command runs from the project root.

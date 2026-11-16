@@ -28,7 +28,7 @@ The server creates the API key itself when it first registers a URL. The command
 
 Registering a URL that is already registered keeps the server's public ID and its key, and updates the version and the last heartbeat. The name is not changed.
 
-With `--json` the command prints only the server as the API's `data` object: `uuid`, `publicId`, `serverUrl`, `name`, `version`, `status`, `lastHeartbeatAt` and `createdAt`.
+With `--json` the command prints only the server as the API's `data` object: `publicId`, `serverUrl`, `name`, `version`, `status`, `lastHeartbeatAt` and `createdAt`.
 
 The command acts with full authority and needs no login.
 
@@ -38,4 +38,4 @@ The command acts with full authority and needs no login.
 |------|---------|
 | 0 | Server registered, or already registered and updated |
 | 1 | Another error occurred; the message says why |
-| 2 | The URL is not a valid `http` or `https` URL |
+| 2 | The URL is not a valid `http` or `https` URL, or the name or version is blank |

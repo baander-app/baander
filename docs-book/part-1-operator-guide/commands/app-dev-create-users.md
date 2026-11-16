@@ -1,6 +1,6 @@
 # app:dev:create-users
 
-Create the standard development users. This is a dev-only command that seeds two fixed test accounts and is safe to run repeatedly — existing users are skipped, not treated as errors.
+Create the standard development users. This dev-only command seeds two fixed test accounts and is safe to run repeatedly: it skips an existing user instead of treating it as an error.
 
 ## Quick start
 
@@ -19,7 +19,7 @@ The command takes no arguments or options. It dispatches `CreateUserCommand` mes
 
 When a user already exists, the command reports `User exists` and continues. Any other `RuntimeException` while creating a user aborts the run with a failure. On success it prints a summary table of the accounts it manages.
 
-This command is normally invoked as an isolated subprocess by `app:dev:setup` so the Messenger bus and compiled container boot fresh.
+`app:dev:setup` normally runs this command as an isolated subprocess, so the Messenger bus and the compiled container boot fresh.
 
 ## Exit codes
 
@@ -31,4 +31,4 @@ This command is normally invoked as an isolated subprocess by `app:dev:setup` so
 ## Tips
 
 - Never run this in production. The passwords (`admin`, `user`) are public and known.
-- Re-running is idempotent — it will not duplicate users or error on existing ones.
+- Running it again creates no duplicate users and does not fail on existing ones.

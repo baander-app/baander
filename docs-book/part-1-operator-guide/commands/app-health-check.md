@@ -1,6 +1,6 @@
 # app:health:check
 
-Check the health of all system components (database, Redis, the background worker, etc.) and report their status, latency, and details.
+Check the health of the system's components, such as the database, Redis and the background worker, and report the status, latency and details of each.
 
 ## Quick start
 
@@ -29,11 +29,10 @@ The `worker_profile` row compares this process's deployment profile with the one
 the active worker boot was started with, including its capability and size. It
 reads `FAIL` when they differ, for example when web was configured for 8 video
 slots and the workers for 4, or web for `transcode` and the workers for `remux`,
-and lists
-each disagreeing boot with its profile fingerprint. It reads `OK` when they match,
-and `N/A` when no worker boot holds the deployment lease or the boot did not record
-its profile. [app:deployment:profile:show](app-deployment-profile-show.md) prints a
-profile's fingerprint.
+and lists each disagreeing boot with its profile fingerprint. It reads `OK` when
+they match, and `N/A` when no worker boot holds the deployment lease or the boot did
+not record its profile. [app:deployment:profile:show](app-deployment-profile-show.md)
+prints a profile's fingerprint.
 
 The exit status describes this container, so it leaves out the background worker, its deployment profile and memory; the web server alerts administrators about those instead. If no other component is unhealthy, the command prints `This container is healthy.` and exits with code 0. If the worker, its profile or memory is unhealthy, it also prints a warning that names them as unhealthy but not counted toward this container. If any other component is unhealthy, it exits with code 1.
 
@@ -50,7 +49,7 @@ This is the same check used by the Docker healthcheck, which the web image defin
 
 ## Tips
 
-- Use this as a quick diagnostic when something seems off — it checks connectivity to database and Redis in seconds.
+- Use this as a first diagnostic when something seems wrong: it checks the database and Redis connections in seconds.
 - The Docker container healthcheck runs this command every 30 seconds.
 - Use [app:config:validate](app-config-validate.md) for additional configuration
   checks; neither command establishes complete background delivery.

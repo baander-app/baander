@@ -1,6 +1,6 @@
 # app:cli:manifest
 
-Output a JSON manifest of all CLI commands and tooling metadata. The manifest enumerates every registered console command (with arguments, options, aliases, and hidden flag) and reports configuration parsed from `phpstan.dist.neon`, `deptrac.yaml`, `composer.json`, and the PHPUnit/Paratest setup.
+Print a JSON manifest of the console commands and the project's tooling metadata. The manifest lists every registered console command with its arguments, options, aliases and hidden flag, reports configuration parsed from `phpstan.dist.neon`, `deptrac.yaml` and `composer.json`, and names the PHPUnit and Paratest setup.
 
 ## Quick start
 
@@ -24,16 +24,16 @@ make exec cmd="php bin/console app:cli:manifest --tooling-only"
 
 The command has no arguments. By default it emits a JSON object with the following top-level keys:
 
-- `console` — array of every registered console command with its name, description, aliases, hidden flag, arguments, and options. Omitted when `--tooling-only` is passed.
+- `console` — an object whose `commands` array lists every registered console command with its name, description, aliases, hidden flag, arguments, and options. Omitted when `--tooling-only` is passed.
 - `phpstan` — level, paths, memory limit, and config file parsed from `phpstan.dist.neon`.
 - `deptrac` — layer names and config file parsed from `deptrac.yaml`.
 - `composer` — scripts and autoload sections from `composer.json`.
-- `phpunit` — config file and coverage flag.
-- `paratest` — process count and config file.
+- `phpunit` — config file and coverage flag, fixed values that the command does not read from a file.
+- `paratest` — process count and config file, also fixed values.
 
-Commands that fail during definition instantiation are still recorded with their name, description, aliases, and hidden flag, but with empty arguments and options.
+A command whose definition cannot be built is still recorded with its name, description, aliases, and hidden flag, but with empty arguments and options.
 
 ## Tips
 
 - Pipe to `jq` to inspect a single section: `make exec cmd="php bin/console app:cli:manifest" | jq .phpstan`.
-- The manifest is intended for tooling and editors that need to reason about the project's CLI surface and static-analysis config.
+- The manifest is for tools and editors that read the project's console commands and static-analysis configuration.

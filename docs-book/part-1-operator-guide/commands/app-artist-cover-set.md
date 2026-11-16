@@ -34,7 +34,7 @@ make exec cmd="php bin/console app:artist:cover:set V1StGXR8_Z5jdHi6B-myT /tmp/a
 
 The command reads the file's content to decide its type; the file name and extension do not matter. A file that is missing, unreadable, larger than 10 MB, or not a JPEG, PNG or WebP image is rejected, and nothing changes.
 
-The file is copied into image storage; the original stays where it is. Each cover gets its own storage path, so a new cover never overwrites the one it replaces. The artist and its new image are saved together. Only after that save does the command delete the old cover's record, its file and its derived WebP files. If the save fails, the new file is removed and the old cover stays.
+The file is copied into image storage; the original stays where it is. Each cover gets its own storage path, so a new cover never overwrites the one it replaces. The artist and its new image are saved together, and only after that save does the command delete the old cover's record, its file and its derived WebP files. If the save fails before it commits, the new file is removed and the old cover stays.
 
 With `--json` the command prints the new image as the API's `data` object, with `publicId`, `url`, `size` in bytes, `width` and `height`.
 

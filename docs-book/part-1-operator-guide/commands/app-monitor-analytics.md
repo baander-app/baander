@@ -36,7 +36,7 @@ make exec cmd="php bin/console app:monitor:analytics --section=failures --from=2
 The range covers jobs created from `--from` up to, but not including, `--to`. A range longer than 90 days ends 90 days after `--from`. The command prints the range it used.
 
 - **summary** prints the success rate (finished jobs out of finished, failed and cancelled ones), completed jobs per hour, job counts by status and job counts by type.
-- **timing** prints the average, median and 95th percentile run time of finished jobs per type, and the average time between a job's creation and its start.
+- **timing** prints the average, median and 95th percentile run time of finished jobs per type, and per type the average time between a job's creation and its start.
 - **failures** prints how many failed jobs were retried, the ten most failing job types, the ten most frequent error classes and the most recent failures.
 
 With `--json` the output is the API's `data` object for that section.

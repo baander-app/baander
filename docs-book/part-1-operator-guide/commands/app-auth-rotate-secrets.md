@@ -26,15 +26,16 @@ php bin/console app:auth:rotate-secrets validate --directory=/srv/baander/secret
 The supported RSA sizes are 2048 (default) and 4096 bits. The command creates a
 private directory containing `private.key`, `public.key`, `oauth.env`, and a
 versioned checksum manifest. Validation checks file ownership, permissions, file
-types, checksums, the RSA pair, and the exact configuration entries. It prints the configuration path, never secret values.
-The bundle is never overwritten by this command; a failed preparation requires a
-new directory. Keep any incomplete bundle private while investigating.
+types, checksums, the RSA pair, and the exact configuration entries. The command
+prints the configuration path, never secret values. It never overwrites a bundle,
+so a failed preparation requires a new directory. Keep any incomplete bundle
+private while investigating.
 
 `oauth.env` contains `OAUTH_PRIVATE_KEY_PATH` and `OAUTH_PUBLIC_KEY_PATH`.
-Provision these values through the deployment's secret
-provider. The paths must resolve to the same validated files in every application
-instance; container deployments must mount them at those paths. Preserve the old
-configuration and files securely before changing anything.
+Provision these values through the deployment's secret provider. The paths must
+resolve to the same validated files in every application instance; container
+deployments must mount them at those paths. Preserve the old configuration and
+files securely before changing anything.
 
 ## Offline cutover
 
@@ -78,5 +79,6 @@ configuration or resume service after an unconfirmed invalidation. Retain the ol
 bundle according to your secret-retention policy after verifying recovery.
 
 Exit status is `0` for a confirmed successful action, `1` for an operational
-failure, and `2` for invalid action/options. `--offline` is required only for
-`invalidate`; `--key-size` applies only to `prepare`.
+failure, and `2` for an invalid action or options. Every action requires
+`--directory`. `invalidate` requires `--offline` and the other actions reject it;
+only `prepare` accepts `--key-size`.

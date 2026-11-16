@@ -5,7 +5,7 @@ Remove every one of an artist's credits on a song, whatever their roles. The com
 ## Quick start
 
 ```bash
-make exec cmd="php bin/console app:artist:song:remove V1StGXR8_Z5jdHi6B-myT 0192a3b4-c5d6-7890-abcd-ef1234567890"
+make exec cmd="php bin/console app:artist:song:remove V1StGXR8_Z5jdHi6B-myT aB3dE5fG7hJ9kL1mN3pQr"
 ```
 
 ## Arguments

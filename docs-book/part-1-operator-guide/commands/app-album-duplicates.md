@@ -12,7 +12,7 @@ make exec cmd="php bin/console app:album:duplicates 0199bf3c-8a00-7000-8000-0000
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `library` | Yes | The UUID of the library to search, as `app:library:scan` prints it |
+| `library` | Yes | The UUID of the library to search |
 
 ## Options
 
@@ -34,7 +34,7 @@ The command prints one row per album, with a separator line between groups:
 | Label | The record label, or `-` |
 | Artists | The album's artists, or `-` |
 
-The shell reads with full authority, so the command searches any library. A library without duplicates, or a UUID that names no library, prints `No duplicate albums found in the library.`
+The command reads with full authority, so it searches any library. A library without duplicates, or a UUID that names no library, prints `No duplicate albums found in the library.`
 
 ## Exit codes
 

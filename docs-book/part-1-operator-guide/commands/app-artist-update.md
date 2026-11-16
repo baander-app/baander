@@ -39,13 +39,13 @@ make exec cmd="php bin/console app:artist:update V1StGXR8_Z5jdHi6B-myT --lock=na
 
 An option that is left out keeps its current value; neither the command nor the API can clear a field.
 
-The lockable fields are `name`, `country`, `gender`, `type`, `lifeSpanBegin`, `lifeSpanEnd`, `disambiguation`, `sortName` and `biography`. Neither the command nor the API edits the life span, but locking it stops metadata enrichment from changing it. A locked field keeps its value: enrichment skips it, and an edit that changes it is rejected with `Field "name" is locked and cannot be updated.` (the API answers `422` with the same message). An unknown field name in `--lock` or `--unlock` is rejected the same way.
+The lockable fields are `name`, `country`, `gender`, `type`, `lifeSpanBegin`, `lifeSpanEnd`, `disambiguation`, `sortName` and `biography`. Neither the command nor the API edits the life span, but locking it stops metadata enrichment from changing it. A locked field keeps its value: enrichment skips it, and an edit that gives it a value is rejected with `Field "name" is locked and cannot be updated.` (the API answers `422` with the same message). An unknown field name in `--lock` or `--unlock` is rejected the same way.
 
 Unlocks apply before the edit and locks after it, so one run can unlock a field and change it, or change a field and lock it. A field that was already locked rejects the change. When any change is rejected, nothing is saved.
 
 The API takes the complete list of locked fields in `lockedFields`, replacing the current list. The command changes single fields instead and leaves the others as they are.
 
-With `--json` the command prints only the updated artist as the API's `data` object, with `uuid`, `publicId`, `name`, `country`, `type`, `disambiguation`, `sortName` and `createdAt`.
+With `--json` the command prints only the updated artist as the API's `data` object, with `publicId`, `name`, `country`, `type`, `disambiguation`, `sortName`, `mbid`, `lockedFields` and `createdAt`.
 
 ## Exit codes
 

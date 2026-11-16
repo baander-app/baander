@@ -52,6 +52,5 @@ The web [Orval](https://orval.dev/) configuration reads the tracked `openapi.jso
 
 ## Tips
 
-- Keep the tracked `openapi.json` and generated web client in sync with API changes.
-- Run this after adding or modifying API endpoints to keep your spec in sync.
-- The YAML format is more readable for human review; JSON is better for tooling.
+- Run this after adding or changing an API endpoint, and keep the tracked `openapi.json` and the generated web client in step with the change.
+- YAML reads better in human review; JSON suits tooling.

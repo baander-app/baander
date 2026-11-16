@@ -48,13 +48,13 @@ make exec cmd="php bin/console app:album:update V1StGXR8_Z5jdHi6B-myT --lock=lab
 
 An option that is left out keeps its current value; neither the command nor the API can clear a field.
 
-The lockable fields are `title`, `type`, `year`, `label`, `catalogNumber`, `barcode`, `country`, `language`, `disambiguation` and `annotation`. A locked field keeps its value: metadata enrichment and album merges skip it, and an edit that changes it is rejected with `Field "label" is locked and cannot be updated.` (the API answers `422` with the same message). An unknown field name in `--lock` or `--unlock` is rejected the same way.
+The lockable fields are `title`, `type`, `year`, `label`, `catalogNumber`, `barcode`, `country`, `language`, `disambiguation` and `annotation`. A locked field keeps its value: metadata enrichment and album merges skip it, and an edit that gives it a value is rejected with `Field "label" is locked and cannot be updated.` (the API answers `422` with the same message). An unknown field name in `--lock` or `--unlock` is rejected the same way.
 
 Unlocks apply before the edit and locks after it, so one run can unlock a field and change it, or change a field and lock it. A field that was already locked rejects the change. When any change is rejected, nothing is saved.
 
 The API takes the complete list of locked fields in `lockedFields`, replacing the current list. The command changes single fields instead and leaves the others as they are.
 
-With `--json` the command prints only the updated album as the API's `data` object, with `uuid`, `publicId`, `title`, `type`, `year`, `label`, `barcode`, `country` and `createdAt`.
+With `--json` the command prints only the updated album as the API's `data` object, with `publicId`, `title`, `type`, `year`, `label`, `barcode`, `country`, `language`, `mbid`, `releaseMbid`, `lockedFields` and `createdAt`.
 
 ## Exit codes
 

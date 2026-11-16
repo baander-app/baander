@@ -1,6 +1,6 @@
 # app:dev:setup
 
-Bootstrap the development environment: run migrations, generate OAuth keys, seed OAuth clients, and create dev users. This is a dev-only command that orchestrates the other setup commands as isolated subprocesses.
+Bootstrap the development environment: run migrations, generate OAuth keys, seed OAuth clients, and create dev users. This dev-only command runs the other setup commands as isolated subprocesses.
 
 The development lifecycle runs this only when initializing an empty instance.
 `make exec` below targets the current worktree's preview. Do not rerun setup with
@@ -36,21 +36,20 @@ The command runs these steps in order, each as a separate `php bin/console` subp
 4. `app:auth:setup-clients --origin=<instance-origin> --no-interaction`
 5. `app:dev:create-users --no-interaction`
 
-Unless `--skip-keys` is supplied, existing OAuth keys are checked as a pair before
-migrations. A valid matching
-pair is retained; partial or mismatched keys cause failure rather than replacement.
-The origin is passed to OAuth client setup for new clients. Existing client identity
-is retained.
+Unless `--skip-keys` is given, the command checks existing OAuth keys as a pair
+before the migrations. It keeps a valid matching pair; a partial or mismatched pair
+fails setup instead of being replaced. The origin is passed to OAuth client setup
+and applies only to a new client; an existing client keeps its identity.
 
-Subprocesses boot a fresh kernel, so they survive the cache clear performed by
-`--fresh` (which deletes compiled container classes the parent process has already
-loaded). A failed subprocess prints its error output, stops setup before later
+Each subprocess boots a fresh kernel, so it is unaffected by the cache clear of
+`--fresh`, which deletes compiled container classes the parent process has already
+loaded. A failed subprocess prints its error output, stops setup before later
 steps, and returns a failure exit code.
 
 On success the command prints the dev account credentials (`admin@baander.test` / `admin`, `user@baander.test` / `user`).
 
 ## Tips
 
-- Use `--fresh` only when you want a completely clean database — it drops every table.
-- Pass `--skip-keys` if you already have OAuth keys and don't want them regenerated.
+- Use `--fresh` only when you want a completely clean database: it drops every table.
+- Pass `--skip-keys` to skip the OAuth key check and key generation. Without it, setup keeps a matching key pair and generates keys only when none exist.
 - Never run this in production.

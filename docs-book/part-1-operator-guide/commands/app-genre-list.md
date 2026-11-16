@@ -23,7 +23,7 @@ make exec cmd="php bin/console app:genre:list --tree"
 
 ## Details
 
-The shell reads with full authority, so the command lists every genre, including genres that no library album, song or movie uses yet. A member's view of the API shows only genres with media in libraries they can open.
+The command reads with full authority, so it lists every genre, including genres that no library album, song or movie uses yet. A member's view of the API shows only genres with media in libraries they can open.
 
 The default table has one row per genre, sorted by name:
 

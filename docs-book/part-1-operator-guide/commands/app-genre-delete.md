@@ -39,7 +39,7 @@ On a terminal the command asks before it deletes anything. Without a terminal an
 
 Deletion cannot be undone. The genre's child genres become root genres, and its links to albums, songs and movies are removed. The albums, songs and movies themselves stay.
 
-With `--json` the command prints nothing on success, because the API answers `204 No Content`; read the outcome from the exit code. Errors still go to stderr. `--json` does not stand in for `--force`.
+With `--json`, errors still go to stderr. `--json` does not stand in for `--force`.
 
 ## Exit codes
 

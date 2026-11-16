@@ -42,9 +42,9 @@ currently handles only `music` and `movie`. Registering another type does not ma
 it ingestible; its scan fails as unsupported. See
 [Library management](../media/library-management.md) for the supported import path.
 
-The library path must be accessible from inside the app container. If you're using Docker, make sure the directory is mounted as a volume. Check it first with [app:library:validate-path](app-library-validate-path.md).
+The library path must be accessible from inside the app container; with Docker, mount the directory as a volume. Check the path first with [app:library:validate-path](app-library-validate-path.md).
 
-The slug is used in URLs and API endpoints. If you don't provide one, it's generated from the name (lowercased, with runs of other characters replaced by hyphens). If another library already has the slug, the command creates nothing and fails; provide `--slug` in that case.
+The slug appears in URLs and API endpoints. Without `--slug`, the command generates one from the name: lowercased, with each run of other characters replaced by a hyphen. If another library already has the slug, the command creates nothing and fails; give `--slug` in that case.
 
 A library's root cannot lie inside another library's root, contain one, or be the same directory, because a file under both would belong to two libraries. The command creates nothing and fails with a message naming the other library; the API answers `409` with `reason` `root_overlaps` and the other library's slug in `library`. Roots are compared by their real paths, so a symlink to another library's directory is refused too, and as written when the directory does not exist yet. Only whole directory names count: `/data/music2` sits beside `/data/music`, not inside it. To split one collection into several libraries, create them on sibling directories, such as `/data/music/rock` and `/data/music/jazz` without a library on `/data/music`.
 
@@ -61,4 +61,4 @@ A library created in the admin panel grants its creating admin access, so that a
 ## Tips
 
 - After creating a library, run [app:library:scan](app-library-scan.md) to index its contents.
-- You can create multiple libraries of the same type (e.g., separate music collections).
+- You can create several libraries of the same type, such as separate music collections.

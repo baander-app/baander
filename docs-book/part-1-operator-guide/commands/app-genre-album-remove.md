@@ -31,7 +31,7 @@ make exec cmd="php bin/console app:genre:album:remove rock aB3dE5fG7hJ9kL1mN3pQr
 
 Only the link between the genre and the album is removed. Removing a link that does not exist succeeds without change, as in the API. An album public ID that names no album fails with `Album not found.`, which the API answers with `404`.
 
-With `--json` the command prints nothing on success, because the API answers `204 No Content`; read the outcome from the exit code. Errors still go to stderr.
+With `--json`, errors still go to stderr.
 
 ## Exit codes
 

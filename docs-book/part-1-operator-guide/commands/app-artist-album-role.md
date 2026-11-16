@@ -5,13 +5,13 @@ Change the role of an artist's credit on an album. The command does what `PATCH 
 ## Quick start
 
 ```bash
-make exec cmd="php bin/console app:artist:album:role V1StGXR8_Z5jdHi6B-myT 0192a3b4-c5d6-7890-abcd-ef1234567890 producer"
+make exec cmd="php bin/console app:artist:album:role V1StGXR8_Z5jdHi6B-myT aB3dE5fG7hJ9kL1mN3pQr producer"
 ```
 
 When the artist holds several roles on the album, name the one to change:
 
 ```bash
-make exec cmd="php bin/console app:artist:album:role V1StGXR8_Z5jdHi6B-myT 0192a3b4-c5d6-7890-abcd-ef1234567890 producer --from=featured"
+make exec cmd="php bin/console app:artist:album:role V1StGXR8_Z5jdHi6B-myT aB3dE5fG7hJ9kL1mN3pQr producer --from=featured"
 ```
 
 ## Arguments

@@ -31,7 +31,7 @@ make exec cmd="php bin/console app:genre:song:add rock aB3dE5fG7hJ9kL1mN3pQr --j
 
 Assigning a genre the song already has succeeds and leaves one link, so a retry is harmless. A song public ID that names no song fails with `Song not found.`, which the API answers with `404`. To undo the assignment, use [app:genre:song:remove](app-genre-song-remove.md).
 
-With `--json` the command prints nothing on success, because the API answers `204 No Content`; read the outcome from the exit code. Errors still go to stderr.
+With `--json`, errors still go to stderr.
 
 ## Exit codes
 

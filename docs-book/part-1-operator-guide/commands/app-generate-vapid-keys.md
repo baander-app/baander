@@ -16,15 +16,15 @@ make exec cmd="php bin/console app:generate-vapid-keys"
 Output:
 
 ```
-================
 VAPID Keys Generated
-================
-Add these to your .env file:
+====================
 
-VAPID_PUBLIC_KEY=BIj3...
-VAPID_PRIVATE_KEY=MIGT...
+ Add these to your .env file:
 
- ! [NOTE] Rotating keys will invalidate all existing push subscriptions.
+ VAPID_PUBLIC_KEY=BIj3...
+ VAPID_PRIVATE_KEY=MIGT...
+
+ [WARNING] Rotating keys will invalidate all existing push subscriptions.
 ```
 
 ## Details
@@ -33,16 +33,16 @@ VAPID (Voluntary Application Server Identification) keys let your server authent
 
 Provision both keys through the instance's private environment configuration.
 The public key can be shared with the frontend; keep the private key secret.
-Follow [Notifications](../administration/notifications.md) when applying configuration to web
-and workers. Generating keys only prints a pair; it changes no active
-configuration or subscription.
+Follow [Notifications](../administration/notifications.md) when applying the
+configuration to web and workers. The command only prints a pair; it changes no
+active configuration or subscription.
 
 ## Important
 
 Replacing the configured VAPID pair prevents delivery to subscriptions tied to
 the old public key. Those browsers need to subscribe again with the new key.
-Generate a pair for initial setup or to replace compromised keys; merely running
-this command does not install it.
+Generate a pair for initial setup or to replace compromised keys; running this
+command does not install it.
 
 ## Exit codes
 
@@ -53,5 +53,5 @@ this command does not install it.
 ## Tips
 
 - You only need to run this once during initial setup.
-- Keep the private key secret — never commit it to version control.
+- Keep the private key secret, and never commit it to version control.
 - Store both keys alongside your other environment secrets.

@@ -22,7 +22,7 @@ make exec cmd="php bin/console app:library:validate-path /data/music"
 
 ## Details
 
-The command prints whether the path is valid, the path it resolves to, whether it exists and is readable, and the reason when it is not valid. A path is valid when it is absolute, has no `..` segment, and names an existing, readable directory.
+The command prints whether the path is valid, the path it resolves to, whether it exists and is readable, and the reason when it is not valid. A path is valid when it is absolute, contains no `..`, and names an existing, readable directory.
 
 The check runs inside the container, so it sees the container's mounts, not the host's directories.
 

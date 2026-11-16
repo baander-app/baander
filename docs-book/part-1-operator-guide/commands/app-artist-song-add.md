@@ -5,13 +5,13 @@ Credit an artist on a song with a role. The command does what `POST /api/artists
 ## Quick start
 
 ```bash
-make exec cmd="php bin/console app:artist:song:add V1StGXR8_Z5jdHi6B-myT 0192a3b4-c5d6-7890-abcd-ef1234567890 featured"
+make exec cmd="php bin/console app:artist:song:add V1StGXR8_Z5jdHi6B-myT aB3dE5fG7hJ9kL1mN3pQr featured"
 ```
 
 In a script that reads only the exit code:
 
 ```bash
-make exec cmd="php bin/console app:artist:song:add V1StGXR8_Z5jdHi6B-myT 0192a3b4-c5d6-7890-abcd-ef1234567890 featured --json"
+make exec cmd="php bin/console app:artist:song:add V1StGXR8_Z5jdHi6B-myT aB3dE5fG7hJ9kL1mN3pQr featured --json"
 ```
 
 ## Arguments
