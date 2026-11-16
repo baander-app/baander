@@ -144,8 +144,9 @@ and the deployment's server-side credential configuration. The control URL conne
 as a second role, the application role's name with `_control` appended, which needs
 the replacement credential too. In the supplied Compose stack, the one-off
 `pooler-credentials` service derives both roles' verifiers from `DB_PASSWORD`, applies
-them and writes the connection pooler's auth file; run it again with the replacement
-password before restarting the pooler. Then restart all clients, and verify protected API
+them and writes the connection pooler's auth file. It logs in as the application role
+with `DB_PASSWORD`, so run it again with the replacement password only after the role
+accepts that password, then restart the pooler. Then restart all clients, and verify protected API
 access, writes and worker progress before retiring the old credential. Changing a
 Compose initialization password does not update a role in an already initialized
 PostgreSQL data directory. See [Backup and recovery](backup-and-recovery.md) and
@@ -240,6 +241,7 @@ APP_URL=https://baander.app
 APP_DOMAIN=baander.app
 DEFAULT_URI=https://baander.app
 
+DB_PASSWORD=<strong_password>
 DATABASE_URL="postgresql://baander:<strong_password>@pooler:6432/baander?serverVersion=18&charset=utf8"
 DATABASE_CONTROL_URL="postgresql://baander_control:<strong_password>@pooler:6432/baander_control?serverVersion=18&charset=utf8"
 
@@ -255,6 +257,10 @@ VAPID_PRIVATE_KEY=<from app:generate-vapid-keys>
 
 STREAM_URL_HMAC_SECRET=<generate with: php -r 'echo bin2hex(random_bytes(32));'>
 ```
+
+The supplied Compose stack initializes PostgreSQL and writes the connection pooler's
+verifiers from `DB_PASSWORD`, which defaults to `baander` when unset. Use the same
+password in `DB_PASSWORD`, `DATABASE_URL` and `DATABASE_CONTROL_URL`.
 
 ### OAuth clients and cross-origin access
 

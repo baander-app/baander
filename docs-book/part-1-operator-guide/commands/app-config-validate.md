@@ -31,7 +31,7 @@ make exec cmd="php bin/console app:config:validate --category=env"
 
 The command groups checks into four categories:
 
-- **env** — checks that the required environment variables are set and have sensible values, such as the length of `APP_SECRET` and the presence of the OAuth keys
+- **env** — checks that the required environment variables are set and have sensible values, such as whether `APP_SECRET` is still the default placeholder (checked only when `APP_ENV` is `prod`) and whether the OAuth key files exist
 - **connectivity** — tests the PostgreSQL and Redis connections
 - **framework** — runs the framework-level checks of the `env` category, leaving out those for environment variables, secrets and API keys
 - **all** — runs every check of every category
