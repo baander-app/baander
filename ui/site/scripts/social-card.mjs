@@ -34,7 +34,7 @@ const card = `<!doctype html>
   <div class="card">
     <div class="brand"><img src="/assets/site/logo.svg" alt="">Bånder</div>
     <h1>Your collection. Ready to play.</h1>
-    <p>Browse your music and movies in a media server you run on your own hardware.</p>
+    <p>Point Bånder at your music and movies. Browse and play them in your browser, from a server you run.</p>
     <div class="url">baander.app</div>
     <img class="shot" src="/assets/site/screenshots/destinations.webp" alt="">
   </div>

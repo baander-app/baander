@@ -69,6 +69,8 @@ final class SearchMetadataTest extends TestCase
         $types = json_decode($home->structuredData, true, flags: JSON_THROW_ON_ERROR)['@graph'] |> (static fn(array $graph): array => array_column($graph, '@type'));
         self::assertSame(['WebSite', 'SoftwareApplication'], $types);
         self::assertSame('https://baander.app/', $home->url);
+        self::assertLessThanOrEqual(60, mb_strlen($home->title), 'The homepage title must fit a search result title.');
+        self::assertLessThanOrEqual(155, mb_strlen($home->description), 'The homepage description must fit a search snippet.');
         $missing = SearchMetadata::notFound('https://baander.app');
         self::assertFalse($missing->indexable);
         self::assertNull($missing->structuredData);

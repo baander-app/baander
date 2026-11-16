@@ -23,8 +23,8 @@ final readonly class SearchMetadata
     public const string SOCIAL_IMAGE = '/assets/site/social-card.png';
     public const array SOCIAL_IMAGE_SIZE = [1200, 630];
     private const string HOME_TITLE = 'Bånder — A home for your media';
-    private const string HOME_DESCRIPTION = 'Browse and play your music and movies with Bånder, a media server you host. '
-        . 'Read the installation and operator manuals.';
+    private const string HOME_DESCRIPTION = 'Point Bånder at your music and movies, then browse and play them in your browser '
+        . 'from a server you run. Read the installation and operator manuals.';
     private const int TITLE_LIMIT = 60;
     private const int DESCRIPTION_LIMIT = 155;
     /** Opening text shorter than this is extended with the following paragraph. */
