@@ -446,16 +446,24 @@ hidden.
 Verification on 2026-11-16:
 
 - Web: `yarn --cwd ui/web test` passed 290 files and 3,621 tests; `typecheck`,
-  `build` and `lint` passed, lint with 0 errors and the 10 warnings `master` also
-  has (generated coverage output and TanStack Virtual call sites).
+  `build` and `lint` passed, lint with 0 errors and 10 warnings, all in files this
+  branch does not touch (generated coverage output and TanStack Virtual call
+  sites).
 - Desktop: the Electron suite ran 75 tests, 67 passed and none failed; the IPC
   security test passed 6 of 6, including the new visibility channel.
   `tsc -p tsconfig.preload.json` and `tsconfig.renderer.json` passed;
   `tsconfig.main.json` reports only the `@baander/audio-core` native module, which
   is not built on this host.
-- Code review: `ce-code-review` at full depth with seven reviewers, verdict "Ready
-  with fixes". Its one confirmed finding, desktop window visibility, is fixed in
-  `db640bf0b`; its testing gaps are closed in `db640bf0b` and `aa3aab712`.
+- Code review: `ce-code-review` at full depth with seven reviewers covered the
+  branch up to `3d20b4230` plus the browser-test and docs edits then uncommitted;
+  verdict "Ready with fixes". Its one confirmed finding, desktop window visibility,
+  is fixed in `db640bf0b`. Of its testing gaps, `db640bf0b` and `aa3aab712` close
+  the frozen-page history, a tab hidden mid-outage, a short drop that dismisses
+  nothing, and a watcher started on a degraded connection. Two remain: the watcher
+  without freshness tracking is covered only by the helper's unit test, and the
+  label-absence test checks only the connecting phase. `db640bf0b` and the commits
+  after it were not reviewed; their new IPC channel is covered by the IPC security
+  test's untrusted-caller loop.
 - Browser: `recovery.spec.ts` against this worktree's preview. Passed: two
   collaborators, failed authoritative read, revocation with a delivery outage,
   frozen-page wake, independent console producer, managed reload and managed
