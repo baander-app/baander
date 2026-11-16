@@ -283,8 +283,8 @@ GitHub had published the PGroonga 4.1.0 database image.
   checks in on CI from time to time rather than waiting for it. See
   [Master CI repair](#master-ci-repair). The first green run is the point to write the
   CI-repair learning with `ce-compound`, which the user confirmed on 2026-11-13.
-- **Quiet live-update status.** On the local branch `feat/quiet-live-update-status`
-  (`5e7db8e96` to `9d8f0da36`), not pushed: the web shell no longer shows the
+- **Quiet live-update status.** On the branch `feat/quiet-live-update-status`
+  (`5e7db8e96` to this record): the web shell no longer shows the
   top-right live-update label, and lasting outages raise a toast and a bell entry;
   see [Quiet live-update status](#quiet-live-update-status).
 - **Web fixes.** With the same push, a click on the active lyrics effect turns effects
@@ -430,12 +430,12 @@ subsequent real scan pass are the recorded qualification.
 
 ## Quiet live-update status
 
-Delivered on 2026-11-16 on the local branch `feat/quiet-live-update-status`, not
-pushed: all six units of
+Delivered on 2026-11-16 on the branch `feat/quiet-live-update-status`: all six
+units of
 `docs/plans/2026-11-16-1823-feat-quiet-live-update-status-plan.md`
 (`702a825ce`, `46cb8ae33`, `bb1d47485`, `3d20b4230`, `b9f52afa9`, `bf2c45323`), the
-code review's fix (`db640bf0b`), and two follow-ups from the browser runs
-(`aa3aab712`, `9d8f0da36`). The web shell no longer shows "Connecting…",
+code review's fix (`db640bf0b`), two follow-ups from the browser runs
+(`aa3aab712`, `9d8f0da36`), and the targeted review's fixes (`34a06d68c`). The web shell no longer shows "Connecting…",
 "Updating…" or "Updates unavailable". A live-update outage of 15 seconds of
 visible time raises one toast, and one of 2 minutes adds an entry to the app and
 admin bells; both clear on recovery. The single toast host moved to the app root,
@@ -445,7 +445,7 @@ hidden.
 
 Verification on 2026-11-16:
 
-- Web: `yarn --cwd ui/web test` passed 290 files and 3,621 tests; `typecheck`,
+- Web: `yarn --cwd ui/web test` passed 290 files and 3,622 tests; `typecheck`,
   `build` and `lint` passed, lint with 0 errors and 10 warnings, all in files this
   branch does not touch (generated coverage output and TanStack Virtual call
   sites).
@@ -461,13 +461,17 @@ Verification on 2026-11-16:
   the frozen-page history, a tab hidden mid-outage, a short drop that dismisses
   nothing, and a watcher started on a degraded connection. Two remain: the watcher
   without freshness tracking is covered only by the helper's unit test, and the
-  label-absence test checks only the connecting phase. `db640bf0b` and the commits
-  after it were not reviewed; their new IPC channel is covered by the IPC security
-  test's untrusted-caller loop.
+  label-absence test checks only the connecting phase. A focused `ce-code-review`
+  of the commits after `3d20b4230` (verdict "Ready with fixes") found that the
+  frozen-page check could pass on a detached store copy and read the outage
+  history too early; `34a06d68c` fixes both and also guards the window visibility
+  send and the first visibility answer. The new IPC channel uses the main-window
+  ownership check, and the IPC security test's untrusted-caller loop covers it.
 - Browser: `recovery.spec.ts` against this worktree's preview. Passed: two
   collaborators, failed authoritative read, revocation with a delivery outage,
   frozen-page wake, independent console producer, managed reload and managed
-  restart. Failed on this branch and on `master` in the same preview: the
+  restart. After `34a06d68c` the frozen-page and revocation scenarios pass again,
+  with the fixtures reading the store under the URL the application loaded. Failed on this branch and on `master` in the same preview: the
   delivery outage with record-play (no play record within 10 seconds), the dirty
   metadata draft with owned audio, and the stalled projection, which never
   reached degraded health on `master` and did not on the last branch run.
