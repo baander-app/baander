@@ -7,7 +7,7 @@ include __DIR__ . '/header.php';
     <div class="hero-copy">
       <p class="eyebrow">A home for your media</p>
       <h1 id="intro-title">Your collection.<br>Ready to play.</h1>
-      <p class="hero-description">Browse your music and movies in Bånder.<br>A media server you run on your own hardware.</p>
+      <p class="hero-description">Point Bånder at your music and movies.<br>Browse and play them in your browser, from a server you run.</p>
       <div class="actions">
         <a class="button" href="/docs/operator-guide/getting-started/">Start hosting <span class="arrow" aria-hidden="true">→</span></a>
         <a class="text-action" href="#how-it-works">How Bånder works <span class="arrow" aria-hidden="true">↓</span></a>
