@@ -904,12 +904,6 @@ jobs:
                     docker push "$REGISTRY/$IMAGE_NAME:latest" > "$OUTPUT/push-latest.log" 2>&1
                     cat "$OUTPUT/push-latest.log"
 
-            -   name: Application image is not publicly pullable
-                # GHCR keeps the package private until an operator changes
-                # it; the image may not be redistributed yet.
-                if: github.server_url == 'https://github.com' && github.ref == 'refs/heads/master'
-                run: sh scripts/ghcr-private-probe.sh "$REGISTRY/$IMAGE_NAME"
-
             -   name: Preserve production packaged inventory on GitHub
                 if: always() && github.server_url == 'https://github.com'
                 uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

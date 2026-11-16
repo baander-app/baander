@@ -509,7 +509,7 @@ SH;
     }
 
     #[DataProvider('publishedImageProvider')]
-    public function testImagesResolveToEachForgesRegistry(string $file, string $name, bool $public): void
+    public function testImagesResolveToEachForgesRegistry(string $file, string $name): void
     {
         $workflow = $this->workflow($file);
         $github = self::context(self::GITHUB);
@@ -526,21 +526,16 @@ SH;
             self::assertSame('ghcr.io/baander-app/baander-runner:latest', self::interpolate($image, $github));
             self::assertSame('registry.baander.app/baander/baander-runner:latest', self::interpolate($image, $forgejo));
         }
-        $probes = array_filter(
-            array_merge(...array_column($workflow['jobs'], 'steps')),
-            static fn(array $step): bool => str_contains($step['run'] ?? '', 'scripts/ghcr-private-probe.sh'),
-        );
-        self::assertCount($public ? 0 : 1, $probes);
     }
 
-    /** @return iterable<string, array{string, string, bool}> */
+    /** @return iterable<string, array{string, string}> */
     public static function publishedImageProvider(): iterable
     {
-        yield 'application' => ['ci.yaml', 'baander', false];
-        yield 'runner' => ['runner.yaml', 'baander-runner', true];
-        yield 'PostgreSQL' => ['postgres.yaml', 'baander-postgres', true];
-        yield 'Nginx' => ['nginx.yaml', 'baander-nginx', false];
-        yield 'FFmpeg' => ['ffmpeg.yaml', 'ffmpeg-baander-static', true];
+        yield 'application' => ['ci.yaml', 'baander'];
+        yield 'runner' => ['runner.yaml', 'baander-runner'];
+        yield 'PostgreSQL' => ['postgres.yaml', 'baander-postgres'];
+        yield 'Nginx' => ['nginx.yaml', 'baander-nginx'];
+        yield 'FFmpeg' => ['ffmpeg.yaml', 'ffmpeg-baander-static'];
     }
 
     public function testCiPullsThePostgresImageFromEachForgesRegistry(): void
@@ -564,79 +559,6 @@ SH;
         self::assertStringContainsString('images->role($argv[1])->reference', $run);
         foreach (['fixtureRedis', 'mailpit'] as $role) {
             self::assertStringContainsString($role, $run);
-        }
-    }
-
-    #[DataProvider('privateImageProbeProvider')]
-    public function testAnonymousPullProbePassesOnlyWhenTheRegistryRefusesThePull(
-        string $file,
-        string $job,
-        string $stepName,
-        string $pushStep,
-        string $image,
-        string $refusal,
-        int $exitCode,
-    ): void {
-        $workflow = $this->workflow($file);
-        $steps = $workflow['jobs'][$job]['steps'];
-        $probe = $this->step($workflow['jobs'][$job], $stepName);
-        self::assertFalse(self::runs($probe, self::context(self::FORGEJO)));
-        self::assertTrue(self::runs($probe, self::context(self::GITHUB)));
-        if (isset($workflow['on']['pull_request'])) {
-            self::assertFalse(self::runs($probe, self::context(self::GITHUB, 'pull_request')));
-        }
-        $names = array_column($steps, 'name');
-        self::assertGreaterThan(array_search($pushStep, $names, true), array_search($stepName, $names, true));
-
-        $tools = $this->directory . '/tools';
-        new Filesystem()->mkdir($tools);
-        // The stub plays ghcr.io: it records the call and whether any credential was configured,
-        // then serves the manifest or fails with the given error.
-        $docker = <<<'SH'
-#!/bin/sh
-printf '%s config=%s\n' "$*" "$(ls -A "$DOCKER_CONFIG")" >> "$CALL_LOG"
-if [ -z "$REFUSAL" ]; then
-    printf '{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json"}\n'
-    exit 0
-fi
-printf '%s\n' "$REFUSAL" >&2
-exit 1
-SH;
-        file_put_contents($tools . '/docker', $docker);
-        chmod($tools . '/docker', 0755);
-        $github = self::context(self::GITHUB);
-        $process = new Process(['/bin/sh', '-e', '-c', self::interpolate($probe['run'], $github)], dirname(__DIR__, 5), [
-            'PATH' => $tools . ':' . getenv('PATH'),
-            'CALL_LOG' => $this->directory . '/probe-calls',
-            'REFUSAL' => $refusal,
-            'REGISTRY' => self::interpolate($workflow['env']['REGISTRY'], $github),
-            'IMAGE_NAME' => self::interpolate($workflow['env']['IMAGE_NAME'], $github),
-            'DOCKER_CONFIG' => $this->directory . '/credentials',
-        ]);
-        $process->run();
-
-        self::assertSame($exitCode, $process->getExitCode(), $process->getErrorOutput());
-        self::assertSame('manifest inspect ' . $image . ":latest config=\n", file_get_contents($this->directory . '/probe-calls'));
-    }
-
-    /** @return iterable<string, array{string, string, string, string, string, string, int}> */
-    public static function privateImageProbeProvider(): iterable
-    {
-        // Only a registry refusal confirms privacy; a local Docker or network failure cannot.
-        $outcomes = [
-            'served anonymously' => ['', 1],
-            'refused as unauthorized' => ['unauthorized: authentication required', 0],
-            'refused as an unknown manifest' => ['manifest unknown', 0],
-            'unreachable through the Docker API' => ['permission denied while trying to connect to the docker API', 1],
-            'unreachable through DNS' => ['dial tcp: lookup ghcr.io: no such host', 1],
-        ];
-        foreach ([
-            'application' => ['ci.yaml', 'build-and-push', 'Application image is not publicly pullable', 'Push verified production image', 'ghcr.io/baander-app/baander'],
-            'Nginx' => ['nginx.yaml', 'build', 'Nginx image is not publicly pullable', 'Build and push Nginx image', 'ghcr.io/baander-app/baander-nginx'],
-        ] as $name => $case) {
-            foreach ($outcomes as $outcome => $result) {
-                yield $name . ' ' . $outcome => [...$case, ...$result];
-            }
         }
     }
 

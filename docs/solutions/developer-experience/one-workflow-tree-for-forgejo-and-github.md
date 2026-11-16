@@ -1,7 +1,7 @@
 ---
 title: Run one workflow tree on Forgejo and GitHub without silent skips
 date: "2026-11-05"
-last_updated: "2026-11-05"
+last_updated: "2026-11-16"
 category: developer-experience
 module: CI workflows shared by Forgejo and GitHub
 problem_type: developer_experience
@@ -12,7 +12,7 @@ applies_when:
   - Adding or moving a workflow file, or creating a .forgejo or .gitea directory
   - Choosing a per-forge value for runs-on, a registry, a cache or an artifact action
   - Changing how build-application.php selects a buildx builder or exports BuildKit cache
-  - Changing the anonymous-pull probe for private GHCR images
+  - Writing a check that treats a registry or API refusal as success
   - Adding a step to a container job that starts a browser, sources an environment script or pulls an image published by the same push
 retire_when: "Forgejo merges workflow directories or exposes forgejo_server_version when it resolves runs-on, or GitHub's docker buildx driver accepts --cache-to type=local; check the Forgejo release notes and the docker/buildx driver documentation"
 tags: [forgejo, github-actions, workflows, buildkit, buildx, ghcr, ci, forge]
@@ -138,13 +138,15 @@ restore are symmetric. The build also exports to a fresh `/tmp/buildkit-cache-ne
 and swaps it in (`ci.yaml:126`, `ci.yaml:134`), because a local cache exported over
 its own source only grows.
 
-**Make the privacy probe fail closed, and test "permission denied" first.**
-`scripts/ghcr-private-probe.sh` treats a registry refusal as proof that the image is
-private, and it matches the refusal on substrings such as `denied`. A runner that
-cannot reach the Docker socket also prints "permission denied", which contains
-`denied`. The probe therefore checks `*"permission denied"*` before the refusal
-patterns and sends it to the failing branch. Without that ordering, a broken runner
-would report every image as private.
+**Make a privacy probe fail closed, and test "permission denied" first.** The
+anonymous-pull probe that kept the application and Nginx images private on GHCR
+treated a registry refusal as proof that the image was private, and matched the
+refusal on substrings such as `denied`. A runner that cannot reach the Docker socket
+also prints "permission denied", which contains `denied`. The probe therefore checked
+`*"permission denied"*` before the refusal patterns and sent it to the failing branch.
+Without that ordering, a broken runner would report every image as private. The probe
+was removed on 2026-11-16, when every image became public; the ordering applies to any
+check that reads a refusal as success.
 
 **Stage the first GitHub rollout.** GitHub runs `workflow_dispatch` only for
 workflows on the default branch, and the gate jobs pull the runner image from GHCR.
@@ -168,7 +170,7 @@ points back to these causes.
 - Before adding a per-forge expression, especially in `runs-on`.
 - When touching builder selection in `packages/baander-tooling/src/Docker/Client.php`
   or the BuildKit cache steps in `ci.yaml`.
-- When editing the patterns in `scripts/ghcr-private-probe.sh`.
+- When writing a check that treats a registry or API refusal as success.
 - When adding a step to a container job that starts a browser, sources an
   environment script or pulls an image that the same push publishes.
 

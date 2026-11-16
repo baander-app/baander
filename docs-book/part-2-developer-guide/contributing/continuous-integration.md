@@ -276,9 +276,9 @@ refuse any server other than github.com.
 | --- | --- | --- | --- |
 | `baander-runner` | `runner.yaml` | Private registry | Public on GHCR |
 | `baander-postgres` | `postgres.yaml` | Private registry | Public on GHCR |
-| `baander-nginx` | `nginx.yaml` | Private registry | Private on GHCR, checked after each push |
+| `baander-nginx` | `nginx.yaml` | Private registry | Public on GHCR |
 | `ffmpeg-baander-static` | `ffmpeg.yaml` | Private registry | Public on GHCR |
-| `baander` | `ci.yaml`, `build-and-push` job | Private registry | Private on GHCR, checked after each push |
+| `baander` | `ci.yaml`, `build-and-push` job | Private registry | Public on GHCR |
 
 Each push tags the image `latest` and with the commit SHA. On GitHub the images are
 `ghcr.io/baander-app/<name>`.
@@ -305,11 +305,12 @@ does the same. Push the commits that follow, such as a digest update in
 `tooling-defaults.json`, separately. The path filter covers every commit in a
 push, so a follow-up pushed together with the FFmpeg change would start the build.
 
-The runner and PostgreSQL images are CI tooling and may be public, and so may the
-FFmpeg image. The application image keeps notice, provenance and embedded-dependency
-gaps that the [application release
-acceptance](../../../ROADMAP.md#application-release-acceptance) requires closing before
-redistribution, and the Nginx image stays private with it.
+Every image is public on GHCR. GHCR creates each new package as private, so an
+operator makes a package public by hand in its package settings after its first
+push. A public image is not a qualified release: the [application release
+acceptance](../../../ROADMAP.md#application-release-acceptance) still lists the
+notice, provenance and embedded-dependency gaps to close before a release image is
+qualified.
 
 The runner workflow builds inside the public `docker:cli` image. Every other job
 runs inside `baander-runner`, and the CI quality gate pulls `baander-postgres`, so
@@ -317,24 +318,6 @@ both images must exist in a forge's registry before that forge's first CI run.
 
 `build-and-push` runs on pull requests too: it builds the production image and
 verifies its packaged inventory, but pushes only from `master`.
-
-### The anonymous-pull check
-
-GHCR creates every new package as private, and GitHub documents visibility changes
-only in its web interface, so an operator makes each change by hand. A package can
-therefore become public by mistake. After each push of the Nginx or
-application image, the job runs `scripts/ghcr-private-probe.sh`. The script runs
-`docker manifest inspect` for the image's `latest` tag with an empty Docker
-configuration, so no stored login takes part:
-
-- If the registry serves the manifest, anyone can pull the image. The job fails
-  with "publicly pullable".
-- If the registry refuses (denied, unauthorized, or an unknown manifest or name),
-  the image stays private and the step passes.
-- Any other error, such as a network failure, also fails the job with "Cannot
-  confirm", because privacy is unconfirmed.
-
-The check runs after the push, so a failure means the image is already public.
 
 ## Staged rollout
 
@@ -386,20 +369,18 @@ Keep these settings in place:
 4. **Make the PostgreSQL image public.** Change `baander-postgres` the same way as
    the runner image in step 2.
 5. **Publish the Nginx image.** The Nginx workflow also runs inside the runner image.
-   If its first run failed for the same reason, dispatch `nginx.yaml` again. The
-   image stays private.
+   If its first run failed for the same reason, dispatch `nginx.yaml` again. Make
+   `baander-nginx` public the same way as the runner image in step 2.
 6. **Publish the FFmpeg image.** A push to `master` that touches the codec, the FFmpeg
    image or its gate starts the FFmpeg workflow; otherwise dispatch it with
    `gh workflow run ffmpeg.yaml --repo baander-app/baander` to create its package.
-   The image may be public.
-7. **Push the gate workflows.** Their first runs pull both public images.
+   Make `ffmpeg-baander-static` public the same way.
+7. **Push the gate workflows.** Their first runs pull both public images. The first
+   push of `master` that passes the CI quality gate publishes the application image;
+   make `baander` public the same way.
 
 ### When GitHub needs attention
 
-- **Failed anonymous-pull check.** When the log says the image is publicly pullable,
-  make that package private at once in its package settings, then re-run the job to
-  confirm. A "Cannot confirm" failure is an error during the check; read the
-  printed output before acting.
 - **Suspended nightly.** GitHub disables scheduled workflows in a public repository
   after 60 days without repository activity. Re-enable Registry nightly
   qualification on the repository's Actions page, or run
