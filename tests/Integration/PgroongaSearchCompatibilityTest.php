@@ -85,12 +85,20 @@ final class PgroongaSearchCompatibilityTest extends TestCase
         }
     }
 
-    public function testInstalledExtensionAndActualIndexUseTheVersionTwoApi(): void
+    public function testInstalledExtensionKeepsTheIndexesOfUncommittedTransactions(): void
     {
         $version = $this->connection->fetchOne("SELECT extversion FROM pg_extension WHERE extname = 'pgroonga'");
         self::assertIsString($version);
-        self::assertTrue(version_compare($version, '2.0.4', '>='), 'The scored tuple signature requires PGroonga 2.0.4 or later.');
+        self::assertTrue(version_compare($version, '4.1.0', '>='), sprintf(
+            'PGroonga %s is older than 4.1.0. Before 4.1.0, the cleanup that VACUUM, ANALYZE and autovacuum run '
+            . 'deletes the search data of an index whose transaction has not committed yet (upstream GH-1013); '
+            . 'rebuild the database image.',
+            $version,
+        ));
+    }
 
+    public function testActualIndexUsesTheVersionTwoApi(): void
+    {
         $index = $this->connection->fetchAssociative(
             'SELECT am.amname, opc.opcname, i.indisvalid, ic.reloptions::text AS options
              FROM pg_index i
