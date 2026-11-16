@@ -27,6 +27,7 @@ use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Domain\ValueObject\MediaReadScope;
 use App\Shared\Infrastructure\Doctrine\Platform\BaanderDriverMiddleware;
 use App\Shared\Infrastructure\Doctrine\Type\CustomTypesRegistrar;
+use App\Tests\Support\Doctrine\PgroongaLeftovers;
 use Doctrine\DBAL\Configuration;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Logging\Middleware;
@@ -133,6 +134,9 @@ try {
             '/plan/dummy.webp', 'webp', 'image/webp', 32, 2, 2, 'album', now(), now()
         FROM generate_series(1, 5000) n
         SQL);
+    // ANALYZE of the copied albums, artists and songs runs PGroonga's cleanup of objects that dropped indexes
+    // left behind; clearing them first leaves it nothing to collide with an autovacuum cleanup over.
+    PgroongaLeftovers::clear($connection);
     foreach (['images', 'albums', 'artists', 'artist_album', 'artist_song', 'songs', 'playlists'] as $table) {
         $connection->executeStatement('ANALYZE ' . $table);
     }

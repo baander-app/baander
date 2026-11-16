@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Tests\Support\Doctrine\PgroongaLeftovers;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -49,6 +50,10 @@ final class CoveredIndexPersistenceTest extends TestCase
         // with fresh statistics. PGroonga estimates a scan of its whole index at zero cost, so on such a table
         // the planner prefers an unqualified PGroonga bitmap or index-only scan with a filter over any B-tree
         // lookup. Only an index scan with an index condition shows that the wider index serves the predicate.
+        // ANALYZE of songs also runs PGroonga's cleanup of objects that dropped indexes left behind. Clearing them
+        // first, with every PGroonga table held against autovacuum until this test's transaction ends, leaves that
+        // cleanup nothing to collide with another cleanup over.
+        PgroongaLeftovers::clear($connection);
         foreach (array_unique(array_column(self::COVERED, 0)) as $table) {
             $connection->executeStatement('ANALYZE ' . $table);
         }
