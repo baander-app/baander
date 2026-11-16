@@ -8,15 +8,15 @@ Baander exposes three HTTP endpoints for health probing. None of these require a
 
 | Endpoint | Purpose | Healthy status | Unhealthy status |
 |----------|---------|---------------|-----------------|
-| `GET /health` | Component results (PostgreSQL, Redis, consumer, Swoole, memory); worker and memory do not decide HTTP status | `200` with `"status": "healthy"` | `503` with `"status": "unhealthy"` |
+| `GET /health` | Component results (PostgreSQL, Redis, consumer, worker profile, Swoole, memory); worker, worker profile and memory do not decide HTTP status | `200` with `"status": "healthy"` | `503` with `"status": "unhealthy"` |
 | `GET /ready` | Dependency readiness (PostgreSQL, Redis); not ready while the web server drains | `200` with `"status": "ready"` | `503` with `"status": "not_ready"` |
 | `GET /live` | Process liveness (Swoole worker alive) | `200` with `"status": "alive"` and `"draining": false` | N/A (always 200 if responding; `"draining": true` while the web server drains) |
 
-`/health` lists the background worker and memory, but neither decides the response code: a worker outage or a web server worker near its memory limit does not turn `/health` into `503`, and `/ready` checks neither. The web server [alerts administrators](../administration/notifications.md#health-alerts) about both instead.
+`/health` lists the background worker, its deployment profile and memory, but none of them decides the response code: a worker outage, a worker started with a different deployment profile from web, or a web server worker near its memory limit does not turn `/health` into `503`, and `/ready` checks none of them. The web server [alerts administrators](../administration/notifications.md#health-alerts) about all three instead.
 
 While the web server [drains before it stops](../maintenance/upgrading.md#stopping-and-restarting-the-web-server), `/ready` answers `503` without checking any dependency. Its `checks` list holds a single `server` entry whose `details` are `{"draining": true}`. The server accepts no new connections once the drain starts, so only a client that holds a kept-alive connection from before the stop sees this answer, and the answer carries `Connection: close`. `/live` still answers `200` during the drain, so liveness probes do not restart the container, and its body says `"draining": true`. The web player reads that answer as "server not back yet".
 
-These are designed for orchestration use. The Docker healthcheck does not call an endpoint; it runs the `app:health:check` command. The web image defines it in `Dockerfile`, and the development stack in `docker-compose.yml`:
+These endpoints are meant for orchestrator probes. The Docker healthcheck does not call one; it runs the `app:health:check` command. The development stack defines it in `docker-compose.yml` as below; the web image's `Dockerfile` defines the same check with a 10-second start period:
 
 ```yaml
 healthcheck:
@@ -36,7 +36,8 @@ dc exec -T app php bin/console app:health:check
 ```
 
 This runs the same checks as `/health` and exits with code 1 if a component other
-than the background worker or memory is unhealthy; otherwise it exits with code 0.
+than the background worker, its deployment profile or memory is unhealthy; otherwise
+it exits with code 0.
 A `not_available` row does not fail the command. Outside a web worker, Swoole can
 therefore read `N/A` even when the command succeeds. The memory row measures the
 CLI process, not the web server's workers. FFmpeg, provider access and successful
@@ -45,13 +46,14 @@ media processing are not checked. See the
 
 ### What is checked
 
-The health check verifies five components:
+The health check verifies six components:
 
 | Component | What it checks |
 |-----------|---------------|
 | PostgreSQL | Connection to the database via `SELECT 1` |
 | Redis | `PING` command and database size |
 | Messenger (background worker) | The age of the heartbeat the worker writes to Redis. Unhealthy after 45 seconds without a renewal while idle or 90 seconds while handling a message, and when the heartbeat disappears. A heartbeat that says the worker stopped reads not available for 45 seconds and unhealthy after that; the 45 seconds give a restarted worker time to report in. Not available until a heartbeat has been seen, and while Redis is unreachable. |
+| Worker profile | Whether web runs with the deployment profile the active worker boot recorded when it started. Unhealthy when the two differ; not available when no worker boot is active or the boot recorded no profile. |
 | Swoole | Swoole VM statistics when running inside a Swoole worker; not available outside one or without the extension |
 | Memory | The real memory use of each HTTP worker of the web server against PHP's `memory_limit`, which the production image sets to [512M](../configuration/deployment-profiles.md#php-memory-limit). Each worker reports every 5 seconds, and the check reads the worker using the most. Unhealthy at 90 percent of the limit, about 461 MiB at 512M; not available when the limit is `-1`. |
 
@@ -94,7 +96,7 @@ meanwhile. The server logs the store failure, not every `503` it answers.
 
 ## Server Stats
 
-The server stats endpoint returns a snapshot of every HTTP worker of the web server. Requires `ROLE_ADMIN`. The [`app:server:stats`](../commands/app-server-stats.md) command prints the same data from the web container.
+The server stats endpoint returns a snapshot of every HTTP worker of the web server. Requires `ROLE_ADMIN`. The [`app:server:stats`](../commands/app-server-stats.md) command prints the same data from the web container with `--json`; its default table shows each worker's memory and coroutines and the Redis figures.
 
 ```bash
 dc exec -T app php bin/console app:server:stats
@@ -110,6 +112,7 @@ The `data` object holds:
 | `workers[].swoole` | Swoole VM status, or `null` |
 | `workers[].coroutines` | Running coroutines and the peak count |
 | `workers[].pools` | Swoole connection pool stats (active, free, limit per connection) |
+| `workers[].live_updates` | Live-update projection and delivery diagnostics; see [Live views stop updating](troubleshooting.md#live-views-stop-updating) |
 | `missing_workers` | IDs of workers that did not answer in time |
 | `worker_errors` | Workers whose figures could not be read, with the error |
 | `redis` | Connected status, ping result, DB size, client count, memory usage; read once for the server |
@@ -205,7 +208,7 @@ dc exec -T app php bin/console app:rate-limiter:clear --all
 ### Rate-limit storage outages
 
 All 22 configured limiters use atomic Redis state while retaining their configured
-budgets and fixed/sliding-window policies. A protected request whose limiter state
+budgets and fixed-window, sliding-window or token-bucket policies. A protected request whose limiter state
 cannot be established receives a generic `503`, `Retry-After: 1` and
 `Cache-Control: no-store`; it does not receive a fresh budget from a cache miss.
 Ordinary exhaustion keeps the limiter's existing response and retry delay.
@@ -233,7 +236,7 @@ This runs all configuration checks and prints a table of results. See the [full 
 `GET /api/debug/config-check` is the admin API counterpart. Use the authenticated
 admin interface or a DPoP-capable client.
 
-The endpoint validates environment variables, key file existence, secret strength, and framework config. It returns a summary with `errors`, `warnings`, and `passed` counts. Rate-limited to prevent abuse.
+The endpoint validates environment variables, key file existence, whether `APP_SECRET` is still the default placeholder, and framework config. It returns a summary with `errors`, `warnings`, and `passed` counts. The endpoint is rate-limited.
 
 ### What is checked
 
@@ -247,6 +250,7 @@ The endpoint validates environment variables, key file existence, secret strengt
 | OAuth key file existence | Warning (dev) / Error (prod) |
 | VAPID key pair consistency | Warning |
 | External API key lengths | Warning |
+| Optional `MAILER_DSN`, `OAUTH_PRIVATE_KEY_PATH`, `OAUTH_PUBLIC_KEY_PATH` or `MESSENGER_TRANSPORT_DSN` unset | Warning |
 
 ## Logs
 
@@ -270,18 +274,21 @@ dc exec -T database ls -lt /var/log/postgresql
 ```
 
 Read the file matching the incident time after identifying it. Nginx's access log
-belongs to `nginx`, not `app`:
+belongs to `nginx`, not `app`; the nginx image sends it to the container's standard
+output:
 
 ```bash
-dc exec -T nginx tail -n 100 /var/log/nginx/access.log
+dc logs --tail=100 nginx
 ```
 
 The separate worker deployment has its own control and consumer containers. Use
 its exact manifest and the inspection steps in
 [Background Work](../workers/background-work.md#observe-background-work) to locate their logs;
-web logs alone cannot explain an outbox relay failure. For Swoole failures, also
-check the configured application log directory: `config/packages/swoole.yaml`
-selects `swoole_<environment>.log` under the application's `var/log` directory.
+web logs alone cannot explain an outbox relay failure. Docker logs carry the
+application's warnings and errors, and Messenger's info messages; the complete
+application log is `<environment>.log` in the application's `var/log` directory,
+with warnings also in `error.log`. For Swoole failures, check the same directory:
+`config/packages/swoole.yaml` selects `swoole_<environment>.log` there.
 
 Before sharing logs or diagnostic output, redact tokens, credentials, private
 paths and personal data. Preserve timestamps, job IDs and the relevant error chain.

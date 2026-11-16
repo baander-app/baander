@@ -1,6 +1,6 @@
 # Watch Parties
 
-Watch parties coordinate video playback through authenticated HTTP APIs and a dedicated WebSocket connection. A client must create or join the party and apply its playback updates. The current web application has no watch-party creation or joining screen; these endpoints are for clients that implement the party workflow.
+Watch parties coordinate video playback through authenticated HTTP APIs and the application's WebSocket connection. A client must create or join the party and apply its playback updates. The current web application has no watch-party creation or joining screen; these endpoints are for clients that implement the party workflow.
 
 A party does not replace access to source media, [transcoding](transcoding.md), or its independent worker. Establish ordinary playback first, then investigate party membership and synchronization separately.
 
@@ -8,7 +8,7 @@ A party does not replace access to source media, [transcoding](transcoding.md), 
 
 1. The **host** creates a session and selects media to watch
 2. Other users **join** the session through the HTTP API or the `party.join` WebSocket message
-3. Playback is **synchronized** — when the host plays, pauses, or seeks, all participants follow
+3. Playback is **synchronized**: the host's play, pause and seek update the session, and the other participants follow the session state they read through `sync` or the session route
 4. Each member can adjust their own audio and subtitle preferences independently
 
 ## Creating a Session
@@ -29,7 +29,7 @@ Deleting a video ends its sessions. Deleting a transcode job, for example during
 - **Leave**: `POST /api/party/sessions/{publicId}/leave`
 - **List sessions**: `GET /api/party/sessions/`
 
-A successful join creates or reconnects the member. An inactive, missing or full session cannot admit a new join. Read `GET /api/party/sessions/{publicId}` to inspect session state and its members. Joining a party is separate from opening a media stream.
+A successful join creates or reconnects the member. An inactive or missing session admits no join, and a full session admits none either, not even a member reconnecting. Read `GET /api/party/sessions/{publicId}` to inspect session state and its members. Joining a party is separate from opening a media stream.
 
 ## During a Session
 
@@ -40,7 +40,7 @@ A successful join creates or reconnects the member. An inactive, missing or full
 
 ## Real-Time Communication
 
-Watch parties use `/ws/party/{sessionPublicId}` for real-time sync. The HTTP information route returns connection details; the web server handles the actual WebSocket upgrade. Clients send `party.join` with the session public ID to establish membership and join its broadcast room, even when they already joined over HTTP. A connected socket alone does not establish that a client is applying host controls or playing media. If updates fail, check session membership, client behavior and the WebSocket connection through [Monitoring](../operations/README.md) and [Troubleshooting](../operations/troubleshooting.md). See the [Real-Time Patterns](../../part-2-developer-guide/architecture/real-time-patterns.md) page in the Developer's Guide for implementation details.
+Watch parties use the application's single WebSocket connection: a client obtains a single-use ticket from `POST /api/ws/tickets` and upgrades at `/api/ws`. The web server refuses an upgrade on any other path, including the `wsUrl` under `/ws/party/{sessionPublicId}` that the HTTP information route returns. Clients send `party.join` with the session public ID to establish membership and join its broadcast room, even when they already joined over HTTP. A connected socket alone does not establish that a client is applying host controls or playing media. If updates fail, check session membership, client behavior and the WebSocket connection through [Monitoring](../operations/README.md) and [Troubleshooting](../operations/troubleshooting.md). See the [Real-Time Patterns](../../part-2-developer-guide/architecture/real-time-patterns.md) page in the Developer's Guide for implementation details.
 
 ## Notes
 

@@ -21,7 +21,7 @@ slash. The client must trust its certificate.
 |--------------------|--------------|---------------------|
 | Reverse proxy and web server | `/live`, `dc logs nginx app` | The request reaches a responding process; read `draining` too |
 | PostgreSQL and Redis | `/ready`, `app:health:check` | Dependency connectivity at the time of the check |
-| Web worker memory and pools | `app:server:stats`, health memory row | Current web process pressure; the CLI health process measures its own memory |
+| Web worker memory and pools | `app:server:stats` (pools with `--json`), health memory row | Current web process pressure; the CLI health process measures its own memory |
 | Admitted worker deployment | Host controller `readiness` action | Current readiness observation of the exact admitted deployment |
 | Redis consumer | Messenger heartbeat and job progress | Recent consumer activity; neither proves outbox progress |
 | Outbox relay | Worker readiness observation and relay logs | Relay state; follow an actual queued operation to establish delivery |
@@ -55,7 +55,7 @@ symptom-led checks.
 | `POST /api/monitor/transport/failed/flush?confirm=true` | Remove all failed messages (admin) |
 | `dc exec -T app php bin/console app:monitor:transport` | CLI transport queue depths and consumer state |
 | `dc exec -T app php bin/console app:failed-message:list` | CLI failed message list |
-| `dc exec -T app php bin/console app:failed-message:flush` | CLI removal of all failed messages |
+| `dc exec app php bin/console app:failed-message:flush` | CLI removal of all failed messages, after a terminal confirmation |
 | `GET /api/monitor/analytics/summary` | Job analytics summary (admin) |
 | `GET /api/monitor/analytics/timing` | Job timing analytics (admin) |
 | `GET /api/monitor/analytics/failures` | Job failure analytics (admin) |

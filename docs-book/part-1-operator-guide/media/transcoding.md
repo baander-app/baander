@@ -120,13 +120,13 @@ Under `transcode`, the media role admits as many video jobs and audio renditions
 once as the profile has [media slots](../configuration/deployment-profiles.md#media-slots): 8 video and 12
 audio by default. Stream copy uses the slots of its kind, and a kind with zero
 slots is refused. Under `remux`, audio and video copy jobs share the configured
-copy slots, 1 to 8, and encoding is refused. Each video job has a fresh PHP kernel and one private CPU
-helper, started before any database or Redis connection opens. FFmpeg processes and their
+copy slots, 1 to 8, and encoding is refused. Each video job has a fresh PHP kernel and runs
+at most one helper command at a time through the native daemon. FFmpeg processes and their
 process groups belong to the worker deployment. Web has no CPU pool or encoder
 fallback.
 
-Private media jobs use one asynchronous file-I/O thread, configured before helper
-forks or reactor startup. The shipped Swoole build uses its thread backend for
+Private media jobs use one asynchronous file-I/O thread, configured before the job
+connects to the native daemon or the database. The shipped Swoole build uses its thread backend for
 coroutine file reads under the worker's default Docker security restrictions.
 The worker containers carry no CPU, memory or PID limit, so the slots are the only
 bound on media work. The native daemon starts each FFmpeg command at nice 10 and
@@ -141,7 +141,7 @@ cost of each job and how to choose the slots; see
 
 ### Segment-by-Segment Tracking
 
-Each transcode job tracks progress per-segment. When a segment completes, the job records the segment index, output file path, file size, and duration. This data is persisted to the database and used by the manifest generator to build accurate playlists.
+Each transcode job tracks progress per-segment. When a segment completes, the job records the segment index, output file path, file size, and duration, and this data is persisted to the database. Manifests are built from the generation's published index on storage, not from these rows.
 
 State transitions for a transcode job: `pending` -> `in_progress` -> `completed` (or `failed` / `cancelled`).
 
@@ -297,8 +297,8 @@ lines of FFmpeg's output. Without a hardware encoder, the worker qualifies its
 software encoder.
 
 With a hardware encoder, unset video slots take the measured hardware default of
-12. Audio stays at 12, and the video maximum still follows the pooler bound: 145
-slots at the 16 GB starting point.
+12. Audio stays at 12, and the video maximum still follows the pooler bound: at the
+16 GB starting point, 145 slots without audio slots, or 137 beside the 12 audio slots.
 
 The default of 12 follows `hevc_vaapi`, the encoder media control picks by default.
 On an AMD Radeon RX 9070 XT with VAAPI, every 1080p stream ran at 1.12x real time
@@ -311,8 +311,8 @@ seconds per second of output up to 12 streams, and up to 0.063 at 14 and 16. The
 records the figures. Other GPUs, codecs and sources sustain different counts, so
 set `videoSlots` after trying the host's own load.
 
-The worker image carries Mesa's VAAPI drivers: radeonsi for AMD and iHD and i965 for
-Intel. `qsv` also needs Intel's oneVPL runtime, `amf` AMD's AMF runtime and `nvenc`
+The worker image carries Mesa's VAAPI driver, radeonsi, which serves AMD GPUs; it
+carries no Intel VAAPI driver (iHD or i965). `qsv` also needs Intel's oneVPL runtime, `amf` AMD's AMF runtime and `nvenc`
 NVIDIA's driver libraries, which the image does not include; their test encode fails
 at start until the image provides them.
 
@@ -352,7 +352,7 @@ Three [server settings](../configuration/server-settings.md#server-settings) gov
 
 Baander then rounds the bitrate down to the highest step of a fixed ladder that does not exceed it: 64, 96, 128, 160, 192, 256 and 320 kbps. A request below 64 kbps gets 64 kbps. The Opus ladder stops at 256 kbps, so an Opus stream never exceeds 256 kbps, whatever the maximum. Because only these steps exist, each track has at most seven renditions per format.
 
-An unsupported format, a bitrate that is not a positive whole number, or a bitrate without a format gets `400`. A failed encode gets `500` and is logged with the track, format and bitrate.
+An unsupported format, a bitrate that is not a positive whole number, or a bitrate without a format gets `400`. A failed encode gets `500` and is logged with its reason.
 
 Renditions are admitted through durable PostgreSQL runtime state. Under `transcode`, the media role runs as many audio encodes at once as its audio slots, 12 by default, independently of its video slots. Requests for the same source fingerprint, format and bitrate join the same accepted work. Web waits up to 60 seconds for output to start; an unavailable worker or failed generation produces an encode failure rather than an inline web encode. When every audio slot stays busy for that whole wait, `/api/stream/track` and `/api/stream/original/track` answer `503` with `Retry-After: 5` and the reason `audio_slots_busy`. The work keeps its place in the queue, and the web player's retry follows it once a slot frees.
 
@@ -382,7 +382,7 @@ failed rendition that neither produced AAC nor read an AAC source stays failed.
 Change it in the admin settings page under Media, or on the command line:
 
 ```bash
-make exec cmd="php bin/console app:settings:set transcode.aac_implementation fdk_aac"
+dc exec app php bin/console app:settings:set transcode.aac_implementation fdk_aac
 ```
 
 When the FFmpeg binary in use lacks the selected implementation, for example an

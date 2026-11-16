@@ -11,7 +11,7 @@ instances; see the [development environment guide](../../part-2-developer-guide/
 
 ## Creating Users
 
-Users can self-register through the public `POST /api/auth/register` endpoint, or operators can create accounts directly with the `app:user:create` command. Operator-created users are immediately verified and can log in right away.
+Users can self-register through the public `POST /api/auth/register` endpoint, or an operator can create the account directly with the `app:user:create` command. An account the operator creates starts verified, so the user can log in right away.
 
 Create a regular user:
 
@@ -47,7 +47,7 @@ See the [full command reference](../commands/app-user-create.md) for exit codes 
 
 ### Password requirements
 
-A password must be 8 to 255 characters. There is no formal password policy beyond this — no complexity rules, no expiration, and no history. Passwords are hashed with Argon2id (memory cost: 65536, time cost: 4), which provides strong protection even if the database is compromised. See the [security guide](../maintenance/security.md#password-security) for more on password hashing.
+A password must be 8 to 255 characters. There is no formal password policy beyond this — no complexity rules, no expiration, and no history. Passwords are hashed with Argon2id (memory cost: 65536, time cost: 4), a memory-hard hash that makes the hashes in a stolen database expensive to crack. See the [security guide](../maintenance/security.md#password-security) for more on password hashing.
 
 ## Roles
 
@@ -59,7 +59,7 @@ Baander uses three roles:
 | `ROLE_ADMIN` | Administrator — has access to the operational and management API endpoints; some changes there need `ROLE_SUPER_ADMIN` |
 | `ROLE_SUPER_ADMIN` | Super administrator — includes `ROLE_ADMIN` and may also make the changes reserved for it, such as creating administrators, changing [server settings](../configuration/server-settings.md#server-settings) and [users' settings](#user-settings), and registering, rotating and revoking [OAuth clients](#oauth-clients) |
 
-Roles are assigned at creation time with the `--role` flag. To change them later, [app:user:roles](../commands/app-user-roles.md) replaces a user's roles with the set you give; a super administrator can do the same in the admin panel or through the admin API (`POST /api/admin/users/{id}/roles`):
+Roles are assigned at creation time with the `--role` flag. To change them later, [app:user:roles](../commands/app-user-roles.md) replaces a user's roles with the set you give; a super administrator can do the same in the admin panel or through the admin API (`POST /api/admin/users/{publicId}/roles`):
 
 ```bash
 dc exec app php bin/console app:user:roles alice@baander.app ROLE_USER ROLE_ADMIN
@@ -80,7 +80,7 @@ The console commands are not affected by these settings: console access carries 
 
 ## Passkeys (WebAuthn)
 
-Users register passkeys through their browser using the standard WebAuthn API. This is a user-initiated action — operators do not manage passkeys on behalf of users.
+Each user registers their own passkeys in the browser through the standard WebAuthn API; operators do not manage passkeys on a user's behalf.
 
 Browser and authenticator support depend on the client device. Test registration and
 sign-in with the clients your installation supports.
@@ -94,11 +94,11 @@ authentication through the API, using a compatible authenticator app.
 
 The setup endpoint returns a secret and provisioning URI. The user confirms a code
 from their authenticator before TOTP is enabled; disabling TOTP also requires a
-current code. There is no operator CLI reset or recovery-code workflow in the
-current implementation. Do not promise a password reset will remove this second
-factor. If the authenticator is lost, the manual has no qualified account-recovery
-procedure for that case; preserve the account while investigating rather than
-handing out a replacement database secret.
+current code. The current implementation has no operator CLI reset and no recovery
+codes, so do not promise that a password reset will remove this second factor. For a
+lost authenticator this manual has no qualified account-recovery procedure: preserve
+the account while you investigate, rather than handing out a replacement secret
+written into the database.
 
 ## Resetting a Password
 
@@ -108,7 +108,7 @@ Set a new password for a user who has forgotten theirs:
 dc exec app php bin/console app:user:reset-password alice@baander.app
 ```
 
-The command prompts for the password, or reads it from stdin with `--password`. It accepts an email address or UUID and does the same as **Reset password** in the admin panel. Both sign the user out of every session. See [app:user:reset-password](../commands/app-user-reset-password.md).
+The command prompts for the password, or reads it from stdin with `--password`. It accepts an email address or public ID and does the same as **Reset password** in the admin panel. Both sign the user out of every session. See [app:user:reset-password](../commands/app-user-reset-password.md).
 
 Users who forget their password can reset it themselves once [email is configured](../configuration/environment-variables.md#mail):
 
@@ -137,7 +137,7 @@ Users change their own address in **Settings**. Operators change it in the admin
 dc exec app php bin/console app:user:change-email alice@baander.app alice.new@baander.app
 ```
 
-The command accepts the current email address or the UUID. All three ways make the new address unverified, email it a verification link, and end the verification and password reset links sent to the old address. See [app:user:change-email](../commands/app-user-change-email.md).
+The command accepts the current email address or the public ID. All three ways make the new address unverified, email it a verification link, and end the verification and password reset links sent to the old address. See [app:user:change-email](../commands/app-user-change-email.md).
 
 ## User Settings
 
@@ -151,15 +151,15 @@ dc exec app php bin/console app:user:setting set alice@baander.app language da
 dc exec app php bin/console app:user:setting reset alice@baander.app language
 ```
 
-The command accepts an email address or UUID. `reset` removes the choice, so the user follows the server default again. See [app:user:setting](../commands/app-user-setting.md).
+The command accepts an email address or public ID. `reset` removes the choice, so the user follows the server default again. See [app:user:setting](../commands/app-user-setting.md).
 
-The admin API offers the same operations. Users are addressed by UUID:
+The admin API offers the same operations. Users are addressed by public ID:
 
 | Method | Path | Role | Purpose |
 |--------|------|------|---------|
-| `GET` | `/api/admin/users/{id}/settings` | `ROLE_ADMIN` | List the user's settings, including a stored value that is no longer allowed, marked `storedValueValid: false` |
-| `PUT` | `/api/admin/users/{id}/settings/{key}` | `ROLE_SUPER_ADMIN` | Set the user's choice; the body is `{"value": <value>}` |
-| `DELETE` | `/api/admin/users/{id}/settings/{key}` | `ROLE_SUPER_ADMIN` | Remove the user's choice |
+| `GET` | `/api/admin/users/{publicId}/settings` | `ROLE_ADMIN` while `admin.can_view_users` is on | List the user's settings, including a stored value that is no longer allowed, marked `storedValueValid: false` |
+| `PUT` | `/api/admin/users/{publicId}/settings/{key}` | `ROLE_SUPER_ADMIN` | Set the user's choice; the body is `{"value": <value>}` |
+| `DELETE` | `/api/admin/users/{publicId}/settings/{key}` | `ROLE_SUPER_ADMIN` | Remove the user's choice |
 
 Super administrators can set every user setting, including any that users cannot change themselves. Each change made through the admin API or the CLI writes an info log entry with the acting administrator's ID (`cli` for the command), the user's ID, the key, and the old and new stored values.
 
@@ -177,16 +177,16 @@ Re-enable a disabled account:
 dc exec app php bin/console app:user:enable alice@baander.app
 ```
 
-Both commands accept an email address or UUID as the identifier. Disabling saves the
+Both commands accept an email address or public ID as the identifier. Disabling saves the
 account state and revokes access and refresh tokens in one transaction, then asks
 the web server to close open WebSocket connections. Run it in the app container so
 it can reach that server. Enabling restores the account, but restores none of its
 revoked tokens: the user signs in again. See [app:user:disable](../commands/app-user-disable.md) and [app:user:enable](../commands/app-user-enable.md) for details.
 
-Use disabling for one account. Global credential rotation affects every user and
-belongs to [Security](../maintenance/security.md). A response already streaming can finish, and
-signed video URLs use a separate secret; see [Disabled accounts](../maintenance/security.md#disabled-accounts)
-before treating a disable as immediate termination of every media transfer.
+Disabling acts on one account; global credential rotation affects every user and
+belongs to [Security](../maintenance/security.md). A disable does not end every media transfer
+at once: a response already streaming can finish, and signed video URLs use a separate
+secret. Read [Disabled accounts](../maintenance/security.md#disabled-accounts) before treating a disable as the end of every media transfer.
 
 ## Deleting Users
 

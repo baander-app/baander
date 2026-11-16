@@ -68,8 +68,8 @@ The generated `.env.compose.local` selects the immutable application image and i
 belongs to the source-installation recipe; it does not turn this checkout into a
 managed preview. Preserve the installation's volumes and network.
 
-Keep the web service stopped while applying a schema change. With PostgreSQL and
-Redis available, update dependencies in the mounted checkout and migrate through
+Keep the web service stopped while applying a schema change. With PostgreSQL, its
+connection pooler and Redis available, update dependencies in the mounted checkout and migrate through
 one-off application containers:
 
 ```bash
@@ -143,16 +143,16 @@ migrations may contain data transformations or index additions. Test databases
 belong to the separate disposable test coordinator.
 
 Fresh databases start with the transactional migration `Version20261017000000`,
-then apply forward migrations through `Version20261021120000`. The initial
+then apply the forward migrations that follow it in `migrations/`. The initial
 migration creates the schema, including microsecond `timestamptz` columns, and
-cannot be downgraded. Forward migrations add playlist persistence versions and
-video/audio execution authority. `Version20261017160000` preserves durable
+cannot be downgraded. The first forward migrations add playlist persistence versions
+and video/audio execution authority. `Version20261017160000` preserves durable
 session/request control receipts; `Version20261017170000` scopes video jobs to
 playback owners without rewriting the initial migration or existing histories.
 `Version20261018130000` imports confirmed singleton retirement history and adds
 the control/execution journals and joint retirement barrier. It is irreversible.
 `Version20261021120000` retains the last observed availability of indexed source
-files and is also irreversible.
+files and is also irreversible, as are most of the forward migrations after it.
 New deployments require a version 9 manifest with a private IPC volume and
 complete deployment and autoscaling profiles, and with no unit limits or CPU sets;
 earlier manifest versions are refused. Every profile field is fingerprinted in
@@ -257,7 +257,7 @@ image starts on it. Rebuild its indexes before writers return:
 
 ## Docker Compose Changes
 
-When `docker-compose.yml` changes (new services, new volume mounts, network changes, environment variable additions), a simple `dc restart` is not enough -- Docker Compose needs to recreate the affected containers from scratch.
+When `docker-compose.yml` changes (new services, new volume mounts, network changes, environment variable additions), `dc restart` is not enough: Docker Compose must recreate the affected containers.
 
 Recreate only the affected services after checking their volumes, ports and
 credentials with the installation's Compose context. Use `dc up -d --no-deps app`
@@ -304,7 +304,7 @@ When its stream fails, or stalls for 10 seconds, the web player asks the server'
 
 A transcoded track resumes once its accepted rendition is complete; until then the player shows "Reconnecting…". When the browser will not start playback without a user gesture, the player shows a "Tap to resume" button. After about two minutes without success, the player pauses with its usual failure notice and keeps the position, so pressing play tries again.
 
-A token refresh that fails because the server is restarting, with a network error or a `5xx` answer, keeps the user signed in. Only a `400` or `401` from the refresh signs the user out. Video execution stays with the worker during a web restart; see [Transcoding](../media/transcoding.md#restarts).
+A token refresh that fails because the server is restarting, with a network error or a `5xx` answer, keeps the user signed in. Only a `401`, or a `400` with the error `invalid_grant`, from the refresh signs the user out. Video execution stays with the worker during a web restart; see [Transcoding](../media/transcoding.md#restarts).
 
 ### nginx and a replaced app container
 

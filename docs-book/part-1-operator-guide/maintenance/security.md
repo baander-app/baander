@@ -139,8 +139,13 @@ for that owner. Do not drop the old role after granting only database access.
 
 Drain traffic and stop application processes and workers, retain a verified backup,
 and have the database administrator prepare the replacement credential with the
-required object privileges and ownership. Update `DATABASE_URL` and the deployment's
-server-side credential configuration, restart all clients, and verify protected API
+required object privileges and ownership. Update `DATABASE_URL`, `DATABASE_CONTROL_URL`
+and the deployment's server-side credential configuration. The control URL connects
+as a second role, the application role's name with `_control` appended, which needs
+the replacement credential too. In the supplied Compose stack, the one-off
+`pooler-credentials` service derives both roles' verifiers from `DB_PASSWORD`, applies
+them and writes the connection pooler's auth file; run it again with the replacement
+password before restarting the pooler. Then restart all clients, and verify protected API
 access, writes and worker progress before retiring the old credential. Changing a
 Compose initialization password does not update a role in an already initialized
 PostgreSQL data directory. See [Backup and recovery](backup-and-recovery.md) and
@@ -235,7 +240,8 @@ APP_URL=https://baander.app
 APP_DOMAIN=baander.app
 DEFAULT_URI=https://baander.app
 
-DATABASE_URL="postgresql://baander:<strong_password>@database:5432/baander?serverVersion=18&charset=utf8"
+DATABASE_URL="postgresql://baander:<strong_password>@pooler:6432/baander?serverVersion=18&charset=utf8"
+DATABASE_CONTROL_URL="postgresql://baander_control:<strong_password>@pooler:6432/baander_control?serverVersion=18&charset=utf8"
 
 REDIS_PASSWORD=<strong_password>
 REDIS_URL=redis://default:<strong_password>@redis:6379
@@ -246,6 +252,8 @@ MAILER_DSN=smtp://user:pass@smtp.baander.app:587
 
 VAPID_PUBLIC_KEY=<from app:generate-vapid-keys>
 VAPID_PRIVATE_KEY=<from app:generate-vapid-keys>
+
+STREAM_URL_HMAC_SECRET=<generate with: php -r 'echo bin2hex(random_bytes(32));'>
 ```
 
 ### OAuth clients and cross-origin access
@@ -269,7 +277,7 @@ Besides Baander's own apps, other clients can obtain tokens through the OAuth 2.
   gets a fresh pair and that unused pair is revoked, so a client whose refresh answer was lost
   keeps its session. See [Token lifetimes](../configuration/authentication-and-limits.md#token-lifetimes).
 - **Client secrets.** A confidential client's secret is shown once, when it is generated, and stored only as a SHA-256 digest. Rotating it ends the old secret at once and leaves issued tokens valid.
-- **Cross-origin access.** The token endpoint and the device authorization endpoint accept requests from any origin, because their callers prove possession with DPoP instead of cookies. Revocation, device approval, the authorization endpoint `/api/oauth/authorize`, and all other API routes accept only the `APP_URL` origin. Third-party clients do not call the authorization endpoint; they send the user's browser to the web app's consent page, which calls it for the signed-in user. See [HTTP](../configuration/environment-variables.md#http).
+- **Cross-origin access.** The token endpoint and the device authorization endpoint accept requests from any origin, because their callers prove possession with DPoP instead of cookies. Revocation, device approval, the authorization endpoint `/api/oauth/authorize`, and all other API routes except the discovery routes under `/api/discovery/` accept only the `APP_URL` origin; the discovery routes accept any origin and still apply their own authentication. Third-party clients do not call the authorization endpoint; they send the user's browser to the web app's consent page, which calls it for the signed-in user. See [HTTP](../configuration/environment-variables.md#http).
 - **Rate limits.** The authorization, token, and device authorization endpoints each have a per-IP limiter, and the token endpoint also counts requests per client. User code lookups and approvals share a per-IP limit that bounds code guessing. See [Rate limiting](../configuration/authentication-and-limits.md#rate-limiting).
 - **Revocation.** Revoking a client also revokes every access and refresh token issued to it. This holds for an administrator revoking a device, public or confidential client and for a user revoking a personal access client. Deleting a user deletes their tokens, authorization codes, and device codes.
 
@@ -280,7 +288,7 @@ Disabling a user, from the admin panel or with [app:user:disable](../commands/ap
 Two kinds of media access outlive the disable:
 
 - **A response already being sent.** A track file, or a transcode that is still encoding, keeps streaming until that one response ends. Every later request authenticates again and is refused.
-- **Signed video stream URLs.** HLS and DASH URLs carry an HMAC signature, not the user's token, so they keep working until they expire. A signed manifest URL lives at most 24 hours. Each manifest the player fetches signs the URLs it lists for another 24 hours. A player that keeps fetching can therefore stream that one video for up to 72 hours after the URL was signed with HLS, and up to 48 hours with DASH. To end every signed URL at once, for every user, set a new `STREAM_URL_HMAC_SECRET` and restart the web server. A signed URL is a bearer capability: it serves whoever holds it, with no session, until it expires, and a member of another library or a signed-out browser is served alike. A request that does present a token on a signed URL must present a valid one: an expired, revoked, foreign-audience or malformed token, or a fingerprint-bound token without its header, answers `401` even with a valid signature, because the firewall validates any token it is shown before the signature is read. The DPoP proof is not read on delivery routes, so no replay key is recorded there. The signature value is redacted from every log record, the access log included, so a logged URL cannot be replayed. A DPoP-bound token presented with the `Bearer` scheme instead of `DPoP` answers `401` on every route the API firewall authenticates; WebSocket upgrades accept only a single-use handshake ticket, not an access token.
+- **Signed video stream URLs.** HLS and DASH URLs carry an HMAC signature, not the user's token, so they keep working until they expire. A signed manifest URL lives at most 24 hours, and every URL a manifest lists keeps that manifest URL's expiry. A player that keeps fetching can therefore stream that one video for at most 24 hours after the URL was signed. To end every signed URL at once, for every user, set a new `STREAM_URL_HMAC_SECRET` and restart the web server. A signed URL is a bearer capability: it serves whoever holds it, with no session, until it expires, and a member of another library or a signed-out browser is served alike. A request that does present a token on a signed URL must present a valid one: an expired, revoked, foreign-audience or malformed token, or a fingerprint-bound token without its header, answers `401` even with a valid signature, because the firewall validates any token it is shown before the signature is read. The DPoP proof is not read on delivery routes, so no replay key is recorded there. The signature value is redacted from every log record, the access log included, so a logged URL cannot be replayed. A DPoP-bound token presented with the `Bearer` scheme instead of `DPoP` answers `401` on every route the API firewall authenticates; WebSocket upgrades accept only a single-use handshake ticket, not an access token.
 
 ### Who can change the catalog, and who can share a playlist
 
@@ -331,7 +339,7 @@ A session is a chain of token pairs: the pair a login issued and every pair a re
 The supplied Compose topology places Nginx in front of the web server. Inspect the
 actual published ports before exposing the installation:
 
-- **Port 80/443** — Nginx handles TLS termination and proxies to the Swoole server
+- **Port 80/443** — Nginx proxies to the Swoole server. The base Compose file builds its development configuration, which also terminates TLS on 443 with a self-signed certificate; the production configuration listens on port 80 only and expects a reverse proxy in front of it to terminate TLS
 - **Port 9200** — Swoole management API. It has no authentication and can report status, reload workers and shut the server down, so it listens only on `127.0.0.1` inside the app container and no compose file publishes it. `swoole:server:status` and `swoole:server:reload` reach it from inside the container. Keep `swoole.http_server.api.host` on loopback; the bundle also defaults to `127.0.0.1` when no host is configured.
 - **Port 5432** — the base Compose file publishes PostgreSQL on the host; remove or
   restrict this publication for an exposed installation.
@@ -339,7 +347,7 @@ actual published ports before exposing the installation:
   inaccessible to untrusted clients.
 
 The base file also binds the web service on host loopback port 9501 and publishes
-UDP port 41234. Review every publication and host firewall rule for your deployment;
+UDP port 41234, on which nothing in the server listens. Review every publication and host firewall rule for your deployment;
 [Getting started](../getting-started/installation.md) describes the source-install topology.
 
 ### Outbound provider requests
@@ -382,6 +390,6 @@ records the scope and qualification limits.
 
 ### Password security
 
-Passwords are hashed with Argon2id (memory cost: 65536, time cost: 4). This is a strong default. Only increase these values if you have specific compliance requirements and sufficient server memory.
+Passwords are hashed with Argon2id (memory cost: 65536, time cost: 4). Increase these values only if you have specific compliance requirements and sufficient server memory.
 
 If an attacker obtains the database, they cannot reverse hashed passwords — but they can attempt to crack weak ones. Encourage users to use strong passwords (the minimum is 8 characters, enforced by the create-user command).

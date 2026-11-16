@@ -25,7 +25,7 @@ dc exec -T app php bin/console app:config:validate
 ```
 
 Read individual rows, including warnings. `app:health:check` can exit successfully
-while the consumer or memory row is unhealthy. Its CLI memory row describes the
+while the consumer, worker profile or memory row is unhealthy. Its CLI memory row describes the
 checking process; Swoole can read `N/A` outside a web worker. It does not check
 FFmpeg, outbox delivery or provider access. Configuration validation detects missing
 or malformed settings but does not prove that every integration works. See
@@ -56,8 +56,9 @@ dc logs -f app nginx
 dc logs --since=1h --tail=100 redis
 ```
 
-Application and proxy output is available through Docker logs. The supplied
-PostgreSQL configuration also collects server logs inside `database` at
+Docker logs carry the proxy's output and the application's warnings and errors.
+The complete application log is `<environment>.log` in the application's `var/log`
+directory. The supplied PostgreSQL configuration also collects server logs inside `database` at
 `/var/log/postgresql`; inspect the files matching the incident time if Docker logs
 only show collector startup. Swoole's configured log is under the application's
 `var/log` directory. See [Monitoring: Logs](health-and-metrics.md#logs) for commands and
@@ -81,7 +82,7 @@ not prove the view is current. Then trace the stages in order:
 2. Collect web worker diagnostics:
 
    ```bash
-   dc exec -T app php bin/console app:server:stats
+   dc exec -T app php bin/console app:server:stats --json
    ```
 
    Inspect `live_updates` for every responding worker. Worker zero owns projection;
@@ -189,9 +190,10 @@ unsupported codec, FFmpeg, worker execution or resource exhaustion.
    `hardware_encoder_unavailable`; see [Hardware acceleration](../media/transcoding.md#hardware-acceleration).
    Use [server statistics](health-and-metrics.md#server-stats) for the web process; they do
    not describe worker container limits.
-5. Once the cause is corrected, choose a single retry path from
-   [failed-message handling](job-monitoring.md#failed-messages). Verify playback of the
-   affected item and the expected tier, rather than relying on a healthy probe.
+5. Once the cause is corrected, verify playback of the affected item and the
+   expected tier, rather than relying on a healthy probe. A transcode has no
+   job-monitor record or failure-transport entry, so
+   [failed-message handling](job-monitoring.md#failed-messages) has nothing to retry for it.
 
 ### Permission errors
 
@@ -206,8 +208,9 @@ dc exec -T app ls -ld /media /media/music
 
 Compare the effective process UID and GID with the mounted host path's owner, group,
 mode and ACL. Check whether the mount is read-only. `HOST_UID` and `HOST_GID` are
-image build inputs in the supplied workflow; changing a host shell variable does
-not change an already built image's user. The worker has a separate mount
+`Dockerfile` build arguments that default to 1000; `scripts/build-application.php`
+does not pass them, so the supplied image's user keeps UID and GID 1000 whatever the
+host shell exports. The worker has a separate mount
 specification and must be checked separately.
 
 For source media, grant the required read and directory traversal access. Writable
@@ -235,8 +238,8 @@ docker inspect --format '{{.RestartCount}} {{.State.Status}} {{.State.OOMKilled}
 ```
 
 Read the timestamps and error preceding an exit. If the process still responds,
-collect `dc exec -T app php bin/console app:server:stats` to see web worker memory,
-missing responses and connection pools. An OOM kill or increasing memory use
+collect `dc exec -T app php bin/console app:server:stats --json` to see web worker
+memory, missing responses and connection pools. An OOM kill or increasing memory use
 requires checking the container limit and workload before adjusting worker counts
 or PHP's memory limit. Use the effective Swoole settings in
 `config/packages/swoole.yaml`; do not assume a shell variable changes them.
@@ -250,11 +253,13 @@ leaves the admitted background worker deployment running.
 A refused connection means the client could not establish a database connection;
 authentication, database-name and schema errors occur later and need their own fix.
 
-1. Check `dc ps` and `dc logs --tail=100 database`. If the logging collector is
-   active, also inspect `/var/log/postgresql` inside `database` for the incident.
-2. Privately check the effective `DATABASE_URL` and selected environment files.
-   Inside the supplied Compose network the hostname is `database`, not
-   `localhost`. The host controller uses its own reachable address. Compare the
+1. Check `dc ps` and `dc logs --tail=100 pooler database`. The application reaches
+   PostgreSQL through the `pooler` connection pooler, so a refusal can come from
+   either service. If the logging collector is active, also inspect
+   `/var/log/postgresql` inside `database` for the incident.
+2. Privately check the effective `DATABASE_URL`, `DATABASE_CONTROL_URL` and selected
+   environment files. Inside the supplied Compose network they name the pooler,
+   `pooler:6432`, not `localhost`. The host controller uses its own reachable address. Compare the
    database name and credentials without printing the URL.
 3. If PostgreSQL is stopped, identify the cause and preserve its volume before
    starting it with `dc up -d database`. Storage corruption or missing data calls
@@ -271,7 +276,7 @@ a dependency outage. Preserve the HTTP status and error from the client, and the
 server timestamp. A Redis outage can produce a retryable `503` during an otherwise
 valid request.
 
-1. Run `app:config:validate` and inspect its key-file and secret-strength results.
+1. Run `app:config:validate` and inspect its key-file and `APP_SECRET` results.
    Privately confirm that the intended environment and OAuth keys are loaded by
    every participating process. Do not print `APP_SECRET`, encryption keys or
    private key contents.

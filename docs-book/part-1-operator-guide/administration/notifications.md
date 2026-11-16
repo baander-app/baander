@@ -1,14 +1,15 @@
 # Notifications
 
-When a notification appears in the app but no email or push arrives, creation has
-succeeded and a later delivery stage needs investigation. Baander stores the in-app
-notification in PostgreSQL and dispatches separate email, push and webhook messages
-to [background work](../workers/background-work.md). A stored notification or accepted message
-is not proof that an external receiver received it.
+When a notification appears in the app but no email or push arrives, creation
+succeeded and the fault lies in a later delivery stage. Baander stores the in-app
+notification in PostgreSQL, then dispatches separate email, push and webhook messages
+to [background work](../workers/background-work.md). A stored notification or an accepted message
+does not prove that an external receiver got it.
 
 Run commands on the installation host, from its checkout, with the
-[`dc` wrapper](../getting-started/installation.md). Keep the worker running after configuration;
-restarting the web service alone does not refresh a separately managed worker.
+[`dc` wrapper](../getting-started/installation.md). The worker sends every notification email,
+push and webhook, so keep it running once delivery is configured. Restarting the web service alone
+does not refresh a separately managed worker.
 
 ## Push Notifications (VAPID)
 
@@ -31,18 +32,18 @@ VAPID_PUBLIC_KEY=BIj3...
 VAPID_PRIVATE_KEY=MIGT...
 ```
 
-Both variables are documented in [configuration.md](../configuration/environment-variables.md#web-push-vapid).
+[Environment variables](../configuration/environment-variables.md#web-push-vapid) documents both.
 
 3. **Apply the new environment to the web service and background worker.** Follow
    the [configuration lifecycle](../configuration/README.md#where-a-change-takes-effect) and
    [Background work](../workers/background-work.md). Recreate containers when changing values
    injected by Compose; restarting an existing container retains its environment.
 
-Users can then enable push notifications from their browser or client. If you need to rotate keys later, see the [VAPID key rotation](../maintenance/security.md#rotating-vapid-keys) section in the security guide.
+Users can then enable push notifications from their browser or client. To rotate the keys later, follow [VAPID key rotation](../maintenance/security.md#rotating-vapid-keys) in the security guide.
 
 ## Webhooks
 
-Outgoing webhooks let Baander deliver notifications to external services (Slack, Discord, custom integrations) via HTTP POST. Webhooks are admin-only — the API requires the `ROLE_ADMIN` role.
+An outgoing webhook delivers notifications to an external service, such as Slack, Discord or a custom integration, as an HTTP POST. Only administrators manage webhooks: the API requires the `ROLE_ADMIN` role.
 
 ### Webhook API
 
@@ -72,13 +73,13 @@ Send a `POST` request with at minimum a `url` field:
 | `url` | `string` (URI) | Yes | The endpoint to deliver notifications to. Must be a valid URL. |
 | `category_filter` | `array<string>` or `null` | No | Restrict which notification categories trigger this webhook. `null` delivers all categories. |
 
-The response includes a `secret` value on creation. Store it securely: it is shown
-once for that value. Rotation generates and returns a new value once.
+The creation response includes the signing `secret`. Store it securely: Baander
+returns each secret value only once, at creation or at the rotation that generated it.
 
 ```json
 {
   "data": {
-    "id": "0197d2ef-...",
+    "publicId": "kTqWbNzRhLmPxVcDfGsJa",
     "url": "https://hooks.slack.com/services/...",
     "category_filter": ["security", "media_changes"],
     "secret": "a1b2c3d4...",
@@ -91,7 +92,7 @@ once for that value. Rotation generates and returns a new value once.
 
 ### Updating and deleting
 
-Use `PUT /api/webhooks/{id}` to change the `url` or `category_filter`. Omitting a field leaves it unchanged. Use `DELETE /api/webhooks/{id}` to remove a webhook entirely.
+The `{id}` in these paths is the webhook's `publicId`. Use `PUT /api/webhooks/{id}` to change the `url` or `category_filter`; a field you omit stays unchanged. Use `DELETE /api/webhooks/{id}` to remove a webhook entirely.
 
 ### HMAC signature verification
 
@@ -104,16 +105,16 @@ Each webhook delivery uses signature protocol version 2 and includes these heade
 | `X-Baander-Webhook-Signature` | HMAC-SHA256 signature over `{timestamp}.{payload}` |
 
 To verify a delivery, compute `sha256=` followed by the hexadecimal HMAC-SHA256
-of the header timestamp, a literal `.`, and the exact raw request body. Use the
-original secret returned at creation or rotation as the HMAC key. Compare the
-complete signature with a constant-time comparison. Reject timestamps outside
-your receiver's freshness window and deduplicate the `Idempotency-Key` header.
-Re-encoding the JSON changes the signed bytes.
+of the header timestamp, a literal `.`, and the exact raw request body, keyed with
+the plain secret returned at creation or rotation. Use the body exactly as received:
+re-encoding the JSON changes the signed bytes. Compare the complete signature with a
+constant-time comparison, reject timestamps outside your receiver's freshness window,
+and deduplicate the `Idempotency-Key` header.
 
-Baander stores the secret encrypted with its application secret; keep that
-application secret stable and protected. Creation and rotation return the original
-webhook secret once. Rotation takes effect after the database flush succeeds:
-configure the receiver with the new secret before sending subsequent notifications.
+Baander stores the webhook secret encrypted with its application secret, so keep
+that application secret stable and protected. Rotation takes effect once the
+database flush succeeds, and later deliveries are signed with the new secret: give
+it to the receiver before further notifications go out.
 
 ### Delivery behavior
 
@@ -137,19 +138,19 @@ configure the receiver with the new secret before sending subsequent notificatio
 
 ### Notification categories
 
-Category filters control which events trigger a webhook. The available categories are:
+A category filter selects which notifications trigger a webhook. The available categories are:
 
 | Category | Description |
 |----------|-------------|
 | `security` | Authentication events, password changes, security alerts |
-| `background_jobs` | Library scan results, transcoding progress, async job status |
-| `media_changes` | New media added, metadata updates, library changes |
+| `background_jobs` | Library scan results. Transcode completion and failure also map here, but nothing raises those events yet |
+| `media_changes` | New albums. Nothing raises the album-created event yet, so no notification arrives in this category |
 
 Set `category_filter` to `null` (or omit it when creating) to receive all categories.
 
 ## Email
 
-Email notifications are sent through Symfony's Mailer component. Configure the transport in your environment.
+Baander sends notification email through Symfony's Mailer component, using the transport configured in the environment.
 
 ### Configuration
 
@@ -159,7 +160,7 @@ Set `MAILER_DSN` in the protected configuration used by the delivery worker:
 MAILER_DSN=smtp://user:pass@smtp.baander.app:587
 ```
 
-The Docker development environment includes [Mailpit](https://mailpit.axllent.org/) as a local SMTP server for testing. The default development DSN is `smtp://mailpit:1025`. See the Mail section in [configuration.md](../configuration/environment-variables.md#mail) for full details, including the sender address.
+The Docker development environment includes [Mailpit](https://mailpit.axllent.org/) as a local SMTP server for testing; its default development DSN is `smtp://mailpit:1025`. The [Mail](../configuration/environment-variables.md#mail) section of the environment variable reference covers the remaining mail settings, including the sender address.
 
 Password reset emails use the same transport but are not notifications: they ignore notification preferences and are sent whenever a user asks for a reset. See [Password reset](../configuration/authentication-and-limits.md#password-reset).
 
@@ -174,14 +175,15 @@ Two [server settings](../configuration/server-settings.md#server-settings) switc
 | Setting | Default | While it is off |
 |---------|---------|-----------------|
 | `notifications.push_enabled` | `true` | No browser push is sent. The notification is still created and delivered in the app and by any other channel, and each skipped push is logged. |
-| `notifications.admin_alerts` | `true` | A component that turns unhealthy no longer alerts administrators; the degradation is still logged. Other admin alerts, such as new user registrations, are always sent. |
+| `notifications.admin_alerts` | `true` | A component that turns unhealthy no longer alerts administrators; the degradation is still logged. Other admin alerts, such as new user registrations, are always created. |
 
 ### Health alerts
 
-The web server creates administrator notifications when a component becomes
-unhealthy. PostgreSQL must be writable to store them, and the worker must be able
-to process the outgoing delivery messages. Alert state, timing, delayed delivery
-and the worker heartbeat belong to [Monitoring](../operations/health-and-metrics.md#what-is-checked).
+When a component becomes unhealthy, the web server creates an in-app notification
+for each administrator. A health alert is only that stored row: Baander sends no
+email, push or webhook for it, so PostgreSQL must be writable for the alert to
+exist. [Monitoring](../operations/health-and-metrics.md#what-is-checked) covers alert
+state, timing, delayed delivery and the worker heartbeat.
 Watch the web server from outside too: it cannot report its own outage.
 
 ## Checking a missing delivery
@@ -204,7 +206,7 @@ Watch the web server from outside too: it cannot report its own outage.
    decryption and receiver status. Search `notification.webhook` logs using the
    notification ID, and confirm the receiver's deduplication and signature checks.
 
-Keep `APP_SECRET` with database backups: webhook secrets need the matching value.
+Keep `APP_SECRET` with database backups: the stored webhook secrets decrypt only with the matching value.
 [Storage and data](../getting-started/storage-and-data.md) explains ownership, and
 [Backup and recovery](../maintenance/backup-and-recovery.md) covers capture and restore limits.
 

@@ -31,11 +31,13 @@ as PID 1 under one deployment namespace and boot identity:
   scheduler poller, autoscaler and media coordinator.
 - **Execution** observes the lease and runs the ordinary `async` consumers, one
   separate `scheduler` consumer and the native execution daemon that launches
-  probes, FFmpeg encoders, media CPU helpers and scheduled console children.
+  probes, FFmpeg encoders and media CPU helpers. The `scheduler` consumer starts
+  scheduled console children itself.
 
-Creation starts both units without container limits and verifies that Docker
-reports no limit on either unit and each unit's out-of-memory score: −500 for
-control and 300 for execution. The native daemon raises each FFmpeg command it
+`create` creates both units without container limits, and `start` starts them.
+`create`, `start`, `readiness` and recovery verify that Docker reports no limit on
+either unit and each unit's out-of-memory score: −500 for control and 300 for
+execution. The native daemon raises each FFmpeg command it
 launches to 600, and each PHP media child raises its own score to 600; see
 [Kill order](../getting-started/system-requirements.md#kill-order).
 
@@ -270,10 +272,13 @@ and worker network respectively. The controller URL and credentials file stay on
 Docker receives the admitted runtime values through a temporary private env-file;
 trusted daemon operators can inspect the resulting container environment.
 Additional runtime keys are `CONVERT_STORAGE_PATH`, `MEDIA_STORAGE_PATH`,
-`REDIS_PASSWORD`, `MAILER_DSN` and `MAIL_FROM_ADDRESS`. Without `MAIL_FROM_ADDRESS`,
-email a worker sends comes from `noreply@localhost`. The sender name is always
-Bånder. Values cannot contain
-line breaks and their complete env-file is limited to 4 KiB.
+`REDIS_PASSWORD`, `MAILER_DSN`, `MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME`,
+`VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY`, `STREAM_URL_HMAC_SECRET`, `APP_URL`,
+`DEFAULT_URI`, `OTEL_ENABLED` and `OTEL_EXPORTER_OTLP_ENDPOINT`. Without
+`MAIL_FROM_ADDRESS`, email a worker sends comes from `noreply@localhost`. The
+sender name is always Bånder; `MAIL_FROM_NAME` is accepted but does not change it.
+Values cannot contain line breaks and their complete
+env-file is limited to 4 KiB.
 
 Worker credentials admit only canonical Redis URL forms that preserve the
 `messages` and `scheduler_occurrences` streams, the `baander` group and the
@@ -318,6 +323,7 @@ an empty queue or an idle slot. See
 the admission and drain policy.
 
 Actions return bounded JSON on stdout. Exit codes are `0` for a confirmed result,
-`1` for `operation_unconfirmed`, `2` for `invalid_configuration`, and `3` for a
-denied or unregistered operation. The external `timeout` command may return its
+`1` for `operation_unconfirmed`, `2` for `invalid_configuration`, and `3` for an
+action that ran but did not succeed, such as a denied creation or start or a
+recovery that left retirement unconfirmed. The external `timeout` command may return its
 own exit code without JSON. Error output contains no credentials or raw diagnostics.

@@ -132,7 +132,8 @@ and evidence age before treating low concurrency as a fault.
 
 Media execution has its own ownership. Under `transcode`, control's media
 coordinator admits at most as many video jobs and audio renditions as the
-profile's slots, 8 and 12 by default. Under `remux`, audio and video copy jobs
+profile's slots, 8 and 12 by default; with a hardware encoder, unset video slots
+default to 12. Under `remux`, audio and video copy jobs
 share the configured copy slots; jobs requiring re-encoding are refused. Original
 files and compatible completed artifacts do not need a live producer. The coordinator
 sends bounded native requests over
@@ -145,8 +146,10 @@ processes; [System Requirements](../getting-started/system-requirements.md#kill-
 out-of-memory kill order.
 
 Worker admission accepts one device: the hardware encoder the deployment profile
-names, mapped into execution only with its group. Without one, execution receives no
-device and encodes in software. See
+names, mapped into execution only with its group. An `nvenc` encoder takes no
+device; execution receives the host's NVIDIA GPUs through the NVIDIA container
+runtime instead. Without a hardware encoder, execution receives no device and
+encodes in software. See
 [Hardware acceleration](../media/transcoding.md#hardware-acceleration), and do not infer worker
 hardware support from optional device examples in the web Compose file.
 

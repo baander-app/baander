@@ -1,11 +1,12 @@
 # Job and Transport Monitoring
 
-Track asynchronous library scans, metadata enrichment, transcoding, and notification jobs through the job monitor, inspect Redis stream and failure-transport depths, and query historical job analytics.
+Track asynchronous library scans, metadata enrichment and notification jobs through the job monitor, inspect Redis stream and failure-transport depths, and query historical job analytics.
 
 ## Job Monitoring
 
-The job monitor records background work such as library scans, transcoding and
-notifications. All job endpoints require authentication with `ROLE_ADMIN`.
+The job monitor records background work such as library scans, metadata enrichment
+and notifications. Transcodes run in the worker deployment's media coordinator and
+have no job-monitor record. All job endpoints require authentication with `ROLE_ADMIN`.
 API clients must send both the access token with the `DPoP` scheme and a fresh
 `DPoP` proof signed by the key bound to that token. A token alone is insufficient;
 the `Bearer` scheme is refused for a bound token. Use the authenticated admin
@@ -33,17 +34,17 @@ Browse jobs with filtering, sorting, and cursor-based pagination:
 # Failed jobs, newest first
 dc exec -T app php bin/console app:monitor:jobs --status=failed --sort=createdAt --direction=desc --limit=20
 
-# Jobs whose type name contains scan
-dc exec -T app php bin/console app:monitor:jobs --type=scan
+# Jobs whose type name contains Scan (case-sensitive)
+dc exec -T app php bin/console app:monitor:jobs --type=Scan
 ```
 
 The API filters are `status` (`queued`, `running`, `finished`, `failed`, `cancelled`),
-`name` (partial match) and `queue` (exact match). The console uses `--type` for
+`name` (case-sensitive partial match) and `queue` (exact match). The console uses `--type` for
 the API's `name` filter; `--cursor` continues a previous page.
 
 ### Job detail
 
-Get the full record, including exception details for a failed job. Replace
+Get the full record, including the exception class of a failed job. Replace
 `JOB_ID` with the job ID from the list:
 
 ```bash
@@ -65,9 +66,9 @@ dc exec -T app php bin/console app:monitor:job:retry JOB_ID
 dc exec -T app php bin/console app:monitor:job:cancel JOB_ID
 ```
 
-Cancellation is cooperative. The job stops at its next checkpoint, between two items of its work, and its status becomes `cancelled`; it is not retried and does not go to the failure transport. The metadata sync jobs, the bulk lyrics fetch and the cover extraction have checkpoints; other jobs run to the end. [app:monitor:job:cancel](../commands/app-monitor-job-cancel.md) lists the jobs and their checkpoints.
+Cancellation is cooperative. The job stops at its next checkpoint, between two items of its work, and its status becomes `cancelled`; it is not retried and does not go to the failure transport. Library scans, the metadata sync jobs, the bulk lyrics fetch and the cover extraction have checkpoints; other jobs run to the end. [app:monitor:job:cancel](../commands/app-monitor-job-cancel.md) lists the jobs and their checkpoints.
 
-A finished bulk lyrics fetch can still be cancelled while the fetches it queued are waiting: they are skipped when they come due, and the job's status changes from `finished` to `cancelled`. The job detail's `cancellable` field says whether cancelling a job can still change anything. Cancelling a failed job, or a finished job with no queued work waiting, answers `409`.
+A finished bulk lyrics fetch, or a finished artist sync, can still be cancelled while the work it queued is waiting: that work is skipped when it comes due, and the job's status changes from `finished` to `cancelled`. The job detail's `cancellable` field says whether cancelling a job can still change anything. Cancelling a failed job, or a finished job with no queued work waiting, answers `409`.
 
 ### Transport status
 
@@ -109,8 +110,8 @@ dc exec -T app php bin/console messenger:failed:retry MESSAGE_ID --force
 ```
 
 Removal and flush discard the stored work. Use them only when that loss is the
-intended action; neither repairs its cause. The table keeps their references for
-that deliberate decision.
+intended action; neither repairs its cause. The table below lists them with the
+other endpoints for that deliberate decision.
 
 | Endpoint | Console counterpart |
 |----------|---------------------|
@@ -124,7 +125,7 @@ Retrying runs `messenger:failed:retry` in a child process, which handles the mes
 
 ## Job Analytics
 
-The analytics endpoints provide aggregate insights into job performance over a time range. All require `ROLE_ADMIN`.
+The analytics endpoints aggregate job records over a time range. All require `ROLE_ADMIN`.
 
 ### Summary
 

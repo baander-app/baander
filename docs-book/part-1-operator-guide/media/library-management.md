@@ -20,7 +20,7 @@ dc exec app php bin/console app:library:create 'My Music' /media/library/music m
 
 The command also accepts `podcast`, `audiobook` and `tv_show` as type values, but their scanners and catalog ingestion are not implemented. Creating one does not provide a working import workflow.
 
-The slug is auto-generated from the name (lowercased, spaces replaced with hyphens, special characters removed). Provide `--slug` to override it:
+The slug is auto-generated from the name: lowercased, with each run of characters other than `a`–`z` and `0`–`9` replaced by one hyphen and hyphens trimmed from both ends, so "AC/DC" becomes `ac-dc`. Provide `--slug` to override it:
 
 ```bash
 dc exec app php bin/console app:library:create 'My Music' /media/library/music music --slug my-music-collection
@@ -52,7 +52,7 @@ Incremental scans skip unchanged indexed files. A full rescan reprocesses discov
 
 Only one scan of a library runs at a time. Starting a scan claims the library, and while the claim holds, the admin panel and the command refuse a second scan of it. `app:library:scan --all` scans every library that is not already scanning. A running scan renews its claim as it works. A claim that nobody renews for 15 minutes lapses, for example after a scan process was killed. The library then reads as `failed` and can be scanned again. To free a library sooner, release its claim with `app:library:scan my-music --release --force` once you know its scan is gone.
 
-See the [command reference](../commands/app-library-scan.md) for details. The other `app:library:*` commands list, show, rename and delete libraries; renaming, deleting and scanning in the admin panel need the admin role.
+See the [command reference](../commands/app-library-scan.md) for details. The other `app:library:*` commands list, show, update and delete libraries, report their statistics, validate a path and manage library membership; renaming, deleting and scanning in the admin panel need the admin role.
 
 ### What happens to new music
 
