@@ -1,13 +1,13 @@
 # Playlist
 
-The Playlist context manages user-created playlists (manual song collections) and smart playlists (dynamically populated by rules). It supports adding, removing, and reordering songs within a playlist.
+The Playlist context manages user-created playlists: ordered song collections whose songs can be added, removed and reordered. A playlist created with `isSmart` also stores its `smartRules`, but no code evaluates the rules or fills a playlist from them.
 
 ## Domain Models
 
 | Model | Type | Purpose |
 |-------|------|---------|
 | `Playlist` | Aggregate Root | A playlist with name, description, visibility, collaborator IDs, and song list |
-| `SmartPlaylist` | Aggregate Root | A playlist with dynamic content populated by rules |
+| `SmartPlaylist` | Domain helper | Static validation of smart playlist rules (`field`, `operator`, and a `value` for every operator except `is_empty` and `is_not_empty`) and the list of valid operators; nothing calls it |
 | `PlaylistSong` | Model | A song within a playlist with an ordered position |
 | `PlaylistPersistenceSnapshot` | Value Object | Captures persistence version, song positions, and collaborator IDs for compare-and-swap writes and revision hashing |
 | `PlaylistReadView` | Read Model | Viewer-scoped projection with owner and collaborator public IDs and visible song count |
@@ -18,6 +18,8 @@ The Playlist context manages user-created playlists (manual song collections) an
 |-------|---------|
 | `PlaylistCreated` | Emitted when a new playlist is created |
 | `SmartPlaylistSynced` | Emitted when a smart playlist refreshes its contents |
+
+`CreatePlaylistHandler` raises `PlaylistCreated`. No code raises `SmartPlaylistSynced`, because nothing refreshes a smart playlist.
 
 ## Commands and Handlers
 

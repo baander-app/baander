@@ -79,6 +79,8 @@ Routes under `/api/admin/metadata` (controller `MetadataAdminController`, gated 
 | `app:metadata:sync` | `MetadataSyncCommand` | Queue a metadata sync for every library and an artist sync, or with `--source=genres` only the genre sync |
 | `app:metadata:status` | `MetadataStatusCommand` | Show metadata sync status: track coverage, last sync time, and sync job counts by type |
 | `app:metadata:providers` | `MetadataProvidersCommand` | List metadata providers and whether each one is enabled and configured |
+| `app:metadata:file:extract` | `MetadataFileExtractCommand` | Read the tags embedded in a media file on the server |
+| `app:metadata:file:match` | `MetadataFileMatchCommand` | Rank candidate records by how well they fit the tags of a media file on the server |
 
 ## Cross-Context Dependencies
 
@@ -127,7 +129,7 @@ MusicBrainz answers the lookup of an ID it merged into another record with a per
 | `OggReader` / `OggParser` | OGG Vorbis and Opus |
 | `WavReader` | WAV |
 
-A `FormatDetector` selects the correct reader based on file MIME type.
+A `FormatDetector` selects the reader from the magic bytes of the file's header, and from the file extension when those match no format.
 
 ### Matching
 

@@ -12,7 +12,7 @@ The context is organized into seven preference subsystems, each with its own con
 |-----------|---------|-----------|
 | AccentColor | UI accent color, any string of up to 32 characters (default `violet`) | No |
 | SidebarConfig | Per-media-type sidebar section ordering and visibility | No |
-| AudioPreferences | EQ settings, normalization, bass boost, etc. | Yes (history + rollback) |
+| AudioPreferences | Ten-band EQ and preset, compressor, master gain, loudness normalization, stereo width, crossfeed, loudness contour, effect chain order and visualizer mode | Yes (history + rollback) |
 | LayoutPreferences | Sidebar mode (`compact` or `expanded`) and active tab | Yes (history + rollback) |
 | PlayerPreferences | Volume, repeat mode, shuffle, crossfade and ReplayGain | Yes (history + rollback) |
 | EqDeviceProfile | Named EQ profiles per device with activate/deactivate | No |

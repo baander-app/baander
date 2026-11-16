@@ -1,6 +1,6 @@
 # Transcode
 
-`src/Transcode/` handles CMAF video transcoding via FFmpeg. It is the most infrastructure-heavy context in the codebase: it manages long-running encoding jobs, produces HLS v6 and DASH manifests, implements a seek-aware segment priority queue, and hands FFmpeg commands to the worker deployment pair, where the execution unit runs the native encoder.
+`src/Transcode/` transcodes video to CMAF with FFmpeg. It is the most infrastructure-heavy context in the codebase: it manages long-running encoding jobs, produces HLS v6 and DASH manifests, keeps a seek-aware segment priority queue, and hands FFmpeg commands to the worker deployment pair, where the execution unit runs the native encoder.
 
 ## Lifecycle
 
@@ -48,7 +48,7 @@ flowchart TD
 | `TranscodeJob` | A single encoding job with status, progress tracking, and quality tier |
 | `TranscodeSession` | A live transcoding session with real-time state, priority, and lifecycle |
 
-`TranscodeJobState` and `TranscodeSessionState` hold constructor/create/reconstitute in sync per the project's aggregate root convention.
+Each root keeps its fields in a state object, `TranscodeJobState` or `TranscodeSessionState`, which its private constructor, `create()` and `reconstitute()` share, as the project's aggregate root convention requires.
 
 ### Value Objects
 
@@ -57,11 +57,19 @@ flowchart TD
 | `SegmentMetadata` | Value object | Metadata for an encoded segment (index, duration, size, keyframe, encoding time, and completion timestamp) |
 | `QualityTier` | Value object | HEVC quality definitions (resolution, bitrate, codec parameters) |
 | `AudioProfile` | Value object | Audio encoding settings (codec, bitrate, channels) |
-| `LoudnessStandard` | Value object | Audio normalization targets (e.g., EBU R128) |
+| `LoudnessStandard` | Enum | Audio normalization targets (e.g., EBU R128) |
 | `SessionState` | Enum | `Pending`, `Preparing`, `Active`, `Paused`, `Completed`, `Failed`, `Cancelled` |
-| `SessionPriority` | Value object | Session priority for the segment queue |
+| `SessionPriority` | Enum | Session priority for the segment queue (`Critical`, `High`, `Normal`, `Low`, `Bulk`) |
 | `TranscodeStatus` | Enum | Job status values |
 | `VideoProbeResult` | Value object | Parsed output from FFprobe |
+| `AudioStreamInfo`, `SubtitleTrackInfo` | Value object | One audio or subtitle stream FFprobe found, with its language, codec and default flag |
+| `ColorSpace` | Value object | A source's color primaries, transfer and matrix, read from FFprobe |
+| `EncoderProfile` | Value object | The hardware or software encoder configuration `HardwareCapabilitiesProber` qualified |
+| `HardwareAccelerator` | Enum | `None`, `Nvenc`, `Vaapi`, `VideoToolbox`, `Qsv`, `Amf` |
+| `ToneMapMethod` | Enum | HDR tone-mapping method: `Hable`, `Reinhard`, `BT2446`, `None` |
+| `AacImplementation` | Enum | The `transcode.aac_implementation` setting (see [Ports](#ports)) |
+| `PresentationSelection` | Value object | The presentation an encode produces: mode, source hash, selected video and audio streams, output container and encoding fingerprint |
+| `StreamType` | Enum | `Video`, `Audio`, `Subtitle`, each encoded separately |
 
 ## Domain Services
 
@@ -145,7 +153,9 @@ for a worker to rebuild it from the same source.
 | `TranscodeJobCompleted` | An encoding job finishes successfully |
 | `TranscodeJobFailed` | An encoding job fails |
 | `TranscodeSessionAttached` | A client attaches to a transcoding session |
-| `PlaybackPositionChanged` | The playback position in a session changes (drives the segment priority queue) |
+| `PlaybackPositionChanged` | Party starts, pauses or seeks playback; `PlaybackPositionChangedListener` turns it into `UpdateTranscodePositionCommand` for the job's session (drives the segment priority queue) |
+
+`TranscodeJobService` raises `TranscodeJobCreated`. No code raises `TranscodeJobCompleted`, `TranscodeJobFailed` or `TranscodeSessionAttached`; `TranscodeJobEventSubscriber` logs the first two, and Notification maps them to its background-jobs category.
 
 ## API Endpoints
 
@@ -200,9 +210,13 @@ The live media playlist, init segment, media segment and subtitle segment routes
 | Direction | Context | Details |
 |-----------|---------|---------|
 | Depends on | Shared | `Uuid`, `PublicId`, `NativeExecutionClientInterface`, `Async`, `JobMonitoringMiddleware` |
-| Depended on by | Party | References transcode jobs for synchronized playback |
-| Depended on by | Media | The track stream transcodes audio through `AudioRenditionPortInterface` and reads `TranscodeSettingDefinitions` keys (the `Transcode Audio Rendition Contract` Deptrac layer) |
-| Depended on by | Notification | Listens to transcode domain events for user notifications |
+| Depended on by | Party | Raises `PlaybackPositionChanged` for synchronized playback and checks access through `PlaybackAccessInterface` (the `Transcode Playback Access Contract` Deptrac layer) |
+| Depended on by | Media | The track stream transcodes audio through `AudioRenditionPortInterface` and reads `TranscodeSettingDefinitions` keys (the `Transcode Audio Rendition Contract` Deptrac layer); playback delivery uses `MediaExecutionPolicyInterface`, `CompletedVideoArtifactPort`, `CompletedVideoDeliveryPort`, `CopyPresentationPortInterface` and `StreamAuthPortInterface` (the `Transcode Delivery Contract` layer) |
+| Depended on by | Catalog | Ingest probes audio and video files through `AudioProbePortInterface` and `VideoProbePortInterface` (the `Transcode Probe Contract` layer) |
+| Depended on by | Notification | Maps `TranscodeJobCompleted` and `TranscodeJobFailed` to its background-jobs category |
+| Depends on | Catalog | Reads videos through `VideoPortInterface` and `VideoRepositoryInterface` |
+| Depends on | Auth | `AuthenticatedUserIdentityInterface`, `UserIdentifierResolverInterface` |
+| Depends on | Media | `PlaybackMediaAccessInterface` |
 | Depends on | QoL | QoL contracts only. `TranscodeSessionSubscriber` injects `StreamAdmissionPortInterface` directly to evaluate stream admission and record completion; `QualityFilteringStreamingDecorator` wraps `TranscodeStreamingService` (decoration priority `-1`) to filter manifests by the allowed-tier contract; `QualityLadderPort` and `EncoderProfileFingerprintAdapter` implement QoL contracts |
 
 ## Infrastructure

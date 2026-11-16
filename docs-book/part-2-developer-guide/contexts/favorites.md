@@ -1,6 +1,6 @@
 # Favorites
 
-The Favorites context lets a user mark catalog entities (songs, albums, artists) as favorites and remove them later. Favorites are scoped per-user and deduplicated by `(userId, entityType, entityPublicId)`.
+The Favorites context lets a user mark songs, albums and artists as favorites and remove them later. Each favorite belongs to one user, and a unique constraint on `(userId, entityType, entityPublicId)` keeps a user from holding the same favorite twice.
 
 ## Domain Models
 
@@ -49,6 +49,7 @@ All endpoints are prefixed with `/api` and require an authenticated user.
 | Direction | Context | Details |
 |-----------|---------|---------|
 | Depends on | Shared | `Uuid`, `PublicId`, `PaginatedResponse`, `NotFoundException` |
+| Depends on | Auth | `FavoritesController` identifies the user through `AuthenticatedUserIdentityInterface` |
 | References | Catalog | Stores `entityPublicId` for songs / albums / artists (no hard import; `FavoriteTargetAccess` checks visibility via SQL) |
 | Depended on by | Catalog | `ArtistMergeService` and `AlbumMergeService` keep favorites on an artist, album or song that exists through the two merge ports, as statements inside the merge's transaction |
 

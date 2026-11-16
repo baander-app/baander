@@ -14,7 +14,7 @@ The Library context manages media libraries — collections of media files organ
 
 | Model | Purpose |
 |-------|---------|
-| `LibraryPath` | Filesystem path with validation (must exist, must be readable) |
+| `LibraryPath` | Absolute filesystem path without trailing slashes; rejects an empty or relative path and any `..` sequence |
 | `LibrarySlug` | URL-safe identifier derived from the library name |
 | `LibraryType` | Enum: `Music` (`music`), `Podcast` (`podcast`), `Audiobook` (`audiobook`), `Movie` (`movie`), `TvShow` (`tv_show`) |
 | `LibraryClaimKind` | Enum identifying what holds a library's exclusive lease: `Scan` (`scan`) or `Delete` (`delete`) |

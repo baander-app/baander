@@ -11,7 +11,7 @@ The Session context coordinates an account's playback destination, media selecti
 | `ListeningSession` | One aggregate per user (`user_id` unique): holds the song or video selection, music queue, track index, source-time position, desired and observed playback states, selected destination, active endpoint incarnation, and revision |
 | `Device` | A registered browser device identified by its client-generated `device_id` and owner |
 
-`ListeningSessionState` and `DeviceState` hold constructor/create/reconstitute in sync per the project's aggregate root convention.
+`ListeningSession` and `Device` keep their fields in `ListeningSessionState` and `DeviceState`, which each model's private constructor, `create()` and `reconstitute()` share, as the project's aggregate root convention requires.
 
 ### Playback Models & Operations
 
@@ -40,7 +40,7 @@ Session uses `PlaybackCoordinator` instead of Messenger command handlers for ses
 
 | Event | Trigger |
 |-------|---------|
-| `DeviceRegistered` | Emitted by `Device::create()` when a device is first registered |
+| `DeviceRegistered` | Recorded by `Device::create()` when a device is first registered; no code drains and dispatches it |
 
 Playback commands and complete snapshots use the coordination ports and durable command ledger rather than domain events.
 
@@ -75,7 +75,7 @@ Device mutation routes address a device by its 21-character `PublicId` (`{public
 |--------|------|---------|
 | GET | `/api/devices` | List all devices registered for the current user |
 | POST | `/api/devices` | Register or touch a device (upsert) |
-| PUT / PATCH | `/api/devices/{publicId}` | Rename a device (`#[Route('/{deviceId}', methods: ['PUT'])]`) |
+| PUT | `/api/devices/{publicId}` | Rename a device (`#[Route('/{deviceId}', methods: ['PUT'])]`) |
 | DELETE | `/api/devices/{publicId}` | Forget a device (`#[Route('/{deviceId}', methods: ['DELETE'])]`) |
 
 ## Cross-Context Relationships

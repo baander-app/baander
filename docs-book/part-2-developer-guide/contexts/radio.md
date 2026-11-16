@@ -14,7 +14,7 @@ The Radio context implements internet radio: country station subscription, stati
 | `RadioSession` | An active radio playback session for a user |
 | `StarredStation` | A user's star on a station |
 
-All aggregates follow the State-object pattern, with `*State` classes (`CountrySubscriptionState`, `RadioStationState`, `RadioSourceState`, `RadioSessionState`, `StarredStationState`) holding constructor/create/reconstitute in sync per the project's aggregate root convention.
+All aggregates follow the state-object pattern: each keeps its fields in a `*State` class (`CountrySubscriptionState`, `RadioStationState`, `RadioSourceState`, `RadioSessionState`, `StarredStationState`) that its constructor, `create()` and `reconstitute()` share, as the project's aggregate root convention requires.
 
 ### Value Objects
 
@@ -62,6 +62,8 @@ All aggregates follow the State-object pattern, with `*State` classes (`CountryS
 | `RadioSessionStopped` | Radio playback session stopped |
 | `StationStarred` | User starred a station |
 | `StationUnstarred` | User removed a star |
+
+`RadioSession::start()` and `stop()` record `RadioSessionStarted` and `RadioSessionStopped`, but `RadioSessionService` drains them without dispatching. No code creates the other four events.
 
 ## API Endpoints
 
@@ -112,8 +114,7 @@ All endpoints are prefixed with `/api`.
 |-----------|---------|---------|
 | Depends on | Shared | `Uuid`, `PublicId`, `AbstractDomainEvent`, `ApiResponsesTrait` |
 | Depends on | Auth | `AuthenticatedUserIdentityInterface` for authenticated user resolution |
-| Depended on by | Activity | `ActivityIdentityProjection` resolves user public IDs through `RadioPublicIdentityInterface` |
-| Depended on by | Shared | `WebSocketIdentityLookup` resolves user public IDs through `RadioPublicIdentityInterface` |
+| Depended on by | None | No context imports Radio. Activity's `ActivityIdentityProjection` and Shared's `WebSocketIdentityLookup` read user public IDs with their own SQL, not through `RadioPublicIdentityInterface` |
 
 ## Infrastructure
 

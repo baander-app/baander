@@ -1,13 +1,13 @@
 # Notification
 
-The Notification context handles in-app notifications, push notifications (Web Push via VAPID), email notifications, and webhook delivery to external services (Discord, Slack). It supports per-user notification preferences and HMAC-signed webhook delivery for security.
+The Notification context delivers notifications in the app, by Web Push (VAPID), by email, and to webhooks of external services (Discord, Slack). Each user enables or disables a channel per notification category, and every webhook delivery is signed with HMAC.
 
 ## Domain Models
 
 | Model | Type | Purpose |
 |-------|------|---------|
 | `Notification` | Aggregate Root | In-app notification with read/unread state |
-| `NotificationPreference` | Model | Per-user notification preferences |
+| `NotificationPreference` | Model | Whether a user receives one category on one channel |
 | `NotificationCategory` | Value Object (enum) | Category of a notification event |
 | `NotificationChannel` | Value Object (enum) | Delivery channel (InApp, Email, Push, Webhook) |
 
@@ -119,7 +119,7 @@ All endpoints are prefixed with `/api`.
 
 ### Webhooks
 
-The entire controller is gated with `#[IsGranted('ROLE_ADMIN')]` — only admins can manage webhooks.
+The whole controller is gated with `#[IsGranted('ROLE_ADMIN')]`, so only admins manage webhooks.
 
 | Method | Path | Controller | Purpose |
 |--------|------|------------|---------|
@@ -137,6 +137,7 @@ The entire controller is gated with `#[IsGranted('ROLE_ADMIN')]` — only admins
 | Depends on | Auth | User identification and authentication |
 | Depends on | Library | `LibraryMembershipQueryPort` for scoping media-change notification recipients |
 | Depends on | UserPreference | `SendEmailHandler` resolves the email language through `UserSettingsContractInterface` (the `UserPreference Settings Contract` Deptrac layer) |
+| Depends on | Auth, Library, Transcode, Catalog | `EventCategoryResolver` names their event classes to map them to categories: Auth's security events to Security, `LibraryScanCompleted`, `TranscodeJobCompleted` and `TranscodeJobFailed` to BackgroundJobs, and `AlbumCreated` to MediaChanges |
 | Depended on by | All contexts | Any context that emits domain events can trigger notifications |
 
 ## Infrastructure

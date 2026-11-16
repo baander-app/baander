@@ -1,8 +1,8 @@
 # Shared Kernel
 
-`src/Shared/` is not a bounded context. It provides cross-cutting infrastructure used by all 21 bounded contexts. It follows the same four-layer structure (Domain, Application, Infrastructure, Interface) but contains no business domain logic of its own.
+`src/Shared/` is not a bounded context. It provides cross-cutting infrastructure used by all 21 bounded contexts. It follows the same four-layer structure (Domain, Application, Infrastructure, Interface) but holds no business domain logic of its own.
 
-When you need a primitive type, async utility, or shared controller, look here first before creating something new in your context.
+Before creating a primitive type, an async utility or a shared controller in your context, look for one here.
 
 ## Domain Models
 
@@ -25,7 +25,7 @@ When you need a primitive type, async utility, or shared controller, look here f
 | Model | Purpose |
 |-------|---------|
 | `Cursor` | Opaque cursor-based pagination token |
-| `CursorDirection` | Pagination direction (`asc` or `desc`) |
+| `CursorDirection` | Pagination direction (`next` or `prev`) |
 | `CursorPage` | A page of results with cursor metadata (has next/previous cursors) |
 
 ### Search
@@ -50,7 +50,7 @@ When you need a primitive type, async utility, or shared controller, look here f
 
 | Model | Purpose |
 |-------|---------|
-| `JobStatus` | Enum representing async job statuses (pending, running, completed, failed) |
+| `JobStatus` | Enum of async job statuses (queued, running, finished, failed, cancelled) |
 
 ## Repository Interfaces
 
@@ -68,7 +68,7 @@ Outside a coroutine a signal ends that `usleep()` early, and a Messenger consume
 
 ### Process Pool
 
-`Swoole\ProcessPool` provides isolated worker processes for CPU-bound work inside Swoole, communicating via Unix sockets (`SWOOLE_IPC_UNIXSOCK`). Media encoding and probing do not use `CpuProcessPool`; they run in the worker deployment pair via `NativeExecutionClientInterface` (`bin/worker-native.php`).
+`CpuProcessPool` (`App\Shared\Infrastructure\Swoole\ProcessPool`) runs CPU-bound work in separate worker processes inside Swoole. It starts individual `Swoole\Process` objects, because Swoole forbids creating a `Process\Pool` once the server exists; the workers receive jobs over Unix socket pipes and write their results to a shared `Swoole\Table`. Media encoding and probing do not use `CpuProcessPool`; they run in the worker deployment pair via `NativeExecutionClientInterface` (`bin/worker-native.php`).
 
 ### WebSocket
 
@@ -123,7 +123,7 @@ API output keeps whole seconds (`Y-m-d\TH:i:sP`); cursors keep the microseconds.
 
 ## Caching
 
-Redis-backed tag-aware cache pools via `RedisTagAwareAdapter`. The `noeviction` policy is required for tag invalidation to work correctly.
+Cache pools are Redis-backed and tag-aware (`RedisTagAwareAdapter`). Tag invalidation requires a Redis `maxmemory-policy` of `noeviction` or `volatile-*`.
 
 ## Redis
 
@@ -248,6 +248,10 @@ Shared response types used across contexts:
 | Direction | Context | Details |
 |-----------|---------|---------|
 | Depends on | Auth application contract | The raw WebSocket adapter redeems tickets through a narrow port |
+| Depends on | Auth | `DoctrineLiveSnapshotReader` reads `CurrentUserAuthorityReader`; `AdminAlertService` finds administrators through `UserRepositoryInterface` |
+| Depends on | Library, Playlist | `DoctrineLiveSnapshotReader` reads live-update audiences through `LibraryAudienceReader` and `PlaylistAudienceReader` |
+| Depends on | Party, Transcode | `WebSocketController` dispatches Party's playback commands and Transcode's `UpdateTranscodePositionCommand` |
+| Depends on | Notification | `AdminAlertService` stores administrator alerts as `Notification` rows |
 | Depended on by | All 21 bounded contexts | Types, infrastructure, and shared controllers |
 
 ## See Also

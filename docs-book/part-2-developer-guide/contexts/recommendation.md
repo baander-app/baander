@@ -1,6 +1,6 @@
 # Recommendation
 
-`src/Recommendation/` generates music recommendations using multiple algorithms and stores them for retrieval. It does not own the entities it recommends (artists, genres) — those live in Catalog. This context is purely about computing, persisting, and serving recommendation scores.
+`src/Recommendation/` generates music recommendations with several algorithms and stores them for retrieval. The songs, albums, artists, movies and videos it recommends live in Catalog; this context computes, persists and serves recommendation scores.
 
 ## Domain Models
 
@@ -84,6 +84,7 @@ Unless `$command->foreground` is `true` (used by the CLI commands `app:recommend
 | `RecommendationInsightsPortInterface` | Read access to recommendation coverage, source quality, and freshness metrics | `RecommendationInsightsRepository` |
 | `RecommendationJobPortInterface` | Recommendation job lifecycle operations | `RecommendationJobService` |
 | `RecommendationPublicIdentityInterface` | Resolves and projects public and internal identifiers for recommendations and catalog entities | `RecommendationPublicIdentity` |
+| `ArtistRecommendationMergePortInterface` | Published contract for Catalog's artist merge (the `Recommendation Artist Merge Contract` Deptrac layer): inside the caller's transaction, points the recommendations from or to a merged artist at the target, deleting any that would recommend the target to itself or duplicate one it has, or deletes every recommendation from or to a removed artist | `ArtistRecommendationMerge` |
 
 ## API Endpoints
 
@@ -126,7 +127,7 @@ Admin endpoints live under `RecommendationAdminController` with the `/api/admin/
 | Depends on | Catalog | Song, artist, and genre references (read-only) |
 | Depends on | Library | `LibraryReadScopeProviderInterface` for scoping visible catalog entities |
 | Depends on | Scheduler | `GenerateRecommendationsCommand` is schedulable through the `Scheduler Schedulable Contract` Deptrac layer |
-| Depended on by | — | No contexts depend on Recommendation directly |
+| Depended on by | Catalog | `ArtistMergeService` moves or deletes an artist's recommendations through `ArtistRecommendationMergePortInterface` |
 
 ## Infrastructure
 

@@ -9,10 +9,10 @@ The Party context implements synchronized watch-party playback. Users create a p
 | `SyncedPartySession` | Aggregate Root | Party session with host, video, members, playback state, and jitter compensation |
 | `PartyMember` | Model | A member within a party session |
 | `MemberRole` | Value Object (enum) | Role within a party (`Host`, `Member`) |
-| `PlaybackAction` | Value Object (enum) | Playback command (`Play`, `Pause`, `Seek`) |
+| `PlaybackAction` | Value Object (enum) | Playback command (`Play`, `Pause`, `Seek`, `Join`, `Leave`) |
 | `PlaybackState` | Value Object (enum) | Current playback state (`Stopped`, `Playing`, `Paused`) |
 
-State value objects `SyncedPartySessionState` and `PartyMemberState` keep constructor/create/reconstitute in sync per the project's aggregate root convention.
+`SyncedPartySession` and `PartyMember` keep their fields in the state objects `SyncedPartySessionState` and `PartyMemberState`, which each model's private constructor, `create()` and `reconstitute()` share, as the project's aggregate root convention requires.
 
 ## Domain Events
 
@@ -91,8 +91,8 @@ The lookup takes the session's 21-character `PublicId`. It sits outside the defa
 | Direction | Context | Relationship |
 |-----------|---------|-------------|
 | Depends on | Shared | Uses `Uuid`, `PublicId`, and `LivePartyRoomsPortInterface` |
-| Depends on | Catalog | `PartyPublicIdentity` and `PartyMediaAccess` resolve video records |
-| Depends on | Transcode | References video playback access (`PlaybackAccessInterface`) and transcode job data |
+| Depends on | Catalog | `PartyPublicIdentity` translates video IDs by reading Catalog's `videos` table with SQL; no Catalog class is imported |
+| Depends on | Transcode | References video playback access (`PlaybackAccessInterface`) and transcode job data; the start, pause and seek handlers raise Transcode's `PlaybackPositionChanged` |
 | Depends on | Auth | User identification and authentication |
 
 ## Infrastructure

@@ -10,14 +10,14 @@ The Scheduler context implements a cron-like scheduled job system. Jobs are regi
 |-------|---------|
 | `ScheduledJob` | A scheduled job: schedule, target command, status, and run metadata |
 
-`ScheduledJobState` holds constructor/create/reconstitute in sync per the project's aggregate root convention.
+`ScheduledJob` keeps its fields in `ScheduledJobState`, which its private constructor, `create()` and `reconstitute()` share, as the project's aggregate root convention requires.
 
 ### Value Objects
 
 | Model | Purpose |
 |-------|---------|
-| `JobType` | Job kind (enum) |
-| `ScheduleStatus` | Job lifecycle status (enum) |
+| `JobType` | Job kind (enum): `messenger` or `console` |
+| `ScheduleStatus` | Job lifecycle status (enum): `active`, `paused` or `disabled` |
 
 ### Marker Interfaces & Traits
 

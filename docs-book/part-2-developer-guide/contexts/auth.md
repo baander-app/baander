@@ -41,7 +41,7 @@ The Auth context signs users in, issues their tokens, and validates those tokens
 
 ## Commands & Handlers
 
-Commands and handlers are organized into feature namespaces under `Application/Command/` and `Application/CommandHandler/`: `LoginBlock/`, `OAuth/`, `Passkey/`, `Totp/`, and `User/`. Password login is checked by `PasswordAuthenticator` on the API firewall, not by a command. Five application services under `Application/Service/` are shared by the OAuth handlers: `TokenPairIssuer` mints every new token pair, `OAuthClientAuthenticator` identifies and authenticates the client of an OAuth request, `PendingDeviceCodeFinder` resolves a user code as the user typed it, `AuthorizationRequestValidator` checks an authorization request for the signed-in user, and `ClientRevoker` revokes a client together with its tokens.
+Commands and handlers are organized into feature namespaces under `Application/Command/` and `Application/CommandHandler/`: `LoginBlock/`, `OAuth/`, `Passkey/`, `Totp/`, and `User/`. Password login is checked by `PasswordAuthenticator` on the API firewall, not by a command. Seven application services under `Application/Service/` are shared by the OAuth handlers: `TokenPairIssuer` mints every new token pair, `OAuthClientAuthenticator` identifies and authenticates the client of an OAuth request, `PendingDeviceCodeFinder` resolves a user code as the user typed it, `AuthorizationRequestValidator` checks an authorization request for the signed-in user, `ClientRevoker` revokes a client together with its tokens, `ChainConnectionCloser` closes the WebSocket connections of a revoked chain, and `IssuanceLockTimeout` bounds the lock waits of a token-issuing transaction.
 
 | Command | Handler | Purpose |
 |---------|---------|---------|
@@ -160,6 +160,8 @@ The verification email that follows registration is sent in the stored language,
 | `PasskeyDeleted` | Passkey removed |
 | `EmailVerified` | Email verification completed |
 | `DeviceCodeApproved` | The user approved a device request; Notification maps it to the Security category (`device_code.approved`) |
+
+No code raises `PasskeyDeleted`: `DELETE /api/auth/passkey/{publicId}` removes the passkey through the repository without an event, although Notification maps the event to the Security category.
 
 ## API Endpoints
 

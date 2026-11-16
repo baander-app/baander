@@ -14,10 +14,10 @@ Each bounded context owns one business capability, with its own domain model, ru
 | [Library](library.md) | Media library management and file scanning |
 | [Lyrics](lyrics.md) | Lyrics storage and retrieval |
 | [Media](media.md) | Image storage, media streaming, playback delivery negotiation, and BlurHash |
-| [Metadata](metadata.md) | Audio/video tag parsing and external API enrichment (Discogs, Last.fm, Spotify, MusicBrainz, TasteDive, CoverArtArchive, TMDB) |
+| [Metadata](metadata.md) | Audio tag parsing and external API enrichment (Discogs, Last.fm, Spotify, MusicBrainz, TasteDive, CoverArtArchive, TMDB) |
 | [Notification](notification.md) | Push, email, webhook, and in-app notifications |
 | [Party](party.md) | Synchronized watch-party playback |
-| [Playlist](playlist.md) | Manual and smart playlist management |
+| [Playlist](playlist.md) | Manual playlists, collaborators, and stored smart playlist rules |
 | [QoL](qol.md) | Stream governance and quality-of-life allocation |
 | [Radio](radio.md) | Internet radio, country subscriptions, and station starring |
 | [Recommendation](recommendation.md) | Music recommendation algorithms |
