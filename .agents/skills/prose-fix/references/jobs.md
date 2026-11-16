@@ -137,7 +137,8 @@ to adjust the sound for their headphones or speakers."
 for each. Start from a preset or shape it with graphic or parametric EQ, add
 compression, stereo width or crossfeed, and save it as that device's profile. Switch
 devices, switch profiles."
-**Ledger:** presets, graphic and parametric EQ, compression, stereo width, crossfeed and
+**Ledger:** "Headphones and speakers don't sound alike": framing, no product claim.
+Presets, graphic and parametric EQ, compression, stereo width, crossfeed and
 per-device profiles: `README.md`, "Listen in the web player". Activating a saved
 profile: `docs-book/part-2-developer-guide/contexts/user-preference.md` (EQ device
 profiles with activate and deactivate).
@@ -146,7 +147,8 @@ profiles with activate and deactivate).
 context coordinates an account's playback destination, media selection, music queue,
 and playback position, alongside registered user devices."
 **After:** "Start an album on the laptop in the kitchen and finish it on the computer in
-the living room. The song, the queue and the position move with you, and so does
+the living room, wherever you're signed in to Bånder. The song, the queue and the
+position move with you, and so does
 whether it was playing or paused. Casting to AirPlay, Chromecast and DLNA receivers is
 planned and not available yet."
 **Ledger:** selection, queue, position and playing state follow the transfer, and each

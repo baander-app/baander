@@ -92,7 +92,13 @@ above.
   Other limits may move out of the opening into a labeled section or disclosure on
   the same page, at their original strength. Never drop a limit.
 - Give a draft the documented limits of the features it leads with, placed by the
-  rule above.
+  rule above. Look for them in the feature's `README.md` section, its operator- and
+  developer-guide pages, and the open items in `ROADMAP.md`, and name the places
+  checked in the report.
+- An opening sentence about the reader's own situation, such as "Headphones and
+  speakers don't sound alike", makes no claim about Bånder and needs no source. Keep
+  it to an observation the reader would recognize, and list it in the claim ledger as
+  framing.
 
 ## Verify preservation
 
@@ -120,8 +126,8 @@ If PHP is unavailable, perform these comparisons manually and disclose that the
 script was not run.
 
 In the Jobs register, also write a claim ledger: each claim the copy adds or keeps
-in the opening, with its source (a path and line, a manual page, or a measurement
-record), and for each translated figure its assumption and arithmetic. Every number
+in the opening, with its source (a path with a line or section, a manual page, or a
+measurement record), and for each translated figure its assumption and arithmetic. Every number
 and code token the audit reports as gained must appear in the ledger. The audit
 cannot see a new claim that carries no number, so check each sentence of the opening
 against the ledger. A draft has no baseline to audit; check it against the ledger
@@ -148,8 +154,10 @@ not require a GitHub MCP connection or session-specific output mirrors.
 
 Report the files changed, the chosen register where useful, the verification result,
 and any unresolved content questions. For Jobs-register work, report the claim
-ledger, and put it in the commit message of the change it covers so the evidence
-stays tracked. For review-only work, give concrete findings
+ledger. Whoever commits the change puts the ledger in that commit message so the
+evidence stays tracked; a worker that does not commit hands the ledger to the agent
+that does. The ledger is evidence: quote it as written, not rewritten as prose. For
+review-only work, give concrete findings
 with file and line references or short quotations, identify strong passages worth
 keeping, and recommend a register. Review chapters individually when the scope
 warrants it; do not turn a rating request into an edit.
