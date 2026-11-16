@@ -108,6 +108,24 @@ extension-capable database image. CI uses `BAANDER_TEST_CHECKOUT_IN_IMAGE=1`
 with its freshly built image; local runs copy the current source and installed
 dependencies into each container.
 
+Without `BAANDER_TEST_POSTGRES_IMAGE`, the runners use the local tag
+`baander-database:latest`, the default in `compose.test.yaml` and
+`packages/baander-tooling/resources/tooling-defaults.json`. Nothing rebuilds that tag
+for you: only a manual build refreshes it, so it keeps whatever
+`docker/postgres/Dockerfile` described when it was last built. On the development host
+it was a Debian 12 build with PGroonga 4.0.5 until 2026-11-16, although the
+Dockerfile had moved to Debian 13 on 2026-11-03. After the Dockerfile changes, rebuild
+the tag, or name a current build with `BAANDER_TEST_POSTGRES_IMAGE`:
+
+```bash
+docker build --file docker/postgres/Dockerfile --tag baander-database:latest docker/
+```
+
+An image with PGroonga older than 4.1.0 fails `PgroongaSearchCompatibilityTest` with a
+message that names 4.1.0. CI does not use the local tag; it pulls
+`baander-postgres:latest`, which the "Build PostgreSQL Image" workflow publishes on a
+`master` push that changes `docker/postgres/`.
+
 The coordinator discovers the selection once, then runs three phases. Ordinary
 unit and rule tests use ParaTest workers recycled after 25 files. The explicit
 native manifest, `scripts/backend-native-tests.json`, assigns Swoole, fork,

@@ -257,7 +257,7 @@ that limitation is recorded for follow-up, with no runtime change in the 2026-10
 
 ## Resume here
 
-### State on 2026-11-15
+### State on 2026-11-16
 
 `master` on GitHub and Forgejo carries, on top of `6912eaaf6`, the work pushed on
 2026-11-15: the CI fixes (`d1504daa3` to `77bb3c8e4`), two web fixes (`9ecf84a3d`,
@@ -268,20 +268,19 @@ publication is the local build of `57fc9e1e3` from 2026-11-13, before all of the
 Pushed later on 2026-11-15, on top of `23f899976`: the matching follow-ups
 (`a7d1c7466` to `6991a9f9a` and their roadmap record), with the fix for the CI cleanup
 limit. Pushed on 2026-11-16, on top of `8d119f5df`: the matching leftovers
-(`a822bf362` to `98a89db8a`).
+(`a822bf362` to `98a89db8a`). On the local branch `fix/pgroonga-cleanup-race`, not
+pushed: the PGroonga cleanup race fix (`8a3cd708b` to `9e7d164bd`, on top of
+`44e315ee3`).
 
 - **Master CI.** No `CI` run on `master` has been green since 2026-11-05. Run
-  43695574134 on the pushed tip `23f899976` passed steps 1 to 38 of the quality gate
-  in its first attempt, among them steps 28 and 37, which the pushed fixes repaired.
-  It failed step 39 on a cleanup time limit after the step's checks had passed, and
-  its second attempt failed while building the CI image. Its third attempt, and run
-  43724380366 on the new tip `8d119f5df`, both passed step 39 and failed step 41, the
-  backend suite: the third attempt on one test that met the PGroonga failure of
-  throwaway schemas, the run on `8d119f5df` on the step's one-hour time budget; see
-  [Master CI repair](#master-ci-repair). Steps 42 onward have not run on GitHub with
-  the fixes, among them the repaired steps 45 and 53. The first green run is the point
-  to write the CI-repair learning with `ce-compound`, which the user confirmed on
-  2026-11-13.
+  43826408058 on `44e315ee3` passed the whole quality gate on 2026-11-16, step 41 in
+  2,276 of its 3,600 seconds, and failed the `build-and-push` job at its check that
+  the application image cannot be pulled anonymously. The user decided the same day
+  that every image is public; the PGroonga branch removes that check (`9e7d164bd`).
+  Run 43826369096 on `98a89db8a` failed step 39 on a DPoP key with a short
+  coordinate, fixed on the same branch. See
+  [Master CI repair](#master-ci-repair). The first green run is the point to write the
+  CI-repair learning with `ce-compound`, which the user confirmed on 2026-11-13.
 - **Web fixes.** With the same push, a click on the active lyrics effect turns effects
   off, and the songs view's genre, artist and album panes scroll; see
   [Lyrics effect toggle and song browser panes](#lyrics-effect-toggle-and-song-browser-panes).
@@ -319,13 +318,22 @@ limit. Pushed on 2026-11-16, on top of `8d119f5df`: the matching leftovers
 - **Next plans.** Better compression of material like the failed held-out recording
   (lossless plan KD12) follows the rename. Its fourth held-out set may be read only
   after the benchmark data has moved and its ledger is rewritten.
-- **Next.** PGroonga isolation of throwaway test schemas, chosen by the user on
-  2026-11-16 as the next item, since it fails step 41 in any order that puts a
-  schema-dropping test first.
+- **PGroonga cleanup race.** The item the user chose on 2026-11-16 as "PGroonga
+  isolation of throwaway test schemas" is built on the local branch
+  `fix/pgroonga-cleanup-race` and not pushed; its cause was PGroonga 4.0.5, not the
+  schema drops. See [PGroonga cleanup race](#pgroonga-cleanup-race). When the user
+  asks for the push: push `master` up to `7c2deaa24` first, wait until "Build
+  PostgreSQL Image" has published `baander-postgres:latest`, then push the rest,
+  since CI pulls that image at the start of each run. The persistent instance moves
+  to the new image after the push.
 - **Cleanup.** GitHub and Forgejo carry only `master`. Left locally on 2026-11-16: the
   merged branches `fix/scan-artist-credits`, `fix/matching-follow-ups` and
   `fix/matching-leftovers`, the verification worktree `/home/martin/dev/baander-ml-verify`
-  (detached at `0405c6142`), and two
+  (detached at `0405c6142`), the PGroonga worktrees `/home/martin/dev/baander-pgrn-diag`
+  (detached at `8a3cd708b`, with an uncommitted autovacuum logging setting in
+  `compose.test.yaml`) and `/home/martin/dev/baander-pgrn-verify` (detached at
+  `dfbd5684d`), the images `baander-database:pgroonga-4.0.5` and
+  `baander-database:pgroonga-4.1.0`, and two
   worktrees whose heads are in `master`, `/home/martin/dev/baander-verify`
   (`ff68e09f2`) and `~/.codex/worktrees/ba59/baander` (`ba5750533`).
   `/home/martin/dev/baander-baac-lossless` stays, detached at `a97ae0058`, until its
@@ -874,21 +882,38 @@ Open:
     coverage": of 12,702 tests, one errored.
     `NewAlbumMetadataSyncTest::testIngestRequestsAMatchOfTheAlbumAScanCreatedOnceTheSettlingDelayPasses`
     got `pgroonga: PGrnLookupWithSize: object isn't found` while an import saved an
-    album. The PGroonga solution page names that message as the symptom, and three
-    migration tests that create and drop throwaway schemas ran earlier in the same
-    lane (`AacImplementationValueMigrationTest`, `ArtistCreditedNameMigrationTest`,
-    `JobMonitorInstantPrecisionMigrationTest`).
+    album. The missing index was the one the test's own setup had just built, while
+    replaying every migration in one transaction; the three migration tests that ran
+    earlier in the lane (`AacImplementationValueMigrationTest`,
+    `ArtistCreditedNameMigrationTest`, `JobMonitorInstantPrecisionMigrationTest`) did
+    not cause it. See [PGroonga cleanup race](#pgroonga-cleanup-race).
 - Run 43724380366 on `8d119f5df` passed steps 1 to 40, step 39 among them, and failed
   step 41 with exit 124: the step's time budget of 3,600 seconds ran out while lane
   `stack-1` was still running. Every lane ran slower than in the third attempt above
   (ordinary 248 s against 153, native 689 s against 496, `stack-2` 2,609 s against
   1,579), and `stack-1`'s output was lost with the lane. Its PostgreSQL log shows the
-  same PGroonga error in an artist insert about a minute before the budget ran out.
-- Steps 42 onward have not run on GitHub with the fixes, among them the repaired
-  steps 45 and 53; steps 46 to 53 have not run there since the port. Locally, on the
-  host against images built from the fixes, steps 28 (Chromium), 37, 45 and 46 to 53
-  pass. Not run with the fixes anywhere: steps 42 to 44 and 54 onward, and the gate
-  as one job in the runner container.
+  same PGroonga error in an artist insert about a minute before the budget ran out,
+  in the session of `MusicBrainzMatchApplyTest`, against the index its own setup had
+  built.
+- Run 43826408058 on `44e315ee3` (2026-11-16) passed the whole quality gate, the
+  repaired steps 45 and 53 and steps 42 onward among them. Step 41 ran 13,028 tests in
+  2,276 seconds: ordinary 167.6 s, native 489.7 s, `stack-1` 1,559.3 s, `stack-2`
+  1,524.4 s, back to the third attempt's pace, so the slowdown on `8d119f5df` was the
+  runner's. Its PostgreSQL logs hold no PGroonga error. The run failed in the
+  `build-and-push` job at "Application image is not publicly pullable":
+  `scripts/ghcr-private-probe.sh` fetched the manifest of
+  `ghcr.io/baander-app/baander:latest` with an empty Docker configuration. A manifest
+  fetch with an empty configuration from the development host succeeded for that
+  image and for `ghcr.io/baander-app/baander-postgres:latest` the same day. The user
+  decided on 2026-11-16 that every image is public, so the check had become wrong;
+  `9e7d164bd` on the PGroonga branch removes it from the application and Nginx
+  workflows.
+- Run 43826369096 on `98a89db8a` failed step 39 in
+  `DevelopmentAcceptanceTest::testDpopProofHasVerifiableEs256SignatureAndBoundClaims`
+  (`openssl_verify(): Supplied key param cannot be coerced into a public key`). The
+  development acceptance client's DPoP key took OpenSSL's coordinates without their
+  leading zero bytes, which about one key in 128 has; the fix is `41bc3d439` on the
+  PGroonga branch.
 - Each run draws a new test-order seed, so another order-dependent test can still
   surface in step 41.
 - The registry release job failed once on a load-smoke lookup that answered 503; it
@@ -1041,9 +1066,9 @@ Open:
   around the enricher's flush, which is separate work); a retag is any byte change at a
   song's path, so a library-wide ReplayGain pass replaces hand-made credits on the next
   scan (the settled retag decision).
-- Housekeeping: the postgres-remediation `doctrine.md` version list is stale; the
-  PGroonga throwaway-schema failure is a candidate for the extension inventory once its
-  cause is isolated; `composer normalize` fails on `master`.
+- Housekeeping: the postgres-remediation `doctrine.md` version list is stale;
+  `composer normalize` fails on `master`. The PGroonga part of this item is done; see
+  [PGroonga cleanup race](#pgroonga-cleanup-race).
 
 ### MusicBrainz matching
 
@@ -1101,8 +1126,10 @@ Verification on 2026-11-15:
   both in tests the branch does not touch. `StreamedResponseProcessorTest` once got
   curl's exit 52 where it expects 18, and passed three reruns on its own.
   `CoveredIndexPersistenceTest` failed on `pgroonga: failed to remove column` during
-  an `ANALYZE`, the order-dependent PGroonga failure of throwaway test schemas, and
-  passed when run directly after `AlbumMatchClaimMigrationTest`.
+  an `ANALYZE` and passed when run directly after `AlbumMatchClaimMigrationTest`. That
+  error is two PGroonga cleanups colliding over the leftover objects of dropped
+  indexes, not the "object isn't found" failure; see
+  [PGroonga cleanup race](#pgroonga-cleanup-race).
 - Static gates at `85bfb293b`: PHPStan reports no errors, Deptrac 0 violations,
   `lint:container` passes, and the OpenAPI specification and the generated web client
   match the application.
@@ -1158,12 +1185,6 @@ Open:
 - From the code review, not built: a test that fails when the MusicBrainz adapter
   goes back to the interruptible sleep. The other test leftovers were delivered by
   [Matching leftovers](#matching-leftovers).
-- `AlbumMatchClaimMigrationTest` replays the migrations, PGroonga indexes included,
-  into a throwaway schema and drops it, as the older migration tests do. The second
-  full run above hit the PGroonga failure in a later suite. Isolating its mechanism
-  is the housekeeping item under
-  [Scan artist credits, song lengths and lyrics outcomes](#scan-artist-credits-song-lengths-and-lyrics-outcomes);
-  until then a full run can fail on it in any order that puts such a test first.
 - From the simplification pass, left as they are: the same User-Agent string in the
   LRCLIB, MusicBrainz and Cover Art Archive adapters; the ranking of candidates
   written twice, in the dialog's search handler and the matcher (predates the branch);
@@ -1317,6 +1338,131 @@ Open:
   cites the removed assigner; it is due at the next learnings refresh.
 - `dev-docs/worker-runtime-inventory.md` holds 15 links that were broken before this
   branch.
+- The plan file stays until the next cleanup retires it.
+
+### PGroonga cleanup race
+
+Delivered from
+[the PGroonga cleanup race plan](docs/plans/2026-11-16-0919-fix-pgroonga-cleanup-race-plan.md)
+on the local branch `fix/pgroonga-cleanup-race` (`8a3cd708b` to `9e7d164bd`, on top
+of `44e315ee3`), not pushed. The user chose the item on 2026-11-16 as "PGroonga
+isolation of throwaway test schemas" and answered the plan's questions the same day:
+the database image moves to PGroonga 4.1.0, and the persistent instance moves to it
+with its data in this work, after the push.
+
+The cause was not the schema drops. PGroonga keeps an index's data in Groonga objects
+outside PostgreSQL's catalog, and its cleanup of objects whose index no longer exists
+runs in every `VACUUM` and `ANALYZE` of a table with a PGroonga index, autovacuum's
+included, and in `pgroonga_vacuum()`. In 4.0.5 that cleanup looked each index up
+under the cleaning session's snapshot, so it deleted the objects of an index another
+session had built and not yet committed (upstream GH-1013, fixed in 4.1.0 on 2026-10-09). A test that builds
+its schema with `FinalSchemaBootstrap` replays all 28 migrations, five PGroonga indexes
+among them, in one transaction; an autovacuum during the replay left the test with an
+index that answered "object isn't found". Each of the six such failures on record,
+from 2026-10-22 to 2026-11-15, hit the index the failing test had just built. The
+"failed to remove column ... failed to stat" error during `ANALYZE` is a second
+symptom: two cleanups colliding over the leftover objects of dropped indexes, which
+4.1.0 still allows.
+
+- **Image** (U2, `7c2deaa24`). `docker/postgres/Dockerfile` and `docker-compose.yml`
+  pin `postgresql-18-pgdg-pgroonga` 4.1.0-1, and the developer guide names the
+  version and why it is the minimum. No migration.
+- **Leftovers before a test's cleanup** (U3, `ba62eb577`). `PgroongaLeftovers::clear()`
+  takes SHARE UPDATE EXCLUSIVE on every table with a PGroonga index, which autovacuum
+  skips rather than waits for, and runs `pgroonga_vacuum()` as the only cleanup in the
+  database; inside a transaction the locks last until it ends.
+  `CoveredIndexPersistenceTest` and the image read-scope plan fixture call it before
+  their `ANALYZE`.
+- **Regression test** (U4, `7c62a6a42`). `PgroongaUncommittedIndexTest` builds an index
+  on a new table in one session's open transaction while another session runs
+  `ANALYZE`, `VACUUM` or `pgroonga_vacuum()`, then commits and searches.
+  `PgroongaSearchCompatibilityTest` requires PGroonga 4.1.0 in a case of its own, so
+  the messaging gate, which runs it, needs 4.1.0 too.
+- **Guard** (U5, `120088fe6`). `PgroongaCleanupConventionTest` fails when a file under
+  `tests/` runs `ANALYZE`, `VACUUM` or `pgroonga_vacuum()` without calling the helper,
+  unless the guard's reviewed list holds the file with its count and a reason.
+- **Documentation** (U6). The extension inventory, the solution page, renamed to
+  `docs/solutions/developer-experience/pgroonga-4-0-cleanup-deletes-indexes-of-uncommitted-transactions.md`, the testing conventions, the backend runner page and the
+  development environment guide describe the above.
+- **Beside the plan**, both on the user's word of 2026-11-16: the development
+  acceptance client's DPoP key always carries 32-byte coordinates (`41bc3d439`), the
+  cause of the step 39 failure in run 43826369096; and every image is public on GHCR,
+  so the check that failed a push when the application or Nginx image could be pulled
+  anonymously is removed, with its script and test cases, and the CI guide lists every
+  image as public (`9e7d164bd`).
+
+Verification on 2026-11-16:
+
+- Two database images built the same day from the Dockerfile, differing only in the
+  PGroonga package (Debian 13.7, PostgreSQL 18.7-1.pgdg13+2, Groonga 16.1.5):
+  `baander-database:pgroonga-4.0.5` (`cbcbb462e4f1`) and
+  `baander-database:pgroonga-4.1.0` (`181e00534c51`).
+- Probes on disposable containers of both images, with PostgreSQL's default
+  configuration:
+  - dropping a schema with all five PGroonga tables broke no later insert or search,
+    and `pgroonga_vacuum()` removed its leftovers;
+  - with autovacuum off, a second session's `ANALYZE`, `VACUUM` or `pgroonga_vacuum()`
+    during an uncommitted index build made the index fail after the commit on 4.0.5,
+    in all three cases, with `22023 ... object isn't found`, and `REINDEX` repaired
+    it; on 4.1.0 all three passed;
+  - with autovacuum alone at a one-second naptime, a ten-second build lost its
+    objects on 4.0.5 and kept them on 4.1.0 through ten autovacuum runs;
+  - two cleanups released at once into 50 leftover indexes collided in 30 of 30 tries
+    on both versions (one failed with "failed to remove column", or on 4.1.0 twice with
+    "nonexistent object"); the other finished, and a cleanup run alone afterwards
+    left no orphan;
+  - on 4.1.0, autovacuum skipped every table held in SHARE UPDATE EXCLUSIVE and logged
+    "skipping vacuum ... lock not available"; in 20 tries the helper's lock request
+    cancelled the autovacuum worker that held `songs`, and its `pgroonga_vacuum()`
+    raised no error and left no orphan.
+- A full backend run on 4.0.5 with every autovacuum logged (seed 41160, master's code):
+  autovacuum processed PGroonga-indexed tables 27 times in `stack-1` and 38 times in
+  `stack-2`, each a PGroonga cleanup. No PGroonga error came up that run; its one
+  failure is the audio rendition test below.
+- The branch's tests: on 4.0.5 the three regression cases failed with
+  `object isn't found` and the version floor with its 4.1.0 message, and the tests run
+  after them in the same lane passed; on 4.1.0 all 19 tests of the targeted set passed, none
+  skipped, with no PGroonga error in the PostgreSQL log.
+- Five full backend runs on 4.1.0 at `dfbd5684d`, 13,028 tests in 1,179 files each, all
+  passed with no `pgroonga:` error in any lane's PostgreSQL log:
+
+  | Seed | ordinary | native | `stack-1` | `stack-2` |
+  |---|---|---|---|---|
+  | 20261116 | 98.7 s | 344.9 s | 1,420.0 s | 1,382.3 s |
+  | 7341 | 89.6 s | 341.4 s | 1,408.3 s | 1,360.1 s |
+  | 99881 | 94.8 s | 340.3 s | 1,409.3 s | 1,376.0 s |
+  | 424242 | 95.9 s | 341.0 s | 1,390.3 s | 1,377.0 s |
+  | 31337 | 93.2 s | 340.9 s | 1,403.3 s | 1,370.5 s |
+
+  The run on 4.0.5 above took 1,444.0 s and 1,405.6 s in its stack lanes, so 4.1.0's
+  extra catalog check showed no cost in lane time.
+- PHPStan over the whole project reports no errors and Deptrac 0 violations at
+  `dfbd5684d`. The tooling tests that read `docker/postgres` pass
+  (`DevelopmentImagePinsTest` 11, `PresetDeploymentTest` 28,
+  `PresetPostgresSettingsTest` 10, `PythonBoundaryTest` 8), and so do the 6 tests of
+  `DevelopmentAcceptanceTest` at `41bc3d439`; its new case failed first on a key with a
+  31-byte coordinate.
+- Simplification: three reviewers; applied the removal of single-use connection
+  aliases (`dfbd5684d`). Left as they are: the new scanner repeats
+  `PoolSafeSqlScanner`'s literal reading and line counting, which only a shared helper
+  that edits that scanner would remove; the two new integration tests each define the
+  project's PGroonga index options and their own throwaway schema.
+
+Open:
+
+- The persistent instance moves to the 4.1.0 image after the push: a verified dump, a
+  rehearsal on a copy of its volume, then `make dev-up` on the new image,
+  `ALTER EXTENSION pgroonga UPDATE`, `pgroonga_list_broken_indexes()` and `REINDEX` of
+  any index it names. On 4.1.0 that probe was not tried against a broken index.
+- `AudioRenditionWorkerHandoffTest` failed in the 4.0.5 run above with
+  `Audio transcoding failed: Cannot safely resolve filesystem path` on the `.part` path
+  of a rendition (`AudioRenditionCache::validatePaths`), as another of its tests did on
+  2026-11-07. Separate work.
+- Deferred by the plan, each separate work: a template database instead of about 500
+  migration replays per run; the test stacks start PostgreSQL with its defaults, not
+  `docker/postgres/conf/postgresql.conf`; nothing checks that the local default test
+  image `baander-database:latest` is current, and on the development host it was a
+  Debian 12 build until 2026-11-16; an upstream report of the cleanup collision.
 - The plan file stays until the next cleanup retires it.
 
 ### Lyrics effect toggle and song browser panes

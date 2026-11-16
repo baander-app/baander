@@ -163,6 +163,27 @@ producer commits or rolls back. Production runtime drills use independent
 connections and disposable services for that purpose; their fixtures are not
 DAMA-wrapped functional tests.
 
+### PGroonga Cleanup in Tests
+
+A test that runs `ANALYZE` or `VACUUM` on a table with a PGroonga index, or calls
+`pgroonga_vacuum()`, first calls `PgroongaLeftovers::clear()` in the same file. Called
+inside a transaction, the helper keeps its locks until that transaction ends, so they
+also cover an `ANALYZE` the test runs in it:
+
+```php
+PgroongaLeftovers::clear($connection);
+$connection->executeStatement('ANALYZE songs');
+```
+
+Each of those statements runs PGroonga's cleanup of the search data that dropped
+indexes and throwaway schemas leave behind, and when two cleanups meet over the same
+leftovers, one of them fails, for example with "failed to remove column". The helper
+clears the leftovers while it holds locks that autovacuum skips, so the test's own
+cleanup finds nothing to collide over. `PgroongaCleanupConventionTest` fails on a cleanup statement in a test file that
+does not call the helper, unless the file is on its reviewed list with an exact count
+and a reason; add a file there only when its cleanups never run or reach no table with
+a PGroonga index.
+
 ### Example: Functional Test (Full Pattern)
 
 `AddFavoriteRequest` validates that `entityPublicId` is a 21-character `PublicId` (`/^[A-Za-z0-9_-]{21}$/D`), and `AddFavoriteHandler` checks through `FavoriteTargetAccessInterface` that the target entity exists in a library visible to the user:

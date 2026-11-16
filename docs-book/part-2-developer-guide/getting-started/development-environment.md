@@ -201,6 +201,18 @@ it, because only the lost operator image could have retired it; that case, and a
 database whose applied migrations were later rewritten, need a repair or a data reset,
 which the instance's owner approves.
 
+Retained data that starts on a newer database image keeps its old extension versions:
+`pg_extension.extversion` changes only when `ALTER EXTENSION ... UPDATE` runs, and no
+migration runs it. The next pending migration then blocks at its checkpoint rehearsal.
+Before a pending migration runs, the instance dumps the live database, restores the
+dump into a scratch container of the instance's database image, and compares the
+restored catalog, extension versions included, with the catalog it recorded from the
+live database. The restore creates each extension at the image's default version, so
+after the image moves from PGroonga 4.0.5 to 4.1.0 the comparison fails with "Restored
+catalog differs from the checkpoint; live migration remains blocked." The migration
+stays blocked until `ALTER EXTENSION pgroonga UPDATE` has run over a direct connection
+to the instance's PostgreSQL, as the database owner.
+
 ## Media mounts
 
 To create libraries automatically during startup, copy `dev.local.example.json`
