@@ -323,20 +323,20 @@ GitHub had published the PGroonga 4.1.0 database image.
   that day as "PGroonga isolation of throwaway test schemas". Its cause was PGroonga
   4.0.5, not the schema drops. The database image and the persistent instance run
   PGroonga 4.1.0. See [PGroonga cleanup race](#pgroonga-cleanup-race).
-- **Cleanup.** GitHub and Forgejo carry only `master`. Left locally on 2026-11-16:
-  - the merged branches `fix/scan-artist-credits`, `fix/matching-follow-ups` and
-    `fix/matching-leftovers`;
-  - the verification worktree `/home/martin/dev/baander-ml-verify` (detached at
-    `0405c6142`);
-  - two worktrees whose heads are in `master`, `/home/martin/dev/baander-verify`
-    (`ff68e09f2`) and `~/.codex/worktrees/ba59/baander` (`ba5750533`).
+- **Cleanup.** GitHub and Forgejo carry only `master`, and so does the local checkout.
+  Left locally on 2026-11-16: the worktree `~/.codex/worktrees/ba59/baander` (detached
+  at `ba5750533`, which is in `master`), and the local gate images
+  `baander-ci-prewarm:local` and `baander-ci-firefox:gate`.
 
-  Removed on 2026-11-16 with the user's approval: the branch
-  `fix/pgroonga-cleanup-race`, the PGroonga worktrees `baander-pgrn-diag` and
-  `baander-pgrn-verify`, the images `baander-database:pgroonga-4.0.5` and
-  `:pgroonga-4.1.0`, and the persistent instance's pre-move dump and saved 4.0.5
-  image. The receipts of the six PGroonga full runs are in
-  `~/.local/state/baander/receipts/2026-11-16-pgroonga.tar.zst`.
+  Removed on 2026-11-16 with the user's approval: the merged branches
+  `fix/scan-artist-credits`, `fix/matching-follow-ups`, `fix/matching-leftovers` and
+  `fix/pgroonga-cleanup-race`; the worktrees `baander-ml-verify`, `baander-verify`,
+  `baander-pgrn-diag` and `baander-pgrn-verify`; the images `baander-ci:mf`, `mci`,
+  `mci-worker`, `mci-proxy` and `u10`, and `baander-database:pgroonga-4.0.5` and
+  `:pgroonga-4.1.0`; and the persistent instance's pre-move dump and saved 4.0.5
+  image. The worktrees' test-run receipts are in
+  `~/.local/state/baander/receipts/2026-11-16-pgroonga.tar.zst` and
+  `2026-11-16-verify-worktrees.tar.zst`.
 
   `/home/martin/dev/baander-baac-lossless` stays, detached at `a97ae0058`, until its
   `bench/work/` has moved. The receipts of the 2026-11-13 cleanup are in
