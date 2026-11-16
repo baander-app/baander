@@ -19,6 +19,15 @@ export interface LiveSnapshot {
   authorityReady: boolean
 }
 
+/**
+ * Whether the browser's live data is current. With freshness tracking the required refresh reads
+ * must have finished; without it, ready authority with current health is enough.
+ */
+export function isLiveCurrent(snapshot: LiveSnapshot, freshnessEnabled: boolean): boolean {
+  return snapshot.status === 'current'
+    || (!freshnessEnabled && snapshot.authorityReady && snapshot.health.state === 'current')
+}
+
 export type LiveRecoveryEvent =
   | { type: 'baseline'; authority: LiveAuthority }
   | { type: 'dirty'; families: readonly LiveFamily[] }

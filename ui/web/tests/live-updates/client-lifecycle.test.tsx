@@ -9,6 +9,11 @@ import { authenticatedTransport, type SharedLiveTransport, type LiveTransportLis
 import { AuthenticatedClientProvider } from '@/shared/live/provider'
 import { usePaletteStore } from '@/features/visualizer/stores/palette-store'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
+import { toast } from 'sonner'
+import { LIVE_OUTAGE_TOAST_ID } from '@/shared/live/outage-watcher'
+import { useLiveOutageStore } from '@/shared/live/outage-store'
+
+vi.mock('sonner', () => ({ toast: { warning: vi.fn(), dismiss: vi.fn() } }))
 
 vi.mock('@/shared/api-client/gen/endpoints', async importOriginal => ({
   ...await importOriginal<typeof import('@/shared/api-client/gen/endpoints')>(),
@@ -349,5 +354,30 @@ describe('authenticated provider lifecycle', () => {
     view.unmount()
     expect(transportState.leases).toBe(0)
     expect(authenticatedTransport.isConnected()).toBe(false)
+  })
+
+  it('raises one outage toast under StrictMode and leaves no notices running after sign-out', async () => {
+    vi.useFakeTimers()
+    try {
+      useAuthStore.setState({ isAuthenticated: true, principalSessionId: 'strict-outage-account' })
+      const view = render(<StrictMode><AuthenticatedClientProvider freshnessEnabled><span>signed in</span></AuthenticatedClientProvider></StrictMode>)
+      const degraded = { ...wire('live.health', ['catalog']), health: { state: 'degraded', oldestPendingAgeMs: 6_000 } }
+      await act(async () => {
+        transportState.listeners.forEach(listener => listener.onMessage?.(wire('live.ready', ['catalog'])))
+        await vi.advanceTimersByTimeAsync(100)
+        transportState.listeners.forEach(listener => listener.onMessage?.(degraded))
+        await vi.advanceTimersByTimeAsync(15_000)
+      })
+      expect(toast.warning).toHaveBeenCalledOnce()
+      expect(useLiveOutageStore.getState().since).not.toBeNull()
+      view.unmount()
+      expect(toast.dismiss).toHaveBeenCalledExactlyOnceWith(LIVE_OUTAGE_TOAST_ID)
+      expect(useLiveOutageStore.getState().since).toBeNull()
+      await act(async () => { await vi.advanceTimersByTimeAsync(3 * 60_000) })
+      expect(toast.warning).toHaveBeenCalledOnce()
+      expect(useLiveOutageStore.getState().since).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
