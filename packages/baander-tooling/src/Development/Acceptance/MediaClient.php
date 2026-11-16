@@ -29,8 +29,9 @@ final class MediaClient
         $this->jwk = [
             'kty' => 'EC',
             'crv' => 'P-256',
-            'x' => self::b64($details['ec']['x']),
-            'y' => self::b64($details['ec']['y']),
+            // OpenSSL drops leading zero bytes; a JWK coordinate is always the full 32 bytes.
+            'x' => self::b64(str_pad($details['ec']['x'], 32, "\0", STR_PAD_LEFT)),
+            'y' => self::b64(str_pad($details['ec']['y'], 32, "\0", STR_PAD_LEFT)),
         ];
     }
 

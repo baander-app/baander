@@ -66,6 +66,20 @@ final class DevelopmentAcceptanceTest extends TestCase
         );
     }
 
+    /**
+     * OpenSSL reports an EC coordinate without its leading zero bytes, so about one P-256 key in
+     * 128 has a coordinate shorter than 32 bytes. A JWK coordinate is the full 32 bytes (RFC 7518),
+     * and a key whose point cannot be rebuilt fails every proof. Two thousand keys leave such a
+     * defect about one chance in six million to pass unseen.
+     */
+    public function testDpopKeyCoordinatesAreTheFullThirtyTwoBytes(): void
+    {
+        for ($i = 0; $i < 2000; ++$i) {
+            $jwk = (new MediaClient('https://media.baander.app/', '/unused', $this->executor->context))->jwk;
+            self::assertSame([32, 32], [strlen($this->decode($jwk['x'])), strlen($this->decode($jwk['y']))]);
+        }
+    }
+
     public function testVerifiedHttpsNegotiatesNonceAndReadsAudioToEof(): void
     {
         $configuration = $this->root . '/openssl.cnf';
