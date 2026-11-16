@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 
 contextBridge.exposeInMainWorld('BaanderWindow', {
   minimize: () => ipcRenderer.invoke('baander:window:minimize'),
@@ -8,5 +8,11 @@ contextBridge.exposeInMainWorld('BaanderWindow', {
   onMaximizedChange: (cb: (maximized: boolean) => void) => {
     ipcRenderer.on('baander:window:maximized-change', (_e, val) => cb(val));
     return () => ipcRenderer.removeAllListeners('baander:window:maximized-change');
+  },
+  isVisible: () => ipcRenderer.invoke('baander:window:is-visible'),
+  onVisibilityChange: (cb: (visible: boolean) => void) => {
+    const listener = (_e: IpcRendererEvent, visible: boolean) => cb(visible);
+    ipcRenderer.on('baander:window:visibility-change', listener);
+    return () => { ipcRenderer.removeListener('baander:window:visibility-change', listener); };
   },
 });

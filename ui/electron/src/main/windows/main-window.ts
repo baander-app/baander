@@ -1,4 +1,5 @@
 import { BrowserWindow, app, dialog } from 'electron';
+import { isShown } from './window-visibility';
 import { join } from 'node:path';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -128,6 +129,12 @@ export function createMainWindow(onLoaded?: (window: BrowserWindow) => void) {
   const window = mainWindow;
   window.on('maximize', () => window.webContents.send('baander:window:maximized-change', true));
   window.on('unmaximize', () => window.webContents.send('baander:window:maximized-change', false));
+  // Background throttling is off for playback, so the page cannot tell a hidden or minimised window apart.
+  const sendVisibility = () => window.webContents.send('baander:window:visibility-change', isShown(window));
+  window.on('show', sendVisibility);
+  window.on('hide', sendVisibility);
+  window.on('minimize', sendVisibility);
+  window.on('restore', sendVisibility);
   if (onLoaded) window.webContents.once('did-finish-load', () => onLoaded(window));
 
   const loadDescription = process.env.VITE_DEV_SERVER_URL ? 'dev server URL' : 'built index.html';

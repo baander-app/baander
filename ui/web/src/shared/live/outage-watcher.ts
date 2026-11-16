@@ -13,14 +13,38 @@ function documentVisible(): boolean {
 }
 
 /**
+ * Tracks whether the desktop app's window is on screen. The desktop app keeps background
+ * throttling off for playback, so its page reports itself visible even while the window is
+ * hidden or minimised; outside the desktop app the window always counts as shown.
+ */
+function watchDesktopWindow(): { shown: () => boolean; stop: () => void } {
+  const desktopWindow = typeof window === 'undefined' ? undefined : window.BaanderWindow
+  if (!desktopWindow) return { shown: () => true, stop: () => undefined }
+  let shown = true
+  let stopped = false
+  const stop = desktopWindow.onVisibilityChange((visible) => { shown = visible })
+  desktopWindow.isVisible()
+    .then((visible) => { if (!stopped) shown = visible })
+    .catch(() => undefined)
+  return {
+    shown: () => shown,
+    stop: () => {
+      stopped = true
+      stop()
+    },
+  }
+}
+
+/**
  * Turns the recovery snapshot into outage notices. An outage starts when live updates become
  * degraded and ends only when live data is current again; reconnecting and refreshing in between
- * continue it. Only time the tab is visible and the device awake counts towards the toast and
- * bell thresholds: each tick credits at most one interval, so a hidden tab, a sleep or a frozen
- * page cannot fire a notice the moment it wakes.
+ * continue it. Only time the tab or desktop window is visible and the device awake counts
+ * towards the toast and bell thresholds: each tick credits at most one interval, so a hidden tab,
+ * a sleep or a frozen page cannot fire a notice the moment it wakes.
  */
 export function startLiveOutageWatcher(recovery: LiveRecovery, freshnessEnabled: boolean): () => void {
   const outage = useLiveOutageStore.getState()
+  const desktopWindow = watchDesktopWindow()
   let counted = 0
   let lastTick = 0
   let ticker: ReturnType<typeof setInterval> | null = null
@@ -29,7 +53,7 @@ export function startLiveOutageWatcher(recovery: LiveRecovery, freshnessEnabled:
     const now = Date.now()
     const elapsed = Math.min(Math.max(now - lastTick, 0), TICK_MS)
     lastTick = now
-    if (!documentVisible()) return
+    if (!documentVisible() || !desktopWindow.shown()) return
     counted += elapsed
     const state = useLiveOutageStore.getState()
     if (counted >= TOAST_AFTER_MS && !state.toastRaised) {
@@ -67,6 +91,7 @@ export function startLiveOutageWatcher(recovery: LiveRecovery, freshnessEnabled:
   observe()
   return () => {
     unsubscribe()
+    desktopWindow.stop()
     end()
   }
 }

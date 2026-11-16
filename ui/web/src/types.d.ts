@@ -4,6 +4,9 @@ interface BaanderWindow {
   close: () => Promise<void>;
   isMaximized: () => Promise<boolean>;
   onMaximizedChange: (cb: (maximized: boolean) => void) => () => void;
+  /** Whether the desktop window is shown and not minimised. */
+  isVisible: () => Promise<boolean>;
+  onVisibilityChange: (cb: (visible: boolean) => void) => () => void;
 }
 
 interface BaanderElectron {

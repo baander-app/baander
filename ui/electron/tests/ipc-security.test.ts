@@ -24,7 +24,7 @@ function fixture(trusted = true) {
   window.webContents = { mainFrame: { url: trust.mainUrl }, getURL: () => window.webContents.mainFrame.url, isDestroyed: () => false };
   window.isDestroyed = () => false;
   for (const action of ['minimize', 'maximize', 'unmaximize', 'close', 'setBackgroundColor']) window[action] = (...args: unknown[]) => effects.push([action, ...args]);
-  window.isMaximized = () => false; if (trusted) registerTrustedWindow(window, trust);
+  window.isMaximized = () => false; window.isVisible = () => true; window.isMinimized = () => false; if (trusted) registerTrustedWindow(window, trust);
   return { window, event: { sender: window.webContents, senderFrame: window.webContents.mainFrame } };
 }
 async function invoke(channel: string, event: any, ...args: unknown[]) { const handler = handlers.get(`baander:${channel}`); assert.ok(handler, channel); return handler(event, ...args); }
@@ -67,6 +67,9 @@ test('native controls require the live main owner and reject invalid colors', as
   for (const color of ['garbage', {}, null, 'url(https://baander.app)']) { effects.length = 0; await assert.rejects(async () => invoke('window:set-background-color', own.event, color), /invalid/i); assert.deepEqual(effects, []); }
   for (const action of ['minimize', 'maximize', 'close']) await invoke(`window:${action}`, own.event);
   effects.length = 0; await assert.rejects(async () => invoke('window:minimize', fixture().event), /unauthorized/i); assert.deepEqual(effects, []);
+  assert.equal(await invoke('window:is-visible', own.event), true);
+  own.window.isMinimized = () => true; assert.equal(await invoke('window:is-visible', own.event), false);
+  await assert.rejects(async () => invoke('window:is-visible', fixture().event), /unauthorized/i);
 });
 test('failed configuration save reports feedback without finishing setup', async () => {
   // The window's style imports are bundled by Vite; only its behaviour runs here.

@@ -118,6 +118,7 @@ describe('live-update outage notices', () => {
     expect(recovery.getSnapshot().status).toBe('current')
     expect(outage().since).toBeNull()
     expect(toast.warning).not.toHaveBeenCalled()
+    expect(toast.dismiss).not.toHaveBeenCalled()
     expect(outage().entry).toBeNull()
   })
 
@@ -216,6 +217,58 @@ describe('live-update outage notices', () => {
     expect(outage().since).toBeNull()
     expect(toast.warning).not.toHaveBeenCalled()
     expect(outage().entry).toBeNull()
+  })
+
+  it('keeps time counted before the tab was hidden and resumes counting when it is shown', async () => {
+    const { bus } = watchedClient()
+    await connect(bus)
+    bus.close()
+    await vi.advanceTimersByTimeAsync(10_000)
+    setVisibility('hidden')
+    await vi.advanceTimersByTimeAsync(5 * MINUTE)
+    setVisibility('visible')
+    await vi.advanceTimersByTimeAsync(4_000)
+    expect(toast.warning).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(toast.warning).toHaveBeenCalledOnce()
+  })
+
+  it('begins counting at once when it starts on an already degraded connection', async () => {
+    const { bus, recovery, stopWatcher } = watchedClient()
+    await connect(bus)
+    stopWatcher()
+    bus.close()
+    await vi.advanceTimersByTimeAsync(100)
+    expect(recovery.getSnapshot().status).toBe('degraded')
+    disposals.push(startLiveOutageWatcher(recovery, true))
+    expect(outage().since).not.toBeNull()
+    await vi.advanceTimersByTimeAsync(15_000)
+    expect(toast.warning).toHaveBeenCalledOnce()
+  })
+
+  it('does not count time while the desktop window is hidden or minimised', async () => {
+    let reportVisibility: (visible: boolean) => void = () => undefined
+    window.BaanderWindow = {
+      minimize: vi.fn(), maximize: vi.fn(), close: vi.fn(), isMaximized: vi.fn(), onMaximizedChange: vi.fn(),
+      isVisible: vi.fn(async () => true),
+      onVisibilityChange: (cb: (visible: boolean) => void) => {
+        reportVisibility = cb
+        return () => { reportVisibility = () => undefined }
+      },
+    }
+    disposals.push(() => { delete window.BaanderWindow })
+    const { bus } = watchedClient()
+    await connect(bus)
+    bus.close()
+    await vi.advanceTimersByTimeAsync(10_000)
+    reportVisibility(false)
+    await vi.advanceTimersByTimeAsync(5 * MINUTE)
+    expect(toast.warning).not.toHaveBeenCalled()
+    reportVisibility(true)
+    await vi.advanceTimersByTimeAsync(4_000)
+    expect(toast.warning).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(toast.warning).toHaveBeenCalledOnce()
   })
 
   it('credits at most one second for a device sleep', async () => {
