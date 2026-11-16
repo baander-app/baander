@@ -65,10 +65,10 @@ supply its own forwarded address. See the
 ## PostgreSQL behind the connection pooler
 
 Every database client, web or worker, connects to the **connection pooler**
-rather than to PostgreSQL. It is PgBouncer in transaction mode: a client holds a
-server connection only for the length of a transaction, so PostgreSQL's backend
-count follows the pooler's server pools instead of the number of web, worker and
-media clients. An application alias serves web, ordinary workers, media jobs and
+rather than to PostgreSQL. The pooler is PgBouncer in transaction mode: a client
+holds a server connection only for the length of a transaction, so PostgreSQL's
+backend count follows the pooler's server pools instead of the number of web,
+worker and media clients. An application alias serves web, ordinary workers, media jobs and
 migrations; a control alias with its own server pool serves worker leases, media
 authority checks and the scheduler. Work that needs session state connects to
 PostgreSQL directly. See
@@ -176,5 +176,5 @@ guide.
 - [Background Work](../workers/background-work.md) — the worker deployment pair, admission and recovery
 - [Storage and Data](storage-and-data.md) — every store, its writers and its preservation meaning
 - [Configuration](../configuration/README.md) — deployment capability and size, the pooler, Redis and proxy trust
-- [Getting Started](installation.md) — the source-installation recipe step by step
+- [Source Installation](installation.md) — the source-installation recipe step by step
 - [Registry](../administration/registry.md) — the separately operated discovery service

@@ -21,5 +21,5 @@ an instance, or the developer guide to work on its code.
 
 ## Other Resources
 
-- [AGENTS.md](../AGENTS.md) — Agent instructions and pointers to canonical rules and repository skills.
-- OpenAPI spec — available at `/api/doc` in dev mode, export via `app:export-openapi-spec`
+- [AGENTS.md](../AGENTS.md) — agent instructions, with pointers to the canonical rules and repository skills
+- OpenAPI spec — served to signed-in users at `/api/doc.json`; export it with `app:export-openapi-spec`

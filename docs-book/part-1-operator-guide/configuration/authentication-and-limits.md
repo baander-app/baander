@@ -1,6 +1,9 @@
 # Authentication and Rate Limiting
 
-OAuth 2.0 signing keys, token lifetimes, rate limiters, WebAuthn passkeys, Argon2id password hashing, self-service account recovery, and IP token binding are configured through environment variables and `config/packages/auth.yaml`.
+This page covers OAuth 2.0 signing keys, token lifetimes, rate limiters, WebAuthn
+passkeys, Argon2id password hashing, self-service account recovery and token
+binding. Most of these are set through environment variables and
+`config/packages/auth.yaml`; each section names where its values come from.
 
 ## OAuth 2.0
 
@@ -121,7 +124,7 @@ The `musicbrainz` limit never answers `429`; callers wait for their turn instead
 
 The `lrclib` limit never answers `429` either. Every LRCLIB request, from any worker or web process, reserves the next free turn in its shared bucket and waits for it; each turn starts at least two seconds after the one before it. The fetch of one song, a lyrics search and an apply, which only administrators may call, wait at most 10 seconds, and a queued lyrics fetch at most 30. A request whose turn comes later is not sent: LRCLIB then counts as unavailable, as it does when the limiter state in Redis cannot be read, and the lyrics routes answer `503`. Clearing `lrclib`, from the **Rate Limits** tab or with `app:rate-limiter:clear lrclib`, resets these turns only. A pause that LRCLIB asked for with a `429`, or a `503` with a `Retry-After` header, is stored outside the limiter and ends on its own, after one hour at most; see [External APIs](../media/external-apis.md#supported-apis).
 
-Media delivery routes are exempt from `anonymous_api` and `authenticated_api`, so playback is never throttled by the general API budget: the audio stream (`/api/stream/track`), the HLS and DASH manifests and segments under `/api/transcode/{id}/` (`master.m3u8`, `media.m3u8`, `manifest.mpd`, `init`, `segment`), subtitle playlists and segments, image files (`/api/images/{id}/file`) and album covers (`GET /api/albums/{id}/cover`). Health, readiness and metrics endpoints (`/health`, `/ready`, `/live`, `/metrics`) are outside `/api` and are never limited.
+Media delivery routes are exempt from `anonymous_api` and `authenticated_api`, so playback is never throttled by the general API budget: the audio stream (`/api/stream/track`), the original-file streams (`/api/stream/video`, `/api/stream/original/track`), the HLS and DASH manifests and segments under `/api/transcode/{id}/` (`master.m3u8`, `media.m3u8`, `manifest.mpd`, `init`, `segment`), the completed-video playlists and segments under `/api/transcode/artifacts/`, subtitle playlists and segments, image files (`/api/images/{id}/file`) and album covers (`GET /api/albums/{id}/cover`). Health, readiness and metrics endpoints (`/health`, `/ready`, `/live`, `/metrics`) are outside `/api` and are never limited.
 
 With `APP_ENV=dev`, only the `config_check`, `auth_password_reset_email`, `auth_email_verification_user`, `musicbrainz`, `musicbrainz_user` and `lrclib` limits apply; the others are skipped.
 
@@ -148,11 +151,16 @@ Configured in `config/packages/auth.yaml`:
 
 ### Passwords (Argon2id)
 
+`config/packages/security.yaml` sets the Argon2id password hasher's memory cost
+to 65536 KiB and its time cost to 4. `.env.example` lists the variables below,
+but the application does not read them, so changing one does not change how
+passwords are hashed.
+
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ARGON2ID_MEMORY_COST` | `65536` | Argon2id memory cost, in KiB. |
-| `ARGON2ID_TIME_COST` | `4` | Argon2id time cost (iterations). |
-| `ARGON2ID_THREAD_COST` | `3` | Argon2id parallelism (thread count). |
+| `ARGON2ID_MEMORY_COST` | `65536` | Argon2id memory cost, in KiB. Not read; `security.yaml` sets the memory cost. |
+| `ARGON2ID_TIME_COST` | `4` | Argon2id time cost (iterations). Not read; `security.yaml` sets the time cost. |
+| `ARGON2ID_THREAD_COST` | `3` | Argon2id parallelism (thread count). Not read; `security.yaml` sets no thread count. |
 
 ### Password reset
 
@@ -186,12 +194,22 @@ Baander sends the email after the HTTP response has gone out, or at once when th
 
 ### Token binding
 
-Constrains how many distinct IPs a single token can bind to, to detect token theft and sharing.
+Every access token is bound to the DPoP key that requested it; see
+[OAuth clients and cross-origin access](../maintenance/security.md#oauth-clients-and-cross-origin-access).
+A token can also be bound to a client fingerprint; no token is bound to IP addresses.
+When the request that issued a token sent the `X-Baander-Client-Fingerprint`
+header, every later request with that token must send the same value, or Baander
+rejects the token. A refreshed token keeps the fingerprint of the token it
+replaces. A token issued without the header is not fingerprint-bound and ignores
+it. No setting configures these checks.
+
+`.env.example` lists the IP-binding variables below, but the application does not
+read them.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TOKEN_BINDING_MAX_IP_CHANGES` | `10` | Maximum number of distinct IPs a token may bind to. |
-| `TOKEN_BINDING_CONCURRENT_IP_WINDOWS_SECONDS` | `300` | Window (seconds) over which concurrent IPs are counted. |
-| `TOKEN_BINDING_MAX_CONCURRENT_IPS` | `1` | Maximum concurrent IPs allowed per token. |
-| `TOKEN_BINDING_MIN_IP_CHANGE_INTERVAL_MINUTES` | `5` | Minimum minutes between allowed IP changes. |
+| `TOKEN_BINDING_MAX_IP_CHANGES` | `10` | Maximum number of distinct IPs a token may bind to. Not read. |
+| `TOKEN_BINDING_CONCURRENT_IP_WINDOWS_SECONDS` | `300` | Window (seconds) over which concurrent IPs are counted. Not read. |
+| `TOKEN_BINDING_MAX_CONCURRENT_IPS` | `1` | Maximum concurrent IPs allowed per token. Not read. |
+| `TOKEN_BINDING_MIN_IP_CHANGE_INTERVAL_MINUTES` | `5` | Minimum minutes between allowed IP changes. Not read. |
 

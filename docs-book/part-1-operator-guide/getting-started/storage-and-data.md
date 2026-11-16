@@ -1,12 +1,12 @@
 # Storage and Data
 
 A database backup cannot recover a missing music file, and a copy of converted
-video cannot recover accounts or library membership. Baander keeps those things
+video cannot recover accounts or library membership: Baander keeps those things
 in different places. Before maintenance, identify each store and the processes
 that can still write to it.
 
 This chapter describes the data to account for. Use [Backup and Recovery](../maintenance/backup-and-recovery.md)
-for capture and recovery prerequisites, and [Getting Started](installation.md)
+for capture and recovery prerequisites, and [Source Installation](installation.md)
 for the source-installation volume layout.
 
 ## What must be preserved
@@ -30,13 +30,13 @@ or change security behavior.
 | Optional registry datastore and secrets | The separate registry writes registration/discovery state through rqlite; its deployment also has independent certificates and backup encryption keys. | Separate authoritative service data. Main PostgreSQL backups do not cover it; see [Registry](../administration/registry.md). |
 
 Job monitor history and the `failed_messages` failure transport live in
-PostgreSQL. Pending asynchronous stream deliveries live in Redis. A job-monitor
+PostgreSQL; pending asynchronous stream deliveries live in Redis. A job-monitor
 row describes processing; it is not a replacement copy of every message waiting
-in the stream. Preserve the distinction when investigating missing work or
-planning a recovery.
+in the stream. Keep the two apart when investigating missing work or planning a
+recovery.
 
 The outbox, scheduler and worker ownership tables are also operational data.
-Restoring them can bring back old descriptions of work or ownership. Restored
+Restoring them can bring back old descriptions of work or ownership, and restored
 records alone cannot establish which processes are still running. Recovery needs
 the old deployment's state resolved before replacement work is admitted; see
 [Background Work](../workers/background-work.md).
@@ -58,19 +58,19 @@ actual Compose configuration and worker manifest when identifying your data.
 Web, scanners, catalog ingestion and encoders need consistent absolute paths.
 Seeing a source file inside `app` does not prove that a worker can read it.
 The admitted worker topology uses shared named volumes and read-only source
-media. The setup recipe also mounts source media read-only into web; deletion
-that removes source files requires separately authorized writable access there.
-Derived storage needs write permissions for the image runtime UID and GID.
+media. The setup recipe also mounts source media read-only into web, so deleting
+source files requires separately authorized writable access there. Derived storage
+needs write permission for the image's runtime UID and GID.
 
 The worker manifest calls writable media mounts `derived`. That admission role
-specifies access and topology; it does not establish that every file beneath a
-mount is disposable. Application storage can contain the only retained copy of
-an upload, and the conversion root also holds learned quality state.
+sets access and topology; it does not mean that every file beneath the mount is
+disposable. Application storage can hold the only retained copy of an upload,
+and the conversion root also holds learned quality state.
 
 The repository Compose file does not declare a persistent Redis volume. Do not
-assume its queued deliveries survive container replacement, or that Redis data
-is included in the PostgreSQL volume. A queue-preservation plan must account for
-the Redis deployment actually in use; see [Backup and Recovery](../maintenance/backup-and-recovery.md).
+assume that its queued deliveries survive container replacement, or that Redis
+data is part of the PostgreSQL volume. A plan to preserve the queue must account
+for the Redis deployment actually in use; see [Backup and Recovery](../maintenance/backup-and-recovery.md).
 
 ## Before changing storage
 
@@ -80,12 +80,12 @@ reports. Include the web processes, console jobs and worker pair when identifyin
 writers; stopping web alone does not stop background writes.
 
 A consistent restore must reconcile database state, queued work, files and
-credentials. Independently copying live stores does not establish such a
-checkpoint. Converted output may be regenerated when its inputs remain available,
-but that does not guarantee that every pending task can be replayed or that an
-old execution can be resumed.
+credentials; copying each live store on its own does not produce such a
+checkpoint. Converted output may be regenerated while its inputs remain
+available, but that does not guarantee that every pending task can be replayed
+or that an old execution can be resumed.
 
 Follow [Backup and Recovery](../maintenance/backup-and-recovery.md) before replacing a store,
 and [Upgrading](../maintenance/upgrading.md) before changing its schema or deployed code.
 Registry capture and restore have their own credentials, destinations and
-qualification limits. Keep those procedures separate from application recovery.
+qualification limits; keep those procedures separate from application recovery.

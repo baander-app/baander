@@ -1,15 +1,16 @@
 # Part I — Operator's Guide
 
-Use this manual to understand, install and maintain a Baander instance. Start
-with the chapters or reading path for a new installation, or choose a task,
-symptom or component below when returning to an existing one.
+This manual explains how to understand, install and maintain a Baander instance.
+For a new installation, follow the chapters or the reading path below. When you
+return to an existing instance, start from a task, a symptom or a component.
 
-Installed-instance commands use the `dc` function defined in
-[Source Installation](getting-started/installation.md), on the installation host from its checkout.
-Worker-controller commands run separately on the trusted host. Repository Make
-targets select development instances; see
+Commands for an installed instance use the `dc` function that
+[Source Installation](getting-started/installation.md) defines, and run on the
+installation host from its checkout. Worker-controller commands run separately,
+on the trusted host. Repository Make targets select development instances, not
+an installed one; see
 [Which installation a command targets](getting-started/understanding-baander.md#which-installation-a-command-targets)
-before carrying a command between environments.
+before carrying a command from one environment to another.
 
 ## Chapters
 

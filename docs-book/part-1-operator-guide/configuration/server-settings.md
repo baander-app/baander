@@ -1,6 +1,9 @@
 # Server and User Settings
 
-Administrators and users adjust runtime behavior—such as audio transcoding, automatic metadata or lyrics enrichment, scheduled recommendations, and email language—through database-backed server and user settings without restarting the server.
+Server and user settings are stored in the database, so administrators and users
+can change runtime behavior without restarting the server. They cover audio
+transcoding, automatic metadata and lyrics enrichment, scheduled recommendations
+and email language, among other things.
 
 ## Server Settings
 

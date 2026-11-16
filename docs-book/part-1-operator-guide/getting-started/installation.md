@@ -9,10 +9,10 @@ volumes or importing media.
 
 A disposable installation verified frontend loading, administrator login, worker
 startup and a sample music scan through ingestion and browser catalog display.
-That checkpoint predates the current application-image build interface below; it
-does not verify this revision of the installation procedure.
-The scanned track played to completion as original FLAC and transcoded Opus;
-byte-range requests also passed. See the
+The scanned track played to completion as original FLAC and as transcoded Opus,
+and byte-range requests passed. That checkpoint predates the current
+application-image build interface below, so it does not verify this revision of
+the installation procedure. See the
 [bootstrap checkpoint](../../../ROADMAP.md#source-installation-documentation) for
 evidence, environment adaptations and verification limits.
 
@@ -28,8 +28,8 @@ evidence, environment adaptations and verification limits.
   and how to choose the slots for your host.
 - Host PHP 8.5 with Swoole for image-build tooling, Composer, and `posix` and
   `pdo_pgsql` for the worker controller. Tooling and application dependencies are
-  installed separately below. The controller runs on the
-  trusted host; the application containers receive no Docker socket.
+  installed separately below. The controller runs on the trusted host; the
+  application containers receive no Docker socket.
 - Media files that you can copy into a shared named Docker volume. Worker admission
   does not accept host-directory bind mounts for media.
 
@@ -150,9 +150,6 @@ command below so it reads the private settings and the image selection explicitl
 Step 3 generates `.env.compose.local` before the first `dc` invocation:
 
 ```bash
-export HOST_UID="$(id -u)"
-export HOST_GID="$(id -g)"
-
 dc() {
     docker compose --env-file .env.dev.local --env-file .env.compose.local -f docker-compose.yml "$@"
 }
@@ -249,8 +246,8 @@ Starting `pooler` first runs its one-off `pooler-credentials` dependency to
 completion: once PostgreSQL is healthy, that step derives SCRAM verifiers from
 `DB_PASSWORD` for the database role and its `_control` role and writes the
 pooler's auth file. The pooler service shares the database image built above.
-The app and nginx are still
-stopped. If a build or dependency fails, inspect its error before continuing.
+The app and nginx are still stopped. If a build or dependency fails, inspect its
+error before continuing.
 
 ### 4. Install PHP dependencies
 

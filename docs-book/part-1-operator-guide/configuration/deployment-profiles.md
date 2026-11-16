@@ -1,6 +1,8 @@
 # Deployment Capability, Size and Runtime
 
-Deployment capability and size, media slots, the PgBouncer connection pooler, and Swoole runtime settings bound web and worker capacity across a Bånder deployment.
+This page describes the settings that bound web and worker capacity across a
+Bånder deployment: its capability and size, its media slots, the PgBouncer
+connection pooler and the Swoole runtime.
 
 ## Deployment capability and size
 
@@ -127,7 +129,7 @@ web, PostgreSQL, the connection pooler, Redis and worker pair. It does not build
 pull images. A later `start` retires the saved workers and stops the saved services
 before installing the selected configuration. `stop` retains named data volumes.
 Preserve the private state directory to recover an interrupted operation. See
-[Getting started](../getting-started/installation.md) for image preparation and account setup.
+[Source Installation](../getting-started/installation.md) for image preparation and account setup.
 
 The preset turns OpenTelemetry export off for web and workers. To export traces,
 set `OTEL_ENABLED` and `OTEL_EXPORTER_OTLP_ENDPOINT` in the configuration's
@@ -198,9 +200,10 @@ point the pools are 20 and 8; at the 4 GB `remux` starting point they are 10 and
 The source installation's Compose file uses the 16 GB pool sizes. The control
 alias keeps its own server connections, so lease renewals and authority checks do
 not wait behind web traffic. PgBouncer sets its query wait per user, so control
-traffic logs in as its own role, a member of the application role. A control query that finds no free server connection fails after one second,
-before the lease agent's 1.5-second deadline; application clients keep
-PgBouncer's two-minute wait.
+traffic logs in as its own role, a member of the application role. A control
+query that finds no free server connection fails after one second, before the
+lease agent's 1.5-second deadline; application clients keep PgBouncer's
+two-minute wait.
 
 `DATABASE_URL` points at the application alias and `DATABASE_CONTROL_URL` at the
 control alias and role. Web and workers require both; the preset derives them
@@ -277,20 +280,20 @@ recipe.
 
 Web configures `aio_core_worker_num: 1` and `aio_worker_num: 4`. Each private media
 job sets both limits to `1` before its helper forks or a reactor starts. These
-finite thread limits apply independently of the host CPU count. Include the AIO
-and encoder threads in container PID accounting.
+finite thread limits apply independently of the host CPU count.
 
 ### PHP memory limit
 
 The production image sets `memory_limit` to `512M` in
 `/usr/local/etc/php/conf.d/zz-baander-production-memory.ini`. Processes use that
-image default unless their launch command supplies an override. The
-`app:health:check` HEALTHCHECK reads this default too. To change the image default,
+image default unless their launch command supplies an override, and the
+`app:health:check` HEALTHCHECK reads it too. To change the image default,
 override the file or add a later one in `conf.d`; explicit launch limits still take
-precedence. The managed preset starts web with the selected profile's PHP heap limit; the worker supervisor
-(`app:worker`) sets its children's limits with `-d`. Every capability and size uses a 256 MiB
-PHP heap while reserving additional native and management memory. The web server's
+precedence. The managed preset starts web with the selected profile's PHP heap
+limit, and the worker supervisor (`app:worker`) sets its children's limits with
+`-d`. Every capability and size uses a 256 MiB PHP heap while reserving
+additional native and management memory. The web server's
 [memory check](../operations/health-and-metrics.md#what-is-checked) measures each HTTP worker against its
-effective limit. Changing PHP's heap limit alone does not change container ceilings
-or the worker's admission reservation.
+effective limit. Changing PHP's heap limit alone does not change the worker's
+admission reservation.
 

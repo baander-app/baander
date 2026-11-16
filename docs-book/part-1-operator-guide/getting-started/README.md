@@ -1,6 +1,9 @@
 # Getting Started
 
-Prepare a Bånder instance from source using the development-oriented Compose stack, size the host for your chosen profile, and deploy the separate background workers that handle scans, metadata, and media conversions.
+These chapters prepare a Bånder instance from source. They explain the components,
+size the host for a deployment capability and size, run the development-oriented
+Compose stack, and deploy the separate background workers that handle scans,
+metadata and media conversions.
 
 | Guide | Scope |
 |-------|-------|

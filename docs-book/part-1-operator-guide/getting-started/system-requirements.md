@@ -5,8 +5,8 @@ Bånder bounds media work with its own job slots. No container carries a CPU,
 memory or PID limit or a CPU set, so the host's real capacity, not a configured
 reservation, decides how much it can run. You find that capacity by trial: start
 from the default slots, watch playback, and lower the slots when encodes fall
-behind. The measured figures below show what each job costs on one reference
-host; they are a starting point, not a guarantee for yours.
+behind. The measured figures below give each job's cost on one reference host;
+they are a starting point, not a guarantee for yours.
 
 ## Host software
 
@@ -18,7 +18,7 @@ host; they are a starting point, not a guarantee for yours.
 - Host PHP 8.5 with Swoole, Composer, and the `posix` and `pdo_pgsql` extensions for
   image-build tooling and the worker controller.
 
-[Getting Started](installation.md#prerequisites) lists the complete
+[Source Installation](installation.md#prerequisites) lists the complete
 prerequisites and the installation order.
 
 ## Choose a capability and size
@@ -74,9 +74,10 @@ Changing the slots replaces the deployment; it is not a live setting.
 
 On 4 November 2026, a `transcode` deployment with four web workers ran every
 default slot at once on the reference host described below: an AMD Ryzen 7
-5800X3D with an AMD Radeon RX 9070 XT. Each video slot converted a 128-second 1080p30 excerpt of Big Buck Bunny to
-1080p, and each audio slot converted 600-second tracks one after another, while
-signed-in web clients browsed the library. A stream's real-time margin is its
+5800X3D with an AMD Radeon RX 9070 XT. Each video slot converted a 128-second
+1080p30 excerpt of Big Buck Bunny to 1080p, and each audio slot converted
+600-second tracks one after another, while signed-in web clients browsed the
+library. A stream's real-time margin is its
 steady speed minus one; a negative margin means the encode fell behind playback.
 
 | Encode path | Slots | Video speed | Video margin | Audio speed |
@@ -90,8 +91,9 @@ paths differ in what they sustain. With a hardware encoder, the default 12 video
 slots stay ahead of real time on this GPU. In software, the eight 1080p encodes
 share the host's CPUs and together produced about 2 seconds of video per second,
 so this host keeps about two software 1080p encodes in real time, not eight. The
-default software slots therefore suit a host that mostly copies streams or converts audio; a host that
-converts video in software should lower its video slots as described above.
+default software slots therefore suit a host that mostly copies streams or
+converts audio; a host that converts video in software should lower its video
+slots as described above.
 
 Alone on the same host after each run, every codec ran ahead of real time on this
 content: `libx264` at 1.08×, `libx265` at 1.30×, `h264_vaapi` at 9.4× and
@@ -153,8 +155,9 @@ source on the GPU. The speed column gives the slowest stream at each concurrency
 | `hevc_vaapi` | 16 | 0.96× | 0.053 | 200 MiB |
 
 The GPU's video engine, not the CPU, sets the limit: it was fully busy at every
-step. Video memory grew by about 1.1 GiB per stream and levelled off near 12.7 GiB of
-the card's 16 GiB above twelve streams.
+step. Video memory grew by about 1.1 GiB per stream and levelled off near 12.7 GiB
+of the card's 16 GiB above twelve streams.
+
 With a hardware encoder, unset video slots default to 12, which follows the HEVC
 rows; a deployment that forces H.264 should set 8. Other GPUs sustain different
 stream counts.
@@ -166,10 +169,11 @@ and every running job. Estimate the media share from the per-job peaks above: at
 the default 8 + 12 with every slot encoding, the media processes alone peak near
 6.5 GiB (8 × (557 + 92) MiB for HEVC video jobs, plus 12 × (56 + 66) MiB for audio
 renditions). The 557 MiB HEVC peak was measured with four pool threads; the
-six-thread peak was not measured. Web, PostgreSQL, Redis and the worker units come on top of that; the
+six-thread peak was not measured. Web, PostgreSQL, Redis and the worker units
+come on top of that; the
 [earlier household measurements](#measurements-before-the-pooler) show their
-consumption under a two-player workload. Lower the slots if the host cannot hold that sum with room
-for the page cache.
+consumption under a two-player workload. Lower the slots if the host cannot hold
+that sum with room left for the page cache.
 
 ### Kill order
 
@@ -223,9 +227,9 @@ before container limits were removed and before profiles were replaced by
 capability and size. The household profile ran what is now `remux` with 2 web
 workers, 4 database slots, 1 ordinary consumer and 2 copy slots, the process values
 of the 4 GB starting point; the full profile ran the process and slot values of
-the 16 GB `transcode` starting point. Each
-deployment served two simultaneous players for at least 30 minutes while a library
-scan and metadata synchronisation ran. In every completed scenario both players
+the 16 GB `transcode` starting point. Each deployment served two simultaneous
+players for at least 30 minutes while a library scan and metadata
+synchronisation ran. In every completed scenario both players
 advanced without a stall, and no service was killed for lack of memory.
 
 | Component | Household peak (MiB) | Full peak (MiB) |

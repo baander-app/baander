@@ -1,6 +1,9 @@
 # Environment Variables
 
-Environment variables configure application URLs, PostgreSQL and Redis connections, Messenger transports, mail and push delivery, external metadata providers, media paths, and scanner safety limits.
+Environment variables configure application URLs, PostgreSQL and Redis
+connections, Messenger transports, mail and push delivery, external metadata
+providers and media paths. `.env.example` also lists variables that the
+application does not read; their sections and rows say so.
 
 ## Application
 
@@ -28,7 +31,7 @@ The test database uses `baander_test` as the database name — configured in `.e
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `REDIS_PASSWORD` | — | Password for the Redis instance. Optional in dev, **required in production**. Used by cache pools, messenger transport, and session storage. |
-| `REDIS_URL` | `redis://default:%env(REDIS_PASSWORD)%@redis:6379` | Redis endpoint URL. Worker deployments require it to be pathless and queryless because the scheduler appends its stream and group. The password is interpolated from `REDIS_PASSWORD`. |
+| `REDIS_URL` | `redis://default:${REDIS_PASSWORD}@redis:6379` | Redis endpoint URL. Worker deployments require it to be pathless and queryless because the scheduler appends its stream and group. The password is interpolated from `REDIS_PASSWORD`. |
 
 Redis is used for:
 - **Cache** — tag-aware caching for API responses, OAuth tokens, and user sessions
@@ -51,7 +54,7 @@ the narrow logout/revocation exceptions.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MESSENGER_TRANSPORT_DSN` | `redis://default:%env(REDIS_PASSWORD)%@redis:6379/messages` | Redis URL for the `async` transport. Worker deployments accept no path, `/messages` or `/messages/baander`. |
+| `MESSENGER_TRANSPORT_DSN` | `redis://default:${REDIS_PASSWORD}@redis:6379/messages` | Redis URL for the `async` transport. Worker deployments accept no path, `/messages` or `/messages/baander`. |
 | `MESSENGER_CONSUMER_NAME` | `${HOSTNAME:-worker}` | Standalone consumer fallback. The admitted worker replaces it with an identity derived from the deployment, boot, worker role and launch generation. |
 
 Worker deployments accept a single `redis://` or `rediss://` endpoint in each URL,
@@ -71,16 +74,16 @@ checks again before launching children; diagnostics identify the setting without
 printing its credential-bearing value. These checks preserve the configured
 streams, group and generated identity. They do not test endpoint connectivity.
 
-The validated workload catalog in `config/packages/messenger.php` supplies fifteen
+The validated workload catalog in `config/packages/messenger.php` supplies eighteen
 default production routes and two explicit-only workloads: lyrics fetch and
 webhook delivery. Container compilation checks routes, handlers, codecs, JSON
 serialization and bounded retry policies; producer dispatch checks the selected
 senders. Execution runs ordinary consumers for `async` and a separate consumer for
 `scheduler`. See [Background work](../workers/background-work.md) for how queues, the outbox
-and scheduled work reach those consumers. Resource classes
-`io`, `cpu` and `coordination` describe work and do not change worker reservations. The `test` environment
-configures both receivers as `in-memory://` in that file; changing a production
-worker DSN to `in-memory://` is rejected.
+and scheduled work reach those consumers. The resource classes `io`, `cpu` and
+`coordination` describe work; they do not change worker reservations. The `test`
+environment configures both receivers as `in-memory://` in that file; changing a
+production worker DSN to `in-memory://` is rejected.
 
 Both `async` and `scheduler` configure `max_retries: 3`, `delay: 1000` milliseconds,
 `multiplier: 2` and `max_delay: 60000` milliseconds. Symfony recoverable exceptions
@@ -127,7 +130,10 @@ MusicBrainz environment values above does not change it. See
 
 ## Library Scanner Security
 
-Limits applied when scanning media libraries, to prevent path traversal, oversized files, and metadata-based attacks. All variables use the `SCANNER_` prefix.
+`.env.example` lists these `SCANNER_` variables as scan limits against path
+traversal, oversized files and metadata-based attacks, but no configuration or
+application code reads them, so changing a value has no effect on a scan. The
+descriptions give the limit each variable names.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -152,6 +158,10 @@ Limits applied when scanning media libraries, to prevent path traversal, oversiz
 | `SCANNER_MAX_LYRICS_LENGTH` | `50000` | Maximum lyrics text length. |
 
 ## Local Network Discovery
+
+`.env.example` lists these variables, but no configuration or server code reads
+them, and the server does not answer discovery broadcasts. The descriptions give
+the behavior each variable names.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
