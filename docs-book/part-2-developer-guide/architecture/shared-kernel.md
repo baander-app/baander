@@ -1,6 +1,6 @@
 # Shared Kernel
 
-`src/Shared/` contains cross-cutting infrastructure used by all bounded contexts. It follows the same four-layer structure as other contexts but exists to provide shared primitives rather than model a business domain.
+`src/Shared/` holds the cross-cutting infrastructure that all bounded contexts use. It has the same four layers as a full context, but it provides shared primitives instead of modelling a business domain.
 
 ## Domain Models
 
@@ -10,7 +10,7 @@
 | `PublicId` | 21-character NanoID, distinct from UUID identity | `Domain/Model/PublicId.php` |
 | `Email` | Typed email value object with validation | `Domain/Model/Email.php` |
 | `Cursor` | Cursor-based pagination token | `Domain/Model/Cursor.php` |
-| `CursorDirection` | Pagination direction (`asc` / `desc`) | `Domain/Model/CursorDirection.php` |
+| `CursorDirection` | Pagination direction (`next` / `prev`) | `Domain/Model/CursorDirection.php` |
 | `CursorPage` | A page of results with cursor metadata | `Domain/Model/CursorPage.php` |
 | `SearchOptions` | Search query parameters | `Domain/Model/SearchOptions.php` |
 | `SearchResult` | Search result with relevance data | `Domain/Model/SearchResult.php` |
@@ -18,7 +18,7 @@
 | `SystemSetting` | Persisted server setting aggregate | `Domain/Model/SystemSetting.php` |
 | `LibraryReadScope` | Library visibility filter for catalog and media queries | `Domain/ValueObject/LibraryReadScope.php` |
 | `MediaReadScope` | Media visibility scope across libraries and party sessions | `Domain/ValueObject/MediaReadScope.php` |
-| `FilesystemType` | Storage filesystem classification (`local`, `network`, etc.) | `Domain/ValueObject/FilesystemType.php` |
+| `FilesystemType` | Storage filesystem classification (currently only `local`) | `Domain/ValueObject/FilesystemType.php` |
 
 ### UUID v7
 
@@ -36,11 +36,11 @@ $id = Uuid::fromString($existing);
 
 ### Cursor Pagination
 
-Baander supports cursor-based and offset-based pagination; the endpoint defines which it accepts. Cursors are opaque tokens that encode the position in the result set, providing consistent results even when data changes between requests.
+Baander supports cursor-based and offset-based pagination; the endpoint defines which it accepts. A cursor is an opaque token that encodes a position in the result set, so results stay consistent even when data changes between requests.
 
 ## Search
 
-PGroonga powers full-text search across the codebase. The `PgroongaSearchTrait` provides a reusable implementation for Doctrine repositories:
+Full-text search runs on PGroonga. `PgroongaSearchTrait` gives Doctrine repositories a reusable implementation:
 
 ```php
 final class AlbumRepository implements AlbumRepositoryInterface
@@ -67,13 +67,13 @@ $this->sleeper->sleep(1.0); // works in both coroutine and non-coroutine context
 
 Infrastructure code may call `Async::sleep()` directly.
 
-Outside a coroutine a signal ends `Async::sleep()` early, and a Messenger consumer's keepalive alarm arrives every 30 seconds. Infrastructure code whose wait has to last its full time, such as the wait for a turn under a rate limit, calls `Async::sleepThroughSignals()`: after each wake it reads a monotonic clock and sleeps again for what is left. `SleeperInterface` offers the plain sleep only.
+Outside a coroutine, a signal ends `Async::sleep()` early, and a Messenger consumer receives a keepalive alarm every 30 seconds. Infrastructure code whose wait has to last its full time, such as the wait for a turn under a rate limit, calls `Async::sleepThroughSignals()`: after each wake it reads a monotonic clock and sleeps again for the time that is left. `SleeperInterface` offers the plain sleep only.
 
 Never call `sleep()`, `usleep()`, or `Swoole\Coroutine::sleep()` directly.
 
 ### Server Control and Native Execution
 
-`ServerControlPortInterface` coordinates state across Swoole HTTP workers (via an in-server coordinator for HTTP requests and a `0600` Unix socket for CLI commands). CPU-bound media probing and FFmpeg encoding run outside the web server in the worker deployment pair through `NativeExecutionClientInterface` (`bin/worker-native.php`).
+`ServerControlPortInterface` coordinates state across Swoole HTTP workers: HTTP requests go through an in-server coordinator, and CLI commands through a `0600` Unix socket. CPU-bound media probing and FFmpeg encoding run outside the web server, in the worker deployment pair, through `NativeExecutionClientInterface` (`bin/worker-native.php`).
 
 ### WebSocket
 
@@ -82,7 +82,7 @@ Never call `sleep()`, `usleep()`, or `Swoole\Coroutine::sleep()` directly.
 
 ## Job Monitoring
 
-Async jobs dispatched via Symfony Messenger are tracked through:
+Async jobs dispatched through Symfony Messenger are tracked with these classes:
 
 - `JobIdStamp` — attached to messages to assign a unique job ID
 - `JobMonitoringMiddleware` — assigns each dispatched message its job ID (`JobIdStamp`)
@@ -94,7 +94,7 @@ See the [Real-Time Patterns](real-time-patterns.md) page for WebSocket details.
 
 ## Redis
 
-- **Caching** — tag-aware cache pools via `RedisTagAwareAdapter`. The `noeviction` policy is required for tag invalidation to work correctly.
+- **Caching** — tag-aware cache pools through `RedisTagAwareAdapter`. Tag invalidation requires a Redis `maxmemory-policy` of `noeviction` or `volatile-*`; the bundled Redis runs with `noeviction`.
 - **Ephemeral coordination and streams** — Messenger `async` and `scheduler` streams, DPoP nonces and replay JTI markers, single-use WebSocket handshake tickets, rate-limiter state, and worker health heartbeats.
 
 ## Controllers
@@ -113,7 +113,7 @@ The Shared kernel provides several shared controllers:
 | `PrometheusMetricsController` | `/metrics` | Prometheus metrics endpoint |
 | `WebSocketController` | `/api/ws` | WebSocket endpoint |
 
-The health probes, `/metrics` and `/api/ws` sit outside the HTTP REST routes covered by the default OpenAPI export. `/metrics` serves Prometheus text rather than an API resource envelope.
+The health probes, `/metrics` and `/api/ws` are not among the HTTP REST routes that the default OpenAPI export covers. `/metrics` serves Prometheus text rather than an API resource envelope.
 
 ## DTOs
 

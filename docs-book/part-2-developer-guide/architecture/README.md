@@ -1,13 +1,13 @@
 # System Architecture
 
-Bånder is organized into Domain-Driven Design bounded contexts backed by a shared kernel, asynchronous Messenger transports, WebSocket real-time channels, and explicit security boundaries.
+Bånder is divided into Domain-Driven Design bounded contexts built on a shared kernel. Around them sit asynchronous Messenger transports, one WebSocket for real-time traffic, and explicit security boundaries.
 
 ## Core Concepts
 
 | Guide | Scope |
 |-------|-------|
 | [Architecture Overview](overview.md) | DDD bounded contexts, four-layer structure (`Domain`, `Application`, `Infrastructure`, `Interface`), shared kernel, and anti-corruption layers |
-| [Communication Map](communication-map.md) | How browsers, the web server, PgBouncer, PostgreSQL, Redis, the worker pair, and external services communicate, and when work is a message |
+| [Communication Map](communication-map.md) | How clients, the web application, PostgreSQL, Redis, the worker pair, and external services communicate, and when work is a message |
 | [Shared Kernel](shared-kernel.md) | Cross-cutting building blocks: UUID v7, `PublicId`, cursor pagination, PGroonga search, Swoole coroutines, caching, and WebSocket support |
 | [Glossary](glossary.md) | Shared DDD, infrastructure, and data-type terminology |
 
@@ -16,7 +16,7 @@ Bånder is organized into Domain-Driven Design bounded contexts backed by a shar
 | Guide | Scope |
 |-------|-------|
 | [Real-Time Patterns](real-time-patterns.md) | WebSocket connection registry, handshake tickets, message protocol, and watch-party synchronization |
-| [Live Updates](live-updates.md) | Committed change capture, revision projection, WebSocket `live.changed` hints, browser tab coordination, and draft preservation |
+| [Live Updates](live-updates.md) | Committed change capture, revision projection, WebSocket `live.changed` hints, browser read coordination, and draft preservation |
 
 ## Security & Threat Models
 

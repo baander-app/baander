@@ -118,8 +118,8 @@ Open the URL printed by `make preview-url` in your browser and sign in.
   the browser over HTTPS HMR, and PHP reloads included files on save. If an atomic
   save or configuration change is not picked up, run `make restart-app`.
 - **Refresh workers after worker changes:** Background workers run an immutable
-  snapshot captured during `make preview-up`. Run `make preview-up` again after
-  changing worker or message-handler code.
+  snapshot captured by the most recent `make preview-up` or `make restart-app`. Run
+  `make preview-up` again after changing worker or message-handler code.
 - **Run console commands and inspect logs:**
 
   ```bash

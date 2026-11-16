@@ -33,7 +33,7 @@ Each feature owns its query descriptors. A descriptor records its family, query
 key variants, source tables or external source, authorization audience, refresh
 policy, and verification. Include list, detail, filtered, and paginated keys.
 Readers that keep server results outside React Query also need a descriptor;
-Recents, Timeline, sidebar configuration, and EQ profiles are examples.
+sidebar configuration and EQ profiles are examples.
 
 Classify the source before choosing a refresh policy:
 
@@ -128,10 +128,9 @@ that has already suspended.
 
 Hold only the affected families. A global pause while any mutation is pending
 would stop unrelated notifications and other readers during a slow save. Device
-rename and forget mutations hold `['devices']`, with the confirmed cache write
-inside the ownership check and before releasing it, while playback session
-coordination runs through `PlaybackSessionCoordinator`. Do not use the total
-mutation count as a substitute for these scopes.
+rename and forget mutations hold `['devices']` until their request completes,
+while playback session coordination runs through `PlaybackSessionCoordinator`.
+Do not use the total mutation count as a substitute for these scopes.
 
 An initial query deferred by admission or a family hold is still pending, even
 when it is not currently fetching. Automatic readers use `isPending` to distinguish
@@ -259,10 +258,11 @@ draining workers stop starting projection and reconciliation work.
 
 Database services are released at the read or projection boundary, before socket
 delivery. Coroutine cleanup provides a second release path. Send and watchdog
-callbacks also register cleanup: logging can acquire pooled services too. Each
-connection has at most one pending frame, with family changes coalesced without losing reset
-information. Delivery limits the socket queue plus the outgoing frame to 64KiB;
-a 100ms watchdog closes a peer whose native send remains blocked.
+callbacks also register cleanup, because logging can acquire pooled services too.
+Each connection has at most one pending frame; family changes are coalesced into it
+without losing reset information. Delivery limits the socket queue plus the
+outgoing frame to 64KiB; a 100ms watchdog closes a peer whose native send remains
+blocked.
 
 Health messages are due every five seconds. Read or projection failure reports
 degraded health while retaining the last baseline. Recovery to current health is
@@ -273,9 +273,10 @@ policy when no message arrives.
 ## Browser ownership
 
 The authenticated application owns one shared transport. `PlaybackSessionCoordinator`
-starts whenever a principal is signed in, retains that shared transport, and
-registers the browser playback endpoint on connect (`POST /api/session/endpoints`
-and `session.endpoint`) rather than opening a second socket or claiming a device.
+starts whenever a principal is signed in and retains that shared transport. On
+connect it registers the browser's device over HTTP (`POST /api/devices`), then
+sends its playback endpoint as a `session.endpoint` message over the shared
+transport rather than opening a second socket.
 
 Swoole's configured 300-second idle check uses
 [the server's last receive time](https://github.com/swoole/swoole-src/blob/v6.2.0/src/server/master.cc#L1693),
@@ -335,9 +336,8 @@ continue an outage but do not start one, so a reconnect from a current state sta
 an outage only if the ready deadline expires. The client counts an outage only while
 the tab is visible and the device awake; in the desktop app, whose page stays
 visible for playback, the window must also be shown and not minimised. After 15
-seconds of that time it raises one
-warning toast; after 2 minutes it also adds an entry to the notification bell and
-the admin bell. The entry exists only in that tab. Recovery closes the toast and
+seconds of that time it raises one warning toast; after 2 minutes it also adds an
+entry to the notification bell and the admin bell. The entry exists only in that tab. Recovery closes the toast and
 removes the entry without a message of its own. A refresh that is slow but never
 fails is not an outage and shows nothing. A ready socket or successful recovery
 snapshot alone does not mean the required resource reads finished.
@@ -355,7 +355,7 @@ existing connection alive while publication recovers.
 
 ## Inspecting the runtime
 
-The existing server statistics HTTP endpoint and `app:server:stats` command expose
+The existing server statistics HTTP endpoint and `app:server:stats --json` expose
 `live_updates` for each worker. The per-worker operation reads in-memory diagnostics
 without acquiring database services or disclosing subscription identities. The full
 statistics request also observes Redis and can borrow pooled services; compare
@@ -393,8 +393,8 @@ It rejects both unclassified consumers and stale inventory entries. Each invento
 row records sources, audiences, mirrors, response-cache policy, key variants,
 dependencies, and a nonempty `unitProofs` list. The test rejects empty
 proof lists and verifies that the referenced proofs exist; it does not establish
-end-to-end behavior by itself. Browser and capacity
-qualification remain separate checkpoints in the [testing guide](../testing/live-updates.md#live-update-qualification).
+end-to-end behavior by itself. Browser and capacity qualification remain separate
+checkpoints in the [testing guide](../testing/live-updates.md#live-update-qualification).
 
 The browser scenarios cover cross-client permissions and notifications, interrupted
 delivery and wake, managed reload/restart, a real scan and worker ingestion, retained
@@ -410,7 +410,6 @@ hook proofs. Do not describe those as browser conflict scenarios or infer comple
 coverage from an inventory row.
 
 For a new stored source, also verify rollback, deletion, ownership changes, and
-bulk writes against disposable PostgreSQL. For a new
-reader, verify local mutation feedback, remote changes, inactive variants,
-recovery, and access removal. Editors must retain drafts; refreshing a profile
+bulk writes against disposable PostgreSQL. For a new reader, verify local mutation
+feedback, remote changes, inactive variants, recovery, and access removal. Editors must retain drafts; refreshing a profile
 list must not apply a profile or restart playback.

@@ -120,9 +120,9 @@ writes; they do not order client intent or prevent replay.
 `relay/tests/run_http_contract.php` updates owner metadata, then replays the exact
 earlier body with the original enrollment capability and checks that the old
 metadata returns with a new revision. A separate heartbeat checks that the owner
-can register without enrollment. This is an accepted limitation of the current protocol. Someone who
-steals the raw owner credential can keep identities online or change their public
-metadata. There is no credential rotation, revocation, ownership transfer or
+can register without enrollment. This is an accepted limitation of the current
+protocol. Someone who steals the raw owner credential can keep identities online
+or change their public metadata. There is no credential rotation, revocation, ownership transfer or
 lost-credential recovery endpoint. Enrollment expiry does not revoke an existing
 owner credential. A future freshness or recovery protocol needs its own design.
 
@@ -136,9 +136,11 @@ credential syntax and the HTTPS URL shape. SQL binds registration values as
 parameters.
 
 The HTTP contract exercises conflicting framing, oversized fixed/chunked bodies,
-pipelined requests, malformed JSON bytes and wrong field types. Its rejection
-checks compare the public metadata/revision snapshot and require a fresh health
-request to succeed; they do not inspect the private owner row for every case.
+pipelined requests, malformed JSON bytes and wrong field types. For malformed JSON,
+wrong field types and the pipelined request, its rejection checks compare the
+public metadata/revision snapshot and require a fresh health request to succeed.
+The framing and oversized-body cases check only the status and the error body.
+None of the checks inspects the private owner row for every case.
 Native security tests exercise malformed database envelopes, row types and values.
 The fuzz target in `relay/tests/parser_fuzz.cpp` covers bounded JSON parsing,
 registration validation and enrollment parsing; its corpus includes duplicate

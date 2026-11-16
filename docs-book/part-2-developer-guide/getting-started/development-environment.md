@@ -101,9 +101,8 @@ controller state directories from sharing a timer. Inspect installed timers with
 It checks remote `master` every 60 seconds while enabled. Its controller and clone
 live outside worktrees. Publication installs a complete controller generation,
 atomically selects it and records its absolute PHP executable, preserving updater
-intent. Invocations lease
-the selected generation until they finish, so an update retains code still in use.
-The service retains the absolute executable search paths
+intent. Invocations lease the selected generation until they finish, so an update
+retains code still in use. The service retains the absolute executable search paths
 from `dev-up`, including Docker credential helpers; remote access must work without
 an interactive prompt. The user manager must remain available for checks to run;
 the workflow does not enable login lingering. A stopped instance stays stopped
@@ -127,8 +126,9 @@ do not authorize a reset or database rollback.
 A preview has a stable worktree-specific hostname below `baander.test`. PHP and
 Vite read the live worktree. PHP's development watcher reloads included files on
 close-write events; atomic saves and configuration changes can require
-`make restart-app` or `make preview-up`. Workers run immutable code captured by the most recent
-`make preview-up`; run that command again after worker changes. Preview PostgreSQL,
+`make restart-app` or `make preview-up`. Workers run immutable code captured by the
+most recent `make preview-up` or `make restart-app`; run `make preview-up` again
+after worker changes. Preview PostgreSQL,
 Redis, secrets, caches and generated media are separate from the persistent instance.
 Startup creates empty mount directories in the checkout; dependencies and runtime
 contents live in the preview volumes.
@@ -181,7 +181,8 @@ settings and tracked defaults. For example:
 make preview-up OPTIONS="--docker-context desktop-linux"
 ```
 
-Use `--docker-host` for an endpoint or `--docker-executable` for a different CLI.
+Use `--docker-host` for another local Unix socket (a `unix:///` endpoint) or
+`--docker-executable` for a different CLI.
 A host and context cannot be supplied together. Startup validates new settings
 before changing instance state. Recovery uses the saved release's target, layout,
 images and generated inputs, even if today's local settings are invalid. Existing
@@ -196,10 +197,12 @@ answers "No such image", the role's image is built or pulled as for a new instan
 the retained data is started on it. The preflight runs from the newly prepared release
 when the previous release's images are gone. A worker boot whose operator image is gone
 is recorded as retired when none of its containers exists. Startup refuses before
-anything starts while containers of that boot survive or the database still registers
-it, because only the lost operator image could have retired it; that case, and a
-database whose applied migrations were later rewritten, need a repair or a data reset,
-which the instance's owner approves.
+anything starts while containers of that boot survive. While the database still
+registers the boot, startup refuses after the preflight has started PostgreSQL, Redis
+and the gateway, but before the instance is quiesced or its database migrated,
+because only the lost operator image could have retired that registration. That case,
+and a database whose applied migrations were later rewritten, need a repair or a data
+reset, which the instance's owner approves.
 
 Retained data that starts on a newer database image keeps its old extension versions:
 `pg_extension.extversion` changes only when `ALTER EXTENSION ... UPDATE` runs, and no

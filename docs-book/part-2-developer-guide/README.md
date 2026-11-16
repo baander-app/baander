@@ -30,8 +30,8 @@ Understand the architecture, write code following project conventions, and contr
 
 | Page | Description |
 |------|-------------|
-| [Quick Start](getting-started/quick-start.md) | Path of least resistance for local DNS, a trusted CA, and a running preview |
-| [Development Environment](getting-started/development-environment.md) | Docker setup, Makefile commands, IDE config, and Xdebug |
+| [Quick Start](getting-started/quick-start.md) | Shortest path to local DNS, a trusted CA, and a running preview |
+| [Development Environment](getting-started/development-environment.md) | Host prerequisites, Makefile workflow, worktree previews, `dev.local.json` settings, media mounts, diagnostics, and runtime qualification |
 | [PHP Dependencies](getting-started/php-dependencies.md) | Runtime selections, Composer updates, patch reviews and maintenance checks |
 | [Coding Conventions](development/coding-conventions.md) | Domain models, value objects, repositories, CQRS, ports, and anti-corruption |
 | [CQRS and Messaging](development/cqrs-and-messaging.md) | Commands, handlers, domain events, and async processing |
@@ -59,5 +59,5 @@ Understand the architecture, write code following project conventions, and contr
 
 ## See Also
 
-- [Part I — Operator's Guide](../part-1-operator-guide/README.md) — Prerequisite reading for developers (you need to run the app before you can develop on it).
+- [Part I — Operator's Guide](../part-1-operator-guide/README.md) — Read it first: you need a running instance before you can develop on it.
 - [AGENTS.md](../../AGENTS.md) — Agent instructions and pointers to canonical rules and repository skills.

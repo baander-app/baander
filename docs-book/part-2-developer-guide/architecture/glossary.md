@@ -6,31 +6,31 @@ Terms used throughout the developer documentation. For the project's complete do
 
 | Term | Definition |
 |------|-----------|
-| **Aggregate Root** | An entity that serves as the entry point to a cluster of related objects. It has a repository interface and enforces invariants across its children. Example: `Album` is an aggregate root — it manages its own fields and rules. |
+| **Aggregate Root** | The entity through which a cluster of related objects is reached and changed. It has a repository interface and enforces invariants across its children. Example: `Album` is an aggregate root — it manages its own fields and rules. |
 | **Anti-Corruption Layer** | A set of adapters or decorators that isolate domain code from external libraries, provider protocols, or cross-context internals. Baander applies it to League OAuth2 Server (which only validates access tokens), to `QualityFilteringStreamingDecorator` between `QoL` and `Transcode`, and to external metadata/station adapters. |
 | **Bounded Context** | A distinct area of the codebase that models a specific business capability with its own domain language, rules, and data. Example: the Playlist context knows nothing about Transcoding. |
 | **Command** | A CQRS write operation — a DTO that carries input data to a handler. Commands are immutable (`final readonly class`). Example: `CreatePlaylistCommand`. |
 | **Domain Event** | A signal that something happened in the domain. Events are captured in the PostgreSQL outbox for durable replay or dispatched live inside the producing process. Example: `TranscodeJobCompleted`. |
-| **Domain Model** | A PHP class in `Domain/Model/` that encapsulates business rules. Aggregate roots use a state object pattern; value objects are immutable with a public constructor. |
-| **Four-Layer Architecture** | Domain, Application, Infrastructure, Interface. Dependencies flow inward: Interface depends on Application, Application depends on Domain. Domain has no framework dependencies. |
-| **Port** | An interface in the Application layer that defines a capability (e.g., `PlaylistPortInterface`). Controllers inject ports; infrastructure implements them. This decouples the API layer from domain logic. |
-| **Repository Interface** | A contract in `Domain/Repository/` for persisting and retrieving aggregates. The implementation lives in `Infrastructure/Doctrine/Repository/`. |
-| **State Object** | A mutable class (`{Entity}State`) that holds all fields of an aggregate root. It keeps the `create()` and `reconstitute()` constructors in sync and is used by the repository for persistence. |
-| **Value Object** | An immutable object identified by its value rather than an identity. Defined as `final readonly class` with a public constructor. Example: `Uuid`, `PublicId`, `Email`. |
+| **Domain Model** | A PHP class in `Domain/Model/` that encapsulates business rules. New aggregate roots use a state object; older ones such as `Playlist` and `Notification` still take positional constructor arguments. Value objects are immutable. |
+| **Four-Layer Architecture** | Domain, Application, Infrastructure, Interface. Dependencies flow inward: Interface depends on Application, Application depends on Domain. A bounded context's Domain layer has no framework dependencies. |
+| **Port** | An interface in the Application layer that defines a capability (for example `PlaylistPortInterface`). Controllers inject ports and infrastructure implements them, so the API layer does not depend on domain logic directly. |
+| **Repository Interface** | A contract in `Domain/Repository/` for persisting and retrieving aggregates. The implementation usually lives in `Infrastructure/Doctrine/Repository/`; Auth also keeps implementations in `Infrastructure/Repository/`. |
+| **State Object** | A mutable class (`{Entity}State`) that holds the persisted fields of an aggregate root. It keeps the creation factory (`create()` or a named factory such as `register()`) and `reconstitute()` in sync, and the repository uses it for persistence. |
+| **Value Object** | An immutable object identified by its value rather than an identity. Defined as a `final readonly class` with a public constructor, a named factory such as `fromString()`, or both. Example: `Uuid`, `PublicId`, `Email`. |
 
 ## Infrastructure
 
 | Term | Definition |
 |------|-----------|
-| **Change Inbox** | The PostgreSQL table (`live_change_inbox`) populated by database triggers in the same transaction as a business write and projected into scoped revisions that drive WebSocket `live.changed` hints. |
+| **Change Inbox** | The PostgreSQL table (`query_change_inbox`) that database triggers fill in the same transaction as a business write. Its rows are projected into scoped revisions, which drive WebSocket `live.changed` hints. |
 | **CQRS** | Command Query Responsibility Segregation. Write operations (commands) are handled separately from read operations (queries) via Symfony Messenger. |
 | **Doctrine Entity** | An ORM mapping class in `Infrastructure/Doctrine/Entity/` that represents a database row. Separate from the domain model — repositories convert between the two. |
 | **Messenger** | Symfony's message bus system. Routes commands to handlers inline or through the Redis `async` and `scheduler` streams. |
 | **Outbox** | The PostgreSQL table (`domain_event_outbox`) that captures domain events inside the producing transaction so the control unit can relay them durably after commit. |
-| **PGroonga** | A PostgreSQL extension for fast full-text search, used by the `PgroongaSearchTrait` in repositories. |
+| **PGroonga** | A PostgreSQL extension for full-text search, used by the `PgroongaSearchTrait` in repositories. |
 | **Port Pattern** | The canonical dependency inversion pattern in Baander. Application ports define interfaces; infrastructure implements them; controllers depend on ports. |
 | **WebSocket** | Bidirectional real-time communication at `/api/ws` (authenticated with a single-use ticket from `POST /api/ws/tickets`) and Baander's only real-time transport: `live.*` change hints, watch-party sync and member events, playback-session coordination, and transcode position controls. |
-| **Worker Deployment Pair** | The control and execution containers admitted together under one deployment namespace and boot identity (`worker-control` and `worker-execution`), joined by a private IPC volume to run background consumers, scheduled occurrences, outbox replay, and native FFmpeg/probe processes. |
+| **Worker Deployment Pair** | The `control` and `execution` containers, admitted together under one deployment namespace and boot identity and joined by a private IPC volume. Together they run background consumers, scheduled occurrences, outbox replay, and native FFmpeg/probe processes. |
 
 ## Data Types
 

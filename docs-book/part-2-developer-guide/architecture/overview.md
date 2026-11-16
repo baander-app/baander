@@ -1,14 +1,14 @@
 # Architecture Overview
 
-Baander follows strict Domain-Driven Design (DDD). The codebase is organized into bounded contexts — each representing a distinct business capability with its own domain model, rules, and language.
+Baander follows Domain-Driven Design (DDD). The codebase is divided into bounded contexts, each a distinct business capability with its own domain model, rules and language.
 
 ## Why DDD
 
-Bounded contexts isolate business logic. The Playlist context knows nothing about Transcoding; Auth doesn't depend on Catalog. This keeps the codebase navigable, testable, and safe to change — modifications in one context rarely ripple into others.
+Bounded contexts isolate business logic. The Playlist context knows nothing about Transcoding, and Auth does not depend on Catalog. A change inside one context therefore rarely reaches another, so each context can be read, tested and changed on its own.
 
 ## Bounded Context Map
 
-Baander has 21 bounded contexts plus a Shared kernel. Most contexts follow the full four-layer structure. A few are utility contexts that omit layers they don't need.
+Baander has 21 bounded contexts plus a Shared kernel. Most contexts use the full four-layer structure; a few utility contexts omit the layers they do not need.
 
 | Context | Responsibility | Layers |
 |---------|---------------|--------|
@@ -34,7 +34,7 @@ Baander has 21 bounded contexts plus a Shared kernel. Most contexts follow the f
 | Transcode | CMAF video transcoding, audio renditions, and stream-copy presentations via FFmpeg | Full |
 | UserPreference | User preferences (accent color, sidebar, theme, layout, audio, player, EQ) and user settings | Full |
 
-The **Shared kernel** (`src/Shared/`) is not a bounded context — it provides cross-cutting infrastructure used by all contexts. It follows the full four-layer structure.
+The **Shared kernel** (`src/Shared/`) is not a bounded context. It provides cross-cutting infrastructure to all contexts and uses the full four-layer structure.
 
 ## Project Layout
 
@@ -44,7 +44,7 @@ src/
 ├── Auth/                # Bounded context
 ├── Catalog/             # Bounded context
 ├── Command/             # Utility context (CLI wrappers)
-├── Discovery/           # Bounded context (LAN discovery + device pairing)
+├── Discovery/           # Bounded context (server registration + device pairing)
 ├── Favorites/           # Bounded context
 ├── Filesystem/          # Utility context (filesystem ports, MIME detection, inotify)
 ├── Kernel.php           # HTTP kernel
@@ -65,7 +65,7 @@ src/
 └── UserPreference/      # Bounded context
 ```
 
-Each bounded context follows the same four-layer architecture:
+A context with the full structure typically has this layout:
 
 ```
 src/<Context>/
@@ -91,27 +91,27 @@ src/<Context>/
     └── Resource/        # API response transformers
 ```
 
-**Dependency flow:** Interface → Application → Domain. Infrastructure implements Domain interfaces but Domain never depends on Infrastructure. This inversion keeps business logic framework-free and testable.
+**Dependency flow:** Interface → Application → Domain. Infrastructure implements Domain repository interfaces and Application ports, but Domain never depends on Infrastructure. This inversion keeps business logic framework-free and testable.
 
 ### Domain
 
-Entities, value objects, repository interfaces, and domain services. Pure PHP with no framework dependencies. This is where business rules live.
+Entities, value objects, repository interfaces and domain services: this is where business rules live. In the bounded contexts it is pure PHP with no framework dependencies. The [architecture rules](../../../.agents/rules/architecture-rules.md) record two exceptions in the Shared kernel: the `Uuid` value type wraps Symfony UID, and the outbox repository and compiler pass under `Domain/Event/Outbox/` use DBAL and the service container.
 
 ### Application
 
-Use-case orchestration. Command/query handlers (via Symfony Messenger), DTOs, and port interfaces. Depends only on Domain.
+Use-case orchestration: command and query handlers (registered with Symfony Messenger), DTOs and port interfaces. It depends on its own Domain, on the Shared kernel's Domain and Application layers, and on the application contracts that other contexts expose.
 
 ### Infrastructure
 
-Technical implementations. Doctrine repository implementations, external API adapters, storage drivers. Implements Domain interfaces.
+Technical implementations: Doctrine repositories, external API adapters and storage drivers. It implements Domain repository interfaces and Application ports.
 
 ### Interface
 
-API entry points. Controllers, request DTOs, response resources. Coordinates between Application ports and the HTTP layer.
+Entry points: controllers, console commands, request DTOs and response resources. It turns HTTP and console input into calls on Application ports and dispatched commands.
 
 ## Shared Kernel
 
-`src/Shared/` contains cross-cutting infrastructure used by all contexts:
+`src/Shared/` holds the cross-cutting infrastructure that all contexts use:
 
 - **Domain models** — `Uuid` (v7), `PublicId`, `Email`, cursor pagination types
 - **Swoole runtime** — async primitives, server control operations, WebSocket support
@@ -120,11 +120,11 @@ API entry points. Controllers, request DTOs, response resources. Coordinates bet
 - **Search** — PGroonga full-text search trait
 - **Security** — the WebSocket handshake authenticator
 
-See the [Shared Kernel](shared-kernel.md) page for detailed documentation.
+The [Shared Kernel](shared-kernel.md) page describes each part.
 
 ## Anti-Corruption Layer
 
-Baander uses League OAuth2 Server only for its `ResourceServer`, which validates access tokens. Auth issues tokens itself, through the login and refresh endpoints and through its own authorization server at `/api/oauth/authorize`, `/api/oauth/token`, and `/api/oauth/device/authorize`; it runs no League authorization server. League defines its own repository interfaces (e.g., `League\OAuth2\Server\Repositories\AccessTokenRepositoryInterface`) that the resource server calls internally. Without an anti-corruption layer, the Auth domain would depend directly on League interfaces, coupling business logic to a third-party library.
+Baander uses League OAuth2 Server only for its `ResourceServer`, which validates access tokens. Auth issues tokens itself, through the login and refresh endpoints and through its own authorization server at `/api/oauth/authorize`, `/api/oauth/token`, and `/api/oauth/device/authorize`; it runs no League authorization server. The resource server calls League's own repository interfaces internally (for example `League\OAuth2\Server\Repositories\AccessTokenRepositoryInterface`). Without an anti-corruption layer, the Auth domain would depend on those interfaces directly and tie its business logic to a third-party library.
 
 Instead, `config/services.yaml` aliases League's interfaces to internal adapter implementations:
 
@@ -136,9 +136,9 @@ League\OAuth2\Server\Repositories\RefreshTokenRepositoryInterface:
     alias: App\Auth\Infrastructure\Adapter\OAuth\RefreshTokenRepository
 ```
 
-`ResourceServerFactory` builds the `ResourceServer` with `DpopAwareBearerTokenValidator`, which also checks the token's audience. `OAuth2Authenticator` calls it for API requests, including WebSocket ticket issuance. The raw upgrade uses `WsTicketAuthenticator` and the Auth ticket-redemption port; it never accepts an OAuth query token. The revocation endpoint uses the two aliased repositories. The domain layer only knows about `App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface` — never the League class.
+`ResourceServerFactory` builds the `ResourceServer` with `DpopAwareBearerTokenValidator`, which also checks the token's audience. `OAuth2Authenticator` calls it for API requests, including WebSocket ticket issuance. The raw upgrade uses `WsTicketAuthenticator` and the Auth ticket-redemption port; it never accepts an OAuth query token. The revocation endpoint dispatches `RevokeTokenCommand`, whose handler works through Auth's own domain repository interfaces rather than the League aliases. The domain layer only knows about `App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface` — never the League class.
 
-The same boundary pattern applies to cross-context decorators and external provider clients. `QualityFilteringStreamingDecorator` wraps `TranscodeStreamingService` behind `TranscodeStreamingPortInterface`, intersecting the video's available quality ladder with the tiers permitted by `StreamAdmissionPortInterface` from `QoL` so `Transcode`'s domain and core streaming service remain decoupled from stream-governance rules. Outbound adapters such as `IprdStationSyncAdapter` (`StationSyncPortInterface` in `Radio`), `LrclibClient` (`LyricsProviderPortInterface` in `Lyrics`), and the `Metadata` provider adapters translate external HTTP payloads into internal DTOs and domain models before any state reaches the application layer.
+The same boundary pattern applies to cross-context decorators and external provider clients. `QualityFilteringStreamingDecorator` wraps `TranscodeStreamingService` behind `TranscodeStreamingPortInterface`. It intersects the video's available quality ladder with the tiers that `StreamAdmissionPortInterface` from `QoL` permits, so neither `Transcode`'s domain nor its core streaming service depends on stream-governance rules. Outbound adapters such as `IprdStationSyncAdapter` (`StationSyncPortInterface` in `Radio`), `LrclibClient` (`LrclibClientInterface` in `Lyrics`), and the `Metadata` provider adapters translate external HTTP payloads into internal DTOs and domain models before any state reaches the application layer.
 
 ## Communication Between Contexts
 
@@ -148,4 +148,4 @@ Contexts communicate through:
 - **Domain events** — captured in the PostgreSQL outbox for durable replay, or dispatched live inside the producing process for real-time room and transcode subscribers
 - **Shared kernel** — common types like `Uuid` and `PublicId` provide a shared vocabulary without coupling
 
-The [Communication Map](communication-map.md) draws these paths together with the clients, stores, worker pair and external services, and gives the rule for choosing between an inline command, an outbox event, a scheduled occurrence and a routed async message.
+The [Communication Map](communication-map.md) draws these paths together with the clients, stores, worker pair and external services. It also gives the rule for choosing between an inline command, an outbox event, a scheduled occurrence and a routed async message.

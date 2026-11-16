@@ -55,7 +55,7 @@ chore(infra): update Docker build, supervisord, FFmpeg, and email templates
 
 Reviewers check for:
 
-- **DDD conventions** — domain models use state objects, ports for dependencies, repositories implement domain interfaces
+- **DDD conventions** — new aggregate roots use state objects, dependencies go through ports, and repositories implement domain interfaces
 - **Test coverage** — new behavior has tests; domain logic is tested without mocks
 - **Pre-release design policy** — while there are no production deployments ([AGENTS.md](../../../AGENTS.md)), favor the intended future design over backward compatibility, remove obsolete paths, and add no compatibility layers or migration fallbacks for hypothetical installations
 - **Code style** — matches existing patterns in the codebase
@@ -70,7 +70,7 @@ CLI reference.
 
 | Code Change | Documentation to Update |
 |-------------|------------------------|
-| Add or modify a CLI command | Use the [documentation-maintainer](../../../.agents/skills/documentation-maintainer/SKILL.md) CLI mode to update [CLI Reference](../../part-1-operator-guide/commands/README.md) (`CommandDocsCoverageTest` checks every `app:*` command) |
+| Add or modify a CLI command | Use the [documentation-maintainer](../../../.agents/skills/documentation-maintainer/SKILL.md) CLI mode to update [CLI Reference](../../part-1-operator-guide/commands/README.md) (`CommandDocsCoverageTest` checks every `#[AsCommand]` command under `src/`) |
 | Add or modify an admin endpoint | Declare `#[CliCounterpart]` or `#[CliParityExemption]` on the admin route (`AdminCliParityTest`) and document the counterpart command in `docs-book/part-1-operator-guide/commands/` |
 | Introduce a new entity, named process, or status concept | Add an entry to [CONCEPTS.md](../../../CONCEPTS.md) |
 | Deliver a planned item or verification checkpoint | Record the delivered scope, suite counts, and static gates in [ROADMAP.md](../../../ROADMAP.md) |
@@ -85,7 +85,7 @@ CLI reference.
 The files in [`.agents/rules/`](../../../.agents/rules/) are the authoritative source for coding conventions. [AGENTS.md](../../../AGENTS.md) points agents to the applicable rules. When conventions change:
 
 1. Update the relevant rules file
-2. Regenerate `coding-conventions.md` from the rules files
+2. Update `coding-conventions.md` by hand to match the rules files
 3. Both the rules file and the human-readable doc should reflect the same conventions
 
 ## Running Tests

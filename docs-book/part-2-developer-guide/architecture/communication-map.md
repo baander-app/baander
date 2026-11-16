@@ -1,13 +1,13 @@
 # Communication Map
 
 Baander is one web application, two stores, a worker pair and a handful of
-clients and external services, and they talk to each other over a small number
-of paths: HTTPS requests with DPoP proofs, a WebSocket, a Symfony Messenger bus
+clients and external services. They talk to each other over a small number of
+paths: HTTPS requests with DPoP proofs, a WebSocket, a Symfony Messenger bus
 with two Redis streams, a PostgreSQL outbox and change inbox, a private IPC
 volume, and outbound provider calls. This page puts every path on one map,
-says which page owns each path, and gives the rule for deciding whether a new
-piece of work is an inline command, an outbox event, a scheduled occurrence or
-a routed async message. It is a hub; the flow diagrams live on the pages it
+names the page that owns each path, and gives the rule for deciding whether a
+new piece of work is an inline command, an outbox event, a scheduled occurrence
+or a routed async message. It is a hub: the flow diagrams live on the pages it
 links.
 
 ```mermaid
@@ -91,17 +91,18 @@ live updates. The Electron app in `ui/electron` loads that same application
 against a configured server URL, so it shares the generated API client and the
 DPoP package in `ui/shared/dpop`; what it adds is a native shell with its own
 codec and window services. [Frontend Development](../development/frontend-development.md)
-owns both. The local casting companion is a Bånder component on the receiver's
-network that supplies discovery and control when the browser or remote server
-cannot provide them directly, connecting the listener's home receivers to
-playback controlled through Bånder; it is planned, and the map draws it with a
-dotted edge for that reason.
+owns both. The local casting companion is planned, so the map draws it with a
+dotted edge. It is a Bånder component on the receiver's network that supplies
+discovery and control when the browser or remote server cannot provide them
+directly, connecting the listener's home receivers to playback controlled
+through Bånder.
 
 ## HTTP API and WebSocket
 
 The HTTP API sits behind the Symfony firewall. `OAuth2Authenticator` validates
-the access token and its DPoP binding on every API request; token endpoints
-hand out single-use nonces that `DpopNonceManager` stores in Redis under
+the access token on each authenticated API request, and `DpopBindingListener`
+then verifies its DPoP proof; signed video delivery routes check a URL signature
+instead. Token endpoints hand out single-use nonces that `DpopNonceManager` stores in Redis under
 `dpop:nonce:` keys for `auth.dpop.nonce_ttl` seconds. The handshake and the
 proof claims are specified in [DPoP Proofs](../development/api-authentication.md#dpop-proofs);
 [Authentication](../development/api-authentication.md#authentication) covers the login, refresh and
@@ -112,10 +113,10 @@ Authorization or DPoP header on an upgrade. The client first calls
 `POST /api/ws/tickets` through its authenticated HTTP client, then opens
 `/api/ws?ticket=<ticket>`; Swoole's upgrade handler checks the route, framing
 and Origin, and `WsTicketAuthenticator` has Redis consume the ticket atomically
-before a fresh database query checks the token. The socket then carries change
-hints, which name what to reread and carry no resource contents, playback
-session coordination messages, party sync messages and transcode position
-controls.
+before a fresh database query checks the token. The socket then carries four
+kinds of message: change hints, which name what to reread and carry no resource
+contents; playback session coordination messages; party sync messages; and
+transcode position controls.
 [Real-Time Patterns](real-time-patterns.md) owns the connection registry, the
 message protocol and [the ticket authentication](real-time-patterns.md#authentication);
 [Live Updates](live-updates.md) owns the committed-change path that feeds it.
@@ -170,10 +171,10 @@ and encoders. A private IPC volume joins them: each unit publishes a heartbeat
 there and admits work only while its peer's heartbeat is current and at the
 same lease epoch. The scheduler records occurrences in PostgreSQL before it
 relays them to the `scheduler` stream, so a recovery pass can publish an
-occurrence that was recorded but never reached Redis. A transcode is the one
-workload that bypasses the bus entirely: the web request commits an execution
-request in PostgreSQL, the control unit claims it, and bounded native requests
-cross the IPC socket to the execution unit.
+occurrence that was recorded but never reached Redis. Transcodes and audio
+renditions are the workloads that bypass the bus entirely: the web request
+commits an execution request in PostgreSQL, the control unit claims it, and
+bounded native requests cross the IPC socket to the execution unit.
 [Background Work](../../part-1-operator-guide/workers/background-work.md) owns the pair's
 duties, admission and recovery; [Scheduled work](../../part-1-operator-guide/workers/background-work.md#scheduled-work)
 owns the occurrence path.
@@ -189,22 +190,25 @@ queue call MusicBrainz from their handlers.
 list and the degradation matrix; [Notifications](../../part-1-operator-guide/administration/notifications.md)
 owns email, push and webhook delivery.
 
-The web application calls out directly in three cases, which is why the map
-has an edge from the HTTP API to the external services as well. Credential
-emails for password reset and verification go through `AfterResponseMailer`,
-which sends after the response, straight to the mailer transport, so that a
-request for a real account takes as long as one for an unknown address. The
-on-demand lyrics fetch and the lyrics search call LRCLIB inside the request:
-`FetchLyricsCommand` has `default` off and `LyricsController` dispatches it
-without a transport stamp, and `SearchLyricsHandler` calls the client from its
-query handler. Metadata browsing (`MetadataBrowseController`) looks up
-MusicBrainz and Last.fm inside the request. Every outbound path and its
+The web application also calls out directly, which is why the map has an edge
+from the HTTP API to the external services as well. Credential emails for
+password reset and verification go through `AfterResponseMailer`, which sends
+after the response, straight to the mailer transport, so that a request for a
+real account takes as long as one for an unknown address. The on-demand lyrics
+fetch, the lyrics search and applying a chosen lyrics result call LRCLIB inside
+the request: `FetchLyricsCommand` has `default` off and `LyricsController`
+dispatches it without a transport stamp, `SearchLyricsHandler` calls the client
+from its query handler, and `ApplyLyricsHandler` fetches the chosen result.
+Metadata browsing (`MetadataBrowseController`) looks up MusicBrainz and Last.fm
+inside the request; metadata search (`MetadataSearchController`) also queries
+Discogs, and the MusicBrainz match candidates endpoint queries MusicBrainz
+through `SearchMatchCandidatesQuery`. Every outbound path and its
 destination policy is listed in the
 [outbound inventory](application-threat-model.md#outbound-inventory).
 
 ## Discovery and the registry
 
-LAN discovery and pairing are an ordinary part of the API. The Discovery
+Server registration and pairing are an ordinary part of the API. The Discovery
 context registers a server, opens a pairing session with a short-lived code and
 completes the pairing, storing server and pairing records in the application
 database; its endpoints live under `/api/discovery/`. The registry is a

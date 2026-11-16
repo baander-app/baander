@@ -15,15 +15,15 @@ store. The workflows select them at run time; nothing is edited per forge.
 | File | Name | Trigger | Does |
 | --- | --- | --- | --- |
 | `ci.yaml` | CI | Pushes to `master` and pull requests | Backend, frontend, DSP and Registry gates, then builds the production application image and pushes it from `master` |
-| `frontend.yaml` | Frontend CI | Pushes and pull requests that touch the frontend paths | Quality checks, tests with coverage, browser suites and the production build |
-| `website.yaml` | Public website | Pushes and pull requests that touch the website paths | Builds, validates and browser-checks the static website, then keeps the archive |
-| `dsp-analysis.yaml` | DSP analysis qualification | Pushes and pull requests that touch the DSP paths | Builds and qualifies the analysis modules with the pinned Emscripten |
+| `frontend.yaml` | Frontend CI | Pushes to `master` and pull requests that touch the frontend paths | Quality checks, tests with coverage, browser suites and the production build |
+| `website.yaml` | Public website | Pushes to `master` and pull requests that touch the website paths | Builds, validates and browser-checks the static website, then keeps the archive |
+| `dsp-analysis.yaml` | DSP analysis qualification | Pushes to `master` and pull requests that touch the DSP paths | Builds and qualifies the analysis modules with the pinned Emscripten |
 | `registry-nightly.yaml` | Registry nightly qualification | `17 2 * * *` (02:17 UTC) and manual dispatch | Five-voter Registry qualification and parser fuzzing |
 | `runner.yaml` | Build Runner Image | Pushes to `master` that touch `docker/runner/**`, and dispatch | Publishes `baander-runner` |
 | `postgres.yaml` | Build PostgreSQL Image | Pushes to `master` that touch `docker/postgres/**`, and dispatch | Publishes `baander-postgres` |
 | `nginx.yaml` | Build Nginx Image | Pushes to `master` that touch `docker/nginx/**`, and dispatch | Publishes `baander-nginx` |
 | `ffmpeg.yaml` | Build FFmpeg Image | Pushes to `master` that touch `packages/baander-audio-core/**`, `docker/ffmpeg/**` or the capability gate script, and dispatch | Publishes `ffmpeg-baander-static` |
-| `audio-core.yml` | Audio Core binding | Pushes, tags and pull requests that touch `packages/baander-audio-core/**` | GitHub only; builds the prebuilt binding and tests the codec, see below |
+| `audio-core.yml` | Audio Core binding | Pushes to `master`, `audio-core-v*` tags and pull requests that touch `packages/baander-audio-core/**` or the desktop app's `package.json` and `yarn.lock`, and dispatch | GitHub only; builds the prebuilt binding and tests the codec, see below |
 
 A workflow with path filters lists its own file among them, so editing the
 workflow runs it. The README's badges show GitHub's status for CI, Frontend CI,
@@ -59,7 +59,8 @@ commit and checks it against the committed manifest. Each sits behind an
 has moved, and the scripts leave a restored copy alone once they have checked it.
 The runner's `flac` package is not used.
 
-The two macOS runners build the kernel suites, `test_dsp` and the lossless suites,
+The two macOS runners build the kernel suite `test_dsp` and the lossless suites
+`test_flac_format`, `test_flac_dsp`, `test_flac_encoder` and `test_flac_decoder`
 for their own architecture and run them. The AAC transforms and the lossless mode
 pick their kernels for the processor they run on, so the arm64 runner is the only
 place where the NEON kernels execute: `test_dsp` compares those of the AAC table, the
@@ -67,9 +68,9 @@ encoder's noise sum among them, with the scalar ones, and `test_flac_dsp` those 
 the lossless mode. `BAC_REQUIRE_KERNELS`
 names the kernel levels a runner has to exercise (`neon` on arm64, `sse2,avx2` on
 Linux, `sse2` on the Intel Mac): `test_flac_dsp` fails when a named level did not
-run or installed no kernel of its own, and the step checks the output of both suites
-for the line that says the level ran and how many of its kernels were compared with
-the scalar ones. Windows has no such step. The CTest suites
+run or installed no kernel of its own. The step then checks the suite output for the
+line that says the level ran and how many of its kernels were compared with the
+scalar ones: on macOS in both suites, on Linux in `test_flac_dsp`. Windows has no such step. The CTest suites
 are POSIX programs, and the Windows build of the codec is tested through the
 binding.
 
@@ -118,7 +119,6 @@ caused it.
 | Caches and coverage baselines | Forgejo generic packages through `scripts/ci-package-store.php` | `actions/cache` |
 | Artifacts | `.github/actions/forgejo-upload-artifact` | `actions/upload-artifact` v7.0.2 |
 | Host disk cleanup | None | Before the CI quality gate, the application build and the static FFmpeg build |
-| Anonymous-pull check | None | After pushing the Nginx and application images |
 
 Registry login passes `secrets.REGISTRY_TOKEN || github.token` as the password, with
 `github.actor` as the user. Job timeouts are the same on both forges.
@@ -149,8 +149,10 @@ run cannot replace the commit under qualification. The image workflows fetch
 ### Rules for editing workflows
 
 `PublicationWorkflowTest` parses the shared tree and evaluates each condition once
-for GitHub and once for Forgejo. It enforces the following rules, except the
-`data.forgejo.org` check in the second, which you make by hand:
+for GitHub and once for Forgejo. It enforces the following rules, except two checks
+that you make by hand: the `data.forgejo.org` listing in the second rule, and that a
+concurrency group is keyed per workflow and ref (the test checks only that a group
+exists):
 
 - Use `github.*` only. `forgejo.*` and `github.forgejo_server_version` do not exist
   on GitHub.
@@ -205,13 +207,14 @@ application image push. The image workflows never run for pull requests. In a fo
 pull request those steps are skipped without failing the run, so the verdict comes
 from the gates alone and no coverage comment appears.
 
-A fork pull request on GitHub therefore pulls the runner and PostgreSQL images
-without logging in. Those two packages must be public for its jobs to start.
+A fork pull request on GitHub therefore pulls the runner, PostgreSQL and FFmpeg
+images without logging in. Those three packages must be public: the runner image
+for its jobs to start, the other two for the quality gate and the image builds.
 
 ## Caches and coverage baselines
 
-Saves happen only on `master` pushes, and pull requests restore what `master`
-saved. Each forge keeps its own copy:
+For the data below, saves happen only on `master` pushes, and pull requests restore
+what `master` saved. Each forge keeps its own copy:
 
 | Data | Workflow | Forgejo package and file | GitHub cache key |
 | --- | --- | --- | --- |
@@ -313,8 +316,10 @@ notice, provenance and embedded-dependency gaps to close before a release image 
 qualified.
 
 The runner workflow builds inside the public `docker:cli` image. Every other job
-runs inside `baander-runner`, and the CI quality gate pulls `baander-postgres`, so
-both images must exist in a forge's registry before that forge's first CI run.
+runs inside `baander-runner`, except the GitHub-only Audio Core binding jobs, which
+run directly on the hosted runners. The CI quality gate pulls `baander-postgres`,
+and the CI and production image builds copy from `ffmpeg-baander-static`, so all
+three images must exist in a forge's registry before that forge's first CI run.
 
 `build-and-push` runs on pull requests too: it builds the production image and
 verifies its packaged inventory, but pushes only from `master`.
@@ -323,9 +328,9 @@ verifies its packaged inventory, but pushes only from `master`.
 
 GitHub runs `workflow_dispatch` only for workflows on the default branch, and every
 GitHub gate job runs inside the GHCR runner image. GitHub therefore comes up in two
-stages: the image workflows reach `master` first and publish the runner and
-PostgreSQL images, which an operator makes public; then the gate workflows follow,
-and their first runs find both images. The GitHub runbook below lists the steps.
+stages: the image workflows reach `master` first and publish the runner,
+PostgreSQL and FFmpeg images, which an operator makes public; then the gate
+workflows follow, and their first runs find those images. The GitHub runbook below lists the steps.
 
 Forgejo's registry already holds every image, so Forgejo needs no staging.
 
@@ -375,8 +380,8 @@ Keep these settings in place:
    image or its gate starts the FFmpeg workflow; otherwise dispatch it with
    `gh workflow run ffmpeg.yaml --repo baander-app/baander` to create its package.
    Make `ffmpeg-baander-static` public the same way.
-7. **Push the gate workflows.** Their first runs pull both public images. The first
-   push of `master` that passes the CI quality gate publishes the application image;
+7. **Push the gate workflows.** Their first runs pull the public images. The first
+   push of `master` that passes every CI gate job publishes the application image;
    make `baander` public the same way.
 
 ### When GitHub needs attention

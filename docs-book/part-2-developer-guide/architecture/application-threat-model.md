@@ -97,14 +97,14 @@ counts and failures belong to the corresponding run artifacts.
 
 | Threat and prerequisite | Impact | Implemented control and supporting evidence | Coverage limit or unresolved finding |
 | --- | --- | --- | --- |
-| Credential leakage through response or error handling: attacker can submit credentials or inspect their own profile response | Token or password disclosure | `Integration/OAuthFirewallAcceptanceTest.php` checks profile and replay-refusal responses and application logs; the runtime drill rejects malformed login input without reflecting a credential canary | Intentional login, refresh, personal-client, registration and webhook-secret responses return credentials. No exhaustive taint analysis of all logs or exporters was performed. |
+| Credential leakage through response or error handling: attacker can submit credentials or inspect their own profile response | Token or password disclosure | `Integration/OAuthFirewallAcceptanceTest.php` checks profile and replay-refusal responses and application logs; the runtime drill rejects malformed login input without reflecting a credential canary | Intentional login, refresh, administrator OAuth client registration and secret rotation, and webhook-secret responses return credentials. No exhaustive taint analysis of all logs or exporters was performed. |
 | Query credential leakage: a WebSocket URL reaches application logging | A log reader can race the client to redeem an unused ticket | `Unit/Shared/Infrastructure/Logging/StreamSignatureRedactionProcessorTest.php` reproduces the prior disclosure and checks ticket/token/signature query redaction, including encoded parameter names | Bundled proxy access logs for exact `/api/ws` requests omit queries and referrers. WebSocket proxy error logging is suppressed because nginx includes raw requests. Pre-location parser errors, external proxies, browser history and third-party observability remain separate limits. Tickets remain short-lived bearer capabilities. |
 | Foreign-origin credential forwarding or stale browser credentials after logout | External-origin disclosure or use of a superseded session | `ui/web/tests/e2e/browser-auth/worker-auth.spec.ts` covers foreign paths, blocked redirects, worker restart, account switch, cross-tab logout and pending logout | Browser fixture responses model the issuer. Application-origin script compromise remains authoritative; CSP/XSS resistance is not established by these tests. |
 | Access-token or DPoP replay: attacker steals a token or proof | Impersonation | `Integration/OAuthFirewallAcceptanceTest.php` checks missing/wrong/replayed proof, method binding and revocation through the production firewall; `Integration/OAuthGrantPathAcceptanceTest.php` covers grant flows | The WebSocket runtime drill verifies ticket issuance and redemption separately. Logout/revoke deliberately permit skipping only replay-store availability checks during a DPoP store outage. |
 | Cross-user or cross-library access: a member guesses another resource identifier or changes request method | Unauthorized read, mutation or queued work | `Integration/CatalogReadFirewallTest.php`, `CatalogMutationFirewallTest.php`, `PlaylistReadFirewallTest.php`, `PlaylistMutationFirewallTest.php`, `ArtistMutationFirewallTest.php` and the extended OAuth firewall suite exercise membership, collaborator removal, owner/admin distinctions and alternate methods | These are production-kernel requests, not network penetration tests. Pairing functional tests and anonymous/revoked route probes do not prove every authenticated pairing race. Pairing sessions have no user ownership field; knowledge of the pairing code is part of their authority. |
 | Malformed JSON/types or oversized wire request: anonymous client sends hostile input | Server errors, unintended writes or loss of availability | `scripts/test-security-runtime-container.sh` runs real `app:serve`; `tests/Fixtures/security-runtime.php` checks bounded rejection, fresh-connection liveness and unchanged user/token counts. Login validation prevents decoding/type errors from escaping as 500 | The drill covers selected malformed framing and declared oversize; it does not establish resistance to slow clients, every request-smuggling ambiguity or sustained resource exhaustion. |
 | Forged forwarding headers: direct client chooses apparent address, scheme or host | Rate-limit evasion and incorrect DPoP request identity | `Unit/Shared/Infrastructure/Http/ProxyTrustTest.php` exercises direct and explicit proxy trust; both configuration layers now default to no trust | Correct proxy header replacement and network isolation are deployment assumptions. The tests do not emulate every proxy vendor or multi-hop topology. |
-| Rate-counter outage or concurrent updates | Brute-force limits can admit more requests than configured | Configured factories execute Symfony policies on operation-local snapshots and commit through Redis compare-and-set. Store errors and exhausted conflict retries stop protected work with a generic 503. Named clears advance the same namespace generation used by consumption. `Integration/RateLimiterConcurrencyTest.php` and `RateLimiterHttpAvailabilityTest.php` target these boundaries; `Functional/Auth/AuthEndpointRateLimitTest.php` and `ApiRateLimitTest.php` retain ordinary exhaustion coverage | Local storage, HTTP and runtime checks pass; distributed load and Redis failover remain unqualified. The generic API limiter preserves the narrow logout/revoke availability exception; it still enforces confirmed exhaustion and every other authentication/proof check. |
+| Rate-counter outage or concurrent updates | Brute-force limits can admit more requests than configured | Configured factories execute Symfony's fixed- and sliding-window policies, or the project's continuous token bucket, on operation-local snapshots and commit through Redis compare-and-set. Store errors and exhausted conflict retries stop protected work with a generic 503. Named clears advance the same namespace generation used by consumption. `Integration/RateLimiterConcurrencyTest.php` and `RateLimiterHttpAvailabilityTest.php` target these boundaries; `Functional/Auth/AuthEndpointRateLimitTest.php` and `ApiRateLimitTest.php` retain ordinary exhaustion coverage | Local storage, HTTP and runtime checks pass; distributed load and Redis failover remain unqualified. The generic API limiter preserves the narrow logout/revoke availability exception; it still enforces confirmed exhaustion and every other authentication/proof check. |
 | Outbound SSRF through webhook URL or changed DNS | Access to internal services | `WebhookDestinationPolicy` checks every DNS answer, denies forbidden ranges and restricts optional LAN allowance; delivery pins the checked address, bypasses ambient proxies and refuses redirects. `Unit/Notification/Infrastructure/Webhook/` tests cover forbidden addresses, changing DNS and dispatch options | DNS tests are controlled resolver fixtures. Local TLS tests qualify transport certificate behavior separately; they do not certify public DNS or deployment trust stores. |
 | Metadata, radio-catalog or push destination changes through DNS or redirects | Internal-service access or provider credential disclosure | `PublicDestinationPolicy` requires an approved HTTPS hostname on port 443 and rejects the request if any DNS answer is not public. `PublicHttpClient` and `PushTransport` pin an approved address, verify TLS and disable proxies, automatic redirects and reused connections. `Unit/Shared/Infrastructure/Http/PublicDestinationPolicyTest.php`, `PublicHttpClientTest.php` and `Unit/Notification/Infrastructure/Push/PushTransportTest.php` cover these controls | Local adapter, destination-policy and TLS regressions pass in the CI image. Complete native DNS runs in a bounded helper within the caller deadline; helper admission, cleanup and scheduling limits are described below. Approved providers and application-origin script compromise remain separate trust boundaries. |
 | Outbound TLS failure or HTTPS downgrade | Interception or connection to an unintended endpoint | `Unit/Lyrics/Infrastructure/Api/LrclibTransportSecurityTest.php` uses a disposable CA/server to check trusted success, untrusted certificate, hostname mismatch and redirect rejection. The lyrics client disables redirects | Other outbound transports have separate limits below. Operator-configured base URLs remain trusted configuration. |
@@ -136,9 +136,9 @@ replace these controls.
 Metadata and IPRD requests reject redirects by default. Cover Art Archive alone may
 follow at most three manual GET redirects within `coverartarchive.org`,
 `archive.org` or their label-boundary subdomains. Each hop repeats validation and
-pinning and cancels the previous response. Cross-origin hops retain only `Accept`, `Accept-Language` and `User-Agent`
-headers; credentials, cookies and request bodies are not forwarded. The
-redirect chain shares one HTTP budget.
+pinning and cancels the previous response. Cross-origin hops retain only the
+`Accept`, `Accept-Language` and `User-Agent` headers; credentials, cookies and
+request bodies are not forwarded. The redirect chain shares one HTTP budget.
 
 Public HTTP requests carry one monotonic deadline through DNS and every approved
 redirect hop, capped at thirty seconds. Push transport shares a thirty-second
@@ -181,17 +181,19 @@ exhaustive taint analysis of logging or external observability.
    proxy logging and deferred native clients remain unqualified.
 2. **Rate-limit storage and residual limits.** The configured limiters use shared atomic Redis
    storage rather than Symfony's cache storage. Each operation executes the installed
-   fixed/sliding-window policy against its own snapshot and compares both the
-   generation and opaque revision before writing. Redis rejects snapshots older than
-   two seconds or from a future server time. Empty reads and per-subject resets leave
-   ten-second revision tombstones, preventing a paused writer from confusing an
-   expired state with the absence it originally read. Definite conflicts retry
-   within a limit of eight total attempts and a two-second monotonic budget; an
-   in-flight bounded Redis call can finish after that deadline. Transport errors,
-   uncertain writes and corrupt state are not retried as fresh consumption. The 19 names, budgets, identity keys,
-   media exemptions and development bypass are unchanged. The full backend suites,
-   focused concurrency/outage checks and production runtime drills have recorded
-   passing runs; those artifacts retain their counts and limits. The rewritten
+   policy (Symfony's fixed or sliding window, or the project's continuous token
+   bucket) against its own snapshot and compares both the generation and opaque
+   revision before writing. Redis rejects snapshots older than two seconds or from a
+   future server time. Empty reads and per-subject resets leave ten-second revision
+   tombstones, so a paused writer does not confuse an expired state with the absence
+   it originally read. Definite conflicts retry within a limit of eight total
+   attempts and a two-second monotonic budget; an in-flight bounded Redis call can
+   finish after that deadline. Transport errors, uncertain writes and corrupt state
+   are not retried as fresh consumption. The atomic storage leaves the 22 limiter
+   names, their budgets, identity keys, media exemptions and the development bypass
+   as configured. The full backend suites, focused concurrency/outage checks and
+   production runtime drills have recorded passing runs; those artifacts retain
+   their counts and limits. The rewritten
    `Unit/Shared/Infrastructure/RateLimiter/RateLimiterFailureSemanticsTest.php`
    targets failed storage, conflict refetch, uncertain writes and the retry deadline.
    The effective configuration contributes to the subject digest, so a configuration
@@ -213,11 +215,10 @@ exhaustive taint analysis of logging or external observability.
    worker and includes lookup in the caller's request budget. The dedicated
    network-isolated DNS drill and native lifecycle tests cover complete answers,
    stalled lookups, cancellation and cleanup; execution results belong to the
-   corresponding run artifacts.
-   Per-process helper capacity, cleanup/scheduling tolerance, overall provider
-   retries and approved-provider compromise remain limits. Webhooks,
-   operator-configured lyrics, mail, tracing
-   and browser playback retain their separate policies.
+   corresponding run artifacts. Per-process helper capacity, cleanup/scheduling
+   tolerance, overall provider retries and approved-provider compromise remain
+   limits. Webhooks, operator-configured lyrics, mail, tracing and browser playback
+   retain their separate policies.
 4. **Unqualified boundaries.** Sustained denial of service, complete HTTP parser
    differential testing, authenticated pairing races, live external TLS providers and
    actual regional deployments remain unqualified. The registry model records its
@@ -230,9 +231,10 @@ Use the CI image and disposable runners from [Testing](../testing/README.md). Th
 runtime runner creates an internal Docker network and disposable PostgreSQL and
 Redis, generates test-only OAuth keys and removes its containers on exit. It has a
 360-second outer deadline. Malformed-input sockets have three-second deadlines;
-WebSocket and outage probes use bounded request budgets of up to ten seconds. It does not reset the
-development database. The [CI workflow](../contributing/continuous-integration.md) runs it as a
-blocking step on both forges.
+WebSocket and outage probes use bounded request budgets of up to ten seconds. It
+does not reset the development database. The
+[CI workflow](../contributing/continuous-integration.md) runs it as a blocking step
+on both forges.
 
 ```bash
 BAANDER_TEST_IMAGE=baander-ci-prewarm:local bash scripts/test-security-runtime-container.sh
@@ -240,7 +242,6 @@ BAANDER_TEST_IMAGE=baander-ci-prewarm:local bash scripts/test-unit-container.sh
 BAANDER_TEST_IMAGE=baander-ci-prewarm:local bash scripts/test-functional-container.sh tests/Functional
 BAANDER_TEST_IMAGE=baander-ci-prewarm:local bash scripts/test-functional-container.sh tests/Integration
 ```
-
 
 The same runner exercises browser-compatible ticket issuance, missing/wrong/replayed
 proofs, Origin and route rejection, ambiguous query parameters, single-use and
