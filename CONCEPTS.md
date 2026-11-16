@@ -724,6 +724,15 @@ It advances when committed source changes are projected, and several changes may
 share one advance. It identifies a need to refetch current data, not an entity
 version, a business-operation count, or a position in replayable event history.
 
+### Live-update outage
+
+The period during which one browser tab's live updates are unavailable: delivery
+is lost or not established within its deadline, recovery or a required resource
+refresh fails, or the server reports degraded health. Connecting within the
+deadline is not an outage. An outage ends only when that tab's live data is
+current again; refresh activity in between does not end it. Each tab measures
+its own outage; the server does not.
+
 ## Store debugging
 
 ### Recorder instance
