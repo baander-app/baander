@@ -19,7 +19,6 @@ import { useElectronPlaybackIpc } from '@/shared/hooks/use-electron-playback-ipc
 import { useMediaShortcuts } from '../hooks/use-media-shortcuts'
 import { KeyboardShortcutsHelp } from '@/shared/components/keyboard-shortcuts-help'
 import { MediatorDevPanel } from '@/shared/components/mediator-dev-panel'
-import { LiveConnectionStatus } from '@/shared/live/provider'
 import { TitleBar } from './TitleBar'
 import { NowPlayingBar } from '@/features/player/components/NowPlayingBar'
 
@@ -35,14 +34,6 @@ const ShellRow = styled.div`
   display: flex;
   flex: 1;
   min-height: 0;
-`
-
-const ConnectionStatus = styled.div`
-  position: absolute;
-  right: 8px;
-  top: 4px;
-  z-index: 10;
-  pointer-events: none;
 `
 
 const MainContent = styled.main`
@@ -76,7 +67,6 @@ export function AppShell() {
         <VideoPlaybackRuntime />
         {window.BaanderElectron && <TitleBar />}
         <ShellRow>
-          <ConnectionStatus><LiveConnectionStatus /></ConnectionStatus>
           <Sidebar />
           <MainContent>
             <ErrorBoundary>

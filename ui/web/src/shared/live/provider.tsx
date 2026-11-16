@@ -1,5 +1,4 @@
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { StatusDot } from '@/shared/components/status-dot'
+import { useEffect, useState, type ReactNode } from 'react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { useNotificationStore } from '@/features/notification/stores/notification-store'
@@ -8,11 +7,11 @@ import { useEqProfilesStore } from '@/features/equalizer/stores/eq-profiles-stor
 import { usePaletteStore } from '@/features/visualizer/stores/palette-store'
 import { activityService } from '@/features/player/services/activity-service'
 import { OwnedQueryClient } from './query-client'
-import { isLiveCurrent, LiveRecovery } from './recovery'
+import { LiveRecovery } from './recovery'
 import { startLiveOutageWatcher } from './outage-watcher'
 import { LIVE_QUERY_DESCRIPTORS } from './descriptors'
 import { LiveQueryCoordinator } from './query-coordinator'
-import { LiveCoordinatorContext, LiveContext, useLiveCoordinator, useLiveRecovery } from './context'
+import { LiveCoordinatorContext } from './context'
 import { authenticatedTransport } from './transport'
 
 function resetMirrors(): void {
@@ -20,26 +19,6 @@ function resetMirrors(): void {
   useNotificationStore.getState().resetForPrincipal()
   useSidebarStore.getState().resetForPrincipal()
   useEqProfilesStore.getState().resetForPrincipal()
-}
-
-export function LiveConnectionStatus() {
-  const recovery = useLiveRecovery()
-  if (!recovery) return null
-  return <ConnectionStatus recovery={recovery} />
-}
-
-function ConnectionStatus({ recovery }: { recovery: LiveRecovery }) {
-  const coordinator = useLiveCoordinator()
-  const snapshot = useSyncExternalStore(recovery.subscribe, recovery.getSnapshot)
-  if (isLiveCurrent(snapshot, coordinator !== null)) return null
-  return (
-    <span role="status">
-      <StatusDot
-        color={snapshot.status === 'degraded' ? 'amber' : 'gray'}
-        label={snapshot.status === 'connecting' ? 'Connecting…' : snapshot.status === 'degraded' ? 'Updates unavailable' : 'Updating…'}
-      />
-    </span>
-  )
 }
 
 interface ClientProviderProps {
@@ -91,11 +70,9 @@ function PrincipalClient({ principal, children, freshnessEnabled }: PrincipalCli
   }, [client, coordinator, freshnessEnabled, principal, recovery])
   return (
     <QueryClientProvider client={client}>
-      <LiveContext.Provider value={principal ? recovery : null}>
-        <LiveCoordinatorContext.Provider value={principal && freshnessEnabled ? coordinator : null}>
-          {children}
-        </LiveCoordinatorContext.Provider>
-      </LiveContext.Provider>
+      <LiveCoordinatorContext.Provider value={principal && freshnessEnabled ? coordinator : null}>
+        {children}
+      </LiveCoordinatorContext.Provider>
     </QueryClientProvider>
   )
 }

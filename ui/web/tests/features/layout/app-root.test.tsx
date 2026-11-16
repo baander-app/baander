@@ -117,3 +117,13 @@ describe('toast host', () => {
     expect(screen.getByText('Playlist saved')).toBeVisible()
   })
 })
+
+describe('live-update status', () => {
+  it('shows no status text in the app shell while live updates connect', async () => {
+    signIn(['ROLE_USER'])
+    showRoute('/settings')
+    render(<App />)
+    expect(await screen.findByRole('tablist', { name: 'Media type' })).toBeInTheDocument()
+    expect(screen.queryByText(/^(Connecting…|Updating…|Updates unavailable)$/)).not.toBeInTheDocument()
+  })
+})
