@@ -9,7 +9,7 @@ RUN gcc -O2 -Wall -Wextra -Werror -o /thp-disabled-exec /src/thp-disabled-exec.c
 FROM postgres:18-trixie AS base
 
 # Set versions as build args for easy updates
-ARG PGROONGA_VERSION=4.0.5-1
+ARG PGROONGA_VERSION=4.1.0-1
 ARG POSTGRESQL_VERSION=18
 ARG PGBOUNCER_VERSION=1.26.1-1.pgdg13+1
 

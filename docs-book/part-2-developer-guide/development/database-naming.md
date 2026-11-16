@@ -40,7 +40,7 @@ The `_trgm` suffix is functional, not only descriptive. `BaanderPostgreSQLSchema
 
 A PGroonga index name records the search it serves, because the access method alone does not: PGroonga provides different operator classes for full-text, prefix and regular-expression search, and an index's tokenizer options change what it matches.
 
-The database image installs PGroonga package `4.0.5-1`. The operator classes and options below are those of PGroonga 4; check a new option against that release before using it, and confirm the installed version with `pg_extension.extversion` on the target database.
+The database image installs PGroonga package `4.1.0-1`. The operator classes and options below are those of PGroonga 4; check a new option against that release before using it, and confirm the installed version with `pg_extension.extversion` on the target database.
 
 | Index | Name | Operator class | Options |
 |-------|------|----------------|---------|

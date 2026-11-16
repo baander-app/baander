@@ -14,8 +14,11 @@ Baander uses the PGroonga 2+ API: `&@~` for query-language matching and
 access method; it is not a PostgreSQL GIN index. See the
 [official reference](https://pgroonga.github.io/reference/) for operator classes,
 index options, and version requirements. The database image currently requests
-PGroonga package `4.0.5-1`; inspect `pg_extension.extversion` on the target database
-rather than assuming the running installation matches the image source.
+PGroonga package `4.1.0-1`; inspect `pg_extension.extversion` on the target database
+rather than assuming the running installation matches the image source. Use 4.1.0 or
+later: in 4.0.x, the cleanup that `VACUUM`, `ANALYZE` and autovacuum run can delete the
+data of a PGroonga index whose creating transaction has not committed yet, and the index
+then fails every lookup until `REINDEX` (upstream issue 1013).
 
 Name PGroonga indexes `idx_<table>_<columns>_pgroonga`, as described in [Database Naming](database-naming.md).
 

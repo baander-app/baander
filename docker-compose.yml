@@ -3,7 +3,7 @@ x-database-build: &database-build
     context: ./docker/
     dockerfile: ./postgres/Dockerfile
     args:
-        PGROONGA_VERSION: 4.0.5-1
+        PGROONGA_VERSION: 4.1.0-1
         POSTGRESQL_VERSION: 18
 
 services:
