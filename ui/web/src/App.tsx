@@ -2,6 +2,7 @@ import { createBrowserRouter, createHashRouter, RouterProvider } from 'react-rou
 import { AuthenticatedClientProvider } from './shared/live/provider';
 import { routes } from './features/layout/routes';
 import { PreferenceSyncProvider } from './features/settings/hooks/use-preference-bootstrap';
+import { Toaster } from './shared/components/ui/sonner';
 import { ThemeProvider } from './shared/theme';
 
 const createRouter = window.location.protocol === 'file:' ? createHashRouter : createBrowserRouter;
@@ -12,8 +13,9 @@ function App() {
     <AuthenticatedClientProvider freshnessEnabled>
       <PreferenceSyncProvider>
         <ThemeProvider>
+          {/* The only Toaster: mounted at the root so toasts show on every route, including admin and OAuth pages. */}
+          <Toaster />
           <RouterProvider router={router}/>
-          {/* Toaster is rendered by AppShell — do NOT add a second one here */}
         </ThemeProvider>
       </PreferenceSyncProvider>
     </AuthenticatedClientProvider>

@@ -18,7 +18,6 @@ import { useKeyboardShortcuts } from '@/shared/hooks/use-keyboard-shortcuts'
 import { useElectronPlaybackIpc } from '@/shared/hooks/use-electron-playback-ipc'
 import { useMediaShortcuts } from '../hooks/use-media-shortcuts'
 import { KeyboardShortcutsHelp } from '@/shared/components/keyboard-shortcuts-help'
-import { Toaster } from '@/shared/components/ui/sonner'
 import { MediatorDevPanel } from '@/shared/components/mediator-dev-panel'
 import { LiveConnectionStatus } from '@/shared/live/provider'
 import { TitleBar } from './TitleBar'
@@ -91,7 +90,6 @@ export function AppShell() {
         <LyricsFullscreenOverlay />
         <SpotlightOverlay />
         <KeyboardShortcutsHelp open={helpOpen} onOpenChange={setHelpOpen} />
-        <Toaster />
         <MediatorDevPanel />
       </Shell>
     </NotificationReader>
