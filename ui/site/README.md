@@ -47,8 +47,10 @@ Every page also carries its search and link-preview metadata, built by
   next to a `TechArticle` carrying the page's last commit date. The homepage
   describes the site and the software, including the ASCII spelling Baander.
 - **Link previews:** Open Graph and Twitter tags point to `assets/social-card.png`.
-  After changing the branding or the playback destinations screenshot, rebuild and
-  regenerate the card with `(cd ui/site && node scripts/social-card.mjs)`.
+  The card repeats the homepage headline and hero description, written into
+  `scripts/social-card.mjs`. After changing the branding, the playback destinations
+  screenshot or that copy, rebuild and regenerate the card with
+  `(cd ui/site && node scripts/social-card.mjs)`.
 
 Manual text belongs in `docs-book/`. Homepage text and layout belong in
 `ui/site/templates/`; site styles and reviewed screenshots belong in
@@ -198,6 +200,11 @@ home page.
    ```bash
    (cd ui/site && corepack yarn vercel deploy --cwd ../../var/website --prebuilt)
    ```
+
+   Previews sit behind Vercel's deployment protection, so a plain request is
+   redirected to the login page. Fetch them through the logged-in CLI with
+   `(cd ui/site && corepack yarn vercel curl <url> --scope martin-juuls-projects)`,
+   passing curl options after `--`.
 
    Inspect the returned preview URL. Check the homepage, a direct nested manual
    URL, a section fragment, a real search result and an unknown URL returning HTTP

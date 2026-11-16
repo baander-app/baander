@@ -516,8 +516,9 @@ Verification on 2026-11-16:
   (YouTube `utlT57WK8a8`, `7l-Pa0uCod0`, `i9XU6wk_mWY`), ignoring case and
   punctuation.
 - Site: `make website-build` built 243 manual pages. `corepack yarn test:browser` in
-  `ui/site/` passed 93 tests, including the 18 stability tests that compare hero line
-  heights in the fallback faces and Geist at 1440 px and 390 px. `node --test
+  `ui/site/` passed 93 tests. Among them, the 18 stability tests check across several
+  pages, the homepage hero included, that text keeps its line heights in the fallback
+  faces and in Geist at 1440 px and 390 px. `node --test
   scripts/*.test.mjs` passed 11.
 - Tooling: `phpunit-tooling.xml.dist` on `scripts/tests/php/Website` passed 105 tests
   and 1,312 assertions, including the new homepage title and description length
