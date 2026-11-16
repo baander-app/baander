@@ -72,8 +72,7 @@ final class PgroongaUncommittedIndexTest extends TestCase
     #[DataProvider('cleanups')]
     public function testAnIndexBuiltBeforeItsCommitAnswersAfterAnotherSessionsCleanup(string $cleanup): void
     {
-        $connection = $this->cleaner;
-        PgroongaLeftovers::clear($connection);
+        PgroongaLeftovers::clear($this->cleaner);
 
         // The table is new: building an index on an existing table holds a SHARE lock that VACUUM,
         // ANALYZE and the clearing above would wait for.
@@ -82,7 +81,7 @@ final class PgroongaUncommittedIndexTest extends TestCase
         $this->builder->executeStatement('CREATE INDEX idx_fresh_titles_title_pgroonga ON fresh_titles USING pgroonga (title) WITH (' . self::INDEX_OPTIONS . ')');
 
         // In autocommit: VACUUM refuses a transaction block.
-        $connection->executeStatement($cleanup);
+        $this->cleaner->executeStatement($cleanup);
 
         $this->builder->commit();
         $this->builder->executeStatement("INSERT INTO fresh_titles (id, title) VALUES (1, 'Fresh title')");

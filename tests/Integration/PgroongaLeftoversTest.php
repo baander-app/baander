@@ -78,8 +78,7 @@ final class PgroongaLeftoversTest extends TestCase
         $this->other->executeStatement('CREATE TABLE fresh_titles (id integer PRIMARY KEY, title text NOT NULL)');
         $this->other->executeStatement('CREATE INDEX idx_fresh_titles_title_pgroonga ON fresh_titles USING pgroonga (title) WITH (' . self::INDEX_OPTIONS . ')');
 
-        $connection = $this->session;
-        PgroongaLeftovers::clear($connection);
+        PgroongaLeftovers::clear($this->session);
 
         $this->other->commit();
         $this->other->executeStatement("INSERT INTO fresh_titles (id, title) VALUES (1, 'Fresh title')");
@@ -104,8 +103,7 @@ final class PgroongaLeftoversTest extends TestCase
 
     public function testClearInAutocommitHoldsNoLockAfterItReturns(): void
     {
-        $connection = $this->session;
-        PgroongaLeftovers::clear($connection);
+        PgroongaLeftovers::clear($this->session);
 
         self::assertNull($this->lockFromTheOtherSession('public.songs', wait: true));
     }
