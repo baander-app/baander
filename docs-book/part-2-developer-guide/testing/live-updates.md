@@ -235,9 +235,15 @@ Because the web shell shows no live-update status label, the recovery scenarios
 read each page's outage state from the application's outage store. An interrupted
 delivery and a stalled projection must each start an outage; the stall must also
 show the outage toast, and recovery must end the outage. The frozen-page scenario
-requires the opposite: its short freeze must start no outage and raise no toast.
-That scenario drives the freeze through a Chromium-only DevTools session, so the
-recovery spec runs in Chromium.
+records the page's outage history from before the freeze and requires that the
+wake raises no toast. The wake can start a brief outage, which the evidence
+records; it must end before the toast threshold. That scenario drives the freeze
+through a Chromium-only DevTools session, so the recovery spec runs in Chromium.
+The fixtures import the application's modules inside the page from the preview's
+Vite dev server. After a module file is deleted or recreated, for example by
+switching branches in the worktree, Vite serves the application's copy under a
+versioned URL and the fixture's import loads a separate copy that sees no outage.
+Run `make preview-up` after such a switch, before the recovery spec.
 
 Before preparing scan media, the browser scenario records a fresh `GET /health`
 response and requires its `messenger` component to be healthy. A healthy top-level
