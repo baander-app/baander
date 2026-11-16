@@ -1,6 +1,6 @@
 # Testing Pyramid and E2E Layers
 
-How Bånder structures its testing pyramid, separates unit, functional, and integration suites, and layers end-to-end browser verification.
+This page describes the layers of Bånder's tests: where the unit, functional, and integration suites draw their boundaries, and how end-to-end browser checks are split by the services each one needs.
 
 ## Testing Pyramid
 
@@ -24,11 +24,11 @@ flowchart BT
     layer4 --> layer5
 ```
 
-Static gates (`make ci`, PHPStan, Deptrac, and frontend AST censuses for typography and live-update consumers) run alongside the pyramid to reject layer violations and malformed request payloads before runtime suites start.
+Static gates run alongside the pyramid: `make ci`, PHPStan, Deptrac, and the frontend AST censuses for typography and live-update consumers. They reject layer violations and malformed request payloads before the runtime suites start.
 
 ## Unit, Functional, and Integration Boundaries
 
-The three backend application suites (`Unit`, `Functional`, and `Integration`) differ by whether the Symfony kernel boots, how authentication and database transactions work, and whether the test crosses process or connection boundaries:
+The three backend application suites (`Unit`, `Functional`, and `Integration`) differ in whether the Symfony kernel boots, how authentication and database transactions work, and whether the test crosses process or connection boundaries:
 
 | Boundary | Unit (`tests/Unit/`, Vitest) | Functional (`tests/Functional/`) | Integration (`tests/Integration/`) |
 |----------|------------------------------|----------------------------------|------------------------------------|
@@ -47,7 +47,7 @@ Ordinary unit and PHPStan rule tests run in ParaTest workers that recycle every 
 
 Functional tests extend `App\Tests\Functional\TestCase` and send requests through Symfony's `KernelBrowser` (`authenticatedRequest()`, `anonymousRequest()`) or execute console commands. One test exercises the full vertical slice inside a single PHP process: routing, `#[MapRequestPayload]` validation, `#[IsGranted]` voters, controller serialization (`successResponse()` vs. flat 201 `created()`), and Doctrine mappings.
 
-To keep functional suites fast and self-cleaning, DAMA DoctrineTestBundle wraps each test in a database transaction and rolls it back on teardown (`$client->disableReboot()` keeps that connection open across requests). Because every query in the test shares one uncommitted transaction and authenticates via `X-Baander-Test-User-Id`, a functional test cannot show what a second database connection sees after a commit or rollback, nor does it exercise production bearer tokens or DPoP proofs.
+DAMA DoctrineTestBundle wraps each functional test in a database transaction and rolls it back on teardown, which keeps the suite fast and leaves nothing behind (`$client->disableReboot()` keeps that connection open across requests). The price is visibility. Every query in the test shares one uncommitted transaction, and requests authenticate with `X-Baander-Test-User-Id`, so a functional test cannot show what a second database connection sees after a commit or rollback, and it does not exercise production bearer tokens or DPoP proofs.
 
 ### Integration Tests
 
@@ -57,11 +57,11 @@ When a test must prove behavior across independent connections, real commits, cr
 - **Committed state and Swoole pool recovery:** `CoverExtractionPersistenceTest` disables DAMA rollback, injects a real ORM flush failure, checks committed rows from a second connection, and verifies that Swoole pool release and Symfony reset let the handler retry cleanly.
 - **OAuth/DPoP cryptography and store outages:** `RefreshTokenGraceTest`, `DpopStoreOutageTest`, and the signed-delivery and mutation firewall matrices test real token rotation, replay grace windows, and bounded `503` responses when Redis is paused or stopped. See [Security, Firewall, and Network Suites](security-and-firewall.md).
 - **Schema and migrations:** `InitialSchemaMigrationTest` and PGroonga search suites verify fresh initialization, upgrades on populated schemas, idempotent second runs, and scored full-text queries against the extension-capable database image.
-- **Native media encoding:** `SegmentEncoder*MediaTest` runs FFmpeg against disposable storage to verify segment output and stream selection. See [Media and Playback Qualification](media-and-playback.md).
+- **Native media encoding:** `SegmentEncoder*MediaTest` runs FFmpeg against disposable storage to verify segment output and stream selection. Unlike the rest of this list, these files sit in the Unit suite under `tests/Unit/Transcode/Infrastructure/FFmpeg/`, not in `tests/Integration/`. See [Media and Playback Qualification](media-and-playback.md).
 
 ## End-to-End and Browser Verification Layers
 
-Running every browser assertion against a full backend stack would make frontend checks slow and brittle. Bånder splits browser and end-to-end verification into four layers so each Playwright suite runs only the services its contract requires:
+Running every browser assertion against a full backend stack would make frontend checks slow and brittle. Bånder splits browser and end-to-end verification into four layers, and each Playwright suite runs only the services its contract requires:
 
 ### 1. Specialized Loopback Browser Harnesses
 
@@ -81,7 +81,7 @@ General browser E2E suites run against the worktree's isolated preview stack (`m
 
 ### 3. Production-Mode Capacity Qualification
 
-Because a development preview carries Vite and debug overhead, live-update latency and concurrency acceptance runs against an immutable production CI image (`php scripts/test-live-capacity-container.php` with `APP_ENV=prod` and `APP_DEBUG=0`). An owned HTTPS ingress container bridges the host loopback browser to an internal network running the production Swoole server, workers, PostgreSQL, and Redis. The suite drives 32 concurrent signed-in principals plus an administrator diagnostics client through ordinary updates, a 10,000-row capture burst over 10 seconds, a 10-page retained song-list refresh, and a 100-page (10,000-album) serial Timeline walk measured with raw CDP network timestamps. See [Live-Update Qualification](live-updates.md).
+A development preview carries Vite and debug overhead, so live-update latency and concurrency acceptance runs against an immutable production CI image (`php scripts/test-live-capacity-container.php` with `APP_ENV=prod` and `APP_DEBUG=0`). An owned HTTPS ingress container bridges the host loopback browser to an internal network running the production Swoole server, workers, PostgreSQL, and Redis. The suite drives 32 concurrent signed-in principals plus an administrator diagnostics client through ordinary updates, a 10,000-row capture burst over 10 seconds, a 10-page retained song-list refresh, and a 100-page (10,000-album) serial Timeline walk measured with raw CDP network timestamps. See [Live-Update Qualification](live-updates.md).
 
 ### 4. Production Runtime Drills and Manual Hardware Checks
 

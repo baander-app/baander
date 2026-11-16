@@ -17,13 +17,13 @@ disposable coordinator.
 
 ## Running Tests
 
-Workflow orchestration requires PHP 8.5+ with Swoole, Composer, Bash and GNU
-coreutils on the host. Process groups also require `setsid`. Generate the standalone
-loaders with `composer tooling:autoload`; this installs the Composer projects under
+The orchestration scripts run on the host and need PHP 8.5+ with Swoole, Composer,
+Bash and GNU coreutils; process groups also need `setsid`. Generate their standalone
+loaders with `composer tooling:autoload`, which installs the Composer projects under
 `scripts/` and `relay/` without booting the application kernel. Production worker
-images install only the standalone scripts project's loader without development
-dependencies, alongside the application's separate production loader. Worker and
-HTTP fixtures select the matching Composer boundary; host-source archives carry
+images install only the standalone scripts project's loader, without development
+dependencies, next to the application's separate production loader. Worker and
+HTTP fixtures select the matching Composer boundary, and host-source archives carry
 the standalone loader required by tooling entrypoints.
 
 With the root development dependencies installed, run the workflow checks from the
@@ -37,17 +37,18 @@ composer check:tooling-format
 composer check:tooling-architecture
 ```
 
-The tooling suite uses `phpunit-tooling.xml.dist` and remains separate from the
+The tooling suite uses `phpunit-tooling.xml.dist` and stays separate from the
 four application suites. `composer run-script --timeout=7200 test:tooling` excludes the
-`registry-python-subject` group. `composer test:registry-subjects` runs that group
-against the unchanged registry backup service and enrollment issuer; it requires
-Python 3 for those programs under test. Set `REGISTRY_SUBJECT_PYTHON` to select
-their interpreter. Both suites are mandatory CI gates. Test and analysis commands
-install the standalone loaders before running. Use `composer format:tooling` to
-apply the scoped PER-CS3 formatting rules before checking them.
+`registry-python-subject` group, and `composer test:registry-subjects` runs that group
+against the unchanged registry backup service and enrollment issuer. Those programs
+under test need Python 3; set `REGISTRY_SUBJECT_PYTHON` to select their interpreter.
+Both suites are mandatory CI gates. The test and analysis commands install the
+standalone loaders before running. Use `composer format:tooling` to apply the scoped
+PER-CS3 formatting rules before checking them.
+
 `composer check:tooling-architecture` combines `composer deptrac:tooling` with
-`composer check:tooling-source-policy`: dependency and source checks reject reverse
-CLI dependencies, raw process/Docker bypasses, manual implementation loaders and
+`composer check:tooling-source-policy`. Together they reject reverse CLI
+dependencies, raw process/Docker bypasses, manual implementation loaders and
 duplicated image/layout defaults. These commands describe the required gates;
 passing results and live qualification limits belong in the roadmap.
 
@@ -75,13 +76,13 @@ lists role image overrides, Docker selector precedence and finite budgets. Suppo
 configuration is captured once per invocation; nested hooks use the same resolved
 target and image selections.
 
-The default image reference in the runners may require registry access. An existing
-locally qualified image can be selected with the same variable. Check its PHP
-extensions and locked Swoole version; host PHP is not a substitute unless those
-requirements pass. The unit and messaging runners stream the current checkout and
-installed Composer dependencies into an isolated container. Image selection does
-not select an older copy of the application source. A code change therefore needs
-no image rebuild. Rebuild the image with the command above when its own content
+The default image reference in the runners may require registry access. The same
+variable selects an existing, locally qualified image instead; check its PHP
+extensions and locked Swoole version first. Host PHP is not a substitute unless
+it meets those requirements. The unit and messaging runners stream the current
+checkout and installed Composer dependencies into an isolated container, so the
+image does not supply an older copy of the application source and a code change
+needs no rebuild. Rebuild the image with the command above when its own content
 changes (PHP extensions, the locked Swoole version, system packages, FFmpeg) or
 when `docker images` no longer lists the tag.
 
@@ -97,12 +98,13 @@ bash scripts/test-backend-container.sh --coverage-text=coverage/report.txt --cov
 It requires the host tooling baseline above, Docker and the Docker Compose plugin.
 `BAANDER_TEST_PROCESSES` defaults to `2` and accepts integers from `1` through
 `8`; `1` is the diagnostic setting. `BAANDER_TEST_TIMEOUT` bounds the complete
-run, including setup, and defaults to `3600` seconds. Cleanup uses a separate
-shared total budget, defaulting to `120` seconds (`BAANDER_CLEANUP_TIMEOUT`), after
-interruption or timeout. Unresolved ownership receipts remain in the run artifacts;
-keep them and their saved transport material for cleanup against the recorded
-daemon. Cleanup failure fails an otherwise successful run. Messaging has a finite
-`600`-second catalog budget, overridable through `tooling.budgets.messaging`.
+run, including setup, and defaults to `3600` seconds. After an interruption or
+timeout, cleanup runs under a separate shared total budget, `120` seconds by default
+(`BAANDER_CLEANUP_TIMEOUT`). Ownership receipts that cleanup could not resolve stay
+in the run artifacts; keep them and their saved transport material to clean up
+against the recorded daemon. A cleanup failure fails an otherwise successful run.
+Messaging has a finite `600`-second catalog budget, overridable through
+`tooling.budgets.messaging`.
 `BAANDER_TEST_IMAGE` selects the application runtime, and `BAANDER_TEST_POSTGRES_IMAGE` selects the
 extension-capable database image. CI uses `BAANDER_TEST_CHECKOUT_IN_IMAGE=1`
 with its freshly built image; local runs copy the current source and installed
@@ -126,26 +128,29 @@ message that names 4.1.0. CI does not use the local tag; it pulls
 `baander-postgres:latest`, which the "Build PostgreSQL Image" workflow publishes on a
 `master` push that changes `docker/postgres/`.
 
-The coordinator discovers the selection once, then runs three phases. Ordinary
-unit and rule tests use ParaTest workers recycled after 25 files. The explicit
-native manifest, `scripts/backend-native-tests.json`, assigns Swoole, fork,
-signal and fixed-resource tests to one worker in a privileged container with
-networking disabled; that worker starts afresh for every file. Add new native
-tests to this manifest. Functional and integration files are distributed
-round-robin across at most the requested number of independent
-app/PostgreSQL/Redis stacks declared in `compose.test.yaml`. Each stack uses a
-unique disposable Compose project and runs one worker with a fresh process for
-every file. Scheduling stays at class/file level; ParaTest's method-level
-`--functional` mode is not used.
+The coordinator discovers the selection once, then runs three phases:
+
+1. Ordinary unit and rule tests run in ParaTest workers that are recycled after 25 files.
+2. The native manifest, `scripts/backend-native-tests.json`, lists Swoole, fork,
+   signal and fixed-resource tests. They run on one worker in a privileged
+   container with networking disabled, and that worker starts afresh for every
+   file. Add new native tests to this manifest.
+3. Functional and integration files are dealt round-robin to at most the requested
+   number of independent app/PostgreSQL/Redis stacks declared in `compose.test.yaml`.
+   Each stack uses a unique disposable Compose project and runs one worker with a
+   fresh process for every file.
+
+Scheduling stays at class/file level; the coordinator does not use ParaTest's
+method-level `--functional` mode.
 
 
 Each stack owns its cache, temporary files, sockets, database, Redis server and
-OAuth keys. No writable host mounts or published ports are used. Database and
-Redis DSNs are exported so nested PHP processes reach the same stack. Each
-database runs migrations twice. Setup uses root inside the disposable container;
-tests run as `www-data`, preserving permission checks. Test worker PHP processes
-receive an explicit 512 MiB memory limit. Coordinator and reporting PHP
-processes receive 2 GiB because full-suite serialized coverage needs more memory
+OAuth keys, and uses no writable host mounts or published ports. The runner exports
+the database and Redis DSNs so nested PHP processes reach the same stack. Each
+database runs migrations twice. Setup runs as root inside the disposable container,
+and tests run as `www-data`, so permission checks still apply. Test worker PHP
+processes get an explicit 512 MiB memory limit. Coordinator and reporting PHP
+processes get 2 GiB, because full-suite serialized coverage needs more memory
 than individual test files.
 
 JUnit validation requires every discovered class, method and dataset label
@@ -173,8 +178,7 @@ Runner regressions use `composer run-script --timeout=7200 test:tooling` and the
 to check database outages, Redis pause/flush, cache/socket separation and
 inherited DSNs. Runtime security drills remain separate serial commands.
 
-For qualification,
-`php scripts/compare-backend-runs.php <reference> <candidate>` compares
+For qualification, `php scripts/compare-backend-runs.php <reference> <candidate>` compares
 selected and completed identities, seed, timings, coverage denominators and
 exact executable/covered line sets. Coverage validation and comparison require the
 PHP DOM extension. Coverage comparison also uses the root Composer dependencies
@@ -186,18 +190,21 @@ and ParaTest. Use the run comparison command above to inspect timings and
 identity or coverage differences in retained artifacts.
 
 
-The separate schema test above uses the fully migrated application kernel to check
-that ORM introspection preserves the DBAL-owned lease table. The search tests exercise
-production Doctrine filtering and scored SQL against mapped PGroonga indexes;
-they require the project's extension-capable database image. Both runners fail on
-PHPUnit notices and skipped tests. Neither reads an
-ignored local `phpunit.xml` or runs the whole functional suite. The Makefile's
-`phpunit`, `paratest`, and `ci` test steps use the same coordinator and tracked
-configuration. `PHPUNIT_OPTIONS` and `PARATEST_OPTIONS` forward test selections;
-use `BAANDER_TEST_PROCESSES` to choose the worker count. Direct `make exec` commands
-select this worktree's preview and require a separately configured development
-test environment. Prefer the disposable coordinator for database-backed tests;
-these commands do not provision a test database or select the persistent instance:
+`WorkerDeploymentLeaseSchemaTest`, run through the functional runner, uses the fully
+migrated application kernel to check that ORM introspection preserves the DBAL-owned
+lease table (see [Messaging and Worker Qualification](workers-and-messaging.md)). The
+PGroonga search tests exercise production Doctrine filtering and scored SQL against
+mapped PGroonga indexes; they require the project's extension-capable database image.
+The functional and messaging runners both fail on PHPUnit notices and skipped tests,
+and neither reads an ignored local `phpunit.xml`.
+
+The Makefile's `phpunit`, `paratest`, and `ci` test steps use the same coordinator
+and tracked configuration. `PHPUNIT_OPTIONS` and `PARATEST_OPTIONS` forward test
+selections; use `BAANDER_TEST_PROCESSES` to choose the worker count. Direct
+`make exec` commands select this worktree's preview and require a separately
+configured development test environment. They do not provision a test database or
+select the persistent instance, so prefer the disposable coordinator for
+database-backed tests:
 
 ```bash
 # Run all tests
@@ -216,53 +223,57 @@ make exec cmd="./vendor/bin/phpunit -c phpunit.xml.dist --testsuite StaticAnalys
 make exec cmd="./vendor/bin/phpunit -c phpunit.xml.dist --filter NotificationControllerTest"
 
 # Run a single test method
-make exec cmd="./vendor/bin/phpunit -c phpunit.xml.dist --filter testCreateAlbum"
+make exec cmd="./vendor/bin/phpunit -c phpunit.xml.dist --filter testCreateWithRequiredFields"
 
 # Run with Xdebug off (faster)
 make exec cmd="XDEBUG_MODE=off ./vendor/bin/phpunit -c phpunit.xml.dist"
 ```
 
-The functional runner creates an isolated PostgreSQL/Redis network, extracts the
-checkout into a fresh directory, and runs Doctrine migrations twice before
-executing the requested PHPUnit paths or options. With no arguments it selects `tests/Functional`.
+The functional runner, `scripts/test-functional-container.sh`, passes its arguments
+to the backend coordinator. Functional and integration files in the selection
+therefore run on isolated PostgreSQL/Redis stacks with a fresh copy of the checkout,
+and Doctrine migrations run twice on each stack before PHPUnit starts. With no arguments the runner selects `tests/Functional`.
 A fresh database executes `Version20261017000000` and all forward migrations in
-`migrations/` (currently through `Version20261114120000`); the second run checks that recorded migrations
-leave no pending work. The paired-deployment migration must also reject unresolved
-or inconsistent singleton history and preserve confirmed retirement records.
+`migrations/` (currently through `Version20261115120000`); the second run checks that
+recorded migrations leave no pending work. The paired-deployment migration must also
+reject unresolved or inconsistent singleton history and preserve confirmed retirement
+records.
 Integration tests and runtime fixtures use
 `tests/Support/FinalSchemaBootstrap.php` to create the same final schema by applying
 the current migration files in timestamp order. Isolated-schema fixtures require
 their own schema to be empty and reuse extensions already provisioned in the
 database.
 
-Playlist persistence conflicts can be checked with:
+To check playlist persistence conflicts, run:
 
 ```bash
 bash scripts/test-functional-container.sh tests/Integration/PlaylistConcurrencyTest.php tests/Integration/PlaylistMutationFirewallTest.php tests/Integration/InitialSchemaMigrationTest.php
 ```
 
-The concurrency selection uses independent PostgreSQL sessions to check competing
-playlist writes, collaborator additions, reorders and cascaded membership removal.
-It verifies that a losing save rolls back without replacing the winner. The
-firewall selection checks revision validation and stale-reorder responses alongside
-the existing permission matrix. Migration checks cover fresh initialization, a
+The concurrency test opens independent PostgreSQL sessions to check competing
+playlist writes, collaborator additions, reorders and cascaded membership removal,
+and verifies that a losing save rolls back without replacing the winner. The
+firewall test checks revision validation and stale-reorder responses alongside
+the existing permission matrix. The migration test covers fresh initialization, a
 populated database upgraded with its playlists intact, and a repeat run with no
 pending work.
 
 
 The functional runner also supplies the isolated PostgreSQL/Redis environment
-aliases used by integration tests that need the full migrated schema and kernel.
+aliases that integration tests need for the full migrated schema and kernel.
 `CoverExtractionPersistenceTest` disables DAMA rollback with its supported attribute
 and observes commits through a second connection. It injects a real flush failure,
-then verifies that the worker's Swoole pool release and Symfony reset allow the
-same handler to retry successfully. Its exact expected pool-reset diagnostic is
-asserted; unexpected-output checks remain enabled.
-These selections use the shared coordinator's 512 MiB test workers, 2 GiB reporting
-processes and default 3600-second overall timeout. Each disposable Compose project
-supplies its own database and Redis DSNs, overriding the tracked PHPUnit defaults,
-and removes its containers, network and volumes after diagnostics are collected.
-The test firewall uses the test authenticator; this does not verify production
-bearer-token or DPoP authentication. The full-suite qualification checkpoint above records the verified selection.
+then verifies that the worker's Swoole pool release and Symfony reset let the
+same handler retry successfully. The test asserts the exact expected pool-reset
+diagnostic, and the unexpected-output checks stay enabled.
+
+These selections use the shared coordinator's PHP memory limits (512 MiB for test
+workers, 2 GiB for reporting processes) and its default 3600-second overall timeout.
+Each disposable Compose project supplies its own database and Redis DSNs, overriding
+the tracked PHPUnit defaults, and removes its containers, network and volumes after
+diagnostics are collected. The test firewall uses the test authenticator, so these
+runs do not verify production bearer-token or DPoP authentication. The full-suite
+qualification checkpoint above records the verified selection.
 
 New migrations use `VersionYYYYMMDDHHMMSS` and normal timestamp ordering after
 `Version20261017000000`. The initial migration is irreversible. Its empty-target
@@ -294,8 +305,8 @@ make exec cmd="vendor/bin/deptrac analyse --no-cache --no-progress"
 
 Run these in the application PHP runtime with the current Composer dependencies.
 Existing baselines record debt; do not regenerate or expand them to hide a failing
-check. Address runtime defects before annotation cleanup. The full application
-publisher requires both analyses to succeed, in addition to its test gates.
+check. Fix runtime defects before cleaning up annotations. The application
+publisher requires both analyses to pass, in addition to its test gates.
 
 `make phpstan` and the static steps of `make ci` run through
 `scripts/check-backend-container.php`. The script copies a snapshot of the
@@ -303,10 +314,10 @@ worktree, uncommitted changes included, and the installed `vendor`,
 `scripts/vendor` and `relay/vendor` directories into a fresh application root in a
 disposable container without network access. It then runs the given command there
 as `www-data` with `APP_ENV=test`. The installed dependencies must match
-`composer.lock`. `--image` or `BAANDER_TEST_IMAGE` selects the image; without
-either, the script first builds a CI image from the snapshot. The same script runs
-the other static gates for the current tree, which are Deptrac, the container lint
-and the OpenAPI drift check:
+`composer.lock`. `--image` selects the image, and the Make targets pass
+`BAANDER_TEST_IMAGE` as `--image`; without it, the script first builds a CI image
+from the snapshot. The same script runs the other static gates for the current
+tree, which are Deptrac, the container lint and the OpenAPI drift check:
 
 ```bash
 export BAANDER_TEST_IMAGE=baander-ci:local

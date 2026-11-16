@@ -1,6 +1,6 @@
 # Media and Playback Qualification
 
-Verification of native FFmpeg segment encoding, two-command worker media deployment, browser playback checkpoints, shared media control capacity, stream selection, deployment qualification, and the Playwright playback destination specs.
+This page covers the media checks: native FFmpeg segment encoding, two-command worker media deployment, browser playback checkpoints, shared media control capacity, stream selection, deployment qualification, and the Playwright playback destination specs.
 
 ## Native Segment Encoder Suites
 
@@ -87,6 +87,7 @@ interval reads from the file beginning instead of input seeking, preserving
 leading physical audio while retaining the requested offset and trimming. Later
 restarts keep fast input seeking. The nominal interval is not a proof of general
 variable-rate behavior.
+
 Source-origin qualification remains unavailable for missing movie-packet
 evidence, malformed metadata, negative origins, B-frame input, other containers
 and general variable-rate gaps.
@@ -105,9 +106,9 @@ For the qualified cases where selected audio ends at or before video,
 states its own end (MOV or MP4 stream timing, or the Matroska track duration
 tag), `whole_dur` pads the audio to that end and `atrim` cuts it there, so both
 tracks finish together. A source whose end is only a container estimate keeps
-output `-shortest`, so its audio still stops at the video end. On FFmpeg 7, `-shortest` buffers up to ten seconds of frames before
-the first segment is published and drops the final AAC frame that crosses the
-video end. Commands with audio also set `-max_interleave_delta 0`: padded audio
+output `-shortest`, so its audio still stops at the video end. On FFmpeg 7,
+`-shortest` buffers up to ten seconds of frames before the first segment is
+published and drops the final AAC frame that crosses the video end. Commands with audio also set `-max_interleave_delta 0`: padded audio
 runs ahead of the movie, and without strict interleaving the DASH muxer can flush
 it before the first video packet and cut empty leading audio segments. When
 selected source audio ends early, real silence must cover the remaining video,
@@ -260,9 +261,9 @@ The preflight checks H.264/AAC support through Media Source Extensions and recor
 native HLS support separately. Playback uses the product's HLS.js player through
 MSE, without media feature overrides. A capability report or HTTP response does
 not prove decoding: the gate requires current-generation delivered media, decoded
-frames, an advancing clock and real seekable ranges.
-Growing movie playback waits for newly published media rather than moving its
-clock to a live sync point; the source cursor remains authoritative.
+frames, an advancing clock and real seekable ranges. Growing movie playback waits
+for newly published media rather than moving its clock to a live sync point; the
+source cursor remains authoritative.
 
 Paused restoration retains the browser's raw frame counter. If it is zero, a
 fresh draw of the current video into a 16-by-9 canvas can establish the fixture's
@@ -284,9 +285,9 @@ artifacts. Run the local engine checks sequentially as well; use
 is not evidence that either browser passed.
 
 Each subtitle-continuity scenario selects its choice once through the TextTrack
-API, then only observes modes and active cues. The nondefault Forced track must remain
-exclusively showing through a source seek and paused capability renewal; Off must
-leave every subtitle track disabled through a paused seek and running renewal.
+API, then only observes modes and active cues. The nondefault Forced track must
+remain exclusively showing through a source seek and paused capability renewal; Off
+must leave every subtitle track disabled through a paused seek and running renewal.
 Selection follows the source stream key, preserving identity between tracks that
 share a language. The remembered choice belongs to the current movie playback
 owner and is not durable across page reloads. If a chosen track is temporarily
@@ -351,14 +352,14 @@ checks the server's fence independently of whether a browser reproduces the race
 
 The hook retains browser evidence with the drill artifacts and removes its browser
 container during cleanup. The standard runner does not require this hook. The
-recorded gate before the paired deployment change passed authenticated playback,
-paused seek,
-web restart, worker containment and recovery, and final completion. It also proves
-both stale-generation probes leave paused state unchanged, checks fourteen
-contained process identities with no survivors and verifies cleanup. Ordinary
-[autoscaling](workers-and-messaging.md#ordinary-worker-autoscaling-qualification) and saturated
-[media controls](#shared-media-control-qualification) have dedicated gates below;
-regional qualification remains separate.
+gate recorded before the paired deployment change passed authenticated playback,
+paused seek, web restart, worker containment and recovery, and final completion. It
+also showed that both stale-generation probes leave the paused state unchanged,
+checked fourteen contained process identities with no survivors, and verified
+cleanup. Ordinary
+[autoscaling](workers-and-messaging.md#ordinary-worker-autoscaling-qualification)
+and saturated [media controls](#shared-media-control-qualification) have dedicated
+gates; regional qualification remains separate.
 
 ### Iterating on the drill locally
 
@@ -458,9 +459,9 @@ remains a separate gate. Observation defaults to zero and is incompatible with
 
 The drill's fixture profile has three video slots and one audio slot. The drill
 fills them, queues ordinary work and applies execution CPU pressure for at least
-60 seconds; the pressure processes run at nice 10 and score 600, as encodes do. The audio encoder is held
-after initial output to keep its slot occupied; this does not measure sustained
-audio throughput. Controls exercise running and paused attachment, ticketed socket
+60 seconds; the pressure processes run at nice 10 and score 600, as encodes do.
+The audio encoder is held after initial output to keep its slot occupied, so this
+does not measure sustained audio throughput. Controls exercise running and paused attachment, ticketed socket
 reconnect and replay, stale generation refusal, paused seek, active and pending
 cancellation, and deliberate admission after cancellation. Retired init and media
 requests must fail even while their old files remain present. Subtitle authority
@@ -468,24 +469,25 @@ and readiness-wait races need their separate deterministic coverage.
 
 `qualification.json` records control acknowledgement and heartbeat p99 and maximum,
 seek readiness, cancellation retirement, occupancy, sampling gaps and ordinary
-progress, together with each unit's absent limits and the sampled kill order. Both p99 limits are one second and both maximum limits are two seconds;
-seek and cancel request handling also have two-second limits. Seek readiness and
+progress, together with each unit's absent limits and the sampled kill order. Both
+p99 limits are one second and both maximum limits are two seconds; seek and cancel
+request handling also have two-second limits. Seek readiness and
 exact encoder retirement after cancellation each have a 30-second watchdog.
 Seek readiness ends when both audio and video init/fragment bytes are available,
 recorded with a monotonic clock before certification. HTTP retrieval uses bounded
 concurrent batches: two playlists, then four init/fragment resources. The fixture
 fetches both tracks before running ffprobe, decoding, signature-tampering and
-subtitle checks.
-All those checks remain mandatory: late bytes, corrupt media or accepted tampering
-fail the qualification. Certification time does not extend the availability limit.
+subtitle checks. All those checks remain mandatory: late bytes, corrupt media or
+accepted tampering fail the qualification. Certification time does not extend the
+availability limit.
 `media.json` holds the scenario receipts; `native-launches.jsonl` records each job,
 generation, output directory, process identity and live predecessors at launch.
 Process identity includes PID, start ticks, PID namespace and hostname. The ledger
 checks duplicate attempts and overlapping predecessors, and attachment compares the
 launch records before and after each concurrent attachment batch. Periodic process
-counts alone cannot prove those properties. Keep the container inspections, native verification,
-control/execution samples, backlog observations, operator log and cleanup receipts
-with these results, including failed runs.
+counts alone cannot prove those properties. Keep the container inspections, native
+verification, control/execution samples, backlog observations, operator log and
+cleanup receipts with these results, including failed runs.
 
 #### Per-job media cost
 
@@ -525,8 +527,8 @@ FFmpeg 5.1 in the Debian 12 worker image, before the move to Debian 13 and
 FFmpeg 7.1. Other heavy host work was paused, and the one-minute load average was
 1.4 before each run. The run predates the removal of unit limits: the execution
 unit was confined to eight logical CPUs and 9216 MiB, on CPUs 1–8, which are seven
-cores plus the SMT sibling of the control unit's CPU 0. One H.264 run and one HEVC run each measured every
-phase; the table gives the range across both runs:
+cores plus the SMT sibling of the control unit's CPU 0. One H.264 run and one HEVC
+run each measured every phase; the table gives the range across both runs:
 
 | Job (1080p30 source) | Peak RSS | Threads | CPU-s per output s: alone / 3 slots / 8 replayed | Speed: alone / 3 slots / 8 replayed |
 |---|---|---|---|---|
@@ -537,8 +539,8 @@ phase; the table gives the range across both runs:
 | AAC 192k rendition | 56 MiB | 1 | 0.019 / 0.020 | 52x / 47–50x |
 | MP3 192k rendition | 52 MiB | 1 | 0.014–0.015 / 0.015–0.016 | 69–70x / 56–66x |
 
-In this run SegmentEncoder capped the encoder's own threads at two; the
-FFmpeg process as a whole used more CPU. An H.264 job used 2.56 CPUs alone. Its two x264
+In this run SegmentEncoder capped the encoder's own threads at two; the FFmpeg
+process as a whole used more CPU. An H.264 job used 2.56 CPUs alone. Its two x264
 threads used 0.9 CPU each, one thread 0.43, and decoding, audio and muxing threads
 0.08–0.13 each. An HEVC job used 2.13 CPUs: its two x265 pool threads used 0.99
 CPU each and every other thread 0.05 or less. Under that cap, HEVC at 1080p
@@ -604,9 +606,10 @@ BAANDER_TEST_MEDIA_COST=hardware BAANDER_TEST_IMAGE=baander-worker:hw-cost \
 step may run (default 150). The runner starts one disposable worker-image
 container with no network, no capabilities and Docker's default seccomp profile,
 and gives it the device and the group that owns it, as worker creation does for
-the execution unit. Inside, the fixture generates the same 120-second 1080p30 H.264/AAC source as cost mode, builds
-the encode command with `SegmentEncoder` for each hardware encoder, and starts each
-step's encodes together through the native daemon's launcher. Every encode decodes,
+the execution unit. Inside, the fixture generates the same 120-second 1080p30
+H.264/AAC source as cost mode, builds the encode command with `SegmentEncoder` for
+each hardware encoder, and starts each step's encodes together through the native
+daemon's launcher. Every encode decodes,
 scales and encodes on the device and encodes AAC audio on the CPU.
 
 Every half second the fixture records each encode's CPU ticks, `VmHWM`, threads,
@@ -642,8 +645,8 @@ by about 1.1 GiB per stream and levelled off near 12.7 GiB above twelve streams
 without errors. Every encode exited cleanly or ran until the step's deadline. H.264
 is real time up to 8 streams and HEVC up to 14. The hardware video default of 12
 follows HEVC, the encoder media control selects by default. It sits at the step
-that kept a 12% margin; 14 streams left only 8%. These figures are for one GPU, one synthetic
-source and one run.
+that kept a 12% margin; 14 streams left only 8%. These figures are for one GPU, one
+synthetic source and one run.
 
 #### Load proof at the default slots
 
@@ -678,8 +681,9 @@ connection is idle, and 8 signed-in clients request the album listing without
 pause. The run admits every video slot at 1080p and keeps every audio slot busy
 with one rendition after another of each lane's track until every video has
 completed or the lane has used each of its 15 distinct renditions; a lane never
-repeats one, because the cache would answer it without encoding. Each video session reports real-time playback progress, capped at its
-encoded output, every two seconds. Finally, with the load stopped, one encode of
+repeats one, because the cache would answer it without encoding. Each video session
+reports real-time playback progress, capped at its encoded output, every two
+seconds. Finally, with the load stopped, one encode of
 each codec runs alone: `libx264` and `libx265` in the software pass, `h264_vaapi` and
 `hevc_vaapi` in the hardware pass.
 
@@ -801,6 +805,7 @@ held when it reloaded. The `clientControls` receipts in the browser's
 `/api/session/close` or `/api/session/recover-local`, which tells which rule
 released the runner. A request from an unloading page can escape the driver, so
 "not seen" is weaker evidence than "seen".
+
 The run also retains offline refresh recovery, web restart, worker recovery,
 subtitle and retired-resource checks. Individual playback waits have a
 45-second watchdog; `client-controls` has a 360-second checkpoint request budget.
@@ -909,21 +914,20 @@ databases, Redis and original media are outside the fixture.
 
 ### AAC implementation in the suites
 
-The CI image runs the project's FFmpeg build, which carries Bånder Audio Core, fdk-aac and
-FFmpeg's built-in AAC codec. The functional audio stream tests run the real
-rendition encoder with the `transcode.aac_implementation` setting at its
-default, so their AAC renditions encode with Bånder Audio Core and AAC sources decode with
-it. Unit tests
-stub the setting and the codec listing to cover each position and a binary
-that lacks one. To run the media suites under another position, set it in the
-test database before the run, or change the default in
-`TranscodeSettingDefinitions` locally; no environment variable selects it for
-the backend suites. The adaptive browser check takes
-`BAANDER_TEST_AAC_IMPLEMENTATION` (`bac` by default, `fdk_aac` or `ffmpeg`)
-and encodes its DASH audio with that implementation. The image build itself
-checks every implementation: its smoke encodes and decodes
-with Bånder Audio Core, and the capability gate requires each implementation as encoder and
-as decoder.
+The CI image runs the project's FFmpeg build, which carries Bånder Audio Core,
+fdk-aac and FFmpeg's built-in AAC codec. The functional audio stream tests run the
+real rendition encoder with the `transcode.aac_implementation` setting at its
+default, so their AAC renditions encode with Bånder Audio Core and AAC sources
+decode with it. Unit tests stub the setting and the codec listing to cover each
+position and a binary that lacks one.
+
+To run the media suites under another position, set it in the test database before
+the run, or change the default in `TranscodeSettingDefinitions` locally; no
+environment variable selects it for the backend suites. The adaptive browser check
+takes `BAANDER_TEST_AAC_IMPLEMENTATION` (`bac` by default, `fdk_aac` or `ffmpeg`)
+and encodes its DASH audio with that implementation. The image build itself checks
+every implementation: its smoke test encodes and decodes with Bånder Audio Core,
+and the capability gate requires each implementation as encoder and as decoder.
 
 ### Sparse movie playback
 
@@ -1122,17 +1126,17 @@ Native and worker checks establish encoded audio tail and cursor coverage;
 browser checks establish complete playback and measured silence. The browser
 gate retains growing publication, signed fresh resources, stable targets, one
 attachment and bounded frame-capture cleanup. Native readiness and coverage
-requirements remain unchanged.
-These cases qualify the selected software movie path and Chromium HLS, not
+requirements remain unchanged. These cases qualify the selected software movie
+path and Chromium HLS, not
 arbitrary discontinuities, additional source origins, hardware, other browsers,
 DASH browser playback or formal CMAF conformance.
 
 ### Deployment qualification
 
 `scripts/qualify-deployment.php` measures a complete disposable deployment on a
-constrained Linux host or VM. The browser driver runs on the invoking machine;
-run that machine outside the measured host. Limiting one container on a larger host does not test
-whether the complete deployment fits that memory size.
+constrained Linux host or VM. The browser driver runs on the invoking machine, so
+run that machine outside the measured host. Limiting one container on a larger host
+does not test whether the complete deployment fits that memory size.
 
 The private JSON configuration has these fields:
 
@@ -1237,9 +1241,9 @@ php scripts/qualify-deployment.php stop --state "$fixture_state" --cleanup
 
 Reports retain host and cgroup memory, swap, pressure, process samples, database
 and Redis observations, browser progress, native launch records and Docker OOM
-events for the deployment's containers. Native
-concurrency samples are a lower bound because a short process can run between
-samples; cgroup memory peaks and the launch journal provide separate evidence.
+events for the deployment's containers. Native concurrency samples are a lower
+bound because a short process can run between samples; cgroup memory peaks and the
+launch journal provide separate evidence.
 Short-lived controller actions record their own cgroup peaks and Docker exit
 state before cleanup. The report lists those lifetime peaks separately from
 simultaneous samples; their sum does not measure concurrent consumption.
@@ -1301,9 +1305,9 @@ that guest's Docker daemon.
 The close report and "Play here anyway" have Playwright specs under
 `ui/web/tests/e2e/playback-destinations/`. `close-report.spec.ts` and
 `override.spec.ts` drive two browser contexts of one account against the
-worktree preview. Each context has
-its own storage, so it shares no tab identity, lock or local recovery record
-with another one, and only the session connects them. The close report and the
+worktree preview. Each context has its own storage, so it shares no tab identity,
+lock or local recovery record with another one, and only the session connects
+them. The close report and the
 override are proved here rather than in the two-command checkpoint, which has one
 page and no way to let a registration lapse.
 

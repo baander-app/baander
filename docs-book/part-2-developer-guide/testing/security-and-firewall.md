@@ -1,6 +1,6 @@
 # Security, Firewall, and Network Suites
 
-Integration and functional suites covering token rotation and reuse grace, DPoP store outages, signed video delivery, catalog and playlist mutation firewalls, atomic rate-limit storage, and outbound destination policies.
+This page covers the integration and functional suites for token rotation and reuse grace, DPoP store outages, signed video delivery, catalog and playlist mutation firewalls, atomic rate-limit storage, and outbound destination policies.
 
 ## Session, Token, and Firewall Matrices
 
@@ -56,8 +56,9 @@ and may or may not hold a token, so the suite crosses anonymous, owner, library
 member, unrelated user and administrator with every credential condition on the
 seven signature-only delivery endpoints (the HLS master, media and subtitle
 manifests, the DASH manifest, the init, media and subtitle segments), the signing
-endpoint and the quality ladder. The contract it records follows the order the
-firewall works in. A valid signed URL is a bearer capability and serves any holder
+endpoint and the quality ladder.
+
+The contract the suite records follows the order the firewall works in. A valid signed URL is a bearer capability and serves any holder
 without a credential. A credential that is presented must be valid: an expired,
 revoked, foreign-audience, malformed or fingerprint-mismatched token answers `401`
 even with a valid signature. The DPoP proof is never read on a delivery route, so a
@@ -67,14 +68,15 @@ is called, the segment index included. On the signing endpoint and the ladder, a
 missing proof, a foreign key, a reused proof and an unbound token answer `403`, a
 bad token `401`, and a video of another library `403`. A DPoP-bound token
 presented with the Bearer scheme answers `401` everywhere the `api` firewall
-authenticates. Every refusal row also asserts which component refused: the API
-answers every `403` with one generic body, so the suite registers a
-kernel-exception probe that records the refusing exception's message, and the
-`401` rows read the authenticator's code from the body. One assertion scans every
-response body and every log file of the kernel for the tokens, proofs and
-signatures the matrix used; the signature scan is what found the request URL,
-signature included, in the web processor's `url` field and the access log, and
-`StreamSignatureRedactionProcessor` now redacts it.
+authenticates.
+
+Every refusal row also asserts which component refused. The API answers every
+`403` with one generic body, so the suite registers a kernel-exception probe that
+records the refusing exception's message; the `401` rows read the authenticator's
+code from the body. One assertion scans every response body and every log file of
+the kernel for the tokens, proofs and signatures the matrix used. That signature
+scan found the request URL, signature included, in the web processor's `url` field
+and the access log, and `StreamSignatureRedactionProcessor` now redacts it.
 `tests/Unit/Shared/Infrastructure/Security/DeliveryRouteInventoryTest.php` keeps
 the delivery route set equal across the security configuration, the binding
 listener's exemption list and the rate limiter's exemption list, and the suite
@@ -84,11 +86,11 @@ The catalog, library and playlist mutations have their own matrices.
 `tests/Integration/CatalogMutationFirewallTest.php` crosses thirty routes (albums,
 songs, movies, genres, covers, cover extraction, the admin deletes and previews, the
 admin duplicates listing and the library routes) with anonymous, member, unrelated
-member and administrator: every denied row asserts the role voter's refusal, an
+member and administrator. Every denied row asserts the role voter's refusal, an
 unchanged catalog snapshot, empty in-memory transports, no storage call and no Redis
-growth, and every administrator row asserts the change and the port calls it makes,
-with scan-all, file deletion on a real library root, album deletion with a cover,
-cross-library merge and path validation as their own rows. Its kernel,
+growth. Every administrator row asserts the change and the port calls it makes;
+scan-all, file deletion on a real library root, album deletion with a cover,
+cross-library merge and path validation have rows of their own. Its kernel,
 `tests/Fixtures/Auth/CatalogMutationOAuthKernel.php`, replaces the Messenger
 transports with in-memory ones and makes the storage port synthetic.
 `tests/Integration/PlaylistMutationFirewallTest.php` crosses every playlist mutation
@@ -116,8 +118,9 @@ mutation, lyrics and push unsubscribe routes with PostgreSQL adapters).
 
 ## Atomic rate-limit storage
 
-Configured rate limiters execute Symfony's installed fixed/sliding-window policies, or
-Baander's continuous token bucket for `token_bucket`, against operation-local snapshots and commit state through Redis compare-and-set.
+Configured rate limiters run Symfony's installed fixed/sliding-window policies, or
+Baander's continuous token bucket for `token_bucket`, against operation-local
+snapshots, and commit state through Redis compare-and-set.
 The focused regressions must distinguish an absent subject from failed or corrupt
 storage, preserve ordinary exhaustion responses, and refuse protected effects when
 state cannot be established. All 22 configured names and budgets remain in force.
@@ -153,7 +156,7 @@ Logout and token revocation keep the generic API limiter's narrow availability
 exception and all remaining authentication/proof checks. Administration checks
 exercise the actual consumed namespace through HTTP and CLI, including unknown
 names, unavailable clears and clear-all partial failure. Run these checks through
-the disposable backend coordinator described below; do not pause or flush the
+the disposable backend coordinator with the command below; do not pause or flush the
 development Redis. The integration selection also observes resets through fresh
 processes; its paused-Redis fault affects only that lane's disposable service.
 

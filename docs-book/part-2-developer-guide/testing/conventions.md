@@ -1,6 +1,6 @@
 # Unit and Functional Conventions
 
-Conventions, base-class helpers, response shapes, and database transaction rules for unit and functional tests in Baander.
+This page collects the conventions, base-class helpers, response shapes, and database transaction rules for Baander's unit and functional tests.
 
 ## Unit Test Conventions
 
@@ -72,7 +72,7 @@ final class StartPlaybackHandlerTest extends TestCase
 
 ## Functional Test Conventions
 
-Functional tests live in `tests/Functional/` and extend `App\Tests\Functional\TestCase`, which provides a `KernelBrowser`, test user factories, and request helpers. Each test is wrapped in a database transaction by DAMA DoctrineTestBundle, so tests share a single connection and never pollute each other.
+Functional tests live in `tests/Functional/` and extend `App\Tests\Functional\TestCase`, which provides a `KernelBrowser`, test user factories, and request helpers. DAMA DoctrineTestBundle wraps each test in a database transaction, so tests share a single connection and never pollute each other.
 
 ### Base Class: `App\Tests\Functional\TestCase`
 
@@ -87,7 +87,7 @@ Functional tests live in `tests/Functional/` and extend `App\Tests\Functional\Te
 
 ### Authentication in Tests
 
-Tests do not use real JWT tokens or `loginUser()`. Instead, the `TestAuthenticator` (registered in `config/packages/test/security.yaml`) reads the `X-Baander-Test-User-Id` header and returns a `SecurityUser` for the corresponding user ID. This is set automatically by `authenticatedRequest()`.
+Tests do not use real JWT tokens or `loginUser()`. The `TestAuthenticator`, registered in `config/packages/test/security.yaml`, reads the `X-Baander-Test-User-Id` header and returns a `SecurityUser` for that user ID. `authenticatedRequest()` sets the header for you.
 
 ```php
 // Anonymous request — no auth headers
@@ -110,7 +110,7 @@ $this->assertSame(201, $response->getStatusCode());
 
 ### Response Shape Gotchas
 
-Controllers use two different response shapes — know which one your test expects:
+Controllers build responses through helpers that wrap the data differently. Check which one your test expects:
 
 | Method | Shape | When to use |
 |--------|-------|-------------|
@@ -139,7 +139,7 @@ $this->assertSame('song', $data['data'][0]['entityType']);
 
 ### PostgreSQL jsonb Float Round-Trip
 
-PostgreSQL `jsonb` stores numbers without type annotations. A whole-number float like `5.0` survives the PHP → PostgreSQL → PHP round-trip as integer `5`, which fails a `assertSame(5.0, ...)` assertion. Always use non-whole-number floats in test payloads:
+PostgreSQL `jsonb` stores numbers without type annotations. A whole-number float like `5.0` comes back from the PHP → PostgreSQL → PHP round-trip as integer `5`, which fails an `assertSame(5.0, ...)` assertion. Always use non-whole-number floats in test payloads:
 
 ```php
 // Bad — survives round-trip as int 5
@@ -151,8 +151,8 @@ PostgreSQL `jsonb` stores numbers without type annotations. A whole-number float
 
 ### DAMA Transaction Isolation
 
-Functional tests using the configured DAMA extension are wrapped in a transaction
-that is rolled back on teardown. This means:
+The configured DAMA extension wraps each functional test in a transaction and
+rolls it back on teardown. This means:
 
 - **No cleanup needed** — inserted rows vanish automatically.
 - **Single connection** — all tests share one DB connection within a test run.
@@ -176,13 +176,15 @@ $connection->executeStatement('ANALYZE songs');
 ```
 
 Each of those statements runs PGroonga's cleanup of the search data that dropped
-indexes and throwaway schemas leave behind, and when two cleanups meet over the same
+indexes and throwaway schemas leave behind. When two cleanups meet over the same
 leftovers, one of them fails, for example with "failed to remove column". The helper
 clears the leftovers while it holds locks that autovacuum skips, so the test's own
-cleanup finds nothing to collide over. `PgroongaCleanupConventionTest` fails on a cleanup statement in a test file that
+cleanup finds nothing to collide over.
+
+`PgroongaCleanupConventionTest` fails on a cleanup statement in a test file that
 does not call the helper, unless the file is on its reviewed list with an exact count
-and a reason; add a file there only when its cleanups never run or reach no table with
-a PGroonga index.
+and a reason. Add a file there only when its cleanups never run or reach no table
+with a PGroonga index.
 
 ### Example: Functional Test (Full Pattern)
 
@@ -243,23 +245,23 @@ final class FavoritesControllerTest extends TestCase
 
 ## Functional Test Coverage
 
-`tests/Functional/Controller/` contains 58 controller test suites (and `tests/Functional/` contains over 120 suites across bounded contexts, console commands, and infrastructure). Representative controller suites include:
+`tests/Functional/Controller/` contains 58 controller test suites, and `tests/Functional/` contains over 120 suites across bounded contexts, console commands, and infrastructure. The Tests column counts PHPUnit test cases, with each data-provider row counted once. Representative controller suites include:
 
 | Context | Controller | Tests | Notes |
 |---------|-----------|-------|-------|
-| Session | DeviceController | 19 | Device registration + rename |
+| Session | DeviceController | 21 | Device registration + rename |
 | Notification | PushSubscriptionController | 15 | Subscribe/unsubscribe/remove-all |
-| Notification | NotificationController | 19 | List, markRead, markAllAsRead, delete |
-| Notification | WebhookController | 13 | Admin-gated CRUD |
+| Notification | NotificationController | 24 | List, markRead, markAllAsRead, delete |
+| Notification | WebhookController | 21 | Admin-gated CRUD |
 | UserPreference | AccentColorController | 7 | GET + PUT |
-| UserPreference | AudioPreferencesController | 14 | Versioned save, history, rollback |
-| UserPreference | LayoutPreferencesController | 13 | Strict 2-field payload |
-| UserPreference | PlayerPreferencesController | 13 | Strict 9-field payload |
+| UserPreference | AudioPreferencesController | 179 | Versioned save, history, rollback |
+| UserPreference | LayoutPreferencesController | 33 | Strict 2-field payload |
+| UserPreference | PlayerPreferencesController | 57 | Strict 9-field payload |
 | UserPreference | EqDeviceProfileController | 33 | CRUD + activate, ownership and safe 404 responses |
 | UserPreference | SidebarConfigController | 10 | Per-media-type config |
 | UserPreference | ThemeMoodController | 7 | GET + PUT |
 | Catalog | GenreController | 16 | CRUD, ROLE_ADMIN on write |
-| Favorites | FavoritesController | 13 | Add/list/remove, type filter |
+| Favorites | FavoritesController | 12 | Add/list/remove, type filter |
 | Shared | HealthCheckController | 5 | /health, /ready, /live probes |
 
 ## Bugs Found by Functional Tests
@@ -276,13 +278,13 @@ The functional suite has surfaced production bugs that were fixed:
 
 EQ profile show, update, delete, and activate now enforce ownership in the
 application port implementation. Foreign, missing, and malformed profile IDs return
-404; unrelated administrators have no bypass. Default-profile deletion by its owner
+404, and unrelated administrators have no bypass. Default-profile deletion by its owner
 still returns 422. The 33 functional tests exercise Symfony's firewall with the test
 authenticator, not the production OAuth/DPoP handshake. Notification mark-read and
 delete also have ownership guards and cross-user 403 regression coverage; the earlier
 ownership warning in this guide was stale.
 
-### Design Gaps Pinned by Tests (Not Yet Fixed)
+### Design Gaps Pinned by Tests
 
-The two design gaps previously pinned here have been resolved and are covered by functional regression tests: `AudioPreferencesController`, `LayoutPreferencesController`, and `PlayerPreferencesController` now catch `PreferenceVersionConflict` and return `409 Conflict`, and `AddFavoriteRequest::$entityType` now carries `#[Assert\Choice]` and returns `422` on invalid types.
+Both design gaps once pinned here are resolved, and functional regression tests cover them. `AudioPreferencesController`, `LayoutPreferencesController`, and `PlayerPreferencesController` now catch `PreferenceVersionConflict` and return `409 Conflict`. `AddFavoriteRequest::$entityType` now carries `#[Assert\Choice]` and returns `422` on invalid types.
 

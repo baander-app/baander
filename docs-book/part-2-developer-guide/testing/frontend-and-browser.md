@@ -1,6 +1,6 @@
 # Frontend, Browser, and Audio Testing
 
-Unit, browser, audio-graph, authentication-transport, typography, store-debugger, Electron, and native Bånder Audio Core codec verification across the client workspaces.
+This page covers the client-side test suites: web unit and browser tests, the audio graph, browser authentication transport, typography, the store debugger, the Electron app, and the native Bånder Audio Core codec.
 
 ## Frontend Testing
 
@@ -40,10 +40,10 @@ fixtures and a local silent WAV cover empty and populated views and an active
 player without library scans or authentication-store injection. Its DOM appearance
 matrix checks all 32 mood/accent combinations; separate Settings tests exercise
 saved preferences through the application. Playback and mocked command-palette cases
-block service workers for deterministic fixture interception; login remains real.
-Screenshots, geometry, keyboard focus,
-reduced-motion and computed-contrast assertions cover selected routes, controls,
-overlays and viewport sizes, not every application state. See the
+block service workers so the fixtures can intercept requests deterministically;
+login remains real. Screenshots, geometry, keyboard focus, reduced-motion and
+computed-contrast assertions cover selected routes, controls, overlays and viewport
+sizes, not every application state. See the
 [browser-test guide](../../../ui/web/tests/e2e/README.md) for scope and audio precautions.
 
 The recessed music footer has a focused rendering check:
@@ -64,8 +64,8 @@ contrast helper does not certify gradients.
 The same spec captures desktop and narrow layouts with seek focus visible.
 Geometry checks cover the compact footer height, vertical alignment and contained
 controls. A desktop pixel check includes the lower lip when comparing the
-centerpiece's top and bottom gaps.
-Review those captures at normal size to judge the subtle recess and lower edge.
+centerpiece's top and bottom gaps. Review those captures at normal size to judge
+the subtle recess and lower edge.
 Browser pixels establish rendered contrast, not the near-black behavior of a
 physical OLED panel; record hardware observations separately when available.
 
@@ -116,23 +116,25 @@ application.
 
 These browser tests render the real `AudioProcessor` nodes with
 `OfflineAudioContext` and compare stereo, processing order, and normalization
-against reference signals. They replace external WASM analysis modules;
+against reference signals. They replace the external WASM analysis modules;
 they do not certify production codecs or audible clicks during live graph
 changes. A separate loader check serves the production TypeScript loader and
 shipped WASM to Chromium, checking instance memory and analysis-state isolation.
-Stereo metering cases additionally run the production metering worklet and WASM
-against native mono, right-only, asymmetric, and opposite-phase signals, and
-compare the independent-channel analyser fallback. The same native cases verify
-paired phase samples and correlation; worklet tests also cover quadrature,
-silence, ring ordering, and programme reset. Native media tests use locally generated WAV files and the
-real playback hook, store, service, and processor to exercise repeated preloaded
-handoffs, crossfade overlap, promoted-element controls, and interrupted fades.
-One resume regression delays a context-resume rejection across track reselection
-and verifies that the newer native playback continues advancing. Hook unit tests
-also cover deferred success, native play rejection, and same-track replay.
-The active-media error regression reloads an already playing element to a local
-404 response, checks the real Chromium `MediaError`, and verifies stop and
-reselection recovery.
+
+Stereo metering cases run the production metering worklet and WASM against native
+mono, right-only, asymmetric, and opposite-phase signals, and compare the
+independent-channel analyser fallback. The same native cases verify paired phase
+samples and correlation; worklet tests also cover quadrature, silence, ring
+ordering, and programme reset.
+
+Native media tests use locally generated WAV files and the real playback hook,
+store, service, and processor to exercise repeated preloaded handoffs, crossfade
+overlap, promoted-element controls, and interrupted fades. One resume regression
+delays a context-resume rejection across track reselection and verifies that the
+newer native playback keeps advancing. Hook unit tests also cover deferred success,
+native play rejection, and same-track replay. The active-media error regression
+reloads an already playing element to a local 404 response, checks the real
+Chromium `MediaError`, and verifies stop and reselection recovery.
 
 Two specs cover a stream that the server cuts midway, as it does when the web
 server [drains](../../part-1-operator-guide/maintenance/upgrading.md#stopping-and-restarting-the-web-server).
@@ -150,13 +152,14 @@ saved position, resumes the same track there once `/live` answers, and records
 one play. Playwright's Linux WebKit decodes media with GStreamer, not Safari's
 media stack, so Safari's resume is a [manual check](runtime-drills.md#safari-resume-after-a-server-restart-manual).
 These verify element ownership and timing, not sample-accurate gaplessness or
-authenticated streaming. Rebuild timing and worklet graph attachment
-also have unit regressions in `audio-processor-rebuild.test.ts`. Deferred module
-and WASM loading, connection replacement, and React StrictMode cleanup have
-processor, service, and playback-hook regressions. Native browser lifecycle tests
-use small fixture worklets to verify readiness and teardown; they do not replace
-tests of the production WASM algorithms. The browser suite runs as a blocking
-step in the frontend workflow.
+authenticated streaming.
+
+Rebuild timing and worklet graph attachment also have unit regressions in
+`audio-processor-rebuild.test.ts`. Deferred module and WASM loading, connection
+replacement, and React StrictMode cleanup have processor, service, and playback-hook
+regressions. Native browser lifecycle tests use small fixture worklets to verify
+readiness and teardown; they do not replace tests of the production WASM
+algorithms. The browser suite runs as a blocking step in the frontend workflow.
 
 Run `bash scripts/test-dsp-analysis.sh` with Emscripten 6.0.3 to test the actual
 WASM analysis modules and production worklet code against reference signals.
@@ -182,10 +185,10 @@ E2E_BASE_URL="$(make preview-url)" yarn --cwd ui/web e2e:headless \
 ```
 
 Start or refresh the isolated preview first. The UI fixture renders all seven
-modes across four moods using a local stereo WAV with browser output muted and
-service workers blocked for fixture interception. Preference writes receive local
-acknowledgments; authentication and preference reads remain real. Keep system
-output muted too. The display measures input before EQ and gain; it does not
+modes across four moods from a local stereo WAV, with browser output muted and
+service workers blocked so the fixture can intercept requests. Preference writes
+receive local acknowledgments; authentication and preference reads remain real.
+Keep system output muted too. The display measures input before EQ and gain; it does not
 establish preference synchronization, acoustic, post-EQ or production
 service-worker qualification. See the
 [audio-graph guide](../../../ui/web/tests/e2e/audio-graph/README.md#spectrum-calibration-and-equalizer-display)
@@ -270,10 +273,11 @@ conditional branch on every action. Enabling recording incurs snapshot/stack cos
 The timeline exports schema-version-2 JSON with ordered events, recorder instance
 IDs, current captures and a history baseline. Each admitted store records a
 registration capture after successful creation; construction-time intermediate
-states are outside the recorded history. Duplicate display names have distinct instance IDs. Explicit
-`unregisterStore(instanceId)` retirement releases observation and removes that
-instance from later historical points and the current Inspector. Retirement does
-not happen automatically when a component unmounts.
+states are outside the recorded history. Duplicate display names have distinct
+instance IDs. Retiring an instance with an explicit `unregisterStore(instanceId)`
+call releases observation and removes that instance from later historical points
+and the current Inspector. Retirement does not happen automatically when a component
+unmounts.
 
 Select a retained event to inspect **Historical store captures** for every recorded
 instance present at that point. Reconstruction folds the full retained history
@@ -285,8 +289,8 @@ instances use a keyboard-accessible virtualized scroll region; rows keep their
 expanded or collapsed state while scrolling.
 
 Evicted events advance the baseline to the start of the retained window. Clearing
-the timeline starts a new baseline epoch from current recorded captures; instance
-and event IDs are not reused. At most 100 active instances are admitted. Omitted
+the timeline starts a new baseline epoch from current recorded captures and does not
+reuse instance or event IDs. At most 100 active instances are admitted. Omitted
 registrations remain uninstrumented and increase the visible cumulative omission
 count, which persists across clearing and retirement. A nonzero count marks
 reconstruction as partial even when each displayed capture is complete. Retiring

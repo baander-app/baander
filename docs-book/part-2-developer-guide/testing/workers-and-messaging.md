@@ -1,14 +1,14 @@
 # Messaging and Worker Qualification
 
-Verification of Symfony Messenger workload routing, Redis fallback without Swoole, worker deployment lifecycle and containment runners, autoscaling qualification, and scheduler occurrence persistence.
+This page covers the checks for Symfony Messenger workload routing, the Redis fallback without Swoole, the worker deployment lifecycle and containment runners, ordinary worker autoscaling, and scheduler occurrence persistence.
 
 ### Validated asynchronous workloads
 
 `config/packages/messenger.php` declares twenty production workloads: eighteen
 default routes and explicit-only `FetchLyricsCommand` and `SendWebhookCommand`
 entries. The test configuration adds `FailureTransportProbe` and uses in-memory
-transports for `async` and `scheduler`. Resource classes `io`, `cpu` and `coordination` describe
-work; they do not allocate capacity.
+transports for `async` and `scheduler`. The resource classes `io`, `cpu` and
+`coordination` describe work; they do not allocate capacity.
 
 Catalog and compiler-pass unit tests cover invalid workload declarations, codec
 registrations, effective default routes, transport-eligible handlers, JSON
@@ -52,15 +52,15 @@ and setting to remain unchanged. Runtime evidence stays beside the lane logs as
 `<lane>.runtime-before.json`, `<lane>.runtime-after.json` and `<lane>.runtime.log`.
 The option accepts `0` or `1` and defaults to `0`.
 
-The dedicated fixture verifies absence in the ParaTest worker and a nested PHP
-process, and checks synchronous execution identity, recursive locking and service
-pool reuse without the extension. It lives outside the default suites because it
-deliberately fails when Swoole is loaded. The selected tests exercise transport-restricted handler
-registration, real Redis delivery, retry and dead-letter handling. Service setup
-also clears the Symfony cache and runs migrations twice without Swoole. CI runs
-this selection as a blocking step. This qualifies the console and Messenger
-paths exercised here; the web server still requires Swoole, and the Composer
-extension requirement remains unchanged.
+The dedicated fixture verifies that the extension is absent in the ParaTest worker
+and in a nested PHP process, and checks synchronous execution identity, recursive
+locking and service pool reuse without it. The fixture lives outside the default
+suites because it deliberately fails when Swoole is loaded. The selected tests
+exercise transport-restricted handler registration, real Redis delivery, retry and
+dead-letter handling. Service setup also clears the Symfony cache and runs
+migrations twice without Swoole. CI runs this selection as a blocking step. It
+qualifies the console and Messenger paths exercised here; the web server still
+requires Swoole, and the Composer extension requirement remains unchanged.
 
 Run the backend runner regressions before changing orchestration or cleanup:
 
@@ -69,11 +69,12 @@ composer run-script --timeout=7200 test:tooling
 bash scripts/test-worker-operator-cleanup.sh
 ```
 
-CI runs the PHP tooling suite and the operator cleanup script as separate steps.
-The operator cleanup script uses a disposable Docker CLI stub to check enumeration
-failures, removal failures, retained resources, browser-hook cleanup and preservation
-of an earlier failure exit code. It does not prove cleanup against a real daemon; the production
-operator drill must still verify absence of its containers, networks and volumes.
+CI runs the PHP tooling suite and the operator cleanup test that the script runs,
+`scripts/tests/php/WorkerCleanupTest.php`, as separate commands. The cleanup test
+uses a disposable Docker CLI stub to check enumeration failures, removal failures,
+retained resources, browser-hook cleanup and preservation of an earlier failure exit
+code. It does not prove cleanup against a real daemon; the production operator drill
+must still verify that its containers, networks and volumes are gone.
 
 For strict unit and messaging checks, run from the checkout:
 
@@ -94,17 +95,17 @@ bash scripts/test-functional-container.sh tests/Integration/CoverlessAlbumKeyset
 bash scripts/test-functional-container.sh tests/Integration/WorkerDeploymentLeaseSchemaTest.php
 ```
 
-Both unit and functional wrappers invoke the shared backend coordinator. They
+The unit and functional wrappers both invoke the shared backend coordinator. They
 require the host tooling baseline above, Docker, the Docker Compose plugin and
 installed application Composer dependencies. The unit wrapper defaults to
 `Unit,StaticAnalysisRules`; filters keep that selection, a later explicit
-`--testsuite` overrides it, and file paths follow
-PHPUnit's selection rules. The functional wrapper defaults to `tests/Functional`
-only when called without arguments; otherwise it forwards the supplied selection,
-including integration paths.
+`--testsuite` overrides it, and file paths follow PHPUnit's selection rules. The
+functional wrapper defaults to `tests/Functional` only when called without
+arguments; otherwise it forwards the supplied selection, including integration paths.
 
-Both wrappers use 512 MiB test workers, 2 GiB coordinator/reporting PHP processes
-and the default 3600-second overall timeout. Ordinary and native unit lanes have
+Both wrappers use the coordinator's PHP memory limits (512 MiB for test workers,
+2 GiB for coordinator and reporting processes) and the default 3600-second overall
+timeout. Ordinary and native unit lanes have
 networking disabled; functional and integration selections use disposable Compose
 stacks. `phpunit.xml.dist` randomizes test order within dependency constraints and
 treats unexpected output as risky.
@@ -160,8 +161,8 @@ modes, including container mode from a workspace with only the former runner scr
 and no host PHP or Composer dependencies. The PHP orchestration now requires the
 host tooling baseline in both modes. The fixture image does not certify the
 production build.
-CI now includes a
-blocking operator lifecycle step using container mode and
+
+CI now includes a blocking operator lifecycle step that uses container mode and
 `BAANDER_TEST_CHECKOUT_IN_IMAGE=1` to copy source and dependencies from the built
 image. Its `quality-gate` job sets `BAANDER_TEST_DOCKER_SOCKET_PATH` from the
 repository variable of the same name, defaulting to `/var/run/docker.sock`. Set
@@ -232,7 +233,7 @@ BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_DOCKER_SOCKET_PATH=/var/run/
   bash scripts/test-worker-production-container.sh
 ```
 
-The runner has a 300-second outer deadline; image build time is outside that bound.
+The runner has a 600-second outer deadline; image build time is outside that bound.
 It verifies the worker user, entrypoint, disabled web health check and production
 environment and disabled PHP error display; checks that development dependencies,
 baked OAuth keys and agent artifacts are absent; and runs Composer's production
@@ -241,17 +242,17 @@ immutable image with default Docker seccomp, all capabilities dropped and
 `no-new-privileges`. This catches an io_uring-enabled Swoole build that cannot use
 its native file backend under those restrictions. The supported image builds
 Swoole without io_uring; no runtime INI switch substitutes for that build choice.
-It then uses
-`BAANDER_TEST_USE_IMAGE=1` with container controller mode to run the lifecycle
-against that exact immutable image. This skips the fixture rebuild and injects no
+The runner then uses `BAANDER_TEST_USE_IMAGE=1` with container controller mode to
+run the lifecycle against that exact immutable image. This skips the fixture rebuild and injects no
 source, dependencies, keys or cache into the worker. Test preparation and Docker
 authority remain in separate containers. The scope is the worker lifecycle,
 outbox and scheduler, without OAuth certification. CI now includes blocking
 context-exclusion, production-worker build and production-lifecycle steps. Their
 configuration does not establish a passing CI run on either forge. The recorded
 immutable-image lifecycle and combined Chromium playback/recovery gates passed
-before the paired deployment change. Retain image identity, phase, containment and cleanup evidence
-with the runner's artifacts before claiming a result for a newer deployment.
+before the paired deployment change. Retain image identity, phase, containment and
+cleanup evidence with the runner's artifacts before claiming a result for a newer
+deployment.
 The production recipes select PHP 8.5.12 and Composer 2.11.1 on the Debian 13
 (trixie) PHP ZTS base. Native Swoole is pinned to Composer's required 6.2.4. PIE
 installation failures fail the image build.
@@ -294,9 +295,8 @@ maxima two and four.
 ### Ordinary worker autoscaling qualification
 
 Build the current worker image as above. The bounded comparison runner creates
-separate disposable pairs for resident
-ordinary maxima 1, 2 and 4, using the operator runner's dependency, lifecycle and
-cleanup ownership. Each profile derives a disposable fixture from the selected
+separate disposable pairs for resident ordinary maxima 1, 2 and 4, using the
+operator runner's dependency, lifecycle and cleanup ownership. Each profile derives a disposable fixture from the selected
 production image so it can inject scenario services. `BAANDER_TEST_USE_IMAGE=1`
 is rejected before provisioning. Fixture development classmaps expose workload
 classes without installing development dependencies or PHPUnit:
@@ -310,8 +310,7 @@ BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_OPERATOR_IN_CONTAINER=1 \
 
 Each profile has a 900-second bound, including setup and workflow completion. Its
 observation callback has a separate 480-second deadline and a 470-second
-evidence-wait budget. Individual
-Docker observations have 12-second bounds. The runner also enforces a 2000-second
+evidence-wait budget. Individual Docker observations have 12-second bounds. The runner also enforces a 2000-second
 deadline for the complete three-profile comparison. The shared `workerCapacity`
 default is 900 seconds; cleanup retains its separate 120-second budget. Capacity,
 media and autoscaling callbacks retain their 240-, 300- and 480-second bounds,
@@ -328,15 +327,14 @@ times the one-slot baseline respectively. The pressure phase combines three vide
 jobs and one audio rendition with execution CPU pressure. The audio encoder is
 deliberately stopped after initial output to retain its occupied slot, while the
 three video encoders remain active; this does not measure uninterrupted audio
-throughput during pressure. Desired-state controls
-must finish within three seconds, and admission must not grow on high CPU
-evidence. The execution unit has no CPU quota, so media load measured against
+throughput during pressure. Desired-state controls must finish within three
+seconds, and admission must not grow on high CPU evidence. The execution unit has no CPU quota, so media load measured against
 every host CPU rarely crosses the CPU ceiling; the policy tests cover blocked
 growth. The drill instead requires each known resource observation to be measured
 against the host's CPUs, memory and task limit, with a utilization that matches
 the execution cgroup's own CPU time over all host CPUs. Native commands sampled
-under load must run at nice 10 and score 600. Sampling
-gaps must stay within five seconds, deployment authority must remain continuous,
+under load must run at nice 10 and score 600. Sampling gaps must stay within five
+seconds, deployment authority must remain continuous,
 and both units must remain running at the final inspection.
 
 Artifacts include declared thresholds, daemon/container details, manifest
@@ -348,7 +346,7 @@ parked. The preflight requires four available CPUs and 15 GiB of host memory, or
 
 The recorded qualification below ran before the worker units lost their limits;
 its CPU placement, quotas and ceilings describe that run, not the current fixture.
-Local qualification used an AMD Ryzen 7 5800X3D host with eight cores, sixteen threads
+It used an AMD Ryzen 7 5800X3D host with eight cores, sixteen threads
 and 64 GiB of physical RAM (Docker reported 67337879552 bytes), Docker
 29.7.2-ce and kernel 7.2.10-1-default. Control used CPU 0 with a one-CPU quota;
 execution used CPUs 1–2 with a two-CPU quota; dependencies and web shared CPU 3.
@@ -459,8 +457,8 @@ Both graceful TERM and supervisor SIGKILL must stop the container and descendant
 activity within the test deadline. The fixture distinguishes direct-child drain
 from verified containment: it exits as PID 1 without acknowledging containment or
 releasing a deployment lease, then the external runner checks namespace shutdown.
-The runner fails on unexpected exit status or
-OOM and removes its containers on exit. It tests the proposed container boundary;
+The runner fails on an unexpected exit status or OOM and removes its containers on
+exit. It tests the proposed container boundary;
 it does not certify per-child descendant cleanup on restart, host systemd behavior,
 deployment lease takeover, or measured production resource defaults.
 
@@ -470,7 +468,9 @@ rejects an incorrect boot identity, then exercises the real external retirement
 adapter. Confirmed force-removal must prevent restart of the old full container ID;
 a subsequent absent-container request must fail closed. PostgreSQL controller tests
 in the messaging runner separately verify that retirement failures preserve the
-lease and concurrent recovery cannot release a newer epoch. The recovery runner combines the real Docker adapter with PostgreSQL lease
+lease and concurrent recovery cannot release a newer epoch.
+
+The recovery runner combines the real Docker adapter with PostgreSQL lease
 coordination. It needs host PHP with `pdo_pgsql`, publishes only an ephemeral
 loopback database port, and destroys its disposable resources. It verifies
 wrong-owner and wrong-label rejection, expiry without takeover, confirmed removal,
@@ -485,19 +485,19 @@ It verifies durable creation admission, refusal to recreate, exact-recipe
 reconciliation without process activity, and registered startup/recovery.
 
 The worker-command runner boots the actual `app:worker` as PID 1 against disposable
-production-mode PostgreSQL and Redis after fresh and repeat migrations.
-It also supplies Redis consumer overrides through path and query forms and a
-conflicting scheduler path, requiring rejection before locks, lease authority or
-child launch, with credential values absent from output. Accepted startup checks
-both catalog receivers in separate execution consumers and their generated
-identities. It verifies
-the control and execution roles, peer/native admission before business launch,
-their exact committed deployment tuple (overriding a bogus
+production-mode PostgreSQL and Redis after fresh and repeat migrations. It also
+supplies Redis consumer overrides through path and query forms and a conflicting
+scheduler path, and requires their rejection before locks, lease authority or child
+launch, with credential values absent from output. Accepted startup checks both
+catalog receivers in separate execution consumers and their generated identities.
+
+The runner verifies the control and execution roles, peer/native admission before
+business launch, their exact committed deployment tuple (overriding a bogus
 inherited epoch), and the namespace/boot-qualified Redis consumer. It kills the
-consumer and scheduler separately to require whole-container draining, tests TERM and forced database lease
-expiry, and confirms a duplicate
-lease claim exits with zero launch attempts. It checks that ownership remains
-reserved after shutdown. It also seeds a real registration event before startup,
+consumer and the scheduler separately to require whole-container draining, tests
+TERM and forced database lease expiry, and confirms that a duplicate lease claim
+exits with zero launch attempts. It checks that ownership remains reserved after
+shutdown. It also seeds a real registration event before startup,
 requires the supervised relay to commit the notification, receipt and channel
 handoffs, requires Redis acknowledgment with no pending, delayed or failed work,
 and repeats the checks after clearing the event acknowledgment. Outbound
@@ -513,7 +513,7 @@ The functional `Console/ServeCommandTest` verifies that `app:serve` and the lega
 server name resolve to the same real command and preserve its options.
 
 
-Scheduler occurrence persistence can be checked with:
+To check scheduler occurrence persistence, run:
 
 ```bash
 bash scripts/test-functional-container.sh tests/Integration/SchedulerOccurrenceStoreTest.php tests/Integration/SchedulerOccurrenceExecutionStoreTest.php tests/Integration/SchedulerOccurrenceGuardTest.php tests/Integration/SchedulerOccurrenceDispatchStoreTest.php tests/Integration/SchedulerOccurrenceRelayTest.php tests/Integration/WorkerDeploymentLeaseSchemaTest.php
@@ -543,7 +543,7 @@ This does not test automatic polling, fencing effects after lease expiry, broker
 crash durability or native console/media execution. No occurrence relay loop is
 enabled yet.
 
-Scheduled-job source parameters can be checked against the real ORM and PostgreSQL:
+To check scheduled-job source parameters against the real ORM and PostgreSQL, run:
 
 ```bash
 bash scripts/test-functional-container.sh tests/Integration/ScheduledJobParameterPersistenceTest.php
@@ -554,7 +554,7 @@ numeric representation before materializing an occurrence, plus the relevant sch
 comparison. Native JSON preserves the encoded values; it does not solve stale
 schedule writes or Doctrine's signed-zero-only dirty-checking limitation.
 
-The occurrence console adapter and worker-stop policy can be checked with:
+To check the occurrence console adapter and the worker-stop policy, run:
 
 ```bash
 bash scripts/test-functional-container.sh tests/Integration/ScheduledConsoleExecutorTest.php tests/Integration/ScheduledConsoleWorkerStopTest.php tests/Integration/SchedulerOccurrenceGuardTest.php

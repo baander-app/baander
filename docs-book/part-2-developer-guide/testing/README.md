@@ -1,6 +1,6 @@
 # Testing
 
-Bånder verifies backend domain logic, persistence, asynchronous workers, native media encoding, and browser/client behavior through isolated test suites and disposable container runners. Use this index to choose the right runner for your change or jump directly to the guide for a specific subsystem.
+Bånder tests backend domain logic, persistence, asynchronous workers, native media encoding, and browser and client behavior with isolated test suites and disposable container runners. Use this index to pick the runner that exercises your change, or go straight to the guide for a subsystem.
 
 ## Test Suites
 
@@ -14,7 +14,7 @@ Bånder verifies backend domain logic, persistence, asynchronous workers, native
 
 ## Quick Start
 
-Generate the standalone tooling autoloaders (`composer tooling:autoload`), select the application CI test image (`BAANDER_TEST_IMAGE`), and run the disposable backend coordinator from the repository root:
+Generate the standalone tooling autoloaders (`composer tooling:autoload`), select the application CI test image with `BAANDER_TEST_IMAGE`, and run the disposable backend coordinator from the repository root:
 
 ```bash
 # Run all four backend PHPUnit suites in disposable containers
@@ -26,7 +26,7 @@ bash scripts/test-backend-container.sh --testsuite Unit,StaticAnalysisRules
 # Run a single functional or integration test file
 bash scripts/test-functional-container.sh tests/Functional/Controller/FavoritesControllerTest.php
 
-# Run static analysis and architecture gates (PHPStan, Deptrac, Composer validation)
+# Run Composer validation, a normalization dry run, PHPStan, Deptrac, then all backend suites with coverage
 make ci
 
 # Run the standalone tooling test suite and architecture gates
@@ -40,11 +40,11 @@ make preview-up
 E2E_BASE_URL="$(make preview-url)" yarn --cwd ui/web e2e:headless
 ```
 
-Key environment and fixture rules across all suites:
+These environment and fixture rules apply to every suite:
 
-- **Test domains:** Always use `baander.app` or its subdomains in fixtures and email addresses (`user@baander.app`); keep HTTP and DNS mocked or routed to disposable local services.
-- **Disposable databases:** Functional and integration lanes provision isolated `compose.test.yaml` stacks (`app` → PostgreSQL 18 + PGroonga + Redis) with 512 MiB worker limits and 2 GiB reporting limits.
-- **No production state:** Fixtures under `tests/Fixtures/` prepare and observe only disposable databases; never point them at an installed or persistent development database.
+- **Test domains:** Always use `baander.app` or its subdomains in fixtures and email addresses (`user@baander.app`). Keep HTTP and DNS mocked or routed to disposable local services.
+- **Disposable databases:** Functional and integration lanes provision isolated `compose.test.yaml` stacks (`app` → PostgreSQL 18 + PGroonga + Redis). Test worker PHP processes get a 512 MiB memory limit and reporting processes 2 GiB.
+- **No production state:** Fixtures under `tests/Fixtures/` prepare and observe only disposable databases. Never point them at an installed or persistent development database.
 
 ## Backend & Conventions
 

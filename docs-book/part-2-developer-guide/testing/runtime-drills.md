@@ -1,6 +1,6 @@
 # Production Runtime Drills
 
-Container startup, outbox/producer atomicity, Swoole web server runtime and drain drills, WebSocket handshake and proxy log security checks, and manual Safari verification procedures.
+This page covers the drills that run the production runtime against disposable services: container startup, outbox and producer atomicity, the Swoole web server's runtime and drain, WebSocket handshake and proxy log security, and the manual Safari checks.
 
 ## Production Runtime Drills
 
@@ -15,18 +15,22 @@ bash scripts/test-web-shutdown-container.sh
 ```
 
 These run the production kernel and actual repositories against disposable
-PostgreSQL and Redis on isolated networks, with cleanup on exit. The startup
-contract uses isolated executable probes to check argument, PID and signal handling.
-The legacy worker-runtime drill checks transport redelivery using a historical
-Supervisor fixture; it does not represent deployment packaging. The worker-command
-drill exercises the current PID-1 supervisor and committed lease lifecycle.
-The outbox drill checks
-notification projections, receipts, channel handoffs, and replay after a lost
-acknowledgement. The producer drill rejects outbox writes, verifies rollback
-through a second connection, and retries through the same bus. It covers operator
-user creation, registration tokens/preferences, email verification token retention,
-and recovery after an ORM flush closes the entity manager. This is coverage of
-three auth producers, not every event producer or a whole-schema audit.
+PostgreSQL and Redis on isolated networks, and clean up on exit. Each covers one
+part of the runtime:
+
+- The startup contract uses isolated executable probes to check argument, PID and
+  signal handling.
+- The legacy worker-runtime drill checks transport redelivery with a historical
+  Supervisor fixture; it does not represent deployment packaging.
+- The worker-command drill exercises the current PID-1 supervisor and the committed
+  lease lifecycle.
+- The outbox drill checks notification projections, receipts, channel handoffs, and
+  replay after a lost acknowledgement.
+- The producer drill rejects outbox writes, verifies rollback through a second
+  connection, and retries through the same bus. It covers operator user creation,
+  registration tokens/preferences, email verification token retention, and recovery
+  after an ORM flush closes the entity manager. That is three auth producers, not
+  every event producer, and it is not a whole-schema audit.
 
 The web drill starts the real Swoole server (`app:serve`) in the production
 environment, with Mailpit receiving its mail. It fails unless a password-reset
@@ -49,11 +53,11 @@ unless the admin and the super-admin each receive exactly one PostgreSQL alert,
 delivered after PostgreSQL returns and naming an outage that began before the
 reload, and no second alert arrives in the next three checks.
 
-The drill then stops Redis while signed-in sessions exist. It signs in as the
-admin twice, each time with a fresh DPoP key, through the real login
-(`app:auth:setup-clients` has seeded the first-party client), stops the Redis
-container, and drives both sessions with `scripts/web-runtime/redis-outage.php`
-inside the app container. The first pair is the session that survives the
+Next, the drill stops Redis while signed-in sessions exist. It signs in as the
+admin twice through the real login, each time with a fresh DPoP key
+(`app:auth:setup-clients` has seeded the first-party client). It then stops the
+Redis container and drives both sessions with `scripts/web-runtime/redis-outage.php`
+inside the app container. The first token pair is the session that survives the
 outage; the second pair is logged out during it. The drill fails unless:
 
 - the refresh of that session answers `503` with a `Retry-After` delay,
@@ -112,10 +116,10 @@ The drill accepts the same image variables as the other runtime runners and
 enforces its own 15-minute timeout.
 
 Fixtures under `tests/Fixtures/` prepare and observe only those disposable
-databases. Do not invoke them against an application database. The runtime runners
-accept `BAANDER_TEST_IMAGE` and `BAANDER_TEST_POSTGRES_IMAGE`; CI sets
+databases; do not invoke them against an application database. The runtime runners
+accept `BAANDER_TEST_IMAGE` and `BAANDER_TEST_POSTGRES_IMAGE`, and CI sets
 `BAANDER_TEST_CHECKOUT_IN_IMAGE=1` to test the checkout already built into its image.
-Outbox, producer and web runners also enforce their own 180-second timeout.
+The outbox, producer and web runners also enforce their own 180-second timeout.
 
 ### WebSocket handshake security
 
@@ -128,12 +132,12 @@ BAANDER_TEST_IMAGE=baander-ci-prewarm:local bash scripts/test-security-runtime-c
 
 Its 360-second deadline covers malformed HTTP probes and WebSocket ticket checks.
 The WebSocket fixture obtains tickets through the real OAuth/DPoP firewall, then
-uses only a ticket query and Origin for the upgrade, as a browser does. It checks
+upgrades with only a ticket query and an Origin, as a browser does. It checks
 proof replay, Origin/path/query rejection without consumption, single-use and
 concurrent redemption, expiry, disabled users, logout closure and rejection of a
 pending ticket after logout. Paused and stopped Redis cases must return bounded
-503 responses; fresh issuance and upgrades must work after recovery. The runner
-checks application logs for the actual ticket and access-token values it used.
+503 responses, and fresh issuance and upgrades must work after recovery. The runner
+searches the application logs for the actual ticket and access-token values it used.
 
 The shutdown fixture also obtains a ticket before opening its socket. Both
 fixtures use `https://baander.app` as their configured browser Origin even though
@@ -205,7 +209,7 @@ it by hand, on macOS and on iOS, against the development stack:
    Safari version.
 2. Play a track whose original file Safari plays, and wait until it has played
    for at least 30 seconds.
-3. Restart the web container with `make restart-app` (or `make restart INSTANCE=persistent` for the persistent instance).
+3. Restart the web server with `make restart-app` (or `make restart INSTANCE=persistent` for the persistent instance). The command refreshes the whole instance, not only the web container.
 4. Record whether the player showed "Reconnecting…" or "Tap to resume", whether
    it resumed the same track, and how far the resumed position was from the
    position at the restart.

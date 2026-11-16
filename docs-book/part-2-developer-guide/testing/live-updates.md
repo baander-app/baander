@@ -1,10 +1,10 @@
 # Live-Update Qualification
 
-End-to-end browser verification and production-mode capacity qualification for committed change capture, revision projection, and WebSocket hint delivery.
+This page covers how live updates are qualified: end-to-end browser checks and production-mode capacity runs for committed change capture, revision projection, and WebSocket hint delivery.
 
 ## Live-update qualification
 
-The [live-update guide](live-updates.md) describes adding producers and readers.
+The [live-update guide](../architecture/live-updates.md) describes adding producers and readers.
 Start with the frontend contracts and the disposable backend selection:
 
 ```bash
@@ -14,12 +14,13 @@ bash scripts/test-backend-container.sh tests/Unit/Shared/LiveUpdates
 
 The frontend suite covers protocol parsing, the AST consumer census, generation
 tracking, bounded HTTP admission, recovery, account ownership, feature readers,
-drafts, preference mirrors, and shared sampling. The census requires classification
-of actual consuming calls and named behavior proofs; a classified call or a proof
-file's existence alone does not establish a passing browser flow. PostgreSQL
-capture tests must also exercise commit, rollback, deletion dependencies, audience
-changes, and bulk writes through the disposable backend runner. Do not use a
-DAMA-wrapped request to infer visibility from an independent producer connection.
+drafts, preference mirrors, and shared sampling. The census requires every actual
+consuming call to be classified and every named behavior proof to exist. A
+classified call or an existing proof file does not by itself establish a passing
+browser flow. PostgreSQL capture tests must also exercise commit, rollback, deletion
+dependencies, audience changes, and bulk writes through the disposable backend
+runner. Do not use a DAMA-wrapped request to infer what an independent producer
+connection can see.
 
 For the real-browser capacity scenario, refresh this worktree's isolated preview
 and pass its URL explicitly:
@@ -43,9 +44,9 @@ Keep credentials out of saved receipts.
 The preview capacity test has a 900-second deadline and retains
 `capacity-raw-receipts.json` in its Playwright output. Keep failed attempts too.
 Record the browser version, native PHP/Swoole runtime, worker identity, pool limits,
-and preview development/debug/Vite overhead with timings. Sharing the pinned
-native base with CI does not turn a preview result into production-mode performance
-evidence.
+and preview development/debug/Vite overhead alongside the timings. A preview shares
+its pinned native base with CI, but that does not make a preview result
+production-mode performance evidence.
 
 Acceptance targets are p95 committed change to rendered eligible view within
 three seconds for 32 principals when source reads finish within one second, and
@@ -150,9 +151,9 @@ trusts the ingress container's exact internal IP as its proxy. The runner still
 requires the published browser endpoint to bind to host loopback.
 
 The backend source digest compares application and package sources, migrations,
-configuration and `composer.lock`. It excludes generated `config/reference.php`,
-which Symfony rewrites during cache compilation. Fixture and built-frontend
-hashes are checked separately. `capacity-runtime-identity.json` records the actual
+configuration and `composer.lock`. It excludes the generated `config/reference.php`,
+which Symfony rewrites during cache compilation. The runner checks fixture and
+built-frontend hashes separately. `capacity-runtime-identity.json` records the actual
 PHP and Swoole versions, environment, debug setting, frontend and immutable image
 identity. A successful identity check establishes the tested setup; workload
 latency, populated-view behavior and cleanup still require their own passing
@@ -231,8 +232,8 @@ E2E_BASE_URL="$(make preview-url)" yarn --cwd ui/web e2e:headless \
   tests/e2e/live-updates/scan.spec.ts --retries=0
 ```
 
-Because the web shell shows no live-update status label, the recovery scenarios
-read each page's outage state from the application's outage store. An interrupted
+The web shell shows no live-update status label, so the recovery scenarios read
+each page's outage state from the application's outage store. An interrupted
 delivery and a stalled projection must each start an outage; the stall must also
 show the outage toast, and recovery must end the outage. The frozen-page scenario
 records the page's outage history from before the freeze and requires that the
