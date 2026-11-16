@@ -283,8 +283,8 @@ GitHub had published the PGroonga 4.1.0 database image.
   checks in on CI from time to time rather than waiting for it. See
   [Master CI repair](#master-ci-repair). The first green run is the point to write the
   CI-repair learning with `ce-compound`, which the user confirmed on 2026-11-13.
-- **Quiet live-update status.** On the branch `feat/quiet-live-update-status`
-  (`5e7db8e96` to this record): the web shell no longer shows the
+- **Quiet live-update status.** On `master` since 2026-11-16, merged from
+  `feat/quiet-live-update-status` (`5e7db8e96` to this record): the web shell no longer shows the
   top-right live-update label, and lasting outages raise a toast and a bell entry;
   see [Quiet live-update status](#quiet-live-update-status).
 - **Web fixes.** With the same push, a click on the active lyrics effect turns effects
@@ -430,8 +430,8 @@ subsequent real scan pass are the recorded qualification.
 
 ## Quiet live-update status
 
-Delivered on 2026-11-16 on the branch `feat/quiet-live-update-status`: all six
-units of
+Delivered on `master` on 2026-11-16, merged from `feat/quiet-live-update-status`:
+all six units of
 `docs/plans/2026-11-16-1823-feat-quiet-live-update-status-plan.md`
 (`702a825ce`, `46cb8ae33`, `bb1d47485`, `3d20b4230`, `b9f52afa9`, `bf2c45323`), the
 code review's fix (`db640bf0b`), two follow-ups from the browser runs
