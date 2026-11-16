@@ -16,6 +16,7 @@ skill; choose by section when a document mixes explanation, reference, and proce
 | Knuth | Ordered deployment, upgrade, recovery, and key-management procedures, including procedural sections of `docs-book/part-1-operator-guide/getting-started/installation.md`, `maintenance/upgrading.md`, and `maintenance/security.md` |
 | Stroustrup | Architecture, bounded-context descriptions, API and configuration references, coding conventions, and designs in `docs/plans/` and `STRATEGY.md` |
 | Mixed | CLI pages in `docs-book/part-1-operator-guide/commands/`: Stroustrup for arguments, options, and behavior; Knuth for ordered procedures; Chen for examples and troubleshooting. Contribution guides: Stroustrup for rules and Chen for workflow explanations. |
+| Jobs | Openings of page copy written in `ui/site/templates/`: the hero of `home.php` and the lead of `bac.php`, meaning the copy before the page's first section heading. The rest of each page keeps its other registers. Manual pages the site renders from `docs-book/` keep the rows above. Anywhere else, only when the request names Jobs. |
 
 A user-specified voice overrides these defaults.
 
@@ -39,6 +40,10 @@ A user-specified voice overrides these defaults.
   Domain/Application/Infrastructure/Interface layers, commands, events, and queries
   are not interchangeable synonyms. Keep existing identifiers and product spelling
   (`Bånder` or `Baander`) as written unless naming changes are requested.
+- Presentation copy in the Jobs register names no competing product. The competitor
+  table in `STRATEGY.md` is positioning, not a source for copy, and measured
+  comparisons stay on pages that report the measurement, such as the Bånder Audio
+  Core page.
 - Preserve claims about authentication, authorization, streaming, monitoring, and
   external services at their original strength. Do not add guarantees, restrictions,
   or project policies to make an explanation sound more decisive.
