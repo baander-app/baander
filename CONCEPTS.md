@@ -645,6 +645,14 @@ functional/integration lane owns a disposable Compose project with separate
 PostgreSQL, Redis and application containers. Together, the lane manifests must
 contain every discovered test file exactly once.
 
+### Throwaway schema
+
+A schema that a test creates on its lane's database, fills by replaying the
+migrations or by copying tables from `public`, puts first on its search path and
+drops at teardown. Dropping it does not remove the Groonga data of its PGroonga
+indexes: that data stays until the next `VACUUM` or `ANALYZE` of any table with a
+PGroonga index, or the next call to `pgroonga_vacuum()`.
+
 ## Continuous integration
 
 ### Forge
