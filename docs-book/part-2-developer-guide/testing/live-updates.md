@@ -231,6 +231,14 @@ E2E_BASE_URL="$(make preview-url)" yarn --cwd ui/web e2e:headless \
   tests/e2e/live-updates/scan.spec.ts --retries=0
 ```
 
+Because the web shell shows no live-update status label, the recovery scenarios
+read each page's outage state from the application's outage store. An interrupted
+delivery and a stalled projection must each start an outage; the stall must also
+show the outage toast, and recovery must end the outage. The frozen-page scenario
+requires the opposite: its short freeze must start no outage and raise no toast.
+That scenario drives the freeze through a Chromium-only DevTools session, so the
+recovery spec runs in Chromium.
+
 Before preparing scan media, the browser scenario records a fresh `GET /health`
 response and requires its `messenger` component to be healthy. A healthy top-level
 status or saved worker-readiness flag does not establish that background workers

@@ -328,10 +328,19 @@ Palettes derive from those bytes, reject obsolete extraction results, and clear
 with the other account-derived mirrors. Refreshing artwork does not replace the
 playback queue.
 
-The status indicator shows **Connecting…** while establishing delivery,
-**Updating…** while recovery or required resource reads remain, and **Updates
-unavailable** when freshness is degraded. It disappears when current. A ready
-socket or successful recovery snapshot alone does not mean those reads finished.
+The web shell shows no live-update status during routine refreshes; it reports
+only a live-update outage. An outage starts when freshness becomes degraded and
+ends only when the browser's live data is current again. Connecting and refreshing
+continue an outage but do not start one, so a reconnect from a current state starts
+an outage only if the ready deadline expires. The client counts an outage only while
+the tab is visible and the device awake; in the desktop app, whose page stays
+visible for playback, the window must also be shown and not minimised. After 15
+seconds of that time it raises one
+warning toast; after 2 minutes it also adds an entry to the notification bell and
+the admin bell. The entry exists only in that tab. Recovery closes the toast and
+removes the entry without a message of its own. A refresh that is slow but never
+fails is not an outage and shows nothing. A ready socket or successful recovery
+snapshot alone does not mean the required resource reads finished.
 The ready deadline is 10 seconds; health expires after 15 seconds without a valid
 message. While visible and degraded, the client attempts HTTP recovery every
 30 seconds and retries failed recovery with jittered backoff from 1 to 30 seconds.

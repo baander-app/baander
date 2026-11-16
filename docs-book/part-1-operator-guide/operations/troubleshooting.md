@@ -68,9 +68,12 @@ worker-log boundaries.
 ### Live views stop updating
 
 A connected socket does not establish that a change was published or that the
-browser read its new contents. Record the affected view, account permissions,
-operation time, and the indicator: **Connecting…**, **Updating…**, or **Updates
-unavailable**. Then trace the stages in order:
+browser read its new contents. Record the affected view, account permissions and
+operation time, and whether the browser reported an outage. Once freshness has been
+degraded for 15 seconds of visible time, the browser shows a **Live updates
+unavailable** toast; after 2 minutes it also adds an outage entry to the
+notification bell. Routine refreshes show nothing, so a missing toast or entry does
+not prove the view is current. Then trace the stages in order:
 
 1. Confirm that the producer committed the expected change. For a scan or queued
    job, follow its completion through [Background Work](../workers/background-work.md#observe-background-work).
@@ -102,11 +105,12 @@ unavailable**. Then trace the stages in order:
    access. Restoring a socket cannot restore revoked permissions. A temporary
    delivery failure with unchanged permissions instead retains readable data.
 5. Once recovery succeeds, confirm that the affected resource endpoint is read
-   again and returns the committed result. A failed or slow HTTP refresh can keep
-   **Updating…** or **Updates unavailable** visible after delivery recovers. Check
-   that endpoint's status and application logs. If its response is current but the
-   view is stale, retain a browser reproduction with the view and timestamps for
-   a client-refresh investigation.
+   again and returns the committed result. A failing HTTP refresh keeps the outage
+   running after delivery recovers, so its toast or bell entry can still appear. A
+   slow refresh that never fails shows nothing; the network results from step 4
+   reveal it. Check that endpoint's status and application logs. If its response
+   is current but the view is stale, retain a browser reproduction with the view
+   and timestamps for a client-refresh investigation.
 
 A `301` followed by a protected collection read's `403` can indicate a client URL
 that differs from the registered route, including its trailing slash. DPoP signs
