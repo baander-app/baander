@@ -130,7 +130,10 @@ export function createMainWindow(onLoaded?: (window: BrowserWindow) => void) {
   window.on('maximize', () => window.webContents.send('baander:window:maximized-change', true));
   window.on('unmaximize', () => window.webContents.send('baander:window:maximized-change', false));
   // Background throttling is off for playback, so the page cannot tell a hidden or minimised window apart.
-  const sendVisibility = () => window.webContents.send('baander:window:visibility-change', isShown(window));
+  const sendVisibility = () => {
+    if (window.isDestroyed() || window.webContents.isDestroyed()) return;
+    window.webContents.send('baander:window:visibility-change', isShown(window));
+  };
   window.on('show', sendVisibility);
   window.on('hide', sendVisibility);
   window.on('minimize', sendVisibility);

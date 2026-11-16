@@ -61,6 +61,9 @@ export const test = base.extend<{ run: RecoveryRun }>({
       const run: RecoveryRun = { fixture, manifest, pages, evidence, open: async (index, beforeLogin) => {
         const user = index < 0 ? manifest.observer : manifest.users[index]!
         const context = await browser.newContext({ baseURL, ignoreHTTPSErrors: true })
+        // The dev server loads hundreds of modules; keep every one in Resource Timing so
+        // fixtures can find the URL the application imported a module under.
+        await context.addInitScript(() => { performance.setResourceTimingBufferSize(100_000) })
         contexts.push(context)
         const page = await context.newPage()
         pages.push(page)
@@ -201,15 +204,31 @@ export const LIVE_OUTAGE_TOAST_TEST_ID = 'live-updates-outage'
 /** The application's outage store, imported inside the page from the preview's dev server. */
 const OUTAGE_STORE_MODULE = '/src/shared/live/outage-store.ts'
 
+/**
+ * The URL the application loaded a module under. Vite re-versions a module whose file was
+ * deleted or recreated, and importing the bare path would then load a separate copy that never
+ * sees the application's state, so a check reading it could pass without observing anything.
+ */
+async function appModuleUrl(page: Page, path: string): Promise<string> {
+  return page.evaluate((modulePath) => {
+    const urls = [...new Set(performance.getEntriesByType('resource')
+      .map(entry => entry.name)
+      .filter(name => new URL(name).pathname === modulePath))]
+    if (urls.length !== 1) throw new Error(`Expected one loaded URL for ${modulePath}, found: ${urls.join(', ') || 'none'}`)
+    return urls[0]!
+  }, path)
+}
+
 /** Reads the page's live-update outage state from the application's own outage store. */
 export async function liveOutage(page: Page): Promise<{ active: boolean; toastRaised: boolean }> {
-  return page.evaluate(async (modulePath) => {
-    const { useLiveOutageStore } = await import(/* @vite-ignore */ modulePath) as {
+  const moduleUrl = await appModuleUrl(page, OUTAGE_STORE_MODULE)
+  return page.evaluate(async (url) => {
+    const { useLiveOutageStore } = await import(/* @vite-ignore */ url) as {
       useLiveOutageStore: { getState: () => { since: number | null; toastRaised: boolean } }
     }
     const { since, toastRaised } = useLiveOutageStore.getState()
     return { active: since !== null, toastRaised }
-  }, OUTAGE_STORE_MODULE)
+  }, moduleUrl)
 }
 
 interface LiveOutageHistory {
@@ -223,8 +242,9 @@ interface LiveOutageHistory {
  * starts and ends before the read leaves the store looking untouched.
  */
 export async function recordOutageHistory(page: Page) {
-  await page.evaluate(async (modulePath) => {
-    const { useLiveOutageStore } = await import(/* @vite-ignore */ modulePath) as {
+  const moduleUrl = await appModuleUrl(page, OUTAGE_STORE_MODULE)
+  await page.evaluate(async (url) => {
+    const { useLiveOutageStore } = await import(/* @vite-ignore */ url) as {
       useLiveOutageStore: {
         subscribe: (listener: (state: { since: number | null; toastRaised: boolean }) => void) => () => void
       }
@@ -236,7 +256,7 @@ export async function recordOutageHistory(page: Page) {
       if (state.since !== null) history.began = true
       if (state.toastRaised) history.toastRaised = true
     })
-  }, OUTAGE_STORE_MODULE)
+  }, moduleUrl)
 }
 
 export async function liveOutageHistory(page: Page): Promise<LiveOutageHistory> {

@@ -21,10 +21,15 @@ function watchDesktopWindow(): { shown: () => boolean; stop: () => void } {
   const desktopWindow = typeof window === 'undefined' ? undefined : window.BaanderWindow
   if (!desktopWindow) return { shown: () => true, stop: () => undefined }
   let shown = true
+  let heard = false
   let stopped = false
-  const stop = desktopWindow.onVisibilityChange((visible) => { shown = visible })
+  const stop = desktopWindow.onVisibilityChange((visible) => {
+    heard = true
+    shown = visible
+  })
+  // A change reported while the first query is in flight is newer than its answer.
   desktopWindow.isVisible()
-    .then((visible) => { if (!stopped) shown = visible })
+    .then((visible) => { if (!stopped && !heard) shown = visible })
     .catch(() => undefined)
   return {
     shown: () => shown,

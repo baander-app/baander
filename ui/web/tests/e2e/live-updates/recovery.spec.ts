@@ -247,6 +247,7 @@ test.describe('Live recovery through the authenticated application', () => {
       await session.detach()
     }
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible({ timeout: 35_000 })
+    await expect.poll(async () => (await liveOutage(page)).active, { timeout: 35_000 }).toBe(false)
     const history = await liveOutageHistory(page)
     expect(history.toastRaised).toBe(false)
     await expect(page.getByTestId(LIVE_OUTAGE_TOAST_TEST_ID)).toHaveCount(0)

@@ -271,6 +271,27 @@ describe('live-update outage notices', () => {
     expect(toast.warning).toHaveBeenCalledOnce()
   })
 
+  it('waits for a desktop window that starts hidden to be shown before counting', async () => {
+    let reportVisibility: (visible: boolean) => void = () => undefined
+    window.BaanderWindow = {
+      minimize: vi.fn(), maximize: vi.fn(), close: vi.fn(), isMaximized: vi.fn(), onMaximizedChange: vi.fn(),
+      isVisible: vi.fn(async () => false),
+      onVisibilityChange: (cb: (visible: boolean) => void) => {
+        reportVisibility = cb
+        return () => { reportVisibility = () => undefined }
+      },
+    }
+    disposals.push(() => { delete window.BaanderWindow })
+    const { bus } = watchedClient()
+    await connect(bus)
+    bus.close()
+    await vi.advanceTimersByTimeAsync(5 * MINUTE)
+    expect(toast.warning).not.toHaveBeenCalled()
+    reportVisibility(true)
+    await vi.advanceTimersByTimeAsync(15_000)
+    expect(toast.warning).toHaveBeenCalledOnce()
+  })
+
   it('credits at most one second for a device sleep', async () => {
     const { bus } = watchedClient()
     await connect(bus)
