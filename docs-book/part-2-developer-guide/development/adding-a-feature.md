@@ -1,6 +1,6 @@
 # Adding a Feature
 
-A step-by-step walkthrough for adding a new feature to an existing bounded context. The example adds a "favorite album" endpoint to the Playlist context, covering the full path from domain model to API endpoint.
+This walkthrough adds a new feature to an existing bounded context. The example adds a "favorite album" endpoint to the Playlist context and follows it from the domain model to the API endpoint.
 
 See [Coding Conventions](coding-conventions.md) and [Testing](../testing/README.md) for detailed pattern references.
 
@@ -13,7 +13,7 @@ Domain  ->  Application  ->  Infrastructure  ->  Interface
 (model)     (port, command)  (entity, repo)      (controller, resource)
 ```
 
-Each step is described below in the order you would implement it.
+The steps below follow the order of implementation.
 
 ## 1. Domain Model
 
@@ -102,7 +102,7 @@ final readonly class AddFavoriteAlbumCommand
 
 ## 5. Command Handler
 
-Handlers are `final class` with `#[AsMessageHandler]` on `__invoke`. They depend on domain interfaces, not infrastructure.
+A handler is a `final class` with `#[AsMessageHandler]` on `__invoke`. It depends on repository and port interfaces, not on infrastructure implementations.
 
 ```php
 // src/Playlist/Application/CommandHandler/AddFavoriteAlbumHandler.php
@@ -131,7 +131,7 @@ final class AddFavoriteAlbumHandler
 
 ## 6. Doctrine Entity
 
-Add a Doctrine entity in `Infrastructure/Doctrine/Entity/` for persistence. These are separate from domain models and contain ORM mapping attributes. Store foreign identifiers across bounded contexts as scalar `Uuid` columns rather than Doctrine `#[ORM\ManyToOne]` associations to foreign context entities, and declare cross-context foreign keys in a `*ForeignKeys` schema listener (such as `FavoritesForeignKeys` or `NotificationForeignKeys`).
+Add a Doctrine entity in `Infrastructure/Doctrine/Entity/` for persistence. Entities are separate from domain models and carry the ORM mapping attributes. Store an identifier from another bounded context as a scalar `Uuid` column, not as a Doctrine `#[ORM\ManyToOne]` association to that context's entity, and declare the cross-context foreign key in the context's `*ForeignKeys` service, which implements `ForeignKeyDeclarationProviderInterface` (such as `FavoritesForeignKeys` or `NotificationForeignKeys`).
 
 ```php
 // src/Playlist/Infrastructure/Doctrine/Entity/FavoriteAlbumEntity.php
@@ -174,14 +174,14 @@ class FavoriteAlbumEntity
 
 **Key rules for Doctrine entities:**
 
-- Primary keys always use UUID v7 (via the `Uuid` domain model and `UuidType` Doctrine type). Never use auto-incrementing integers.
-- String columns always use `TEXT`, never `VARCHAR(n)`. Length validation belongs in the domain layer.
+- Primary keys use UUID v7 (via the `Uuid` domain model and `UuidType` Doctrine type). A new internal integer key needs a documented purpose and an identity column, not a serial type.
+- String columns use `TEXT` rather than `VARCHAR(n)` unless the length is a real contract. Length validation belongs in the domain layer.
 - JSON columns always use JSONB (via `options: ['jsonb' => true]` on `json` type).
 - When an entity's primary key is a to-one association (`#[ORM\Id]` on a `ManyToOne` or `OneToOne`), its repository reads and writes the table with DBAL statements, not the unit of work, and the entity stays as schema mapping only: once Doctrine has loaded such an entity, the strict `uuid` type rejects the key it binds on update. See `docs/solutions/runtime-errors/doctrine-cannot-update-a-loaded-entity-keyed-by-its-association-under-the-strict-uuid-type.md`.
 
 ## 7. Doctrine Repository Implementation
 
-Implement the repository interface in `Infrastructure/Doctrine/Repository/`. Include the three private helpers: `toDomain()`, `syncToEntity()`, and `findEntityOrCreate()`.
+Implement the repository interface in `Infrastructure/Doctrine/Repository/`. A repository that maps an aggregate typically has three private helpers, `toDomain()`, `syncToEntity()`, and `findEntityOrCreate()`; the names are conventions, not requirements.
 
 ```php
 // src/Playlist/Infrastructure/Doctrine/Repository/FavoriteAlbumRepository.php
@@ -276,7 +276,7 @@ make migrate
 
 ## 9. Resource
 
-Resources extend `AbstractResource` and transform domain models to API responses via a static `from()` method. They live in `Interface/Resource/` and expose 21-character `PublicId` values rather than internal `Uuid` keys.
+A resource extends `AbstractResource` and maps a domain model to an API response in a static `from()` method. Resources live in `Interface/Resource/` and expose 21-character `PublicId` values rather than internal `Uuid` keys.
 
 ```php
 // src/Playlist/Interface/Resource/FavoriteAlbumResource.php
@@ -295,17 +295,14 @@ final class FavoriteAlbumResource extends AbstractResource
             'albumPublicId' => $source->toString(),
         ];
     }
-
-    public static function collection(array $items): array
-    {
-        return array_map(self::from(...), $items);
-    }
 }
 ```
 
+`AbstractResource` also supplies `collection()`, which maps a list of items through `from()`. It is final, so a resource does not redeclare it.
+
 ## 10. Request DTO
 
-Request DTOs use promoted properties with Symfony validation attributes and `#[OA\Schema]` for OpenAPI docs. They live in `Interface/Request/` and accept public IDs on public transport boundaries.
+A request DTO uses promoted properties with Symfony validation attributes and `#[OA\Schema]` for the OpenAPI documentation. Request DTOs live in `Interface/Request/` and accept public IDs at public transport boundaries.
 
 ```php
 // src/Playlist/Interface/Request/AddFavoriteAlbumRequest.php
@@ -333,7 +330,7 @@ final readonly class AddFavoriteAlbumRequest
 
 ## 11. Controller
 
-Controllers live in `Interface/Controller/` and depend on port interfaces. Routes are defined via `#[Route]` attributes directly on the controller class and methods. Resolve the authenticated user via `AuthenticatedUserIdentityInterface`.
+Controllers live in `Interface/Controller/` and depend on port interfaces. `#[Route]` attributes on the controller class and its methods define the routes. To resolve the authenticated user, check that the Symfony `Security` user implements `AuthenticatedUserIdentityInterface` and read its UUID with `getId()`.
 
 ```php
 // src/Playlist/Interface/Controller/FavoriteAlbumController.php
@@ -345,20 +342,22 @@ use App\Playlist\Application\Port\FavoriteAlbumPortInterface;
 use App\Playlist\Interface\Request\AddFavoriteAlbumRequest;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
+use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
-use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
 
-#[OA\Tag(name: 'Favorites')]
+#[OA\Tag(name: 'Favorites', description: 'User favorites endpoints')]
 #[Route('/api/favorites/albums', name: 'favorite_album_')]
-final class FavoriteAlbumController extends AbstractController
+final class FavoriteAlbumController
 {
     use ApiResponsesTrait;
 
     public function __construct(
-        private readonly AuthenticatedUserIdentityInterface $userIdentity,
+        private readonly Security $security,
         private readonly AlbumPortInterface $albumPort,
         private readonly FavoriteAlbumPortInterface $favoriteAlbumService,
     ) {}
@@ -366,7 +365,7 @@ final class FavoriteAlbumController extends AbstractController
     #[OA\Post(
         path: '/api/favorites/albums',
         summary: 'Add an album to favorites',
-        requestBody: new OA\RequestBody(ref: '#/components/schemas/AddFavoriteAlbumRequest'),
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: AddFavoriteAlbumRequest::class))),
         responses: [
             new OA\Response(response: '201', description: 'Added to favorites'),
             new OA\Response(response: '401', description: 'Not authenticated'),
@@ -377,10 +376,11 @@ final class FavoriteAlbumController extends AbstractController
     #[Route('', name: 'store', methods: ['POST'])]
     public function store(#[MapRequestPayload] AddFavoriteAlbumRequest $payload): JsonResponse
     {
-        $userId = $this->userIdentity->resolveAuthenticatedUserId();
-        if ($userId === null) {
+        $user = $this->security->getUser();
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return $this->unauthorized();
         }
+        $userId = Uuid::fromString($user->getId());
 
         $albumPublicId = PublicId::fromString($payload->albumPublicId);
         $album = $this->albumPort->findByPublicId($albumPublicId);
@@ -395,13 +395,13 @@ final class FavoriteAlbumController extends AbstractController
 }
 ```
 
-No separate route configuration file is needed. The `#[Route]` attributes on the class and methods define the routing.
+No separate route configuration file is needed.
 
 ## 12. Tests
 
 ### Unit Test (Domain Logic)
 
-Unit tests live in `tests/Unit/<Context>/` and test domain behavior with no container or framework dependencies. Construct objects manually -- the project does not use Zenstruck Foundry by convention.
+Unit tests live in `tests/Unit/<Context>/` and test domain behavior without the container or framework. Construct objects manually -- by convention, the project's tests do not use Zenstruck Foundry.
 
 ```php
 // tests/Unit/Playlist/Domain/Model/FavoriteAlbumTest.php
@@ -428,7 +428,7 @@ final class FavoriteAlbumTest extends TestCase
 
 ### Unit Test (Resource)
 
-Test that the resource correctly transforms domain models to API responses.
+Test that the resource maps the domain value to the expected API response.
 
 ```php
 // tests/Unit/Playlist/Interface/Resource/FavoriteAlbumResourceTest.php
@@ -453,7 +453,7 @@ final class FavoriteAlbumResourceTest extends TestCase
 
 ### Functional Test (API Endpoint)
 
-Functional tests live in `tests/Functional/` and use the kernel container. Extend the base `TestCase` which provides `authenticatedRequest()`, `anonymousRequest()`, `createTestUser()`, and `assertJsonResponse()` helpers.
+Functional tests live in `tests/Functional/` and use the kernel container. They extend the base `TestCase`, which provides the `authenticatedRequest()`, `anonymousRequest()`, `createTestUser()`, and `assertJsonResponse()` helpers.
 
 ```php
 // tests/Functional/Controller/FavoriteAlbumControllerTest.php
@@ -496,7 +496,7 @@ make exec cmd="./vendor/bin/phpunit tests/Unit/Playlist/Domain/Model/FavoriteAlb
 
 ## Creating a New Bounded Context
 
-When a feature does not fit into any existing context, create a new one. The context directory follows the four-layer structure:
+When a feature fits no existing context, create a new one. The context directory follows the four-layer structure:
 
 ```
 src/<Context>/
@@ -524,7 +524,7 @@ Start with the domain model and repository interface, then build outward. Regist
 
 ## Adding a Console Command
 
-Console commands live in `Interface/Console/` within a bounded context and follow the `app:<noun>[:<sub>]:<verb>` naming convention with a singular noun. Admin-facing commands use `AdminCommandSupport`, and admin controller routes mark their CLI counterpart with `#[CliCounterpart('app:...')]`. Every console command also requires a reference page in `docs-book/part-1-operator-guide/commands/` and an entry in `docs-book/part-1-operator-guide/commands/README.md` (`CommandDocsCoverageTest` enforces both).
+Console commands live in a bounded context's `Interface/Console/` and are named `app:<noun>[:<sub>]:<verb>` with a singular noun. Admin-facing commands use `AdminCommandSupport`, and admin controller routes name their CLI counterpart with `#[CliCounterpart('app:...')]`. Every console command also needs a reference page in `docs-book/part-1-operator-guide/commands/` and an entry in `docs-book/part-1-operator-guide/commands/README.md`; `CommandDocsCoverageTest` enforces both.
 
 ```php
 // src/Playlist/Interface/Console/SyncSmartPlaylistsCommand.php
@@ -563,7 +563,7 @@ When adding a feature, verify each item:
 - [ ] Command DTO as `final readonly class` in `Application/Command/`
 - [ ] Handler with `#[AsMessageHandler]` in `Application/CommandHandler/`
 - [ ] Doctrine entity with UUID primary key, TEXT strings, JSONB for JSON
-- [ ] Repository implementation with `toDomain()`, `syncToEntity()`, `findEntityOrCreate()`
+- [ ] Repository implementation with `toDomain()`, `syncToEntity()`, `findEntityOrCreate()` where they apply
 - [ ] Service alias wired in `config/services.yaml`
 - [ ] Doctrine migration
 - [ ] Resource extending `AbstractResource` in `Interface/Resource/`

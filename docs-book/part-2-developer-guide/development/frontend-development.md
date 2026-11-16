@@ -1,6 +1,6 @@
 # Frontend Development
 
-The web frontend lives in `ui/web/`. It is a single-page application built with React, TypeScript, and Vite, consuming the backend API via an auto-generated client.
+The web frontend lives in `ui/web/`. It is a single-page application built with React, TypeScript, and Vite, and it calls the backend API through a generated client.
 
 ## Package Manager
 
@@ -32,7 +32,7 @@ yarn install
 | Sonner | Toast notifications |
 | @dnd-kit | Drag-and-drop (sortable lists, playlists) |
 | @tanstack/react-virtual | Virtualized lists and grids (required for collections > 50 items) |
-| hls.js / dashjs | Adaptive HLS and DASH media playback |
+| hls.js | Adaptive HLS media playback (dash.js is only a development dependency: the pinned reference player of the transcode publication browser test) |
 | three | WebGL 3D rendering for audio visualizers |
 | @fontsource-variable/* | Self-hosted Geist and Noto variable font families |
 
@@ -99,7 +99,7 @@ ui/web/
 └── package.json
 ```
 
-Each feature module follows the same internal structure:
+A feature module uses the directories it needs from this set:
 
 ```
 features/<name>/
@@ -111,7 +111,7 @@ features/<name>/
 ```
 
 Features may also have API modules, views, utilities, and colocated `__tests__/`.
-Add the directories the feature needs. [Frontend rules](../../../.agents/rules/frontend.md)
+[Frontend rules](../../../.agents/rules/frontend.md)
 describe implementation conventions; [the design language](../../../ui/DESIGN.md)
 defines the product's layout, interaction, accessibility, and visual requirements.
 Use existing shared primitives and theme tokens rather than introducing Tailwind
@@ -124,9 +124,9 @@ make preview-up
 make preview-url
 ```
 
-The preview runs Vite with HMR behind its HTTPS hostname. Edit `ui/web/` in this
-worktree and open the URL returned by `make preview-url`. Follow the one-time host
-setup in [Development Environment](../getting-started/development-environment.md) first. The preview's
+The preview runs Vite with HMR behind its HTTPS hostname. Follow the one-time host
+setup in [Development Environment](../getting-started/development-environment.md) first,
+then edit `ui/web/` in this worktree and open the URL returned by `make preview-url`. The preview's
 web source is live; its immutable worker snapshot refreshes on `make preview-up`.
 
 ## Build
@@ -135,7 +135,7 @@ web source is live; its immutable worker snapshot refreshes on `make preview-up`
 cd ui/web && yarn build
 ```
 
-Runs `yarn typecheck` followed by `vite build`. Type checking covers the app and the streaming worker's separate TypeScript configuration. Output goes to `public/` (served by the Symfony backend in production).
+The build runs `yarn typecheck`, then `vite build`. Type checking covers the app and the streaming worker's separate TypeScript configuration. The output goes to `public/`, which the Symfony backend serves in production.
 
 ## Scripts
 
@@ -163,7 +163,7 @@ Runs `yarn typecheck` followed by `vite build`. Type checking covers the app and
 
 ## API Client Generation
 
-Orval reads the backend's OpenAPI spec (`openapi.json`) and generates typed React Query hooks and TypeScript types.
+Orval reads the backend's OpenAPI spec (`openapi.json`) and generates typed React Query hooks and TypeScript types from it.
 
 ```bash
 cd ui/web && yarn generate
@@ -176,7 +176,7 @@ Configuration is in `orval.config.ts`:
 - **Client mode**: `react-query` (generates TanStack Query hooks)
 - **HTTP layer**: Uses a custom Axios instance from `src/shared/api-client/axios-instance.ts`
 
-Regenerate the client after any backend API changes (new endpoints, modified request/response schemas, etc.). The generated file is committed to version control.
+Regenerate the client after a backend API change, such as a new endpoint or a changed request or response schema. The generated file is committed to version control.
 
 ## State Management
 
@@ -201,7 +201,7 @@ function ArtistsList() {
 
 ### Zustand Stores
 
-Feature stores live in `features/<name>/stores/`. Create a store when state is shared across many components or needs to persist beyond component lifecycle:
+Feature stores live in `features/<name>/stores/`. Create a store when many components share the state or it needs to outlive a component:
 
 - Wrap store creators with outermost `withStoreDebug` from `@/shared/stores/` for opt-in development tracing.
 - For persisted stores, use `withNoopGuard` inside `persist` and `createSelectiveJSONStorage` from `@/shared/stores/` with an explicit `partialize` projection that excludes DOM references and transient state.
@@ -228,7 +228,7 @@ Configured in `vite.config.ts` and `tsconfig.json`:
 
 ## Testing
 
-Vitest uses jsdom. Tests live both beside implementation under `src/` (including `__tests__/`) and in `ui/web/tests/`. Configuration is in `vite.config.ts`; it excludes the separate Playwright suite under `tests/e2e/`.
+Vitest runs in jsdom. Tests live both beside the implementation under `src/` (including `__tests__/`) and in `ui/web/tests/`. The configuration is in `vite.config.ts`; it excludes the separate Playwright suite under `tests/e2e/`.
 
 ```bash
 cd ui/web && yarn test           # Run all tests once
@@ -249,7 +249,7 @@ cd ui/web && yarn test:coverage  # With coverage report
 
 ### Setup
 
-Global test setup is in `tests/setup.ts`. This file runs before every test suite and configures matchers and mocks.
+Global test setup is in `tests/setup.ts`, which runs before every test suite and configures matchers and mocks.
 
 Playwright uses `tests/e2e/playwright.config.ts`. Set `E2E_BASE_URL` to an
 isolated preview before running `yarn e2e:headless`:
@@ -268,14 +268,16 @@ lint, Vitest, build, and build-verification checks.
 The Electron app ships the AAC codec of Bånder Audio Core, from `packages/baander-audio-core`,
 as a native Node-API module, `@baander/audio-core`, declared as a `file:`
 dependency in `ui/electron/package.json`. On `yarn install` the package's
-install script fetches the prebuilt binding for the platform from the newest
-`audio-core-v*` GitHub release (built by `.github/workflows/audio-core.yml`)
-into `prebuilds/<platform>-<arch>/`, and builds it with node-gyp from the C++
-sources when that is not possible; `yarn electron-rebuild` builds it for the
-Electron ABI into `build/Release/`, which the loader tries after `prebuilds/`
-(set `BAANDER_AUDIO_CORE_BINDING` to a file to make a local build win).
+install script fetches the prebuilt binding for the platform from the
+`audio-core-v<version>` GitHub release that matches the package's version
+(built by `.github/workflows/audio-core.yml`) into `prebuilds/<platform>-<arch>/`.
+When that is not possible, it builds the binding with node-gyp from the C++
+sources. `yarn electron-rebuild` builds it for the Electron ABI into
+`build/Release/`. The loader tries `build/Release/` and `build/Debug/` before
+`prebuilds/`, so a local build wins over a fetched one; a file named in
+`BAANDER_AUDIO_CORE_BINDING` comes before both.
 electron-builder (`ui/electron/electron-builder.yml`, the only packaging
-configuration) bundles only its ESM entry, types and the binding, prebuilt or
+configuration) bundles only the package's ESM entry, types and the binding, prebuilt or
 local, unpacked from the asar archive. The package is ESM-only and targets
 Node 26; the desktop toolchain is Electron 45. A Node-API module is
 ABI-stable, so one binding serves both runtimes. The application icon is

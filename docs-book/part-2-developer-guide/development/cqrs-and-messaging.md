@@ -1,19 +1,19 @@
 # CQRS and Messaging
 
-Baander uses Symfony Messenger to implement the Command Query Responsibility Segregation (CQRS) pattern. Commands represent writes (create, update, delete), and queries represent reads. Messenger routes selected background commands to a transport; commands without a transport route run in the calling process.
+Baander implements Command Query Responsibility Segregation (CQRS) with Symfony Messenger. Commands represent writes (create, update, delete), and queries represent reads. Messenger sends selected background commands to a transport; a command without a transport route runs in the calling process.
 
 ## How It Works
 
-1. A controller creates a command DTO and dispatches it via `MessageBusInterface`
+1. A controller creates a command DTO and dispatches it through `MessageBusInterface`
 2. Messenger routes the command to the matching handler (identified by `#[AsMessageHandler]`)
 3. The handler executes business logic using domain models and repositories
 4. The handler returns a result or dispatches domain events
 
-The routed background commands use Redis outside tests. Tests replace the ordinary transports with in-memory transports; an unrouted command still runs inline.
+Outside tests, the routed background commands travel through Redis. Tests replace the ordinary transports with in-memory transports; an unrouted command still runs inline.
 
 ## Writing a Command
 
-Commands are `final readonly class` with getter-only properties. They carry input data and nothing else — no business logic.
+A command is a `final readonly class` that carries input data and no business logic. Its fields are either private with getters, as below, or public promoted properties; it has no setters.
 
 ```php
 // src/Playlist/Application/Command/CreatePlaylistCommand.php
@@ -36,7 +36,7 @@ final readonly class CreatePlaylistCommand
 
 ## Writing a Handler
 
-Handlers are `final class` with `#[AsMessageHandler]` on `__invoke`. They depend on domain interfaces (repositories, ports), never on infrastructure directly.
+A handler is a `final class` with `#[AsMessageHandler]` on `__invoke`. It depends on repository and port interfaces, never on infrastructure implementations.
 
 ```php
 // src/Playlist/Application/CommandHandler/CreatePlaylistHandler.php
@@ -63,6 +63,7 @@ final class CreatePlaylistHandler
         $this->eventDispatcher->dispatch(new PlaylistCreated(
             playlistId: $playlist->getId(),
             name: $playlist->getName(),
+            isPublic: $command->isPublic(),
             userId: $command->getUserId(),
         ));
 
@@ -71,26 +72,26 @@ final class CreatePlaylistHandler
 }
 ```
 
-When a handler must persist a domain write and capture an outbox event atomically, wrap the write and event dispatch in `TransactionPortInterface` so both share one database commit boundary (see [Durable Event Replay](#durable-event-replay)).
+When a handler must persist a domain write and capture an outbox event atomically, wrap the write and the event dispatch in `TransactionPortInterface` so both share one database commit boundary (see [Durable Event Replay](#durable-event-replay)). The Playlist handler above saves and dispatches without that boundary: it shows the shape of a handler, not of an atomic producer.
 
 ## Dispatching from a Controller
 
-Controllers inject `MessageBusInterface` and dispatch commands:
+A controller injects `MessageBusInterface` and dispatches the command:
 
 ```php
 $this->commandBus->dispatch(new CreatePlaylistCommand(
     name: $payload->name,
-    userId: $user->getId(),
+    userId: Uuid::fromString($user->getId()),
     description: $payload->description,
-    isPublic: $payload->isPublic(),
+    isPublic: $payload->isPublic,
 ));
 ```
 
-Symfony's service container auto-wires `MessageBusInterface` to the command bus. No explicit configuration is needed.
+Symfony's service container autowires `MessageBusInterface` to the application's only bus, `messenger.bus.default`. No explicit configuration is needed. `dispatch()` returns the envelope rather than the handler's value; a controller that needs the result reads it from the envelope's stamps.
 
 ## Domain Events
 
-Domain events carry side-effect signals between contexts. They extend `AbstractDomainEvent` and implement `eventName()`, `toPayload()`, and `fromPayload()`:
+A domain event signals a side effect to other contexts. It extends `AbstractDomainEvent` and implements `eventName()`, `toPayload()`, and `fromPayload()`:
 
 ```php
 // src/Transcode/Domain/Event/TranscodeJobCompleted.php
@@ -116,13 +117,13 @@ final readonly class TranscodeJobCompleted extends AbstractDomainEvent
 }
 ```
 
-Events are dispatched via Symfony's `EventDispatcherInterface` inside handlers. Event listeners in other contexts react to these events (e.g., a `TranscodeJobCompleted` listener might notify users that their video is ready).
+Handlers dispatch events through Symfony's `EventDispatcherInterface`, and listeners in other contexts react to them; a `TranscodeJobCompleted` listener, for example, could notify users that their video is ready.
 
 ## Job Monitoring
 
-Every dispatched message gets a `JobIdStamp` from `JobMonitoringMiddleware` before a transport stores it. The job ID travels with the message, so each delivery of it (a Messenger retry, a retry from the failure transport, or a redelivery after a worker died) is an attempt of the same job. `WorkerJobMonitorSubscriber` records received delivery attempts. `JobMonitorAdministration::runInline()` records monitored work executed in the calling process. Both use `JobMonitorService::startAttempt()`, which upserts the job's single `job_monitors` row, and complete only the attempt they started. See [Monitoring](../../part-1-operator-guide/operations/README.md) for details.
+`JobMonitoringMiddleware` gives every dispatched message a `JobIdStamp` before a transport stores it. The job ID travels with the message, so each delivery of it (a Messenger retry, a retry from the failure transport, or a redelivery after a worker died) is an attempt of the same job. `WorkerJobMonitorSubscriber` records received delivery attempts. `JobMonitorAdministration::runInline()` records monitored work executed in the calling process. Both use `JobMonitorService::startAttempt()`, which upserts the job's single `job_monitors` row, and complete only the attempt they started. See [Monitoring](../../part-1-operator-guide/operations/README.md) for details.
 
-A long-running handler lets an operator cancel its job. It calls `JobCancellationCheckpointInterface::check()` (a Shared Application port) between items of its work, outside any `catch` that would swallow the exception. `check()` throws `JobCancelledException` when the job monitor's Cancel action, or `app:monitor:job:cancel`, has set the job's cancellation flag; outside a job run it does nothing. Each check costs a Redis `EXISTS`, so place checkpoints per item of real work (an album, a directory, a page), not inside a tight loop.
+An operator can cancel the job of a long-running handler. The handler calls `JobCancellationCheckpointInterface::check()` (a Shared Application port) between items of its work, outside any `catch` that would swallow the exception. `check()` throws `JobCancelledException` when the job monitor's Cancel action, or `app:monitor:job:cancel`, has set the job's cancellation flag; outside a job run it does nothing. Each check costs a Redis `EXISTS`, so place checkpoints per item of real work (an album, a directory, a page), not inside a tight loop.
 
 `JobCancellationMiddleware` runs each received job as the current job of its coroutine, so the checkpoint finds the job ID without the handler passing it, on Messenger workers and inline runs alike. When the handler stops at a checkpoint, the middleware marks the row `cancelled` and returns the envelope with a `JobCancelledStamp`, so the transport acknowledges the delivery: it is not retried and does not reach the failure transport. An inline run (`JobMonitorAdministrationInterface::runInline()`) rethrows `JobCancelledException` to its console command.
 
@@ -130,7 +131,7 @@ A long-running handler lets an operator cancel its job. It calls `JobCancellatio
 
 ### Routing
 
-Messenger routes a dispatched message by the workloads map in `config/packages/messenger.php`. A message that the map lists with its `default` flag on, or whose dispatcher names a transport in a `TransportNamesStamp`, goes to that transport's Redis stream. Every other message runs inline in the calling process.
+The workloads map in `config/packages/messenger.php` decides where a dispatched message goes. A message that the map lists with its `default` flag on, or whose dispatcher names a transport in a `TransportNamesStamp`, goes to that transport's Redis stream. Every other message runs inline in the calling process.
 
 ```mermaid
 flowchart TB
@@ -151,15 +152,14 @@ flowchart TB
     retry -->|Exhausted| failed[(Failed messages)]
 ```
 
-The consumers that read these streams are described below.
-
-The admitted worker deployment owns the Redis `async` (`MESSENGER_TRANSPORT_DSN`)
-and `scheduler` consumers, outbox relay, scheduler and media execution. The web
-container runs `app:serve` without task workers or a CPU pool. Consumer names
-include the deployment and boot identity. [Background Work](../../part-1-operator-guide/workers/background-work.md)
-owns the operator explanation of admission, observation, lifecycle and uncertain
-outcomes; [Worker deployment](../../part-1-operator-guide/workers/worker-deployment.md)
-provides the manifest and host-command reference.
+The consumers of these streams run in the admitted worker deployment, which owns
+the Redis `async` (`MESSENGER_TRANSPORT_DSN`) and `scheduler` consumers, the outbox
+relay, the scheduler and media execution. The web container runs `app:serve`
+without task workers or a CPU pool. Consumer names include the deployment and boot
+identity. [Background Work](../../part-1-operator-guide/workers/background-work.md)
+explains admission, observation, lifecycle and uncertain outcomes for operators;
+[Worker deployment](../../part-1-operator-guide/workers/worker-deployment.md)
+is the manifest and host-command reference.
 
 ### Message contract and retries
 
@@ -169,15 +169,15 @@ Redis payloads do not depend on Symfony object serialization. Retry metadata kee
 completed handler names, so a retry skips handlers that already succeeded.
 Consumers still need idempotency for external effects.
 
-A message that exhausts its retries goes to the `failed` transport. That transport is a PostgreSQL table, `failed_messages`, created by a migration rather than by Messenger (`auto_setup: false`) and excluded from Doctrine schema comparison. Its receiver is listable, so `messenger:failed:show`, `messenger:failed:retry` and `messenger:failed:remove` work by message ID, and the admin endpoints in [Monitoring](../../part-1-operator-guide/operations/job-monitoring.md#failed-messages) use the same receiver. Tests use this table too; the other transports are in-memory.
+A message that exhausts its retries goes to the `failed` transport. That transport is a PostgreSQL table, `failed_messages`, created by a migration rather than by Messenger (`auto_setup: false`) and excluded from Doctrine schema comparison. Its receiver is listable, so `messenger:failed:show`, `messenger:failed:retry` and `messenger:failed:remove` work by message ID, and the admin endpoints in [Monitoring](../../part-1-operator-guide/operations/job-monitoring.md#failed-messages) use the same receiver.
 
-Tests use in-memory ordinary transports. See [Testing](../testing/workers-and-messaging.md) for the disposable-service delivery, retry and runtime drills.
+Tests use this table too, while the ordinary transports are in-memory. See [Testing](../testing/workers-and-messaging.md) for the disposable-service delivery, retry and runtime drills.
 
 ## Durable Event Replay
 
 Live domain events enter the outbox. For `LibraryDirectoryIndexed`, a Library
-dispatcher converts the committed event into the existing `FilesDiscovered`
-message and sends it to `async`. Other events continue through the private
+dispatcher converts the committed event into a `FilesDiscovered` message and
+sends it to `async`. Other events continue through the private
 notification dispatcher, where notification and admin-alert listeners run. Party
 and transcode listeners stay on the live dispatcher. A notification event's receipt,
 notification records and channel delivery intents commit in one transaction;
@@ -203,14 +203,14 @@ import's missing-file observation cannot be overwritten by the scanner's later
 index write. A capture failure rolls back that directory; earlier committed
 directories survive a later failure or cancellation.
 
-Directory relay uses the existing leased retries and five-attempt dead-letter
+Directory relay uses the same leased retries and five-attempt dead-letter
 policy. It does not use the notification receipt: Redis may accept a message even
 when the relay loses its acknowledgement, so duplicate imports remain possible.
 The scan's `directoriesQueued` count reports durable acceptance, not completed
 transport delivery or catalog ingestion. After a dead-lettered handoff, repair the
-cause and use the existing [rescan option](../../part-1-operator-guide/commands/app-library-scan.md#queued-directories-and-delivery-failures)
-to queue unchanged indexed files again. This producer boundary does not establish
-a complete audit of all event producers.
+cause and use the [rescan option](../../part-1-operator-guide/commands/app-library-scan.md#queued-directories-and-delivery-failures)
+to queue unchanged indexed files again. This boundary covers the library scan
+only; it does not show that every event producer has one.
 
 ## See Also
 

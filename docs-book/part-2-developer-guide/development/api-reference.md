@@ -1,10 +1,10 @@
 # API Reference
 
-Bånder exposes a resource-oriented JSON API documented via OpenAPI, using 21-character NanoID public identities, cursor and offset pagination, standardized error envelopes, and context-owned resource classes.
+Bånder exposes a resource-oriented JSON API documented with OpenAPI. It identifies resources by 21-character NanoID public IDs, pages collections by cursor or offset, reports errors in a standard envelope, and builds responses in resource classes owned by each context.
 
 ## OpenAPI Specification
 
-Baander generates its OpenAPI specification from source code using Nelmio ApiDoc. The spec is derived from attributes on controllers, request DTOs, and response resources. Route and schema tests check its coverage; export and client-generation checks detect drift in the checked-in artifacts.
+Nelmio ApiDoc generates Baander's OpenAPI specification from the attributes on controllers, request DTOs, and response resources. Route and schema tests check its coverage; export and client-generation checks detect drift in the checked-in artifacts.
 
 The JSON documentation route is `/api/doc.json`; the Swagger UI route at `/api/doc` is currently commented out in `config/routes/nelmio_api_doc.yaml`. The repository tracks `openapi.json`, which supplies the web Orval client. After changing an API contract, export the specification and regenerate the client:
 
@@ -13,20 +13,21 @@ make exec cmd="php bin/console app:export-openapi-spec --output=/tmp/baander-ope
 make exec cmd="cat /tmp/baander-openapi.json" > openapi.json
 ```
 
+The preview mounts application source read-only, so the first command writes the
+export to the container's temporary directory and the second redirects it to the
+host's tracked file.
+
 Run `app:export-openapi-spec --check` to compare the tracked file with the current export without writing it. The web client has `yarn generate` and `yarn generate:check` scripts in `ui/web`; the latter regenerates the client and fails on a tracked diff.
 
 The default export covers application `/api` routes; the generated documentation endpoint `/api/doc.json` is excluded. Operational endpoints such as `/health` and `/metrics`, WebSocket paths and `/.well-known` discovery endpoints are outside that export.
 
 See the [export command documentation](../../part-1-operator-guide/commands/app-export-openapi-spec.md) for full details.
 
-The preview mounts application source read-only. The export commands above write
-to its temporary directory, then redirect the result to the host's tracked file.
-
 ## REST Conventions
 
 ### Resource-Based URLs
 
-Endpoints follow a resource-oriented pattern. Collections live under a plural noun; the identifier for an individual resource is defined by that endpoint.
+Endpoints follow a resource-oriented pattern. A collection lives under a plural noun; each endpoint defines the identifier of an individual resource.
 
 | Pattern | Example |
 |---------|---------|
@@ -48,7 +49,7 @@ Protocol identifiers have separate meanings. OAuth token IDs, WebAuthn credentia
 
 A device resource exposes both `publicId`, its persisted public identity, and `deviceId`, the browser-generated UUID token used to register that device. Rename and forget requests at `/api/devices/{deviceId}` take the resource's public ID despite the parameter name. Device registration takes the browser token as `deviceId`.
 
-Playback coordination routes under `/api/session` (`POST /api/session/endpoints`, `/transfer`, `/ack`, `/observe`, `/control`, `/reconcile`, `/recover-local`, `/close`, `/override`, and `GET /api/session/snapshot`) identify the playback endpoint capability through the `X-Baander-Playback-Endpoint` header. `PlaybackSnapshotResource` exposes `selectedDestinationId` and `activeDestinationId` (persisted device public IDs), `activeIncarnationId` (the client-generated incarnation UUID), and `destinations[]` (`destinationId` + `incarnationId`), so clients resolve their own browser token through the device list before comparing destination ownership.
+Playback coordination routes under `/api/session` (`POST /api/session/endpoints`, `/transfer`, `/ack`, `/observe`, `/control`, `/reconcile`, `/recover-local`, `/close`, `/override`, and `GET /api/session/snapshot`) identify the playback endpoint capability through the `X-Baander-Playback-Endpoint` header. `PlaybackSnapshotResource` exposes `selectedDestinationId` and `activeDestinationId` (public IDs of playback destinations, each a browser tab registered as an endpoint), `activeIncarnationId` (the incarnation UUID the server issues when the endpoint registers), and `destinations[]` (`destinationId` + `incarnationId`). A client recognizes its own endpoint by comparing `activeIncarnationId` with the incarnation ID its registration returned.
 
 An EQ profile's `publicId` identifies the profile for updates, deletion and activation. Its optional `deviceId` is an audio-output token supplied by the client; it does not refer to a persisted device. `activeProfileId` carries the selected profile's public ID.
 
@@ -56,16 +57,16 @@ Listening sessions, party sessions and transcode sessions expose their own publi
 
 ### Pagination
 
-Two pagination strategies are available depending on the endpoint.
+Each paginated endpoint uses one of two strategies.
 
-**Cursor pagination** is used for searchable collections and large datasets. Pass `cursor` and `limit` as query parameters. The response includes cursors for both directions.
+**Cursor pagination** is used for large ordered collections, such as the song list (`GET /api/songs/`). Pass `cursor` and `limit` as query parameters. A `CursorPaginatedResponse` includes cursors for both directions.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `cursor` | `string`, optional | Opaque cursor from a previous response. Omit to fetch the first page. |
 | `limit` | `int`, optional | Items per page. Defaults vary by endpoint. |
 
-**Offset pagination** is used for simpler collections. Pass `page` and `limit` as query parameters.
+**Offset pagination** is used for other collections, including the searchable album, artist and movie lists. Pass `page` and `limit` as query parameters.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -90,7 +91,7 @@ The envelope depends on the endpoint. `ApiResponsesTrait::successResponse()` wra
 
 ### Cursor-Paginated Collection
 
-Returned as a `CursorPaginatedResponse`. The `meta` object contains navigation cursors and page metadata. The cursor below is an illustrative placeholder; clients pass the server-provided cursor unchanged and treat its contents as opaque:
+The song list returns a `CursorPaginatedResponse`; other cursor-paginated endpoints, such as the notification list and the job monitor, use their own envelopes. The `meta` object contains navigation cursors and page metadata. The cursor below is a placeholder; clients pass the server-provided cursor unchanged and treat its contents as opaque:
 
 ```json
 {
@@ -118,11 +119,11 @@ Returned as a `CursorPaginatedResponse`. The `meta` object contains navigation c
 | `has_previous_page` | `bool` | Whether a previous page exists. |
 | `total` | `int` | Total number of items matching the query. |
 | `per_page` | `int` | Number of items returned per page. |
-| `stale_cursor` | `bool` | `true` if the supplied cursor no longer matches the dataset (e.g., items were deleted). Results are recalculated from the nearest valid position. |
+| `stale_cursor` | `bool` | `true` if a cursor was supplied and the page is empty, for example because the items after it were deleted. The page is not recalculated. A cursor issued for another sort or order gets `400` instead. |
 
 ### Offset-Paginated Collection
 
-Returned as a `PaginatedResponse`. The `meta` object contains standard page metadata:
+Returned as a `PaginatedResponse`. The `meta` object contains the page metadata:
 
 ```json
 {
@@ -153,7 +154,7 @@ Application errors generally follow the `ApiError` format. Protocol endpoints an
 ```json
 {
   "error": {
-    "message": "Validation failed",
+    "message": "Validation failed.",
     "code": 422
   }
 }
@@ -164,7 +165,7 @@ Validation errors include a `details` key mapping each field path to its list of
 ```json
 {
   "error": {
-    "message": "Validation failed",
+    "message": "Validation failed.",
     "code": 422,
     "details": {
       "name": ["This value should not be blank."],
@@ -183,7 +184,7 @@ Validation errors include a `details` key mapping each field path to its list of
 
 ## Resource Pattern
 
-Controllers never serialize domain models directly. Instead, each context defines `AbstractResource` subclasses that transform domain models into API-safe response shapes. These resource classes expose a static `from()` method that accepts a domain model or read view and returns the serialized array. This excerpt from `PlaylistResource` shows the public identifier and timestamp field names:
+Controllers never serialize domain models directly. Each context defines `AbstractResource` subclasses that map domain models to API response shapes. A resource class exposes a static `from()` method that accepts a domain model or read view and returns the serialized array. This excerpt from `PlaylistResource` shows the public identifier and timestamp field names:
 
 ```php
 final class PlaylistResource extends AbstractResource
@@ -202,4 +203,4 @@ final class PlaylistResource extends AbstractResource
 }
 ```
 
-This keeps serialization logic co-located with the context that owns the domain model, and ensures the API response shape is decoupled from the internal domain structure. See [Coding Conventions](coding-conventions.md) for details on the port pattern that controllers use to invoke application logic.
+Serialization therefore lives in the context that owns the domain model, and a change to the domain structure does not change the API response shape unless the resource changes. See [Coding Conventions](coding-conventions.md) for the port pattern that controllers use to invoke application logic.

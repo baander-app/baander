@@ -59,7 +59,7 @@ Every token request carries a `DPoP` header with a proof JWT (RFC 9449) signed b
 1. Send the request with a proof that has no nonce. The server answers `400` with `{"error": "use_dpop_nonce", "error_description": "..."}` and a `DPoP-Nonce` header.
 2. Repeat the request with a new proof whose `nonce` claim is that value.
 
-Each nonce works once and expires after `auth.dpop.nonce_ttl` seconds (default 300). Successful token responses include a `DPoP-Nonce` header for the client's next proof. At the first-party endpoints, a request without a `DPoP` header gets a `400` `ApiError`, and an invalid proof gets the `use_dpop_nonce` answer. The OAuth token endpoint answers a missing or invalid proof with `400` and `{"error": "invalid_dpop_proof", "error_description": "..."}` (RFC 9449), with a `DPoP-Nonce` header as well.
+Each nonce works once and expires after `auth.dpop.nonce_ttl` seconds (default 300). Successful token responses include a `DPoP-Nonce` header for the client's next proof; after password login and refresh the header is best-effort and is left out while the nonce store cannot save a nonce, so the client's next token request starts with a nonce challenge. At the first-party endpoints, a request without a `DPoP` header gets a `400` `ApiError`, and an invalid proof gets the `use_dpop_nonce` answer. The OAuth token endpoint answers a missing or invalid proof with `400` and `{"error": "invalid_dpop_proof", "error_description": "..."}` (RFC 9449), with a `DPoP-Nonce` header as well.
 
 The sequence below shows the handshake against one token endpoint; `/api/auth/login`, `/api/auth/refresh`, and `/api/oauth/token` all follow it.
 
@@ -128,7 +128,7 @@ A refused refresh token answers `401`; sign in again. `503` with `Retry-After` m
 
 ### Client Fingerprint Binding
 
-Password login, passkey login, and the token endpoint accept an optional `X-Baander-Client-Fingerprint` header. If it is sent, the access token is bound to that value, and every API request with the token must send the same header or get `401` (`AUTH_INVALID_TOKEN`). Refresh keeps the binding. Tokens issued without the header ignore it. The WebSocket upgrade authenticates with a handshake ticket issued over HTTP and does not carry the fingerprint header; see [Real-Time Patterns](../architecture/real-time-patterns.md#authentication).
+Password login, passkey login, and the token endpoint accept an optional `X-Baander-Client-Fingerprint` header. If it is sent, the access token is bound to that value, and every API request with the token must send the same header or get `401` (`AUTH_INVALID_TOKEN`). Refresh, at `/api/auth/refresh` or with `grant_type=refresh_token`, keeps the binding of the token it rotates and ignores a header sent with the refresh request. Tokens issued without the header ignore it. The WebSocket upgrade authenticates with a handshake ticket issued over HTTP and does not carry the fingerprint header; see [Real-Time Patterns](../architecture/real-time-patterns.md#authentication).
 
 ### OAuth 2.0 Authorization Server
 
@@ -182,11 +182,11 @@ Then `POST /api/oauth/authorize`, with the same parameters plus `decision`, reco
 }
 ```
 
-On denial (`"decision": "deny"`), `redirect_uri` carries `error=access_denied`, `error_description`, `state`, and `iss` instead of `code`. `iss` (RFC 9207) lets the client detect a mix-up between authorization servers. The page navigates to `redirect_uri`; neither endpoint redirects. Both answer `Cache-Control: no-store`, and an unauthenticated request gets `401` `ApiError`.
+On denial (`"decision": "deny"`), `redirect_uri` carries `error=access_denied`, `error_description`, `state`, and `iss` instead of `code`. `iss` (RFC 9207) lets the client detect a mix-up between authorization servers. The page navigates to `redirect_uri`; neither endpoint redirects. Their success and OAuth error answers carry `Cache-Control: no-store`; an unauthenticated request gets a `401` `ApiError` without it.
 
 PKCE with `S256` is required for every client; `plain` and a missing method are rejected. The redirect URI must match a registered one exactly, except that a loopback URI matches on any port (RFC 8252), and it may be omitted only when the client registered exactly one. Errors from either endpoint are `400` with `{"error": "...", "error_description": "..."}`:
 
-- When the client is unknown or revoked, or the redirect URI is missing or not registered, the body has no `redirect_uri`, and the status is `400` even for `invalid_client`. The page shows the error to the user and must not redirect.
+- When the client is unknown or revoked, or the redirect URI is missing or not registered, the body has no `redirect_uri`, and the status is `400` even for `invalid_client`. The same holds for an `invalid_request` from `POST /api/oauth/authorize` whose `decision` is missing or invalid, or whose body is neither JSON nor form-encoded. The page shows the error to the user and must not redirect.
 - Any later error, such as `unsupported_response_type`, `unauthorized_client` for a device client, `invalid_request` for a missing or wrong PKCE challenge, or `access_denied` for a disabled account, adds `redirect_uri`: the client's redirect URI carrying `error`, `error_description`, `state`, and `iss`. The page navigates there.
 
 The client then redeems the code:
@@ -241,7 +241,7 @@ Polls answer `authorization_pending` until the user decides, `slow_down` when th
 
 **Refresh at the token endpoint.** `grant_type=refresh_token` rotates a pair exactly as `POST /api/auth/refresh` does, and the refresh token must have been issued to the authenticated client.
 
-The token endpoint accepts form-encoded or JSON parameters. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`. Errors use the RFC 6749 shape `{"error": "...", "error_description": "..."}`: `400`, or `401` for `invalid_client`. Every answer, OAuth errors included, carries `Cache-Control: no-store`, `Pragma: no-cache`, and a `DPoP-Nonce` for the next proof. A successful answer uses the RFC 6749 token response above.
+The token endpoint accepts form-encoded or JSON parameters. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`. Errors use the RFC 6749 shape `{"error": "...", "error_description": "..."}`: `400`, or `401` for `invalid_client`. Every token answer and OAuth error carries `Cache-Control: no-store`, `Pragma: no-cache`, and a `DPoP-Nonce` for the next proof. Two answers carry no nonce: a rate-limited request gets `429`, and a request the server cannot decide, for example while its database restarts or the nonce store is unavailable, gets `503` with `Retry-After` and `Cache-Control: no-store`; keep the tokens and retry after the delay. A successful answer uses the RFC 6749 token response above.
 
 **Personal access clients.** `GET` and `POST /api/oauth/clients/` list and create the current user's personal access clients, and `DELETE /api/oauth/clients/{publicId}` revokes one together with its access and refresh tokens. Only the owner can revoke a client. The list carries no client secret.
 

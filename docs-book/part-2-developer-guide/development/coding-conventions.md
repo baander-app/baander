@@ -1,26 +1,26 @@
 # Coding Conventions
 
-This page documents the core patterns used across the Baander codebase. These conventions are derived from the authoritative rules files in [`.agents/rules/`](../../../.agents/rules/). [AGENTS.md](../../../AGENTS.md) points agents to the applicable rules.
+This page summarizes the core patterns of the Baander codebase. It is derived from the authoritative rules files in [`.agents/rules/`](../../../.agents/rules/), and [AGENTS.md](../../../AGENTS.md) points agents to the rules that apply to a change.
 
 ## Domain Models
 
-Aggregate roots (entities with a repository interface) use a **state object pattern** to keep the constructor, `create()`, and `reconstitute()` signatures in sync.
+New aggregate roots use a **state object pattern**, which keeps the fields of the creation factory and of `reconstitute()` aligned. A repository interface is good evidence that a model is an aggregate root, but not a definition: a model without one may be a child entity, a value type or a simple model. Existing aggregates that still take positional constructor arguments, such as `Playlist`, are accepted until they are deliberately migrated.
 
 ### State Object
 
-A mutable class alongside the aggregate root holding all fields as public properties. It's an implementation detail — only the aggregate root and its repository use it.
+The state object is a final, mutable class beside the aggregate root, with a public property for each persisted field. Identity and creation fields that no mutation reassigns stay `readonly`. It is an implementation detail: only the aggregate root and its repository use it.
 
 ```php
 // src/Catalog/Domain/Model/AlbumState.php
 final class AlbumState
 {
     public function __construct(
-        public Uuid $id,
-        public PublicId $publicId,
+        public readonly Uuid $id,
+        public readonly PublicId $publicId,
         public string $title,
         public string $type,
         // ... all fields
-        public DateTimeImmutable $createdAt,
+        public readonly DateTimeImmutable $createdAt,
         public DateTimeImmutable $updatedAt,
     ) {
     }
@@ -29,7 +29,7 @@ final class AlbumState
 
 ### Aggregate Root
 
-Private constructor takes the state. `create()` builds new entities with auto-generated IDs. `reconstitute()` rehydrates from persistence.
+The private constructor takes the state. A public static factory validates the invariants and supplies the new identity and creation data; keep a semantic name such as `register()` or `issue()` where the domain has one, since a literal `create()` is not required. `reconstitute()` rehydrates the aggregate from persistence.
 
 ```php
 final class Album
@@ -62,9 +62,11 @@ final class Album
 }
 ```
 
+Ordinary clients use the getters. `getState()` serves persistence; it is not an HTTP or serialized payload contract.
+
 ### Value Objects
 
-`final readonly class` with a public constructor and a `fromString()` factory. Immutable.
+A value object is an immutable `final readonly class`. It has a public constructor, a named factory such as `fromString()`, or both, whichever fits the type.
 
 ```php
 final readonly class Uuid implements Stringable, JsonSerializable
@@ -86,7 +88,7 @@ final readonly class Uuid implements Stringable, JsonSerializable
 
 - Aggregate roots are `final class` (not `readonly` — they hold mutable state)
 - Value objects are `final readonly class`
-- Never put Doctrine annotations in domain models
+- Keep Doctrine mappings and persistence adapters out of domain models
 - Add new fields to the state object when extending an aggregate root
 - Use internal `Uuid` (v7 default) for persistence keys, foreign keys, and domain events; expose 21-character `PublicId` NanoIDs on public routes, relationships, cursors, and WebSocket payloads (see [CONCEPTS.md](../../../CONCEPTS.md))
 
@@ -94,7 +96,7 @@ final readonly class Uuid implements Stringable, JsonSerializable
 
 ### Interface
 
-Lives in `Domain/Repository/`. Extends `Searchable` when the entity supports full-text search.
+A repository interface lives in `Domain/Repository/`, or a feature subfolder of it. It extends `Searchable` only when the repository actually implements full-text search.
 
 ```php
 interface AlbumRepositoryInterface extends Searchable
@@ -108,7 +110,7 @@ interface AlbumRepositoryInterface extends Searchable
 
 ### Implementation
 
-Lives in `Infrastructure/Doctrine/Repository/`. Three private helpers:
+A new Doctrine repository lives in `Infrastructure/Doctrine/Repository/`. It typically has three private helpers; their names are conventions, not requirements for every storage adapter:
 
 - **`toDomain(Entity)`** — converts Doctrine entity to domain model via `reconstitute()`
 - **`syncToEntity(Model, Entity)`** — copies domain state to Doctrine entity
@@ -116,7 +118,7 @@ Lives in `Infrastructure/Doctrine/Repository/`. Three private helpers:
 
 ### Wiring
 
-Every repository interface gets an alias in `config/services.yaml`:
+Give each new repository interface an explicit alias in `config/services.yaml`:
 
 ```yaml
 App\Catalog\Domain\Repository\AlbumRepositoryInterface:
@@ -127,7 +129,7 @@ Always depend on the interface, never the implementation.
 
 ## CQRS
 
-Commands are `final readonly class` data carriers. Handlers use `#[AsMessageHandler]` on `__invoke`.
+A command is a `final readonly class` that carries input data and no business logic. Its fields are either private with getters or public promoted properties; it has no setters. A handler carries `#[AsMessageHandler]` on `__invoke`.
 
 ### Command
 
@@ -164,11 +166,11 @@ final class CreatePlaylistHandler
 }
 ```
 
-Dispatch from controllers via `MessageBusInterface::dispatch()`.
+Controllers dispatch commands through `MessageBusInterface::dispatch()`. The call returns the envelope, not the handler's value; read the result from the envelope's stamps.
 
 ## Port Pattern
 
-The canonical pattern for controller dependencies. Application layer defines `Port/` interfaces. Controllers inject ports. Infrastructure implements them.
+Controllers depend on ports. The Application layer defines the port interfaces in `Port/`, controllers inject them, and Infrastructure implements them. Existing controllers that inject repositories or infrastructure classes directly are recorded debt, not a pattern to follow.
 
 ### Port Interface
 
@@ -194,7 +196,7 @@ public function __construct(
 
 ```yaml
 App\Auth\Application\Port\TotpVerifierInterface:
-    alias: App\Auth\Infrastructure\Security\TotpVerifier
+    alias: App\Auth\Infrastructure\Security\Totp\TotpVerifier
 ```
 
 ## Anti-Corruption Layer
@@ -205,16 +207,16 @@ Baander uses League OAuth2 Server only to validate access tokens through its `Re
 
 ### Request DTO
 
-`final readonly class` with Symfony validation attributes and `#[OA\Schema]` for OpenAPI docs.
+A request DTO is a concrete `final readonly class` with Symfony validation attributes and `#[OA\Schema]` for the OpenAPI documentation. `#[MapRequestPayload]` takes such a class, never a bare `object`. Its validation does not replace the domain's invariant checks.
 
 ### Resource
 
-Extends `AbstractResource` with a static `from()` method that transforms domain models to API responses.
+A resource extends `AbstractResource` and maps a domain model to an API response in a static `from()` method. Never return a state object or a persistence entity as a response.
 
 ### HTTP Headers and Identity
 
 - Prefix Baander-defined HTTP headers with `X-Baander-` (for example, `X-Baander-Client-Fingerprint`, `X-Baander-Playback-Endpoint`); keep standard protocol, proxy, and security header names.
-- Resolve the signed-in user in controllers through `App\Auth\Application\Port\AuthenticatedUserIdentityInterface` rather than calling `$this->security->getUser()` directly.
+- Resolve the signed-in user in a controller by checking that `$this->security->getUser()` implements `App\Auth\Application\Port\AuthenticatedUserIdentityInterface`; its `getId()` returns the user's UUID as a string.
 
 ## Admin Actions and Console Parity
 
@@ -223,12 +225,12 @@ Every action on the admin pages has a console command counterpart, and CLI execu
 - **Shared use case:** A controller method and its CLI command dispatch the same Application command, query, or port. Business logic lives in Application, never in the controller or command alone.
 - **Route attributes:** Mark every admin-guarded route (and every non-admin route called by an admin page) with `#[CliCounterpart('app:noun:verb')]` or `#[CliParityExemption(...)]`. `AdminCliParityTest` verifies these markings and checks that every counterpart has a documentation page under `docs-book/part-1-operator-guide/commands/`.
 - **Command naming and helpers:** Name commands `app:<noun>[:<sub>]:<verb>` with a singular noun and build them on `App\Shared\Interface\Console\AdminCommandSupport`.
-- **Shared exceptions:** Throw `NotFoundException` (`404` / exit `1`), `ConflictException` (`409` / exit `1`), or `InvalidInputException` (`422` / exit `2`) from handlers instead of `RuntimeException`, and let the HTTP exception subscriber and `AdminCommandSupport::dispatch()` map them consistently.
+- **Shared exceptions:** Throw `NotFoundException` (`404` / exit `1`), `ConflictException` (`409` / exit `1`), `InvalidInputException` (`422` / exit `2`), or `ServiceUnavailableException` (`503` / exit `1`) from handlers instead of `RuntimeException`, and let the HTTP exception subscriber and `AdminCommandSupport::dispatch()` map them consistently.
 
 ## Database Conventions
 
-- **Primary keys**: Always UUID v7 via the `Uuid` domain model (unless an internal integer sequence or text key has a documented purpose)
-- **String columns**: Always `TEXT`, never `VARCHAR(n)` — length validation belongs in the application layer
+- **Primary keys**: Generate aggregate identifiers as UUID v7 through the `Uuid` domain model. Token IDs, public IDs, imported identifiers and internal sequence keys keep their own contracts; a new internal integer key needs a documented purpose and an identity column
+- **String columns**: Prefer `TEXT` to `VARCHAR(n)`; keep a bounded string only where the length is a real contract, and otherwise validate length in the application layer
 - **Timestamps**: Always `TIMESTAMPTZ` without explicit precision (`datetime_immutable` mapped via `InstantType`)
 - **JSON columns**: Always `JSONB`
 - **Foreign keys and indexes**: Index every foreign key column and follow [Database Naming](database-naming.md)
