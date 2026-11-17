@@ -20,7 +20,8 @@ use Symfony\Component\Routing\RouterInterface;
 /**
  * Only a party's host and members see it, and only a user its host has invited joins it: the
  * public ID alone admits no one. A signed-in user who is neither a member nor invited is answered
- * as for a party that does not exist.
+ * as for a party that does not exist, and so is every user without a member row on every route
+ * but the join.
  *
  * The party here has its host, one member who was invited and joined, and an outsider who is
  * neither invited nor a member.
@@ -29,6 +30,21 @@ final class PartySessionAccessTest extends TestCase
 {
     private const URI = '/api/party/sessions/';
     private const MISSING = '{"error":{"message":"Resource not found.","code":404}}';
+
+    /** What a user can ask of one party: every party route but the join. */
+    private const array REQUESTS_THAT_NAME_A_PARTY = [
+        'reading the party',
+        'listing the members',
+        'setting playback preferences',
+        'leaving',
+        'syncing',
+        'ending the party',
+        'handing the host role to the host',
+        'handing the host role to an unknown user',
+        'inviting themself',
+        'revoking the host',
+        'listing the invitations',
+    ];
 
     private LibraryEntity $library;
     private VideoEntity $video;
@@ -58,9 +74,12 @@ final class PartySessionAccessTest extends TestCase
         self::getContainer()->get('security.token_storage')->setToken(null);
 
         $this->assertJsonResponse($this->anonymousRequest('GET', self::URI), 401);
-        $this->assertJsonResponse($this->anonymousRequest('GET', self::URI . $this->party), 401);
-        $this->assertJsonResponse($this->anonymousRequest('GET', $this->membersUri($this->party)), 401);
         $this->assertJsonResponse($this->anonymousRequest('POST', self::URI . $this->party . '/join'), 401);
+        foreach ($this->requestsThatNameAParty($this->outsider) as $request => [$method, $path, $body]) {
+            $response = $this->anonymousRequest($method, self::URI . $this->party . $path, $body);
+
+            self::assertSame(401, $response->getStatusCode(), $request . ': ' . $response->getContent());
+        }
     }
 
     public function testAnOutsiderSeesNeitherTheSessionNorItsMembers(): void
@@ -242,6 +261,86 @@ final class PartySessionAccessTest extends TestCase
         self::assertSame([], $this->listedParties($this->member));
     }
 
+    /** @return iterable<string, array{string, string}> how the caller comes to hold no member row in the party, and what they ask of it */
+    public static function requestsOfAUserWithoutAMemberRow(): iterable
+    {
+        $callers = [
+            'never invited' => 'a user who was never invited',
+            // An invitation alone shows nothing of the party: only a member row does.
+            'invited' => 'an invited user who has not joined',
+            'revoked' => 'a member the host revoked',
+        ];
+
+        foreach ($callers as $caller => $described) {
+            foreach (self::REQUESTS_THAT_NAME_A_PARTY as $request) {
+                yield $described . ', ' . $request => [$caller, $request];
+            }
+        }
+    }
+
+    #[DataProvider('requestsOfAUserWithoutAMemberRow')]
+    public function testEveryRouteButTheJoinAnswersAUserWithoutAMemberRowAsForAPartyThatDoesNotExistAndChangesNothing(string $caller, string $request): void
+    {
+        $user = $this->userWithoutAMemberRow($caller);
+        [$method, $path, $body] = $this->requestsThatNameAParty($user)[$request];
+        $this->assertARefusalReadsDifferentlyInDanish($user);
+        $stored = $this->storedParty();
+
+        $this->assertAnsweredAsForAMissingParty($user, $this->party, $method, $path, $body);
+
+        self::assertSame($stored, $this->storedParty());
+    }
+
+    public function testTheHostAndAMemberSyncTheirPlaybackPosition(): void
+    {
+        foreach ([$this->host, $this->member] as $user) {
+            $response = $this->authenticatedRequest('POST', self::URI . $this->party . '/sync', $user, ['clientPosition' => 12.5, 'clientLatency' => 0.25]);
+            $synced = $this->assertJsonResponse($response, 200, 'data')['data'];
+
+            self::assertSame(['serverPosition'], array_keys($synced));
+            self::assertIsNumeric($synced['serverPosition']);
+        }
+    }
+
+    public function testTheHostAndAMemberSetTheirOwnPlaybackPreferences(): void
+    {
+        $preferences = [
+            [$this->host, ['audioProfileId' => 'surround', 'subtitleTrackId' => 'dan']],
+            [$this->member, ['audioProfileId' => 'stereo', 'subtitleTrackId' => 'eng']],
+        ];
+
+        foreach ($preferences as [$user, $chosen]) {
+            $updated = $this->assertJsonResponse($this->authenticatedRequest('PATCH', self::URI . $this->party . '/members/me', $user, $chosen), 200, 'data')['data'];
+
+            self::assertSame($user->getPublicId()->toString(), $updated['userId']);
+            self::assertSame($chosen, ['audioProfileId' => $updated['audioProfileId'], 'subtitleTrackId' => $updated['subtitleTrackId']]);
+        }
+
+        $members = array_column($this->session($this->host)['members'], null, 'userId');
+        foreach ($preferences as [$user, $chosen]) {
+            $member = $members[$user->getPublicId()->toString()];
+            self::assertSame($chosen, ['audioProfileId' => $member['audioProfileId'], 'subtitleTrackId' => $member['subtitleTrackId']]);
+        }
+    }
+
+    public function testAnEndedPartyIsStillReadAndLeftByItsMembers(): void
+    {
+        $party = $this->partyIn('ended');
+
+        foreach ([$this->host, $this->member] as $user) {
+            $session = $this->session($user);
+            self::assertFalse($session['isActive']);
+            self::assertSame($this->publicIds($this->host, $this->member), $this->sorted(array_column($session['members'], 'userId')));
+            self::assertSame($this->publicIds($this->host, $this->member), $this->members($party, $user));
+        }
+
+        $this->assertJsonResponse($this->authenticatedRequest('POST', self::URI . $party . '/leave', $this->member), 200);
+
+        $this->assertJsonResponse($this->authenticatedRequest('GET', self::URI . $party, $this->member), 404);
+        self::assertSame($this->publicIds($this->host), $this->members($party));
+        self::assertFalse($this->session($this->host)['isActive']);
+    }
+
     public function testNoRouteOutsideTheApiServesThePartySession(): void
     {
         $router = self::getContainer()->get(RouterInterface::class);
@@ -302,29 +401,108 @@ final class PartySessionAccessTest extends TestCase
      */
     private function assertJoinIsAnsweredAsForAMissingParty(User $user, string $party): void
     {
+        $this->assertARefusalReadsDifferentlyInDanish($user);
+        $this->assertAnsweredAsForAMissingParty($user, $party, 'POST', '/join');
+    }
+
+    /**
+     * The user's request to the party gets the status, body and headers the same request to an
+     * unknown party ID gets, in the default language and in Danish.
+     *
+     * @param array<string, mixed> $body
+     */
+    private function assertAnsweredAsForAMissingParty(User $user, string $party, string $method, string $path, array $body = []): void
+    {
         $unknown = (new PublicId())->toString();
-        // A translated refusal reads differently in Danish, so the comparison in Danish is not idle.
-        self::assertSame('{"error":{"message":"Forbudt.","code":403}}', $this->requestIn('GET', '/api/admin/users', $user, 'da')->getContent());
 
         foreach ([null, 'da'] as $language) {
-            $hidden = $this->requestIn('POST', self::URI . $party . '/join', $user, $language);
-            $missing = $this->requestIn('POST', self::URI . $unknown . '/join', $user, $language);
+            $route = $method . ' ' . $path . ' in ' . ($language ?? 'the default language');
+            $hidden = $this->requestIn($method, self::URI . $party . $path, $user, $language, $body);
+            $missing = $this->requestIn($method, self::URI . $unknown . $path, $user, $language, $body);
 
-            self::assertSame(404, $hidden->getStatusCode(), (string) $hidden->getContent());
-            self::assertSame(404, $missing->getStatusCode(), (string) $missing->getContent());
-            self::assertSame(self::MISSING, $missing->getContent());
-            self::assertSame($missing->getContent(), $hidden->getContent());
-            self::assertSame($this->headersOf($missing), $this->headersOf($hidden));
+            self::assertSame(404, $hidden->getStatusCode(), $route . ': ' . $hidden->getContent());
+            self::assertSame(404, $missing->getStatusCode(), $route . ': ' . $missing->getContent());
+            self::assertSame(self::MISSING, $missing->getContent(), $route);
+            self::assertSame($missing->getContent(), $hidden->getContent(), $route);
+            self::assertSame($this->headersOf($missing), $this->headersOf($hidden), $route);
         }
     }
 
-    private function requestIn(string $method, string $uri, User $user, ?string $acceptLanguage): Response
+    /** A translated refusal reads differently in Danish, so a comparison made in Danish is not idle. */
+    private function assertARefusalReadsDifferentlyInDanish(User $user): void
+    {
+        self::assertSame('{"error":{"message":"Forbudt.","code":403}}', $this->requestIn('GET', '/api/admin/users', $user, 'da')->getContent());
+    }
+
+    /**
+     * Each request to a party route as the user would send it: the method, the path after the
+     * party's public ID, and the body.
+     *
+     * @return array<string, array{string, string, array<string, mixed>}>
+     */
+    private function requestsThatNameAParty(User $caller): array
+    {
+        return [
+            'reading the party' => ['GET', '', []],
+            'listing the members' => ['GET', '/members/', []],
+            'setting playback preferences' => ['PATCH', '/members/me', ['audioProfileId' => 'stereo', 'subtitleTrackId' => 'eng']],
+            'leaving' => ['POST', '/leave', []],
+            'syncing' => ['POST', '/sync', ['clientPosition' => 12.5, 'clientLatency' => 0.25]],
+            'ending the party' => ['DELETE', '', []],
+            'handing the host role to the host' => ['POST', '/members/transfer-host', ['newHostUserId' => $this->host->getPublicId()->toString()]],
+            // Whether a user has the public ID is for the host alone to learn.
+            'handing the host role to an unknown user' => ['POST', '/members/transfer-host', ['newHostUserId' => (new PublicId())->toString()]],
+            'inviting themself' => ['PUT', '/invitations/' . $caller->getPublicId()->toString(), []],
+            'revoking the host' => ['DELETE', '/invitations/' . $this->host->getPublicId()->toString(), []],
+            'listing the invitations' => ['GET', '/invitations/', []],
+        ];
+    }
+
+    /** The user who holds no member row in the party, for the named reason. */
+    private function userWithoutAMemberRow(string $reason): User
+    {
+        if ($reason === 'invited') {
+            $this->invite($this->outsider, $this->party);
+        }
+        if ($reason === 'revoked') {
+            $revoked = $this->authenticatedRequest('DELETE', $this->invitationUri($this->member, $this->party), $this->host);
+            self::assertSame(204, $revoked->getStatusCode(), (string) $revoked->getContent());
+
+            return $this->member;
+        }
+
+        return $this->outsider;
+    }
+
+    /**
+     * The party as its host reads it, with its members and its invitations.
+     *
+     * @return array<string, mixed>
+     */
+    private function storedParty(): array
+    {
+        $invitations = $this->authenticatedRequest('GET', self::URI . $this->party . '/invitations/', $this->host);
+
+        return [
+            'party' => $this->session($this->host),
+            'invitations' => $this->assertJsonResponse($invitations, 200, 'data')['data'],
+        ];
+    }
+
+    /** @return array<string, mixed> the test's party, with its members, as one of them reads it */
+    private function session(User $member): array
+    {
+        return $this->assertJsonResponse($this->authenticatedRequest('GET', self::URI . $this->party, $member), 200, 'data')['data'];
+    }
+
+    /** @param array<string, mixed> $body */
+    private function requestIn(string $method, string $uri, User $user, ?string $acceptLanguage, array $body = []): Response
     {
         $server = ['CONTENT_TYPE' => 'application/json', BaanderHeader::TestUserId->serverKey() => $user->getId()->toString()];
         if ($acceptLanguage !== null) {
             $server['HTTP_ACCEPT_LANGUAGE'] = $acceptLanguage;
         }
-        $this->client->request($method, $uri, server: $server);
+        $this->client->request($method, $uri, server: $server, content: $body === [] ? null : json_encode($body, JSON_THROW_ON_ERROR));
 
         return $this->client->getResponse();
     }

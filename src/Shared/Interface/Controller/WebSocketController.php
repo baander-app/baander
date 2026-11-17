@@ -285,6 +285,33 @@ final class WebSocketController extends AbstractWebSocketController
         return $session;
     }
 
+    /**
+     * The party with the public ID when the user holds a member row in it. A party the user is
+     * not a member of is refused exactly as an unknown one, so the message that names it gets
+     * the answer an unknown party gets.
+     */
+    private function partyIdForMember(string $publicId, Uuid $userId): Uuid
+    {
+        return $this->identities->partyIdForMember(PublicId::fromString($publicId), $userId)
+            ?? throw new InvalidArgumentException('Party session not found.');
+    }
+
+    /**
+     * The action of a `party.playback` message when it is one that steers playback. Joining and
+     * leaving have messages of their own, so playback acts on neither.
+     *
+     * @return PlaybackAction::Play|PlaybackAction::Pause|PlaybackAction::Seek|null
+     */
+    private function steeringAction(mixed $action): ?PlaybackAction
+    {
+        $action = is_string($action) ? PlaybackAction::tryFrom($action) : null;
+
+        return match ($action) {
+            PlaybackAction::Play, PlaybackAction::Pause, PlaybackAction::Seek => $action,
+            PlaybackAction::Join, PlaybackAction::Leave, null => null,
+        };
+    }
+
     /** @param array<array-key, mixed> $payload */
     private function handlePartyJoin(int $fd, string $userId, array $payload): void
     {
@@ -420,8 +447,8 @@ final class WebSocketController extends AbstractWebSocketController
         }
 
         try {
-            $sessionUuid = $this->partyId($sessionId);
             $userUuid = Uuid::fromString($userId);
+            $sessionUuid = $this->partyIdForMember($sessionId, $userUuid);
         } catch (InvalidArgumentException) {
             $this->pusher->pushToConnection($fd, [
                 'type' => 'error',
@@ -467,7 +494,6 @@ final class WebSocketController extends AbstractWebSocketController
     private function handlePartyPlayback(int $fd, string $userId, array $payload): void
     {
         $sessionId = $payload['sessionId'] ?? null;
-        $action = $payload['action'] ?? null;
 
         if (!is_string($sessionId) || $sessionId === '') {
             $this->pusher->pushToConnection($fd, [
@@ -478,9 +504,23 @@ final class WebSocketController extends AbstractWebSocketController
             return;
         }
 
+        // The whole payload is checked before the party is looked up, so a malformed message
+        // gets the same answer whether or not the party exists.
+        $playbackAction = $this->steeringAction($payload['action'] ?? null);
+        // A position that is absent or null means the handler keeps the current one.
+        $position = $payload['position'] ?? null;
+        if ($playbackAction === null || ($position !== null && !is_int($position) && !is_float($position))) {
+            $this->pusher->pushToConnection($fd, [
+                'type' => 'error',
+                'message' => 'Invalid sessionId or action',
+            ]);
+
+            return;
+        }
+
         try {
-            $sessionUuid = $this->partyId($sessionId);
-            $playbackAction = PlaybackAction::from($action ?? '');
+            $userUuid = Uuid::fromString($userId);
+            $sessionUuid = $this->partyIdForMember($sessionId, $userUuid);
         } catch (InvalidArgumentException) {
             $this->pusher->pushToConnection($fd, [
                 'type' => 'error',
@@ -502,32 +542,21 @@ final class WebSocketController extends AbstractWebSocketController
                 case PlaybackAction::Play:
                     $this->logger?->debug('Playback play', ['fd' => $fd, 'sessionId' => $sessionId, 'userId' => $userId]);
                     $this->bus->dispatch(
-                        new StartPlaybackCommand(
-                            $sessionUuid,
-                            Uuid::fromString($userId),
-                            $payload['position'] ?? null,
-                        ),
+                        new StartPlaybackCommand($sessionUuid, $userUuid, $position),
                     );
                     break;
 
                 case PlaybackAction::Pause:
                     $this->bus->dispatch(
-                        new PausePlaybackCommand($sessionUuid, Uuid::fromString($userId)),
+                        new PausePlaybackCommand($sessionUuid, $userUuid),
                     );
                     break;
 
                 case PlaybackAction::Seek:
                     $this->bus->dispatch(
-                        new SeekPlaybackCommand(
-                            $sessionUuid,
-                            Uuid::fromString($userId),
-                            $payload['position'] ?? 0.0,
-                        ),
+                        new SeekPlaybackCommand($sessionUuid, $userUuid, $position ?? 0.0),
                     );
                     break;
-
-                default:
-                    return;
             }
         } catch (HandlerFailedException $e) {
             $this->pusher->pushToConnection($fd, [
@@ -579,7 +608,7 @@ final class WebSocketController extends AbstractWebSocketController
 
         try {
             $userUuid = Uuid::fromString($userId);
-            $sessionUuid = $this->partyId($sessionId);
+            $sessionUuid = $this->partyIdForMember($sessionId, $userUuid);
         } catch (InvalidArgumentException) {
             $this->pusher->pushToConnection($fd, [
                 'type' => 'error',

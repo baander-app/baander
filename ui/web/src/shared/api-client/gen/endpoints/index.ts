@@ -6645,8 +6645,12 @@ export type PostPartyMemberTransferHostBody = {
   newHostUserId: string;
 };
 
-export type PostPartyMemberTransferHost200 = {
+export type PostPartyMemberTransferHost200Data = {
   message?: string;
+};
+
+export type PostPartyMemberTransferHost200 = {
+  data?: PostPartyMemberTransferHost200Data;
 };
 
 export type GetPartySessionIndex200DataItem = {
@@ -6689,8 +6693,12 @@ export type GetPartySessionShow200 = {
   data?: GetPartySessionShow200Data;
 };
 
-export type DeletePartySessionEnd200 = {
+export type DeletePartySessionEnd200Data = {
   message?: string;
+};
+
+export type DeletePartySessionEnd200 = {
+  data?: DeletePartySessionEnd200Data;
 };
 
 export type PostPartySessionJoin200Data = {
@@ -6706,12 +6714,20 @@ export type PostPartySessionJoin200 = {
   data?: PostPartySessionJoin200Data;
 };
 
-export type PostPartySessionLeave200 = {
+export type PostPartySessionLeave200Data = {
   message?: string;
 };
 
-export type PostPartySessionSync200 = {
+export type PostPartySessionLeave200 = {
+  data?: PostPartySessionLeave200Data;
+};
+
+export type PostPartySessionSync200Data = {
   serverPosition?: number;
+};
+
+export type PostPartySessionSync200 = {
+  data?: PostPartySessionSync200Data;
 };
 
 export type GetPlaylistIndex200 = {
@@ -25606,7 +25622,7 @@ export const deletePartySessionEnd = async (publicId: string, options?: Paramete
 
 export const getDeletePartySessionEndMutationKey = () => ['deletePartySessionEnd'] as const;
 
-export const getDeletePartySessionEndMutationOptions = <TError = ErrorType<unknown>,
+export const getDeletePartySessionEndMutationOptions = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePartySessionEnd>>, TError,DeletePartySessionEndMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof deletePartySessionEnd>>, TError,DeletePartySessionEndMutationVariables, TContext> => {
 
@@ -25635,13 +25651,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type DeletePartySessionEndMutationResult = NonNullable<Awaited<ReturnType<typeof deletePartySessionEnd>>>
 
-    export type DeletePartySessionEndMutationError = ErrorType<unknown>
+    export type DeletePartySessionEndMutationError = ErrorType<ApiError>
     export type DeletePartySessionEndMutationVariables = {publicId: string}
 
     /**
  * @summary End a party session (host only)
  */
-export const useDeletePartySessionEnd = <TError = ErrorType<unknown>,
+export const useDeletePartySessionEnd = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePartySessionEnd>>, TError,DeletePartySessionEndMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deletePartySessionEnd>>,
@@ -25755,7 +25771,7 @@ export const postPartySessionLeave = async (publicId: string, options?: Paramete
 
 export const getPostPartySessionLeaveMutationKey = () => ['postPartySessionLeave'] as const;
 
-export const getPostPartySessionLeaveMutationOptions = <TError = ErrorType<unknown>,
+export const getPostPartySessionLeaveMutationOptions = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionLeave>>, TError,PostPartySessionLeaveMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postPartySessionLeave>>, TError,PostPartySessionLeaveMutationVariables, TContext> => {
 
@@ -25784,13 +25800,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostPartySessionLeaveMutationResult = NonNullable<Awaited<ReturnType<typeof postPartySessionLeave>>>
 
-    export type PostPartySessionLeaveMutationError = ErrorType<unknown>
+    export type PostPartySessionLeaveMutationError = ErrorType<ApiError>
     export type PostPartySessionLeaveMutationVariables = {publicId: string}
 
     /**
  * @summary Leave a party session
  */
-export const usePostPartySessionLeave = <TError = ErrorType<unknown>,
+export const usePostPartySessionLeave = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionLeave>>, TError,PostPartySessionLeaveMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postPartySessionLeave>>,
@@ -25844,7 +25860,7 @@ return customInstance<PostPartySessionSync200>(getPostPartySessionSyncUrl(public
 
 export const getPostPartySessionSyncMutationKey = () => ['postPartySessionSync'] as const;
 
-export const getPostPartySessionSyncMutationOptions = <TError = ErrorType<unknown>,
+export const getPostPartySessionSyncMutationOptions = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionSync>>, TError,PostPartySessionSyncMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postPartySessionSync>>, TError,PostPartySessionSyncMutationVariables, TContext> => {
 
@@ -25873,13 +25889,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostPartySessionSyncMutationResult = NonNullable<Awaited<ReturnType<typeof postPartySessionSync>>>
     export type PostPartySessionSyncMutationBody = BodyType<SyncPlaybackRequest>
-    export type PostPartySessionSyncMutationError = ErrorType<unknown>
+    export type PostPartySessionSyncMutationError = ErrorType<ApiError>
     export type PostPartySessionSyncMutationVariables = {publicId: string;data: BodyType<SyncPlaybackRequest>}
 
     /**
  * @summary Synchronize playback position
  */
-export const usePostPartySessionSync = <TError = ErrorType<unknown>,
+export const usePostPartySessionSync = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionSync>>, TError,PostPartySessionSyncMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postPartySessionSync>>,

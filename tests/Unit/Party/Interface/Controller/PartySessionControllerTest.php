@@ -13,14 +13,17 @@ use App\Party\Domain\Model\PartyMember;
 use App\Party\Domain\Model\SyncedPartySession;
 use App\Party\Interface\Controller\PartySessionController;
 use App\Party\Interface\Request\CreatePartySessionRequest;
+use App\Party\Interface\Request\SyncPlaybackRequest;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\ControllerMetadata\ArgumentMetadataFactory;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorage;
@@ -211,6 +214,38 @@ final class PartySessionControllerTest extends TestCase
         $this->memberPort->method('findByUserAndSession')->willReturn(null);
 
         self::assertSame(404, $this->controller->show($session->getPublicId()->toString(), $user)->getStatusCode());
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function actionsOnOneParty(): iterable
+    {
+        yield 'leave' => ['leave'];
+        yield 'sync' => ['sync'];
+        yield 'end' => ['end'];
+    }
+
+    #[DataProvider('actionsOnOneParty')]
+    public function testLeaveSyncAndEndAnswerACallerWithoutAMemberRowAsForAPartyThatDoesNotExist(string $action): void
+    {
+        $this->commandBus->expects($this->never())->method('dispatch');
+        $user = $this->principal();
+        $session = SyncedPartySession::create(new Uuid(), new Uuid(), null);
+        $this->sessionPort->method('findByPublicIdentifier')->willReturnCallback(
+            static fn (string $publicId): ?SyncedPartySession => $publicId === $session->getPublicId()->toString() ? $session : null,
+        );
+        $this->memberPort->method('findByUserAndSession')->willReturn(null);
+        $act = [
+            'leave' => fn (string $party): JsonResponse => $this->controller->leave($party, $user),
+            'sync' => fn (string $party): JsonResponse => $this->controller->sync($party, new SyncPlaybackRequest(12.5, 0.25), $user),
+            'end' => fn (string $party): JsonResponse => $this->controller->end($party, $user),
+        ][$action];
+
+        $hidden = $act($session->getPublicId()->toString());
+        $missing = $act((new PublicId())->toString());
+
+        self::assertSame(404, $hidden->getStatusCode());
+        // The answer does not reveal that the session exists.
+        self::assertSame($missing->getContent(), $hidden->getContent());
     }
 
     public function testIndexListsTheSessionsTheCallerBelongsTo(): void

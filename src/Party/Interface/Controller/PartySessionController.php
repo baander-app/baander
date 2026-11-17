@@ -188,14 +188,15 @@ final class PartySessionController
             new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Left', content: new OA\JsonContent(properties: [new OA\Property(property: 'message', type: 'string')])),
+            new OA\Response(response: '200', description: 'Left', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'message', type: 'string')], type: 'object')])),
+            new OA\Response(response: '404', description: 'The session does not exist, or the caller is neither its host nor a member', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/{publicId}/leave', name: 'leave', methods: ['POST'])]
     public function leave(string $publicId, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
         $session = $this->sessionPort->findByPublicIdentifier($publicId);
-        if ($session === null) {
+        if ($session === null || !$this->belongsTo($session->getId(), $user)) {
             return $this->notFound();
         }
 
@@ -214,14 +215,15 @@ final class PartySessionController
             new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Synced position', content: new OA\JsonContent(properties: [new OA\Property(property: 'serverPosition', type: 'number')])),
+            new OA\Response(response: '200', description: 'Synced position', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'serverPosition', type: 'number')], type: 'object')])),
+            new OA\Response(response: '404', description: 'The session does not exist, or the caller is neither its host nor a member', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/{publicId}/sync', name: 'sync', methods: ['POST'])]
     public function sync(string $publicId, #[MapRequestPayload] SyncPlaybackRequest $payload, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
         $session = $this->sessionPort->findByPublicIdentifier($publicId);
-        if ($session === null) {
+        if ($session === null || !$this->belongsTo($session->getId(), $user)) {
             return $this->notFound();
         }
 
@@ -242,14 +244,16 @@ final class PartySessionController
             new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Ended', content: new OA\JsonContent(properties: [new OA\Property(property: 'message', type: 'string')])),
+            new OA\Response(response: '200', description: 'Ended', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'message', type: 'string')], type: 'object')])),
+            new OA\Response(response: '403', description: 'The caller is a member of the session but not its host', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '404', description: 'The session does not exist, or the caller is neither its host nor a member', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/{publicId}', name: 'end', methods: ['DELETE'])]
     public function end(string $publicId, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
         $session = $this->sessionPort->findByPublicIdentifier($publicId);
-        if ($session === null) {
+        if ($session === null || !$this->belongsTo($session->getId(), $user)) {
             return $this->notFound();
         }
 

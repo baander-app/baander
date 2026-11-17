@@ -23,6 +23,7 @@ use App\Shared\Infrastructure\Swoole\WebSocketPusher;
 use App\Shared\Infrastructure\Swoole\WebSocketRooms;
 use App\Shared\Interface\Controller\WebSocketController;
 use App\Tests\Functional\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Swoole\WebSocket\Server;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -31,8 +32,8 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * Leaving, ending and the host's playback reach the live room listener, which does
  * nothing outside the web server's HTTP workers, so the routes and commands still
  * complete here. The revoke test and the socket tests put this process in the place of an
- * HTTP worker with open sockets, so the listener changes the room they fill and `party.join`
- * runs through the application's own controller, bus and handler.
+ * HTTP worker with open sockets, so the listener changes the room they fill and the party
+ * messages run through the application's own controller, bus and handlers.
  */
 final class PartyLiveRoomWiringTest extends TestCase
 {
@@ -198,6 +199,172 @@ final class PartyLiveRoomWiringTest extends TestCase
         self::assertSame([], $registry->getRoomMembers($room));
     }
 
+    /** @return iterable<string, array{array<string, mixed>, string}> the message without the party it names, and what an unknown party answers */
+    public static function messagesThatNameAParty(): iterable
+    {
+        yield 'leave' => [['type' => 'party.leave'], 'Invalid public identity'];
+        yield 'play' => [['type' => 'party.playback', 'action' => 'play', 'position' => 30.5], 'Invalid sessionId or action'];
+        yield 'pause' => [['type' => 'party.playback', 'action' => 'pause'], 'Invalid sessionId or action'];
+        yield 'seek' => [['type' => 'party.playback', 'action' => 'seek', 'position' => 12.5], 'Invalid sessionId or action'];
+        yield 'sync' => [['type' => 'party.sync', 'position' => 12.5, 'latency' => 0.25], 'Invalid sessionId format'];
+    }
+
+    /** @param array<string, mixed> $message */
+    #[DataProvider('messagesThatNameAParty')]
+    public function testAPartyMessageFromAUserWithoutAMemberRowGetsTheFrameOfAnUnknownPartyAndTheRoomHearsNothing(array $message, string $answer): void
+    {
+        [$controller, $registry, $party, $host, , $outsiders] = $this->partyWithItsRoomAndTwoUsersWithoutAMemberRow();
+        $room = $this->room($party);
+        $stored = $this->session($party, $host);
+
+        foreach (array_keys($outsiders) as $fd) {
+            $missing = $this->send($controller, $fd, [...$message, 'sessionId' => (new PublicId())->toString()]);
+            $hidden = $this->send($controller, $fd, [...$message, 'sessionId' => $party]);
+
+            // One frame, to the sender alone: the two sockets in the party's room hear nothing.
+            self::assertSame([['fd' => $fd, 'payload' => ['type' => 'error', 'message' => $answer]]], $missing);
+            self::assertSame($missing, $hidden);
+            self::assertEqualsCanonicalizing([1, 2], $registry->getRoomMembers($room));
+            self::assertSame($stored, $this->session($party, $host));
+        }
+    }
+
+    /** @return iterable<string, array{string}> what a user asks of a party that would change it or tell its room */
+    public static function requestsThatWouldChangeAParty(): iterable
+    {
+        $requests = ['leaving', 'syncing', 'ending the party', 'handing the host role to a member', 'setting playback preferences', 'revoking a member'];
+
+        foreach ($requests as $request) {
+            yield $request => [$request];
+        }
+    }
+
+    #[DataProvider('requestsThatWouldChangeAParty')]
+    public function testARequestFromAUserWithoutAMemberRowReachesNoSocketInThePartysRoom(string $request): void
+    {
+        [, $registry, $party, $host, $guest, $outsiders] = $this->partyWithItsRoomAndTwoUsersWithoutAMemberRow();
+        $room = $this->room($party);
+        $stored = $this->session($party, $host);
+        [$method, $path, $body] = [
+            'leaving' => ['POST', '/leave', []],
+            'syncing' => ['POST', '/sync', ['clientPosition' => 12.5, 'clientLatency' => 0.25]],
+            'ending the party' => ['DELETE', '', []],
+            'handing the host role to a member' => ['POST', '/members/transfer-host', ['newHostUserId' => $guest->getPublicId()->toString()]],
+            'setting playback preferences' => ['PATCH', '/members/me', ['audioProfileId' => 'stereo']],
+            'revoking a member' => ['DELETE', '/invitations/' . $guest->getPublicId()->toString(), []],
+        ][$request];
+
+        foreach ($outsiders as $user) {
+            $this->pushed = [];
+
+            $this->assertJsonResponse($this->authenticatedRequest($method, '/api/party/sessions/' . $party . $path, $user, $body), 404);
+
+            self::assertSame([], $this->pushed);
+            self::assertEqualsCanonicalizing([1, 2], $registry->getRoomMembers($room));
+            self::assertSame($stored, $this->session($party, $host));
+        }
+    }
+
+    /** @return iterable<string, array{array<string, mixed>}> the malformed playback message without the party it names */
+    public static function malformedPlaybackMessages(): iterable
+    {
+        yield 'an unknown action' => [['type' => 'party.playback', 'action' => 'rewind']];
+        // Joining has a message of its own; playback does not act on it.
+        yield 'join as the action' => [['type' => 'party.playback', 'action' => 'join']];
+        yield 'a text position' => [['type' => 'party.playback', 'action' => 'seek', 'position' => '12.5']];
+    }
+
+    /** @param array<string, mixed> $message */
+    #[DataProvider('malformedPlaybackMessages')]
+    public function testAMalformedPartyPlaybackGetsTheSameAnswerForTheHostsPartyAndAnUnknownOneAndChangesNothing(array $message): void
+    {
+        [$controller, $registry, $party, $host] = $this->partyWithItsRoomAndTwoUsersWithoutAMemberRow();
+        $room = $this->room($party);
+        $stored = $this->session($party, $host);
+
+        $missing = $this->send($controller, 1, [...$message, 'sessionId' => (new PublicId())->toString()]);
+        $real = $this->send($controller, 1, [...$message, 'sessionId' => $party]);
+
+        self::assertSame([['fd' => 1, 'payload' => ['type' => 'error', 'message' => 'Invalid sessionId or action']]], $missing);
+        self::assertSame($missing, $real);
+        self::assertEqualsCanonicalizing([1, 2], $registry->getRoomMembers($room));
+        self::assertSame($stored, $this->session($party, $host));
+    }
+
+    public function testPartyPlaybackOverTheSocketIsAppliedAndBroadcastForTheHostAndIgnoredForAMember(): void
+    {
+        [$controller, , $party, $host] = $this->partyWithItsRoomAndTwoUsersWithoutAMemberRow();
+
+        // A member who is not the host steers nothing and is told nothing.
+        self::assertSame([], $this->send($controller, 2, ['type' => 'party.playback', 'sessionId' => $party, 'action' => 'play', 'position' => 30.5]));
+        self::assertSame('stopped', $this->session($party, $host)['playbackState']);
+
+        $steps = [
+            'play' => [['action' => 'play', 'position' => 30.5], 'playing', 30.5],
+            'seek' => [['action' => 'seek', 'position' => 12], 'playing', 12.0],
+            'pause' => [['action' => 'pause'], 'paused', 12.0],
+        ];
+        foreach ($steps as $step => [$action, $state, $position]) {
+            $frames = $this->send($controller, 1, ['type' => 'party.playback', 'sessionId' => $party, ...$action]);
+
+            // The host's own socket is in the room, so it hears the new state as the member does.
+            self::assertEqualsCanonicalizing([1, 2], array_column($frames, 'fd'), $step);
+            foreach ($frames as $frame) {
+                self::assertSame('party.playback_state', $frame['payload']['type'], $step);
+                self::assertSame($party, $frame['payload']['sessionId'], $step);
+                self::assertSame($state, $frame['payload']['playbackState'], $step);
+                self::assertEquals($position, $frame['payload']['wallClockPosition'], $step);
+            }
+            $session = $this->session($party, $host);
+            self::assertSame($state, $session['playbackState'], $step);
+            self::assertEquals($position, $session['wallClockPosition'], $step);
+        }
+    }
+
+    public function testPartySyncOverTheSocketAnswersTheHostAndAMemberWithTheServerPosition(): void
+    {
+        [$controller, , $party] = $this->partyWithItsRoomAndTwoUsersWithoutAMemberRow();
+
+        foreach ([1, 2] as $fd) {
+            $frames = $this->send($controller, $fd, ['type' => 'party.sync', 'sessionId' => $party, 'position' => 12.5, 'latency' => 0.25]);
+
+            self::assertCount(1, $frames);
+            self::assertSame($fd, $frames[0]['fd']);
+            self::assertSame(['type', 'sessionId', 'serverPosition'], array_keys($frames[0]['payload']));
+            self::assertSame('party.sync_response', $frames[0]['payload']['type']);
+            self::assertSame($party, $frames[0]['payload']['sessionId']);
+            self::assertIsNumeric($frames[0]['payload']['serverPosition']);
+        }
+    }
+
+    public function testPartyLeaveOverTheSocketTakesAMemberAndThenTheHostOutOfThePartyAndItsRoom(): void
+    {
+        [$controller, $registry, $party, $host, $guest] = $this->partyWithItsRoomAndTwoUsersWithoutAMemberRow();
+        $room = $this->room($party);
+        $second = $this->createTestUser();
+        $this->invite($host, $second, $party);
+        $controller->onOpen(5, $second->getId()->toString(), 'token-5');
+        self::assertSame('party.joined', $this->send($controller, 5, ['type' => 'party.join', 'sessionId' => $party])[0]['payload']['type']);
+        $left = static fn (User $user): array => ['type' => 'party.member_event', 'sessionId' => $party, 'action' => 'leave', 'userId' => $user->getPublicId()->toString()];
+
+        // The leaver is told nothing; the sockets left in the room hear that they left.
+        self::assertEqualsCanonicalizing(
+            [['fd' => 1, 'payload' => $left($guest)], ['fd' => 5, 'payload' => $left($guest)]],
+            $this->send($controller, 2, ['type' => 'party.leave', 'sessionId' => $party]),
+        );
+        self::assertEqualsCanonicalizing([1, 5], $registry->getRoomMembers($room));
+        self::assertEqualsCanonicalizing(
+            [$host->getPublicId()->toString(), $second->getPublicId()->toString()],
+            array_column($this->session($party, $host)['members'], 'userId'),
+        );
+
+        self::assertSame([['fd' => 5, 'payload' => $left($host)]], $this->send($controller, 1, ['type' => 'party.leave', 'sessionId' => $party]));
+        self::assertSame([5], $registry->getRoomMembers($room));
+        $session = $this->session($party, $second);
+        self::assertSame($second->getPublicId()->toString(), $session['hostUserId']);
+        self::assertSame([$second->getPublicId()->toString()], array_column($session['members'], 'userId'));
+    }
+
     public function testAHostWhoLeavesHandsThePartyAndItsPlaybackToTheEarliestMember(): void
     {
         $host = $this->createTestUser();
@@ -266,14 +433,59 @@ final class PartyLiveRoomWiringTest extends TestCase
     }
 
     /**
+     * A party with a socket of its host (1) and of a member (2) in its room and, outside the
+     * room, a socket of each of two users without a member row: one who was never invited (3)
+     * and one the host revoked after they had joined (4).
+     *
+     * @return array{WebSocketController, WebSocketConnectionRegistry, string, User, User, array<int, User>} the controller, the registry, the party, its host, the member, and the two other users by socket
+     */
+    private function partyWithItsRoomAndTwoUsersWithoutAMemberRow(): array
+    {
+        $registry = $this->liveSockets();
+        $controller = self::getContainer()->get(WebSocketController::class);
+        self::assertInstanceOf(WebSocketController::class, $controller);
+
+        $host = $this->createTestUser();
+        $guest = $this->createTestUser();
+        $uninvited = $this->createTestUser();
+        $revoked = $this->createTestUser();
+        $party = $this->party($host);
+        $this->invite($host, $guest, $party);
+        $this->invite($host, $revoked, $party);
+        foreach ([1 => $host, 2 => $guest, 3 => $uninvited, 4 => $revoked] as $fd => $user) {
+            $controller->onOpen($fd, $user->getId()->toString(), 'token-' . $fd);
+        }
+        foreach ([1, 2, 4] as $fd) {
+            self::assertSame('party.joined', $this->partyJoin($controller, $fd, $party)[0]['payload']['type']);
+        }
+        self::assertSame(204, $this->authenticatedRequest('DELETE', '/api/party/sessions/' . $party . '/invitations/' . $revoked->getPublicId()->toString(), $host)->getStatusCode());
+        self::assertEqualsCanonicalizing([1, 2], $registry->getRoomMembers($this->room($party)));
+        $this->pushed = [];
+
+        return [$controller, $registry, $party, $host, $guest, [3 => $uninvited, 4 => $revoked]];
+    }
+
+    /**
      * The socket sends `party.join` for the party.
      *
      * @return list<array{fd: int, payload: mixed}> what the server pushed in answer, to this socket and to the room
      */
     private function partyJoin(WebSocketController $controller, int $fd, string $party): array
     {
+        return $this->send($controller, $fd, ['type' => 'party.join', 'sessionId' => $party]);
+    }
+
+    /**
+     * The socket sends the message.
+     *
+     * @param array<string, mixed> $message
+     *
+     * @return list<array{fd: int, payload: mixed}> what the server pushed in answer, to this socket and to others
+     */
+    private function send(WebSocketController $controller, int $fd, array $message): array
+    {
         $this->pushed = [];
-        $controller->onMessage($fd, json_encode(['type' => 'party.join', 'sessionId' => $party], JSON_THROW_ON_ERROR));
+        $controller->onMessage($fd, json_encode($message, JSON_THROW_ON_ERROR));
 
         return $this->pushed;
     }

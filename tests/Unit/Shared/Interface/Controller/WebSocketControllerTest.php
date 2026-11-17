@@ -15,6 +15,7 @@ use App\Party\Domain\Model\SyncedPartySessionState;
 use App\Shared\Domain\Model\PublicId;
 use App\Party\Application\Command\JoinPartySessionCommand;
 use App\Party\Application\Command\LeavePartySessionCommand;
+use App\Party\Application\Command\StartPlaybackCommand;
 use App\Party\Application\Command\SyncPlaybackCommand;
 use App\Party\Domain\Event\MemberLeft;
 use App\Party\Domain\Model\PartyMember;
@@ -263,6 +264,7 @@ final class WebSocketControllerTest extends TestCase
             $this->pushedMessages = [];
             $identities = $this->createStub(WebSocketIdentityLookupInterface::class);
             $identities->method('partyId')->willThrowException(new \RuntimeException('Database unavailable'));
+            $identities->method('partyIdForMember')->willThrowException(new \RuntimeException('Database unavailable'));
             $identities->method('transcodeSessionId')->willThrowException(new \RuntimeException('Database unavailable'));
             $bus = $this->createMock(MessageBusInterface::class);
             $bus->expects(self::never())->method('dispatch');
@@ -915,6 +917,114 @@ final class WebSocketControllerTest extends TestCase
         self::assertSame(['type' => 'error', 'message' => 'Sync failed'], $this->lastPushedPayload());
         $controller->onMessage(1, '{"type":"ping"}');
         $this->assertLastPushMatches(1, 'pong');
+    }
+
+    /** @return iterable<string, array{array<string, mixed>, string}> the message without the party it names, and what an unknown party answers */
+    public static function messagesToAPartyTheSenderIsNotAMemberOf(): iterable
+    {
+        yield 'leave' => [['type' => 'party.leave'], 'Invalid public identity'];
+        yield 'play' => [['type' => 'party.playback', 'action' => 'play', 'position' => 12.5], 'Invalid sessionId or action'];
+        yield 'pause' => [['type' => 'party.playback', 'action' => 'pause'], 'Invalid sessionId or action'];
+        yield 'seek' => [['type' => 'party.playback', 'action' => 'seek', 'position' => 12.5], 'Invalid sessionId or action'];
+        yield 'sync' => [['type' => 'party.sync', 'position' => 12.5, 'latency' => 0.25], 'Invalid sessionId format'];
+    }
+
+    /** @param array<string, mixed> $message */
+    #[DataProvider('messagesToAPartyTheSenderIsNotAMemberOf')]
+    public function testAPartyMessageFromAUserWithoutAMemberRowGetsTheFrameOfAnUnknownPartyAndChangesNothing(array $message, string $answer): void
+    {
+        $sessionId = '01900000-0000-7000-8000-000000000002';
+        $room = WebSocketRooms::party($sessionId);
+        $identities = $this->createStub(WebSocketIdentityLookupInterface::class);
+        // The party exists, but the sender holds no member row in it; no party has the other public ID.
+        $identities->method('partyId')->willReturnCallback(static fn(PublicId $id): ?Uuid => $id->toString() === self::publicId($sessionId) ? Uuid::fromString($sessionId) : null);
+        $identities->method('partyIdForMember')->willReturn(null);
+        $this->bus->method('dispatch')->willReturnCallback(static function (): never {
+            self::fail('A message from a user without a member row must not reach the message bus.');
+        });
+        $controller = new WebSocketController($this->registry, $this->pusher, $this->bus, new JsonEncoder(), $this->listeningSessions, $identities, $this->createStub(LiveSubscriptions::class));
+        $controller->onOpen(1, '01900000-0000-7000-8000-000000000001', 'token-1');
+        $controller->onOpen(2, '01900000-0000-7000-8000-000000000003', 'token-2');
+        $this->registry->joinRoom($room, 2);
+        $this->pushedMessages = [];
+
+        $controller->onMessage(1, json_encode([...$message, 'sessionId' => self::publicId($sessionId)], JSON_THROW_ON_ERROR));
+        $controller->onMessage(1, json_encode([...$message, 'sessionId' => str_repeat('u', 21)], JSON_THROW_ON_ERROR));
+
+        // One frame each, to the sender alone: the member in the party's room hears nothing.
+        self::assertSame([
+            ['fd' => 1, 'payload' => ['type' => 'error', 'message' => $answer]],
+            ['fd' => 1, 'payload' => ['type' => 'error', 'message' => $answer]],
+        ], $this->allPushedPayloads());
+        self::assertSame([2], $this->registry->getRoomMembers($room));
+    }
+
+    public function testAPlayWithANullPositionIsDispatchedLikeAPlayWithoutOne(): void
+    {
+        $sessionId = '01900000-0000-7000-8000-000000000002';
+        $identities = $this->createStub(WebSocketIdentityLookupInterface::class);
+        $identities->method('partyIdForMember')->willReturn(Uuid::fromString($sessionId));
+        $positions = [];
+        $this->bus->method('dispatch')->willReturnCallback(static function (object $command) use (&$positions): Envelope {
+            self::assertInstanceOf(StartPlaybackCommand::class, $command);
+            $positions[] = $command->getPosition();
+
+            return new Envelope($command);
+        });
+        $controller = new WebSocketController($this->registry, $this->pusher, $this->bus, new JsonEncoder(), $this->listeningSessions, $identities, $this->createStub(LiveSubscriptions::class));
+        $controller->onOpen(1, '01900000-0000-7000-8000-000000000001', 'token-1');
+        $this->pushedMessages = [];
+
+        foreach ([['position' => null], []] as $position) {
+            $controller->onMessage(1, json_encode(['type' => 'party.playback', 'action' => 'play', 'sessionId' => self::publicId($sessionId), ...$position], JSON_THROW_ON_ERROR));
+        }
+
+        self::assertSame([null, null], $positions);
+        self::assertSame([], $this->allPushedPayloads());
+    }
+
+    /** @return iterable<string, array{array<string, mixed>, string}> the malformed message without the party it names, and what its sender is told */
+    public static function malformedPartyMessages(): iterable
+    {
+        yield 'playback with an unknown action' => [['type' => 'party.playback', 'action' => 'rewind'], 'Invalid sessionId or action'];
+        // Joining and leaving have messages of their own; playback acts on neither.
+        yield 'playback with join as the action' => [['type' => 'party.playback', 'action' => 'join'], 'Invalid sessionId or action'];
+        yield 'playback with leave as the action' => [['type' => 'party.playback', 'action' => 'leave'], 'Invalid sessionId or action'];
+        yield 'playback without an action' => [['type' => 'party.playback'], 'Invalid sessionId or action'];
+        yield 'playback with an action that is not text' => [['type' => 'party.playback', 'action' => ['play']], 'Invalid sessionId or action'];
+        yield 'playback with a text position' => [['type' => 'party.playback', 'action' => 'seek', 'position' => '12.5'], 'Invalid sessionId or action'];
+        yield 'pause with a text position' => [['type' => 'party.playback', 'action' => 'pause', 'position' => 'now'], 'Invalid sessionId or action'];
+        yield 'sync with a text position' => [['type' => 'party.sync', 'position' => '42'], 'Invalid position or latency'];
+    }
+
+    /** @param array<string, mixed> $message */
+    #[DataProvider('malformedPartyMessages')]
+    public function testAMalformedPartyMessageGetsTheSameAnswerWhetherOrNotThePartyExists(array $message, string $answer): void
+    {
+        $sessionId = '01900000-0000-7000-8000-000000000002';
+        $room = WebSocketRooms::party($sessionId);
+        $identities = $this->createStub(WebSocketIdentityLookupInterface::class);
+        // The sender is a member of the party; no party has the other public ID.
+        $party = static fn(PublicId $id): ?Uuid => $id->toString() === self::publicId($sessionId) ? Uuid::fromString($sessionId) : null;
+        $identities->method('partyId')->willReturnCallback($party);
+        $identities->method('partyIdForMember')->willReturnCallback($party);
+        $this->bus->method('dispatch')->willReturnCallback(static function (): never {
+            self::fail('A malformed message must not reach the message bus.');
+        });
+        $controller = new WebSocketController($this->registry, $this->pusher, $this->bus, new JsonEncoder(), $this->listeningSessions, $identities, $this->createStub(LiveSubscriptions::class));
+        $controller->onOpen(1, '01900000-0000-7000-8000-000000000001', 'token-1');
+        $controller->onOpen(2, '01900000-0000-7000-8000-000000000003', 'token-2');
+        $this->registry->joinRoom($room, 1);
+        $this->registry->joinRoom($room, 2);
+        $this->pushedMessages = [];
+
+        $controller->onMessage(1, json_encode([...$message, 'sessionId' => self::publicId($sessionId)], JSON_THROW_ON_ERROR));
+        $controller->onMessage(1, json_encode([...$message, 'sessionId' => str_repeat('u', 21)], JSON_THROW_ON_ERROR));
+
+        self::assertSame([
+            ['fd' => 1, 'payload' => ['type' => 'error', 'message' => $answer]],
+            ['fd' => 1, 'payload' => ['type' => 'error', 'message' => $answer]],
+        ], $this->allPushedPayloads());
     }
 
     // --- Rate limiting ---

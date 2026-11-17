@@ -138,17 +138,50 @@ final class PartyMemberControllerTest extends TestCase
         // route dispatches without asking.
         $identities = $this->identities();
         $identities->method('userId')->willThrowException(new NotFoundException('User not found.'));
+        $members = $this->createStub(PartyMemberPortInterface::class);
+        $members->method('findByUserAndSession')->willReturn(PartyMember::create($userId, $sessionId));
         $controller = new PartyMemberController(
             $this->security($user),
             $bus,
             $sessions,
             $identities,
-            $this->createStub(PartyMemberPortInterface::class),
+            $members,
         );
 
         $response = $controller->transferHost($session->getPublicId()->toString(), new TransferHostRequest($target->toString()));
 
         self::assertSame(200, $response->getStatusCode());
+    }
+
+    public function testTransferAnswersACallerWithoutAMemberRowAsForAPartyThatDoesNotExistWhoeverTheyName(): void
+    {
+        $session = SyncedPartySession::create(new Uuid(), new Uuid(), null);
+        $sessions = $this->createStub(PartySessionPortInterface::class);
+        $sessions->method('findByPublicIdentifier')->willReturnCallback(
+            static fn (string $publicId): ?SyncedPartySession => $publicId === $session->getPublicId()->toString() ? $session : null,
+        );
+        $members = $this->createStub(PartyMemberPortInterface::class);
+        $members->method('findByUserAndSession')->willReturn(null);
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects($this->never())->method('dispatch');
+        // Nobody has the named public ID, which the caller must not learn.
+        $identities = $this->identities();
+        $identities->method('userId')->willThrowException(new NotFoundException('User not found.'));
+        $controller = new PartyMemberController(
+            $this->security(new SecurityUser((new Uuid())->toString(), 'outsider@baander.app', '')),
+            $bus,
+            $sessions,
+            $identities,
+            $members,
+        );
+        $request = new TransferHostRequest((new PublicId())->toString());
+
+        $hidden = $controller->transferHost($session->getPublicId()->toString(), $request);
+        $missing = $controller->transferHost((new PublicId())->toString(), $request);
+
+        self::assertSame(404, $hidden->getStatusCode());
+        // The answer does not reveal that the session exists.
+        self::assertSame($missing->getContent(), $hidden->getContent());
     }
 
     public function testAnonymousActionsPreserveUnauthorizedResponseWithoutSideEffects(): void

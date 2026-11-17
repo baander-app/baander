@@ -14,7 +14,7 @@ use App\Shared\Infrastructure\Swoole\WebSocketRooms;
  *
  * | Room | Joined by | Left by | Broadcasts |
  * |------|-----------|---------|------------|
- * | `party:{sessionUuid}` | `party.join`, which names the party by public ID; the controller resolves it to the session UUID and joins the room after JoinPartySessionCommand accepts the user as a member | every socket of a member who leaves the party (`party.leave` or `POST /api/party/sessions/{publicId}/leave`); every socket when the party ends; one socket with `room.leave` or when it closes | `party.member_event` join from WebSocketController, leave from SwooleLivePartyRooms; `party.playback_state` from SwooleLivePartyRooms after the host plays, pauses or seeks |
+ * | `party:{sessionUuid}` | `party.join`, which names the party by public ID; the controller resolves it to the session UUID and joins the room after JoinPartySessionCommand accepts the user as a member | every socket of a member who leaves the party (`party.leave` or `POST /api/party/sessions/{publicId}/leave`) or whose invitation the host revokes; every socket when the party ends; one socket with `room.leave` or when it closes | `party.member_event` join from WebSocketController, leave from SwooleLivePartyRooms; `party.playback_state` from SwooleLivePartyRooms after the host plays, pauses or seeks |
  *
  * Everything else goes to individual connections and needs no room:
  * WebSocketPusher::pushToConnection() for replies and pushes, LiveFrameSender for `live.*`

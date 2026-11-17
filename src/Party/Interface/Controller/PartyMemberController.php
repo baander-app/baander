@@ -139,9 +139,11 @@ final class PartyMemberController
             new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Host transferred', content: new OA\JsonContent(properties: [new OA\Property(property: 'message', type: 'string')])),
+            new OA\Response(response: '200', description: 'Host transferred', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'message', type: 'string')], type: 'object')])),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '403', description: 'The caller is a member of the session but not its host', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '404', description: 'The session does not exist, or the caller is neither its host nor a member; for the host, no user has the public ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'The request body is invalid, or the host named themself or a user who is not a member of the session', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/transfer-host', name: 'transfer_host', methods: ['POST'])]
@@ -156,7 +158,7 @@ final class PartyMemberController
         }
 
         $session = $this->sessionPort->findByPublicIdentifier($publicId);
-        if ($session === null) {
+        if ($session === null || !$this->belongsTo($session->getId(), $user)) {
             return $this->notFound();
         }
 
