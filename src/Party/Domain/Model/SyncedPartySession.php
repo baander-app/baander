@@ -63,7 +63,9 @@ final class SyncedPartySession
      */
     public function startPlayback(?float $position = null): void
     {
-        $startPosition = $position ?? $this->state->pausedAtPosition ?? $this->state->wallClockPosition;
+        // Without a position, playback continues from where it is: the paused position, or the
+        // running playhead when the session is already playing.
+        $startPosition = $position ?? $this->getCurrentPosition();
 
         $this->state->wallClockPosition = $startPosition;
         $this->state->playbackState = PlaybackState::Playing;
@@ -119,7 +121,7 @@ final class SyncedPartySession
     public function syncPlayback(float $clientPosition, float $clientLatency): float
     {
         if ($this->state->playbackState !== PlaybackState::Playing) {
-            return $this->state->wallClockPosition;
+            return $this->getCurrentPosition();
         }
 
         $serverPosition = $this->getCurrentPosition();

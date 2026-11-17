@@ -196,6 +196,12 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
             throw new InvalidInputException('Days must be at least 1.', ['days' => 'Days must be at least 1.']);
         }
 
+        if ($days > self::MAX_PRUNE_DAYS) {
+            $message = sprintf('Days must be at most %d.', self::MAX_PRUNE_DAYS);
+
+            throw new InvalidInputException($message, ['days' => $message]);
+        }
+
         $olderThan = new \DateTimeImmutable(sprintf('-%d days', $days));
 
         return new JobMonitorPruneResult(

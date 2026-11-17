@@ -131,7 +131,7 @@ Host-initiated actions are dispatched as CQRS commands via Messenger:
 
 | Command | Handler | Effect |
 |---------|---------|--------|
-| `StartPlaybackCommand` | `StartPlaybackHandler` | Sets state to `Playing`, resets `playbackStartedAt` |
+| `StartPlaybackCommand` | `StartPlaybackHandler` | Sets state to `Playing` from the given position, or without one from the current position (the paused position, or the running playhead when already playing); resets `playbackStartedAt` |
 | `PausePlaybackCommand` | `PausePlaybackHandler` | Captures current position into `pausedAtPosition`, sets `Paused` |
 | `SeekPlaybackCommand` | `SeekPlaybackHandler` | Sets `wallClockPosition` to target; resets the start timestamp while playing |
 
@@ -147,7 +147,7 @@ Non-host participants periodically report their local playback position to the s
 
 1. Client sends `party.sync` with its current position and measured latency.
 2. `SyncPlaybackHandler` delegates to `PlaybackSynchronizer::synchronize()` (`PlaybackSynchronizationPortInterface`).
-3. `PlaybackSynchronizer` verifies party membership and calls `PartySessionPortInterface::syncPlayback()`. While the party is playing, it computes the server's current position via `getCurrentPosition()` on `SyncedPartySession`; otherwise it returns `wallClockPosition`.
+3. `PlaybackSynchronizer` verifies party membership and calls `PartySessionPortInterface::syncPlayback()`. It answers with the server's current position from `getCurrentPosition()` on `SyncedPartySession`: while the party is playing, the position the clock has reached; while paused, `pausedAtPosition`; otherwise `wallClockPosition`.
 4. If drift exceeds `clientLatency + 1.0` seconds, the server position is returned for correction; otherwise, the server position is returned as the authoritative position without requiring a seek.
 5. `PlaybackSynchronizer` updates the member's smoothed EMA jitter (initializing to `jitter` when `currentJitter <= 0`) and saves the member.
 

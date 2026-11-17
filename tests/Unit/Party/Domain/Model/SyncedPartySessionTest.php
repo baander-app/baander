@@ -269,7 +269,7 @@ final class SyncedPartySessionTest extends TestCase
         $this->assertLessThan(0.30, $position);
     }
 
-    public function testSyncPlaybackReturnsWallClockPositionWhenNotPlaying(): void
+    public function testSyncPlaybackReturnsThePausedPositionWhenNotPlaying(): void
     {
         $session = SyncedPartySession::create(
             Uuid::v4(),
@@ -282,7 +282,49 @@ final class SyncedPartySessionTest extends TestCase
 
         $result = $session->syncPlayback(10.0, 0.5);
 
-        $this->assertSame(50.0, $result);
+        $this->assertEqualsWithDelta(50.0, $result, 0.01);
+    }
+
+    public function testSyncPlaybackReturnsThePausedPositionAfterPlaybackRan(): void
+    {
+        $session = $this->playingSince(50.0, 30.0);
+
+        $session->pausePlayback();
+
+        $result = $session->syncPlayback(10.0, 0.5);
+
+        $this->assertEqualsWithDelta(80.0, $result, 0.5, 'A paused party syncs members to where the host paused.');
+    }
+
+    public function testStartPlaybackWhilePlayingKeepsTheCurrentPosition(): void
+    {
+        $session = $this->playingSince(50.0, 30.0);
+
+        $session->startPlayback();
+
+        $this->assertEqualsWithDelta(80.0, $session->getCurrentPosition(), 0.5, 'A second play does not rewind to the last play anchor.');
+    }
+
+    /** A playing session anchored at the given position, started the given seconds ago. */
+    private function playingSince(float $position, float $secondsAgo): SyncedPartySession
+    {
+        $now = new \DateTimeImmutable();
+
+        return SyncedPartySession::reconstitute(new SyncedPartySessionState(
+            id: Uuid::v4(),
+            publicId: new PublicId(),
+            hostUserId: Uuid::v4(),
+            videoId: Uuid::v4(),
+            transcodeJobId: null,
+            maxMembers: 5,
+            playbackState: PlaybackState::Playing,
+            wallClockPosition: $position,
+            playbackStartedAt: $now->modify(sprintf('-%d seconds', (int) $secondsAgo)),
+            pausedAtPosition: null,
+            isActive: true,
+            createdAt: $now,
+            updatedAt: $now,
+        ));
     }
 
     public function testEndSessionStopsPlaybackAndDeactivates(): void

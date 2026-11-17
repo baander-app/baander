@@ -18632,6 +18632,7 @@
                                         "description": "Prune jobs older than this many days",
                                         "type": "integer",
                                         "default": 7,
+                                        "maximum": 36500,
                                         "minimum": 1
                                     }
                                 },
@@ -18668,7 +18669,7 @@
                         }
                     },
                     "422": {
-                        "description": "Days is not a whole number, or is less than 1",
+                        "description": "Days is not a whole number, or lies outside 1 to 36500",
                         "content": {
                             "application/json": {
                                 "schema": {

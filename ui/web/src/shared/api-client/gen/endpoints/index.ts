@@ -7834,6 +7834,7 @@ export type PostMonitorPruneBody = {
   /**
      * Prune jobs older than this many days
      * @minimum 1
+     * @maximum 36500
      */
   days?: number;
 };

@@ -182,7 +182,7 @@ final class JobMonitorController
         requestBody: new OA\RequestBody(
             content: new OA\JsonContent(
                 properties: [
-                    new OA\Property(property: 'days', description: 'Prune jobs older than this many days', type: 'integer', default: JobMonitorAdministrationInterface::DEFAULT_PRUNE_DAYS, minimum: 1),
+                    new OA\Property(property: 'days', description: 'Prune jobs older than this many days', type: 'integer', default: JobMonitorAdministrationInterface::DEFAULT_PRUNE_DAYS, maximum: JobMonitorAdministrationInterface::MAX_PRUNE_DAYS, minimum: 1),
                 ],
             ),
         ),
@@ -196,7 +196,7 @@ final class JobMonitorController
                     type: 'object',
                 ),
             ),
-            new OA\Response(response: '422', description: 'Days is not a whole number, or is less than 1', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '422', description: 'Days is not a whole number, or lies outside 1 to ' . JobMonitorAdministrationInterface::MAX_PRUNE_DAYS, content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
         ],
     )]
     #[CliCounterpart('app:monitor:prune')]

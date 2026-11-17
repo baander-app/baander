@@ -26,6 +26,12 @@ interface JobMonitorAdministrationInterface
     /** Days of finished job monitors a prune keeps when the caller names none. */
     public const int DEFAULT_PRUNE_DAYS = 7;
 
+    /**
+     * The most days a prune accepts, one hundred years. A much larger value would
+     * overflow the cutoff date into the future and delete every record.
+     */
+    public const int MAX_PRUNE_DAYS = 36500;
+
     public function overview(): JobMonitorOverview;
 
     /** @throws InvalidInputException for an unknown status filter */

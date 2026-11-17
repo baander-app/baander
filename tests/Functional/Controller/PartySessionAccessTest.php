@@ -113,6 +113,15 @@ final class PartySessionAccessTest extends TestCase
         self::assertSame([], $this->listedParties($this->member));
     }
 
+    public function testAnEndedPartyLeavesTheSessionListOfItsHostAndMembers(): void
+    {
+        $this->assertJsonResponse($this->authenticatedRequest('DELETE', self::URI . $this->party, $this->host), 200);
+
+        // Ending a party keeps its member rows, so only the active filter drops it from the lists.
+        self::assertSame([], $this->listedParties($this->host));
+        self::assertSame([], $this->listedParties($this->member));
+    }
+
     public function testNoRouteOutsideTheApiServesThePartySession(): void
     {
         $router = self::getContainer()->get(RouterInterface::class);

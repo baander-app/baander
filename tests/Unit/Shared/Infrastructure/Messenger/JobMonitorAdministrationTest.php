@@ -327,6 +327,15 @@ final class JobMonitorAdministrationTest extends TestCase
         $this->administration(null, $this->createStub(MessageBusInterface::class), expectFlush: false)->prune(0);
     }
 
+    public function testPruningMoreThanOneHundredYearsIsInvalidInput(): void
+    {
+        // A larger value would wrap the cutoff date past the present and delete every record.
+        $this->expectException(InvalidInputException::class);
+        $this->expectExceptionMessage('Days must be at most 36500.');
+
+        $this->administration(null, $this->createStub(MessageBusInterface::class), expectFlush: false)->prune(36501);
+    }
+
     public function testAnInlineRunIsRecordedAsAJobThatFinishes(): void
     {
         $handled = [];
