@@ -35,7 +35,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'commands', type: 'array', items: new OA\Items(ref: new Model(type: PlaybackCommandResource::class))),
         new OA\Property(property: 'endpoint', ref: new Model(type: PlaybackEndpointResource::class), nullable: true),
         new OA\Property(property: 'recoveryResult', required: ['incarnationId', 'outcome', 'revision'], properties: [
-            new OA\Property(property: 'incarnationId', description: 'Client-generated endpoint incarnation identifier.', type: 'string'),
+            new OA\Property(property: 'incarnationId', description: 'The recovered endpoint incarnation, as the recovery request named it; the server issued it when that endpoint registered.', type: 'string'),
             new OA\Property(property: 'outcome', type: 'string', enum: ['recovered']),
             new OA\Property(property: 'revision', type: 'integer', minimum: 0),
         ], type: 'object', nullable: true),

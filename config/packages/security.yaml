@@ -38,7 +38,6 @@ security:
 
     access_control:
         # API endpoints require authentication
-        - { path: '^/api/docs', roles: PUBLIC_ACCESS, methods: [GET] }
         - { path: '^/api/admin', roles: ROLE_ADMIN }
         - { path: '^/api/debug', roles: ROLE_ADMIN }
         - { path: '^/api/auth/', roles: PUBLIC_ACCESS }

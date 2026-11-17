@@ -1752,7 +1752,7 @@ export interface PendingDeviceAuthorizationResource {
 export interface TokenResource {
   /** OAuth 2.0 access token */
   accessToken: string;
-  /** Token type, typically Bearer */
+  /** Token type, always DPoP: the access token is bound to the client's DPoP key (RFC 9449) */
   tokenType: string;
   /** Seconds until token expiry */
   expiresIn: number;
@@ -3560,7 +3560,7 @@ export interface PlaybackDestinationResource {
   kind: PlaybackDestinationResourceKind;
   capabilities: PlaybackDestinationResourceCapabilitiesItem[];
   /**
-     * Client-generated endpoint incarnation identifier.
+     * Endpoint incarnation identifier, issued by the server when the endpoint registered.
      * @nullable
      */
   incarnationId: string | null;
@@ -3634,7 +3634,7 @@ export interface PlaybackCommandResource {
   attemptId: string;
   /** @minimum 0 */
   revision: number;
-  /** Client-generated endpoint incarnation identifier. */
+  /** Incarnation identifier of the endpoint the command is for, issued by the server when that endpoint registered. */
   incarnationId: string;
   /** @minimum 1 */
   epoch: number;
@@ -3645,7 +3645,7 @@ export interface PlaybackCommandResource {
 
 export interface PlaybackEndpointResource {
   destinationId: string;
-  /** Client-generated endpoint incarnation identifier. */
+  /** Endpoint incarnation identifier, issued by the server when the endpoint registers. */
   incarnationId: string;
   /** @minimum 1 */
   epoch: number;
@@ -3714,7 +3714,7 @@ export const PlaybackSnapshotResourceRecoveryResultOutcome = {
  * @nullable
  */
 export type PlaybackSnapshotResourceRecoveryResult = {
-  /** Client-generated endpoint incarnation identifier. */
+  /** The recovered endpoint incarnation, as the recovery request named it; the server issued it when that endpoint registered. */
   incarnationId: string;
   outcome: PlaybackSnapshotResourceRecoveryResultOutcome;
   /** @minimum 0 */
@@ -25022,7 +25022,8 @@ export const getGetPartySessionIndexUrl = () => {
 }
 
 /**
- * @summary List active party sessions
+ * Lists only the active parties the caller hosts or has joined. A party's public ID works as its invite: share it so others can join.
+ * @summary List the caller's active party sessions
  */
 export const getPartySessionIndex = async ( options?: Parameters<typeof customInstance>[1]): Promise<GetPartySessionIndex200> => {
 
@@ -25046,7 +25047,7 @@ export const getGetPartySessionIndexQueryKey = () => {
     }
 
 
-export const getGetPartySessionIndexQueryOptions = <TData = Awaited<ReturnType<typeof getPartySessionIndex>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetPartySessionIndexQueryOptions = <TData = Awaited<ReturnType<typeof getPartySessionIndex>>, TError = ErrorType<ApiError>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -25065,10 +25066,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetPartySessionIndexQueryResult = NonNullable<Awaited<ReturnType<typeof getPartySessionIndex>>>
-export type GetPartySessionIndexQueryError = ErrorType<unknown>
+export type GetPartySessionIndexQueryError = ErrorType<ApiError>
 
 
-export function useGetPartySessionIndex<TData = Awaited<ReturnType<typeof getPartySessionIndex>>, TError = ErrorType<unknown>>(
+export function useGetPartySessionIndex<TData = Awaited<ReturnType<typeof getPartySessionIndex>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getPartySessionIndex>>,
@@ -25078,7 +25079,7 @@ export function useGetPartySessionIndex<TData = Awaited<ReturnType<typeof getPar
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetPartySessionIndex<TData = Awaited<ReturnType<typeof getPartySessionIndex>>, TError = ErrorType<unknown>>(
+export function useGetPartySessionIndex<TData = Awaited<ReturnType<typeof getPartySessionIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getPartySessionIndex>>,
@@ -25088,15 +25089,15 @@ export function useGetPartySessionIndex<TData = Awaited<ReturnType<typeof getPar
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetPartySessionIndex<TData = Awaited<ReturnType<typeof getPartySessionIndex>>, TError = ErrorType<unknown>>(
+export function useGetPartySessionIndex<TData = Awaited<ReturnType<typeof getPartySessionIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary List active party sessions
+ * @summary List the caller's active party sessions
  */
 
-export function useGetPartySessionIndex<TData = Awaited<ReturnType<typeof getPartySessionIndex>>, TError = ErrorType<unknown>>(
+export function useGetPartySessionIndex<TData = Awaited<ReturnType<typeof getPartySessionIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -25211,6 +25212,7 @@ export const getGetPartySessionShowUrl = (publicId: string,) => {
 }
 
 /**
+ * Returns the session and its members to the session's host and members only. Live updates arrive over the application WebSocket: request a single-use ticket from `POST /api/ws/tickets`, upgrade at `/api/ws`, then send `party.join` with the session public ID as `sessionId` to enter its room.
  * @summary Get a party session
  */
 export const getPartySessionShow = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetPartySessionShow200> => {

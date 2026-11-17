@@ -18,11 +18,11 @@ use Throwable;
  * its handlers find the job ID, and ends a job whose handler stopped at a checkpoint.
  *
  * Every execution path passes a received envelope with a job ID through the bus: a Messenger
- * worker, a Swoole task worker and an inline run. A handler that throws JobCancelledException
- * leaves the job's monitor row `cancelled`, and the delivery returns normally with a
- * JobCancelledStamp: the transport acknowledges it, so it is not retried and does not reach
- * the failure transport. The recorders' later finish of the attempt leaves the cancelled row
- * as it is (JobMonitorService only completes a running attempt).
+ * worker consuming the Redis transport, and an inline run. A handler that throws
+ * JobCancelledException leaves the job's monitor row `cancelled`, and the delivery returns
+ * normally with a JobCancelledStamp: the transport acknowledges it, so it is not retried and
+ * does not reach the failure transport. The recorders' later finish of the attempt leaves the
+ * cancelled row as it is (JobMonitorService only completes a running attempt).
  */
 final readonly class JobCancellationMiddleware implements MiddlewareInterface
 {

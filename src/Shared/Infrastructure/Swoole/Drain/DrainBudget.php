@@ -10,9 +10,9 @@ namespace App\Shared\Infrastructure\Swoole\Drain;
  * - the window S = floor((D - 4) / 2), during which workers drain with their client connections
  *   still open;
  * - Swoole's max_wait_time W = floor((D - 4 - S) / 2). After the window Swoole stops the event
- *   workers and then the task workers, each for up to W, and the manager kills what is left at 2W;
- * - the CPU pool's stop takes up to 3 seconds once the workers have gone, and 1 second is margin,
- *   so S + 2W + 4 never exceeds D. The watchdog kills what is still running at D.
+ *   workers for up to W, and the manager kills what is left at 2W;
+ * - 4 seconds stay in reserve once the workers have gone, so S + 2W + 4 never exceeds D. The
+ *   watchdog kills what is still running at D.
  */
 final readonly class DrainBudget
 {

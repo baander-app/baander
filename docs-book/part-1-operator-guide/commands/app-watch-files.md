@@ -1,7 +1,7 @@
 # app:watch-files
 
-Print inotify events for explicitly watched directories. The command reports events;
-it does not scan libraries or dispatch ingestion. See
+Print inotify events for the directories you name, or for the current directory. The
+command reports events; it does not scan libraries or dispatch ingestion. See
 [Library management](../media/library-management.md) for catalog discovery and import.
 
 ## Quick start
@@ -27,7 +27,7 @@ dc exec app php bin/console app:watch-files --path /media/library/music --path /
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--path`, `-p` | None | Directory to watch. Can be specified multiple times. |
+| `--path`, `-p` | The current directory | Directory to watch. Can be specified multiple times. |
 | `--timeout`, `-t` | `5000` | Read timeout in milliseconds. Controls how often the watcher checks for events. |
 
 ## Details
@@ -52,19 +52,20 @@ Event types you'll see:
 | `CLOSE_WRITE` | File was opened for writing and then closed (common after file copy/download) |
 
 Directory events are marked with `[DIR]`. Output uses the event name, not its
-absolute path. Watches cover only the specified directories; subdirectories are
-not added recursively.
+absolute path. Each watch covers only its own directory; subdirectories are not
+added recursively.
 
-At least one `--path` is required in practice. Without a path, the command prints
-a notice about watching the current directory, but registers no watch and fails
-with `No directories are being watched. Call watch() first.`
+Without `--path`, the command prints `No paths specified. Watching current directory.`
+and watches the directory it runs in. Inside the application container that is the
+application directory (`APP_HOME`), not a media directory, so name the media
+directories with `--path`.
 
 ## Exit codes
 
 | Code | Meaning |
 |------|---------|
 | 0 | Watcher stopped normally after SIGINT or SIGTERM |
-| 1 | No directory was registered, a directory is missing, or watcher setup failed |
+| 1 | A directory is missing, the current directory cannot be read, or watcher setup failed |
 
 ## Tips
 

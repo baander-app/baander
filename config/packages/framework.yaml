@@ -47,7 +47,7 @@ framework:
     # CSRF protection
     csrf_protection: true
 
-    # PHP serializer
+    # Log PHP errors
     php_errors:
         log: true
 
@@ -57,8 +57,9 @@ framework:
     assets:
         version_strategy: 'Pentatrion\ViteBundle\Asset\ViteAssetVersionStrategy'
 
-    # Rate limiting. Each limiter has its own Redis-backed pool (config/packages/cache.yaml)
-    # so the admin panel and app:rate-limiter:clear can reset one limiter without the others.
+    # Rate limiting. Every limiter keeps its state in Redis through RedisRateLimiterStore,
+    # under a key namespace of its own (RateLimiterCatalogPass wires them), so the admin panel
+    # and app:rate-limiter:clear can reset one limiter without the others.
     rate_limiter:
         # Generic /api limiters, enforced by App\Auth\Infrastructure\Security\ApiRateLimitListener.
         anonymous_api:

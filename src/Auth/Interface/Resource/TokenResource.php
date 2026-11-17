@@ -12,7 +12,7 @@ use OpenApi\Attributes as OA;
     schema: 'TokenResource',
     properties: [
         new OA\Property(property: 'accessToken', type: 'string', description: 'OAuth 2.0 access token'),
-        new OA\Property(property: 'tokenType', type: 'string', description: 'Token type, typically Bearer'),
+        new OA\Property(property: 'tokenType', type: 'string', description: 'Token type, always DPoP: the access token is bound to the client\'s DPoP key (RFC 9449)'),
         new OA\Property(property: 'expiresIn', type: 'integer', description: 'Seconds until token expiry'),
         new OA\Property(property: 'refreshToken', type: 'string', nullable: true, description: 'OAuth 2.0 refresh token'),
     ],

@@ -10,7 +10,7 @@ This context has Application and Infrastructure layers alongside its `Command`, 
 
 | Command | Handler | Purpose |
 |---------|---------|---------|
-| `WatchFilesCommand` | Self-handling (`app:watch-files`) | Starts an inotify-based file watcher on the directories passed with `--path` (`-p`, repeatable) and reports their filesystem events (create, modify, delete, move, close-write), reading every `--timeout` milliseconds (`-t`, default 5000). Without a `--path` it prints that it watches the current directory, but it adds no watch, and `FileWatcher::run()` stops it with an error |
+| `WatchFilesCommand` | Self-handling (`app:watch-files`) | Starts an inotify-based file watcher on the directories passed with `--path` (`-p`, repeatable) and reports their filesystem events (create, modify, delete, move, close-write), reading every `--timeout` milliseconds (`-t`, default 5000). Without a `--path` it watches the current working directory (`getcwd()`) |
 
 ## Ports
 

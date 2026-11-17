@@ -36,12 +36,13 @@ final class WatchFilesCommand extends Command
         $paths = $input->getOption('path');
         $timeout = (int) $input->getOption('timeout');
 
-        foreach ($paths as $path) {
-            $this->fileWatcher->watch($path);
-        }
-
         if ($paths === []) {
             $output->writeln('<comment>No paths specified. Watching current directory.</comment>');
+            $paths = [getcwd() ?: throw new \RuntimeException('The current directory cannot be read; name a directory with --path.')];
+        }
+
+        foreach ($paths as $path) {
+            $this->fileWatcher->watch($path);
         }
 
         $this->fileWatcher->onEvent(function (FileWatchEvent $event) use ($output): void {

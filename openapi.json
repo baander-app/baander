@@ -12610,8 +12610,18 @@
                             }
                         }
                     },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "404": {
-                        "description": "Not found",
+                        "description": "The session does not exist, or the caller is neither its host nor a member",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -12795,7 +12805,8 @@
                 "tags": [
                     "Party"
                 ],
-                "summary": "List active party sessions",
+                "summary": "List the caller's active party sessions",
+                "description": "Lists only the active parties the caller hosts or has joined. A party's public ID works as its invite: share it so others can join.",
                 "operationId": "get_party_session_index",
                 "responses": {
                     "200": {
@@ -12820,6 +12831,16 @@
                                         }
                                     },
                                     "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -12887,6 +12908,7 @@
                     "Party"
                 ],
                 "summary": "Get a party session",
+                "description": "Returns the session and its members to the session's host and members only. Live updates arrive over the application WebSocket: request a single-use ticket from `POST /api/ws/tickets`, upgrade at `/api/ws`, then send `party.join` with the session public ID as `sessionId` to enter its room.",
                 "operationId": "get_party_session_show",
                 "parameters": [
                     {
@@ -12939,8 +12961,18 @@
                             }
                         }
                     },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "404": {
-                        "description": "Not found",
+                        "description": "The session does not exist, or the caller is neither its host nor a member",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -18636,7 +18668,7 @@
                         }
                     },
                     "422": {
-                        "description": "Days is less than 1",
+                        "description": "Days is not a whole number, or is less than 1",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -26692,7 +26724,7 @@
                         "type": "string"
                     },
                     "tokenType": {
-                        "description": "Token type, typically Bearer",
+                        "description": "Token type, always DPoP: the access token is bound to the client's DPoP key (RFC 9449)",
                         "type": "string"
                     },
                     "expiresIn": {
@@ -29481,7 +29513,7 @@
                         }
                     },
                     "incarnationId": {
-                        "description": "Client-generated endpoint incarnation identifier.",
+                        "description": "Endpoint incarnation identifier, issued by the server when the endpoint registered.",
                         "type": "string",
                         "nullable": true
                     },
@@ -29542,7 +29574,7 @@
                         "minimum": 0
                     },
                     "incarnationId": {
-                        "description": "Client-generated endpoint incarnation identifier.",
+                        "description": "Incarnation identifier of the endpoint the command is for, issued by the server when that endpoint registered.",
                         "type": "string"
                     },
                     "epoch": {
@@ -29637,7 +29669,7 @@
                         "type": "string"
                     },
                     "incarnationId": {
-                        "description": "Client-generated endpoint incarnation identifier.",
+                        "description": "Endpoint incarnation identifier, issued by the server when the endpoint registers.",
                         "type": "string"
                     },
                     "epoch": {
@@ -29814,7 +29846,7 @@
                         ],
                         "properties": {
                             "incarnationId": {
-                                "description": "Client-generated endpoint incarnation identifier.",
+                                "description": "The recovered endpoint incarnation, as the recovery request named it; the server issued it when that endpoint registered.",
                                 "type": "string"
                             },
                             "outcome": {

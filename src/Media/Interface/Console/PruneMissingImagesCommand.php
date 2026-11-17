@@ -20,8 +20,8 @@ use Throwable;
  * The CLI counterpart of POST /api/admin/media/prune-missing, and with `--dry-run` of
  * GET /api/admin/media/missing-check.
  *
- * The prune runs inline and is recorded in the job monitor: the web path queues it
- * on the Swoole task workers, which a console process cannot reach.
+ * The web path queues the prune for the worker containers; this command runs it in this
+ * process instead, recorded in the job monitor.
  */
 #[AsCommand(
     name: 'app:image:prune-missing',

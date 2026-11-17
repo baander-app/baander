@@ -411,6 +411,6 @@ Routes under `/api/admin/albums` and `/api/admin/songs` (controllers `AdminAlbum
 | `app:metadata:match:reviews` | List the albums that need a match review |
 | `app:genre:list`, `app:genre:create`, `app:genre:update`, `app:genre:delete` | Manage genres |
 | `app:genre:song:add`, `app:genre:song:remove`, `app:genre:album:add`, `app:genre:album:remove` | Assign or remove a genre |
-| `app:e2e:ingest-video` | Ingest a test video file for end-to-end tests |
+| `app:e2e:ingest-video` | Ingest a directory of video files as a movie library for end-to-end tests |
 
 See the [Search](../development/search.md) page for details on PGroonga full-text search.

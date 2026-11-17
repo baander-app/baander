@@ -91,7 +91,6 @@ classify_role() {
     local args="$1"
     case "$args" in
         *supervisord*)       echo "supervisord" ;;
-        *task-worker*)       echo "swoole-task" ;;
         *messenger:consume*) echo "messenger" ;;
         *bin/console*)       echo "console" ;;
         *phpunit*)           echo "phpunit" ;;

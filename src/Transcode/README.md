@@ -3,7 +3,7 @@
 
 # Transcode
 
-On-demand video transcoding via FFmpeg, generating HLS v6 (fMP4) and DASH manifests with adaptive bitrate quality tiers. FFmpeg runs isolated in a Swoole CPU process pool to avoid blocking the event loop.
+On-demand video transcoding via FFmpeg, generating HLS v6 (fMP4) and DASH manifests with adaptive bitrate quality tiers. The web request commits the session and its execution request; the worker deployment pair runs the encoder, and FFmpeg itself runs in the execution unit's native daemon.
 
 ## Concepts
 
@@ -12,14 +12,14 @@ Two aggregates:
 - **TranscodeJob** — represents a transcoding request for a video. Tracks overall progress and quality tier selection.
 - **TranscodeSession** — an active transcoding process for a specific job. Manages start/pause/resume/cancel lifecycle.
 
-The pipeline flows: **create session** → **FFmpeg encodes segments** → **manifest generation** (HLS + DASH) → **serve via streaming endpoints**
+The pipeline flows: **create session** → **the control unit claims the execution request** → **FFmpeg encodes segments in the execution unit** → **manifest generation** (HLS + DASH) → **serve via streaming endpoints**
 
 Key infrastructure:
-- `FFmpegAdapter` implements `FFmpegPortInterface`, runs in `CpuProcessPool` with `SWOOLE_IPC_UNIXSOCK`
+- `FFmpegAdapter` implements `FFmpegPortInterface`; `ProcessExecutor` sends each FFmpeg command through the native execution client, so inside the worker pair it runs only in the execution unit
 - `InMemorySegmentCache` caches encoded segments for fast repeated access
 - `SegmentEncoder` builds FFmpeg filter chains for audio/video processing
 - `QualityLadder` and `AudioProcessingRules` are domain services defining encoding parameters
-- `SeekSignalBroker` handles seek requests from Party playback
+- `PlaybackPositionChangedListener` turns Party's `PlaybackPositionChanged` into `UpdateTranscodePositionCommand` for the job's session, which steers the segment priority queue
 
 ## Ports
 
@@ -38,15 +38,17 @@ Key infrastructure:
 | Event | Category | Consumers |
 |-------|----------|-----------|
 | `TranscodeJobCreated` | — | none |
-| `TranscodeJobCompleted` | — | `StreamCompletionListener` (reports completion to QoL) |
-| `TranscodeJobFailed` | — | none |
-| `TranscodeSessionAttached` | — | `StreamAdmissionListener` (QoL stream-budget veto, priority 1) |
-| `PlaybackPositionChanged` | — | Party (for sync) |
+| `TranscodeJobCompleted` | BackgroundJobs | `TranscodeJobEventSubscriber` (logs it); Notification |
+| `TranscodeJobFailed` | BackgroundJobs | `TranscodeJobEventSubscriber` (logs it); Notification |
+| `TranscodeSessionAttached` | — | none |
+| `PlaybackPositionChanged` | — | `PlaybackPositionChangedListener`; Party's start, pause and seek handlers raise it |
+
+`TranscodeJobService` raises `TranscodeJobCreated`. No code raises `TranscodeJobCompleted`, `TranscodeJobFailed` or `TranscodeSessionAttached`.
 
 ## Interactions
 
 - **Catalog** — `TranscodeSessionSubscriber` looks up `VideoRepositoryInterface` to resolve video metadata
-- **Party** — dispatches `PlaybackPositionChanged` to steer a party's transcode job, and checks a new party's video and job through `PlaybackAccessInterface`
+- **Party** — raises `PlaybackPositionChanged` to steer a party's transcode job, and checks a new party's video and job through `PlaybackAccessInterface`
 - **QoL** — Transcode Infrastructure calls QoL's stream-admission and allowed-tier contracts and implements its quality-ladder and encoder-profile contracts
 
 ---

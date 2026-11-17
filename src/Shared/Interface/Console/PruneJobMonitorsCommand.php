@@ -42,7 +42,7 @@ final class PruneJobMonitorsCommand extends Command
         $dryRun = $input->getOption('dry-run') === true;
 
         try {
-            $result = $this->jobMonitor->prune((int) $input->getOption('days'), $dryRun);
+            $result = $this->jobMonitor->prune(AdminCommandSupport::integerOption($input, 'days') ?? 7, $dryRun);
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
         }

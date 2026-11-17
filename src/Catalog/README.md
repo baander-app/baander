@@ -48,6 +48,8 @@ The artist sync fills an artist's empty, unlocked details from MusicBrainz by th
 | `SongMetadataUpdated` | — | none |
 | `MetadataSynced` | — | none |
 
+No code raises these three events. Notification maps `AlbumCreated` to its media-changes category.
+
 ## Interactions
 
 - **Library** populates Catalog during scans via port interfaces

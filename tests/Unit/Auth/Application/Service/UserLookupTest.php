@@ -14,7 +14,7 @@ use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
-/** The resolver other contexts' commands use finds a user by email address or UUID, or by public id alone, and nobody else. */
+/** The resolver other contexts' commands use finds a user by email address or public ID, never by internal UUID, and nobody else. */
 final class UserLookupTest extends TestCase
 {
     public function testResolvesAUserByEmailAddressOrPublicIdToTheirUuid(): void
@@ -31,7 +31,7 @@ final class UserLookupTest extends TestCase
     {
         yield 'an unknown email address' => ['nobody@baander.app'];
         yield 'an unknown UUID' => [Uuid::generate()->toString()];
-        yield 'neither an email address nor a UUID' => ['not-a-user'];
+        yield 'neither an email address nor a public ID' => ['not-a-user'];
     }
 
     #[DataProvider('unknownUsers')]

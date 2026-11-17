@@ -34,11 +34,10 @@ use Throwable;
 /**
  * The CLI counterpart of POST /api/libraries/{id}/scan and POST /api/libraries/scan-all.
  *
- * The web queues scans on the Swoole task workers, which a console process cannot reach,
- * so this command claims each library and runs its scan in this process, recorded in the
- * job monitor. A scan that fails, that is cancelled from the job monitor, or that SIGINT or
- * SIGTERM interrupts, ends its claim. A process killed outright leaves its claim to lapse
- * with its lease.
+ * The web queues scans for the worker containers; this command claims each library and runs
+ * its scan in this process instead, recorded in the job monitor. A scan that fails, that is
+ * cancelled from the job monitor, or that SIGINT or SIGTERM interrupts, ends its claim. A
+ * process killed outright leaves its claim to lapse with its lease.
  */
 #[AsCommand(
     name: 'app:library:scan',

@@ -20,10 +20,10 @@ use Psr\Clock\ClockInterface;
 /**
  * A scan claims its library first, so one scan runs per library, and none while a delete with
  * files holds the library (LibraryMediaFilesInterface::claim() takes that claim, of the kind
- * `delete`). The claim is a lease that its holder renews while it works: a claim whose scan was
- * lost before it started (a queued task dropped by a server restart) or that died (a killed
- * process) lapses, and the next claim takes the library over. Each claim has an ID that the scan
- * carries, so a scan renews and ends only its own claim, and a scan that lost its claim stops.
+ * `delete`). The claim is a lease that its holder renews while it works: a claim whose scan
+ * never started or that died (a killed process) lapses, and the next claim takes the library
+ * over. Each claim has an ID that the scan carries, so a scan renews and ends only its own
+ * claim, and a scan that lost its claim stops.
  * The web, the console and the scan job all claim through this service.
  */
 final readonly class LibraryScanClaims
@@ -32,7 +32,7 @@ final readonly class LibraryScanClaims
      * How long a claim stays valid without renewal. Long enough for the longest pause between
      * renewals: walking the directory tree of a large library, or hashing one large video file,
      * which can take minutes on network storage. A queued scan's claim counts from the moment it
-     * was queued; if it lapses while the scan waits for a task worker, the library reads as
+     * was queued; if it lapses while the scan waits in the queue for a worker, the library reads as
      * failed, and the scan renews its claim when it starts, unless another claim took the
      * library meanwhile, in which case it stops with a conflict. A delete with files holds its
      * claim for the same lease.

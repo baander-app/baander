@@ -244,6 +244,9 @@ final class JobMonitorControllerTest extends TestCase
         self::assertSame(1, $pruned['pruned']);
         self::assertSame(Command::INVALID, $tester->execute(['--days' => '0']));
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/monitor/prune', $this->createAdminUser(), ['days' => 0]), 422);
+        // Neither path reads the leading digits of a value that is not a whole number.
+        self::assertSame(Command::INVALID, $tester->execute(['--days' => '5x']));
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/monitor/prune', $this->createAdminUser(), ['days' => '5x']), 422);
     }
 
     public function testAnInlineRunIsRecordedAndListedLikeAQueuedJob(): void

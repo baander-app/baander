@@ -31,7 +31,7 @@ final class LibraryMemberRevokeCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addArgument('user', InputArgument::REQUIRED, 'The user, by email address or UUID')
+            ->addArgument('user', InputArgument::REQUIRED, 'The user, by email address or public ID')
             ->addArgument('library', InputArgument::REQUIRED, 'Library public ID or slug');
         AdminCommandSupport::addJsonOption($this);
     }

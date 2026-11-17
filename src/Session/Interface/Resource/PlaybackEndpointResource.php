@@ -12,7 +12,7 @@ use OpenApi\Attributes as OA;
     required: ['destinationId', 'incarnationId', 'epoch'],
     properties: [
         new OA\Property(property: 'destinationId', type: 'string'),
-        new OA\Property(property: 'incarnationId', description: 'Client-generated endpoint incarnation identifier.', type: 'string'),
+        new OA\Property(property: 'incarnationId', description: 'Endpoint incarnation identifier, issued by the server when the endpoint registers.', type: 'string'),
         new OA\Property(property: 'epoch', type: 'integer', minimum: 1),
         new OA\Property(property: 'recoveryCredential', type: 'string', nullable: true, description: 'Private stop-only recovery credential for durable local storage.'),
         new OA\Property(property: 'recoveryExpiresAt', type: 'string', format: 'date-time', nullable: true),

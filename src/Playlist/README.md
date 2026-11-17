@@ -3,11 +3,11 @@
 
 # Playlist
 
-User playlist management — manual playlists with add/remove/reorder, plus smart playlists that auto-sync based on criteria.
+User playlist management: playlists whose songs are added, removed and reordered. A playlist created with `isSmart` also stores its `smartRules`, but no code evaluates the rules or fills a playlist from them.
 
 ## Concepts
 
-The `Playlist` aggregate manages an ordered list of songs. Operations are pure CQRS: `CreatePlaylist`, `AddSong`, `RemoveSong`, `UpdatePlaylist` — each with a dedicated handler. `PlaylistSong` and `SmartPlaylist` are models without repositories (value-level concepts).
+The `Playlist` aggregate manages an ordered list of songs. Operations are pure CQRS: `CreatePlaylist`, `UpdatePlaylist`, `AddSong`, `RemoveSong`, `ReorderSongs`, `AddCollaborator` and `RemoveCollaborator`, each with a dedicated handler. `PlaylistSong` is a model without a repository. `SmartPlaylist` is a domain helper whose static `parseRules()` and `getValidOperators()` validate smart playlist rules; nothing calls it.
 
 `PlaylistCollaboratorEntity` supports shared playlists via a Doctrine join table referencing `UserEntity`.
 
@@ -24,6 +24,8 @@ The `Playlist` aggregate manages an ordered list of songs. Operations are pure C
 |-------|----------|-----------|
 | `PlaylistCreated` | — | none |
 | `SmartPlaylistSynced` | — | none |
+
+`CreatePlaylistHandler` raises `PlaylistCreated`. No code raises `SmartPlaylistSynced`, because nothing refreshes a smart playlist.
 
 ## Interactions
 

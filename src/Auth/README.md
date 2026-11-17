@@ -37,10 +37,12 @@ The OAuth models AccessToken, AuthCode, Client, DeviceCode and RefreshToken each
 | Event | Category | Consumers |
 |-------|----------|-----------|
 | `UserRegistered` | Security | Notification |
-| `UserCreatedByOperator` | Security | Notification |
+| `UserCreatedByOperator` | — | none |
 | `PasswordChanged` | Security | Notification |
 | `TokenRevoked` | Security | Notification |
 | `DeviceCodeApproved` | Security | Notification (through the `Auth Device Approval Event Contract` Deptrac layer) |
 | `PasskeyRegistered` | Security | Notification |
 | `PasskeyDeleted` | Security | Notification |
 | `EmailVerified` | — | none |
+
+No code raises `PasskeyDeleted`: `DELETE /api/auth/passkey/{publicId}` removes the passkey through the repository without an event, although Notification maps the event to the Security category. `CreateUserHandler` raises `UserCreatedByOperator`, but Notification maps no category to it, so no notification follows.

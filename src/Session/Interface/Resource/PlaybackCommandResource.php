@@ -15,7 +15,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'id', description: 'Command identifier.', type: 'string'),
         new OA\Property(property: 'attemptId', description: 'Transfer attempt identifier.', type: 'string'),
         new OA\Property(property: 'revision', type: 'integer', minimum: 0),
-        new OA\Property(property: 'incarnationId', description: 'Client-generated endpoint incarnation identifier.', type: 'string'),
+        new OA\Property(property: 'incarnationId', description: 'Incarnation identifier of the endpoint the command is for, issued by the server when that endpoint registered.', type: 'string'),
         new OA\Property(property: 'epoch', type: 'integer', minimum: 1),
         new OA\Property(property: 'type', type: 'string', enum: ['prepare', 'quiesce', 'start', 'stop', 'play', 'pause', 'seek', 'load', 'observe', 'volume', 'queue']),
         new OA\Property(property: 'payload', required: ['media', 'queue', 'currentTrackIndex', 'position', 'desiredState'], properties: [

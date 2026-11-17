@@ -30,8 +30,8 @@ final readonly class RevokeLibraryAccessHandler
     }
 
     /**
-     * @throws NotFoundException        when no user has the UUID or email address
-     * @throws LibraryNotFoundException when no library has the UUID or slug
+     * @throws NotFoundException        when no user has the public ID or email address
+     * @throws LibraryNotFoundException when no library has the public ID or slug
      */
     #[AsMessageHandler]
     public function __invoke(RevokeLibraryAccessCommand $command): LibraryAccess

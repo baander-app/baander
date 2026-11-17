@@ -73,16 +73,14 @@ admin route, an admin page call, or a console command. Read it with the
 - A command runs long work inline through
   `JobMonitorAdministrationInterface::runInline()`. The run leaves the same job-monitor
   record as the web path. Offer `--queue` only when a process that can do the work
-  consumes the message; worker containers may lack the media mounts, and the CLI
-  cannot reach `swoole_task`.
+  consumes the message; worker containers may lack the media mounts.
 - A handler that loops over items calls `JobCancellationCheckpointInterface::check()`
   between items or directories, never per byte or per tight inner step. A cancelled job
   ends acknowledged and `cancelled`, with no retry and nothing in the failure
   transport. Add new long handlers to the table in `app-monitor-job-cancel.md`.
-- `swoole_task` is in memory and loses queued messages on restart. State set when
-  work is queued there, such as a claim or a `running` status, must expire or be fenced
-  by a token the message carries. The library scan claim's lease and claim ID are the
-  pattern.
+- A queued message can wait, be retried, or never run. State set when work is queued,
+  such as a claim or a `running` status, must expire or be fenced by a token the message
+  carries. The library scan claim's lease and claim ID are the pattern.
 - Guard status transitions in SQL (`WHERE status = :expected`, or a row lock) so a
   late `finished` or `completed` write cannot overwrite a cancellation.
 

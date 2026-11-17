@@ -19,7 +19,7 @@ use Throwable;
  */
 #[AsCommand(
     name: 'app:monitor:job:show',
-    description: 'Show one background job with its error, stored message and run time.',
+    description: 'Show one background job: its status, attempts, timing and error class.',
 )]
 final class MonitorJobShowCommand extends Command
 {

@@ -13,15 +13,14 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
- * Ingest a test video file into the catalog for e2e transcoding tests.
+ * Ingests a directory of test video files as a movie library, for the e2e transcoding tests.
  *
- * This command runs the scan and catalog handlers synchronously so it can be
- * executed from the CLI while the Swoole server is running. It does not rely on
- * Messenger transports for the ingest step.
+ * The command finds or creates the library, then runs the scan and catalog handlers in this
+ * process, so it works while the web server runs and needs no Messenger consumer.
  */
 #[AsCommand(
     name: 'app:e2e:ingest-video',
-    description: 'Ingest a test video file into the catalog for e2e tests.',
+    description: 'Ingest a directory of test video files as a movie library for e2e tests.',
 )]
 final class IngestTestVideoCommand extends Command
 {

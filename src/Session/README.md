@@ -117,7 +117,7 @@ first shows a command to its runner, and 21 for a control that issues one comman
 
 | Event | Trigger | Payload |
 |-------|---------|---------|
-| `DeviceRegistered` | `Device::create()` | `user_id`, `device_id`, `occurred_at` |
+| `DeviceRegistered` | Recorded by `Device::create()` when a device is first registered; no code drains and dispatches it | `user_id`, `device_id`, `occurred_at` |
 
 Playback commands and complete snapshots use the coordination ports and durable
 command ledger.

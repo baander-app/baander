@@ -8,9 +8,9 @@ namespace App\Library\Application\Command;
 final readonly class GrantLibraryAccessCommand
 {
     public function __construct(
-        /** The user's UUID or email address. */
+        /** The user's public ID or email address. */
         public string $user,
-        /** The library's UUID or slug. */
+        /** The library's public ID or slug. */
         public string $library,
     ) {
     }

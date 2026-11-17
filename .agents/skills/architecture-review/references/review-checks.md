@@ -32,9 +32,10 @@ Use [architecture](../../../rules/architecture-rules.md),
   invalid-input exceptions, and that each admin route carries `#[CliCounterpart]` or
   `#[CliParityExemption]`. `AdminCliParityTest` proves only the markings, not that
   both paths share their rules.
-- Check that state set when work is queued on `swoole_task`, such as a claim or a
-  running status, expires or is fenced, because that transport loses queued messages
-  on restart.
+- Check that state set when work is queued on the Redis `async` transport, such as a
+  claim or a running status, expires or is fenced by a token the message carries. The
+  worker containers consume that transport, and a queued message can wait, be retried
+  or never run.
 - Check command immutability and callable registration across all current layouts.
   Class-level versus method-level valid framework registration is not an import
   violation merely because a scanner only recognizes one syntax.

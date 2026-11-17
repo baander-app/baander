@@ -17,11 +17,11 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 /**
  * Sweep the transcode segment cache.
  *
- * Deletes idle video and track audio rendition cache directories older than the TTL (default 24h) and
- * evicts least-recently-accessed directories when the cache exceeds the size
- * budget (default 50GB). Safe by construction: a directory whose job is still
- * encoding, or whose session was touched within the active-playback window
- * (default 30 min), is always retained.
+ * Deletes idle cache units (a video's segment directory, or a track's audio renditions) whose
+ * newest file is older than the TTL (default 24h), and evicts the least recently written units
+ * while the cache exceeds the size budget (default 50GB). A unit in use is always retained: a
+ * video whose job is still encoding or whose session was touched within the active-playback
+ * window (default 30 min), or a track whose audio rendition was written within that window.
  *
  * Usage:
  *   php bin/console app:transcode:cache-sweep
@@ -47,14 +47,14 @@ final class SweepTranscodeCacheCommand extends Command implements SchedulableCon
                 'ttl-hours',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'Delete video cache directories whose newest file is older than this many hours.',
+                'Delete a cache unit (a video\'s segments or a track\'s audio renditions) whose newest file is older than this many hours.',
                 (string) SweepTranscodeCacheHandler::DEFAULT_TTL_HOURS,
             )
             ->addOption(
                 'max-gb',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'Cache size budget in gigabytes; evict least-recently-accessed directories beyond this.',
+                'Cache size budget in gigabytes; evict the least recently written units beyond this.',
                 (string) SweepTranscodeCacheHandler::DEFAULT_MAX_GB,
             )
             ->addOption(
@@ -67,7 +67,7 @@ final class SweepTranscodeCacheCommand extends Command implements SchedulableCon
                 'active-window-seconds',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'A session updated within this many seconds counts as actively watching (protects the directory).',
+                'A session updated, or an audio rendition written, within this many seconds protects its cache unit.',
                 (string) SweepTranscodeCacheHandler::DEFAULT_ACTIVE_WINDOW_SECONDS,
             );
     }
@@ -118,13 +118,13 @@ final class SweepTranscodeCacheCommand extends Command implements SchedulableCon
             'ttl-hours' => [
                 'type' => 'int',
                 'required' => false,
-                'description' => 'Hours of idle age before a video cache directory is swept.',
+                'description' => 'Hours of idle age before a cache unit is swept.',
                 'default' => SweepTranscodeCacheHandler::DEFAULT_TTL_HOURS,
             ],
             'max-gb' => [
                 'type' => 'float',
                 'required' => false,
-                'description' => 'Cache size budget in GB; LRU-evicts beyond this.',
+                'description' => 'Cache size budget in GB; the least recently written units beyond it are evicted.',
                 'default' => SweepTranscodeCacheHandler::DEFAULT_MAX_GB,
             ],
             'dry-run' => [

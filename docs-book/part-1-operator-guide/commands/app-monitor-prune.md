@@ -26,13 +26,13 @@ make exec cmd="php bin/console app:monitor:prune --days=30 --json"
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--days` (`-d`) | `7` | Prune jobs older than this many days |
+| `--days` (`-d`) | `7` | Prune jobs older than this many days; a whole number of at least 1 |
 | `--dry-run` | off | Show how many jobs would be pruned without deleting |
 | `--json` | off | Print only the result, as the admin API's `data` payload, in JSON |
 
 ## Details
 
-The command computes a cutoff timestamp from `--days` and deletes finished, failed, and cancelled job monitors created before that cutoff. In dry-run mode it counts the same monitors and deletes nothing.
+The command computes a cutoff timestamp from `--days` and deletes finished, failed, and cancelled job monitors created before that cutoff. In dry-run mode it counts the same monitors and deletes nothing. A `--days` value that is not a whole number, such as `5x`, is refused before anything is counted or deleted.
 
 With `--json` the command prints only `{"pruned": 42, "olderThan": "2026-09-08T10:00:00+00:00"}`, the API's `data` object with the cutoff as an ISO 8601 timestamp. With `--dry-run`, `pruned` is the number of jobs that would be removed.
 
@@ -42,7 +42,7 @@ With `--json` the command prints only `{"pruned": 42, "olderThan": "2026-09-08T1
 |------|---------|
 | 0 | Prune completed (or dry-run report shown) |
 | 1 | The job monitor could not be changed; the message says why |
-| 2 | `--days` was set to a value less than 1 |
+| 2 | `--days` is not a whole number (`--days must be an integer.`), or is less than 1 |
 
 ## Tips
 

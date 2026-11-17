@@ -10,7 +10,7 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Messenger\Event\WorkerRunningEvent;
 use Symfony\Component\Messenger\Event\WorkerStoppedEvent;
 
-/** Releases pooled services between CLI deliveries, as the HTTP/task runtime does. */
+/** Releases pooled services between CLI deliveries, as the HTTP runtime does between requests. */
 final readonly class WorkerServicePoolResetSubscriber implements EventSubscriberInterface
 {
     public function __construct(

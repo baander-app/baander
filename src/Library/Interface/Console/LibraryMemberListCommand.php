@@ -30,7 +30,7 @@ final class LibraryMemberListCommand extends Command
 
     protected function configure(): void
     {
-        $this->addArgument('user', InputArgument::REQUIRED, 'The user, by email address or UUID');
+        $this->addArgument('user', InputArgument::REQUIRED, 'The user, by email address or public ID');
         AdminCommandSupport::addJsonOption($this);
     }
 

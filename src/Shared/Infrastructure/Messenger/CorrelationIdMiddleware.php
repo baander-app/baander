@@ -14,8 +14,9 @@ use Symfony\Component\Messenger\Middleware\StackInterface;
  * Propagates the correlation ID across the Messenger transport boundary.
  *
  * Outgoing: stamps the envelope with the current correlation ID from the processor.
- * Incoming: restores the correlation ID into the processor so task-worker logs
- *           carry the same ID as the originating HTTP request.
+ * Incoming: restores the correlation ID into the processor so the logs of the
+ *           Messenger worker that consumes the message carry the same ID as the
+ *           originating HTTP request.
  */
 final readonly class CorrelationIdMiddleware implements MiddlewareInterface
 {
@@ -29,7 +30,7 @@ final readonly class CorrelationIdMiddleware implements MiddlewareInterface
         $existingStamp = $envelope->last(CorrelationIdStamp::class);
 
         if ($existingStamp !== null) {
-            // Incoming message in a task worker — restore the correlation ID
+            // Incoming message in the Messenger worker that consumes it — restore the correlation ID
             $this->processor->setCorrelationId($existingStamp->correlationId);
         } else {
             // Outgoing message — stamp with the current correlation ID

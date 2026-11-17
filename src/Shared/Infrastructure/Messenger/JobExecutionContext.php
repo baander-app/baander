@@ -10,10 +10,10 @@ use App\Shared\Application\Port\CurrentJobInterface;
  * The job the current execution is handling, so a cancellation checkpoint can find its job
  * ID without the handler knowing it.
  *
- * A Swoole task worker can run several jobs at once, one per coroutine, while the service is
- * shared, so the job ID is kept per coroutine. Outside a coroutine (a Messenger worker or a
- * console command) there is one key, -1. A coroutine that a job's handler starts does not
- * inherit the job.
+ * The web server can run several jobs at once, one per request coroutine, when an admin route
+ * runs a job inline, while the service is shared, so the job ID is kept per coroutine. Outside
+ * a coroutine (a Messenger worker or a console command) there is one key, -1. A coroutine that
+ * a job's handler starts does not inherit the job.
  */
 final class JobExecutionContext implements CurrentJobInterface
 {

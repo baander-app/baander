@@ -462,11 +462,11 @@ with runtime configuration before serving bundle assets. Symfony generates its
 cache on first boot. Local caches, logs and local dotenv overrides are excluded
 from the image context.
 
-Swoole configures four HTTP workers and two task workers; there is no current queue
-autoscaler. [swoole.yaml](../config/packages/swoole.yaml) disables both HTTP and
-task-worker recycling because of child-pool lifetime coupling. The configured
-six-child pool must be measured at runtime; comments describing older worker
-counts are not a process-tree measurement.
+Swoole takes its HTTP worker count from the deployment profile and runs no task
+workers (`task_worker.worker_count: 0`); there is no current queue autoscaler.
+[swoole.yaml](../config/packages/swoole.yaml) disables HTTP worker recycling. The
+child pool must be measured at runtime; comments describing older worker counts are
+not a process-tree measurement.
 
 The proposed worker tree has fixed scheduler/outbox/control-service ownership and
 scaled queue consumers for `control`, `notifications`, `catalog`, `metadata` and
@@ -806,8 +806,10 @@ Forgejo run. Status returns committed observations with `readiness: not_checked`
 not a readiness grant.
 
 The production-image check is now `scripts/test-worker-production-container.sh`,
-run with `BAANDER_TEST_IMAGE` after building `Dockerfile --target worker`. Its
-300-second deadline excludes the separate build. It checks actual worker metadata,
+run with `BAANDER_TEST_IMAGE` after building `Dockerfile --target worker`. It runs
+under the 600-second fixture budget (`budgets.fixture` in the tooling defaults; the
+two-command drill uses the 900-second `workerCapacity` budget instead), which excludes
+the separate build. It checks actual worker metadata,
 production Composer platform requirements and the absence of development
 dependencies, baked OAuth keys and agent artifacts. It then runs the operator
 lifecycle with `BAANDER_TEST_USE_IMAGE=1`, using the immutable worker image directly

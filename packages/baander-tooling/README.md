@@ -53,6 +53,12 @@ are:
 | `proxy` | `BAANDER_TEST_PROXY_IMAGE` |
 | `browser` | `BAANDER_BROWSER_IMAGE` |
 | `operatorHelper` | `BAANDER_TEST_DOCKER_CLI_IMAGE` |
+| `ffmpeg` | `BAANDER_FFMPEG_IMAGE` |
+
+The `ffmpeg` role names the static FFmpeg image; the default pins it by digest. Application
+builds pass it to the Dockerfile as the `FFMPEG_IMAGE` build argument, and the
+application image copies `ffmpeg` and `ffprobe` from it; set `BAANDER_FFMPEG_IMAGE`
+to use a registry copy or a local build instead.
 
 A custom browser reference must also declare `playwrightVersion` in its local image
 object, or set `BAANDER_BROWSER_PLAYWRIGHT_VERSION` alongside the environment image

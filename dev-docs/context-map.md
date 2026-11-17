@@ -3,7 +3,7 @@
 
 # Bounded Context Map
 
-This document describes all bounded contexts in Bander, their relationships, communication patterns, and shared infrastructure.
+This document describes 14 of Baander's bounded contexts, their relationships, communication patterns, and shared infrastructure.
 
 ## Context Overview
 
@@ -42,7 +42,7 @@ graph TD
     Shared -.->|"used by all"| Lyrics
 
     Library -->|"Doctrine FK"| Auth
-    Library -->|"ExtractAlbumCoverCommand"| Metadata
+    Catalog -->|"ExtractAlbumCoverCommand"| Metadata
     Library -->|"populates"| Catalog
     Notification -->|"SecurityUser"| Auth
 
@@ -60,7 +60,6 @@ graph TD
 
     Notification -.->|"consumes events"| Auth
     Notification -.->|"consumes events"| Library
-    Notification -.->|"consumes events"| Catalog
 ```
 
 ---
@@ -76,8 +75,8 @@ graph TD
 | **Aggregates** | `User` |
 | **Repositories** | `UserRepositoryInterface` |
 | **Ports** | `UserPortInterface`, `AuthenticatedUserIdentityInterface`, `PasswordHasherInterface`, `JwtGeneratorInterface`, `TotpVerifierInterface`, `DpopJtiCacheInterface`, `PasskeyVerifierInterface`, `PasswordResetTokenRepositoryInterface`, `EmailVerificationTokenRepositoryInterface`, `OAuthSecretBundleInterface`, `OAuthTokenInvalidatorInterface` |
-| **Events** | `UserRegistered`, `UserCreatedByOperator`, `EmailVerified`, `PasswordChanged`, `TokenRevoked`, `DeviceCodeApproved`, `PasskeyRegistered`, `PasskeyDeleted` |
-| **Tech** | Own OAuth 2.0 authorization server (RFC 6749, 7636, 8628, 8414, 9207), League OAuth2 Server resource server (anti-corruption layer), WebAuthn (web-auth/webauthn-lib), OTPHP (TOTP), Redis (DPoP JTI cache and nonces, cached access tokens, rate limiters) |
+| **Events** | `UserRegistered`, `UserCreatedByOperator`, `EmailVerified`, `PasswordChanged`, `TokenRevoked`, `DeviceCodeApproved`, `PasskeyRegistered`; `PasskeyDeleted` is defined but no code raises it |
+| **Tech** | Own OAuth 2.0 authorization server (RFC 6749, 7636, 8628, 8414, 9207), League OAuth2 Server resource server (anti-corruption layer), WebAuthn (web-auth/webauthn-lib), OTPHP (TOTP), Redis (DPoP JTI cache and nonces, WebSocket tickets, rate limiters) |
 
 ### Catalog
 
@@ -86,23 +85,23 @@ graph TD
 | **Responsibility** | Core media catalog: artists, albums, songs, movies, videos, genres. The central read-model for the media library. |
 | **Namespace** | `App\Catalog` |
 | **Aggregates** | `Song`, `Album`, `Artist`, `Genre`, `Movie`, `Video` |
-| **Repositories** | `SongRepositoryInterface` (Searchable), `AlbumRepositoryInterface`, `ArtistRepositoryInterface`, `GenreRepositoryInterface`, `MovieRepositoryInterface`, `VideoRepositoryInterface` |
+| **Repositories** | `SongRepositoryInterface`, `AlbumRepositoryInterface`, `ArtistRepositoryInterface`, `MovieRepositoryInterface` (all Searchable), `GenreRepositoryInterface`, `VideoRepositoryInterface` |
 | **Ports** | `SongPortInterface`, `AlbumPortInterface`, `ArtistPortInterface`, `GenrePortInterface`, `MoviePortInterface` |
-| **Events** | `AlbumCreated`, `SongMetadataUpdated`, `MetadataSynced` |
-| **Tech** | PGroonga full-text search (via `SongRepository`), Doctrine ORM |
+| **Events** | `AlbumCreated`, `SongMetadataUpdated`, `MetadataSynced` (defined; no code raises them) |
+| **Tech** | PGroonga full-text search (song, album, artist and movie repositories), Doctrine ORM |
 
 ### Library
 
 | Attribute | Detail |
 |-----------|--------|
-| **Responsibility** | Media library definition and file-system scanning. Owns the concept of a "library" (a watched directory on disk) and orchestrates scans that discover media files and feed them into Catalog and Metadata. |
+| **Responsibility** | Media library definition and file-system scanning. Owns the concept of a "library" (a watched directory on disk) and orchestrates scans that discover media files and feed them into Catalog. |
 | **Namespace** | `App\Library` |
 | **Aggregates** | `Library` |
 | **Repositories** | `LibraryRepositoryInterface` |
-| **Ports** | `LibraryPortInterface`, `DirectoryScannerPortInterface`, `CoverArtExtractorPortInterface`, `LibraryMembershipQueryPort` |
-| **Events** | `LibraryScanCompleted` |
+| **Ports** | `LibraryPortInterface`, `DirectoryScannerPortInterface`, `LibraryMembershipQueryPort` |
+| **Events** | `LibraryDirectoryIndexed`, `LibraryScanCompleted` |
 | **Value Objects** | `LibraryPath`, `LibrarySlug`, `LibraryType` |
-| **Tech** | File-system scanning, Swoole task transport for async scans |
+| **Tech** | File-system scanning, Redis `async` transport for queued scans, transactional outbox for discovered files |
 
 ### Media
 
@@ -122,9 +121,9 @@ graph TD
 |-----------|--------|
 | **Responsibility** | External metadata enrichment. Reads embedded tags from audio files, matches them against external APIs (Discogs, Last.fm, MusicBrainz, Spotify, TasteDive), and synchronizes results back to Catalog. |
 | **Namespace** | `App\Metadata` |
-| **Aggregates** | None -- operates on Catalog aggregates via commands |
-| **Ports** | None -- downstream consumer, not a service provider |
-| **Events** | None -- consumes events from Library, does not publish its own |
+| **Aggregates** | None -- operates on Catalog aggregates through Catalog ports |
+| **Ports** | `MetadataAdminPortInterface`, `MediaFileMetadataInterface`, `MusicBrainzLookupInterface` (published contract) |
+| **Events** | None -- handles commands and messages from Catalog and its admin sync, publishes no events |
 | **Value Objects** | `ExtractedMetadata`, `CoverArt`, `MatchQuality`, `MetadataMatch` |
 | **Tech** | HTTP clients for Discogs, Last.fm, MusicBrainz, Spotify, TasteDive. Custom ID3/Vorbis/FLAC parsers. Matching strategies with validators. |
 
@@ -132,12 +131,12 @@ graph TD
 
 | Attribute | Detail |
 |-----------|--------|
-| **Responsibility** | User playlist management. Supports both manual playlists (add/remove/reorder songs) and smart playlists (auto-synced based on criteria). |
+| **Responsibility** | User playlist management. Supports manual playlists (add/remove/reorder songs). A playlist created as smart stores its `smartRules`, but no code evaluates them or fills the playlist. |
 | **Namespace** | `App\Playlist` |
 | **Aggregates** | `Playlist` |
 | **Repositories** | `PlaylistRepositoryInterface` |
 | **Ports** | `PlaylistPortInterface` |
-| **Events** | `PlaylistCreated`, `SmartPlaylistSynced` |
+| **Events** | `PlaylistCreated`; `SmartPlaylistSynced` is defined but no code raises it |
 | **Value Objects** | `PlaylistSong` |
 
 ### Recommendation
@@ -148,7 +147,7 @@ graph TD
 | **Namespace** | `App\Recommendation` |
 | **Aggregates** | `Recommendation` |
 | **Repositories** | `RecommendationRepositoryInterface` |
-| **Ports** | None -- consumed via controller directly |
+| **Ports** | `RecommendationJobPortInterface`, `RecommendationInsightsPortInterface`, `RecommendationPublicIdentityInterface`, `ArtistRecommendationMergePortInterface` (published contract) |
 | **Events** | None |
 | **Domain Services** | `CollaborativeFilteringCalculator`, `ContentSimilarityCalculator`, `DatabaseRelationCalculator`, `GenreSimilarityCalculator` |
 | **Value Objects** | `RecommendationType` |
@@ -168,14 +167,14 @@ graph TD
 
 | Attribute | Detail |
 |-----------|--------|
-| **Responsibility** | Multi-channel notification delivery. Receives domain events from any context via the `NotificationBridgeSubscriber`, resolves them to notification categories, and dispatches through email, push (Web Push/VAPID), or webhooks (Slack, Discord). Manages per-user notification preferences. |
+| **Responsibility** | Multi-channel notification delivery. Receives the mapped domain events that the outbox replays to `NotificationBridgeSubscriber`, resolves them to notification categories, and dispatches through email, push (Web Push/VAPID), or webhooks (Slack, Discord). Manages per-user notification preferences. |
 | **Namespace** | `App\Notification` |
 | **Aggregates** | `Notification`, `NotificationPreference` |
 | **Repositories** | `NotificationRepositoryInterface`, `NotificationPreferenceRepositoryInterface` |
-| **Ports** | None -- consumes events; does not expose ports |
-| **Events** | `NotificationEvent` |
+| **Ports** | `WebhookRepositoryInterface`, `WebhookSecretPortInterface`, `WebhookDestinationPortInterface`, `PushSubscriptionRegistrationPortInterface`, `PushSubscriptionRemovalPortInterface` |
+| **Events** | `NotificationEvent` (defined; no code raises it) |
 | **Value Objects** | `NotificationCategory`, `NotificationChannel` |
-| **Tech** | Web Push (VAPID), HMAC-signed webhooks, Redis Pub/Sub for SSE delivery, Discord and Slack webhook adapters |
+| **Tech** | Web Push (VAPID), HMAC-signed webhooks, `live.changed` WebSocket hints after which the client rereads over HTTP, Discord and Slack webhook adapters |
 
 ### Transcode
 
@@ -186,10 +185,10 @@ graph TD
 | **Aggregates** | `TranscodeJob`, `TranscodeSession` |
 | **Repositories** | `TranscodeJobRepositoryInterface`, `TranscodeSessionRepositoryInterface` |
 | **Ports** | `TranscodeJobPortInterface`, `TranscodeSessionPortInterface`, `TranscodeStreamingPortInterface`, `SegmentCachePortInterface`, `TranscodeStoragePortInterface`, `FFmpegPortInterface` |
-| **Events** | `TranscodeJobCreated`, `TranscodeJobCompleted`, `TranscodeJobFailed`, `TranscodeSessionAttached`, `PlaybackPositionChanged` |
+| **Events** | `TranscodeJobCreated`, `PlaybackPositionChanged` (raised by Party); `TranscodeJobCompleted`, `TranscodeJobFailed` and `TranscodeSessionAttached` are defined but no code raises them |
 | **Value Objects** | `AudioProfile`, `LoudnessStandard`, `QualityTier`, `SessionPriority`, `SessionState`, `TranscodeStatus`, `VideoProbeResult` |
 | **Domain Services** | `AudioProcessingRules`, `QualityLadder` |
-| **Tech** | FFmpeg (isolated in Swoole CPU process pool), HLS fMP4 segment writer, DASH manifest generator, in-memory segment cache |
+| **Tech** | FFmpeg (run by the execution unit's native daemon in the worker deployment pair), HLS fMP4 segment writer, DASH manifest generator, in-memory segment cache |
 
 ### Party
 
@@ -200,9 +199,9 @@ graph TD
 | **Aggregates** | `SyncedPartySession`, `PartyMember` |
 | **Repositories** | `SyncedPartySessionRepositoryInterface`, `PartyMemberRepositoryInterface` |
 | **Ports** | `PartySessionPortInterface`, `PartyMemberPortInterface` |
-| **Events** | `PartySessionCreated`, `PartySessionEnded`, `MemberJoined` |
+| **Events** | `PartySessionCreated`, `PartySessionEnded`, `MemberJoined`, `MemberLeft`, `PlaybackStateChanged` |
 | **Value Objects** | `MemberRole`, `PlaybackAction`, `PlaybackState` |
-| **Tech** | WebSocket (Swoole), Redis Pub/Sub for event broadcasting, `PlaybackSynchronizer` for wall-clock sync |
+| **Tech** | WebSocket (Swoole), party rooms in the shared-memory tables of `WebSocketConnectionRegistry` broadcast through `WebSocketPusher`, `PlaybackSynchronizer` for wall-clock sync |
 
 ### UserPreference
 
@@ -231,7 +230,7 @@ graph TD
 
 | Attribute | Detail |
 |-----------|--------|
-| **Responsibility** | Song lyrics storage and retrieval. Integrates with LRCLIB API to fetch plain and synced/timed lyrics (LRC format). Supports multiple sources (embedded tags, LRCLIB, Musixmatch, Genius). |
+| **Responsibility** | Song lyrics storage and retrieval. Integrates with LRCLIB API to fetch plain and synced/timed lyrics (LRC format). The model accepts the sources embedded tags, LRCLIB, Musixmatch and Genius, but only LRCLIB fetches store lyrics. |
 | **Namespace** | `App\Lyrics` |
 | **Aggregates** | `Lyrics` (state object) |
 | **Repositories** | `LyricsRepositoryInterface` |
@@ -244,7 +243,7 @@ graph TD
 
 ## Shared Kernel (`src/Shared/`)
 
-The Shared kernel provides cross-cutting primitives used by every context. Importing from Shared is always allowed. Importing from another bounded context requires justification.
+The Shared kernel provides cross-cutting primitives used by every context. Deptrac allows Shared imports by layer: a Domain layer may import only Shared Domain, and an Application layer only Shared Domain and Shared Application. Importing from another bounded context requires justification.
 
 ### Domain Layer
 
@@ -275,22 +274,22 @@ The Shared kernel provides cross-cutting primitives used by every context. Impor
 | Component | Purpose |
 |-----------|---------|
 | `Doctrine/` | Custom types (`UuidType`, `PublicIdType`, `CitextType`, `JobStatusType`), `GeneratePublicIdListener`, `PgroongaSearchTrait` |
-| `Messenger/` | `JobIdStamp`, `JobMonitoringMiddleware`, `JobMonitorService`, `ResultStampMiddleware` with `PartyMemberResultStamp`, `PublicIdNormalizer`, `UuidNormalizer`, `SwooleTaskWithRedisFallbackSender` |
-| `Swoole/` | `Async::sleep()` (coroutine-aware), `ProcessPool`, `WebSocketConnectionRegistry`, `WebSocketPusher` |
+| `Messenger/` | `JobIdStamp`, `JobMonitoringMiddleware`, `JobMonitorService`, `ResultStampMiddleware` with `PartyMemberResultStamp`, `PublicIdNormalizer`, `UuidNormalizer`, `ValidatedSendersLocator`, `OrdinaryAdmissionTransport` (wraps the Redis `async` transport) |
+| `Swoole/` | `Async::sleep()` (coroutine-aware), `CpuProcessPool` (excluded from the container; nothing uses it), `WebSocketConnectionRegistry`, `WebSocketPusher` |
 | `Cache/` | `CacheTags` for Redis tag-aware invalidation |
 | `Redis/` | `RedisClientFactory` |
-| `Sse/` | `RedisPubSubConnection` for Server-Sent Events |
-| `Security/` | `SseQueryTokenAuthenticator`, `WsQueryTokenAuthenticator` |
+| `LiveUpdates/` | `LiveUpdateRuntime`, `LiveFrameSender` for `live.*` change hints over the WebSocket |
+| `Security/` | `WsTicketAuthenticator` (redeems single-use WebSocket tickets) |
 | `Logging/` | `BoundedContextProcessor`, `CorrelationIdProcessor` |
 | `Health/` | `HealthCheckService`, `HealthCheckResult` |
-| `Event/` | `NotificationBridgeSubscriber` (forwards domain events to Notification context) |
+| `Event/` | `OutboxEventDispatcher` and `NotificationReplayDispatcher` (replay outbox events to the notification listeners), `NotificationDeliveryBus` (stores notification delivery intents), `RelayOutboxWorkerCommand` (`app:outbox:consume`) |
 | `Pagination/` | `CursorPaginator`, `CursorCodec`, `CursorResult` |
 
 ### Interface Layer
 
 | Component | Purpose |
 |-----------|---------|
-| `Controller/` | Shared controllers (SPA, health, SSE, WebSocket, job monitor, metrics, config) |
+| `Controller/` | Shared controllers (SPA, health, WebSocket, job monitor, metrics, config) |
 | `DTO/` | `ApiError`, `OAuthError`, `ValidationError`, `PaginatedResponse`, `CursorPaginatedResponse` |
 | `Resource/` | `AbstractResource` -- base for API response transformation |
 | `Console/` | `HealthCheckCommand`, `ConfigValidateCommand`, `app:settings:list`, `get`, `set` and `reset` |
@@ -300,7 +299,7 @@ The Shared kernel provides cross-cutting primitives used by every context. Impor
 
 ## Event Flow Map
 
-Domain events are the primary integration mechanism between contexts. The `NotificationBridgeSubscriber` in Shared intercepts all domain events and forwards those with a notification category mapping to the Notification context via Messenger.
+Domain events are the primary integration mechanism between contexts. In-process listeners hear an event when it is dispatched. `OutboxSubscriber` also stores each event in `domain_event_outbox`, and `app:outbox:consume` replays the stored events to `NotificationBridgeSubscriber` in Notification Infrastructure, which listens only to the mapped event classes and turns each into a `CreateNotificationCommand`.
 
 ### Events Published by Context
 
@@ -313,45 +312,49 @@ graph LR
         A4["user.email_verified"]
         A5["token.revoked"]
         A6["user.passkey_registered"]
-        A7["user.passkey_deleted"]
+        A7["user.passkey_deleted<br/><small>never raised</small>"]
         A8["device_code.approved"]
     end
 
     subgraph Catalog
-        C1["album.created"]
-        C2["song.metadata_updated"]
-        C3["metadata.synced"]
+        C1["album.created<br/><small>never raised</small>"]
+        C2["song.metadata_updated<br/><small>never raised</small>"]
+        C3["metadata.synced<br/><small>never raised</small>"]
     end
 
     subgraph Library
         L1["library.scan_completed"]
+        L2["library.directory_indexed"]
     end
 
     subgraph Party
         P1["party.session_created"]
         P2["party.session_ended"]
-        P3["member.joined"]
+        P3["party.member_joined"]
+        P4["party.member_left"]
+        P5["party.playback_state_changed"]
     end
 
     subgraph Playlist
         PL1["playlist.created"]
-        PL2["smart_playlist.synced"]
+        PL2["smart_playlist.synced<br/><small>never raised</small>"]
     end
 
     subgraph Transcode
         T1["transcode.job_created"]
-        T2["transcode.job_completed"]
-        T3["transcode.job_failed"]
-        T4["transcode.session_attached"]
-        T5["playback_position.changed"]
+        T2["transcode.job_completed<br/><small>never raised</small>"]
+        T3["transcode.job_failed<br/><small>never raised</small>"]
+        T4["transcode.session_attached<br/><small>never raised</small>"]
+        T5["transcode.playback_position_changed<br/><small>raised by Party</small>"]
     end
 
     Bridge["NotificationBridge"]
     N["Notification"]
-    M["Metadata"]
+    FD["Catalog<br/><small>FilesDiscoveredHandler</small>"]
+    Rooms["LivePartyRoomListener"]
+    Position["PlaybackPositionChangedListener"]
 
     A1 -->|"Security"| Bridge
-    A2 -->|"Security"| Bridge
     A3 -->|"Security"| Bridge
     A5 -->|"Security"| Bridge
     A6 -->|"Security"| Bridge
@@ -361,14 +364,22 @@ graph LR
     C1 -->|"MediaChanges"| Bridge
 
     L1 -->|"BackgroundJobs"| Bridge
-    L1 -->|"ExtractAlbumCoverCommand"| M
+    L2 -->|"FilesDiscovered"| FD
 
-    T5 -->|"consumed by"| Party
+    P2 --> Rooms
+    P4 --> Rooms
+    P5 --> Rooms
+
+    T2 -->|"BackgroundJobs"| Bridge
+    T3 -->|"BackgroundJobs"| Bridge
+    T5 --> Position
 
     Bridge --> N
 ```
 
-Unconnected events (no consumer): `user.email_verified`, `song.metadata_updated`, `metadata.synced`, all Party events, all Playlist events, `transcode.job_created`, `transcode.job_completed`, `transcode.job_failed`, `transcode.session_attached`.
+Unconnected events (raised, but no consumer): `user.created_by_operator`, `user.email_verified`, `party.session_created`, `party.member_joined`, `playlist.created`, `transcode.job_created`.
+
+Defined but never raised: `user.passkey_deleted`, `album.created`, `song.metadata_updated`, `metadata.synced`, `smart_playlist.synced`, `transcode.job_completed`, `transcode.job_failed`, `transcode.session_attached`. The edges from `user.passkey_deleted`, `album.created`, `transcode.job_completed` and `transcode.job_failed` show only the resolver's mapping.
 
 ### Event Notification Categories
 
@@ -377,7 +388,7 @@ The `EventCategoryResolver` maps events to categories that determine how and whe
 | Category | Events |
 |----------|--------|
 | **Security** | `UserRegistered`, `PasswordChanged`, `PasskeyRegistered`, `PasskeyDeleted`, `TokenRevoked`, `DeviceCodeApproved` |
-| **BackgroundJobs** | `LibraryScanCompleted` |
+| **BackgroundJobs** | `LibraryScanCompleted`, `TranscodeJobCompleted`, `TranscodeJobFailed` |
 | **MediaChanges** | `AlbumCreated` |
 
 ---
@@ -387,7 +398,6 @@ The `EventCategoryResolver` maps events to categories that determine how and whe
 ```mermaid
 graph TD
     Library -->|"Doctrine FK<br/><small>Infrastructure</small>"| Auth
-    Library -->|"ExtractAlbumCoverCommand<br/><small>Application</small>"| Metadata
     Library -->|"populates"| Catalog
     Notification -->|"SecurityUser<br/><small>Infrastructure</small>"| Auth
     Party -.->|"Symfony Security<br/><small>Interface</small>"| Auth
@@ -403,7 +413,7 @@ graph TD
     Party -->|"playback sync"| Transcode
     Transcode -->|"video lookup"| Catalog
     Lyrics -->|"song/album metadata"| Catalog
-    Catalog -->|"MusicBrainz lookup, album and artist sync messages<br/><small>Application</small>"| Metadata
+    Catalog -->|"MusicBrainz lookup, album and artist sync messages, ExtractAlbumCoverCommand<br/><small>Application</small>"| Metadata
     Catalog -->|"artist and album merge<br/><small>Infrastructure</small>"| Favorites
     Catalog -->|"artist and album merge<br/><small>Infrastructure</small>"| Activity
     Catalog -->|"artist merge<br/><small>Infrastructure</small>"| Recommendation
@@ -417,28 +427,28 @@ graph TD
 
 ### Library -> Auth (Infrastructure layer)
 
-- **What:** `UserLibraryEntity` references `Auth\Infrastructure\Doctrine\Entity\UserEntity` via Doctrine `ManyToOne` relation
-- **Why:** The `user_libraries` join table needs a foreign key to the users table. Data-level dependency only, not domain-level.
+- **What:** `UserLibraryAccessEntity` keeps the user as a plain `user_id` UUID column; `LibraryForeignKeys` declares the `fk_user_library_access_user_id` foreign key from `user_library_access.user_id` to `users`
+- **Why:** The `user_library_access` join table needs a foreign key to the users table. Data-level dependency only, not domain-level.
 
-### Library -> Metadata (Application layer)
+### Catalog -> Metadata: cover extraction (Application layer)
 
-- **What:** `ScanLibraryHandler` dispatches `Metadata\Application\Command\ExtractAlbumCoverCommand` via Messenger for each newly created album
-- **Why:** After a library scan discovers new albums, cover art extraction is delegated to the Metadata context. Coupling is through an async command DTO, keeping it loose.
+- **What:** Library imports no Metadata class. Catalog's `FilesDiscoveredHandler` dispatches `Metadata\Application\Command\ExtractAlbumCoverCommand` for each album an import touched that has no cover, and `BatchExtractCoversHandler` dispatches it for albums missing art
+- **Why:** Catalog creates the albums, so it requests cover art extraction from Metadata. Coupling is through an async command DTO, keeping it loose.
 
-### Library -> Catalog (Application layer)
+### Catalog -> Library (Application layer)
 
-- **What:** `MusicScanner` and `CoverArtExtractor` use Catalog port interfaces (`AlbumPortInterface`, `ArtistPortInterface`, etc.)
-- **Why:** Library scans discover media files and create/populate Catalog entities. Tight coupling that could benefit from a more event-driven approach.
+- **What:** `ScanLibraryHandler` records each directory it indexes as `LibraryDirectoryIndexed` in the transactional outbox. `LibraryDirectoryOutboxEventDispatcher` relays it as Library's `FilesDiscovered` message on the `async` transport, and Catalog's `FilesDiscoveredHandler` creates the catalog entries. Library imports no Catalog class; Catalog depends on the `Library Files Discovered Contract` Deptrac layer.
+- **Why:** Library scans discover media files and Catalog owns the entities. The outbox records the event in the transaction that commits the index rows.
 
-### Lyrics -> Catalog (Application + Infrastructure + Interface layer)
+### Lyrics -> Catalog (Application + Interface layer)
 
-- **What:** Lyrics uses Catalog's `SongLookupInterface` contract. `FetchLyricsHandler` and `LyricsService` call `findLyricSignature()`, which returns a `SongLyricSignature` (title, artist name, album title, duration). `BulkFetchLyricsHandler` walks song IDs with `songIdsAfter()`, and `LyricsController` resolves a visible song with `findVisibleSongId()`.
+- **What:** Lyrics uses Catalog's `SongLookupInterface` contract. `FetchLyricsHandler` calls `findLyricSignature()`, which returns a `SongLyricSignature` (title, artist name, album title, duration). `BulkFetchLyricsHandler` walks song IDs with `songIdsAfter()` and reads their signatures with `findLyricSignatures()`, and `LyricsController` and `LyricsSongResolver` resolve a visible song with `findVisibleSongId()`.
 - **Why:** LRCLIB requires track name, artist name, album name, and duration to find matching lyrics. Catalog resolves them from its song and album data and passes only the signature across the boundary.
 
 ### Notification -> Auth (Infrastructure layer)
 
-- **What:** `Notification\Security\NotificationVoter` uses `Auth\Infrastructure\Security\SecurityUser` for authorization decisions
-- **Why:** Notification endpoints need to verify the authenticated user owns the resources being accessed.
+- **What:** `Notification\Infrastructure\Security\NotificationVoter` uses `Auth\Infrastructure\Security\SecurityUser` for authorization decisions
+- **Why:** The voter checks that the authenticated user owns a notification. No controller calls it; `NotificationController` checks ownership itself.
 
 ### Notification -> Auth (Domain layer)
 
@@ -477,18 +487,18 @@ graph TD
 
 ### Media -> Transcode (Interface layer)
 
-- **What:** `Media\Interface\Controller\StreamController` transcodes a track through `Transcode\Application\Port\AudioRenditionPortInterface` and reads `transcode.enabled` and `transcode.max_bitrate` by the constants of `TranscodeSettingDefinitions`. Deptrac allows this through the `Transcode Audio Rendition Contract` layer: the port, `AudioRendition`, `AudioRenditionFormat`, `AudioRenditionFailedException` and the settings class.
-- **Why:** Media owns the track stream and its access checks; Transcode owns FFmpeg, the CPU process pool and the transcode cache.
+- **What:** `Media\Interface\Controller\StreamController` transcodes a track through `Transcode\Application\Port\AudioRenditionPortInterface` and reads `transcode.enabled` and `transcode.max_bitrate` by the constants of `TranscodeSettingDefinitions`. Deptrac allows this through the `Transcode Audio Rendition Contract` layer: the port, `AudioRendition`, `AudioRenditionFormat`, `AudioRenditionFailedException`, `AudioRenditionBusyException` and the settings class.
+- **Why:** Media owns the track stream and its access checks; Transcode owns FFmpeg execution and the transcode cache.
 
 ### Metadata -> Catalog, Media (Application layer)
 
-- **What:** Metadata enrichers use Catalog ports to update domain models and Media ports for image storage
+- **What:** Metadata enrichers and sync handlers use Catalog ports to update domain models, and `ExtractAlbumCoverHandler` uses Media ports for image storage
 - **Why:** After external API enrichment, results must be written back to the catalog and cover art stored.
 
 ### Party -> Transcode (Application layer)
 
-- **What:** Playback handlers reference `PlaybackPositionChanged` domain event
-- **Why:** Party sessions need to know about playback position changes for synchronized playback.
+- **What:** Party's start, pause and seek handlers raise Transcode's `PlaybackPositionChanged` domain event when the party has a transcode job; Transcode's `PlaybackPositionChangedListener` turns it into an `UpdateTranscodePositionCommand` for the job's session
+- **Why:** The transcode of a party's video follows the host's playback position.
 
 ### Transcode -> Catalog (Infrastructure layer)
 
@@ -503,7 +513,7 @@ graph TD
 ### Implicit: Party, Notification -> Auth (via Symfony Security)
 
 - **What:** Controllers use Symfony's `Security` to resolve the current user, which returns `Auth\Infrastructure\Security\SecurityUser`
-- **Why:** These contexts create resources owned by authenticated users. The dependency is in the Interface layer only.
+- **Why:** These contexts create resources owned by authenticated users. This controller dependency is in the Interface layer; Notification also depends on Auth in its Domain, Application and Infrastructure layers.
 
 ---
 
@@ -524,12 +534,14 @@ graph TD
         Spotify["Spotify API"]
         TasteDive["TasteDive API"]
         CoverArtArchive["CoverArtArchive API"]
+        Tmdb["TMDB API"]
         Discogs --> Metadata\\Infrastructure\\Api\\Discogs
         LastFm --> Metadata\\Infrastructure\\Api\\LastFm
         MusicBrainz --> Metadata\\Infrastructure\\Api\\MusicBrainz
         Spotify --> Metadata\\Infrastructure\\Api\\Spotify
         TasteDive --> Metadata\\Infrastructure\\Api\\TasteDive
         CoverArtArchive --> Metadata\\Infrastructure\\Api\\CoverArtArchive
+        Tmdb --> Metadata\\Infrastructure\\Api\\Tmdb
     end
 
     subgraph "Lyrics ACL"
@@ -539,11 +551,13 @@ graph TD
     end
 
     subgraph "Transcode ACL"
-        FFmpeg["FFmpeg<br/><small>proc_open()</small>"]
+        FFmpeg["FFmpeg"]
         FFmpegAdapter["FFmpegAdapter<br/><small>implements FFmpegPortInterface</small>"]
-        Pool["Swoole ProcessPool<br/><small>SWOOLE_IPC_UNIXSOCK</small>"]
-        FFmpegAdapter -->|"isolated in"| Pool
-        Pool -->|"runs"| FFmpeg
+        Executor["ProcessExecutor"]
+        Native["Native execution daemon<br/><small>bin/worker-native.php</small>"]
+        FFmpegAdapter -->|"exec()"| Executor
+        Executor -->|"NativeExecutionClient<br/>Unix socket"| Native
+        Native -->|"runs"| FFmpeg
     end
 ```
 
@@ -553,7 +567,7 @@ Auth uses the League OAuth2 Server library only for its `ResourceServer`, which 
 
 ### External API Adapters (Metadata Context)
 
-The Metadata context wraps six external services behind internal adapters. Each adapter translates external API responses into domain-level DTOs before they enter the matching pipeline.
+The Metadata context wraps seven external services behind internal adapters. Each adapter translates external API responses into domain-level DTOs before they enter the matching pipeline.
 
 | External Service | Location |
 |-----------------|----------|
@@ -563,6 +577,7 @@ The Metadata context wraps six external services behind internal adapters. Each 
 | Spotify | `Metadata\Infrastructure\Api\Spotify\` |
 | TasteDive | `Metadata\Infrastructure\Api\TasteDive\` |
 | CoverArtArchive | `Metadata\Infrastructure\Api\CoverArtArchive\` |
+| TMDB | `Metadata\Infrastructure\Api\Tmdb\` |
 
 ### LRCLIB API (Lyrics Context)
 
@@ -570,7 +585,7 @@ The LRCLIB lyrics database API is isolated behind `LrclibClientInterface`. The `
 
 ### FFmpeg (Transcode Context)
 
-FFmpeg is isolated behind `FFmpegPortInterface`. Process execution runs inside the Swoole CPU process pool to avoid blocking the main event loop. `proc_open()` calls never touch Swoole workers.
+FFmpeg is isolated behind `FFmpegPortInterface`. `ProcessExecutor` sends each FFmpeg command through the native execution client, and the session encoder starts through `NativeProcessSpawner` on the same client, so inside the worker deployment pair FFmpeg runs only in the execution unit's native daemon (`bin/worker-native.php`). The web server starts no encoder. `ProcessExecutor` runs a command locally with `proc_open()` only in standalone tools.
 
 ---
 
@@ -579,8 +594,9 @@ FFmpeg is isolated behind `FFmpegPortInterface`. Process execution runs inside t
 ```mermaid
 graph TD
     subgraph "Pattern 1: Domain Event"
-        E1["Publisher Context"] -->|"EventDispatcher::dispatch()"| E2["NotificationBridgeSubscriber"]
-        E2 -->|"Messenger"| E3["Notification Context"]
+        E1["Publisher Context"] -->|"EventDispatcher::dispatch()"| E2["OutboxSubscriber<br/>domain_event_outbox"]
+        E2 -->|"app:outbox:consume replay"| E4["NotificationBridgeSubscriber"]
+        E4 -->|"CreateNotificationCommand"| E3["Notification Context"]
     end
 
     subgraph "Pattern 2: Messenger Command"
@@ -591,22 +607,22 @@ graph TD
         P1["Controller"] -->|"injects Port"| P2["Infrastructure Implementation"]
     end
 
-    subgraph "Pattern 4: WebSocket / SSE"
-        W1["Swoole WS Server"] -->|"WebSocketPusher<br/>Redis Pub/Sub"| W2["Connected Clients"]
+    subgraph "Pattern 4: WebSocket"
+        W1["Swoole WS Server"] -->|"WebSocketPusher<br/>LiveFrameSender"| W2["Connected Clients"]
     end
 ```
 
-### Pattern 1: Domain Event (Synchronous)
+### Pattern 1: Domain Event (In-Process Dispatch and Outbox Replay)
 
-- **Publisher:** Any context dispatches via `EventDispatcherInterface::dispatch()`
-- **Consumer:** `NotificationBridgeSubscriber` catches all events and routes to Notification if mapped
+- **Publisher:** Any context dispatches via `EventDispatcherInterface::dispatch()`; in-process listeners such as `LivePartyRoomListener` run at once
+- **Consumer:** `OutboxSubscriber` stores the event in `domain_event_outbox`; `app:outbox:consume` replays it, and `NotificationBridgeSubscriber` creates a notification when the event has a category mapping
 - **Use when:** Broadcasting that something happened in the domain
 
 ### Pattern 2: Messenger Command (Asynchronous)
 
 - **Publisher:** Any context dispatches via `MessageBusInterface::dispatch()`
 - **Consumer:** Handler in another context with `#[AsMessageHandler]`
-- **Use when:** Requesting another context to perform an action (e.g., Library asking Metadata to extract covers)
+- **Use when:** Requesting another context to perform an action (e.g., Catalog asking Metadata to extract covers)
 
 ### Pattern 3: Port Interface (Synchronous, In-Process)
 
@@ -614,11 +630,11 @@ graph TD
 - **Provider:** Infrastructure service implements the port interface
 - **Use when:** The Interface layer needs to invoke Application/Domain logic without depending on infrastructure
 
-### Pattern 4: WebSocket / SSE (Real-Time)
+### Pattern 4: WebSocket (Real-Time)
 
-- **Server:** `Swoole\WebSocket\Server` managed by Shared infrastructure
-- **Push:** `WebSocketPusher` and `RedisPubSubConnection` in Shared
-- **Consumers:** Party (real-time playback sync), Notification (SSE delivery), Transcode (progress events)
+- **Server:** `Swoole\WebSocket\Server` at `/api/ws`, managed by Shared infrastructure; no SSE endpoint remains
+- **Push:** `WebSocketPusher` in Shared for replies and party room broadcasts; `LiveFrameSender` for `live.*` change hints
+- **Consumers:** Party (real-time playback sync and member events), Session (`session.snapshot` pushes), Transcode (`transcode.position` reports from clients), and views such as notifications and admin pages, which reread over HTTP after a `live.changed` hint
 - **Use when:** Pushing real-time updates to connected clients
 
 ---
@@ -628,19 +644,19 @@ graph TD
 | Context | Layer Completeness | Aggregate Pattern | Notes |
 |---------|-------------------|------------------|-------|
 | Auth | Full 4-layer + features | State object | Most mature. Own OAuth authorization server; League resource-server ACL. 8 domain events. |
-| Catalog | Full 4-layer | State objects | Core domain. PGroonga search on `SongRepository`. 6 aggregates. |
-| Library | Full 4-layer | No state object | Orchestrates scanning pipeline. Heaviest cross-context coupling. |
-| Media | Full 4-layer | No state object | Storage/streaming abstraction. |
-| Metadata | Partial | No aggregates | Operates on Catalog data. Admin port and the published MusicBrainz lookup and sync contracts. 6 external APIs. |
-| Playlist | Full 4-layer | No state object | Manual + smart playlists. |
+| Catalog | Full 4-layer | State objects | Core domain. PGroonga search on the song, album, artist and movie repositories. 6 aggregates. |
+| Library | Full 4-layer | State object | Orchestrates scanning pipeline. Hands discovered files to Catalog as `FilesDiscovered` messages; imports only Auth ports from other contexts. |
+| Media | Full 4-layer | State object | Storage/streaming abstraction. |
+| Metadata | Full 4-layer (value objects only in Domain) | No aggregates | Operates on Catalog data. Admin port and the published MusicBrainz lookup and sync contracts. 7 external APIs. |
+| Playlist | Full 4-layer | No state object | Manual playlists; smart playlists store rules that nothing evaluates. |
 | Recommendation | Full 4-layer | Old positional-arg pattern | Has CQRS queries. Candidate for state-object migration. |
 | Activity | Full 4-layer | No state object | Simple record/play model. |
 | Notification | Full 4-layer | No state object | Event-driven consumer. Multi-channel delivery. |
-| Transcode | Full 4-layer | State objects | Heaviest infrastructure. Swoole process pool for FFmpeg. 6 ports. |
+| Transcode | Full 4-layer | State objects | Heaviest infrastructure. FFmpeg runs in the worker deployment pair's execution unit. |
 | Party | Full 4-layer | State objects | WebSocket-driven. Real-time sync. 9 CQRS handlers. |
 | UserPreference | Full 4-layer | State object | Simple CRUD context for the preference subsystems. User settings are written through two command handlers and published to Auth and Notification through a narrow contract. |
 | Filesystem | Partial (no 4-layer) | None | Utility: MIME detection + file watcher. |
-| Lyrics | Full 4-layer | State object | LRCLIB integration with cached-first strategy. REST API + console command. Anti-corruption layer for LRCLIB. |
+| Lyrics | Full 4-layer | State object | LRCLIB integration with cached-first strategy. REST API + console commands. Anti-corruption layer for LRCLIB. |
 
 ---
 

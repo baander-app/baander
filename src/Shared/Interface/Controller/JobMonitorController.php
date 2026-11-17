@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Controller;
 
 use App\Shared\Application\DTO\JobMonitorQuery;
+use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Port\JobMonitorAdministrationInterface;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\DTO\ApiError;
@@ -195,19 +196,40 @@ final class JobMonitorController
                     type: 'object',
                 ),
             ),
-            new OA\Response(response: '422', description: 'Days is less than 1', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '422', description: 'Days is not a whole number, or is less than 1', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
         ],
     )]
     #[CliCounterpart('app:monitor:prune')]
     #[Route('/prune', name: 'prune', methods: ['POST'])]
     public function prune(Request $request): JsonResponse
     {
-        $result = $this->jobMonitor->prune((int) ($request->toArray()['days'] ?? 7));
+        // The body is optional: without one, as without `days`, the prune keeps the default.
+        $body = $request->getContent() === '' ? [] : $request->toArray();
+        $result = $this->jobMonitor->prune(self::days($body['days'] ?? 7));
 
         return $this->successResponse([
             'pruned' => $result->count,
             'olderThan' => $result->olderThan->format(\DateTimeInterface::ATOM),
         ]);
+    }
+
+    /**
+     * Reads the days a prune keeps as `app:monitor:prune --days` does: a whole number, as a JSON
+     * integer or its decimal string. The use case refuses one less than 1.
+     *
+     * @throws InvalidInputException when the value is not a whole number
+     */
+    private static function days(mixed $value): int
+    {
+        $days = match (true) {
+            is_int($value) => $value,
+            is_string($value) => filter_var($value, FILTER_VALIDATE_INT),
+            default => false,
+        };
+
+        return $days === false
+            ? throw new InvalidInputException('Days must be an integer.', ['days' => 'Days must be an integer.'])
+            : $days;
     }
 
     /**
