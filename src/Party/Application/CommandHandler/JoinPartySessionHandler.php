@@ -31,17 +31,18 @@ final class JoinPartySessionHandler
             throw new RuntimeException('Party session not found or inactive.');
         }
 
-        $memberCount = $this->memberPort->countBySession($command->getSessionId());
-        if ($memberCount >= $session->getMaxMembers()) {
-            throw new RuntimeException('Party session is full.');
-        }
-
+        // A returning member already holds a place, so a full session still takes them back.
         $existing = $this->memberPort->findByUserAndSession($command->getUserId(), $command->getSessionId());
         if ($existing !== null) {
             $existing->reconnect();
             $this->memberPort->save($existing);
 
             return $existing;
+        }
+
+        $memberCount = $this->memberPort->countBySession($command->getSessionId());
+        if ($memberCount >= $session->getMaxMembers()) {
+            throw new RuntimeException('Party session is full.');
         }
 
         $member = $this->memberPort->addMember($command->getUserId(), $command->getSessionId());

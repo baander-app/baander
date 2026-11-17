@@ -90,6 +90,35 @@ final class JoinPartySessionHandlerTest extends TestCase
         $this->assertSame($existingMember, $result);
     }
 
+    public function testReconnectsExistingMemberWhenSessionIsFull(): void
+    {
+        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
+        $this->handler = $this->createJoinPartySessionHandlerFixture();
+
+        $userId = Uuid::v4();
+        $session = $this->createActiveSession(2);
+
+        $existingMember = PartyMember::reconstitute(new PartyMemberState(
+            id: Uuid::v4(),
+            publicId: new PublicId(),
+            userId: $userId,
+            sessionId: $session->getId(),
+            joinedAt: new DateTimeImmutable('-1 hour'),
+            isConnected: false,
+        ));
+
+        $this->sessionPort->method('findByUuid')->willReturn($session);
+        $this->memberPort->method('countBySession')->willReturn(2);
+        $this->memberPort->method('findByUserAndSession')->willReturn($existingMember);
+        $this->memberPort->expects($this->never())->method('addMember');
+        $this->memberPort->expects($this->once())->method('save')->with($existingMember);
+
+        $result = ($this->handler)(new JoinPartySessionCommand($userId, $session->getId()));
+
+        $this->assertSame($existingMember, $result);
+        $this->assertTrue($result->isConnected(), 'A returning member of a full session should be reconnected.');
+    }
+
     public function testNewMemberJoinsAndDispatchesMemberJoinedEvent(): void
     {
         $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
