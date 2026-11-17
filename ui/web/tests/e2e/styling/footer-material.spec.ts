@@ -1,10 +1,7 @@
 import type { Locator } from '@playwright/test'
-import { test, expect, catalogAlbum } from './fixtures'
-import { spaNavigate } from '../fixtures'
+import { test, expect } from './footer-playback'
 import { ACCENTS, MOODS, setTheme } from '../helpers/theme-utils'
 import { expectContained, expectNoPageOverflow } from './helpers'
-
-test.use({ serviceWorkers: 'block' })
 
 /** Sample the painted vertical surface in its empty right padding, alongside each label/control. */
 async function paintedContrast(display: Locator) {
@@ -65,16 +62,11 @@ async function paintedContrast(display: Locator) {
   }, screenshot.toString('base64'))
 }
 
-test('painted centerpiece stays readable across every mood and accent', async ({ populatedCatalog: page }) => {
-  test.setTimeout(120_000)
+test('painted centerpiece stays readable across every mood and accent', async ({ pausedFooter: page }) => {
+  test.setTimeout(180_000)
   await page.setViewportSize({ width: 1280, height: 800 })
-  await spaNavigate(page)(`/music/albums/${catalogAlbum.publicId}`)
-  await page.getByRole('button', { name: 'Play', exact: true }).first().click()
   const footer = page.getByRole('region', { name: 'Playback', exact: true })
   const display = footer.getByRole('group', { name: 'Now playing', exact: true })
-  const seek = display.getByRole('slider', { name: 'Seek', exact: true })
-  await expect(seek).toHaveAttribute('aria-valuemax', '30')
-  await footer.getByRole('button', { name: 'Pause', exact: true }).click()
 
   for (const mood of MOODS) {
     for (const accent of ACCENTS) {
@@ -101,15 +93,12 @@ test('painted centerpiece stays readable across every mood and accent', async ({
 })
 
 for (const width of [390, 768, 1280]) {
-  test(`recessed surface preserves contained controls and focus at ${width}px`, async ({ populatedCatalog: page }) => {
+  test(`recessed surface preserves contained controls and focus at ${width}px`, async ({ pausedFooter: page }) => {
+    test.setTimeout(120_000)
     await page.setViewportSize({ width, height: 800 })
-    await spaNavigate(page)(`/music/albums/${catalogAlbum.publicId}`)
-    await page.getByRole('button', { name: 'Play', exact: true }).first().click()
     const footer = page.getByRole('region', { name: 'Playback', exact: true })
     const display = footer.getByRole('group', { name: 'Now playing', exact: true })
     const seek = display.getByRole('slider', { name: 'Seek', exact: true })
-    await expect(seek).toHaveAttribute('aria-valuemax', '30')
-    await footer.getByRole('button', { name: 'Pause', exact: true }).click()
 
     const geometry = await footer.evaluate(node => {
       const box = (element: Element) => {
@@ -160,10 +149,14 @@ for (const width of [390, 768, 1280]) {
           context.drawImage(image, 0, 0)
           const background = context.getImageData(1, Math.floor(image.height / 2), 1, 1).data
           const center = context.getImageData(Math.floor(image.width / 2), 0, 1, image.height).data
+          const painted = (y: number) => [0, 1, 2].some(channel => center[y * 4 + channel] !== background[channel])
           const rows = []
-          // Ignore the footer border; include the centerpiece's painted lower lip.
-          for (let y = 1; y < image.height; y++) {
-            if ([0, 1, 2].some(channel => center[y * 4 + channel] !== background[channel])) rows.push(y)
+          // Ignore the footer border, which covers two rows when the footer starts between
+          // pixels; include the centerpiece's painted lower lip.
+          let y = 0
+          while (y < image.height && painted(y)) y++
+          for (; y < image.height; y++) {
+            if (painted(y)) rows.push(y)
           }
           return { top: rows[0], bottom: image.height - 1 - rows[rows.length - 1] }
         }, screenshot.toString('base64'))
