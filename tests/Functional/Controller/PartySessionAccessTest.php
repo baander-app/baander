@@ -5,13 +5,11 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Controller;
 
 use App\Auth\Domain\Model\User;
-use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
-use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
-use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\PublicId;
+use App\Tests\Functional\Party\PartyFixtures;
 use App\Tests\Functional\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\HttpFoundation\Response;
@@ -28,6 +26,8 @@ use Symfony\Component\Routing\RouterInterface;
  */
 final class PartySessionAccessTest extends TestCase
 {
+    use PartyFixtures;
+
     private const URI = '/api/party/sessions/';
     private const MISSING = '{"error":{"message":"Resource not found.","code":404}}';
 
@@ -59,11 +59,11 @@ final class PartySessionAccessTest extends TestCase
 
         $this->library = $this->library();
         $this->video = $this->video($this->library);
-        $this->host = $this->viewer();
-        $this->member = $this->viewer();
-        $this->outsider = $this->viewer();
-        $this->party = $this->createParty($this->host);
-        $this->invite($this->member, $this->party);
+        $this->host = $this->viewer($this->library);
+        $this->member = $this->viewer($this->library);
+        $this->outsider = $this->viewer($this->library);
+        $this->party = $this->createParty($this->host, $this->video);
+        $this->invite($this->host, $this->member, $this->party);
         $this->join($this->member, $this->party);
     }
 
@@ -111,9 +111,9 @@ final class PartySessionAccessTest extends TestCase
 
     public function testTheSessionListHoldsOnlyTheCallersHostedAndJoinedParties(): void
     {
-        $other = $this->viewer();
-        $otherParty = $this->createParty($other);
-        $memberParty = $this->createParty($this->member);
+        $other = $this->viewer($this->library);
+        $otherParty = $this->createParty($other, $this->video);
+        $memberParty = $this->createParty($this->member, $this->video);
 
         self::assertSame($this->sorted([$this->party, $memberParty]), $this->listedParties($this->member));
         self::assertSame([$this->party], $this->listedParties($this->host));
@@ -144,7 +144,7 @@ final class PartySessionAccessTest extends TestCase
 
     public function testAnInvitedUserJoinsAndThenReadsThePartyAndItsMembersAndFindsItInTheirSessionList(): void
     {
-        $this->invite($this->outsider, $this->party);
+        $this->invite($this->host, $this->outsider, $this->party);
         // The invitation alone shows nothing of the party: only the member row does.
         $this->assertJsonResponse($this->authenticatedRequest('GET', self::URI . $this->party, $this->outsider), 404);
         self::assertSame([], $this->listedParties($this->outsider));
@@ -198,7 +198,7 @@ final class PartySessionAccessTest extends TestCase
     public function testAFullPartyTakesAMemberBackAndRefusesAnInvitedUser(): void
     {
         $party = $this->partyIn('full');
-        $this->invite($this->outsider, $party);
+        $this->invite($this->host, $this->outsider, $party);
         $rows = $this->memberRows($party);
 
         // A returning member already holds a place: the host and the member come back to their own rows.
@@ -216,7 +216,7 @@ final class PartySessionAccessTest extends TestCase
 
     public function testAnEndedPartyRefusesItsHostItsMembersAndAnInvitedUser(): void
     {
-        $this->invite($this->outsider, $this->party);
+        $this->invite($this->host, $this->outsider, $this->party);
         $party = $this->partyIn('ended');
 
         foreach ([$this->host, $this->member, $this->outsider] as $user) {
@@ -230,7 +230,7 @@ final class PartySessionAccessTest extends TestCase
     public function testARevokedUsersJoinIsAnsweredAsForAPartyThatDoesNotExist(): void
     {
         // One revoked user had joined, the other was only invited.
-        $this->invite($this->outsider, $this->party);
+        $this->invite($this->host, $this->outsider, $this->party);
         foreach ([$this->member, $this->outsider] as $user) {
             $revoked = $this->authenticatedRequest('DELETE', $this->invitationUri($user, $this->party), $this->host);
             self::assertSame(204, $revoked->getStatusCode(), (string) $revoked->getContent());
@@ -357,24 +357,6 @@ final class PartySessionAccessTest extends TestCase
         self::assertStringNotContainsString($this->video->getPublicId()->toString(), $content);
     }
 
-    private function viewer(): User
-    {
-        $user = $this->createTestUser();
-        self::getContainer()->get(LibraryAccessPortInterface::class)->grant($user->getId(), $this->library->getId());
-
-        return $user;
-    }
-
-    private function createParty(User $host, int $maxMembers = 10): string
-    {
-        $response = $this->authenticatedRequest('POST', self::URI, $host, [
-            'videoId' => $this->video->getPublicId()->toString(),
-            'maxMembers' => $maxMembers,
-        ]);
-
-        return $this->assertJsonResponse($response, 201, 'data')['data']['publicId'];
-    }
-
     /**
      * The party in the named state, with its host and the member in it: the test's party as it
      * is or ended, or a party of two places, which the two fill.
@@ -382,8 +364,8 @@ final class PartySessionAccessTest extends TestCase
     private function partyIn(string $state): string
     {
         if ($state === 'full') {
-            $party = $this->createParty($this->host, maxMembers: 2);
-            $this->invite($this->member, $party);
+            $party = $this->createParty($this->host, $this->video, maxMembers: 2);
+            $this->invite($this->host, $this->member, $party);
             $this->join($this->member, $party);
 
             return $party;
@@ -462,7 +444,7 @@ final class PartySessionAccessTest extends TestCase
     private function userWithoutAMemberRow(string $reason): User
     {
         if ($reason === 'invited') {
-            $this->invite($this->outsider, $this->party);
+            $this->invite($this->host, $this->outsider, $this->party);
         }
         if ($reason === 'revoked') {
             $revoked = $this->authenticatedRequest('DELETE', $this->invitationUri($this->member, $this->party), $this->host);
@@ -517,29 +499,6 @@ final class PartySessionAccessTest extends TestCase
         return $headers;
     }
 
-    /** The party's host invites the user. */
-    private function invite(User $user, string $party): void
-    {
-        $response = $this->authenticatedRequest('PUT', $this->invitationUri($user, $party), $this->host);
-
-        self::assertSame(204, $response->getStatusCode(), (string) $response->getContent());
-    }
-
-    private function invitationUri(User $user, string $party): string
-    {
-        return self::URI . $party . '/invitations/' . $user->getPublicId()->toString();
-    }
-
-    /**
-     * The user joins the party; a scenario about an invited user invites them first.
-     *
-     * @return array<string, mixed> the member row the join answers with
-     */
-    private function join(User $user, string $party): array
-    {
-        return $this->assertJsonResponse($this->authenticatedRequest('POST', self::URI . $party . '/join', $user), 200, 'data')['data'];
-    }
-
     /** @return list<string> the members' user public IDs, sorted, as a member reads them: the host unless another is named */
     private function members(string $party, ?User $reader = null): array
     {
@@ -583,32 +542,5 @@ final class PartySessionAccessTest extends TestCase
         sort($values);
 
         return $values;
-    }
-
-    private function library(): LibraryEntity
-    {
-        $library = new LibraryEntity(
-            name: 'Party access test',
-            slug: 'party-access-' . bin2hex(random_bytes(8)),
-            path: '/media/party-access-' . bin2hex(random_bytes(8)),
-            type: 'movie',
-            filesystemType: 'local',
-        );
-        $this->entityManager->persist($library);
-        $this->entityManager->flush();
-
-        return $library;
-    }
-
-    private function video(LibraryEntity $library): VideoEntity
-    {
-        $video = new VideoEntity(new PublicId(), '/media/party-access-test.mkv', bin2hex(random_bytes(16)));
-        $movie = new MovieEntity(new PublicId(), $library, 'Party access test movie');
-        $this->entityManager->persist($video);
-        $this->entityManager->persist($movie);
-        $this->entityManager->persist(new MovieVideoEntity($movie, $video));
-        $this->entityManager->flush();
-
-        return $video;
     }
 }

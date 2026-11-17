@@ -5,11 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Party;
 
 use App\Auth\Domain\Model\User;
-use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
-use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
-use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
 use App\Library\Application\Port\LibraryAccessPortInterface;
-use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Party\Application\Command\StartPlaybackCommand;
 use App\Party\Domain\Event\MemberLeft;
 use App\Party\Domain\Event\PartySessionEnded;
@@ -37,6 +33,8 @@ use Symfony\Component\Messenger\MessageBusInterface;
  */
 final class PartyLiveRoomWiringTest extends TestCase
 {
+    use PartyFixtures;
+
     private const array ANSWER_FOR_AN_UNKNOWN_PARTY = ['type' => 'error', 'message' => 'Invalid public identity'];
 
     /** @var list<array{fd: int, payload: mixed}> what the server pushed to its sockets */
@@ -496,42 +494,19 @@ final class PartyLiveRoomWiringTest extends TestCase
         return WebSocketRooms::party((string) $this->entityManager->getConnection()->fetchOne('SELECT id FROM party_sessions WHERE public_id = :publicId', ['publicId' => $party]));
     }
 
-    /** The party's host invites the guest, who may then join. */
-    private function invite(User $host, User $guest, string $party): void
-    {
-        $response = $this->authenticatedRequest('PUT', '/api/party/sessions/' . $party . '/invitations/' . $guest->getPublicId()->toString(), $host);
-
-        self::assertSame(204, $response->getStatusCode(), (string) $response->getContent());
-    }
-
     /** @return array<string, mixed> */
     private function session(string $party, User $member): array
     {
         return $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/party/sessions/' . $party, $member), 200, 'data')['data'];
     }
 
+    /** The party the host creates for a video in a new library the host has access to. */
     private function party(User $host, int $maxMembers = 10): string
     {
-        $library = new LibraryEntity(
-            name: 'Live room test',
-            slug: 'live-room-' . bin2hex(random_bytes(8)),
-            path: '/media/live-room-' . bin2hex(random_bytes(8)),
-            type: 'movie',
-            filesystemType: 'local',
-        );
-        $video = new VideoEntity(new PublicId(), '/media/live-room.mkv', bin2hex(random_bytes(16)));
-        $movie = new MovieEntity(new PublicId(), $library, 'Live room movie');
-        $this->entityManager->persist($library);
-        $this->entityManager->persist($video);
-        $this->entityManager->persist($movie);
-        $this->entityManager->persist(new MovieVideoEntity($movie, $video));
-        $this->entityManager->flush();
+        $library = $this->library();
+        $video = $this->video($library);
         self::getContainer()->get(LibraryAccessPortInterface::class)->grant($host->getId(), $library->getId());
 
-        return $this->assertJsonResponse(
-            $this->authenticatedRequest('POST', '/api/party/sessions/', $host, ['videoId' => $video->getPublicId()->toString(), 'maxMembers' => $maxMembers]),
-            201,
-            'data',
-        )['data']['publicId'];
+        return $this->createParty($host, $video, $maxMembers);
     }
 }

@@ -5,13 +5,11 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Controller;
 
 use App\Auth\Domain\Model\User;
-use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
-use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
-use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Party\Domain\Event\MemberLeft;
 use App\Shared\Domain\Model\PublicId;
+use App\Tests\Functional\Party\PartyFixtures;
 use App\Tests\Functional\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -27,6 +25,8 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class PartyInvitationTest extends TestCase
 {
+    use PartyFixtures;
+
     private const URI = '/api/party/sessions/';
     private const MISSING = '{"error":{"message":"Resource not found.","code":404}}';
 
@@ -46,12 +46,12 @@ final class PartyInvitationTest extends TestCase
 
         $this->library = $this->library();
         $this->video = $this->video($this->library);
-        $this->host = $this->viewer();
-        $this->member = $this->viewer();
-        $this->outsider = $this->viewer();
-        $this->party = $this->createParty($this->host);
+        $this->host = $this->viewer($this->library);
+        $this->member = $this->viewer($this->library);
+        $this->outsider = $this->viewer($this->library);
+        $this->party = $this->createParty($this->host, $this->video);
         $this->assertNoContent($this->invite($this->host, $this->member));
-        $this->join($this->member);
+        $this->join($this->member, $this->party);
 
         $dispatcher = self::getContainer()->get('event_dispatcher');
         self::assertInstanceOf(EventDispatcherInterface::class, $dispatcher);
@@ -73,7 +73,7 @@ final class PartyInvitationTest extends TestCase
 
     public function testCreatingAPartyGivesItsCreatorAnInvitation(): void
     {
-        $party = $this->createParty($this->outsider);
+        $party = $this->createParty($this->outsider, $this->video);
 
         self::assertSame([$this->outsider->getPublicId()->toString()], $this->invited($this->outsider, $party));
     }
@@ -294,26 +294,24 @@ final class PartyInvitationTest extends TestCase
         ];
     }
 
+    /**
+     * The caller invites the user to the test's party and gets the route's answer back. This takes
+     * the place of the shared invite, which asserts that the invite succeeded: the tests here
+     * assert on refusals too.
+     */
     private function invite(User $caller, User|PublicId $user): Response
     {
-        return $this->authenticatedRequest('PUT', $this->invitationUri($user), $caller);
+        return $this->authenticatedRequest('PUT', $this->invitationUri($user, $this->party), $caller);
     }
 
     private function revoke(User $caller, User|PublicId $user): Response
     {
-        return $this->authenticatedRequest('DELETE', $this->invitationUri($user), $caller);
+        return $this->authenticatedRequest('DELETE', $this->invitationUri($user, $this->party), $caller);
     }
 
     private function listInvitations(User $caller, ?string $party = null): Response
     {
         return $this->authenticatedRequest('GET', self::URI . ($party ?? $this->party) . '/invitations/', $caller);
-    }
-
-    private function invitationUri(User|PublicId $user): string
-    {
-        $publicId = $user instanceof User ? $user->getPublicId() : $user;
-
-        return self::URI . $this->party . '/invitations/' . $publicId->toString();
     }
 
     private function assertNoContent(Response $response): void
@@ -367,53 +365,5 @@ final class PartyInvitationTest extends TestCase
         );
 
         $this->assertJsonResponse($response, 200);
-    }
-
-    private function viewer(): User
-    {
-        $user = $this->createTestUser();
-        self::getContainer()->get(LibraryAccessPortInterface::class)->grant($user->getId(), $this->library->getId());
-
-        return $user;
-    }
-
-    private function createParty(User $host): string
-    {
-        $response = $this->authenticatedRequest('POST', self::URI, $host, ['videoId' => $this->video->getPublicId()->toString()]);
-
-        return $this->assertJsonResponse($response, 201, 'data')['data']['publicId'];
-    }
-
-    /** The user joins the party; a scenario about an invited user invites them first. */
-    private function join(User $user): void
-    {
-        $this->assertJsonResponse($this->authenticatedRequest('POST', self::URI . $this->party . '/join', $user), 200, 'data');
-    }
-
-    private function library(): LibraryEntity
-    {
-        $library = new LibraryEntity(
-            name: 'Party invitation test',
-            slug: 'party-invitation-' . bin2hex(random_bytes(8)),
-            path: '/media/party-invitation-' . bin2hex(random_bytes(8)),
-            type: 'movie',
-            filesystemType: 'local',
-        );
-        $this->entityManager->persist($library);
-        $this->entityManager->flush();
-
-        return $library;
-    }
-
-    private function video(LibraryEntity $library): VideoEntity
-    {
-        $video = new VideoEntity(new PublicId(), '/media/party-invitation-test.mkv', bin2hex(random_bytes(16)));
-        $movie = new MovieEntity(new PublicId(), $library, 'Party invitation test movie');
-        $this->entityManager->persist($video);
-        $this->entityManager->persist($movie);
-        $this->entityManager->persist(new MovieVideoEntity($movie, $video));
-        $this->entityManager->flush();
-
-        return $video;
     }
 }

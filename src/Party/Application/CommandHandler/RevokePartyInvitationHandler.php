@@ -50,10 +50,10 @@ final readonly class RevokePartyInvitationHandler
     #[AsMessageHandler]
     public function __invoke(RevokePartyInvitationCommand $command): void
     {
-        $removedMember = $this->transaction->run(fn (): ?MemberLeft => $this->revoke($command));
+        $left = $this->transaction->run(fn (): ?MemberLeft => $this->revoke($command));
 
-        if ($removedMember !== null) {
-            $this->eventDispatcher->dispatch($removedMember);
+        if ($left !== null) {
+            $this->eventDispatcher->dispatch($left);
         }
     }
 

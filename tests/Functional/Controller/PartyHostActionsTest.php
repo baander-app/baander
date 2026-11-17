@@ -5,12 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Controller;
 
 use App\Auth\Domain\Model\User;
-use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
-use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
-use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Shared\Domain\Model\PublicId;
+use App\Tests\Functional\Party\PartyFixtures;
 use App\Tests\Functional\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\HttpFoundation\Response;
@@ -21,6 +19,8 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class PartyHostActionsTest extends TestCase
 {
+    use PartyFixtures;
+
     private const URI = '/api/party/sessions/';
 
     private LibraryEntity $library;
@@ -35,10 +35,10 @@ final class PartyHostActionsTest extends TestCase
 
         $this->library = $this->library();
         $this->video = $this->video($this->library);
-        $this->host = $this->viewer();
-        $this->member = $this->viewer();
-        $this->party = $this->createParty($this->host);
-        $this->invite($this->member, $this->party);
+        $this->host = $this->viewer($this->library);
+        $this->member = $this->viewer($this->library);
+        $this->party = $this->createParty($this->host, $this->video);
+        $this->invite($this->host, $this->member, $this->party);
         $this->join($this->member, $this->party);
     }
 
@@ -83,7 +83,7 @@ final class PartyHostActionsTest extends TestCase
 
     public function testTheHostCannotHandThePartyToAUserWhoIsNotAMember(): void
     {
-        $outsider = $this->viewer();
+        $outsider = $this->viewer($this->library);
 
         $this->assertJsonResponse($this->transfer($this->host, $outsider->getPublicId()), 422);
 
@@ -135,60 +135,5 @@ final class PartyHostActionsTest extends TestCase
     private function roles(): array
     {
         return array_column($this->session($this->host)['members'], 'role', 'userId');
-    }
-
-    private function viewer(): User
-    {
-        $user = $this->createTestUser();
-        self::getContainer()->get(LibraryAccessPortInterface::class)->grant($user->getId(), $this->library->getId());
-
-        return $user;
-    }
-
-    private function createParty(User $host): string
-    {
-        $response = $this->authenticatedRequest('POST', self::URI, $host, ['videoId' => $this->video->getPublicId()->toString()]);
-
-        return $this->assertJsonResponse($response, 201, 'data')['data']['publicId'];
-    }
-
-    /** The party's host invites the user, who may then join. */
-    private function invite(User $user, string $party): void
-    {
-        $response = $this->authenticatedRequest('PUT', self::URI . $party . '/invitations/' . $user->getPublicId()->toString(), $this->host);
-
-        self::assertSame(204, $response->getStatusCode(), (string) $response->getContent());
-    }
-
-    private function join(User $user, string $party): void
-    {
-        $this->assertJsonResponse($this->authenticatedRequest('POST', self::URI . $party . '/join', $user), 200, 'data');
-    }
-
-    private function library(): LibraryEntity
-    {
-        $library = new LibraryEntity(
-            name: 'Party host actions test',
-            slug: 'party-host-actions-' . bin2hex(random_bytes(8)),
-            path: '/media/party-host-actions-' . bin2hex(random_bytes(8)),
-            type: 'movie',
-            filesystemType: 'local',
-        );
-        $this->entityManager->persist($library);
-        $this->entityManager->flush();
-
-        return $library;
-    }
-
-    private function video(LibraryEntity $library): VideoEntity
-    {
-        $video = new VideoEntity(new PublicId(), '/media/party-host-actions-test.mkv', bin2hex(random_bytes(16)));
-        $movie = new MovieEntity(new PublicId(), $library, 'Party host actions test movie');
-        $this->entityManager->persist($video);
-        $this->entityManager->persist($movie);
-        $this->entityManager->persist(new MovieVideoEntity($movie, $video));
-        $this->entityManager->flush();
-
-        return $video;
     }
 }

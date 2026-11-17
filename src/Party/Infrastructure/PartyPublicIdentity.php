@@ -44,7 +44,7 @@ final readonly class PartyPublicIdentity implements PartyPublicIdentityPortInter
 
     public function invitations(array $invitations): array
     {
-        $users = $this->publicIds('users', array_map(
+        $users = $this->userPublicIds(array_map(
             static fn (PartyInvitation $invitation): Uuid => $invitation->getUserId(),
             $invitations,
         ));
@@ -90,14 +90,13 @@ final readonly class PartyPublicIdentity implements PartyPublicIdentityPortInter
     }
 
     /**
-     * The public IDs of the rows with the given IDs, read in one statement.
+     * The public IDs of the users with the given IDs, read in one statement.
      *
-     * @param 'users'    $table
      * @param list<Uuid> $ids
      *
-     * @return array<string, PublicId> by internal ID; an ID without a row has no entry
+     * @return array<string, PublicId> by internal ID; an ID without a user has no entry
      */
-    private function publicIds(string $table, array $ids): array
+    private function userPublicIds(array $ids): array
     {
         if ($ids === []) {
             return [];
@@ -105,7 +104,7 @@ final readonly class PartyPublicIdentity implements PartyPublicIdentityPortInter
 
         /** @var array<string, string> $rows */
         $rows = $this->connection->fetchAllKeyValue(
-            'SELECT id, public_id FROM ' . $table . ' WHERE id IN (:ids)',
+            'SELECT id, public_id FROM users WHERE id IN (:ids)',
             ['ids' => array_map(static fn (Uuid $id): string => $id->toString(), $ids)],
             ['ids' => ArrayParameterType::STRING],
         );
