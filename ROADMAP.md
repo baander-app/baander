@@ -837,7 +837,11 @@ local: it is not merged into `master` and not pushed.
 - Documents (`c1634ae13`, `caaa7f0f4`). `ui/DESIGN.md` states the one-well rule, the
   notification pane and the handoff's Motion row; `CONCEPTS.md` defines the well; the
   browser-testing guide names the handoff spec. The plan states the mechanism that
-  shipped.
+  shipped, and its risk about the exit animation under jsdom is corrected
+  (`adf70a575`): the notification suite passes with the animation written in longhand
+  too. What the footer's fade taught about gradients and resting pixels is in
+  `docs/solutions/best-practices/fade-a-gradient-surface-through-a-number-inside-its-own-colour-expressions.md`
+  (`6ecc80373`).
 - Footer material spec (`c249e5d4e`). The listening session answers 422 to the styling
   suite's catalog fixture song, so the spec could not put a track in the footer. It
   now plays a server fixture's song through `tests/e2e/styling/footer-playback.ts`.
