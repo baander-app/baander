@@ -219,6 +219,21 @@ still write.
 relies on this; its cascade test failed on PostgreSQL 18.7 without the flag
 (2026-11-17).
 
+A row lock orders nothing when the read under it answers from the identity map. A
+controller often loads an entity before it dispatches the command that locks its row;
+a locking DQL or SQL statement then returns that managed entity with the values it was
+loaded with, and the handler decides on state another transaction has since changed.
+Read under the lock with `Query::HINT_REFRESH` (or `find()` with a pessimistic lock
+mode), and refresh rows that are read after the lock but may have been loaded before
+it.
+[SyncedPartySessionRepository::lockByUuid](../../../../src/Party/Infrastructure/Doctrine/Repository/SyncedPartySessionRepository.php)
+and the finders of
+[PartyMemberRepository](../../../../src/Party/Infrastructure/Doctrine/Repository/PartyMemberRepository.php)
+are the worked example. Without the refresh a leave promoted nobody after a competing
+host transfer, and an onward transfer left two member rows with the host role; the
+cases with a preloaded session or member row in `PartyMembershipSerializationTest`
+failed on both (2026-11-17).
+
 - An insert is persisted, flushed and detached in the method that creates it. The
   unit of work does not order inserts across scalar-referenced entities, so a parent
   row is flushed before its child, and a DQL read does not see an unflushed row.

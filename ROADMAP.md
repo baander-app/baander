@@ -748,8 +748,12 @@ Verification on 2026-11-17:
   `InitialSchemaMigrationTest` and `OpenApiSpecTest`. Each unit was also verified at
   its own commit from a separate worktree. Every cell of the plan's answers-by-caller
   table has a test, and each non-member answer is compared with the missing-party
-  answer in status, body and headers. The workers saw each new case fail before its
-  fix; the lock cases fail when the handler does not take the lock.
+  answer in status, body and headers. The leave, transfer, end, join and non-member
+  cases were seen failing before their fix. The invitation routes' functional tests
+  passed on their first run and were then proven by mutating the code: five mutations
+  (no lock, user resolved before the host check, `MemberLeft` always dispatched, no
+  member check, no host check) failed twelve tests. `PartyHostActionsTest` pins
+  behaviour that was already built, so it has no red of its own.
 - After the simplification the four functional party files hold the same 98 tests and
   2,535 assertions as before it.
 - Static at `0326c6acb`: PHPStan reports no errors on 3,807 files. Deptrac reports 0
@@ -786,6 +790,11 @@ Open:
   another member.
 - Nothing prunes the rows of ended parties, and no retention rule says when they
   should go.
+- An invite whose user is deleted between the lookup and the insert fails on the
+  foreign key and answers 500.
+- `handlePartyJoin` treats any `NotFoundException` from the join handler as a hidden
+  party, not only `PartyNotFoundException`: Deptrac forbids the WebSocket controller
+  that Party class. The join handler throws no other not-found outcome today.
 - The plan lists as a risk that a long-lived WebSocket worker can hold party entities
   from an earlier message. The review traced that each socket message runs in its own
   coroutine whose entity manager is cleared on release, so the exposure is one
