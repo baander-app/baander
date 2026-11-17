@@ -85,7 +85,9 @@ export async function signIn(page, { email, password }) {
     throw new Error(`The application refused to sign ${email} in (HTTP ${response.status()}).`);
   }
   await page.waitForURL(url => url.pathname === '/music');
-  await page.getByRole('heading', { name: 'Home', exact: true, level: 1 }).waitFor();
+  // The heading is found in the page itself: the question about the settings can open before the
+  // home page is drawn, and while it is open the page behind it has no headings to find by role.
+  await page.locator('h1').filter({ hasText: /^Home$/ }).waitFor();
   await preferencesRead;
   await keepStoredSettings(page, 1500);
 }
@@ -93,9 +95,10 @@ export async function signIn(page, { email, password }) {
 /**
  * Answers the application's question about which version of the settings to keep, when it asks
  * within `patience` milliseconds, by choosing the one the account has stored. A window asks after
- * signing in, and a second window of an account may ask when the first changes a setting.
+ * signing in, and a second window of an account may ask when the first changes a setting or
+ * starts a song.
  */
-async function keepStoredSettings(page, patience) {
+export async function keepStoredSettings(page, patience) {
   const question = page.getByRole('dialog').filter({ hasText: 'Settings conflict' });
   for (;;) {
     try {
@@ -182,6 +185,62 @@ export async function isPlaying(page, title) {
 export async function pausePlayback(page) {
   await playerBar(page).getByRole('button', { name: 'Pause', exact: true }).click();
   await playerBar(page).getByRole('button', { name: 'Play', exact: true }).waitFor();
+}
+
+/**
+ * Ends the hold that a browser which closed while it played keeps on the account's playback, with
+ * the application's own "Play here anyway", for a scene that starts playback elsewhere than on
+ * the Songs page. Without a hold it does nothing.
+ */
+export async function playHere(page) {
+  const destination = playerBar(page).getByRole('button', { name: 'Playback destination', exact: true });
+  if (await destination.count() > 0 && await destination.getAttribute('title') === 'Previous playback is unconfirmed.') {
+    await destination.click();
+    await page.getByRole('menuitem', { name: 'Play here anyway', exact: true }).click();
+    await page.getByRole('menu').waitFor({ state: 'hidden' });
+  }
+}
+
+/**
+ * Waits until the song is the one in the player bar, playing or paused. The bar's title carries
+ * the song's name as its tooltip; the album in the line below it may have the same name.
+ */
+export async function songInPlayer(page, title) {
+  await playerBar(page).getByRole('group', { name: 'Now playing', exact: true }).getByTitle(title, { exact: true }).waitFor();
+}
+
+/**
+ * Moves the song in the player bar to a position, in seconds, with one press on the seek bar, and
+ * waits until the bar is there. The seek bar's keys are not used: after them the application
+ * keeps showing the chosen position whatever plays next.
+ */
+export async function seekTo(page, seconds) {
+  const thumb = playerBar(page).getByRole('slider', { name: 'Seek', exact: true });
+  const bar = playerBar(page).locator('[data-slot="slider"]').filter({ has: page.getByRole('slider', { name: 'Seek', exact: true }) });
+  const { x, y, width, height } = await bar.boundingBox();
+  const length = Number(await thumb.getAttribute('aria-valuemax'));
+  await page.mouse.click(x + width * seconds / length, y + height / 2);
+  await page.waitForFunction(
+    ([slider, wanted]) => Math.round(Number(slider.getAttribute('aria-valuenow'))) === wanted,
+    [await thumb.elementHandle(), seconds],
+  );
+}
+
+/** Closes the panel beside the page when it is open. */
+export async function closeSidePanel(page) {
+  const close = page.getByRole('button', { name: 'Close context panel', exact: true });
+  if (await close.isVisible()) await close.click();
+  await close.waitFor({ state: 'hidden' });
+}
+
+/**
+ * An album's card in a grid of covers, by its cover, so the card is there once the cover is drawn.
+ * It is found by the picture's alternative text in the page itself: while a menu is open the
+ * application hides the page behind it from the accessibility tree.
+ */
+export function albumCard(page, title) {
+  // The Albums page draws a card as a button, an artist's page as a cell of a grid.
+  return page.locator('main :is(button, [role="gridcell"])').filter({ has: page.locator(`img[alt="${title}"]`) });
 }
 
 /** Scrolls the page back to its top with the mouse wheel. */

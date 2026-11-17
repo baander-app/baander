@@ -10,6 +10,8 @@
 // metadata or lyrics provider about a name.
 //
 // A scene signs in through the login page and does what its feature page tells a visitor to do.
+// A step of it may work in the window of another sample account, and a scene about several
+// browsers of one account also gets a window in Firefox, which needs Playwright's Firefox.
 // Each picture is taken twice from one state, in the dark theme and in the light one, as a
 // lossless WebP that is compared pixel for pixel with what the browser drew. The pairs go to
 // ui/site/assets/screenshots, and the record of every picture, which the site build checks the
@@ -21,16 +23,22 @@ import { randomBytes } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
 import { parseArgs, promisify } from 'node:util';
-import { chromium } from '@playwright/test';
+import { chromium, firefox } from '@playwright/test';
 import { SCALE, THEMES, WINDOW, chooseTheme, leave, openFromSidebar, openWindow, readCatalog, signIn } from './application.mjs';
 import {
   SAMPLE_ACCOUNTS, SETTINGS_KEPT_OFF, accountProblems, catalogProblems, contactSheet, coverFailures, libraryProblems,
   mergeRecords, pendingWorkProblems, recordEntry, settingProblems, settingValue,
 } from './checks.mjs';
 import { buildManifest } from './library-manifest.mjs';
+import administration from './scenes/administration.mjs';
+import destinations from './scenes/destinations.mjs';
 import equalizer from './scenes/equalizer.mjs';
+import libraries from './scenes/libraries.mjs';
+import library from './scenes/library.mjs';
+import player from './scenes/player.mjs';
+import playlists from './scenes/playlists.mjs';
 
-const SCENES = [equalizer];
+const SCENES = [equalizer, library, player, playlists, destinations, libraries, administration];
 const ROOT = resolve(import.meta.dirname, '../../../..');
 // Everything under ui/site/assets is published with the site, so the record is kept beside the pages' data instead.
 const PICTURES = join(ROOT, 'ui/site/assets/screenshots');
@@ -119,12 +127,17 @@ async function applicationCommit() {
   return commit.trim();
 }
 
-/** Stops the picture when its view is not finished: something lies over the page or a cover is missing. */
-async function requireFinishedView({ page, covers }, clip, wholeWindow) {
+/**
+ * Stops the picture when its view is not finished: something lies over the page or a cover is
+ * missing. A picture of an open dialog or menu names it as its `overlay`; that one must be open
+ * and the others must not.
+ */
+async function requireFinishedView({ page, covers }, clip, wholeWindow, overlay) {
   await page.mouse.move(0, 0);
-  for (const [what, selector] of [['a dialog', '[role="dialog"]'], ['a menu', '[role="menu"]'], ['a notice', '[data-sonner-toast]']]) {
-    await page.locator(selector).first().waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {
-      throw new NotReady(`${what} lies over the page`);
+  for (const [name, selector] of [['dialog', '[role="dialog"]'], ['menu', '[role="menu"]'], ['notice', '[data-sonner-toast]']]) {
+    const wanted = name === overlay;
+    await page.locator(selector).first().waitFor({ state: wanted ? 'visible' : 'hidden', timeout: 15000 }).catch(() => {
+      throw new NotReady(wanted ? `the ${name} the picture is of is not open` : `a ${name} lies over the page`);
     });
   }
   for (let waited = 0; covers.pending.size > 0; waited += 100) {
@@ -146,8 +159,13 @@ async function requireFinishedView({ page, covers }, clip, wholeWindow) {
   if (unloaded > 0) throw new NotReady(`${unloaded} image(s) in the frame have not loaded`);
 }
 
-/** The whole-pixel rectangle around the elements of a crop, which must lie uncovered inside the window. */
-async function cropAround(locators) {
+/**
+ * The whole-pixel rectangle around the elements of a crop, which must lie uncovered inside the
+ * window. `underOverlay` says that the picture is of an open menu or dialog with the page behind
+ * it. `margin` widens the rectangle on every side by that many CSS pixels of what surrounds the
+ * elements, for a crop whose text would otherwise touch the picture's edge.
+ */
+async function cropAround(locators, underOverlay = false, margin = 0) {
   const boxes = await Promise.all(locators.map(locator => locator.boundingBox()));
   const left = Math.floor(Math.min(...boxes.map(box => box.x)));
   const top = Math.floor(Math.min(...boxes.map(box => box.y)));
@@ -155,15 +173,25 @@ async function cropAround(locators) {
   const bottom = Math.ceil(Math.max(...boxes.map(box => box.y + box.height)));
   for (const locator of locators) {
     // The middle of each edge belongs to the element unless something covers it or it runs off the window.
-    const uncovered = await locator.evaluate((element) => {
+    const uncovered = await locator.evaluate((element, behindOverlay) => {
       const box = element.getBoundingClientRect();
       const middle = [box.left + box.width / 2, box.top + box.height / 2];
       return [[middle[0], box.top + 2], [middle[0], box.bottom - 2], [box.left + 2, middle[1]], [box.right - 2, middle[1]]]
-        .every(([x, y]) => element.contains(document.elementFromPoint(x, y)));
-    });
+        .every(([x, y]) => {
+          const hit = document.elementFromPoint(x, y);
+          // While a menu or dialog is open the application takes the page behind it out of the
+          // pointer's reach, and a point of the page that the overlay does not cover answers
+          // with the document itself.
+          return element.contains(hit) || (behindOverlay && hit === document.documentElement);
+        });
+    }, underOverlay);
     if (!uncovered) throw new NotReady('part of the crop is covered or outside the window');
   }
-  return { x: left, y: top, width: right - left, height: bottom - top };
+  const clip = { x: left - margin, y: top - margin, width: right - left + 2 * margin, height: bottom - top + 2 * margin };
+  if (margin > 0 && (clip.x < 0 || clip.y < 0 || clip.x + clip.width > WINDOW.width || clip.y + clip.height > WINDOW.height)) {
+    throw new NotReady('the crop with its margin runs off the window');
+  }
+  return clip;
 }
 
 const pngSize = png => ({ width: png.readUInt32BE(16), height: png.readUInt32BE(20) });
@@ -175,8 +203,8 @@ async function takePair(session, step, scene) {
   for (const theme of Object.keys(THEMES)) {
     await chooseTheme(appearance, page, theme);
     await step.before?.({ page });
-    const clip = step.kind === 'window' ? { x: 0, y: 0, ...WINDOW } : await cropAround(step.region({ page }));
-    await requireFinishedView(session, clip, step.kind === 'window');
+    const clip = step.kind === 'window' ? { x: 0, y: 0, ...WINDOW } : await cropAround(step.region({ page }), Boolean(step.overlay), step.margin ?? 0);
+    await requireFinishedView(session, clip, step.kind === 'window', step.overlay);
     // Playwright hides the text cursor with a style of its own unless told to leave it.
     shots[theme] = await page.screenshot({ clip, caret: 'initial' });
   }
@@ -224,6 +252,7 @@ async function main() {
   refuseOver(await previewProblems());
 
   const browser = await chromium.launch({ args: ['--mute-audio'] });
+  const browsers = [browser];
   const pairs = [];
   const refused = [];
   try {
@@ -241,20 +270,36 @@ async function main() {
       }
       return sessions.get(email);
     };
+    // A scene about several browsers of one account names the other makes it needs. It gets a
+    // window in each, signed in as its account through the login page, which stays open until
+    // the run ends. Firefox is launched as silent as Chromium is.
+    const otherBrowsersOf = async (scene) => {
+      const others = {};
+      for (const make of scene.otherBrowsers ?? []) {
+        const other = await { firefox }[make].launch({ firefoxUserPrefs: { 'media.volume_scale': '0.0' } });
+        browsers.push(other);
+        ({ page: others[make] } = await openWindow(other, values['base-url']));
+        await signIn(others[make], { email: scene.account, password: passwords[scene.account] });
+      }
+      return others;
+    };
 
     refuseOver(catalogProblems(buildManifest(), await readCatalog((await sessionOf(scenes[0].account)).page)));
 
     for (const scene of scenes) {
       const session = await sessionOf(scene.account);
       await chooseTheme(session.appearance, session.page, 'dark');
+      const others = await otherBrowsersOf(scene);
       for (const step of scene.steps) {
         console.log(`${scene.name}: ${step.picture ?? step.title}`);
+        // A step may name another sample account; it then works in, or is a picture of, that account's window.
+        const window = step.account ? await sessionOf(step.account) : session;
         if (!step.picture) {
-          await step.run({ page: session.page });
+          await step.run({ page: window.page, others });
           continue;
         }
         try {
-          pairs.push(await takePair(session, step, scene));
+          pairs.push(await takePair(window, step, scene));
         } catch (error) {
           if (!(error instanceof NotReady)) throw error;
           refused.push(`${step.picture}: ${error.message}`);
@@ -263,9 +308,9 @@ async function main() {
       }
     }
   } finally {
-    const windows = browser.contexts().flatMap(context => context.pages());
+    const windows = browsers.flatMap(each => each.contexts()).flatMap(context => context.pages());
     await Promise.all(windows.map(window => leave(window).catch(() => {})));
-    await browser.close();
+    await Promise.all(browsers.map(each => each.close()));
   }
 
   await mkdir(join(SCRATCH, 'work'), { recursive: true });
