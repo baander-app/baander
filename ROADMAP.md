@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-11-16. This roadmap selects future work and records unresolved
+Updated: 2026-11-17. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
@@ -266,6 +266,8 @@ scan artist credits and MusicBrainz matching. The persistent instance ran `6912e
 before that push and updates itself from `master`. The website was last published on
 2026-11-17: a local build of `31d1f8a81`, deployed to production as
 `baander-h0mkq4o71` and aliased to `https://baander.app`.
+Pushed later on 2026-11-17, on top of `0660fb943`: party invitations (`3a666d381` to
+their roadmap record).
 Pushed later on 2026-11-15, on top of `23f899976`: the matching follow-ups
 (`a7d1c7466` to `6991a9f9a` and their roadmap record), with the fix for the CI cleanup
 limit. Pushed on 2026-11-16, on top of `8d119f5df`: the matching leftovers
@@ -616,7 +618,8 @@ configuration items the docs-book rewrite left open:
 - Watch parties are invite-only, as the user decided on 2026-11-17. The session list,
   a session's details and its member list answer only the party's host and members;
   anyone else gets 404, and a caller who is not signed in gets 401. Joining with the
-  public ID stays open. The unauthenticated `GET /ws/party/{sessionPublicId}/` route is
+  public ID stayed open in this delivery; the party invitations work below replaced
+  that later the same day, and joining now needs an invitation. The unauthenticated `GET /ws/party/{sessionPublicId}/` route is
   deleted without a replacement, also by the user's decision (`45f76d17d`).
 - The host's play, pause and seek reach every member as `party.playback_state`; a
   leaving host hands the session's host role to the promoted member (`7cb1cfc6a`). A
@@ -671,17 +674,124 @@ Verification on 2026-11-17:
   pre-existing; it is fixed anyway under the rule for defects beside touched code,
   together with the two playback defects the correctness reviewer reported.
 
-Open (residual risks from the review; not fixed):
+Open (residual risks from the review; not fixed). The concurrent-leave race listed
+here on 2026-11-17 is fixed by the party invitations work below.
 
-- Two members leaving at the same moment can hand the host role to the one who is
-  leaving, so the remaining members cannot steer playback. The window is milliseconds,
-  and the race predates this change.
 - The transcode steer runs before the broadcast; if it throws, the party state is saved
   but the room receives no `party.playback_state`.
 - `PlaybackStateChanged` is a domain event, so every host play, pause and seek also
   writes an outbox row that no durable consumer reads.
 - `HW_BITRATE_MULTIPLIER` reaches `SegmentEncoder` and the hardware diagnostics, but
   `SegmentEncoder::applyBitrateMultiplier()` has no caller, so encodes never apply it.
+
+## Party invitations
+
+Delivered on `master` on 2026-11-17, fast-forwarded from `feat/party-invitations`
+(`3a666d381` to this record) from the plan
+`docs/plans/2026-11-17-1229-feat-party-invitations-plan.md`. The user decided on
+2026-11-17 that the host invites specific users, over a secret invite link.
+
+- Invitations (`e2a7dd773`, `fbe662ed4`). `party_invitations` holds one row per
+  invited user and party. The host invites with
+  `PUT /api/party/sessions/{publicId}/invitations/{userPublicId}`, revokes with
+  `DELETE` on the same path and lists with `GET .../invitations/`. A revoke also
+  removes a user who had joined and takes their sockets out of the party's room. A
+  party's creator holds an invitation from creation. An invitation lasts until it is
+  revoked or its party or user is deleted.
+- Joining (`0928065ce`). `POST .../join` and `party.join` admit only a member or an
+  invited user. Anyone else gets the answer a party that does not exist gets, whether
+  the party is active, ended or full. A member or invited user gets 409 from an ended
+  party, and an invited user gets 409 from a full one; before, both answered 500.
+- Members only (`50961a18e`). Leave, sync, end, transfer-host, the invitation routes,
+  `party.leave`, `party.playback` and `party.sync` answer a signed-in user without a
+  member row as a missing party and change nothing. `party.playback` checks its
+  payload before it looks the party up, so malformed input no longer reveals a party.
+- Serialisation (`fa0c7e6c5`). Join, invite, revoke, leave and transfer-host run in
+  one transaction each, starting with a `FOR UPDATE` read of the `party_sessions` row
+  that refreshes an already loaded session; the member finders refresh loaded rows
+  too. Party events are dispatched after the commit. This fixes the race in which two
+  members leaving at once handed the host role to a leaver. It also fixes three
+  defects beside the join path: a transfer to oneself demoted the host while the
+  session still named them, a transfer to a non-member answered 500, and ending a
+  party as a non-host answered 200 without doing anything.
+- The OpenAPI document and the generated web client carry the three routes and the
+  changed answers. The success bodies of leave, sync, end and transfer-host were
+  documented at the top level while the routes return them under `data`; the schemas
+  now match.
+- Documentation (`9f6fb8c9e`): the operator guide, the developer guide's Party and
+  real-time pages, `src/Party/README.md`, `dev-docs/context-map.md` and `CONCEPTS.md`.
+- Simplification (`0326c6acb`): four functional tests share `PartyFixtures`.
+
+Not built, by the plan: a library-access check on invite or join, a way for an invited
+user to see or decline invitations, a notice to a revoked socket, a cap on invitations
+per party, invitation events and a console command.
+
+Verification on 2026-11-17:
+
+- Full backend suite at `0326c6acb` in the local CI image: 13,247 tests in 1,193
+  files. The ordinary lane (8,487 tests) and the first stack lane (1,622) passed. The
+  native lane (948) had one failure and the second stack lane (2,190) one error and
+  one failure, all three outside the change, which touches no transcode or HTTP
+  streaming code:
+  - `StreamedResponseProcessorTest` ("The probe server did not start") and
+    `AudioRenditionWorkerHandoffTest` passed when rerun on their own; the suite ran
+    while other container runs loaded the host.
+  - `AudioTranscodeStreamTest::testEachSupportedFormatProducesItsCodec` fails the same
+    way on `master` at `0660fb943` with the same image: the `format=aac` request
+    answers 500. The cause is not investigated.
+- Party tests at `50961a18e`: 648 unit tests across `tests/Unit/Party`,
+  `tests/Unit/Shared/Interface`, the security tests and `CaptureCoverageTest` pass, and
+  196 database-backed tests in 13 files pass, among them `PartySessionAccessTest`,
+  `PartyHostActionsTest`, `PartyInvitationTest`, `PartyLiveRoomWiringTest`,
+  `PartyMembershipSerializationTest`, `WebSocketIdentityLookupTest`,
+  `PartyOwnershipPersistenceTest`, `ReferentialIntegrityTest`,
+  `InitialSchemaMigrationTest` and `OpenApiSpecTest`. Each unit was also verified at
+  its own commit from a separate worktree. Every cell of the plan's answers-by-caller
+  table has a test, and each non-member answer is compared with the missing-party
+  answer in status, body and headers. The workers saw each new case fail before its
+  fix; the lock cases fail when the handler does not take the lock.
+- After the simplification the four functional party files hold the same 98 tests and
+  2,535 assertions as before it.
+- Static at `0326c6acb`: PHPStan reports no errors on 3,807 files. Deptrac reports 0
+  violations, warnings and errors; 452 are skipped by its baseline, 9 more than
+  before, all further references from `WebSocketController` to `PlaybackAction`, an
+  edge the baseline already held. The OpenAPI export check matches and the web
+  client's `generate:check` passes at `50961a18e`; no route changed after it.
+- Site at `9f6fb8c9e`: `make website-build` built 243 pages; every relative link and
+  anchor resolves; `corepack yarn test:browser` in `ui/site/` passed 93 tests and
+  `node --test scripts/*.test.mjs` passed 11. A first browser run, made while
+  container runs loaded the host, failed one homepage font-stability test that passes
+  on its own and in the full rerun.
+- Code review: `ce-code-review` at full depth with correctness, security, adversarial
+  (in-process; cross-model review is off in this checkout), reliability, API contract,
+  data migration, testing and project-standards reviewers. No findings; verdict "Ready
+  to merge". Three of the reviewers (data migration, API contract, reliability)
+  returned within 30 seconds, so their coverage is thin. The review ran no gate itself.
+
+Open:
+
+- An uninvited join takes the party's row lock and runs two more queries before it is
+  refused, while an unknown ID is refused before dispatch. The answers match; the
+  response times differ, and a holder of the ID can briefly queue on the lock.
+- A worker that dies between a revoke's or a leave's commit and its event leaves the
+  user's sockets on other workers in the room until they close. The member row is
+  gone either way, so the user cannot re-enter.
+- When the room listener fails after the commit, the caller gets an error although
+  the change is stored; the listener closes the whole room first.
+- Ending a party reads the host without the row lock, so a host demoted during the
+  same request can still end it.
+- Deleting the user who hosts a party deletes the party by cascade without
+  `PartySessionEnded` and without closing its room. The fix belongs to the user
+  deletion path in Auth and needs a decision on whether the party ends or passes to
+  another member.
+- Nothing prunes the rows of ended parties, and no retention rule says when they
+  should go.
+- The plan lists as a risk that a long-lived WebSocket worker can hold party entities
+  from an earlier message. The review traced that each socket message runs in its own
+  coroutine whose entity manager is cleared on release, so the exposure is one
+  message, not the worker's lifetime. That trace was read from the code, not run.
+- `AudioTranscodeStreamTest::testEachSupportedFormatProducesItsCodec` fails on
+  `master` in the local CI image (see the verification above).
 
 ## Cohesive operator manual
 
