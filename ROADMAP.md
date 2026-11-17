@@ -871,15 +871,21 @@ Verification on 2026-11-17 at `caaa7f0f4`:
   paused and the four moods switched through in turn. The whole footer image is
   byte-identical in dark, cool and balanced in every capture. In warm the captures
   vary: of five, one matched the original and four differed from it by one level in
-  one channel on 2,476 to 3,536 of 117,760 pixels, 11 after a forced repaint. Two
-  captures of the original source do not differ from each other. The plan's samples
+  one channel on 2,476 to 3,536 of 117,760 pixels. With the warm mood set without the
+  animated switch, three captures each differed on 11 pixels by one level, as did one
+  capture after a forced repaint. Two captures of the original source do not differ
+  from each other. The plan's samples
   (four columns through the display, from two rows above it to two below the lip,
   1,296 in the four moods) were identical in the capture at `5aabfc463` and differed
   on 33 in the capture at `caaa7f0f4`. The registration's `inherits` value makes no
   difference to this.
 - Guard checks: with the yield's styling disabled the handoff test fails (the face
   spans 7 levels in the dark mood); with the header label on `--color-muted-foreground`
-  the contrast test fails in the warm mood.
+  the contrast test fails in the warm mood; with the pane's Escape handler removed
+  both 390px Escape tests fail, because focus does not return to the bell.
+- Production-style injection: with styled-components made to insert rules through the
+  CSSOM, as a production build does, the display's fade still ran on `--well-presence`
+  in three runs on the preview. A production build was not served.
 - Code review, run `20261117-182724-92ce9f41`: one finding, applied in `77a2dc40a`.
   The contrast test located a timestamp by its "ago" text while its fixture
   notification had a fixed date, so it would have failed once that date was 30 days
@@ -888,10 +894,14 @@ Verification on 2026-11-17 at `caaa7f0f4`:
 Open:
 
 - The warm mood's one-level differences at rest are unexplained. The computed
-  declarations are the same as before, and the same code renders with and without the
-  differences from run to run, so the cause is in how the browser rasterises partial
-  repaints after a mood switch. A capture on a fresh load in the warm mood, without a
-  mood switch, was not taken.
+  declarations are the same as before. Most of the differences follow an animated mood
+  switch and vary from run to run, which points at how the browser rasterises partial
+  repaints; 11 pixels differ without one. The user has not yet said whether this is
+  acceptable, and the plan made a changed rest state a reason to stop and ask.
+- The sidebar notification spec's failure may have been helped along by this work:
+  diagnostic runs signed in as the preview's admin account and sent play, transfer and
+  a rejected acknowledgement to that account's leftover listening session before the
+  spec was first run.
 - `tests/e2e/playback-destinations/sidebar-notifications.spec.ts` fails on the worktree
   preview with and without this change: a "Settings conflict" dialog for the admin
   account covers the page before the test reaches the bell. Its cause was not
