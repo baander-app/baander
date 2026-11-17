@@ -12,10 +12,10 @@ execution: code
 ## Goal Capsule
 
 - **Objective:** When someone opens the notification history from the sidebar bell, the pane is the one surface on screen with depth, so attention goes to it. The footer player gives up its depth while the pane is open and gets it back when the pane closes.
-- **Means:** One shared well definition whose shading fades on a single layer, driven by the pane's open state (KTD1, KTD2, KTD4).
+- **Means:** One shared well definition whose shading fades through one registered number, driven by the pane's open state (KTD1, KTD2, KTD4).
 - **Authority:** The request and R1–R7 govern behaviour. KTD1–KTD7 govern mechanism. `ui/DESIGN.md` applies as it stands except where R1–R5 change it; U4 brings the document in line.
 - **Execution profile:** Lightweight. Four units on one branch named after this plan, with browser checks against the worktree preview.
-- **Stop conditions:** Stop and ask when the footer display at rest cannot paint the pixels it paints today once its shading sits on a layer, or when pane text cannot reach 4.5:1 painted contrast over the well in a mood without changing colours outside the well definition.
+- **Stop conditions:** Stop and ask when the footer display at rest cannot paint the pixels it paints today, or when pane text cannot reach 4.5:1 painted contrast over the well in a mood without changing colours outside the well definition.
 - **Finishing:** `ce-work` lands the units as local commits, runs `ce-simplify-code` and `ce-code-review`, and records the delivery in `ROADMAP.md`. Nothing is pushed unless the user asks.
 
 ## Product Contract
@@ -67,7 +67,7 @@ The well is the recessed treatment of the music footer's centre display (`TrackD
 ### Key Technical Decisions
 
 - KTD1. **One shared well definition.** The colour variables, the shading, the secondary text colour and the handoff timing move from `TrackDisplay` into one module under `ui/web/src/shared/theme/`, parameterised by the surface colour. The footer display and the pane both use it, which makes the equal duration in R6 true by construction.
-- KTD2. **The shading is one layer and only its opacity changes.** A `background-image` gradient and unregistered custom properties do not interpolate, so a transition on the host fades the inset edge while the gradient snaps. On the footer display the gradient, inset edge and lip sit on one layer between the flat face and the content, and that layer's opacity carries the handoff. Registering the three colours with `@property` was the alternative; it adds global registrations and per-mood overrides for the same visual result.
+- KTD2. **The shading stays on the element and one registered number fades it.** A `background-image` gradient and unregistered custom properties do not interpolate, so a transition on the host fades the inset edge while the gradient snaps. A number registered with `@property`, the well's presence, does interpolate: 1 while the surface holds the well, 0 once it has yielded it. Each shading colour takes the presence inside its own expression, so at rest it computes to exactly the value it had. Three alternatives were measured on the preview and rejected because they changed the footer at rest. A separate shading layer faded by opacity came out with a weaker lip (243 to 239 over a 235 card in the balanced mood), because the display ends between pixels and two stacked boxes anti-alias differently from one. Registering the colours themselves, or mixing each finished colour with its flat value, left one-level differences in the warm mood's gradient.
 - KTD3. **The pane paints the well on itself and fades as a whole.** The pane mounts and unmounts, so its enter and exit are keyframe animations keyed on Radix `data-state`, as `ui/web/src/shared/components/ui/tooltip.tsx` does with `fadeIn` and `fadeOut`. Radix keeps closed content mounted only while a CSS animation runs; a transition would not hold it. The pane clips its children with `overflow: hidden`, which would cut a lip painted by a child layer, so the shading goes on the pane element.
 - KTD4. **The footer reads the pane's open state from the notification store.** `isPopoutOpen` in `ui/web/src/features/notification/stores/notification-store.ts` already controls the popover. The "Now playing" group exposes whether it holds the well as a data attribute, and the layer's opacity follows that attribute. `AppShell` renders `Sidebar` (which always renders `SidebarPinnedFooter`) and `NowPlayingBar` together, so the popover root is mounted whenever the footer is on screen.
 - KTD5. **120ms, `ease-out`.** The Motion rules in `ui/DESIGN.md` allow `ease-out` only and at most 120ms, the value the context panel uses. `--duration-fast` is 150ms and does not fit.
@@ -89,9 +89,9 @@ The user saw these four calls before planning and has not yet answered them.
 flowchart TB
   Bell[Sidebar bell] -->|open / close| Store[notification store: isPopoutOpen]
   Store -->|open| Pane[Notification pane: holds the well, fades in]
-  Store -->|open| Footer[Footer centre display: shading layer fades out]
+  Store -->|open| Footer[Footer centre display: shading fades out]
   Store -->|closed| PaneOut[Pane fades out, then unmounts]
-  Store -->|closed| FooterIn[Footer shading layer fades in]
+  Store -->|closed| FooterIn[Footer shading fades in]
   Well[Shared well definition: colours, shading, 120ms ease-out] --> Pane
   Well --> Footer
 ```
@@ -99,24 +99,24 @@ flowchart TB
 ### Risks
 
 - **Exit animation under jsdom.** `sidebar-notifications.test.tsx` asserts the pane is gone right after Escape, an outside click and a principal change. Declare the pane's enter and exit with the `animation` shorthand, as `tooltip.tsx` does. jsdom 30.1.3 reports `animation-name: none` for the shorthand, so Radix unmounts the pane at once; for a longhand `animation-name` it reports the name, and Radix waits for an `animationend` that jsdom never fires. The Vitest suite therefore does not show that the exit animation exists; the browser spec does.
-- **Rest-state drift.** Moving the footer shading to a layer must not change a pixel at rest. `ui/web/tests/e2e/styling/footer-material.spec.ts` asserts thresholds and compares no captures, so it cannot show this. The before-and-after sample comparison in U1 is the proof.
+- **Rest-state drift.** Moving the footer's shading into the shared definition must not change a pixel at rest. `ui/web/tests/e2e/styling/footer-material.spec.ts` asserts thresholds and compares no captures, so it cannot show this. The before-and-after sample comparison in U1 is the proof.
 - **Theme changes.** `html.theme-transitioning *::before` in `ui/web/src/shared/theme/GlobalStyles.tsx` replaces the transitioned properties for 120ms after a theme change, so a handoff in that window is immediate. Accepted.
 
 ### Sources
 
 - `docs/solutions/best-practices/browser-font-checks-that-pass-without-proving-anything.md`: break the thing a browser check guards and confirm the check fails before trusting it.
 - `ui/web/tests/e2e/playback-destinations/sidebar-notifications.spec.ts`: route mocks for the notification list and unread count.
-- `ui/web/tests/e2e/styling/fixtures.ts`: `populatedCatalog` gives an active footer player from catalog fixtures and a silent WAV.
+- `ui/web/tests/e2e/styling/footer-playback.ts`: `pausedFooter` gives a footer with a paused track by playing a server fixture's song. `populatedCatalog` in `ui/web/tests/e2e/styling/fixtures.ts` cannot, because the listening session answers 422 to its catalog fixture song.
 
 ## Implementation Units
 
-### U1. Shared well definition with the footer shading on a layer
+### U1. Shared well definition used by the footer display
 
 - **Goal:** One definition of the well in the shared theme, used by the footer display, with no visible change.
 - **Requirements:** R7; prepares R1, R3, R6.
 - **Dependencies:** none.
 - **Files:** `ui/web/src/shared/theme/well.ts` (new), `ui/web/src/shared/theme/index.ts`, `ui/web/src/features/player/components/NowPlayingBar.tsx`.
-- **Approach:** Per KTD1 and KTD2. The module exports the well's colour variables with the dark-mood override, the shading declarations, the secondary text colour that `TrackDisplay` defines today as `--player-secondary-text`, and the handoff duration and easing. `TrackDisplay` keeps its flat `--color-muted` face and paints the shading on a layer behind its content. Define the colour variables on the host, not inside the layer block, so the mood override selector resolves against the component.
+- **Approach:** Per KTD1 and KTD2. The module exports the well's colour variables with the dark-mood override, the shading declarations, the secondary text colour that `TrackDisplay` defines today as `--player-secondary-text`, and the handoff duration and easing. `TrackDisplay` keeps its `--color-muted` face and paints the shading on itself, with the presence registered once in the global stylesheet.
 - **Execution note:** Before editing `TrackDisplay`, record the centre display's painted pixels in its empty right padding column, from the row above its upper edge through the lip row, in all four moods at 1280px with a track loaded and paused. After the change the same samples must be identical. A difference is the first stop condition.
 - **Patterns to follow:** mixins in `ui/web/src/shared/theme/mixins.ts`.
 - **Test scenarios:** Test expectation: none -- rendering-preserving refactor, shown by the comparison in the execution note. `footer-material.spec.ts` and `ui/web/src/features/player/components/__tests__/NowPlayingBar.test.tsx` pass unchanged.
@@ -151,14 +151,14 @@ flowchart TB
 - **Requirements:** R3, R4, R5, R6.
 - **Dependencies:** U1, U2.
 - **Files:** `ui/web/src/features/player/components/NowPlayingBar.tsx`, `ui/web/src/features/player/components/__tests__/NowPlayingBar.test.tsx`, `ui/web/tests/e2e/styling/well-handoff.spec.ts`.
-- **Approach:** Per KTD4. The music bar selects `isPopoutOpen`, marks the "Now playing" group, and the shading layer's opacity transitions with the shared timing.
+- **Approach:** Per KTD4. The music bar selects `isPopoutOpen`, marks the "Now playing" group, and the well's presence transitions with the shared timing.
 - **Execution note:** After the browser spec passes, remove the yield and confirm the spec fails, then restore it.
 - **Test scenarios:**
   - Vitest: with `isPopoutOpen` true the "Now playing" group reports that it has yielded the well; setting it false reports that it holds the well again.
   - Vitest: the radio player bar renders unchanged when `isPopoutOpen` is true.
   - Browser, 390 and 1280px, dark and balanced moods, a track loaded and paused: opening the bell leaves the footer display's painted face one colour from top to bottom with no lip below it.
   - Browser: closing the pane with Escape brings back the darker upper edge and the lip on the footer display, and removes the pane.
-  - Browser: the footer layer's computed transition duration and easing equal the pane's animation duration and easing, and the layer's running transition after a toggle is on `opacity` only.
+  - Browser: the footer display's computed transition duration and easing equal the pane's animation duration and easing, and its only transition after a toggle is the well's presence.
   - Browser: labels and sliders in the footer display keep their minimum painted contrast while it is flat (4.5:1 for text, 3:1 for controls).
   - Browser, reduced motion emulated: both surfaces report a duration of at most 0.01ms.
   - `ui/web/src/features/player/stores/__tests__/player-performance.test.tsx` passes with unchanged render counts.
