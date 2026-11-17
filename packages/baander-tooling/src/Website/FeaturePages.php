@@ -13,6 +13,11 @@ use RuntimeException;
  * under the file that has it. What depends on the manual travels with each page as references,
  * which the builder checks once it has read the manual.
  *
+ * `ui/site/features/captures.json` records every picture the capture script took: the scene, the
+ * application commit, the date and the SHA-256 of its dark and its light file. A page may show
+ * only a picture whose two files are the recorded ones, so a picture retaken in one theme only or
+ * edited by hand fails the build.
+ *
  * @phpstan-import-type PublicPage from WebsiteBuilder
  * @phpstan-import-type ManualBlockReference from WebsiteBuilder
  */
@@ -20,6 +25,7 @@ final class FeaturePages
 {
     public const string DIRECTORY = 'ui/site/features';
     private const string INDEX = self::DIRECTORY . '/index.php';
+    private const string CAPTURES = self::DIRECTORY . '/captures.json';
     private const string OVERVIEW_URL = '/features/';
     /** The overview's title, and the section every feature page's title and breadcrumb name. */
     private const string SECTION = 'Features';
@@ -86,6 +92,7 @@ final class FeaturePages
         self::checkTitles($pages);
         self::checkRepeats([$index, ...array_values($pages)], 'description', '');
         self::checkRepeats(array_values($pages), 'name', ', so both pages would have one title');
+        self::checkCaptures($root, $pages);
         $errors = [$index, ...array_values($pages)]
             |> (static fn(array $files): array => array_map(static fn(FeatureFile $file): array => $file->errors, $files))
             |> (static fn(array $errors): array => array_merge(...$errors))
@@ -173,6 +180,49 @@ final class FeaturePages
             }
             $first[$value] ??= $file->path;
         }
+    }
+
+    /**
+     * Every picture a page shows has a capture record, and its two files are the recorded ones.
+     * The record is read only when a page shows a picture, and a missing record file records
+     * nothing.
+     *
+     * @param array<string, FeatureFile> $pages
+     */
+    private static function checkCaptures(string $root, array $pages): void
+    {
+        $records = null;
+        foreach ($pages as $page) {
+            foreach (array_keys($page->pictures) as $name) {
+                $records ??= self::captures($root);
+                $hashes = is_array($records[$name] ?? null) ? $records[$name]['sha256'] ?? null : null;
+                if (!is_array($hashes)) {
+                    $page->fail([], 'picture "' . $name . '" has no record in ' . self::CAPTURES);
+                    continue;
+                }
+                foreach (Screenshots::files($name) as $variant => $path) {
+                    if (($hashes[$variant] ?? null) !== hash_file('sha256', $root . '/' . $path)) {
+                        $page->fail([], 'picture "' . $name . '": ' . $path . ' is not the ' . $variant . ' file recorded in ' . self::CAPTURES);
+                    }
+                }
+            }
+        }
+    }
+
+    /** @return array<mixed> the capture records by picture name; none while the record file does not exist */
+    private static function captures(string $root): array
+    {
+        $path = $root . '/' . self::CAPTURES;
+        if (!is_file($path)) {
+            return [];
+        }
+        try {
+            $records = json_decode((string) file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
+        } catch (\JsonException $error) {
+            throw new RuntimeException(self::CAPTURES . ': is not valid JSON (' . $error->getMessage() . ')', previous: $error);
+        }
+
+        return is_array($records) ? $records : [];
     }
 
     /**

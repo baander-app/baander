@@ -19,6 +19,8 @@ const test = base.extend<{ localRequests: void }>({
 // The specs cannot read the site's data files, so the built sitemap says which feature pages exist.
 const sitemap = readFileSync(fileURLToPath(new URL('../../../var/website/sitemap.xml', import.meta.url)), 'utf8');
 const featurePages = [...sitemap.matchAll(/<loc>https:\/\/baander\.app(\/features\/[^<]+)<\/loc>/g)].map((match) => match[1]);
+// The record of the pictures the capture script took, by picture name, with the scene that took each.
+const captures: Record<string, { scene: string }> = JSON.parse(readFileSync(fileURLToPath(new URL('../features/captures.json', import.meta.url)), 'utf8'));
 
 async function loadedImage(image: Locator): Promise<void> {
   await image.scrollIntoViewIfNeeded();
@@ -168,6 +170,20 @@ for (const path of featurePages) {
     }
   });
 }
+
+test('the equalizer page shows the five pictures recorded for its scene, and the site serves each in both variants', async ({ page }) => {
+  const recorded = Object.keys(captures).filter((name) => captures[name].scene === 'equalizer');
+  expect(recorded).toHaveLength(5);
+  await page.goto('/features/equalizer/');
+  const sources = await page.locator('main .app-screenshot img').evaluateAll((images) => images.map((image) => image.getAttribute('src')!));
+  expect([...sources].sort()).toEqual(recorded.flatMap((name) => [`/assets/site/screenshots/${name}-light.webp`, `/assets/site/screenshots/${name}.webp`]).sort());
+  // The variant an appearance hides is not loaded by the page, so each file is asked for by itself.
+  const served = await page.evaluate((paths) => Promise.all(paths.map(async (path) => {
+    const response = await fetch(path);
+    return { path, status: response.status, type: response.headers.get('content-type') };
+  })), sources);
+  expect(served).toEqual(sources.map((path) => ({ path, status: 200, type: 'image/webp' })));
+});
 
 test('each feature page links to its neighbours in the overview\'s order and to the overview, and the ends do not wrap around', async ({ page }) => {
   const order = await overviewLinks(page);

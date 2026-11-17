@@ -1,0 +1,241 @@
+// What a capture does in the application's interface, written against the labels a visitor
+// sees: opening a window, signing in, moving between pages, starting and pausing playback and
+// choosing a theme. Nothing here intercepts a request, injects a style or script that changes
+// what the application shows, or edits the page; the page is only read and operated.
+
+// The size every picture is taken at: the website's content column, at twice the pixel density.
+export const WINDOW = { width: 1136, height: 710 };
+export const SCALE = 2;
+
+// The theme names of the two variants of a picture, as the application's appearance settings
+// label them and as it marks them on the page.
+export const THEMES = {
+  dark: { label: 'Dark', mood: 'dark' },
+  light: { label: 'Balanced', mood: 'balanced' },
+};
+
+const COVER_REQUEST = /^\/api\/(images\/|(albums|artists)\/[^/]+\/cover$)/;
+const PREFERENCE_READS = ['/api/user/audio-preferences/', '/api/user/player-preferences/', '/api/user/layout-preferences/'];
+
+const pathOf = message => new URL(message.url()).pathname;
+
+/**
+ * Opens an application window of the picture size in a browser context of its own.
+ *
+ * The returned `covers` follows the window's cover requests without touching them: `pending`
+ * holds the ones in flight, and `failed` the ones whose latest answer was an error, by the
+ * address the application asked for.
+ */
+export async function openWindow(browser, baseURL, deviceScaleFactor = SCALE) {
+  // The preview's certificate is signed locally, which no browser trusts by itself.
+  const context = await browser.newContext({ baseURL, ignoreHTTPSErrors: true, viewport: WINDOW, deviceScaleFactor });
+  const page = await context.newPage();
+  const covers = { pending: new Set(), failed: new Map() };
+  // A redirected request is answered under another address; the cover is the one first asked for.
+  const asked = (request) => {
+    let first = request;
+    while (first.redirectedFrom()) first = first.redirectedFrom();
+    return first;
+  };
+  page.on('request', (request) => {
+    if (COVER_REQUEST.test(pathOf(asked(request)))) covers.pending.add(asked(request));
+  });
+  page.on('requestfinished', async (request) => {
+    const first = asked(request);
+    if (!covers.pending.has(first)) return;
+    const response = await request.response();
+    if (response.status() >= 300 && response.status() < 400) return;
+    covers.pending.delete(first);
+    if (response.ok()) covers.failed.delete(pathOf(first));
+    else covers.failed.set(pathOf(first), `answered ${response.status()}`);
+  });
+  page.on('requestfailed', (request) => {
+    const first = asked(request);
+    if (!covers.pending.delete(first)) return;
+    // The application abandons the request of a cover that left the screen.
+    if (request.failure()?.errorText !== 'net::ERR_ABORTED') covers.failed.set(pathOf(first), `failed: ${request.failure()?.errorText}`);
+  });
+  return { page, covers };
+}
+
+/**
+ * Signs in through the login page and waits until the application has read the account's stored
+ * preferences. When it then asks which version of the settings to keep, the stored one is chosen.
+ */
+export async function signIn(page, { email, password }) {
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  await page.getByLabel('Email', { exact: true }).fill(email);
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  const preferencesRead = Promise.all(PREFERENCE_READS.map(path => page.waitForResponse(
+    response => pathOf(response) === path && response.request().method() === 'GET',
+  )));
+  // A refused sign-in is reported below; the reads it never made must not be reported as well.
+  preferencesRead.catch(() => {});
+  // The first attempt may be answered with a nonce to prove possession with; the application retries by itself.
+  const answered = page.waitForResponse(async (response) => {
+    if (pathOf(response) !== '/api/auth/login' || response.request().method() !== 'POST') return false;
+    return !(response.status() === 400 && response.headers()['dpop-nonce']);
+  });
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  const response = await answered;
+  if (response.status() === 429) {
+    throw new Error(`The application limits sign-in attempts and refused ${email}; it accepts the next one in ${response.headers()['retry-after'] ?? 'an unknown number of'} seconds.`);
+  }
+  if (!response.ok()) {
+    throw new Error(`The application refused to sign ${email} in (HTTP ${response.status()}).`);
+  }
+  await page.waitForURL(url => url.pathname === '/music');
+  await page.getByRole('heading', { name: 'Home', exact: true, level: 1 }).waitFor();
+  await preferencesRead;
+  await keepStoredSettings(page, 1500);
+}
+
+/**
+ * Answers the application's question about which version of the settings to keep, when it asks
+ * within `patience` milliseconds, by choosing the one the account has stored. A window asks after
+ * signing in, and a second window of an account may ask when the first changes a setting.
+ */
+async function keepStoredSettings(page, patience) {
+  const question = page.getByRole('dialog').filter({ hasText: 'Settings conflict' });
+  for (;;) {
+    try {
+      await question.waitFor({ timeout: patience });
+    } catch {
+      return;
+    }
+    await question.getByRole('button', { name: 'Use server version', exact: true }).click();
+    await question.waitFor({ state: 'hidden' });
+  }
+}
+
+/**
+ * Leaves the application as a visitor who goes to another address does, which lets it report
+ * that the window no longer plays. A window that just disappears keeps hold of the account's
+ * playback for a while, and a run started soon after could not start a song.
+ */
+export async function leave(page) {
+  await page.goto('about:blank');
+}
+
+/** Follows a link in the sidebar, as a visitor moves between pages; the session stays signed in. */
+export async function openFromSidebar(page, name, path) {
+  await page.locator('aside').first().getByRole('link', { name, exact: true }).click();
+  await page.waitForURL(url => url.pathname === path);
+}
+
+/** A card on the page, by its title. */
+export function card(page, title) {
+  return page.locator('main [data-slot="card"]').filter({ has: page.locator('[data-slot="card-title"]').getByText(title, { exact: true }) });
+}
+
+/**
+ * Lists the catalog as the Songs page does for its artist and album columns, by reading the two
+ * answers the page itself receives when it opens.
+ */
+export async function readCatalog(page) {
+  const listing = path => page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return url.pathname === path && url.searchParams.get('limit') === '100' && response.request().method() === 'GET';
+  });
+  const answers = Promise.all([listing('/api/artists/'), listing('/api/albums/')]);
+  await openFromSidebar(page, 'Songs', '/music/songs');
+  const [artists, albums] = await Promise.all((await answers).map(answer => answer.json()));
+  return {
+    artists: { total: artists.meta.total, names: artists.data.map(artist => artist.name) },
+    albums: {
+      total: albums.meta.total,
+      entries: albums.data.map(album => ({ title: album.title, artists: album.artists.map(artist => artist.name) })),
+    },
+  };
+}
+
+const playerBar = page => page.getByLabel('Playback', { exact: true });
+
+/**
+ * Starts a song from its beginning on the Songs page and waits until it plays.
+ *
+ * A browser that closed while it played keeps hold of the account's playback; the hold is ended
+ * first with the application's own "Play here anyway".
+ */
+export async function playSong(page, { album, title }) {
+  await openFromSidebar(page, 'Songs', '/music/songs');
+  const destination = playerBar(page).getByRole('button', { name: 'Playback destination', exact: true });
+  if (await destination.count() > 0 && await destination.getAttribute('title') === 'Previous playback is unconfirmed.') {
+    await destination.click();
+    await page.getByRole('menuitem', { name: 'Play here anyway', exact: true }).click();
+    await page.getByRole('menu').waitFor({ state: 'hidden' });
+  }
+  await page.getByRole('listbox', { name: 'Album', exact: true }).getByRole('option', { name: album }).click();
+  await page.locator('main').getByText(title, { exact: true }).dblclick();
+  await playerBar(page).getByRole('button', { name: 'Pause', exact: true }).waitFor();
+  await playerBar(page).getByRole('group', { name: 'Now playing', exact: true }).getByText(title, { exact: true }).waitFor();
+}
+
+/** Whether the player bar shows the song as the one playing now. */
+export async function isPlaying(page, title) {
+  const bar = playerBar(page);
+  return await bar.getByRole('button', { name: 'Pause', exact: true }).isVisible()
+    && await bar.getByRole('group', { name: 'Now playing', exact: true }).getByText(title, { exact: true }).isVisible();
+}
+
+/** Pauses playback with the player bar's button. */
+export async function pausePlayback(page) {
+  await playerBar(page).getByRole('button', { name: 'Pause', exact: true }).click();
+  await playerBar(page).getByRole('button', { name: 'Play', exact: true }).waitFor();
+}
+
+/** Scrolls the page back to its top with the mouse wheel. */
+export async function scrollToTop(page) {
+  const shown = await page.locator('main').boundingBox();
+  await page.mouse.move(shown.x + shown.width / 2, shown.y + shown.height / 2);
+  await page.mouse.wheel(0, -100000);
+  await page.waitForTimeout(150);
+}
+
+/**
+ * Scrolls the page so that the elements are in view together, centred in the area the window
+ * shows. It starts from the top of the page each time, so the same elements always land on the
+ * same spot.
+ */
+export async function bringIntoView(page, ...locators) {
+  await scrollToTop(page);
+  const shown = await page.locator('main').boundingBox();
+  const boxes = await Promise.all(locators.map(locator => locator.boundingBox()));
+  const top = Math.min(...boxes.map(box => box.y));
+  const bottom = Math.max(...boxes.map(box => box.y + box.height));
+  await page.mouse.wheel(0, Math.round(top - shown.y - Math.max(0, (shown.height - (bottom - top)) / 2)));
+  await page.waitForTimeout(150);
+}
+
+/**
+ * Sets a slider to a value with the arrow keys, whatever it showed before, and takes the keyboard
+ * focus off it again by clicking the text `rest`, which must do nothing when clicked.
+ */
+export async function setSlider(thumb, value, rest) {
+  await thumb.focus();
+  for (let presses = 0; presses < 200; presses += 1) {
+    const now = Number(await thumb.getAttribute('aria-valuenow'));
+    if (now === value) {
+      await rest.click();
+      return;
+    }
+    await thumb.press(now < value ? 'ArrowUp' : 'ArrowDown');
+  }
+  throw new Error(`The slider ${await thumb.getAttribute('aria-label')} did not reach ${value}.`);
+}
+
+/**
+ * Chooses a theme for the account in a second window, on the Settings page's appearance buttons,
+ * and waits until the photographed window has taken it over through the application's live
+ * updates. The photographed window is not touched, so its view stays as it was.
+ */
+export async function chooseTheme(appearance, page, theme) {
+  const { label, mood } = THEMES[theme];
+  if (await page.locator('html').getAttribute('data-theme') !== mood) {
+    await keepStoredSettings(appearance, 1);
+    await appearance.getByRole('button', { name: `Select ${label} theme`, exact: true }).click();
+    await page.waitForFunction(wanted => document.documentElement.getAttribute('data-theme') === wanted, mood);
+  }
+  // Colours that fade rather than switch have finished well within this time.
+  await page.waitForTimeout(600);
+}

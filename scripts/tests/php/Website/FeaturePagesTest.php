@@ -15,6 +15,8 @@ final class FeaturePagesTest extends TestCase
     private const string INDEX = 'ui/site/features/index.php';
     private const string EQUALIZER = 'ui/site/features/equalizer.php';
     private const string CONSOLE = 'ui/site/features/console.php';
+    private const string CAPTURES = 'ui/site/features/captures.json';
+    private const string PICTURES = 'ui/site/assets/screenshots/';
     private string $root;
 
     protected function setUp(): void
@@ -165,6 +167,7 @@ final class FeaturePagesTest extends TestCase
         $this->site();
         $this->picture('equalizer', $dark, $light);
         file_put_contents($this->root . '/ui/site/assets/screenshots/equalizer-light.webp', str_repeat("\0", $padding), FILE_APPEND);
+        $this->record('equalizer', 'equalizer-bands');
         self::assertSame(self::EQUALIZER . ': hero: ' . $problem, $this->failure());
     }
 
@@ -172,8 +175,76 @@ final class FeaturePagesTest extends TestCase
     {
         $this->site();
         file_put_contents($this->root . '/ui/site/assets/screenshots/equalizer.webp', str_repeat("\0", 500_000 - 38), FILE_APPEND);
+        $this->record('equalizer', 'equalizer-bands');
         self::assertSame(500_000, filesize($this->root . '/ui/site/assets/screenshots/equalizer.webp'));
         self::assertCount(3, FeaturePages::load($this->root));
+    }
+
+    public function testReferencedPictureWithoutACaptureRecordNamesTheDataFileAndThePicture(): void
+    {
+        $this->site();
+        $this->record('equalizer');
+        self::assertSame(self::EQUALIZER . ': picture "equalizer-bands" has no record in ' . self::CAPTURES, $this->failure());
+
+        unlink($this->root . '/' . self::CAPTURES);
+        self::assertSame(implode("\n", [
+            self::EQUALIZER . ': picture "equalizer" has no record in ' . self::CAPTURES,
+            self::EQUALIZER . ': picture "equalizer-bands" has no record in ' . self::CAPTURES,
+        ]), $this->failure());
+    }
+
+    public function testPagesThatShowNoPictureNeedNoCaptureRecord(): void
+    {
+        $index = self::index();
+        $index['groups'] = [$index['groups'][1]];
+        $this->data('index', $index);
+        $this->data('console', self::console());
+
+        self::assertFileDoesNotExist($this->root . '/' . self::CAPTURES);
+        self::assertCount(2, FeaturePages::load($this->root));
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function variants(): iterable
+    {
+        yield 'dark' => ['dark', 'equalizer-bands.webp'];
+        yield 'light' => ['light', 'equalizer-bands-light.webp'];
+    }
+
+    #[DataProvider('variants')]
+    public function testPictureFileThatIsNotTheRecordedOneNamesTheFileAndItsVariant(string $variant, string $file): void
+    {
+        $this->site();
+        self::assertCount(3, FeaturePages::load($this->root));
+
+        // What a picture retaken in one theme only, or edited by hand, leaves behind.
+        file_put_contents($this->root . '/' . self::PICTURES . $file, "\0", FILE_APPEND);
+        self::assertSame(
+            self::EQUALIZER . ': picture "equalizer-bands": ' . self::PICTURES . $file . ' is not the ' . $variant . ' file recorded in ' . self::CAPTURES,
+            $this->failure(),
+        );
+    }
+
+    public function testCaptureRecordProblemsAreReportedWithTheOtherProblemsOfTheirPage(): void
+    {
+        $this->site();
+        $this->record('equalizer-bands');
+        $this->data('equalizer', self::equalizer(['colour' => 'violet']));
+        $console = self::console();
+        unset($console['limits']);
+        $this->data('console', $console);
+        self::assertSame(implode("\n", [
+            self::CONSOLE . ': limits: missing',
+            self::EQUALIZER . ': colour: unknown key',
+            self::EQUALIZER . ': picture "equalizer" has no record in ' . self::CAPTURES,
+        ]), $this->failure());
+    }
+
+    public function testCaptureRecordThatIsNotJsonNamesTheRecord(): void
+    {
+        $this->site();
+        file_put_contents($this->root . '/' . self::CAPTURES, "<<<<<<< HEAD\n{}");
+        self::assertSame(self::CAPTURES . ': is not valid JSON (Syntax error)', $this->failure());
     }
 
     public function testAlternativeTextMustBePresentAndUniqueWithinAPage(): void
@@ -390,8 +461,8 @@ final class FeaturePagesTest extends TestCase
     }
 
     /**
-     * Writes a valid index, the equalizer page with two pictures and the console page whose hero is
-     * a manual block.
+     * Writes a valid index, the equalizer page with two recorded pictures and the console page
+     * whose hero is a manual block.
      */
     private function site(): void
     {
@@ -400,6 +471,20 @@ final class FeaturePagesTest extends TestCase
         $this->data('console', self::console());
         $this->picture('equalizer', '4x2', '4x2');
         $this->picture('equalizer-bands', '6x2', '6x2');
+        $this->record('equalizer', 'equalizer-bands');
+    }
+
+    /** Writes the capture record of the named pictures as their files are now; no other picture has a record. */
+    private function record(string ...$names): void
+    {
+        $hash = fn(string $file): string => (string) hash_file('sha256', $this->root . '/' . self::PICTURES . $file);
+        $records = array_map(static fn(string $name): array => [
+            'scene' => 'equalizer',
+            'commit' => '0326c6acb67e44ab6ac79bac9bb61e230e04c878',
+            'date' => '2026-11-17',
+            'sha256' => ['dark' => $hash($name . '.webp'), 'light' => $hash($name . '-light.webp')],
+        ], array_combine($names, $names));
+        file_put_contents($this->root . '/' . self::CAPTURES, json_encode($records, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT));
     }
 
     /** The manual pages the valid site links to and borrows from, and templates that print what they receive. */

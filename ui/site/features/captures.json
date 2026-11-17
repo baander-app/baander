@@ -1,0 +1,47 @@
+{
+  "equalizer-compare": {
+    "scene": "equalizer",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "d376eabb5b1fe98b6696b2f461ef0ff89e07e179f2ec622c11f07e6dc47a057d",
+      "light": "53e7f966874d3eda8f101da78ba3c28dcc3e1b1fe4b475e61e70a24bd270b56b"
+    }
+  },
+  "equalizer-curve": {
+    "scene": "equalizer",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "cd700ead7f558d4a1a4922320621fef4fc95e191af785301f8ed598106972af2",
+      "light": "6b637b2cc853b32d9696188565dbfce444d78d6f4cfefbf9fa3d2f49bb7796db"
+    }
+  },
+  "equalizer-device-profiles": {
+    "scene": "equalizer",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "188112e50e2c4d9900a655f4f5eca9fa1ca55dbf2ee24958902d991026191326",
+      "light": "5281b6f548e2e9d24098060916d4304c245551fc0754e1cc7e012928223adf2f"
+    }
+  },
+  "equalizer-dynamics": {
+    "scene": "equalizer",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "39cdf19deec09a4759486311ffecc6f8f940b94d978f51b90c390f7dd4f8a171",
+      "light": "75ce21a0ba01fc7598a82c0c35a12cf87ec6efeef98ed6783f1f6e83251535d1"
+    }
+  },
+  "equalizer-window": {
+    "scene": "equalizer",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "b16f4aab8d11f89fd68ef5986f096371e1067619ced410ea08f196b13fd7fadf",
+      "light": "3fc9589388ce7833f933c655911ea7f5c13b5dd46b0cd6444e028f319e928ee5"
+    }
+  }
+}
