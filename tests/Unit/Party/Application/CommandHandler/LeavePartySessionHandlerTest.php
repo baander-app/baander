@@ -15,180 +15,208 @@ use App\Party\Domain\Model\PartyMemberState;
 use App\Party\Domain\Model\SyncedPartySession;
 use App\Party\Domain\ValueObject\MemberRole;
 use App\Party\Domain\ValueObject\PlaybackState;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
-use PHPUnit\Framework\MockObject\MockObject;
-use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
+/**
+ * A leave runs in one transaction that starts by locking the party, and the room hears of it
+ * after the commit. The ports here keep a party in memory: a read hands out a copy, so only
+ * what the handler saves is stored.
+ */
 final class LeavePartySessionHandlerTest extends TestCase
 {
-    private PartySessionPortInterface&MockObject $sessionPort;
-    private PartyMemberPortInterface&MockObject $memberPort;
-    private EventDispatcherInterface&Stub $eventDispatcher;
-    private LeavePartySessionHandler $handler;
-
+    private ?SyncedPartySession $session = null;
+    /** @var array<string, PartyMember> the stored member rows by user ID */
+    private array $members = [];
+    private bool $inTransaction = false;
+    private bool $locked = false;
     /** @var list<object> */
     private array $dispatched = [];
+    private LeavePartySessionHandler $handler;
 
     protected function setUp(): void
     {
-        $this->sessionPort = $this->createMock(PartySessionPortInterface::class);
-        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
-        $this->eventDispatcher = $this->createStub(EventDispatcherInterface::class);
-        $this->dispatched = [];
-        $this->eventDispatcher->method('dispatch')->willReturnCallback(function (object $e): object {
-            $this->dispatched[] = $e;
+        $sessions = $this->createStub(PartySessionPortInterface::class);
+        $sessions->method('lockByUuid')->willReturnCallback(function (Uuid $id): ?SyncedPartySession {
+            self::assertTrue($this->inTransaction, 'The party is locked inside the transaction.');
+            $this->locked = true;
 
-            return $e;
+            return $this->session?->getId()->equals($id) === true
+                ? SyncedPartySession::reconstitute(clone $this->session->getState())
+                : null;
         });
-        $this->handler = new LeavePartySessionHandler($this->sessionPort, $this->memberPort, $this->eventDispatcher);
+        $sessions->method('save')->willReturnCallback(function (SyncedPartySession $session): void {
+            self::assertTrue($this->locked, 'The party changes under its lock.');
+            $this->session = $session;
+        });
+
+        $members = $this->createStub(PartyMemberPortInterface::class);
+        $members->method('removeMember')->willReturnCallback(function (Uuid $userId): bool {
+            self::assertTrue($this->locked, 'Membership is decided under the party\'s lock.');
+            $held = isset($this->members[$userId->toString()]);
+            unset($this->members[$userId->toString()]);
+
+            return $held;
+        });
+        $members->method('findBySession')->willReturnCallback(function (): array {
+            self::assertTrue($this->locked, 'Membership is decided under the party\'s lock.');
+
+            return array_map(
+                static fn (PartyMember $member): PartyMember => PartyMember::reconstitute(clone $member->getState()),
+                array_values($this->members),
+            );
+        });
+        $members->method('save')->willReturnCallback(function (PartyMember $member): void {
+            self::assertTrue($this->locked, 'A member changes under the party\'s lock.');
+            $this->members[$member->getUserId()->toString()] = $member;
+        });
+
+        $transaction = $this->createStub(TransactionPortInterface::class);
+        $transaction->method('run')->willReturnCallback(function (callable $operation): mixed {
+            $this->inTransaction = true;
+            try {
+                return $operation();
+            } finally {
+                $this->inTransaction = false;
+            }
+        });
+
+        $events = $this->createStub(EventDispatcherInterface::class);
+        $events->method('dispatch')->willReturnCallback(function (object $event): object {
+            self::assertFalse($this->inTransaction, 'The room hears of the leave after the commit.');
+            if ($event instanceof MemberLeft) {
+                self::assertArrayNotHasKey($event->getUserId()->toString(), $this->members, 'The member row is gone when the room hears of the leave.');
+            }
+            $this->dispatched[] = $event;
+
+            return $event;
+        });
+
+        $this->handler = new LeavePartySessionHandler($sessions, $members, $transaction, $events);
     }
 
-    public function testNonHostMemberLeavesAndIsRemovedWithoutPromotionAndMemberLeftIsDispatched(): void
+    public function testALeaveByAUserWithNoMemberRowChangesNothingAndTellsNobody(): void
     {
-        $hostUserId = Uuid::v4();
-        $memberUserId = Uuid::v4();
-        $session = SyncedPartySession::create($hostUserId, Uuid::v4(), Uuid::v4());
+        $host = Uuid::v4();
+        $this->party($host, guests: [Uuid::v4()]);
 
-        $this->sessionPort->method('findByUuid')->willReturn($session);
+        ($this->handler)(new LeavePartySessionCommand(Uuid::v4(), $this->sessionId()));
 
-        $this->memberPort->expects($this->once())
-            ->method('removeMember')
-            ->with($memberUserId, $session->getId());
-
-        $this->memberPort->expects($this->never())->method('findBySession');
-        $this->memberPort->expects($this->never())->method('save');
-        $this->sessionPort->expects($this->never())->method('save');
-        $this->sessionPort->expects($this->never())->method('transferHost');
-
-        ($this->handler)(new LeavePartySessionCommand($memberUserId, $session->getId()));
-
-        $this->assertMemberLeft($session->getId(), $memberUserId);
+        self::assertCount(2, $this->members);
+        self::assertTrue($this->session?->getHostUserId()->equals($host));
+        self::assertTrue($this->session->isActive());
+        self::assertSame([], $this->dispatched);
     }
 
-    public function testHostLeavingWithRemainingMembersHandsTheHostRoleToTheEarliestJoined(): void
+    public function testAMembersLeaveRemovesTheirRowAndTellsTheRoomOnce(): void
     {
-        $hostUserId = Uuid::v4();
-        $session = SyncedPartySession::create($hostUserId, Uuid::v4(), Uuid::v4());
-        $sessionId = $session->getId();
+        $host = Uuid::v4();
+        $guest = Uuid::v4();
+        $this->party($host, guests: [$guest]);
 
-        // Create remaining members with deliberately out-of-order joinedAt timestamps
-        $earliestMember = $this->buildMember($sessionId, new DateTimeImmutable('2026-01-01T10:00:00'));
-        $middleMember = $this->buildMember($sessionId, new DateTimeImmutable('2026-01-01T11:00:00'));
-        $latestMember = $this->buildMember($sessionId, new DateTimeImmutable('2026-01-01T12:00:00'));
+        ($this->handler)(new LeavePartySessionCommand($guest, $this->sessionId()));
 
-        $this->sessionPort->method('findByUuid')->willReturn($session);
-
-        $this->memberPort->expects($this->once())
-            ->method('removeMember')
-            ->with($hostUserId, $sessionId);
-
-        // Return members in non-sorted order to verify usort
-        $this->memberPort->expects($this->once())
-            ->method('findBySession')
-            ->with($sessionId)
-            ->willReturn([$latestMember, $earliestMember, $middleMember]);
-
-        // Only the earliest-joined member should be saved (promoted to host)
-        $this->memberPort->expects($this->once())
-            ->method('save')
-            ->with($this->callback(function (PartyMember $member) use ($earliestMember): bool {
-                $this->assertTrue($member->getUserId()->equals($earliestMember->getUserId()));
-                $this->assertSame(MemberRole::Host, $member->getRole(), 'Earliest member should be promoted to host.');
-
-                return true;
-            }));
-
-        // The session itself names the promoted member as host, so that member steers playback.
-        $this->sessionPort->expects($this->once())
-            ->method('transferHost')
-            ->with($sessionId, $earliestMember->getUserId());
-        $this->sessionPort->expects($this->never())->method('save');
-
-        ($this->handler)(new LeavePartySessionCommand($hostUserId, $sessionId));
-
-        $this->assertMemberLeft($sessionId, $hostUserId);
+        self::assertSame([$host->toString() => MemberRole::Host], $this->roles());
+        self::assertTrue($this->session?->getHostUserId()->equals($host));
+        $this->assertOnlyMemberLeft($guest);
     }
 
-    public function testHostLeavingWithNoRemainingMembersEndsSessionAndDispatchesEvent(): void
+    public function testAHostWhoLeavesHandsThePartyToTheEarliestJoinedMember(): void
     {
-        $hostUserId = Uuid::v4();
-        $session = SyncedPartySession::create($hostUserId, Uuid::v4(), Uuid::v4());
-        $sessionId = $session->getId();
+        $host = Uuid::v4();
+        [$latest, $earliest, $middle] = [Uuid::v4(), Uuid::v4(), Uuid::v4()];
+        // Stored out of joining order, so the handler has to compare the joining times.
+        $this->party($host, guests: [$latest, $earliest, $middle], joinedAfterMinutes: [3, 1, 2]);
 
-        $this->sessionPort->method('findByUuid')->willReturn($session);
+        ($this->handler)(new LeavePartySessionCommand($host, $this->sessionId()));
 
-        $this->memberPort->expects($this->once())
-            ->method('removeMember')
-            ->with($hostUserId, $sessionId);
+        self::assertTrue($this->session?->getHostUserId()->equals($earliest), 'The session names the earliest-joined member as its host.');
+        self::assertTrue($this->session->isActive());
+        self::assertSame(
+            [
+                $latest->toString() => MemberRole::Member,
+                $earliest->toString() => MemberRole::Host,
+                $middle->toString() => MemberRole::Member,
+            ],
+            $this->roles(),
+        );
+        $this->assertOnlyMemberLeft($host);
+    }
 
-        $this->memberPort->expects($this->once())
-            ->method('findBySession')
-            ->with($sessionId)
-            ->willReturn([]);
+    public function testTheLastMemberToLeaveEndsThePartyAfterLeavingIt(): void
+    {
+        $host = Uuid::v4();
+        $this->party($host, guests: []);
 
-        $this->sessionPort->expects($this->never())->method('transferHost');
-        $this->sessionPort->expects($this->once())
-            ->method('save')
-            ->with($this->callback(function (SyncedPartySession $saved) use ($hostUserId): bool {
-                $this->assertFalse($saved->isActive(), 'Session should be ended.');
-                $this->assertSame(PlaybackState::Stopped, $saved->getPlaybackState());
-                $this->assertTrue($saved->getHostUserId()->equals($hostUserId));
+        ($this->handler)(new LeavePartySessionCommand($host, $this->sessionId()));
 
-                return true;
-            }));
-
-        ($this->handler)(new LeavePartySessionCommand($hostUserId, $sessionId));
-
-        // The member leaves first, then the session ends: one event each.
-        self::assertCount(2, $this->dispatched);
-        self::assertInstanceOf(MemberLeft::class, $this->dispatched[0]);
-        self::assertTrue($this->dispatched[0]->getUserId()->equals($hostUserId));
-        $ended = $this->dispatched[1];
+        self::assertSame([], $this->members);
+        self::assertFalse($this->session?->isActive(), 'A party without members ends.');
+        self::assertSame(PlaybackState::Stopped, $this->session->getPlaybackState());
+        self::assertSame([MemberLeft::class, PartySessionEnded::class], array_map(get_class(...), $this->dispatched));
+        [$left, $ended] = $this->dispatched;
+        self::assertInstanceOf(MemberLeft::class, $left);
+        self::assertTrue($left->getUserId()->equals($host));
         self::assertInstanceOf(PartySessionEnded::class, $ended);
-        self::assertTrue($ended->getSessionId()->equals($sessionId));
-        self::assertTrue($ended->getHostUserId()->equals($hostUserId));
+        self::assertTrue($ended->getSessionId()->equals($this->sessionId()));
+        self::assertTrue($ended->getHostUserId()->equals($host));
     }
 
-    public function testNoOpWhenSessionNotFound(): void
+    public function testALeaveOfAPartyThatDoesNotExistDoesNothing(): void
     {
-        $sessionId = Uuid::v4();
-
-        $this->sessionPort->expects($this->once())
-            ->method('findByUuid')
-            ->with($sessionId)
-            ->willReturn(null);
-
-        $this->memberPort->expects($this->never())->method('removeMember');
-        $this->memberPort->expects($this->never())->method('findBySession');
-        $this->sessionPort->expects($this->never())->method('save');
-        $this->sessionPort->expects($this->never())->method('transferHost');
-
-        ($this->handler)(new LeavePartySessionCommand(Uuid::v4(), $sessionId));
+        ($this->handler)(new LeavePartySessionCommand(Uuid::v4(), Uuid::v4()));
 
         self::assertSame([], $this->dispatched);
     }
 
-    private function assertMemberLeft(Uuid $sessionId, Uuid $userId): void
+    /**
+     * Stores a party whose host joined first.
+     *
+     * @param list<Uuid> $guests
+     * @param list<int>  $joinedAfterMinutes each guest's joining time after the host's; one minute apart in the given order when empty
+     */
+    private function party(Uuid $host, array $guests, array $joinedAfterMinutes = []): void
+    {
+        $this->session = SyncedPartySession::create($host, Uuid::v4(), null);
+        $this->member($host, MemberRole::Host, 0);
+        foreach ($guests as $index => $guest) {
+            $this->member($guest, MemberRole::Member, $joinedAfterMinutes[$index] ?? $index + 1);
+        }
+    }
+
+    private function member(Uuid $userId, MemberRole $role, int $joinedAfterMinutes): void
+    {
+        $this->members[$userId->toString()] = PartyMember::reconstitute(new PartyMemberState(
+            id: Uuid::v4(),
+            publicId: new PublicId(),
+            userId: $userId,
+            sessionId: $this->sessionId(),
+            joinedAt: new DateTimeImmutable('2026-01-01T10:00:00+00:00')->modify('+' . $joinedAfterMinutes . ' minutes'),
+            role: $role,
+        ));
+    }
+
+    private function sessionId(): Uuid
+    {
+        return $this->session?->getId() ?? self::fail('No party is stored.');
+    }
+
+    /** @return array<string, MemberRole> the stored members' roles by user ID */
+    private function roles(): array
+    {
+        return array_map(static fn (PartyMember $member): MemberRole => $member->getRole(), $this->members);
+    }
+
+    private function assertOnlyMemberLeft(Uuid $userId): void
     {
         self::assertCount(1, $this->dispatched);
         $event = $this->dispatched[0];
         self::assertInstanceOf(MemberLeft::class, $event);
-        self::assertTrue($event->getSessionId()->equals($sessionId));
+        self::assertTrue($event->getSessionId()->equals($this->sessionId()));
         self::assertTrue($event->getUserId()->equals($userId));
-    }
-
-    private function buildMember(Uuid $sessionId, DateTimeImmutable $joinedAt): PartyMember
-    {
-        return PartyMember::reconstitute(new PartyMemberState(
-            id: Uuid::v4(),
-            publicId: new PublicId(),
-            userId: Uuid::v4(),
-            sessionId: $sessionId,
-            joinedAt: $joinedAt,
-        ));
     }
 }

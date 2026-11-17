@@ -6,63 +6,182 @@ namespace App\Tests\Unit\Party\Application\CommandHandler;
 
 use App\Party\Application\Command\TransferHostCommand;
 use App\Party\Application\CommandHandler\TransferHostHandler;
+use App\Party\Application\Exception\PartyNotFoundException;
 use App\Party\Application\Port\PartyMemberPortInterface;
+use App\Party\Application\Port\PartyPublicIdentityPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
 use App\Party\Domain\Model\PartyMember;
 use App\Party\Domain\Model\SyncedPartySession;
 use App\Party\Domain\ValueObject\MemberRole;
+use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Application\Exception\NotFoundException;
+use App\Shared\Application\Port\TransactionPortInterface;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\AssertionFailedError;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
+use Symfony\Contracts\Translation\TranslatableInterface;
 
+/**
+ * A host transfer runs in one transaction that starts by locking the party. The ports here keep
+ * a party of a host and a guest in memory: a read hands out a copy, so only what the handler
+ * saves is stored. An outsider is a user who is not a member; nobody has the unknown public ID.
+ */
 final class TransferHostHandlerTest extends TestCase
 {
-    public function testTransfersHostOnlyToAnExistingMemberAndPreservesInternalCommands(): void
+    private const array USERS = ['host', 'guest', 'outsider'];
+
+    private ?SyncedPartySession $session = null;
+    /** @var array<string, PartyMember> the stored member rows by user ID */
+    private array $members = [];
+    /** @var array<string, Uuid> */
+    private array $userIds = [];
+    /** @var array<string, PublicId> */
+    private array $publicIds = [];
+    private Uuid $sessionId;
+    private bool $inTransaction = false;
+    private bool $locked = false;
+    private TransferHostHandler $handler;
+
+    protected function setUp(): void
     {
-        $host = new Uuid();
-        $target = new Uuid();
-        $session = SyncedPartySession::create($host, new Uuid(), null);
-        $oldMember = PartyMember::create($host, $session->getId(), MemberRole::Host);
-        $newMember = PartyMember::create($target, $session->getId());
-        $sessions = $this->createMock(PartySessionPortInterface::class);
-        $sessions->expects($this->once())->method('findByUuid')->with($session->getId())->willReturn($session);
-        $sessions->expects($this->once())->method('transferHost')->with($session->getId(), $target);
-        $members = $this->createMock(PartyMemberPortInterface::class);
-        $members->expects($this->exactly(2))->method('findByUserAndSession')->willReturnOnConsecutiveCalls($newMember, $oldMember);
-        $members->expects($this->exactly(2))->method('save');
+        foreach (self::USERS as $name) {
+            $this->userIds[$name] = Uuid::v4();
+            $this->publicIds[$name] = new PublicId();
+        }
+        $this->publicIds['unknown'] = new PublicId();
+        $this->session = SyncedPartySession::create($this->userIds['host'], Uuid::v4(), null);
+        $this->sessionId = $this->session->getId();
+        foreach (['host' => MemberRole::Host, 'guest' => MemberRole::Member] as $name => $role) {
+            $this->members[$this->userIds[$name]->toString()] = PartyMember::create($this->userIds[$name], $this->sessionId, $role);
+        }
 
-        (new TransferHostHandler($sessions, $members))(new TransferHostCommand($session->getId(), $host, $target));
+        $sessions = $this->createStub(PartySessionPortInterface::class);
+        $sessions->method('lockByUuid')->willReturnCallback(function (Uuid $id): ?SyncedPartySession {
+            self::assertTrue($this->inTransaction, 'The party is locked inside the transaction.');
+            $this->locked = true;
 
-        self::assertSame(MemberRole::Host, $newMember->getRole());
-        self::assertSame(MemberRole::Member, $oldMember->getRole());
+            return $this->session?->getId()->equals($id) === true
+                ? SyncedPartySession::reconstitute(clone $this->session->getState())
+                : null;
+        });
+        $sessions->method('save')->willReturnCallback(function (SyncedPartySession $session): void {
+            self::assertTrue($this->locked, 'The party changes under its lock.');
+            $this->session = $session;
+        });
+
+        $members = $this->createStub(PartyMemberPortInterface::class);
+        $members->method('findByUserAndSession')->willReturnCallback(function (Uuid $userId): ?PartyMember {
+            self::assertTrue($this->locked, 'Membership is decided under the party\'s lock.');
+            $member = $this->members[$userId->toString()] ?? null;
+
+            return $member === null ? null : PartyMember::reconstitute(clone $member->getState());
+        });
+        $members->method('save')->willReturnCallback(function (PartyMember $member): void {
+            self::assertTrue($this->locked, 'A member changes under the party\'s lock.');
+            $this->members[$member->getUserId()->toString()] = $member;
+        });
+
+        $identities = $this->createStub(PartyPublicIdentityPortInterface::class);
+        $identities->method('userId')->willReturnCallback(function (PublicId $publicId): Uuid {
+            foreach (self::USERS as $name) {
+                if ($this->publicIds[$name]->equals($publicId)) {
+                    return $this->userIds[$name];
+                }
+            }
+
+            throw new NotFoundException('User not found.');
+        });
+
+        $transaction = $this->createStub(TransactionPortInterface::class);
+        $transaction->method('run')->willReturnCallback(function (callable $operation): mixed {
+            $this->inTransaction = true;
+            try {
+                return $operation();
+            } finally {
+                $this->inTransaction = false;
+            }
+        });
+
+        $this->handler = new TransferHostHandler($sessions, $members, $identities, $transaction);
     }
 
-    public function testNonHostCannotTransferTheParty(): void
+    public function testTheHostHandsThePartyToAMember(): void
     {
-        $session = SyncedPartySession::create(new Uuid(), new Uuid(), null);
-        $sessions = $this->createMock(PartySessionPortInterface::class);
-        $sessions->method('findByUuid')->willReturn($session);
-        $sessions->expects($this->never())->method('transferHost');
-        $members = $this->createMock(PartyMemberPortInterface::class);
-        $members->expects($this->never())->method('findByUserAndSession');
-        $members->expects($this->never())->method('save');
-        $this->expectException(AccessDeniedException::class);
+        ($this->handler)($this->transfer(by: 'host', to: 'guest'));
 
-        (new TransferHostHandler($sessions, $members))(new TransferHostCommand($session->getId(), new Uuid(), new Uuid()));
+        self::assertTrue($this->session?->getHostUserId()->equals($this->userIds['guest']), 'The session names the new host.');
+        self::assertSame(['host' => MemberRole::Member, 'guest' => MemberRole::Host], $this->roles());
     }
 
-    public function testMissingTargetMemberCannotChangeTheHost(): void
+    /** @return iterable<string, array{string, string, class-string<\Throwable>, string}> the caller, the named target, the refusal and its message */
+    public static function refusals(): iterable
     {
-        $host = new Uuid();
-        $session = SyncedPartySession::create($host, new Uuid(), null);
-        $sessions = $this->createMock(PartySessionPortInterface::class);
-        $sessions->method('findByUuid')->willReturn($session);
-        $sessions->expects($this->never())->method('transferHost');
-        $members = $this->createMock(PartyMemberPortInterface::class);
-        $members->method('findByUserAndSession')->willReturn(null);
-        $members->expects($this->never())->method('save');
-        $this->expectException(\RuntimeException::class);
+        yield 'the host names themself' => ['host', 'host', InvalidInputException::class, 'The new host already hosts the party.'];
+        yield 'the host names a user who is not a member' => ['host', 'outsider', InvalidInputException::class, 'The new host is not a party member.'];
+        yield 'the host names an unknown user' => ['host', 'unknown', NotFoundException::class, 'User not found.'];
+        yield 'a member who is not the host names a member' => ['guest', 'host', AccessDeniedException::class, 'Only the host may transfer the party.'];
+        // Refused before the target is looked up, so the answer does not say whether the user exists.
+        yield 'a member who is not the host names an unknown user' => ['guest', 'unknown', AccessDeniedException::class, 'Only the host may transfer the party.'];
+    }
 
-        (new TransferHostHandler($sessions, $members))(new TransferHostCommand($session->getId(), $host, new Uuid()));
+    /** @param class-string<\Throwable> $refusal */
+    #[DataProvider('refusals')]
+    public function testARefusedTransferChangesNeitherTheHostNorTheRoles(string $by, string $to, string $refusal, string $message): void
+    {
+        $refused = $this->refusalOf($this->transfer($by, $to));
+
+        self::assertSame($refusal, $refused::class);
+        self::assertSame($message, $refused->getMessage());
+        self::assertTrue($this->session?->getHostUserId()->equals($this->userIds['host']), 'The session still names its host.');
+        self::assertSame(['host' => MemberRole::Host, 'guest' => MemberRole::Member], $this->roles());
+    }
+
+    public function testATransferOfAPartyThatDoesNotExistAnswersAsAnyMissingResource(): void
+    {
+        $this->session = null;
+
+        $refused = $this->refusalOf($this->transfer(by: 'host', to: 'guest'));
+
+        // The shared not-found outcome with the message a route gives for a missing party. A
+        // translatable outcome would be reported in the request's language and differ from it.
+        self::assertInstanceOf(NotFoundException::class, $refused);
+        self::assertNotInstanceOf(TranslatableInterface::class, $refused);
+        self::assertSame(PartyNotFoundException::class, $refused::class);
+        self::assertSame('Resource not found.', $refused->getMessage());
+    }
+
+    private function transfer(string $by, string $to): TransferHostCommand
+    {
+        return new TransferHostCommand($this->sessionId, $this->userIds[$by], $this->publicIds[$to]);
+    }
+
+    private function refusalOf(TransferHostCommand $command): \Throwable
+    {
+        try {
+            ($this->handler)($command);
+        } catch (AssertionFailedError $failure) {
+            throw $failure;
+        } catch (\Throwable $refused) {
+            return $refused;
+        }
+
+        self::fail('The transfer was not refused.');
+    }
+
+    /** @return array<string, MemberRole> the stored member rows' roles by user name */
+    private function roles(): array
+    {
+        $roles = [];
+        foreach (self::USERS as $name) {
+            $member = $this->members[$this->userIds[$name]->toString()] ?? null;
+            if ($member !== null) {
+                $roles[$name] = $member->getRole();
+            }
+        }
+
+        return $roles;
     }
 }

@@ -12,6 +12,7 @@ use App\Party\Infrastructure\Doctrine\Entity\PartyMemberEntity;
 use App\Party\Infrastructure\Doctrine\Entity\SyncedPartySessionEntity;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Query;
 
 final class PartyMemberRepository implements PartyMemberRepositoryInterface
 {
@@ -39,21 +40,34 @@ final class PartyMemberRepository implements PartyMemberRepositoryInterface
 
     public function findByUserAndSession(Uuid $userId, Uuid $sessionId): ?PartyMember
     {
+        // The refresh hint overwrites a member entity that is already managed with the stored
+        // row. Without it the query finds the row but returns the entity as it was loaded, and
+        // a role decided on that under the party's lock can be written as no change at all.
         $entity = $this->entityManager
-            ->getRepository(PartyMemberEntity::class)
-            ->findOneBy(['userId' => $userId, 'session' => $sessionId]);
+            ->createQuery(
+                'SELECT membership FROM ' . PartyMemberEntity::class . ' membership'
+                . ' WHERE membership.userId = :user AND membership.session = :session',
+            )
+            ->setParameter('user', $userId, 'uuid')
+            ->setParameter('session', $sessionId, 'uuid')
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getOneOrNullResult();
 
-        return $entity !== null ? $this->toDomain($entity) : null;
+        return $entity instanceof PartyMemberEntity ? $this->toDomain($entity) : null;
     }
 
     /** @return PartyMember[] */
     public function findBySession(Uuid $sessionId): array
     {
+        // Refreshed for the same reason as in findByUserAndSession().
+        /** @var list<PartyMemberEntity> $entities */
         $entities = $this->entityManager
-            ->getRepository(PartyMemberEntity::class)
-            ->findBy(['session' => $sessionId]);
+            ->createQuery('SELECT membership FROM ' . PartyMemberEntity::class . ' membership WHERE membership.session = :session')
+            ->setParameter('session', $sessionId, 'uuid')
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getResult();
 
-        return array_map(fn(PartyMemberEntity $e) => $this->toDomain($e), $entities);
+        return array_map($this->toDomain(...), $entities);
     }
 
     public function countBySession(Uuid $sessionId): int

@@ -19,6 +19,15 @@ interface PartySessionPortInterface
 
     public function findByUuid(Uuid $uuid): ?SyncedPartySession;
 
+    /**
+     * Locks the party's row inside the caller's transaction and returns the session as it is
+     * stored then, or null when it does not exist.
+     *
+     * A change of a party's members or host starts here: two of them then take turns, and the
+     * second decides on what the first committed, not on a session loaded before the lock.
+     */
+    public function lockByUuid(Uuid $uuid): ?SyncedPartySession;
+
     public function findByPublicId(PublicId $publicId): ?SyncedPartySession;
 
     public function findByPublicIdentifier(string $publicId): ?SyncedPartySession;
@@ -42,8 +51,6 @@ interface PartySessionPortInterface
     public function syncPlayback(Uuid $uuid, float $clientPosition, float $clientLatency): float;
 
     public function endSession(Uuid $uuid): void;
-
-    public function transferHost(Uuid $uuid, Uuid $newHostUserId): void;
 
     public function save(SyncedPartySession $session): void;
 

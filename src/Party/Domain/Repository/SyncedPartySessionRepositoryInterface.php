@@ -18,6 +18,14 @@ interface SyncedPartySessionRepositoryInterface
 
     public function findByUuid(Uuid $uuid): ?SyncedPartySession;
 
+    /**
+     * Locks the session's row until the caller's transaction ends and returns the session as it
+     * is stored then, or null when it does not exist. A session loaded earlier through the same
+     * unit of work is overwritten with the locked row. Refused outside a transaction, where the
+     * lock would end with the statement.
+     */
+    public function lockByUuid(Uuid $uuid): ?SyncedPartySession;
+
     public function findByPublicId(PublicId $publicId): ?SyncedPartySession;
 
     /**

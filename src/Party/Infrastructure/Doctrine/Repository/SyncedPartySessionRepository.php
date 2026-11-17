@@ -12,7 +12,9 @@ use App\Party\Infrastructure\Doctrine\Entity\PartyMemberEntity;
 use App\Party\Infrastructure\Doctrine\Entity\SyncedPartySessionEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Query;
 
 final class SyncedPartySessionRepository implements SyncedPartySessionRepositoryInterface
 {
@@ -48,6 +50,24 @@ final class SyncedPartySessionRepository implements SyncedPartySessionRepository
             ->find($uuid);
 
         return $entity !== null ? $this->toDomain($entity) : null;
+    }
+
+    public function lockByUuid(Uuid $uuid): ?SyncedPartySession
+    {
+        // One statement locks the row and reads it, so a second change of the same party waits
+        // here and then reads what the first committed. The refresh hint overwrites a session
+        // entity loaded before the lock, which find() would return as it was loaded. FOR UPDATE,
+        // the row lock DQL has, also holds back an insert of a row that refers to the session,
+        // since its foreign key takes FOR KEY SHARE on this row; a row added to a party while
+        // its membership changes is meant to wait for the change.
+        $entity = $this->entityManager
+            ->createQuery('SELECT session FROM ' . SyncedPartySessionEntity::class . ' session WHERE session.id = :id')
+            ->setParameter('id', $uuid, 'uuid')
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getOneOrNullResult();
+
+        return $entity instanceof SyncedPartySessionEntity ? $this->toDomain($entity) : null;
     }
 
     public function findByPublicId(PublicId $publicId): ?SyncedPartySession

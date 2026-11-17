@@ -20,7 +20,12 @@ interface PartyMemberPortInterface
 
     public function countBySession(Uuid $sessionId): int;
 
-    public function removeMember(Uuid $userId, Uuid $sessionId): void;
+    /**
+     * Deletes the user's member row in the session.
+     *
+     * @return bool whether a row was deleted; false when the user held none
+     */
+    public function removeMember(Uuid $userId, Uuid $sessionId): bool;
 
     public function save(PartyMember $member): void;
 }

@@ -30,6 +30,11 @@ final readonly class PartySessionService implements PartySessionPortInterface
         return $this->sessionRepository->findByUuid($uuid);
     }
 
+    public function lockByUuid(Uuid $uuid): ?SyncedPartySession
+    {
+        return $this->sessionRepository->lockByUuid($uuid);
+    }
+
     public function findByPublicId(PublicId $publicId): ?SyncedPartySession
     {
         return $this->sessionRepository->findByPublicId($publicId);
@@ -98,15 +103,6 @@ final readonly class PartySessionService implements PartySessionPortInterface
         $session = $this->sessionRepository->findByUuid($uuid);
         if ($session !== null) {
             $session->endSession();
-            $this->sessionRepository->save($session);
-        }
-    }
-
-    public function transferHost(Uuid $uuid, Uuid $newHostUserId): void
-    {
-        $session = $this->sessionRepository->findByUuid($uuid);
-        if ($session !== null) {
-            $session->transferHost($newHostUserId);
             $this->sessionRepository->save($session);
         }
     }

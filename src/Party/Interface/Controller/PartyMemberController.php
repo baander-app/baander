@@ -160,12 +160,10 @@ final class PartyMemberController
             return $this->notFound();
         }
 
-        $newHostUserId = $this->identities->userId(PublicId::fromString($payload->newHostUserId));
-
         $this->commandBus->dispatch(new TransferHostCommand(
             sessionId: $session->getId(),
             currentHostUserId: Uuid::fromString($user->getId()),
-            newHostUserId: $newHostUserId,
+            newHostPublicId: PublicId::fromString($payload->newHostUserId),
         ));
 
         return $this->successResponse(['message' => 'Host transferred.']);

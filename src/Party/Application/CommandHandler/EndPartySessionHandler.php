@@ -9,6 +9,7 @@ use App\Party\Application\Port\PartySessionPortInterface;
 use App\Party\Domain\Event\PartySessionEnded;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 final class EndPartySessionHandler
 {
@@ -18,6 +19,9 @@ final class EndPartySessionHandler
     ) {
     }
 
+    /**
+     * @throws AccessDeniedException when the caller is not the party's host
+     */
     #[AsMessageHandler]
     public function __invoke(EndPartySessionCommand $command): void
     {
@@ -26,8 +30,8 @@ final class EndPartySessionHandler
             return;
         }
 
-        if ($session->getHostUserId()->toString() !== $command->getUserId()->toString()) {
-            return;
+        if (!$session->getHostUserId()->equals($command->getUserId())) {
+            throw new AccessDeniedException('Only the host may end the party.');
         }
 
         $session->endSession();

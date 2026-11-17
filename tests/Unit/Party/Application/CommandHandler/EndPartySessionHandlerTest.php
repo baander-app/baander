@@ -14,6 +14,7 @@ use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 final class EndPartySessionHandlerTest extends TestCase
 {
@@ -79,16 +80,19 @@ final class EndPartySessionHandlerTest extends TestCase
         ($this->handler)(new EndPartySessionCommand($sessionId, Uuid::v4()));
     }
 
-    public function testNoOpWhenUserIsNotHost(): void
+    public function testAMemberWhoIsNotTheHostIsForbiddenToEndThePartyAndItStaysActive(): void
     {
-        $hostUserId = Uuid::v4();
-        $session = SyncedPartySession::create($hostUserId, Uuid::v4(), Uuid::v4());
-        $otherUser = Uuid::v4();
-
+        $session = SyncedPartySession::create(Uuid::v4(), Uuid::v4(), Uuid::v4());
         $this->sessionPort->method('findByUuid')->willReturn($session);
         $this->sessionPort->expects($this->never())->method('save');
         $this->eventDispatcher->expects($this->never())->method('dispatch');
 
-        ($this->handler)(new EndPartySessionCommand($session->getId(), $otherUser));
+        try {
+            ($this->handler)(new EndPartySessionCommand($session->getId(), Uuid::v4()));
+            self::fail('Ending the party was not refused.');
+        } catch (AccessDeniedException) {
+        }
+
+        self::assertTrue($session->isActive());
     }
 }

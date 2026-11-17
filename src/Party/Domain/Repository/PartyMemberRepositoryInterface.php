@@ -13,9 +13,16 @@ interface PartyMemberRepositoryInterface
 
     public function findByUuid(Uuid $uuid): ?PartyMember;
 
+    /**
+     * The user's member row in the session as it is stored now, also when the member was loaded
+     * earlier through the same unit of work.
+     */
     public function findByUserAndSession(Uuid $userId, Uuid $sessionId): ?PartyMember;
 
     /**
+     * The session's member rows as they are stored now, also when a member was loaded earlier
+     * through the same unit of work.
+     *
      * @return PartyMember[]
      */
     public function findBySession(Uuid $sessionId): array;

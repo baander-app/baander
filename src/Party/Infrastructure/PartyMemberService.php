@@ -44,13 +44,17 @@ final readonly class PartyMemberService implements PartyMemberPortInterface
         return $this->memberRepository->countBySession($sessionId);
     }
 
-    public function removeMember(Uuid $userId, Uuid $sessionId): void
+    public function removeMember(Uuid $userId, Uuid $sessionId): bool
     {
         $member = $this->memberRepository->findByUserAndSession($userId, $sessionId);
-        if ($member !== null) {
-            $member->disconnect();
-            $this->memberRepository->delete($member);
+        if ($member === null) {
+            return false;
         }
+
+        $member->disconnect();
+        $this->memberRepository->delete($member);
+
+        return true;
     }
 
     public function save(PartyMember $member): void

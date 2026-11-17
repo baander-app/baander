@@ -12,9 +12,11 @@ use App\Party\Domain\Model\PartyMember;
 use App\Party\Interface\Controller\PartyMemberController;
 use App\Party\Interface\Request\TransferHostRequest;
 use App\Party\Interface\Request\UpdatePartyMemberRequest;
+use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
 use App\Party\Domain\Model\SyncedPartySession;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Container;
@@ -115,32 +117,36 @@ final class PartyMemberControllerTest extends TestCase
         self::assertSame('eng', $member->getSubtitleTrackId());
     }
 
-    public function testTransferDispatchesTheResolvedCurrentHostIdentity(): void
+    public function testTransferDispatchesTheCallerAndTheNamedTargetWithoutLookingTheTargetUp(): void
     {
         $userId = new Uuid();
         $session = SyncedPartySession::create($userId, new Uuid(), null);
         $sessionId = $session->getId();
         $sessions = $this->createStub(PartySessionPortInterface::class);
         $sessions->method('findByPublicIdentifier')->willReturn($session);
-        $newHost = new Uuid();
+        $target = new PublicId();
         $user = new SecurityUser($userId->toString(), 'member@baander.app', '');
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($this->once())->method('dispatch')
             ->with($this->callback(static fn (TransferHostCommand $command): bool =>
                 $command->getSessionId()->equals($sessionId)
                 && $command->getCurrentHostUserId()->equals($userId)
-                && $command->getNewHostUserId()->equals($newHost)
+                && $command->getNewHostPublicId()->equals($target)
             ))
             ->willReturnCallback(static fn (object $command): Envelope => new Envelope($command));
+        // Nobody has the target's public ID. The handler says so, and only to the host, so the
+        // route dispatches without asking.
+        $identities = $this->identities();
+        $identities->method('userId')->willThrowException(new NotFoundException('User not found.'));
         $controller = new PartyMemberController(
             $this->security($user),
             $bus,
             $sessions,
-            $this->identities($newHost),
+            $identities,
             $this->createStub(PartyMemberPortInterface::class),
         );
 
-        $response = $controller->transferHost($session->getPublicId()->toString(), new TransferHostRequest((new PublicId())->toString()));
+        $response = $controller->transferHost($session->getPublicId()->toString(), new TransferHostRequest($target->toString()));
 
         self::assertSame(200, $response->getStatusCode());
     }
@@ -202,10 +208,9 @@ final class PartyMemberControllerTest extends TestCase
 
         return new Security($container);
     }
-    private function identities(?Uuid $target = null): \App\Party\Application\Port\PartyPublicIdentityPortInterface
+    private function identities(): \App\Party\Application\Port\PartyPublicIdentityPortInterface&Stub
     {
         $identities = $this->createStub(\App\Party\Application\Port\PartyPublicIdentityPortInterface::class);
-        $identities->method('userId')->willReturn($target ?? new Uuid());
         $identities->method('member')->willReturnCallback(static fn (PartyMember $member) => new \App\Party\Application\DTO\PartyMemberView($member, new PublicId(), new PublicId()));
 
         return $identities;
