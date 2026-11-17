@@ -257,7 +257,7 @@ that limitation is recorded for follow-up, with no runtime change in the 2026-10
 
 ## Resume here
 
-### State on 2026-11-16
+### State on 2026-11-17
 
 `master` on GitHub and Forgejo carries, on top of `6912eaaf6`, the work pushed on
 2026-11-15: the CI fixes (`d1504daa3` to `77bb3c8e4`), two web fixes (`9ecf84a3d`,
@@ -275,7 +275,8 @@ GitHub had published the PGroonga 4.1.0 database image. Pushed later on 2026-11-
 on top of `e99e748a6`: the prose-fix presentation register and the homepage hero
 (`ba5cbce6b` to `7fe638cec` and their roadmap record). Pushed later on 2026-11-16, on
 top of `c47af96fb`: the docs-book rewrite (`20be3f1df` to `0d017641f` and its roadmap
-record).
+record). Pushed on 2026-11-17, on top of `f5065dcfe`: the docs-book rewrite follow-ups
+(`9b72c2185` to their roadmap record).
 
 - **Master CI.** No `CI` run on `master` has been green since 2026-11-05. Run
   43826408058 on `44e315ee3` passed the whole quality gate on 2026-11-16, step 41 in
@@ -296,10 +297,14 @@ record).
   record) and published to `https://baander.app`: prose-fix gains a Jobs register for
   website feature introductions, and the homepage hero uses it; see
   [Presentation register and homepage hero](#presentation-register-and-homepage-hero).
+- **docs-book rewrite follow-ups.** On `master` since 2026-11-17, fast-forwarded from
+  `fix/docs-rewrite-follow-ups`: invite-only watch parties with the host's playback
+  broadcast to the room, the unread configuration removed, `VIDEO_ENCODER` passed to
+  the workers, and the stale text outside the book corrected; see
+  [docs-book rewrite follow-ups](#docs-book-rewrite-follow-ups).
 - **docs-book rewrite.** On `master` since 2026-11-16 and published to
   `https://baander.app`: every manual page passed through prose-fix and outdated claims
-  were corrected against the code; the code and configuration defects found on the way
-  are open items; see [docs-book rewrite](#docs-book-rewrite).
+  were corrected against the code; see [docs-book rewrite](#docs-book-rewrite).
 - **Web fixes.** With the same push, a click on the active lyrics effect turns effects
   off, and the songs view's genre, artist and album panes scroll; see
   [Lyrics effect toggle and song browser panes](#lyrics-effect-toggle-and-song-browser-panes).
@@ -587,31 +592,92 @@ Verification on 2026-11-16:
 - Published: a local build of `0d017641f`, previewed as `baander-ljsgl7olj` and
   deployed to production as `baander-cqu4pnh8z`, aliased to `https://baander.app`.
 
-Open (found during the rewrite; code and configuration, not docs):
+Open (found during the rewrite; code and configuration, not docs). The party,
+configuration, worker environment, console and stale-text items were fixed on
+2026-11-17; see [docs-book rewrite follow-ups](#docs-book-rewrite-follow-ups). Still
+open:
 
-- Security: `GET /ws/party/{sessionPublicId}/` sits outside the `^/api/` firewall
-  (`config/packages/security.yaml`), so anyone holding a party's public ID reads its
-  session details without signing in.
-- Watch parties: the info route returns a `wsUrl` the handshake refuses, host playback
-  is never broadcast, and a full session refuses its own reconnecting member.
-- `.env` and `.env.example` carry 29 variables no code reads, plus
-  `MUSICBRAINZ_VERSION`, `MUSICBRAINZ_CONTACT` and `LASTFM_API_SECRET`; Compose
-  publishes UDP 41234, on which nothing listens.
-- `VIDEO_ENCODER` is not in the worker runtime environment, so the transcoding guide's
-  hardware-encoder setting cannot reach the media worker.
-- Four Prometheus gauges are never emitted; `app:watch-files` without `--path`
-  watches nothing; `app:monitor:prune` casts `--days` with `(int)` against the console
-  rules; `app:album:duplicates` takes a library UUID that no command prints.
+- Four Prometheus gauges are never emitted; `app:album:duplicates` takes a library
+  UUID that no command prints.
 - Domain events mapped to notification categories (`AlbumCreated`,
   `TranscodeJobCompleted`, `TranscodeJobFailed`) are never raised.
-- Stale descriptions outside the book: code comments and `.agents/rules/admin-cli-parity.md`
-  still name the removed `swoole_task` transport; several `#[AsCommand]` and OpenAPI
-  descriptions, the `src/*/README.md` files and `dev-docs/context-map.md` repeat
-  claims the book now corrects.
 - Policy questions the workers left open: the playback snapshot exposes UUID
   primary keys although public payloads use public IDs; the Electron tests run on Node
   24 in CI while pages say 26; the database rotation step that reruns
   `pooler-credentials` is derived from the script and has not been drilled.
+
+## docs-book rewrite follow-ups
+
+Delivered on `master` on 2026-11-17, fast-forwarded from `fix/docs-rewrite-follow-ups`
+(`9b72c2185` to this record) from the plan
+`docs/plans/2026-11-17-0817-fix-docs-rewrite-follow-ups-plan.md`. It fixes the code and
+configuration items the docs-book rewrite left open:
+
+- Watch parties are invite-only, as the user decided on 2026-11-17. The session list,
+  a session's details and its member list answer only the party's host and members;
+  anyone else gets 404, and a caller who is not signed in gets 401. Joining with the
+  public ID stays open. The unauthenticated `GET /ws/party/{sessionPublicId}/` route is
+  deleted without a replacement, also by the user's decision (`45f76d17d`).
+- The host's play, pause and seek reach every member as `party.playback_state`; a
+  leaving host hands the session's host role to the promoted member (`7cb1cfc6a`). A
+  member who drops can rejoin a full party (`02ef0f5ea`).
+- `.env` and `.env.example` lose 32 variables nothing reads, plus `APP_NAME`,
+  `MUSICBRAINZ_APP_NAME` and `MAIL_FROM_NAME`. Compose no longer publishes UDP 41234.
+  `VIDEO_ENCODER` passes all three worker environment allowlists, so the transcoding
+  guide's encoder setting reaches the media worker (`af93988b4`).
+- Comments, `.agents/rules/admin-cli-parity.md`, the `src/*/README.md` files,
+  `dev-docs/`, and the command and OpenAPI descriptions say what the code does; the
+  dead `^/api/docs` firewall rule is gone. `app:monitor:prune --days` and
+  `POST /api/monitor/prune` refuse a value that is not a whole number, and
+  `app:watch-files` without `--path` watches the current directory (`9412174c7`). The
+  `docs/solutions` entries that mention `swoole_task` stay as history.
+- From the code review (`61588c430`): a paused party syncs members to where the host
+  paused, not to the last play or seek anchor, and a second play while playing no
+  longer rewinds the party. Both date from the initial commit and became visible once
+  the broadcast pushed them to every member. A prune accepts at most 36500 days,
+  because a much larger value overflowed the cutoff into the future and deleted every
+  record. A functional test pins that an ended party leaves its host's and members'
+  lists.
+
+Verification on 2026-11-17:
+
+- Unit: on the final tree, `tests/Unit/Party` with `SwooleLivePartyRoomsTest` and
+  `WebSocketControllerTest` pass (256 tests), and the prune use case, command and API
+  tests pass; each new case was red before its fix. A wider run of 508 tests across Party, the
+  Swoole rooms, the worker environment, the Shared console commands, Filesystem and
+  Docs had one error: `FileWatcherInitializationTest` calls `posix_getrlimit()`, which
+  the host PHP lacks; the test predates the branch.
+- Tooling: `DeploymentRuntimeEnvironmentTest` (42), `PresetDeploymentTest` (29) and
+  `DevelopmentRuntimeTest` (13) pass; the tooling formatter is clean.
+- Functional and integration on the final tree: `PartySessionAccessTest` (8),
+  `JobMonitorControllerTest` (9), and `PartyLiveRoomWiringTest`,
+  `PartyOwnershipPersistenceTest` and `ReferentialIntegrityTest` (23 together) pass.
+  `ProductNameConfigurationTest` passed on `af93988b4`, the commit that changed `.env`.
+- Static: PHPStan reports no errors on the final tree; Deptrac reports 0 violations,
+  warnings and errors (443 skipped by its baseline). The OpenAPI export check matches,
+  and the web client's `generate:check` and typecheck pass.
+- Site: `make website-build` built 243 pages; every relative link and anchor resolves;
+  `corepack yarn test:browser` in `ui/site/` passed 93 tests and
+  `node --test scripts/*.test.mjs` passed 11.
+- Code review: `ce-code-review` at full depth with correctness, security, adversarial
+  (in-process; cross-model review is off in this checkout), API contract, testing and
+  project-standards reviewers; verdict "Ready with fixes", with no P0 or P1. Its one
+  confirmed finding, the untested active-only filter on the session list, is fixed
+  with the functional test above. The validator rejected the prune overflow as
+  pre-existing; it is fixed anyway under the rule for defects beside touched code,
+  together with the two playback defects the correctness reviewer reported.
+
+Open (residual risks from the review; not fixed):
+
+- Two members leaving at the same moment can hand the host role to the one who is
+  leaving, so the remaining members cannot steer playback. The window is milliseconds,
+  and the race predates this change.
+- The transcode steer runs before the broadcast; if it throws, the party state is saved
+  but the room receives no `party.playback_state`.
+- `PlaybackStateChanged` is a domain event, so every host play, pause and seek also
+  writes an outbox row that no durable consumer reads.
+- `HW_BITRATE_MULTIPLIER` reaches `SegmentEncoder` and the hardware diagnostics, but
+  `SegmentEncoder::applyBitrateMultiplier()` has no caller, so encodes never apply it.
 
 ## Cohesive operator manual
 
