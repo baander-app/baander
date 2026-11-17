@@ -6,6 +6,7 @@ namespace App\Party\Application\CommandHandler;
 
 use App\Party\Application\Command\SeekPlaybackCommand;
 use App\Party\Application\Port\PartySessionPortInterface;
+use App\Party\Domain\Event\PlaybackStateChanged;
 use App\Transcode\Domain\Event\PlaybackPositionChanged;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -32,17 +33,23 @@ final class SeekPlaybackHandler
 
         $this->sessionPort->seekTo($command->getSessionId(), $command->getPosition());
 
-        // Without a job (none was named, or it has been deleted) there is no encoder to steer;
-        // the party's own playback state above still synchronizes its members.
-        $jobId = $session->getTranscodeJobId();
-        if ($jobId === null) {
+        // Re-fetch to get the post-mutation state
+        $session = $this->sessionPort->findByUuid($command->getSessionId());
+        if ($session === null) {
             return;
         }
 
-        $this->eventDispatcher->dispatch(new PlaybackPositionChanged(
-            jobId: $jobId,
-            position: $command->getPosition(),
-            action: 'seek',
-        ));
+        // Without a job (none was named, or it has been deleted) there is no encoder to steer.
+        $jobId = $session->getTranscodeJobId();
+        if ($jobId !== null) {
+            $this->eventDispatcher->dispatch(new PlaybackPositionChanged(
+                jobId: $jobId,
+                position: $command->getPosition(),
+                action: 'seek',
+            ));
+        }
+
+        // After the encoder, so members who follow the new state find it already steered.
+        $this->eventDispatcher->dispatch(PlaybackStateChanged::of($session));
     }
 }

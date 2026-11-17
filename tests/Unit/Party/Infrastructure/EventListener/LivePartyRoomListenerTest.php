@@ -6,6 +6,8 @@ namespace App\Tests\Unit\Party\Infrastructure\EventListener;
 
 use App\Party\Domain\Event\MemberLeft;
 use App\Party\Domain\Event\PartySessionEnded;
+use App\Party\Domain\Event\PlaybackStateChanged;
+use App\Party\Domain\ValueObject\PlaybackState;
 use App\Party\Infrastructure\EventListener\LivePartyRoomListener;
 use App\Shared\Application\Port\LivePartyRoomsPortInterface;
 use App\Shared\Domain\Model\Uuid;
@@ -35,6 +37,33 @@ final class LivePartyRoomListenerTest extends TestCase
         $rooms->expects(self::never())->method('removeMember');
 
         $this->dispatcher($rooms)->dispatch(new PartySessionEnded($sessionId, Uuid::generate()));
+    }
+
+    public function testTheHostsPlaybackStateReachesTheRoom(): void
+    {
+        $sessionId = Uuid::generate();
+        $sessionPublicId = new \App\Shared\Domain\Model\PublicId();
+        $updatedAt = new \DateTimeImmutable('2026-11-17T09:00:00+00:00');
+        $rooms = $this->createMock(LivePartyRoomsPortInterface::class);
+        $rooms->expects(self::once())->method('broadcastPlayback')->with(
+            $sessionId,
+            $sessionPublicId,
+            'paused',
+            42.5,
+            40.0,
+            $updatedAt,
+        );
+        $rooms->expects(self::never())->method('removeMember');
+        $rooms->expects(self::never())->method('close');
+
+        $this->dispatcher($rooms)->dispatch(new PlaybackStateChanged(
+            sessionId: $sessionId,
+            sessionPublicId: $sessionPublicId,
+            playbackState: PlaybackState::Paused,
+            currentPosition: 42.5,
+            wallClockPosition: 40.0,
+            updatedAt: $updatedAt,
+        ));
     }
 
     public function testMissingSessionClosesRoomBeforePropagatingFailure(): void
@@ -90,6 +119,7 @@ final class LivePartyRoomListenerTest extends TestCase
         $dispatcher = new EventDispatcher();
         $dispatcher->addListener(MemberLeft::class, $listener->onMemberLeft(...));
         $dispatcher->addListener(PartySessionEnded::class, $listener->onSessionEnded(...));
+        $dispatcher->addListener(PlaybackStateChanged::class, $listener->onPlaybackStateChanged(...));
 
         return $dispatcher;
     }

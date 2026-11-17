@@ -10,25 +10,35 @@ use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
 use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
+use App\Party\Application\Command\StartPlaybackCommand;
 use App\Party\Domain\Event\MemberLeft;
 use App\Party\Domain\Event\PartySessionEnded;
+use App\Party\Domain\Event\PlaybackStateChanged;
 use App\Party\Infrastructure\EventListener\LivePartyRoomListener;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
- * Leaving and ending a party reach the live room listener, which does nothing
- * outside the web server's HTTP workers, so the HTTP routes still answer here.
+ * Leaving, ending and the host's playback reach the live room listener, which does
+ * nothing outside the web server's HTTP workers, so the routes and commands still
+ * complete here.
  */
 final class PartyLiveRoomWiringTest extends TestCase
 {
-    public function testTheListenerHearsALeaveAndAnEnd(): void
+    public function testTheListenerHearsALeaveAnEndAndAPlaybackChange(): void
     {
         $dispatcher = self::getContainer()->get('event_dispatcher');
         self::assertInstanceOf(EventDispatcherInterface::class, $dispatcher);
 
-        foreach ([MemberLeft::class => 'onMemberLeft', PartySessionEnded::class => 'onSessionEnded'] as $event => $method) {
+        $listeners = [
+            MemberLeft::class => 'onMemberLeft',
+            PartySessionEnded::class => 'onSessionEnded',
+            PlaybackStateChanged::class => 'onPlaybackStateChanged',
+        ];
+        foreach ($listeners as $event => $method) {
             $heard = array_filter(
                 $dispatcher->getListeners($event),
                 static fn (mixed $listener): bool => is_array($listener)
@@ -50,6 +60,27 @@ final class PartyLiveRoomWiringTest extends TestCase
         $this->assertJsonResponse($this->authenticatedRequest('DELETE', '/api/party/sessions/' . $party, $host), 200);
     }
 
+    public function testAHostWhoLeavesHandsThePartyAndItsPlaybackToTheEarliestMember(): void
+    {
+        $host = $this->createTestUser();
+        $guest = $this->createTestUser();
+        $party = $this->party($host);
+        $sessionId = Uuid::fromString((string) $this->entityManager->getConnection()->fetchOne('SELECT id FROM party_sessions WHERE public_id = :publicId', ['publicId' => $party]));
+        $bus = self::getContainer()->get(MessageBusInterface::class);
+
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/party/sessions/' . $party . '/join', $guest), 200);
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/party/sessions/' . $party . '/leave', $host), 200);
+        self::assertSame($guest->getPublicId()->toString(), $this->session($party, $guest)['hostUserId']);
+
+        $bus->dispatch(new StartPlaybackCommand($sessionId, $host->getId(), 30.5));
+        self::assertSame('stopped', $this->session($party, $guest)['playbackState'], 'The departed host still steered the party.');
+
+        $bus->dispatch(new StartPlaybackCommand($sessionId, $guest->getId(), 30.5));
+        $session = $this->session($party, $guest);
+        self::assertSame('playing', $session['playbackState']);
+        self::assertSame(30.5, $session['wallClockPosition']);
+    }
+
     public function testPublicPartyOutputProjectsNestedIdentitiesAndRejectsTheInternalAddress(): void
     {
         $host = $this->createTestUser();
@@ -68,6 +99,12 @@ final class PartyLiveRoomWiringTest extends TestCase
         self::assertStringNotContainsString($internalId, (string) $response->getContent());
         $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/party/sessions/' . $internalId, $host), 404);
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/party/sessions/' . $internalId . '/join', $host), 404);
+    }
+
+    /** @return array<string, mixed> */
+    private function session(string $party, User $member): array
+    {
+        return $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/party/sessions/' . $party, $member), 200, 'data')['data'];
     }
 
     private function party(User $host): string

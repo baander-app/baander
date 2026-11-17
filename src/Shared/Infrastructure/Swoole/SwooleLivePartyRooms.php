@@ -8,11 +8,13 @@ use App\Shared\Application\Port\LivePartyRoomsPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Infrastructure\Swoole\Control\ServerWorkers;
+use DateTimeImmutable;
+use DateTimeInterface;
 
 /**
- * Changes party rooms in the connection registry. Its tables are shared by every
- * worker, so the worker that runs the leave or end changes sockets other workers
- * own without fanning out.
+ * Changes party rooms in the connection registry and pushes to them. Its tables are
+ * shared by every worker, so the worker that runs the leave, end or playback change
+ * reaches sockets other workers own without fanning out.
  */
 final readonly class SwooleLivePartyRooms implements LivePartyRoomsPortInterface
 {
@@ -52,6 +54,28 @@ final readonly class SwooleLivePartyRooms implements LivePartyRoomsPortInterface
         foreach ($this->registry->getRoomMembers($room) as $fd) {
             $this->registry->leaveRoom($room, $fd);
         }
+    }
+
+    public function broadcastPlayback(
+        Uuid $sessionId,
+        PublicId $sessionPublicId,
+        string $playbackState,
+        float $currentPosition,
+        float $wallClockPosition,
+        DateTimeImmutable $updatedAt,
+    ): void {
+        if (!$this->insideTheServer()) {
+            return;
+        }
+
+        $this->pusher->broadcast(WebSocketRooms::party($sessionId->toString()), [
+            'type'              => 'party.playback_state',
+            'sessionId'         => $sessionPublicId->toString(),
+            'playbackState'     => $playbackState,
+            'currentPosition'   => $currentPosition,
+            'wallClockPosition' => $wallClockPosition,
+            'updatedAt'         => $updatedAt->format(DateTimeInterface::ATOM),
+        ]);
     }
 
     /**

@@ -8,6 +8,9 @@ use App\Party\Domain\Event\MemberJoined;
 use App\Party\Domain\Event\MemberLeft;
 use App\Party\Domain\Event\PartySessionCreated;
 use App\Party\Domain\Event\PartySessionEnded;
+use App\Party\Domain\Event\PlaybackStateChanged;
+use App\Party\Domain\ValueObject\PlaybackState;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
@@ -97,6 +100,32 @@ final class DomainEventRoundTripTest extends TestCase
         $this->assertSame('party.member_left', $restored->eventName());
         $this->assertTrue($original->getSessionId()->equals($restored->getSessionId()));
         $this->assertTrue($original->getUserId()->equals($restored->getUserId()));
+        $this->assertSame($occurredAt->format(DateTimeImmutable::ATOM), $restored->occurredAt()->format(DateTimeImmutable::ATOM));
+    }
+
+    public function testPlaybackStateChangedRoundTrip(): void
+    {
+        $occurredAt = new DateTimeImmutable('2026-11-17T09:00:01+00:00');
+        $updatedAt = new DateTimeImmutable('2026-11-17T09:00:00+00:00');
+        $original = new PlaybackStateChanged(
+            sessionId: Uuid::v4(),
+            sessionPublicId: new PublicId(),
+            playbackState: PlaybackState::Paused,
+            currentPosition: 42.5,
+            wallClockPosition: 40.0,
+            updatedAt: $updatedAt,
+            occurredAt: $occurredAt,
+        );
+
+        $restored = PlaybackStateChanged::fromPayload($original->toPayload());
+
+        $this->assertSame('party.playback_state_changed', $restored->eventName());
+        $this->assertTrue($original->getSessionId()->equals($restored->getSessionId()));
+        $this->assertSame($original->getSessionPublicId()->toString(), $restored->getSessionPublicId()->toString());
+        $this->assertSame(PlaybackState::Paused, $restored->getPlaybackState());
+        $this->assertSame(42.5, $restored->getCurrentPosition());
+        $this->assertSame(40.0, $restored->getWallClockPosition());
+        $this->assertSame($updatedAt->format(DateTimeImmutable::ATOM), $restored->getUpdatedAt()->format(DateTimeImmutable::ATOM));
         $this->assertSame($occurredAt->format(DateTimeImmutable::ATOM), $restored->occurredAt()->format(DateTimeImmutable::ATOM));
     }
 

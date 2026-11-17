@@ -62,13 +62,14 @@ final class LeavePartySessionHandlerTest extends TestCase
         $this->memberPort->expects($this->never())->method('findBySession');
         $this->memberPort->expects($this->never())->method('save');
         $this->sessionPort->expects($this->never())->method('save');
+        $this->sessionPort->expects($this->never())->method('transferHost');
 
         ($this->handler)(new LeavePartySessionCommand($memberUserId, $session->getId()));
 
         $this->assertMemberLeft($session->getId(), $memberUserId);
     }
 
-    public function testHostLeavingWithRemainingMembersPromotesEarliestJoined(): void
+    public function testHostLeavingWithRemainingMembersHandsTheHostRoleToTheEarliestJoined(): void
     {
         $hostUserId = Uuid::v4();
         $session = SyncedPartySession::create($hostUserId, Uuid::v4(), Uuid::v4());
@@ -101,6 +102,10 @@ final class LeavePartySessionHandlerTest extends TestCase
                 return true;
             }));
 
+        // The session itself names the promoted member as host, so that member steers playback.
+        $this->sessionPort->expects($this->once())
+            ->method('transferHost')
+            ->with($sessionId, $earliestMember->getUserId());
         $this->sessionPort->expects($this->never())->method('save');
 
         ($this->handler)(new LeavePartySessionCommand($hostUserId, $sessionId));
@@ -125,6 +130,7 @@ final class LeavePartySessionHandlerTest extends TestCase
             ->with($sessionId)
             ->willReturn([]);
 
+        $this->sessionPort->expects($this->never())->method('transferHost');
         $this->sessionPort->expects($this->once())
             ->method('save')
             ->with($this->callback(function (SyncedPartySession $saved) use ($hostUserId): bool {
@@ -159,6 +165,7 @@ final class LeavePartySessionHandlerTest extends TestCase
         $this->memberPort->expects($this->never())->method('removeMember');
         $this->memberPort->expects($this->never())->method('findBySession');
         $this->sessionPort->expects($this->never())->method('save');
+        $this->sessionPort->expects($this->never())->method('transferHost');
 
         ($this->handler)(new LeavePartySessionCommand(Uuid::v4(), $sessionId));
 

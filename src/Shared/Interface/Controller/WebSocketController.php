@@ -500,14 +500,7 @@ final class WebSocketController extends AbstractWebSocketController
                 'type' => 'error',
                 'message' => 'Playback action failed',
             ]);
-
-            return;
         }
-
-        // Fetch updated session state for broadcast
-        $sessionPort = null; // Would need injection — skip for now, rely on client polling
-        // The playback state broadcast will be handled by the existing event system
-        // when the command handler dispatches domain events.
     }
 
     /** @param array<array-key, mixed> $payload */

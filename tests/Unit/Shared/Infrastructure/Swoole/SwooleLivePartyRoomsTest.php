@@ -86,17 +86,52 @@ final class SwooleLivePartyRoomsTest extends TestCase
         self::assertSame([], $this->pushed);
     }
 
+    public function testSendsThePlaybackStateToEverySocketInTheRoomAndChangesNoMembership(): void
+    {
+        $this->broadcastPlayback($this->rooms(inHttpWorker: true));
+
+        $fds = array_column($this->pushed, 'fd');
+        sort($fds);
+        self::assertSame([1, 2, 3], $fds);
+        foreach ($this->pushed as $push) {
+            self::assertSame([
+                'type' => 'party.playback_state',
+                'sessionId' => str_repeat('s', 21),
+                'playbackState' => 'playing',
+                'currentPosition' => 12.75,
+                'wallClockPosition' => 12.5,
+                'updatedAt' => '2026-11-17T09:00:00+00:00',
+            ], $push['payload']);
+        }
+        $members = $this->registry->getRoomMembers(WebSocketRooms::party(self::SESSION));
+        sort($members);
+        self::assertSame([1, 2, 3], $members);
+    }
+
     public function testDoesNothingOutsideAnHttpWorkerOfTheRunningServer(): void
     {
         $rooms = $this->rooms(inHttpWorker: false);
 
         $rooms->removeMember(Uuid::fromString(self::SESSION), Uuid::fromString(self::LEAVER), new PublicId(str_repeat('s', 21)), new PublicId(str_repeat('u', 21)));
         $rooms->close(Uuid::fromString(self::SESSION));
+        $this->broadcastPlayback($rooms);
 
         $members = $this->registry->getRoomMembers(WebSocketRooms::party(self::SESSION));
         sort($members);
         self::assertSame([1, 2, 3], $members);
         self::assertSame([], $this->pushed);
+    }
+
+    private function broadcastPlayback(SwooleLivePartyRooms $rooms): void
+    {
+        $rooms->broadcastPlayback(
+            sessionId: Uuid::fromString(self::SESSION),
+            sessionPublicId: new PublicId(str_repeat('s', 21)),
+            playbackState: 'playing',
+            currentPosition: 12.75,
+            wallClockPosition: 12.5,
+            updatedAt: new \DateTimeImmutable('2026-11-17T09:00:00+00:00'),
+        );
     }
 
     private function rooms(bool $inHttpWorker): SwooleLivePartyRooms

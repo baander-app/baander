@@ -9,12 +9,14 @@ use App\Party\Application\Port\PartyPublicIdentityPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Party\Domain\Event\PartySessionEnded;
+use App\Party\Domain\Event\PlaybackStateChanged;
 use App\Shared\Application\Port\LivePartyRoomsPortInterface;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 
 /**
  * Takes a member who left, over HTTP or the WebSocket, out of the party's live room,
- * and empties the room when the party ends, so the room only reaches members.
+ * and empties the room when the party ends, so the room only reaches members. Tells
+ * the room each playback state the host sets.
  */
 final readonly class LivePartyRoomListener
 {
@@ -48,5 +50,18 @@ final readonly class LivePartyRoomListener
     public function onSessionEnded(PartySessionEnded $event): void
     {
         $this->rooms->close($event->getSessionId());
+    }
+
+    #[AsEventListener(event: PlaybackStateChanged::class)]
+    public function onPlaybackStateChanged(PlaybackStateChanged $event): void
+    {
+        $this->rooms->broadcastPlayback(
+            sessionId: $event->getSessionId(),
+            sessionPublicId: $event->getSessionPublicId(),
+            playbackState: $event->getPlaybackState()->value,
+            currentPosition: $event->getCurrentPosition(),
+            wallClockPosition: $event->getWallClockPosition(),
+            updatedAt: $event->getUpdatedAt(),
+        );
     }
 }

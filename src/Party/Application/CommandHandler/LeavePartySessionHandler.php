@@ -54,9 +54,11 @@ final class LeavePartySessionHandler
                 return;
             }
 
-            // Promote the earliest-joined remaining member to host
+            // Hand the host role to the earliest-joined remaining member, on the session as
+            // well as the member, so that member steers playback and the leaver no longer does.
             usort($remainingMembers, fn ($a, $b) => $a->getJoinedAt() <=> $b->getJoinedAt());
             $newHost = $remainingMembers[0];
+            $this->sessionPort->transferHost($command->getSessionId(), $newHost->getUserId());
             $newHost->promoteToHost();
             $this->memberPort->save($newHost);
         }
