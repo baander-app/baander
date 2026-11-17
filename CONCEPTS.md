@@ -126,6 +126,16 @@ A user the playlist's owner has named on a playlist. While the playlist is colla
 
 An opaque marker of the complete playlist state returned with its displayed song order. A reorder must present that revision; if the playlist changed, the caller reloads it before choosing an order again. Hidden songs affect the revision without exposing their identifiers.
 
+## Watch parties
+
+### Watch party
+
+A session in which signed-in users watch one video together. One member is the host, who alone steers playback, ends the party, hands the host role to another member and manages its invitations; when the host leaves, the earliest-joined remaining member becomes the host. Only its members see a party: to any other signed-in user it does not exist.
+
+### Party invitation
+
+The host's permission for one user, named by public ID, to join a watch party. A user joins only with an invitation or as an existing member; the party's public ID alone admits no one. An invitation lasts until the host revokes it or until its party or its user is deleted, and joining and leaving do not use it up. Revoking it also removes the user from the party when they had joined. The party's creator holds one from the party's creation, and invitations follow the party's current host, not the host who issued them.
+
 ## Rate limiting
 
 ### Limiter generation
