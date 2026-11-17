@@ -136,8 +136,8 @@ include __DIR__ . '/header.php';
   <section class="home-section experience-feature experience-feature-reversed" aria-labelledby="playlists-title">
     <div class="section-intro">
       <p class="eyebrow">Your playlists</p>
-      <h2 id="playlists-title">Choose the songs.<br>Or set the rules.</h2>
-      <p>Pick songs yourself, or create smart playlists with rules that select music from your catalog.</p>
+      <h2 id="playlists-title">Choose the songs.<br>Share the list.</h2>
+      <p>Pick the songs yourself and put them in the order you want. Each playlist has its own page to browse and play.</p>
       <p>Share playlists with other people on your server, and choose whether collaborators can change the track list.</p>
     </div>
     <figure class="app-screenshot feature-screenshot">
