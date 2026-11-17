@@ -264,8 +264,8 @@ that limitation is recorded for follow-up, with no runtime change in the 2026-10
 `052e8684d`) and the roadmap cleanup with its plan retirement. Landed on 2026-11-14:
 scan artist credits and MusicBrainz matching. The persistent instance ran `6912eaaf6`
 before that push and updates itself from `master`. The website was last published on
-2026-11-17: a local build of `31d1f8a81`, deployed to production as
-`baander-h0mkq4o71` and aliased to `https://baander.app`.
+2026-11-17: a local build of `7a3460fef`, deployed to production as
+`baander-ht5ywd4ja` and aliased to `https://baander.app`.
 Pushed later on 2026-11-17, on top of `0660fb943`: party invitations (`3a666d381` to
 their roadmap record).
 Pushed later on 2026-11-15, on top of `23f899976`: the matching follow-ups
@@ -765,7 +765,12 @@ Verification on 2026-11-17:
   anchor resolves; `corepack yarn test:browser` in `ui/site/` passed 93 tests and
   `node --test scripts/*.test.mjs` passed 11. A first browser run, made while
   container runs loaded the host, failed one homepage font-stability test that passes
-  on its own and in the full rerun.
+  on its own and in the full rerun. The web client's typecheck passes.
+- Published: a local build of `7a3460fef` (243 pages, every link resolving, 93 browser
+  tests and 11 script tests passing), previewed as `baander-f8ucvjp1y` and deployed to
+  production as `baander-ht5ywd4ja`, aliased to `https://baander.app`; the home page
+  and the watch-parties and Party context pages answer 200, and the watch-parties page
+  carries the Invitations section.
 - Code review: `ce-code-review` at full depth with correctness, security, adversarial
   (in-process; cross-model review is off in this checkout), reliability, API contract,
   data migration, testing and project-standards reviewers. No findings; verdict "Ready
