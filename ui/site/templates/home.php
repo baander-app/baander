@@ -19,8 +19,6 @@ include __DIR__ . '/header.php';
       $screenshot = [
           'name' => 'music',
           'alt' => "Bånder's music library in the browser, with album artwork and playback controls.",
-          'width' => 1600,
-          'height' => 1000,
       ];
       include __DIR__ . '/screenshot.php';
       ?>
@@ -47,8 +45,6 @@ include __DIR__ . '/header.php';
           $screenshot = [
               'name' => 'equalizer',
               'alt' => "Bånder's graphic equalizer, presets and live input analyzer.",
-              'width' => 1600,
-              'height' => 1000,
               'loading' => 'lazy',
           ];
           include __DIR__ . '/screenshot.php';
@@ -68,8 +64,6 @@ include __DIR__ . '/header.php';
           $screenshot = [
               'name' => 'equalizer-parametric',
               'alt' => "Bånder's parametric equalizer with a response curve and selectable band points.",
-              'width' => 1600,
-              'height' => 1000,
               'loading' => 'lazy',
           ];
           include __DIR__ . '/screenshot.php';
@@ -89,8 +83,6 @@ include __DIR__ . '/header.php';
           $screenshot = [
               'name' => 'equalizer-processing',
               'alt' => "Bånder's audio processing controls for compression, stereo width, crossfeed, loudness and master gain.",
-              'width' => 652,
-              'height' => 517,
               'loading' => 'lazy',
           ];
           include __DIR__ . '/screenshot.php';
@@ -110,8 +102,6 @@ include __DIR__ . '/header.php';
           $screenshot = [
               'name' => 'equalizer-profiles',
               'alt' => "Bånder's A/B comparison slots and named device profiles.",
-              'width' => 1600,
-              'height' => 1000,
               'loading' => 'lazy',
           ];
           include __DIR__ . '/screenshot.php';
@@ -145,8 +135,6 @@ include __DIR__ . '/header.php';
       $screenshot = [
           'name' => 'playlists',
           'alt' => "Bånder's playlists view in the browser.",
-          'width' => 1600,
-          'height' => 1000,
           'loading' => 'lazy',
       ];
       include __DIR__ . '/screenshot.php';
@@ -174,8 +162,6 @@ include __DIR__ . '/header.php';
       $screenshot = [
           'name' => 'destinations',
           'alt' => "Bånder's playback destination menu, showing music playing on the living-room device with other signed-in devices listed.",
-          'width' => 2272,
-          'height' => 1420,
           'loading' => 'lazy',
       ];
       include __DIR__ . '/screenshot.php';
