@@ -101,18 +101,27 @@ final class DeploymentRuntimeEnvironmentTest extends TestCase
         $variables = ['APP_ENV' => 'prod', 'APP_DEBUG' => '0', 'DATABASE_URL' => 'postgresql://db.baander.app/baander',
             'REDIS_URL' => 'redis://redis.baander.app', 'REDIS_PASSWORD' => '', 'APP_SECRET' => 'secret',
             'MESSENGER_TRANSPORT_DSN' => 'redis://redis.baander.app/messages', 'MAILER_DSN' => 'smtp://mail.baander.app',
-            'MAIL_FROM_ADDRESS' => 'noreply@baander.app', 'MAIL_FROM_NAME' => 'Bånder',
+            'MAIL_FROM_ADDRESS' => 'noreply@baander.app', 'VIDEO_ENCODER' => 'libx264',
             'CONVERT_STORAGE_PATH' => '/var/www/html/storage/conversions', 'MEDIA_STORAGE_PATH' => '/media/library'];
         ksort($variables);
         self::assertSame($variables, new DeploymentRuntimeEnvironment($variables)->variables);
     }
 
-    public function testPassesTheSenderSettingsWorkerEmailNeeds(): void
+    public function testPassesTheSenderAddressWorkerEmailNeeds(): void
     {
-        $environment = new DeploymentRuntimeEnvironment(['MAIL_FROM_ADDRESS' => 'noreply@baander.app', 'MAIL_FROM_NAME' => 'Bånder']);
+        $environment = new DeploymentRuntimeEnvironment(['MAIL_FROM_ADDRESS' => 'noreply@baander.app']);
 
         $environment->withFile(static function (string $path): void {
-            self::assertSame("MAIL_FROM_ADDRESS=noreply@baander.app\nMAIL_FROM_NAME=Bånder\n", file_get_contents($path));
+            self::assertSame("MAIL_FROM_ADDRESS=noreply@baander.app\n", file_get_contents($path));
+        });
+    }
+
+    public function testPassesTheVideoEncoderTheMediaWorkerQualifies(): void
+    {
+        $environment = new DeploymentRuntimeEnvironment(['VIDEO_ENCODER' => 'h264_vaapi']);
+
+        $environment->withFile(static function (string $path): void {
+            self::assertSame("VIDEO_ENCODER=h264_vaapi\n", file_get_contents($path));
         });
     }
 
@@ -168,7 +177,7 @@ final class DeploymentRuntimeEnvironmentTest extends TestCase
     /** @return iterable<string,array{array<array-key,mixed>}> */
     public static function invalidVariables(): iterable
     {
-        foreach (['app_secret', 'APP-SECRET', 'APP_SECRET\n', '0APP', '', 'UNKNOWN_SETTING',
+        foreach (['app_secret', 'APP-SECRET', 'APP_SECRET\n', '0APP', '', 'UNKNOWN_SETTING', 'MAIL_FROM_NAME',
             'BAANDER_WORKER_NAMESPACE', 'BAANDER_WORKER_BOOT_ID', 'BAANDER_WORKER_OTHER',
             'PATH', 'LD_PRELOAD', 'LD_LIBRARY_PATH', 'PHP_INI_SCAN_DIR', 'PHPRC', 'HOME', 'SHELL',
         ] as $key) {

@@ -272,12 +272,14 @@ and worker network respectively. The controller URL and credentials file stay on
 Docker receives the admitted runtime values through a temporary private env-file;
 trusted daemon operators can inspect the resulting container environment.
 Additional runtime keys are `CONVERT_STORAGE_PATH`, `MEDIA_STORAGE_PATH`,
-`REDIS_PASSWORD`, `MAILER_DSN`, `MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME`,
+`REDIS_PASSWORD`, `MAILER_DSN`, `MAIL_FROM_ADDRESS`, `VIDEO_ENCODER`,
 `VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY`, `STREAM_URL_HMAC_SECRET`, `APP_URL`,
 `DEFAULT_URI`, `OTEL_ENABLED` and `OTEL_EXPORTER_OTLP_ENDPOINT`. Without
-`MAIL_FROM_ADDRESS`, email a worker sends comes from `noreply@localhost`. The
-sender name is always Bånder; `MAIL_FROM_NAME` is accepted but does not change it.
-Values cannot contain line breaks and their complete
+`MAIL_FROM_ADDRESS`, email a worker sends comes from `noreply@localhost`; the
+sender name is always Bånder. `VIDEO_ENCODER` reaches the media worker and
+overrides the value in the image's `.env`; see
+[Hardware acceleration](../media/transcoding.md#hardware-acceleration) for the
+encoder it selects. Values cannot contain line breaks and their complete
 env-file is limited to 4 KiB.
 
 Worker credentials admit only canonical Redis URL forms that preserve the

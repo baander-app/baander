@@ -14,8 +14,9 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 /**
  * Explicit production application configuration, never inherited host environment.
- * The allowlist covers the configured framework, database, cache, Messenger and
- * mailer inputs. Worker identity and process/loader configuration are excluded.
+ * The allowlist covers the configured framework, database, cache, Messenger, mailer
+ * and video encoder inputs. Worker identity and process/loader configuration are
+ * excluded.
  * Public variables are sensitive; Docker daemon inspectors can read container
  * environment. Debug/JSON redaction does not encrypt that metadata.
  */
@@ -27,9 +28,12 @@ final readonly class DeploymentRuntimeEnvironment implements JsonSerializable
         'APP_ENV', 'APP_DEBUG', 'APP_SECRET', 'DATABASE_URL', 'DATABASE_CONTROL_URL', 'REDIS_URL',
         'REDIS_PASSWORD', 'MESSENGER_TRANSPORT_DSN', 'MAILER_DSN',
         'CONVERT_STORAGE_PATH', 'MEDIA_STORAGE_PATH',
-        // config/packages/mailer.yaml builds every email's From header from these; without
-        // them a worker's notification email would fall back to noreply@localhost.
-        'MAIL_FROM_ADDRESS', 'MAIL_FROM_NAME',
+        // config/packages/mailer.yaml takes every email's From address from this; without
+        // it a worker's notification email would fall back to noreply@localhost.
+        'MAIL_FROM_ADDRESS',
+        // The media worker qualifies the encoder this names; without it the worker keeps the
+        // value baked into the image's .env.
+        'VIDEO_ENCODER',
         'VAPID_PRIVATE_KEY', 'VAPID_PUBLIC_KEY', 'STREAM_URL_HMAC_SECRET',
         'APP_URL', 'DEFAULT_URI',
         // The managed preset turns OpenTelemetry export off unless the operator sets a collector.

@@ -425,6 +425,17 @@ final class PresetDeploymentTest extends TestCase
         }
     }
 
+    public function testWorkerEnvironmentCarriesTheVideoEncoderButNotTheSenderName(): void
+    {
+        $data = self::transcodeConfiguration();
+        $data['environment'] += ['VIDEO_ENCODER' => 'h264_vaapi', 'MAIL_FROM_NAME' => 'Bånder'];
+        $worker = PresetRenderer::workerEnvironment(PresetConfiguration::fromArray($data), $this->profile('transcode'));
+        self::assertSame('h264_vaapi', $worker['VIDEO_ENCODER']);
+        self::assertArrayNotHasKey('MAIL_FROM_NAME', $worker);
+        ksort($worker);
+        self::assertSame($worker, new DeploymentRuntimeEnvironment($worker)->variables);
+    }
+
     public function testProcessSizeBoundsMatchTheApplicationProfile(): void
     {
         self::assertSame([

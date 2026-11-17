@@ -34,7 +34,7 @@ final class PresetRenderer
         return array_intersect_key(self::environment($configuration, $profile), array_flip([
             'APP_ENV', 'APP_DEBUG', 'APP_SECRET', 'DATABASE_URL', 'DATABASE_CONTROL_URL', 'REDIS_URL',
             'REDIS_PASSWORD', 'MESSENGER_TRANSPORT_DSN', 'MAILER_DSN',
-            'CONVERT_STORAGE_PATH', 'MEDIA_STORAGE_PATH', 'MAIL_FROM_ADDRESS', 'MAIL_FROM_NAME',
+            'CONVERT_STORAGE_PATH', 'MEDIA_STORAGE_PATH', 'MAIL_FROM_ADDRESS', 'VIDEO_ENCODER',
             'VAPID_PRIVATE_KEY', 'VAPID_PUBLIC_KEY', 'STREAM_URL_HMAC_SECRET', 'APP_URL', 'DEFAULT_URI',
             'BAANDER_DEPLOYMENT_PROFILE', 'OTEL_ENABLED', 'OTEL_EXPORTER_OTLP_ENDPOINT',
         ]));

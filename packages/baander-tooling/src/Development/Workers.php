@@ -92,7 +92,7 @@ class Workers
                 'CONVERT_STORAGE_PATH',
                 'MEDIA_STORAGE_PATH',
                 'MAIL_FROM_ADDRESS',
-                'MAIL_FROM_NAME',
+                'VIDEO_ENCODER',
                 'VAPID_PRIVATE_KEY',
                 'VAPID_PUBLIC_KEY',
                 'STREAM_URL_HMAC_SECRET',

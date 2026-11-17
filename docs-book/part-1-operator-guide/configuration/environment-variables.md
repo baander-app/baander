@@ -2,8 +2,7 @@
 
 Environment variables configure application URLs, PostgreSQL and Redis
 connections, Messenger transports, mail and push delivery, external metadata
-providers and media paths. `.env.example` also lists variables that the
-application does not read; their sections and rows say so.
+providers and media paths.
 
 ## Application
 
@@ -116,58 +115,13 @@ providers need credentials in the process that makes the request.
 |----------|---------|-------------|
 | `DISCOGS_TOKEN` | — | Discogs API personal access token. The admitted worker recipe cannot currently provision it for queued enrichment; see [External APIs](../media/external-apis.md#configuration). |
 | `LASTFM_API_KEY` | — | Last.fm API key for web artist search and browse information; stored metadata sync does not use it. |
-| `LASTFM_API_SECRET` | — | Listed in `.env.example`, but not consumed by the current Last.fm adapter. |
 | `SPOTIFY_CLIENT_ID` | — | Adapter credential; no current application workflow calls Spotify. |
 | `SPOTIFY_CLIENT_SECRET` | — | Companion adapter secret; it does not enable a current workflow. |
 | `TASTE_DIVE_API_KEY` | — | Adapter credential; no current application workflow calls TasteDive. |
-| `MUSICBRAINZ_VERSION` | `1.0.0` | Listed in `.env.example`, but not consumed by the current MusicBrainz adapter. |
-| `MUSICBRAINZ_CONTACT` | `noreply@localhost` | Listed in `.env.example`, but not consumed by the current MusicBrainz adapter. |
 
-The MusicBrainz adapter sends a fixed application user agent. Changing the two
-MusicBrainz environment values above does not change it. See
+The MusicBrainz adapter sends a fixed application user agent. See
 [External APIs](../media/external-apis.md) for provider behavior and limits.
 
-
-## Library Scanner Security
-
-`.env.example` lists these `SCANNER_` variables as scan limits against path
-traversal, oversized files and metadata-based attacks, but no configuration or
-application code reads them, so changing a value has no effect on a scan. The
-descriptions give the limit each variable names.
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `SCANNER_ALLOWED_PATHS` | `/home,/media,/mnt,/Users,/Volumes` | Comma-separated roots the scanner may read. Paths outside these are rejected. |
-| `SCANNER_MAX_AUDIO_SIZE_MB` | `500` | Maximum audio file size, in MB. |
-| `SCANNER_MAX_VIDEO_SIZE_MB` | `5000` | Maximum video file size, in MB. |
-| `SCANNER_MAX_LYRICS_SIZE_MB` | `1` | Maximum lyrics file size, in MB. |
-| `SCANNER_MAX_IMAGE_SIZE_MB` | `10` | Maximum image file size, in MB. |
-| `SCANNER_MAX_SUBTITLE_SIZE_MB` | `1` | Maximum subtitle file size, in MB. |
-| `SCANNER_MAX_TOTAL_FILES` | `100000` | Maximum number of files a single scan processes. |
-| `SCANNER_MAX_DIRECTORY_DEPTH` | `20` | Maximum directory recursion depth. |
-| `SCANNER_FILE_TIMEOUT` | `30` | Per-file processing timeout, in seconds. |
-| `SCANNER_DIR_TIMEOUT` | `300` | Per-directory processing timeout, in seconds. |
-| `SCANNER_VALIDATE_MAGIC_BYTES` | `true` | Verify file magic bytes match the claimed MIME type. |
-| `SCANNER_ALLOW_MIME_MISMATCH` | `false` | If true, accept files whose MIME type differs from their extension. |
-| `SCANNER_SANITIZE_METADATA` | `true` | Neutralize unsafe metadata fields during import. |
-| `SCANNER_MAX_TITLE_LENGTH` | `255` | Maximum title length retained from metadata. |
-| `SCANNER_MAX_ARTIST_LENGTH` | `255` | Maximum artist name length. |
-| `SCANNER_MAX_ALBUM_LENGTH` | `255` | Maximum album name length. |
-| `SCANNER_MAX_GENRE_LENGTH` | `100` | Maximum genre length. |
-| `SCANNER_MAX_COMMENT_LENGTH` | `1000` | Maximum comment length. |
-| `SCANNER_MAX_LYRICS_LENGTH` | `50000` | Maximum lyrics text length. |
-
-## Local Network Discovery
-
-`.env.example` lists these variables, but no configuration or server code reads
-them, and the server does not answer discovery broadcasts. The descriptions give
-the behavior each variable names.
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DISCOVERY_ENABLED` | `true` | Enable LAN server discovery, so clients find the server without a manual URL. |
-| `DISCOVERY_PORT` | `41234` | UDP port used for discovery broadcasts. |
-| `DISCOVERY_SERVER_NAME` | `Bånder` | Server name advertised to clients. |
 
 ## Media Storage & Tools
 

@@ -352,8 +352,8 @@ actual published ports before exposing the installation:
 - **Port 6379** — the base Compose file binds Redis on host loopback. Keep it
   inaccessible to untrusted clients.
 
-The base file also binds the web service on host loopback port 9501 and publishes
-UDP port 41234, on which nothing in the server listens. Review every publication and host firewall rule for your deployment;
+The base file also binds the web service on host loopback port 9501. Review every
+publication and host firewall rule for your deployment;
 [Getting started](../getting-started/installation.md) describes the source-install topology.
 
 ### Outbound provider requests

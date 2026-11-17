@@ -102,10 +102,11 @@ HW_BITRATE_MULTIPLIER=1.0
 ```
 
 The encoder settings above select CPU encoding. Set them before building the
-worker image: its media process requires all three, and the worker credentials
-file does not accept these settings. A hardware encoder is configured in the
-deployment profile instead; see
-[Transcoding](../media/transcoding.md#hardware-acceleration).
+worker image: its media process requires all three. The worker credentials file
+can override `VIDEO_ENCODER` through its `runtimeEnvironment`, but it does not
+accept `HW_ACCEL_DEVICE` or `HW_BITRATE_MULTIPLIER`; those two come from the image's
+`.env`. A hardware encoder is configured in the deployment profile instead;
+see [Transcoding](../media/transcoding.md#hardware-acceleration).
 
 Create `.env.dev.local` with mode `0600`. Put the following settings in it, replacing
 the secret placeholders with independently generated values from `openssl rand -hex 32`.

@@ -8,6 +8,7 @@ use Baander\Tooling\Tests\DevelopmentCommandExecutor;
 use Baander\Tooling\Development\Workers;
 use Baander\Tooling\Development\WorkflowError;
 use Baander\Tooling\Filesystem\AtomicFile;
+use App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 final class DevelopmentWorkersTest extends DevDataTestCase
@@ -709,6 +710,17 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         self::assertSame(0700, fileperms($this->instance['workers']['directory']) & 0777);
         self::assertSame([], glob($this->root . '/resource-*.json'));
         self::assertSame([$this->instance['workers']['directory'] . '/ipc-resources.json'], glob($this->instance['workers']['directory'] . '/*-resources.json'));
+    }
+
+    public function testWorkerCredentialsCarryTheVideoEncoderButNotTheSenderName(): void
+    {
+        AtomicFile::writeJson($this->store->directory('persistent') . '/env.json', $this->environment() + ['VIDEO_ENCODER' => 'h264_vaapi', 'MAIL_FROM_NAME' => 'Bånder']);
+        new Workers($this->store, $this->preparationRunner())->prepare($this->instance, $this->release);
+        $runtime = AtomicFile::readJson($this->instance['workers']['directory'] . '/credentials.json')['runtimeEnvironment'];
+        self::assertSame('h264_vaapi', $runtime['VIDEO_ENCODER']);
+        self::assertArrayNotHasKey('MAIL_FROM_NAME', $runtime);
+        ksort($runtime);
+        self::assertSame($runtime, new DeploymentRuntimeEnvironment($runtime)->variables);
     }
 
     public function testDerivedBindIsRefusedBeforeSavingWorkerPointer(): void

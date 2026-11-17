@@ -96,7 +96,6 @@ class Runtime
             'DEFAULT_URI' => $origin,
             'APP_DOMAIN' => $instance['hostname'],
             'TRUSTED_PROXIES' => $instance['proxy_ip'] ?? '',
-            'DISCOVERY_ENABLED' => 'false',
         ]);
         $mounts = [
             self::volume('var', $home . '/var'),

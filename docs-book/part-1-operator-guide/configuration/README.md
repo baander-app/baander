@@ -41,12 +41,13 @@ the installation's commands; Make targets the development preview instead. See
 [Command context](../getting-started/installation.md#command-context).
 
 The worker pair runs with `APP_ENV=prod` and does not read the web's
-`.env.dev.local`. Its admitted credentials accept a restricted set of runtime keys;
-other values, including encoder selection, must be configured in the image as the
-worker and transcoding guides describe. Web, workers and the host controller must
-reach the same main database, each through an address that works on its own
-network. Web and workers must also agree on shared media paths and Redis transport
-settings. See [Shared media paths](../getting-started/storage-and-data.md#shared-media-paths).
+`.env.dev.local`. Its admitted credentials accept a restricted set of runtime keys,
+among them `VIDEO_ENCODER`, which overrides the value in the image's `.env`. Other
+values, including `HW_ACCEL_DEVICE` and `HW_BITRATE_MULTIPLIER`, must be configured in
+the image as the worker and transcoding guides describe. Web, workers and the host
+controller must reach the same main database, each through an address that works on
+its own network. Web and workers must also agree on shared media paths and Redis
+transport settings. See [Shared media paths](../getting-started/storage-and-data.md#shared-media-paths).
 
 ## Protect configuration
 

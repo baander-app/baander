@@ -293,8 +293,15 @@ encodes. When `VIDEO_ENCODER` names the same accelerator's H.264 encoder, such a
 fails, media control stops instead of encoding in software, and the worker
 deployment does not become ready. Its `worker_media_failure` log line then carries
 `"reason": "hardware_encoder_unavailable"` with the encoder, the device and the last
-lines of FFmpeg's output. Without a hardware encoder, the worker qualifies its
-software encoder.
+lines of FFmpeg's output. Without a hardware encoder, the worker qualifies the
+software encoder that `VIDEO_ENCODER` names when it is `libx264`, `libx265` or
+`libsvtav1`, and `libx265` otherwise. `VIDEO_ENCODER` alone never selects a
+hardware encoder.
+
+Set `VIDEO_ENCODER` in the managed preset's `environment` object, or in the
+`runtimeEnvironment` of the [worker credentials](../workers/worker-deployment.md#credentials-format)
+for a source install. Either value reaches the media worker and overrides the one in
+the image's `.env`.
 
 With a hardware encoder, unset video slots take the measured hardware default of
 12. Audio stays at 12, and the video maximum still follows the pooler bound: at the

@@ -152,15 +152,7 @@ Configured in `config/packages/auth.yaml`:
 ### Passwords (Argon2id)
 
 `config/packages/security.yaml` sets the Argon2id password hasher's memory cost
-to 65536 KiB and its time cost to 4. `.env.example` lists the variables below,
-but the application does not read them, so changing one does not change how
-passwords are hashed.
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ARGON2ID_MEMORY_COST` | `65536` | Argon2id memory cost, in KiB. Not read; `security.yaml` sets the memory cost. |
-| `ARGON2ID_TIME_COST` | `4` | Argon2id time cost (iterations). Not read; `security.yaml` sets the time cost. |
-| `ARGON2ID_THREAD_COST` | `3` | Argon2id parallelism (thread count). Not read; `security.yaml` sets no thread count. |
+to 65536 KiB and its time cost to 4.
 
 ### Password reset
 
@@ -202,14 +194,4 @@ header, every later request with that token must send the same value, or Baander
 rejects the token. A refreshed token keeps the fingerprint of the token it
 replaces. A token issued without the header is not fingerprint-bound and ignores
 it. No setting configures these checks.
-
-`.env.example` lists the IP-binding variables below, but the application does not
-read them.
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `TOKEN_BINDING_MAX_IP_CHANGES` | `10` | Maximum number of distinct IPs a token may bind to. Not read. |
-| `TOKEN_BINDING_CONCURRENT_IP_WINDOWS_SECONDS` | `300` | Window (seconds) over which concurrent IPs are counted. Not read. |
-| `TOKEN_BINDING_MAX_CONCURRENT_IPS` | `1` | Maximum concurrent IPs allowed per token. Not read. |
-| `TOKEN_BINDING_MIN_IP_CHANGE_INTERVAL_MINUTES` | `5` | Minimum minutes between allowed IP changes. Not read. |
 
