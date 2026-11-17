@@ -235,3 +235,56 @@ test('code borrowed from the manual keeps the manual\'s highlighting and scrolls
   expect(style.border).toBe('solid');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
 });
+
+test('the playlists page names smart playlists only among its limits, and the homepage not at all', async ({ page }) => {
+  await page.goto('/features/playlists/');
+  const texts = await page.evaluate(() => {
+    const limits = document.querySelector('section[aria-labelledby="good-to-know-title"]')!;
+    const rest = document.querySelector('main')!.cloneNode(true) as HTMLElement;
+    rest.querySelector('section[aria-labelledby="good-to-know-title"]')!.remove();
+    return { limits: limits.textContent!, rest: rest.textContent! };
+  });
+  expect(texts.limits).toMatch(/Smart playlist/);
+  expect(texts.limits).toMatch(/does not evaluate/);
+  expect(texts.rest).not.toMatch(/smart|\brules?\b/i);
+  await page.goto('/');
+  expect(await page.locator('section[aria-labelledby="playlists-title"]').textContent()).not.toMatch(/smart|\brules?\b/i);
+});
+
+test('the playback destinations page names casting receivers only in a note labelled planned', async ({ page }) => {
+  await page.goto('/features/destinations/');
+  const note = page.locator('main .feature-note');
+  await expect(note).toHaveCount(1);
+  await expect(note).toContainText(/AirPlay, Chromecast and DLNA/);
+  await expect(note).toContainText(/planned and not available yet/);
+  const rest = await page.evaluate(() => {
+    const main = document.querySelector('main')!.cloneNode(true) as HTMLElement;
+    for (const planned of main.querySelectorAll('.feature-note')) planned.remove();
+    return main.textContent!;
+  });
+  expect(rest).not.toMatch(/AirPlay|Chromecast|DLNA|\bcast/i);
+});
+
+test('listener and operator pages say before their steps that Bånder is pre-release, with the installation guide', async ({ page }) => {
+  let checked = 0;
+  for (const path of featurePages) {
+    await page.goto(path);
+    const group = await page.getByRole('navigation', { name: 'Breadcrumb' }).locator('span').last().textContent();
+    if (group === 'For building on it') continue;
+    const needs = page.locator('section[aria-labelledby="try-it-title"] .section-intro p');
+    await expect(needs, path).toContainText('Bånder is pre-release and installs by building from source');
+    await expect(needs.getByRole('link', { name: 'installation guide' }), path).toHaveAttribute('href', '/docs/operator-guide/getting-started/installation/');
+    checked++;
+  }
+  expect(checked).toBeGreaterThan(0);
+});
+
+test('no picture on a feature page describes itself with an address of a development instance', async ({ page }) => {
+  for (const path of featurePages) {
+    await page.goto(path);
+    const words = await page.locator('main .app-screenshot').evaluateAll((figures) => figures.flatMap((figure) => [
+      ...[...figure.querySelectorAll('img')].map((image) => image.alt), figure.querySelector('figcaption')!.textContent!,
+    ]));
+    for (const text of words) expect(text, path).not.toMatch(/baander\.test/);
+  }
+});

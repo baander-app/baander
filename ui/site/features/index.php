@@ -15,7 +15,7 @@ return [
             'id' => 'listeners',
             'title' => 'For listening',
             'lead' => 'Browse your collection, play it and shape how it sounds.',
-            'pages' => ['equalizer'],
+            'pages' => ['library', 'player', 'equalizer', 'playlists', 'destinations'],
         ],
         [
             'id' => 'developers',

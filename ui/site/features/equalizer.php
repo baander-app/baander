@@ -25,7 +25,7 @@ return [
             'figure' => [
                 'picture' => 'equalizer-compare',
                 'alt' => 'The ten frequency bands with a preset adjusted, above the A/B Compare card with both slots filled.',
-                'caption' => 'Bands and A/B comparison · Captured in Bånder with sample music',
+                'caption' => 'Bands and A/B · Captured in Bånder with sample music',
             ],
             'layout' => 'wide',
         ],
