@@ -8,6 +8,7 @@ use App\Party\Application\Command\CreatePartySessionCommand;
 use App\Party\Application\Exception\PartyMediaNotFoundException;
 use App\Party\Application\Exception\TranscodeJobVideoMismatchException;
 use App\Party\Application\CommandHandler\CreatePartySessionHandler;
+use App\Party\Application\Port\PartyInvitationPortInterface;
 use App\Party\Application\Port\PartyMediaAccessPortInterface;
 use App\Party\Application\Port\PartyMemberPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
@@ -16,6 +17,7 @@ use App\Party\Domain\Event\PartySessionCreated;
 use App\Party\Domain\Model\PartyMember;
 use App\Party\Domain\Model\SyncedPartySession;
 use App\Party\Domain\ValueObject\MemberRole;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -29,6 +31,10 @@ final class CreatePartySessionHandlerTest extends TestCase
     private PartyMemberPortInterface&Stub $memberPort;
     private EventDispatcherInterface&MockObject $eventDispatcher;
     private PartyMediaAccessPortInterface&Stub $mediaAccess;
+    private PartyInvitationPortInterface&Stub $invitationPort;
+    private TransactionPortInterface&Stub $transaction;
+    private bool $inTransaction = false;
+    private int $transactions = 0;
     private CreatePartySessionHandler $handler;
 
     protected function setUp(): void
@@ -38,12 +44,30 @@ final class CreatePartySessionHandlerTest extends TestCase
         $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
         $this->eventDispatcher->method('dispatch')->willReturnCallback(fn (object $e) => $e);
         $this->mediaAccess = $this->createStub(PartyMediaAccessPortInterface::class);
+        $this->invitationPort = $this->createStub(PartyInvitationPortInterface::class);
+        $this->transaction = $this->createStub(TransactionPortInterface::class);
+        $this->transaction->method('run')->willReturnCallback(function (callable $operation): mixed {
+            ++$this->transactions;
+            $this->inTransaction = true;
+            try {
+                return $operation();
+            } finally {
+                $this->inTransaction = false;
+            }
+        });
         $this->handler = $this->createCreatePartySessionHandlerFixture();
     }
 
     private function createCreatePartySessionHandlerFixture(): CreatePartySessionHandler
     {
-        $fixture = new CreatePartySessionHandler($this->sessionPort, $this->memberPort, $this->eventDispatcher, $this->mediaAccess);
+        $fixture = new CreatePartySessionHandler(
+            $this->sessionPort,
+            $this->memberPort,
+            $this->eventDispatcher,
+            $this->mediaAccess,
+            $this->invitationPort,
+            $this->transaction,
+        );
         return $fixture;
     }
 
@@ -153,6 +177,49 @@ final class CreatePartySessionHandlerTest extends TestCase
         self::assertNull(($this->handler)(new CreatePartySessionCommand($hostUserId, $videoId, null))->getTranscodeJobId());
     }
 
+    public function testTheCreatorHoldsAnInvitationWrittenWithTheSessionAndTheMemberRowBeforeAnyEventLeaves(): void
+    {
+        $hostUserId = Uuid::v4();
+        $session = SyncedPartySession::create($hostUserId, Uuid::v4(), null);
+        /** @var list<string> $written what was stored */
+        $written = [];
+        /** @var list<array{string, string}> $invited the invited user and the session they are invited to */
+        $invited = [];
+        $inOneTransaction = function (string $what) use (&$written): void {
+            self::assertTrue($this->inTransaction, 'The ' . $what . ' is written inside the transaction.');
+            $written[] = $what;
+        };
+
+        $this->sessionPort->method('createSession')->willReturnCallback(static function () use ($session, $inOneTransaction): SyncedPartySession {
+            $inOneTransaction('session');
+
+            return $session;
+        });
+        $this->memberPort->method('addMember')->willReturn(PartyMember::create($hostUserId, $session->getId()));
+        $this->memberPort->method('save')->willReturnCallback(static function (PartyMember $member) use ($inOneTransaction): void {
+            $inOneTransaction('host member row');
+        });
+        $this->invitationPort->method('invite')->willReturnCallback(static function (Uuid $userId, Uuid $sessionId) use (&$invited, $inOneTransaction): void {
+            $inOneTransaction('invitation');
+            $invited[] = [$userId->toString(), $sessionId->toString()];
+        });
+        $dispatched = [];
+        $this->eventDispatcher->expects($this->exactly(2))->method('dispatch')->willReturnCallback(function (object $event) use (&$dispatched, &$invited): object {
+            self::assertFalse($this->inTransaction, 'The events leave after the commit.');
+            self::assertCount(1, $invited, 'The creator is invited before any event leaves.');
+            $dispatched[] = $event::class;
+
+            return $event;
+        });
+
+        ($this->handler)(new CreatePartySessionCommand($hostUserId, $session->getVideoId(), null));
+
+        self::assertSame([[$hostUserId->toString(), $session->getId()->toString()]], $invited);
+        self::assertEqualsCanonicalizing(['session', 'host member row', 'invitation'], $written);
+        self::assertSame(1, $this->transactions, 'The session, the member row and the invitation share one transaction.');
+        self::assertSame([PartySessionCreated::class, MemberJoined::class], $dispatched);
+    }
+
     /** @return iterable<string, array{\RuntimeException}> */
     public static function rejectedMedia(): iterable
     {
@@ -166,11 +233,13 @@ final class CreatePartySessionHandlerTest extends TestCase
     {
         $this->sessionPort = $this->createMock(PartySessionPortInterface::class);
         $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
+        $this->invitationPort = $this->createMock(PartyInvitationPortInterface::class);
         $this->handler = $this->createCreatePartySessionHandlerFixture();
         $this->mediaAccess->method('assertHostCanPlay')->willThrowException($rejection);
 
         $this->sessionPort->expects($this->never())->method('createSession');
         $this->memberPort->expects($this->never())->method('addMember');
+        $this->invitationPort->expects($this->never())->method('invite');
         $this->eventDispatcher->expects($this->never())->method('dispatch');
 
         $this->expectExceptionObject($rejection);

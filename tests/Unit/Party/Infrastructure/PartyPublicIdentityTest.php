@@ -6,12 +6,16 @@ namespace App\Tests\Unit\Party\Infrastructure;
 
 use App\Auth\Domain\Model\User;
 use App\Catalog\Domain\Model\Video;
+use App\Party\Domain\Model\PartyInvitation;
 use App\Party\Domain\Model\PartyMember;
 use App\Party\Domain\Model\SyncedPartySession;
 use App\Party\Infrastructure\PartyPublicIdentity;
+use App\Party\Interface\Resource\PartyInvitationResource;
 use App\Party\Interface\Resource\PartyMemberResource;
 use App\Party\Interface\Resource\PartySessionResource;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use PHPUnit\Framework\TestCase;
@@ -94,4 +98,55 @@ final class PartyPublicIdentityTest extends TestCase
         (new PartyPublicIdentity($connection, $access))->videoId($video->getPublicId());
     }
 
+    public function testInvitationsResolveTheirUsersInOneLookupAndProjectNoInternalIds(): void
+    {
+        $sessionId = new Uuid();
+        $invitations = [
+            PartyInvitation::issue(new Uuid(), $sessionId),
+            PartyInvitation::issue(new Uuid(), $sessionId),
+            PartyInvitation::issue(new Uuid(), $sessionId),
+        ];
+        $userIds = array_map(static fn (PartyInvitation $invitation): string => $invitation->getUserId()->toString(), $invitations);
+        $publicIds = array_combine($userIds, [(new PublicId())->toString(), (new PublicId())->toString(), (new PublicId())->toString()]);
+        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $connection->expects($this->never())->method('fetchOne');
+        $connection->expects($this->once())->method('fetchAllKeyValue')->willReturnCallback(
+            static function (string $sql, array $parameters) use ($userIds, $publicIds): array {
+                self::assertStringContainsString(' FROM users WHERE ', $sql);
+                self::assertSame(['ids' => $userIds], $parameters);
+
+                // The database returns the rows in no particular order.
+                return array_reverse($publicIds, true);
+            },
+        );
+        $identities = new PartyPublicIdentity($connection, $this->createStub(\App\Party\Application\Port\PartyMediaAccessPortInterface::class));
+
+        $output = PartyInvitationResource::collection($identities->invitations($invitations));
+
+        self::assertSame(
+            array_map(
+                static fn (PartyInvitation $invitation): array => [
+                    'userId' => $publicIds[$invitation->getUserId()->toString()],
+                    'invitedAt' => $invitation->getCreatedAt()->format(\DateTimeInterface::ATOM),
+                ],
+                $invitations,
+            ),
+            $output,
+        );
+        $json = json_encode($output, JSON_THROW_ON_ERROR);
+        foreach ($invitations as $invitation) {
+            self::assertStringNotContainsString($invitation->getUserId()->toString(), $json);
+            self::assertStringNotContainsString($invitation->getId()->toString(), $json);
+        }
+        self::assertStringNotContainsString($sessionId->toString(), $json);
+    }
+
+    public function testNoInvitationsNeedNoLookup(): void
+    {
+        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $connection->expects($this->never())->method($this->anything());
+        $identities = new PartyPublicIdentity($connection, $this->createStub(\App\Party\Application\Port\PartyMediaAccessPortInterface::class));
+
+        self::assertSame([], $identities->invitations([]));
+    }
 }

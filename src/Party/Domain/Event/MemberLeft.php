@@ -8,7 +8,7 @@ use App\Shared\Domain\Event\AbstractDomainEvent;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 
-/** A member left a party session, over HTTP or the WebSocket. */
+/** A member left a party session: they left over HTTP or the WebSocket, or the host revoked their invitation. */
 final readonly class MemberLeft extends AbstractDomainEvent
 {
     public function __construct(

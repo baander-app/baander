@@ -17,14 +17,20 @@ use App\Party\Domain\Event\PlaybackStateChanged;
 use App\Party\Infrastructure\EventListener\LivePartyRoomListener;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Swoole\Control\ServerWorkers;
+use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
+use App\Shared\Infrastructure\Swoole\WebSocketPusher;
+use App\Shared\Infrastructure\Swoole\WebSocketRooms;
 use App\Tests\Functional\TestCase;
+use Swoole\WebSocket\Server;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * Leaving, ending and the host's playback reach the live room listener, which does
  * nothing outside the web server's HTTP workers, so the routes and commands still
- * complete here.
+ * complete here. The revoke test puts this process in the place of an HTTP worker, so
+ * the listener changes the room the test filled.
  */
 final class PartyLiveRoomWiringTest extends TestCase
 {
@@ -58,6 +64,60 @@ final class PartyLiveRoomWiringTest extends TestCase
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/party/sessions/' . $party . '/join', $guest), 200);
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/party/sessions/' . $party . '/leave', $guest), 200);
         $this->assertJsonResponse($this->authenticatedRequest('DELETE', '/api/party/sessions/' . $party, $host), 200);
+    }
+
+    public function testARevokeTakesTheUsersSocketOutOfTheRoomAndTellsTheSocketsThatRemain(): void
+    {
+        // Before the first request, so the live rooms are built on these.
+        $workers = $this->createStub(ServerWorkers::class);
+        $workers->method('currentHttpWorkerId')->willReturn(0);
+        self::getContainer()->set(ServerWorkers::class, $workers);
+        $pushed = [];
+        $server = $this->createStub(Server::class);
+        $server->method('isEstablished')->willReturn(true);
+        $server->method('push')->willReturnCallback(function (int $fd, string $data) use (&$pushed): bool {
+            $pushed[] = ['fd' => $fd, 'payload' => json_decode($data, true)];
+
+            return true;
+        });
+        $pusher = self::getContainer()->get(WebSocketPusher::class);
+        self::assertInstanceOf(WebSocketPusher::class, $pusher);
+        $pusher->setServer($server);
+        $registry = self::getContainer()->get(WebSocketConnectionRegistry::class);
+        self::assertInstanceOf(WebSocketConnectionRegistry::class, $registry);
+
+        $host = $this->createTestUser();
+        $guest = $this->createTestUser();
+        $uninvited = $this->createTestUser();
+        $party = $this->party($host);
+        $invitations = '/api/party/sessions/' . $party . '/invitations/';
+        self::assertSame(204, $this->authenticatedRequest('PUT', $invitations . $guest->getPublicId()->toString(), $host)->getStatusCode());
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/party/sessions/' . $party . '/join', $guest), 200);
+
+        $room = WebSocketRooms::party((string) $this->entityManager->getConnection()->fetchOne('SELECT id FROM party_sessions WHERE public_id = :publicId', ['publicId' => $party]));
+        $registry->addConnection(1, $host->getId()->toString(), 0, 'token-host');
+        $registry->addConnection(2, $guest->getId()->toString(), 0, 'token-guest');
+        $registry->joinRoom($room, 1);
+        $registry->joinRoom($room, 2);
+        self::assertEqualsCanonicalizing([1, 2], $registry->getRoomMembers($room));
+
+        // A user who holds no member row leaves nothing, so the room hears nothing.
+        self::assertSame(204, $this->authenticatedRequest('DELETE', $invitations . $uninvited->getPublicId()->toString(), $host)->getStatusCode());
+        self::assertEqualsCanonicalizing([1, 2], $registry->getRoomMembers($room));
+        self::assertSame([], $pushed);
+
+        self::assertSame(204, $this->authenticatedRequest('DELETE', $invitations . $guest->getPublicId()->toString(), $host)->getStatusCode());
+
+        self::assertSame([1], $registry->getRoomMembers($room));
+        self::assertSame([[
+            'fd' => 1,
+            'payload' => [
+                'type' => 'party.member_event',
+                'sessionId' => $party,
+                'action' => 'leave',
+                'userId' => $guest->getPublicId()->toString(),
+            ],
+        ]], $pushed);
     }
 
     public function testAHostWhoLeavesHandsThePartyAndItsPlaybackToTheEarliestMember(): void

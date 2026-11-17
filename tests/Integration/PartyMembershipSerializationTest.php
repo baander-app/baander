@@ -5,19 +5,27 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Party\Application\Command\InvitePartyMemberCommand;
 use App\Party\Application\Command\LeavePartySessionCommand;
+use App\Party\Application\Command\RevokePartyInvitationCommand;
 use App\Party\Application\Command\TransferHostCommand;
+use App\Party\Application\CommandHandler\InvitePartyMemberHandler;
 use App\Party\Application\CommandHandler\LeavePartySessionHandler;
+use App\Party\Application\CommandHandler\RevokePartyInvitationHandler;
 use App\Party\Application\CommandHandler\TransferHostHandler;
+use App\Party\Application\Port\PartyInvitationPortInterface;
 use App\Party\Application\Port\PartyMediaAccessPortInterface;
 use App\Party\Application\Port\PartyMemberPortInterface;
+use App\Party\Application\Port\PartyPublicIdentityPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
 use App\Party\Domain\Event\MemberLeft;
 use App\Party\Domain\Model\PartyMember;
 use App\Party\Domain\Model\SyncedPartySession;
 use App\Party\Domain\ValueObject\MemberRole;
+use App\Party\Infrastructure\Doctrine\Repository\PartyInvitationRepository;
 use App\Party\Infrastructure\Doctrine\Repository\PartyMemberRepository;
 use App\Party\Infrastructure\Doctrine\Repository\SyncedPartySessionRepository;
+use App\Party\Infrastructure\PartyInvitationService;
 use App\Party\Infrastructure\PartyMemberService;
 use App\Party\Infrastructure\PartyPublicIdentity;
 use App\Party\Infrastructure\PartySessionService;
@@ -78,7 +86,7 @@ final class PartyMembershipSerializationTest extends TestCase
         foreach ([$this->first, $this->second] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        foreach (['users', 'party_sessions', 'party_members'] as $table) {
+        foreach (['users', 'party_sessions', 'party_members', 'party_invitations'] as $table) {
             $this->first->executeStatement('CREATE TABLE ' . $table . ' (LIKE public.' . $table . ' INCLUDING ALL)');
         }
         $this->first->executeStatement('ALTER TABLE party_members ADD FOREIGN KEY (session_id) REFERENCES party_sessions (id) ON DELETE CASCADE');
@@ -128,6 +136,39 @@ final class PartyMembershipSerializationTest extends TestCase
         $this->second->rollBack();
 
         self::assertSame($before, $this->stored($party));
+        self::assertSame([], $this->dispatched);
+    }
+
+    public function testAnInviteAndARevokeFailOnTheHeldPartyLockAndChangeNothing(): void
+    {
+        [$party, [$host, $guest, $uninvited]] = $this->party(guests: 2);
+        // The guest holds an invitation and a member row for the revoke to delete; the third
+        // user holds no invitation for the invite to write.
+        $this->invitations($this->manager)->invite($guest->getId(), $party);
+        $this->manager->clear();
+        $before = [$this->stored($party), $this->invited($party)];
+        self::assertSame([$guest->getId()->toString()], $before[1]);
+
+        // Another change of the same party is under way in the second session.
+        $this->second->beginTransaction();
+        self::assertNotNull($this->sessions($this->competitor)->lockByUuid($party));
+        $this->first->executeStatement("SET lock_timeout = '200ms'");
+
+        $changes = [
+            'invite' => fn () => $this->invite($this->manager, $party, $host, $uninvited),
+            'revoke' => fn () => $this->revoke($this->manager, $party, $host, $guest),
+        ];
+        foreach ($changes as $name => $change) {
+            try {
+                $change();
+                self::fail('The ' . $name . ' did not wait for the party\'s row lock.');
+            } catch (DriverException $refused) {
+                self::assertSame('55P03', $refused->getSQLState(), 'The ' . $name . ' ends on the lock timeout.');
+            }
+        }
+        $this->second->rollBack();
+
+        self::assertSame($before, [$this->stored($party), $this->invited($party)]);
         self::assertSame([], $this->dispatched);
     }
 
@@ -243,11 +284,37 @@ final class PartyMembershipSerializationTest extends TestCase
         $handler = new TransferHostHandler(
             $this->sessions($manager),
             $this->members($manager),
-            new PartyPublicIdentity($manager->getConnection(), $this->createStub(PartyMediaAccessPortInterface::class)),
+            $this->identities($manager),
             $this->transaction($manager),
         );
 
         $handler(new TransferHostCommand($party, $host->getId(), $target->getPublicId()));
+    }
+
+    private function invite(EntityManager $manager, Uuid $party, UserEntity $host, UserEntity $user): void
+    {
+        $handler = new InvitePartyMemberHandler(
+            $this->sessions($manager),
+            $this->invitations($manager),
+            $this->identities($manager),
+            $this->transaction($manager),
+        );
+
+        $handler(new InvitePartyMemberCommand($party, $host->getId(), $user->getPublicId()));
+    }
+
+    private function revoke(EntityManager $manager, Uuid $party, UserEntity $host, UserEntity $user): void
+    {
+        $handler = new RevokePartyInvitationHandler(
+            $this->sessions($manager),
+            $this->invitations($manager),
+            $this->members($manager),
+            $this->identities($manager),
+            $this->transaction($manager),
+            $this->events(),
+        );
+
+        $handler(new RevokePartyInvitationCommand($party, $host->getId(), $user->getPublicId()));
     }
 
     private function sessions(EntityManager $manager): PartySessionPortInterface
@@ -258,6 +325,16 @@ final class PartyMembershipSerializationTest extends TestCase
     private function members(EntityManager $manager): PartyMemberPortInterface
     {
         return new PartyMemberService(new PartyMemberRepository($manager));
+    }
+
+    private function invitations(EntityManager $manager): PartyInvitationPortInterface
+    {
+        return new PartyInvitationService(new PartyInvitationRepository($manager));
+    }
+
+    private function identities(EntityManager $manager): PartyPublicIdentityPortInterface
+    {
+        return new PartyPublicIdentity($manager->getConnection(), $this->createStub(PartyMediaAccessPortInterface::class));
     }
 
     private function transaction(EntityManager $manager): TransactionPortInterface
@@ -332,6 +409,19 @@ final class PartyMembershipSerializationTest extends TestCase
                 ['id' => $party->toString()],
             ),
         ];
+    }
+
+    /**
+     * The party's invitations as the second session reads them: what is committed.
+     *
+     * @return list<string> the invited users' IDs, oldest invitation first
+     */
+    private function invited(Uuid $party): array
+    {
+        return $this->second->fetchFirstColumn(
+            'SELECT user_id FROM party_invitations WHERE session_id = :id ORDER BY created_at, id',
+            ['id' => $party->toString()],
+        );
     }
 
     private function entityManager(Connection $connection): EntityManager

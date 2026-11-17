@@ -12563,6 +12563,240 @@
                 }
             }
         },
+        "/api/party/sessions/{publicId}/invitations/": {
+            "get": {
+                "tags": [
+                    "Party"
+                ],
+                "summary": "List the invitations of a party session",
+                "description": "Only the host may list the invitations. They are ordered oldest first.",
+                "operationId": "get_party_invitation_index",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "description": "Party session public ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The invitations, oldest first",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/PartyInvitationResource"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The caller is a member of the session but not its host",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The session does not exist, or the caller is neither its host nor a member",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/party/sessions/{publicId}/invitations/{userPublicId}": {
+            "put": {
+                "tags": [
+                    "Party"
+                ],
+                "summary": "Invite a user to a party session",
+                "description": "Only the host may invite. Inviting a user who is invited already changes nothing.",
+                "operationId": "put_party_invitation_invite",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "description": "Party session public ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
+                        }
+                    },
+                    {
+                        "name": "userPublicId",
+                        "in": "path",
+                        "description": "The invited user's public ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "The user is invited"
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The caller is a member of the session but not its host",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The session does not exist, or the caller is neither its host nor a member; for the host, no user has the public ID",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The host named themself",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Party"
+                ],
+                "summary": "Revoke a user's invitation to a party session",
+                "description": "Only the host may revoke. A revoked user who had joined stops being a member of the session. Revoking a user who is not invited changes nothing.",
+                "operationId": "delete_party_invitation_revoke",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "description": "Party session public ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
+                        }
+                    },
+                    {
+                        "name": "userPublicId",
+                        "in": "path",
+                        "description": "The revoked user's public ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "The user is neither invited nor a member"
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The caller is a member of the session but not its host",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The session does not exist, or the caller is neither its host nor a member; for the host, no user has the public ID",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The host named themself",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/party/sessions/{publicId}/members/": {
             "get": {
                 "tags": [
@@ -29012,6 +29246,27 @@
                     },
                     "createdAt": {
                         "description": "Creation timestamp",
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "PartyInvitationResource": {
+                "required": [
+                    "userId",
+                    "invitedAt"
+                ],
+                "properties": {
+                    "userId": {
+                        "description": "Invited user public ID",
+                        "type": "string",
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
+                    },
+                    "invitedAt": {
+                        "description": "Invitation timestamp",
                         "type": "string",
                         "format": "date-time"
                     }

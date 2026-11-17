@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace App\Party\Infrastructure;
 
+use App\Party\Application\DTO\PartyInvitationView;
 use App\Party\Application\DTO\PartyMemberView;
 use App\Party\Application\DTO\PartySessionView;
 use App\Party\Application\Exception\PartyMediaNotFoundException;
 use App\Party\Application\Port\PartyPublicIdentityPortInterface;
 use App\Party\Application\Port\PartyMediaAccessPortInterface;
+use App\Party\Domain\Model\PartyInvitation;
 use App\Party\Domain\Model\PartyMember;
 use App\Party\Domain\Model\SyncedPartySession;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 
 final readonly class PartyPublicIdentity implements PartyPublicIdentityPortInterface
@@ -37,6 +40,22 @@ final readonly class PartyPublicIdentity implements PartyPublicIdentityPortInter
         $session = $this->publicId('party_sessions', $member->getSessionId()) ?? throw new NotFoundException('Party session not found.');
 
         return new PartyMemberView($member, $user, $session);
+    }
+
+    public function invitations(array $invitations): array
+    {
+        $users = $this->publicIds('users', array_map(
+            static fn (PartyInvitation $invitation): Uuid => $invitation->getUserId(),
+            $invitations,
+        ));
+
+        return array_map(
+            static fn (PartyInvitation $invitation): PartyInvitationView => new PartyInvitationView(
+                $invitation,
+                $users[$invitation->getUserId()->toString()] ?? throw new NotFoundException('Party user not found.'),
+            ),
+            $invitations,
+        );
     }
 
     public function videoId(PublicId $publicId): Uuid
@@ -68,6 +87,30 @@ final readonly class PartyPublicIdentity implements PartyPublicIdentityPortInter
         $value = $this->connection->fetchOne('SELECT public_id FROM ' . $table . ' WHERE id = :id', ['id' => $id->toString()]);
 
         return is_string($value) ? PublicId::fromString($value) : null;
+    }
+
+    /**
+     * The public IDs of the rows with the given IDs, read in one statement.
+     *
+     * @param 'users'    $table
+     * @param list<Uuid> $ids
+     *
+     * @return array<string, PublicId> by internal ID; an ID without a row has no entry
+     */
+    private function publicIds(string $table, array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        /** @var array<string, string> $rows */
+        $rows = $this->connection->fetchAllKeyValue(
+            'SELECT id, public_id FROM ' . $table . ' WHERE id IN (:ids)',
+            ['ids' => array_map(static fn (Uuid $id): string => $id->toString(), $ids)],
+            ['ids' => ArrayParameterType::STRING],
+        );
+
+        return array_map(PublicId::fromString(...), $rows);
     }
 
     /** @param 'users'|'videos'|'transcode_jobs' $table */

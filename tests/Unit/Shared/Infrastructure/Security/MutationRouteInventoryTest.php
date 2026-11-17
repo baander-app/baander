@@ -76,6 +76,7 @@ final class MutationRouteInventoryTest extends TestCase
         'party' => [
             'party_session_create', 'party_session_join', 'party_session_leave', 'party_session_sync', 'party_session_end',
             'party_member_update_me', 'party_member_transfer_host',
+            'party_invitation_invite', 'party_invitation_revoke',
         ],
         'favorites' => ['favorites_add', 'favorites_remove'],
         'activity' => ['activity_play', 'activity_love'],

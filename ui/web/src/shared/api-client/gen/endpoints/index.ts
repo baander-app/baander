@@ -3211,6 +3211,18 @@ export interface NotificationResource {
   createdAt: string;
 }
 
+export interface PartyInvitationResource {
+  /**
+     * Invited user public ID
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  userId: string;
+  /** Invitation timestamp */
+  invitedAt: string;
+}
+
 /**
  * Playback state
  */
@@ -6585,6 +6597,10 @@ export type PostWebhookRotateSecret200Data = {
 
 export type PostWebhookRotateSecret200 = {
   data: PostWebhookRotateSecret200Data;
+};
+
+export type GetPartyInvitationIndex200 = {
+  data?: PartyInvitationResource[];
 };
 
 export type GetPartyMemberIndex200DataItem = {
@@ -24733,6 +24749,262 @@ export const usePostWebhookRotateSecret = <TError = ErrorType<ApiError | Validat
         TContext
       > => {
       return useMutation(getPostWebhookRotateSecretMutationOptions(options), queryClient);
+    }
+
+export const getGetPartyInvitationIndexUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/party/sessions/${publicId}/invitations/`
+}
+
+/**
+ * Only the host may list the invitations. They are ordered oldest first.
+ * @summary List the invitations of a party session
+ */
+export const getPartyInvitationIndex = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetPartyInvitationIndex200> => {
+
+  return customInstance<GetPartyInvitationIndex200>(getGetPartyInvitationIndexUrl(publicId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPartyInvitationIndexQueryKey = (publicId: string,) => {
+    return [
+    `/api/party/sessions/${publicId}/invitations/`
+    ] as const;
+    }
+
+
+export const getGetPartyInvitationIndexQueryOptions = <TData = Awaited<ReturnType<typeof getPartyInvitationIndex>>, TError = ErrorType<ApiError>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartyInvitationIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPartyInvitationIndexQueryKey(publicId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPartyInvitationIndex>>> = ({ signal }) => getPartyInvitationIndex(publicId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPartyInvitationIndex>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetPartyInvitationIndexQueryResult = NonNullable<Awaited<ReturnType<typeof getPartyInvitationIndex>>>
+export type GetPartyInvitationIndexQueryError = ErrorType<ApiError>
+
+
+export function useGetPartyInvitationIndex<TData = Awaited<ReturnType<typeof getPartyInvitationIndex>>, TError = ErrorType<ApiError>>(
+ publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartyInvitationIndex>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getPartyInvitationIndex>>,
+          TError,
+          Awaited<ReturnType<typeof getPartyInvitationIndex>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetPartyInvitationIndex<TData = Awaited<ReturnType<typeof getPartyInvitationIndex>>, TError = ErrorType<ApiError>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartyInvitationIndex>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getPartyInvitationIndex>>,
+          TError,
+          Awaited<ReturnType<typeof getPartyInvitationIndex>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetPartyInvitationIndex<TData = Awaited<ReturnType<typeof getPartyInvitationIndex>>, TError = ErrorType<ApiError>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartyInvitationIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List the invitations of a party session
+ */
+
+export function useGetPartyInvitationIndex<TData = Awaited<ReturnType<typeof getPartyInvitationIndex>>, TError = ErrorType<ApiError>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartyInvitationIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetPartyInvitationIndexQueryOptions(publicId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPutPartyInvitationInviteUrl = (publicId: string,
+    userPublicId: string,) => {
+
+
+
+
+  return `/api/party/sessions/${publicId}/invitations/${userPublicId}`
+}
+
+/**
+ * Only the host may invite. Inviting a user who is invited already changes nothing.
+ * @summary Invite a user to a party session
+ */
+export const putPartyInvitationInvite = async (publicId: string,
+    userPublicId: string, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
+
+  return customInstance<void>(getPutPartyInvitationInviteUrl(publicId,userPublicId),
+  {
+    ...options,
+    method: 'PUT'
+
+
+  }
+);}
+
+
+
+
+
+export const getPutPartyInvitationInviteMutationKey = () => ['putPartyInvitationInvite'] as const;
+
+export const getPutPartyInvitationInviteMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putPartyInvitationInvite>>, TError,PutPartyInvitationInviteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof putPartyInvitationInvite>>, TError,PutPartyInvitationInviteMutationVariables, TContext> => {
+
+const mutationKey = getPutPartyInvitationInviteMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putPartyInvitationInvite>>, PutPartyInvitationInviteMutationVariables> = (props) => {
+          const {publicId,userPublicId} = props ?? {};
+
+          return  putPartyInvitationInvite(publicId,userPublicId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutPartyInvitationInviteMutationResult = NonNullable<Awaited<ReturnType<typeof putPartyInvitationInvite>>>
+
+    export type PutPartyInvitationInviteMutationError = ErrorType<ApiError>
+    export type PutPartyInvitationInviteMutationVariables = {publicId: string;userPublicId: string}
+
+    /**
+ * @summary Invite a user to a party session
+ */
+export const usePutPartyInvitationInvite = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putPartyInvitationInvite>>, TError,PutPartyInvitationInviteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof putPartyInvitationInvite>>,
+        TError,
+        PutPartyInvitationInviteMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPutPartyInvitationInviteMutationOptions(options), queryClient);
+    }
+
+export const getDeletePartyInvitationRevokeUrl = (publicId: string,
+    userPublicId: string,) => {
+
+
+
+
+  return `/api/party/sessions/${publicId}/invitations/${userPublicId}`
+}
+
+/**
+ * Only the host may revoke. A revoked user who had joined stops being a member of the session. Revoking a user who is not invited changes nothing.
+ * @summary Revoke a user's invitation to a party session
+ */
+export const deletePartyInvitationRevoke = async (publicId: string,
+    userPublicId: string, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
+
+  return customInstance<void>(getDeletePartyInvitationRevokeUrl(publicId,userPublicId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeletePartyInvitationRevokeMutationKey = () => ['deletePartyInvitationRevoke'] as const;
+
+export const getDeletePartyInvitationRevokeMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePartyInvitationRevoke>>, TError,DeletePartyInvitationRevokeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deletePartyInvitationRevoke>>, TError,DeletePartyInvitationRevokeMutationVariables, TContext> => {
+
+const mutationKey = getDeletePartyInvitationRevokeMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deletePartyInvitationRevoke>>, DeletePartyInvitationRevokeMutationVariables> = (props) => {
+          const {publicId,userPublicId} = props ?? {};
+
+          return  deletePartyInvitationRevoke(publicId,userPublicId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeletePartyInvitationRevokeMutationResult = NonNullable<Awaited<ReturnType<typeof deletePartyInvitationRevoke>>>
+
+    export type DeletePartyInvitationRevokeMutationError = ErrorType<ApiError>
+    export type DeletePartyInvitationRevokeMutationVariables = {publicId: string;userPublicId: string}
+
+    /**
+ * @summary Revoke a user's invitation to a party session
+ */
+export const useDeletePartyInvitationRevoke = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePartyInvitationRevoke>>, TError,DeletePartyInvitationRevokeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deletePartyInvitationRevoke>>,
+        TError,
+        DeletePartyInvitationRevokeMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeletePartyInvitationRevokeMutationOptions(options), queryClient);
     }
 
 export const getGetPartyMemberIndexUrl = (publicId: string,) => {
