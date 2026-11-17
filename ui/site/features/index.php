@@ -18,6 +18,12 @@ return [
             'pages' => ['library', 'player', 'equalizer', 'playlists', 'destinations'],
         ],
         [
+            'id' => 'operators',
+            'title' => 'For running it',
+            'lead' => 'Add libraries, follow the work and manage an instance.',
+            'pages' => ['libraries', 'administration', 'console'],
+        ],
+        [
             'id' => 'developers',
             'title' => 'For building on it',
             'lead' => 'See how the code is organized and try a change.',
