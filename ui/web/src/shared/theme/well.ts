@@ -10,11 +10,12 @@ export const WELL_HANDOFF = '120ms ease-out';
  * Registers the well's presence as a number, for the global stylesheet: 1 while a surface holds
  * the well, 0 once it has yielded it. A gradient does not interpolate and neither does an
  * unregistered custom property; a registered number does, so the gradient, the inset edge and
- * the lip fade together on the element that paints them. A browser without `@property` reads
- * the fallback of 1 and changes at once.
+ * the lip fade together on the element that paints them. The presence belongs to that element
+ * alone and does not inherit, so a fade restyles nothing inside it. A browser without
+ * `@property` reads the fallback of 1 and changes at once.
  */
 export const wellProperties = css`
-  @property --well-presence { syntax: '<number>'; inherits: true; initial-value: 1; }
+  @property --well-presence { syntax: '<number>'; inherits: false; initial-value: 1; }
 `;
 
 /**

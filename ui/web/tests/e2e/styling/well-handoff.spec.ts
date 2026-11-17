@@ -36,11 +36,15 @@ async function closeContextPanel(page: Page) {
   await expect(closeContext).toBeHidden()
 }
 
+/** Waits until the element's running animations and transitions have finished. */
+const settled = (surface: Locator) =>
+  surface.evaluate((node) => Promise.all(node.getAnimations().map((animation) => animation.finished)))
+
 /** Opens the pane and waits until its fade has finished. */
 async function openPane(page: Page) {
   await bellOf(page).click()
   await expect(paneOf(page)).toBeVisible()
-  await paneOf(page).evaluate((node) => Promise.all(node.getAnimations().map((animation) => animation.finished)))
+  await settled(paneOf(page))
   return paneOf(page)
 }
 
@@ -48,10 +52,6 @@ const box = async (locator: Locator) => (await locator.boundingBox())!
 
 const displayOf = (page: Page) => page.getByRole('region', { name: 'Playback', exact: true })
   .getByRole('group', { name: 'Now playing', exact: true })
-
-/** Waits until the footer display's shading has finished fading. */
-const settled = (display: Locator) =>
-  display.evaluate((node) => Promise.all(node.getAnimations().map((animation) => animation.finished)))
 
 /**
  * What the footer display paints in its empty right padding: how many levels its face spans
@@ -121,13 +121,16 @@ test('every label in the open pane stays readable over the well in every mood', 
   for (const mood of MOODS) {
     await setTheme(page, mood, 'violet')
     const bounds = await box(pane)
-    for (const [name, label] of Object.entries(labels)) {
+    const marks = await Promise.all(Object.entries(labels).map(async ([name, label]) => {
       const text = await box(label)
       // The header's labels sit at its two ends, the item's text ends before its right padding.
       const x = name === 'header' || name === 'action' ? bounds.x + bounds.width / 2 : bounds.x + bounds.width - 6
-      const [background] = await paintedPixels(page, [{ x, y: text.y + text.height / 2 }])
-      expect(contrastRatio(await textColor(label), background), `${mood}: ${name}`).toBeGreaterThanOrEqual(4.5)
-    }
+      return { name, color: await textColor(label), behind: { x, y: text.y + text.height / 2 } }
+    }))
+    const backgrounds = await paintedPixels(page, marks.map((mark) => mark.behind))
+    marks.forEach((mark, index) => {
+      expect(contrastRatio(mark.color, backgrounds[index]), `${mood}: ${mark.name}`).toBeGreaterThanOrEqual(4.5)
+    })
   }
 })
 
