@@ -98,7 +98,7 @@ flowchart TB
 
 ### Risks
 
-- **Exit animation under jsdom.** `sidebar-notifications.test.tsx` asserts the pane is gone right after Escape, an outside click and a principal change. Declare the pane's enter and exit with the `animation` shorthand, as `tooltip.tsx` does. jsdom 30.1.3 reports `animation-name: none` for the shorthand, so Radix unmounts the pane at once; for a longhand `animation-name` it reports the name, and Radix waits for an `animationend` that jsdom never fires. The Vitest suite therefore does not show that the exit animation exists; the browser spec does.
+- **Exit animation under jsdom.** `sidebar-notifications.test.tsx` asserts the pane is gone right after Escape, an outside click and a principal change. Its 19 tests pass with the exit animation in place, whether the animation is written with the `animation` shorthand or with longhand properties. A bare jsdom 30.1.3 document reports `animation-name: none` for the shorthand and the name for the longhand, which suggested that the longhand would leave Radix waiting for an `animationend`; the suite did not hang on it. The Vitest suite does not show that the exit animation exists; the browser spec does.
 - **Rest-state drift.** Moving the footer's shading into the shared definition must not change a pixel at rest. `ui/web/tests/e2e/styling/footer-material.spec.ts` asserts thresholds and compares no captures, so it cannot show this. The before-and-after sample comparison in U1 is the proof.
 - **Theme changes.** `html.theme-transitioning *::before` in `ui/web/src/shared/theme/GlobalStyles.tsx` replaces the transitioned properties for 120ms after a theme change, so a handoff in that window is immediate. Accepted.
 
