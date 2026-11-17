@@ -809,10 +809,10 @@ Open:
 
 ## Notification pane well
 
-Delivered on the branch `feat/notification-pane-well` on 2026-11-17 (`182ea0948` to
-this record) from the plan
-`docs/plans/2026-11-17-1705-feat-notification-pane-well-plan.md`. The branch is
-local: it is not merged into `master` and not pushed.
+Delivered on `master` on 2026-11-17, fast-forwarded from `feat/notification-pane-well`
+(`182ea0948` to this record) from the plan
+`docs/plans/2026-11-17-1705-feat-notification-pane-well-plan.md`. The user chose the
+fast-forward on 2026-11-17; nothing is pushed.
 
 - The handoff (`7f357281a`, `02292d5f7`). While the sidebar notification pane is open
   it holds the well: shading toward its upper edge, an inset upper edge and a lower
@@ -900,8 +900,8 @@ Open:
 - The warm mood's one-level differences at rest are unexplained. The computed
   declarations are the same as before. Most of the differences follow an animated mood
   switch and vary from run to run, which points at how the browser rasterises partial
-  repaints; 11 pixels differ without one. The user has not yet said whether this is
-  acceptable, and the plan made a changed rest state a reason to stop and ask.
+  repaints; 11 pixels differ without one. The plan made a changed rest state a reason
+  to stop and ask, and the user accepted this difference on 2026-11-17.
 - The sidebar notification spec's failure may have been helped along by this work:
   diagnostic runs signed in as the preview's admin account and sent play, transfer and
   a rejected acknowledgement to that account's leftover listening session before the
