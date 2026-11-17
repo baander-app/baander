@@ -36,8 +36,10 @@ E2E_BASE_URL="$(make preview-url)" yarn --cwd ui/web e2e:headless \
 ```
 
 The styling suite signs in through the real login flow. Deterministic catalog GET
-fixtures and a local silent WAV cover empty and populated views and an active
-player without library scans or authentication-store injection. Its DOM appearance
+fixtures cover empty and populated views without library scans or
+authentication-store injection. They no longer give an active player, and the
+playback cases of `browsing-playback.spec.ts` that rely on them fail; the footer
+specs below explain why and how they play a track. Its DOM appearance
 matrix checks all 32 mood/accent combinations; separate Settings tests exercise
 saved preferences through the application. Playback and mocked command-palette cases
 block service workers so the fixtures can intercept requests deterministically;
@@ -68,6 +70,29 @@ centerpiece's top and bottom gaps. Review those captures at normal size to judge
 the subtle recess and lower edge.
 Browser pixels establish rendered contrast, not the near-black behavior of a
 physical OLED panel; record hardware observations separately when available.
+
+The listening session accepts only songs the server knows. It answers 422 to a song
+from the catalog GET fixtures, so those fixtures cannot put a track in the footer.
+The footer specs therefore sign in as a server fixture user and play that fixture's
+song, through the `pausedFooter` fixture in `tests/e2e/styling/footer-playback.ts`.
+
+The well handoff between the footer and the sidebar notification pane has its own
+spec:
+
+```bash
+E2E_BASE_URL="$(make preview-url)" yarn --cwd ui/web e2e:headless \
+  tests/e2e/styling/well-handoff.spec.ts
+```
+
+It reads painted pixels at 390px and 1280px in the four moods. In the open pane it
+samples the inset upper edge and the lower lip. In the footer centerpiece it samples
+the empty right padding, which is shaded with a lip at rest and spans at most one
+level while the pane is open; a flat face can span one level because the browser
+dithers the gradient it is painted with. The spec also checks four things: label
+contrast over the pane's shading and on the flat centerpiece; that the pane's fade
+and the centerpiece's shading report the same duration and easing; that both are
+immediate when reduced motion is requested; and that Escape returns focus to the
+bell.
 
 The Electron app has its own Node test suite, run with Node 26:
 

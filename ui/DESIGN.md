@@ -68,8 +68,10 @@ is supplementary Mojave-era material, not a 2014 source. Apple Music is not the
 visual reference.
 
 Baander is gradually combining restrained Aqua material cues with flat surfaces.
-The web music footer's recessed centerpiece is the first application; other
-surfaces retain their existing rules. Material supports hierarchy while content
+The material is the well: a recessed face that one surface holds at a time. The
+web music footer's centerpiece holds it by default and the sidebar notification
+pane takes it while open; other surfaces retain their existing rules. Material
+supports hierarchy while content
 and controls remain dominant. Desktop, touch and TV share this visual language,
 but each needs layouts and controls suited to its input model and viewing
 conditions; visual consistency does not require the desktop footer arrangement
@@ -103,15 +105,31 @@ centerpiece's lower lip; these are footer-specific spacing values.
 For OLED screens, retain the dark mood's true-black background and distinguish
 near-black layers through existing roles: `--color-card` for the footer,
 `--color-muted` for its central display and `--color-secondary` for the play
-button. Other moods use their own values for those roles. The central display has
-a shallow inset face and faint lower lip, using static shading derived from the
-existing theme colors. Keep this depth subtle, with track information and playback
-controls visually dominant and legible. The treatment has no animation or
-pointer-driven lighting. The footer and play-button surfaces remain flat.
-While the centerpiece is visible, it is the only surface on screen with material
-shading or shadows that imply depth. Keep surrounding panels and controls flat so
-the recess remains the focal surface. Focus indicators and the separation of
+button. Other moods use their own values for those roles. The central display
+holds the well: a shallow inset face and faint lower lip, with shading derived from
+the existing theme colors. Keep this depth subtle, with track information and
+playback controls visually dominant and legible. The shading is static at rest and
+has no pointer-driven lighting; its only motion is the well handoff in the Motion
+table. The footer and play-button surfaces remain flat.
+
+One surface holds the well at a time, and it is the only surface on screen with
+material shading or shadows that imply depth. The centerpiece holds it by default.
+While the notification pane is open the pane holds it, and the centerpiece is flat
+on `--color-muted` with no inset edge or lip. Keep surrounding panels and controls
+flat so the well remains the focal surface. Focus indicators and the separation of
 transient menus and overlays retain their existing rules.
+
+### Notification pane
+
+The sidebar bell opens the notification pane above it. While open, the pane holds
+the well over its `--color-popover` face, so the one depth cue on screen marks the
+surface the user just opened. It keeps its border and overlay radius and has no
+drop shadow. Muted text in the pane uses the well's secondary text color,
+`--well-secondary-text`, which keeps 4.5:1 over the shaded upper edge in every
+mood; `--color-muted-foreground` does not in the warm mood. The pane fades in and out
+over the well handoff time, and the centerpiece's shading fades out and back over
+the same time. The admin bell's pane does not hold the well, because the admin
+shell has no footer player to take it from.
 
 ### Surfaces
 - Background: `var(--color-background)`
@@ -119,7 +137,7 @@ transient menus and overlays retain their existing rules.
 - Sidebar: `var(--color-sidebar)`
 - Borders: `var(--color-border)` — used sparingly, not between every element
 - Surface colors follow the selected mood; dark-mode values are not universal defaults.
-- No gradients except for the music footer's recessed central display described above. No drop shadows except on context menus and overlays (subtle, `0 4px 24px rgba(0,0,0,0.4)`); the central display may use a shallow inset edge and faint lower lip.
+- No gradients except on the surface that holds the well, described above. No drop shadows except on context menus and overlays (subtle, `0 4px 24px rgba(0,0,0,0.4)`); the well uses a shallow inset edge and faint lower lip.
 
 ### Border radius
 - Cards: 12px radius. Do not use 16px for card surfaces.
@@ -361,6 +379,7 @@ Motion communicates *where things went*, not *how fancy the UI is*.
 | Column browser column change | 80ms | ease-out |
 | Selection highlight | 0ms | none (instant) |
 | Context panel open/close | 120ms | ease-out |
+| Well handoff (notification pane open/close) | 120ms | ease-out |
 | Hover state | 60ms | ease-out |
 | Context menu | Native OS | — |
 
@@ -472,8 +491,8 @@ View mode preference persists across sessions (Zustand + localStorage).
 | `setState` inside `useMemo` | Extract to `useEffect` |
 | Two-effect blob URL pattern | Use `useImageBlob` hook (single effect) |
 | `any` type | Never. Define the type. |
-| Gradients on surfaces | Flat colors except the music footer's recessed central display |
-| Drop shadows on cards | No shadows except overlays and the music footer's shallow inset edge and faint lower lip |
+| Gradients on surfaces | Flat colors except the surface that holds the well |
+| Drop shadows on cards | No shadows except overlays and the well's shallow inset edge and faint lower lip |
 | Bounce/spring animations | ease-out only, <120ms |
 | "..." menu buttons on items | Native right-click only |
 | Full-page reloads for navigation | React Router `<Link>` / `useNavigate()` |
