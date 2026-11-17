@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Interface\Controller;
 
+use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Port\WebSocketIdentityLookupInterface;
 use App\Shared\Application\LiveUpdates\LiveSubscriptions;
+use App\Party\Application\Exception\PartyNotFoundException;
 use App\Party\Application\Port\PartyPublicIdentityPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
 use App\Party\Domain\Model\SyncedPartySession;
@@ -106,6 +108,8 @@ final class WebSocketControllerTest extends TestCase
         $this->parties->method('findByUuid')->willReturnCallback(static fn(Uuid $id): SyncedPartySession => self::party($id->toString()));
         $this->identities = $this->createStub(WebSocketIdentityLookupInterface::class);
         $this->identities->method('partyId')->willReturnCallback(static fn(PublicId $id): Uuid => Uuid::fromString('01900000-0000-7000-8000-00000000000' . substr($id->toString(), -1)));
+        // Every user holds a member row in every party, unless a test says otherwise.
+        $this->identities->method('partyIdForMember')->willReturnCallback(static fn(PublicId $id): Uuid => Uuid::fromString('01900000-0000-7000-8000-00000000000' . substr($id->toString(), -1)));
         $this->identities->method('userPublicId')->willReturnCallback(static fn(Uuid $id): PublicId => new PublicId(self::publicId($id->toString())));
 
         $this->controller = new WebSocketController(
@@ -680,6 +684,93 @@ final class WebSocketControllerTest extends TestCase
 
         $this->assertLastPushMatches(1, 'error', ['message' => 'Failed to join party session']);
         self::assertSame([], $this->registry->getRoomMembers('party:' . $sessionId));
+        $controller->onMessage(1, '{"type":"ping"}');
+        $this->assertLastPushMatches(1, 'pong');
+    }
+
+    public function testPartyJoinOfAPartyTheHandlerHidesGetsTheFrameOfAnUnknownPartyAndStaysOutOfTheRoom(): void
+    {
+        $sessionId = '01900000-0000-7000-8000-000000000002';
+        $identities = $this->createStub(WebSocketIdentityLookupInterface::class);
+        // The party exists; no party has the other public ID.
+        $identities->method('partyId')->willReturnCallback(static fn(PublicId $id): ?Uuid => $id->toString() === self::publicId($sessionId) ? Uuid::fromString($sessionId) : null);
+        $identities->method('userPublicId')->willReturnCallback(static fn(Uuid $id): PublicId => new PublicId(self::publicId($id->toString())));
+        $this->identities = $identities;
+        // The handler hides the party from a user who is neither a member of it nor invited to it.
+        $controller = $this->controllerWithJoinHandler(
+            static fn(JoinPartySessionCommand $command): never => throw new PartyNotFoundException(),
+            new ResultStampMiddleware([PartyMemberResultStamp::class]),
+        );
+        $controller->onOpen(1, '01900000-0000-7000-8000-000000000001', 'token-1');
+        $this->pushedMessages = [];
+
+        $controller->onMessage(1, json_encode(['type' => 'party.join', 'sessionId' => self::publicId($sessionId)], JSON_THROW_ON_ERROR));
+        $controller->onMessage(1, json_encode(['type' => 'party.join', 'sessionId' => str_repeat('u', 21)], JSON_THROW_ON_ERROR));
+
+        [$hidden, $unknown] = $this->allPushedPayloads();
+        self::assertSame(['fd' => 1, 'payload' => ['type' => 'error', 'message' => 'Invalid public identity']], $unknown);
+        self::assertSame($unknown, $hidden);
+        self::assertSame([], $this->registry->getRoomMembers('party:' . $sessionId));
+    }
+
+    public function testPartyJoinOfAnEndedOrFullPartyIsRefusedAndStaysOutOfTheRoom(): void
+    {
+        $sessionId = '01900000-0000-7000-8000-000000000002';
+        $controller = $this->controllerWithJoinHandler(
+            static fn(JoinPartySessionCommand $command): never => throw new ConflictException('The party is full.'),
+            new ResultStampMiddleware([PartyMemberResultStamp::class]),
+        );
+        $controller->onOpen(1, '01900000-0000-7000-8000-000000000001', 'token-1');
+        $this->pushedMessages = [];
+
+        $controller->onMessage(1, json_encode(['type' => 'party.join', 'sessionId' => self::publicId($sessionId)], JSON_THROW_ON_ERROR));
+
+        self::assertSame([['fd' => 1, 'payload' => ['type' => 'error', 'message' => 'Party operation refused']]], $this->allPushedPayloads());
+        self::assertSame([], $this->registry->getRoomMembers('party:' . $sessionId));
+    }
+
+    /** @return iterable<string, array{bool, string}> whether the member row can be read, and what the joiner is told */
+    public static function joinersWhoseMemberRowIsNotFoundAfterTheJoin(): iterable
+    {
+        // A revoke that committed between the join and the room entry: answered as for an unknown party.
+        yield 'the member row is gone' => [true, 'Invalid public identity'];
+        yield 'the member row cannot be read' => [false, 'Identity lookup unavailable'];
+    }
+
+    #[DataProvider('joinersWhoseMemberRowIsNotFoundAfterTheJoin')]
+    public function testPartyJoinLeavesTheRoomAgainUnlessTheMemberRowIsStillStoredAfterEnteringIt(bool $readable, string $message): void
+    {
+        $joiner = '01900000-0000-7000-8000-000000000001';
+        $member = '01900000-0000-7000-8000-000000000003';
+        $sessionId = '01900000-0000-7000-8000-000000000002';
+        $room = WebSocketRooms::party($sessionId);
+        $identities = $this->createStub(WebSocketIdentityLookupInterface::class);
+        $identities->method('partyId')->willReturn(Uuid::fromString($sessionId));
+        $identities->method('userPublicId')->willReturnCallback(static fn(Uuid $id): PublicId => new PublicId(self::publicId($id->toString())));
+        // Only the joiner's member row in this party is missing: every other user holds one.
+        $identities->method('partyIdForMember')->willReturnCallback(static function (PublicId $party, Uuid $user) use ($sessionId, $joiner, $readable): ?Uuid {
+            if ($party->toString() !== self::publicId($sessionId) || $user->toString() !== $joiner) {
+                return Uuid::fromString($sessionId);
+            }
+
+            return $readable ? null : throw new \RuntimeException('Database unavailable');
+        });
+        $this->identities = $identities;
+        // The handler admits the joiner and commits the member row.
+        $controller = $this->controllerWithJoinHandler(static fn(JoinPartySessionCommand $command): PartyMember => PartyMember::create(
+            $command->getUserId(),
+            $command->getSessionId(),
+        ), new ResultStampMiddleware([PartyMemberResultStamp::class]));
+        $controller->onOpen(1, $joiner, 'token-1');
+        $controller->onOpen(2, $member, 'token-2');
+        $this->registry->joinRoom($room, 2);
+        $this->pushedMessages = [];
+
+        $controller->onMessage(1, json_encode(['type' => 'party.join', 'sessionId' => self::publicId($sessionId)], JSON_THROW_ON_ERROR));
+
+        self::assertSame([2], $this->registry->getRoomMembers($room));
+        // The joiner is told once and not that it joined, and the member in the room hears nothing.
+        self::assertSame([['fd' => 1, 'payload' => ['type' => 'error', 'message' => $message]]], $this->allPushedPayloads());
         $controller->onMessage(1, '{"type":"ping"}');
         $this->assertLastPushMatches(1, 'pong');
     }

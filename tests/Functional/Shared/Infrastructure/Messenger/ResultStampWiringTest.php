@@ -49,6 +49,9 @@ final class ResultStampWiringTest extends TestCase
         self::assertNotNull($session);
         self::assertArrayNotHasKey('uuid', $party);
         $guest = $this->createTestUser();
+        // The join admits only a user the host has invited.
+        $invited = $this->authenticatedRequest('PUT', '/api/party/sessions/' . $party['publicId'] . '/invitations/' . $guest->getPublicId()->toString(), $host);
+        self::assertSame(204, $invited->getStatusCode(), (string) $invited->getContent());
 
         $envelope = self::getContainer()->get(MessageBusInterface::class)->dispatch(
             new JoinPartySessionCommand($guest->getId(), $session->getId()),

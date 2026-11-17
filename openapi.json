@@ -13040,7 +13040,7 @@
                     "Party"
                 ],
                 "summary": "List the caller's active party sessions",
-                "description": "Lists only the active parties the caller hosts or has joined. A party's public ID works as its invite: share it so others can join.",
+                "description": "Lists only the active parties the caller hosts or has joined. A party's host invites the users who may join it; an invited user finds the party here once they have joined.",
                 "operationId": "get_party_session_index",
                 "responses": {
                     "200": {
@@ -13261,6 +13261,7 @@
                     "Party"
                 ],
                 "summary": "Join a party session",
+                "description": "Only a member of the session and a user its host has invited may join. A member who joins again keeps their place, also when the session is full. Every other caller gets the answer an unknown session gets.",
                 "operationId": "post_party_session_join",
                 "parameters": [
                     {
@@ -13295,6 +13296,36 @@
                                         }
                                     },
                                     "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The session does not exist, or the caller is neither a member of it nor invited to it",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The session has ended, or it is full and the caller is not a member of it yet",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }

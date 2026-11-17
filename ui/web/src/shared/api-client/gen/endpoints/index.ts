@@ -25295,7 +25295,7 @@ export const getGetPartySessionIndexUrl = () => {
 }
 
 /**
- * Lists only the active parties the caller hosts or has joined. A party's public ID works as its invite: share it so others can join.
+ * Lists only the active parties the caller hosts or has joined. A party's host invites the users who may join it; an invited user finds the party here once they have joined.
  * @summary List the caller's active party sessions
  */
 export const getPartySessionIndex = async ( options?: Parameters<typeof customInstance>[1]): Promise<GetPartySessionIndex200> => {
@@ -25661,6 +25661,7 @@ export const getPostPartySessionJoinUrl = (publicId: string,) => {
 }
 
 /**
+ * Only a member of the session and a user its host has invited may join. A member who joins again keeps their place, also when the session is full. Every other caller gets the answer an unknown session gets.
  * @summary Join a party session
  */
 export const postPartySessionJoin = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<PostPartySessionJoin200> => {
@@ -25680,7 +25681,7 @@ export const postPartySessionJoin = async (publicId: string, options?: Parameter
 
 export const getPostPartySessionJoinMutationKey = () => ['postPartySessionJoin'] as const;
 
-export const getPostPartySessionJoinMutationOptions = <TError = ErrorType<unknown>,
+export const getPostPartySessionJoinMutationOptions = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionJoin>>, TError,PostPartySessionJoinMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postPartySessionJoin>>, TError,PostPartySessionJoinMutationVariables, TContext> => {
 
@@ -25709,13 +25710,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostPartySessionJoinMutationResult = NonNullable<Awaited<ReturnType<typeof postPartySessionJoin>>>
 
-    export type PostPartySessionJoinMutationError = ErrorType<unknown>
+    export type PostPartySessionJoinMutationError = ErrorType<ApiError>
     export type PostPartySessionJoinMutationVariables = {publicId: string}
 
     /**
  * @summary Join a party session
  */
-export const usePostPartySessionJoin = <TError = ErrorType<unknown>,
+export const usePostPartySessionJoin = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionJoin>>, TError,PostPartySessionJoinMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postPartySessionJoin>>,

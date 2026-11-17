@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Controller;
 
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Application\Exception\HandlerFailure;
+use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\LiveUpdates\LiveSubscription;
 use App\Shared\Application\LiveUpdates\LiveSubscriptions;
 use App\Shared\Application\Port\WebSocketIdentityLookupInterface;
@@ -324,9 +326,13 @@ final class WebSocketController extends AbstractWebSocketController
             $member = $envelope->last(PartyMemberResultStamp::class)?->getMember()
                 ?? throw new \UnexpectedValueException('The join handler result carries no PartyMemberResultStamp.');
         } catch (HandlerFailedException $e) {
+            // The handler answers not found to hide the party from a user who is neither a member
+            // of it nor invited to it: that user gets the answer an unknown party gets.
             $this->pusher->pushToConnection($fd, [
                 'type' => 'error',
-                'message' => 'Party operation refused',
+                'message' => HandlerFailure::cause($e) instanceof NotFoundException
+                    ? 'Invalid public identity'
+                    : 'Party operation refused',
             ]);
 
             return;
@@ -347,6 +353,9 @@ final class WebSocketController extends AbstractWebSocketController
         if (!$this->joinBroadcastRoom($fd, $userId, $room)) {
             return;
         }
+        if (!$this->staysInPartyRoom($fd, $room, $sessionId, $userUuid)) {
+            return;
+        }
         $this->logger?->info('Party joined', ['fd' => $fd, 'userId' => $userId, 'sessionId' => $sessionId, 'role' => $member->getRole()->value]);
 
         $this->pusher->pushToConnection($fd, [
@@ -363,6 +372,38 @@ final class WebSocketController extends AbstractWebSocketController
             'userId' => $userPublicId->toString(),
             'role' => $member->getRole()->value,
         ]);
+    }
+
+    /**
+     * Whether the user's member row is still stored now that the socket is in the party's room.
+     * When the row is gone, the socket leaves the room again and is answered as for an unknown
+     * party.
+     *
+     * The host can revoke the member once the join has committed. The revoke takes the member's
+     * sockets out of the room, but a socket that enters only after that would stay and keep
+     * receiving the party's broadcasts. When the row cannot be read, the socket leaves the room
+     * as well, so none stays in a room without a member row known to be behind it.
+     */
+    private function staysInPartyRoom(int $fd, string $room, string $partyPublicId, Uuid $userId): bool
+    {
+        try {
+            $refusal = $this->identities->partyIdForMember(PublicId::fromString($partyPublicId), $userId) === null
+                ? 'Invalid public identity'
+                : null;
+        } catch (Throwable) {
+            $refusal = 'Identity lookup unavailable';
+        }
+        if ($refusal === null) {
+            return true;
+        }
+
+        $this->registry->leaveRoom($room, $fd);
+        $this->pusher->pushToConnection($fd, [
+            'type' => 'error',
+            'message' => $refusal,
+        ]);
+
+        return false;
     }
 
     /** @param array<array-key, mixed> $payload */

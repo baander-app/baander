@@ -6,10 +6,12 @@ namespace App\Tests\Integration;
 
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Party\Application\Command\InvitePartyMemberCommand;
+use App\Party\Application\Command\JoinPartySessionCommand;
 use App\Party\Application\Command\LeavePartySessionCommand;
 use App\Party\Application\Command\RevokePartyInvitationCommand;
 use App\Party\Application\Command\TransferHostCommand;
 use App\Party\Application\CommandHandler\InvitePartyMemberHandler;
+use App\Party\Application\CommandHandler\JoinPartySessionHandler;
 use App\Party\Application\CommandHandler\LeavePartySessionHandler;
 use App\Party\Application\CommandHandler\RevokePartyInvitationHandler;
 use App\Party\Application\CommandHandler\TransferHostHandler;
@@ -172,6 +174,37 @@ final class PartyMembershipSerializationTest extends TestCase
         self::assertSame([], $this->dispatched);
     }
 
+    public function testAJoinFailsOnTheHeldPartyLockAndAddsNoMember(): void
+    {
+        [$party, [, $member]] = $this->party(guests: 1);
+        // One joiner returns to the member row they hold, which writes nothing that refers to
+        // the party; the other holds an invitation and no member row yet.
+        $invited = $this->user();
+        $this->manager->flush();
+        $this->invitations($this->manager)->invite($invited->getId(), $party);
+        $this->manager->clear();
+        $before = [$this->stored($party), $this->invited($party)];
+        self::assertSame([$invited->getId()->toString()], $before[1]);
+
+        // Another change of the same party is under way in the second session.
+        $this->second->beginTransaction();
+        self::assertNotNull($this->sessions($this->competitor)->lockByUuid($party));
+        $this->first->executeStatement("SET lock_timeout = '200ms'");
+
+        foreach (['returning member' => $member, 'invited user' => $invited] as $name => $joiner) {
+            try {
+                $this->join($this->manager, $party, $joiner);
+                self::fail('The join of the ' . $name . ' did not wait for the party\'s row lock.');
+            } catch (DriverException $refused) {
+                self::assertSame('55P03', $refused->getSQLState(), 'The join of the ' . $name . ' ends on the lock timeout.');
+            }
+        }
+        $this->second->rollBack();
+
+        self::assertSame($before, [$this->stored($party), $this->invited($party)]);
+        self::assertSame([], $this->dispatched);
+    }
+
     public function testALeaveDecidesOnTheHostACompetingTransferCommittedAfterTheSessionWasLoaded(): void
     {
         [$party, [$host, $guest, $latest]] = $this->party(guests: 2);
@@ -265,6 +298,19 @@ final class PartyMembershipSerializationTest extends TestCase
         $this->expectException(TransactionRequiredException::class);
 
         $this->sessions($this->manager)->lockByUuid($party);
+    }
+
+    private function join(EntityManager $manager, Uuid $party, UserEntity $user): void
+    {
+        $handler = new JoinPartySessionHandler(
+            $this->sessions($manager),
+            $this->members($manager),
+            $this->invitations($manager),
+            $this->transaction($manager),
+            $this->events(),
+        );
+
+        $handler(new JoinPartySessionCommand($user->getId(), $party));
     }
 
     private function leave(EntityManager $manager, Uuid $party, UserEntity $user): void
@@ -368,8 +414,7 @@ final class PartyMembershipSerializationTest extends TestCase
     {
         $users = [];
         for ($index = 0; $index <= $guests; ++$index) {
-            $users[] = $user = new UserEntity(new PublicId(), 'Party member', bin2hex(random_bytes(8)) . '@baander.app', 'test-only', '');
-            $this->manager->persist($user);
+            $users[] = $this->user();
         }
         $this->manager->flush();
 
@@ -386,6 +431,15 @@ final class PartyMembershipSerializationTest extends TestCase
         $this->manager->clear();
 
         return [$session->getId(), $users];
+    }
+
+    /** A user the first manager stores with its next flush. */
+    private function user(): UserEntity
+    {
+        $user = new UserEntity(new PublicId(), 'Party member', bin2hex(random_bytes(8)) . '@baander.app', 'test-only', '');
+        $this->manager->persist($user);
+
+        return $user;
     }
 
     /**

@@ -21,6 +21,7 @@ use App\Shared\Infrastructure\Swoole\Control\ServerWorkers;
 use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
 use App\Shared\Infrastructure\Swoole\WebSocketPusher;
 use App\Shared\Infrastructure\Swoole\WebSocketRooms;
+use App\Shared\Interface\Controller\WebSocketController;
 use App\Tests\Functional\TestCase;
 use Swoole\WebSocket\Server;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -29,11 +30,17 @@ use Symfony\Component\Messenger\MessageBusInterface;
 /**
  * Leaving, ending and the host's playback reach the live room listener, which does
  * nothing outside the web server's HTTP workers, so the routes and commands still
- * complete here. The revoke test puts this process in the place of an HTTP worker, so
- * the listener changes the room the test filled.
+ * complete here. The revoke test and the socket tests put this process in the place of an
+ * HTTP worker with open sockets, so the listener changes the room they fill and `party.join`
+ * runs through the application's own controller, bus and handler.
  */
 final class PartyLiveRoomWiringTest extends TestCase
 {
+    private const array ANSWER_FOR_AN_UNKNOWN_PARTY = ['type' => 'error', 'message' => 'Invalid public identity'];
+
+    /** @var list<array{fd: int, payload: mixed}> what the server pushed to its sockets */
+    private array $pushed = [];
+
     public function testTheListenerHearsALeaveAnEndAndAPlaybackChange(): void
     {
         $dispatcher = self::getContainer()->get('event_dispatcher');
@@ -60,6 +67,7 @@ final class PartyLiveRoomWiringTest extends TestCase
         $host = $this->createTestUser();
         $guest = $this->createTestUser();
         $party = $this->party($host);
+        $this->invite($host, $guest, $party);
 
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/party/sessions/' . $party . '/join', $guest), 200);
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/party/sessions/' . $party . '/leave', $guest), 200);
@@ -68,33 +76,17 @@ final class PartyLiveRoomWiringTest extends TestCase
 
     public function testARevokeTakesTheUsersSocketOutOfTheRoomAndTellsTheSocketsThatRemain(): void
     {
-        // Before the first request, so the live rooms are built on these.
-        $workers = $this->createStub(ServerWorkers::class);
-        $workers->method('currentHttpWorkerId')->willReturn(0);
-        self::getContainer()->set(ServerWorkers::class, $workers);
-        $pushed = [];
-        $server = $this->createStub(Server::class);
-        $server->method('isEstablished')->willReturn(true);
-        $server->method('push')->willReturnCallback(function (int $fd, string $data) use (&$pushed): bool {
-            $pushed[] = ['fd' => $fd, 'payload' => json_decode($data, true)];
-
-            return true;
-        });
-        $pusher = self::getContainer()->get(WebSocketPusher::class);
-        self::assertInstanceOf(WebSocketPusher::class, $pusher);
-        $pusher->setServer($server);
-        $registry = self::getContainer()->get(WebSocketConnectionRegistry::class);
-        self::assertInstanceOf(WebSocketConnectionRegistry::class, $registry);
+        $registry = $this->liveSockets();
 
         $host = $this->createTestUser();
         $guest = $this->createTestUser();
         $uninvited = $this->createTestUser();
         $party = $this->party($host);
         $invitations = '/api/party/sessions/' . $party . '/invitations/';
-        self::assertSame(204, $this->authenticatedRequest('PUT', $invitations . $guest->getPublicId()->toString(), $host)->getStatusCode());
+        $this->invite($host, $guest, $party);
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/party/sessions/' . $party . '/join', $guest), 200);
 
-        $room = WebSocketRooms::party((string) $this->entityManager->getConnection()->fetchOne('SELECT id FROM party_sessions WHERE public_id = :publicId', ['publicId' => $party]));
+        $room = $this->room($party);
         $registry->addConnection(1, $host->getId()->toString(), 0, 'token-host');
         $registry->addConnection(2, $guest->getId()->toString(), 0, 'token-guest');
         $registry->joinRoom($room, 1);
@@ -104,7 +96,7 @@ final class PartyLiveRoomWiringTest extends TestCase
         // A user who holds no member row leaves nothing, so the room hears nothing.
         self::assertSame(204, $this->authenticatedRequest('DELETE', $invitations . $uninvited->getPublicId()->toString(), $host)->getStatusCode());
         self::assertEqualsCanonicalizing([1, 2], $registry->getRoomMembers($room));
-        self::assertSame([], $pushed);
+        self::assertSame([], $this->pushed);
 
         self::assertSame(204, $this->authenticatedRequest('DELETE', $invitations . $guest->getPublicId()->toString(), $host)->getStatusCode());
 
@@ -117,7 +109,93 @@ final class PartyLiveRoomWiringTest extends TestCase
                 'action' => 'leave',
                 'userId' => $guest->getPublicId()->toString(),
             ],
-        ]], $pushed);
+        ]], $this->pushed);
+    }
+
+    public function testPartyJoinOverTheSocketAdmitsOnlyAMemberOrAnInvitedUserAndHidesThePartyFromEveryoneElse(): void
+    {
+        $registry = $this->liveSockets();
+        $controller = self::getContainer()->get(WebSocketController::class);
+        self::assertInstanceOf(WebSocketController::class, $controller);
+
+        $host = $this->createTestUser();
+        $guest = $this->createTestUser();
+        $uninvited = $this->createTestUser();
+        $party = $this->party($host);
+        $this->invite($host, $guest, $party);
+        $room = $this->room($party);
+        foreach ([1 => $host, 2 => $guest, 3 => $uninvited] as $fd => $user) {
+            $controller->onOpen($fd, $user->getId()->toString(), 'token-' . $fd);
+        }
+
+        // A user who is neither a member nor invited gets the frame an unknown party gets.
+        self::assertSame([['fd' => 3, 'payload' => self::ANSWER_FOR_AN_UNKNOWN_PARTY]], $this->partyJoin($controller, 3, (new PublicId())->toString()));
+        self::assertSame([['fd' => 3, 'payload' => self::ANSWER_FOR_AN_UNKNOWN_PARTY]], $this->partyJoin($controller, 3, $party));
+        self::assertSame([], $registry->getRoomMembers($room));
+
+        self::assertSame(
+            ['fd' => 1, 'payload' => ['type' => 'party.joined', 'sessionId' => $party, 'role' => 'host']],
+            $this->partyJoin($controller, 1, $party)[0],
+        );
+        self::assertSame([1], $registry->getRoomMembers($room));
+
+        $told = ['type' => 'party.member_event', 'sessionId' => $party, 'action' => 'join', 'userId' => $guest->getPublicId()->toString(), 'role' => 'member'];
+        self::assertEqualsCanonicalizing([
+            ['fd' => 2, 'payload' => ['type' => 'party.joined', 'sessionId' => $party, 'role' => 'member']],
+            ['fd' => 1, 'payload' => $told],
+            ['fd' => 2, 'payload' => $told],
+        ], $this->partyJoin($controller, 2, $party));
+        self::assertEqualsCanonicalizing([1, 2], $registry->getRoomMembers($room));
+        self::assertEqualsCanonicalizing(
+            [$host->getPublicId()->toString(), $guest->getPublicId()->toString()],
+            array_column($this->session($party, $host)['members'], 'userId'),
+        );
+
+        // A revoked member is out of the room and is answered as the uninvited user was.
+        self::assertSame(204, $this->authenticatedRequest('DELETE', '/api/party/sessions/' . $party . '/invitations/' . $guest->getPublicId()->toString(), $host)->getStatusCode());
+        self::assertSame([1], $registry->getRoomMembers($room));
+        self::assertSame([['fd' => 2, 'payload' => self::ANSWER_FOR_AN_UNKNOWN_PARTY]], $this->partyJoin($controller, 2, $party));
+        self::assertSame([1], $registry->getRoomMembers($room));
+        self::assertSame([$host->getPublicId()->toString()], array_column($this->session($party, $host)['members'], 'userId'));
+    }
+
+    public function testPartyJoinOverTheSocketIsRefusedByAFullPartyExceptForItsMembersAndByAnEndedPartyForAll(): void
+    {
+        $registry = $this->liveSockets();
+        $controller = self::getContainer()->get(WebSocketController::class);
+        self::assertInstanceOf(WebSocketController::class, $controller);
+
+        $host = $this->createTestUser();
+        $guest = $this->createTestUser();
+        $late = $this->createTestUser();
+        $party = $this->party($host, maxMembers: 2);
+        $this->invite($host, $guest, $party);
+        $this->invite($host, $late, $party);
+        $room = $this->room($party);
+        foreach ([1 => $host, 2 => $guest, 3 => $late] as $fd => $user) {
+            $controller->onOpen($fd, $user->getId()->toString(), 'token-' . $fd);
+        }
+        $refused = ['type' => 'error', 'message' => 'Party operation refused'];
+
+        // The guest takes the party's second and last place.
+        self::assertSame('party.joined', $this->partyJoin($controller, 2, $party)[0]['payload']['type']);
+        self::assertSame([['fd' => 3, 'payload' => $refused]], $this->partyJoin($controller, 3, $party));
+        // The host and the member return to the full party and are let in.
+        foreach ([1 => 'host', 2 => 'member'] as $fd => $role) {
+            self::assertSame(
+                ['fd' => $fd, 'payload' => ['type' => 'party.joined', 'sessionId' => $party, 'role' => $role]],
+                $this->partyJoin($controller, $fd, $party)[0],
+            );
+        }
+        self::assertEqualsCanonicalizing([1, 2], $registry->getRoomMembers($room));
+
+        $this->assertJsonResponse($this->authenticatedRequest('DELETE', '/api/party/sessions/' . $party, $host), 200);
+        self::assertSame([], $registry->getRoomMembers($room));
+
+        foreach ([1, 2, 3] as $fd) {
+            self::assertSame([['fd' => $fd, 'payload' => $refused]], $this->partyJoin($controller, $fd, $party));
+        }
+        self::assertSame([], $registry->getRoomMembers($room));
     }
 
     public function testAHostWhoLeavesHandsThePartyAndItsPlaybackToTheEarliestMember(): void
@@ -127,6 +205,7 @@ final class PartyLiveRoomWiringTest extends TestCase
         $party = $this->party($host);
         $sessionId = Uuid::fromString((string) $this->entityManager->getConnection()->fetchOne('SELECT id FROM party_sessions WHERE public_id = :publicId', ['publicId' => $party]));
         $bus = self::getContainer()->get(MessageBusInterface::class);
+        $this->invite($host, $guest, $party);
 
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/party/sessions/' . $party . '/join', $guest), 200);
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/party/sessions/' . $party . '/leave', $host), 200);
@@ -161,13 +240,65 @@ final class PartyLiveRoomWiringTest extends TestCase
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/party/sessions/' . $internalId . '/join', $host), 404);
     }
 
+    /**
+     * Puts this process in the place of an HTTP worker with open sockets. Called before the
+     * first request, so the live rooms are built on these.
+     */
+    private function liveSockets(): WebSocketConnectionRegistry
+    {
+        $workers = $this->createStub(ServerWorkers::class);
+        $workers->method('currentHttpWorkerId')->willReturn(0);
+        self::getContainer()->set(ServerWorkers::class, $workers);
+        $server = $this->createStub(Server::class);
+        $server->method('isEstablished')->willReturn(true);
+        $server->method('push')->willReturnCallback(function (int $fd, string $data): bool {
+            $this->pushed[] = ['fd' => $fd, 'payload' => json_decode($data, true)];
+
+            return true;
+        });
+        $pusher = self::getContainer()->get(WebSocketPusher::class);
+        self::assertInstanceOf(WebSocketPusher::class, $pusher);
+        $pusher->setServer($server);
+        $registry = self::getContainer()->get(WebSocketConnectionRegistry::class);
+        self::assertInstanceOf(WebSocketConnectionRegistry::class, $registry);
+
+        return $registry;
+    }
+
+    /**
+     * The socket sends `party.join` for the party.
+     *
+     * @return list<array{fd: int, payload: mixed}> what the server pushed in answer, to this socket and to the room
+     */
+    private function partyJoin(WebSocketController $controller, int $fd, string $party): array
+    {
+        $this->pushed = [];
+        $controller->onMessage($fd, json_encode(['type' => 'party.join', 'sessionId' => $party], JSON_THROW_ON_ERROR));
+
+        return $this->pushed;
+    }
+
+    /** The live room of the party. */
+    private function room(string $party): string
+    {
+        return WebSocketRooms::party((string) $this->entityManager->getConnection()->fetchOne('SELECT id FROM party_sessions WHERE public_id = :publicId', ['publicId' => $party]));
+    }
+
+    /** The party's host invites the guest, who may then join. */
+    private function invite(User $host, User $guest, string $party): void
+    {
+        $response = $this->authenticatedRequest('PUT', '/api/party/sessions/' . $party . '/invitations/' . $guest->getPublicId()->toString(), $host);
+
+        self::assertSame(204, $response->getStatusCode(), (string) $response->getContent());
+    }
+
     /** @return array<string, mixed> */
     private function session(string $party, User $member): array
     {
         return $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/party/sessions/' . $party, $member), 200, 'data')['data'];
     }
 
-    private function party(User $host): string
+    private function party(User $host, int $maxMembers = 10): string
     {
         $library = new LibraryEntity(
             name: 'Live room test',
@@ -186,7 +317,7 @@ final class PartyLiveRoomWiringTest extends TestCase
         self::getContainer()->get(LibraryAccessPortInterface::class)->grant($host->getId(), $library->getId());
 
         return $this->assertJsonResponse(
-            $this->authenticatedRequest('POST', '/api/party/sessions/', $host, ['videoId' => $video->getPublicId()->toString()]),
+            $this->authenticatedRequest('POST', '/api/party/sessions/', $host, ['videoId' => $video->getPublicId()->toString(), 'maxMembers' => $maxMembers]),
             201,
             'data',
         )['data']['publicId'];

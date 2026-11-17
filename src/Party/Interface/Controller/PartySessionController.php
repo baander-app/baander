@@ -107,7 +107,7 @@ final class PartySessionController
 
     #[OA\Get(
         path: '/api/party/sessions/',
-        description: 'Lists only the active parties the caller hosts or has joined. A party\'s public ID works as its invite: share it so others can join.',
+        description: 'Lists only the active parties the caller hosts or has joined. A party\'s host invites the users who may join it; an invited user finds the party here once they have joined.',
         summary: 'List the caller\'s active party sessions',
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')]))])),
@@ -153,12 +153,16 @@ final class PartySessionController
 
     #[OA\Post(
         path: '/api/party/sessions/{publicId}/join',
+        description: 'Only a member of the session and a user its host has invited may join. A member who joins again keeps their place, also when the session is full. Every other caller gets the answer an unknown session gets.',
         summary: 'Join a party session',
         parameters: [
             new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Joined', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')])])),
+            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '404', description: 'The session does not exist, or the caller is neither a member of it nor invited to it', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '409', description: 'The session has ended, or it is full and the caller is not a member of it yet', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/{publicId}/join', name: 'join', methods: ['POST'])]

@@ -38,6 +38,7 @@ final class PartyHostActionsTest extends TestCase
         $this->host = $this->viewer();
         $this->member = $this->viewer();
         $this->party = $this->createParty($this->host);
+        $this->invite($this->member, $this->party);
         $this->join($this->member, $this->party);
     }
 
@@ -149,6 +150,14 @@ final class PartyHostActionsTest extends TestCase
         $response = $this->authenticatedRequest('POST', self::URI, $host, ['videoId' => $this->video->getPublicId()->toString()]);
 
         return $this->assertJsonResponse($response, 201, 'data')['data']['publicId'];
+    }
+
+    /** The party's host invites the user, who may then join. */
+    private function invite(User $user, string $party): void
+    {
+        $response = $this->authenticatedRequest('PUT', self::URI . $party . '/invitations/' . $user->getPublicId()->toString(), $this->host);
+
+        self::assertSame(204, $response->getStatusCode(), (string) $response->getContent());
     }
 
     private function join(User $user, string $party): void

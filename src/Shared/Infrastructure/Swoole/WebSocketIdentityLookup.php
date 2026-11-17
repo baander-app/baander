@@ -22,6 +22,18 @@ final readonly class WebSocketIdentityLookup implements WebSocketIdentityLookupI
         return is_string($id) ? Uuid::fromString($id) : null;
     }
 
+    public function partyIdForMember(PublicId $publicId, Uuid $userId): ?Uuid
+    {
+        $id = $this->connection->fetchOne(
+            'SELECT party.id FROM party_sessions party'
+            . ' JOIN party_members membership ON membership.session_id = party.id'
+            . ' WHERE party.public_id = :id AND membership.user_id = :user',
+            ['id' => $publicId->toString(), 'user' => $userId->toString()],
+        );
+
+        return is_string($id) ? Uuid::fromString($id) : null;
+    }
+
     public function userPublicId(Uuid $userId): ?PublicId
     {
         $id = $this->connection->fetchOne('SELECT public_id FROM users WHERE id = :id', ['id' => $userId->toString()]);

@@ -6,216 +6,306 @@ namespace App\Tests\Unit\Party\Application\CommandHandler;
 
 use App\Party\Application\Command\JoinPartySessionCommand;
 use App\Party\Application\CommandHandler\JoinPartySessionHandler;
+use App\Party\Application\Exception\PartyNotFoundException;
+use App\Party\Application\Port\PartyInvitationPortInterface;
 use App\Party\Application\Port\PartyMemberPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
 use App\Party\Domain\Event\MemberJoined;
 use App\Party\Domain\Model\PartyMember;
 use App\Party\Domain\Model\PartyMemberState;
 use App\Party\Domain\Model\SyncedPartySession;
-use App\Party\Domain\Model\SyncedPartySessionState;
 use App\Party\Domain\ValueObject\MemberRole;
-use App\Party\Domain\ValueObject\PlaybackState;
+use App\Shared\Application\Exception\ConflictException;
+use App\Shared\Application\Exception\NotFoundException;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
-use PHPUnit\Framework\MockObject\MockObject;
-use PHPUnit\Framework\MockObject\Stub;
+use PHPUnit\Framework\AssertionFailedError;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Contracts\Translation\TranslatableInterface;
 
+/**
+ * A join is decided in one transaction that starts by locking the party: a member row or an
+ * invitation admits, and a user who holds neither is answered as for a party that does not exist,
+ * whatever state the party is in. The ports here keep in memory which users hold an invitation
+ * and which hold a member row. The party has room for three, and its host holds both.
+ */
 final class JoinPartySessionHandlerTest extends TestCase
 {
-    private PartySessionPortInterface&Stub $sessionPort;
-    private PartyMemberPortInterface&Stub $memberPort;
-    private EventDispatcherInterface&Stub $eventDispatcher;
+    private const array USERS = ['host', 'guest', 'other'];
+
+    private ?SyncedPartySession $session = null;
+    /** @var array<string, true> the invited users, by user ID */
+    private array $invited = [];
+    /** @var array<string, PartyMember> the stored member rows, by user ID */
+    private array $members = [];
+    /** @var array<string, Uuid> */
+    private array $userIds = [];
+    private Uuid $sessionId;
+    private bool $inTransaction = false;
+    private bool $locked = false;
+    /** @var list<object> */
+    private array $dispatched = [];
     private JoinPartySessionHandler $handler;
 
     protected function setUp(): void
     {
-        $this->sessionPort = $this->createStub(PartySessionPortInterface::class);
-        $this->memberPort = $this->createStub(PartyMemberPortInterface::class);
-        $this->eventDispatcher = $this->createEventDispatcher();
-        $this->handler = $this->createJoinPartySessionHandlerFixture();
+        foreach (self::USERS as $name) {
+            $this->userIds[$name] = Uuid::v4();
+        }
+        $this->session = SyncedPartySession::create($this->userIds['host'], Uuid::v4(), null, maxMembers: 3);
+        $this->sessionId = $this->session->getId();
+        $this->stand('host', invited: true, joined: true);
+
+        $sessions = $this->createStub(PartySessionPortInterface::class);
+        $sessions->method('lockByUuid')->willReturnCallback(function (Uuid $id): ?SyncedPartySession {
+            self::assertTrue($this->inTransaction, 'The party is locked inside the transaction.');
+            $this->locked = true;
+
+            return $this->session?->getId()->equals($id) === true
+                ? SyncedPartySession::reconstitute(clone $this->session->getState())
+                : null;
+        });
+
+        $invitations = $this->createStub(PartyInvitationPortInterface::class);
+        $invitations->method('isInvited')->willReturnCallback(function (Uuid $userId, Uuid $sessionId): bool {
+            self::assertTrue($this->locked, 'The invitation is read under the party\'s lock.');
+            self::assertTrue($sessionId->equals($this->sessionId));
+
+            return isset($this->invited[$userId->toString()]);
+        });
+
+        $members = $this->createStub(PartyMemberPortInterface::class);
+        $members->method('findByUserAndSession')->willReturnCallback(function (Uuid $userId, Uuid $sessionId): ?PartyMember {
+            self::assertTrue($this->locked, 'Membership is decided under the party\'s lock.');
+            self::assertTrue($sessionId->equals($this->sessionId));
+            $stored = $this->members[$userId->toString()] ?? null;
+
+            return $stored === null ? null : PartyMember::reconstitute(clone $stored->getState());
+        });
+        $members->method('countBySession')->willReturnCallback(function (Uuid $sessionId): int {
+            self::assertTrue($this->locked, 'The party\'s members are counted under its lock.');
+            self::assertTrue($sessionId->equals($this->sessionId));
+
+            return count($this->members);
+        });
+        $members->method('addMember')->willReturnCallback(function (Uuid $userId, Uuid $sessionId): PartyMember {
+            self::assertTrue($this->locked, 'A member row is written under the party\'s lock.');
+            self::assertArrayNotHasKey($userId->toString(), $this->members, 'A user holds one member row in a party.');
+
+            return $this->members[$userId->toString()] = PartyMember::create($userId, $sessionId);
+        });
+        $members->method('save')->willReturnCallback(function (PartyMember $member): void {
+            self::assertTrue($this->locked, 'A member row is written under the party\'s lock.');
+            $this->members[$member->getUserId()->toString()] = PartyMember::reconstitute(clone $member->getState());
+        });
+
+        $transaction = $this->createStub(TransactionPortInterface::class);
+        $transaction->method('run')->willReturnCallback(function (callable $operation): mixed {
+            $this->inTransaction = true;
+            try {
+                return $operation();
+            } finally {
+                $this->inTransaction = false;
+            }
+        });
+
+        $events = $this->createStub(EventDispatcherInterface::class);
+        $events->method('dispatch')->willReturnCallback(function (object $event): object {
+            self::assertFalse($this->inTransaction, 'The room hears of the new member after the commit.');
+            $this->dispatched[] = $event;
+
+            return $event;
+        });
+
+        $this->handler = new JoinPartySessionHandler($sessions, $members, $invitations, $transaction, $events);
     }
 
-    private function createEventDispatcher(bool $expectCalls = false): EventDispatcherInterface&Stub
+    public function testAnInvitedUserBecomesAMemberAndTheRoomHearsOfItAfterTheCommit(): void
     {
-        $double = $expectCalls ? $this->createMock(EventDispatcherInterface::class) : $this->createStub(EventDispatcherInterface::class);
-        $double->method('dispatch')->willReturnCallback(fn (object $e) => $e);
-        return $double;
+        $this->stand('guest', invited: true, joined: false);
+
+        $member = ($this->handler)($this->join('guest'));
+
+        self::assertTrue($member->getUserId()->equals($this->userIds['guest']));
+        self::assertTrue($member->getSessionId()->equals($this->sessionId));
+        self::assertSame(MemberRole::Member, $member->getRole());
+        self::assertTrue($member->isConnected());
+        self::assertSame(['host', 'guest'], $this->names($this->members));
+        self::assertTrue($this->members[$this->userIds['guest']->toString()]->getId()->equals($member->getId()));
+
+        self::assertCount(1, $this->dispatched);
+        $joined = $this->dispatched[0];
+        self::assertInstanceOf(MemberJoined::class, $joined);
+        self::assertTrue($joined->getSessionId()->equals($this->sessionId));
+        self::assertTrue($joined->getUserId()->equals($this->userIds['guest']));
+        self::assertSame(MemberRole::Member->value, $joined->getRole());
     }
 
-    private function createJoinPartySessionHandlerFixture(): JoinPartySessionHandler
+    public function testAnInvitedUserTakesTheLastPlaceInTheParty(): void
     {
-        $fixture = new JoinPartySessionHandler($this->sessionPort, $this->memberPort, $this->eventDispatcher);
-        return $fixture;
+        $this->stand('other', invited: true, joined: true);
+        $this->stand('guest', invited: true, joined: false);
+
+        ($this->handler)($this->join('guest'));
+
+        self::assertSame(self::USERS, $this->names($this->members));
+        self::assertCount(1, $this->dispatched);
     }
 
-    public function testReconnectsExistingMemberAndReturnsIt(): void
+    /** @return iterable<string, array{bool, bool}> whether the member still holds an invitation and whether the party is full */
+    public static function returningMembers(): iterable
     {
-        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
-        $this->eventDispatcher = $this->createEventDispatcher(expectCalls: true);
-        $this->handler = $this->createJoinPartySessionHandlerFixture();
+        yield 'a member who is invited' => [true, false];
+        // The member row alone admits: it is what the join wrote.
+        yield 'a member who holds no invitation' => [false, false];
+        // A returning member already holds a place.
+        yield 'a member of a full party' => [true, true];
+        yield 'a member of a full party who holds no invitation' => [false, true];
+    }
 
-        $userId = Uuid::v4();
-        $session = $this->createActiveSession(5);
+    #[DataProvider('returningMembers')]
+    public function testAMemberReconnectsToTheirOwnMemberRowAndIsNotAnnouncedAgain(bool $invited, bool $full): void
+    {
+        $this->stand('guest', $invited, joined: true, connected: false);
+        if ($full) {
+            $this->stand('other', invited: true, joined: true);
+        }
+        $row = $this->members[$this->userIds['guest']->toString()];
+        $before = $this->names($this->members);
 
-        $existingMember = PartyMember::reconstitute(new PartyMemberState(
-            id: Uuid::v4(),
-            publicId: new PublicId(),
-            userId: $userId,
-            sessionId: $session->getId(),
-            joinedAt: new DateTimeImmutable('-1 hour'),
-            isConnected: false,
+        $member = ($this->handler)($this->join('guest'));
+
+        self::assertTrue($member->getId()->equals($row->getId()));
+        self::assertTrue($member->isConnected());
+        self::assertTrue($this->members[$this->userIds['guest']->toString()]->isConnected(), 'The stored member row is connected again.');
+        self::assertSame($before, $this->names($this->members));
+        self::assertSame([], $this->dispatched);
+    }
+
+    /** @return iterable<string, array{bool, bool, bool}> whether the party exists, whether it has ended and whether it is full */
+    public static function partiesHiddenFromAnUninvitedUser(): iterable
+    {
+        yield 'a party that does not exist' => [false, false, false];
+        yield 'an active party' => [true, false, false];
+        // Ended and full are looked at only for a user the party admits.
+        yield 'an ended party' => [true, true, false];
+        yield 'a full party' => [true, false, true];
+        yield 'an ended and full party' => [true, true, true];
+    }
+
+    #[DataProvider('partiesHiddenFromAnUninvitedUser')]
+    public function testAUserWithNeitherAMemberRowNorAnInvitationIsAnsweredAsForAPartyThatDoesNotExist(bool $exists, bool $ended, bool $full): void
+    {
+        $this->stand('other', invited: true, joined: $full);
+        if ($full) {
+            // The host, the other member and one more user fill the three places.
+            $this->members[Uuid::v4()->toString()] = PartyMember::create(Uuid::v4(), $this->sessionId);
+        }
+        if ($ended) {
+            $this->session?->endSession();
+        }
+        if (!$exists) {
+            $this->session = null;
+        }
+        $before = array_keys($this->members);
+
+        $refused = $this->refusalOf($this->join('guest'));
+
+        // The shared not-found outcome with the message a route gives for a missing party. A
+        // translatable outcome would be reported in the request's language and differ from it.
+        self::assertInstanceOf(NotFoundException::class, $refused);
+        self::assertNotInstanceOf(TranslatableInterface::class, $refused);
+        self::assertSame(PartyNotFoundException::class, $refused::class);
+        self::assertSame('Resource not found.', $refused->getMessage());
+        self::assertSame($before, array_keys($this->members));
+        self::assertSame([], $this->dispatched);
+    }
+
+    /** @return iterable<string, array{bool, bool, bool, string}> whether the user holds a member row, whether the party has ended, whether it is full, and the refusal's message */
+    public static function partiesThatRefuseAnAdmittedUser(): iterable
+    {
+        yield 'a member returning to an ended party' => [true, true, false, 'The party has ended.'];
+        yield 'an invited user joining an ended party' => [false, true, false, 'The party has ended.'];
+        yield 'an invited user joining a full party' => [false, false, true, 'The party is full.'];
+        yield 'an invited user joining an ended and full party' => [false, true, true, 'The party has ended.'];
+    }
+
+    #[DataProvider('partiesThatRefuseAnAdmittedUser')]
+    public function testAnEndedPartyRefusesItsMembersAndInviteesAndAFullOneItsInvitees(bool $joined, bool $ended, bool $full, string $message): void
+    {
+        $this->stand('guest', invited: true, joined: $joined, connected: false);
+        $this->stand('other', invited: true, joined: true);
+        if ($full) {
+            $this->members[Uuid::v4()->toString()] = PartyMember::create(Uuid::v4(), $this->sessionId);
+        }
+        if ($ended) {
+            $this->session?->endSession();
+        }
+        $before = array_keys($this->members);
+
+        $refused = $this->refusalOf($this->join('guest'));
+
+        self::assertSame(ConflictException::class, $refused::class);
+        self::assertSame($message, $refused->getMessage());
+        self::assertSame($before, array_keys($this->members));
+        if ($joined) {
+            self::assertFalse($this->members[$this->userIds['guest']->toString()]->isConnected(), 'A refused member is not reconnected.');
+        }
+        self::assertSame([], $this->dispatched);
+    }
+
+    private function join(string $user): JoinPartySessionCommand
+    {
+        return new JoinPartySessionCommand($this->userIds[$user], $this->sessionId);
+    }
+
+    private function refusalOf(JoinPartySessionCommand $command): \Throwable
+    {
+        try {
+            ($this->handler)($command);
+        } catch (AssertionFailedError $failure) {
+            throw $failure;
+        } catch (\Throwable $refused) {
+            return $refused;
+        }
+
+        self::fail('The join was not refused.');
+    }
+
+    /** Stores whether the named user holds an invitation and a member row, and whether that row is connected. */
+    private function stand(string $name, bool $invited, bool $joined, bool $connected = true): void
+    {
+        $id = $this->userIds[$name];
+        if ($invited) {
+            $this->invited[$id->toString()] = true;
+        }
+        if ($joined) {
+            $this->members[$id->toString()] = PartyMember::reconstitute(new PartyMemberState(
+                id: Uuid::v4(),
+                publicId: new PublicId(),
+                userId: $id,
+                sessionId: $this->sessionId,
+                joinedAt: new DateTimeImmutable('-1 hour'),
+                role: $name === 'host' ? MemberRole::Host : MemberRole::Member,
+                isConnected: $connected,
+            ));
+        }
+    }
+
+    /**
+     * @param array<string, PartyMember> $rows
+     *
+     * @return list<string> the names of the users who hold a row, in the order of USERS
+     */
+    private function names(array $rows): array
+    {
+        return array_values(array_filter(
+            self::USERS,
+            fn (string $name): bool => isset($rows[$this->userIds[$name]->toString()]),
         ));
-
-        $this->sessionPort->method('findByUuid')->willReturn($session);
-        $this->memberPort->method('countBySession')->willReturn(1);
-        $this->memberPort->method('findByUserAndSession')->willReturn($existingMember);
-
-        $this->memberPort->expects($this->once())
-            ->method('save')
-            ->with($this->callback(function (PartyMember $saved): bool {
-                $this->assertTrue($saved->isConnected(), 'Existing member should be reconnected.');
-
-                return true;
-            }));
-
-        self::assertInstanceOf(MockObject::class, $this->eventDispatcher);
-        $this->eventDispatcher->expects($this->never())->method('dispatch');
-
-        $result = ($this->handler)(new JoinPartySessionCommand($userId, $session->getId()));
-
-        $this->assertSame($existingMember, $result);
-    }
-
-    public function testReconnectsExistingMemberWhenSessionIsFull(): void
-    {
-        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
-        $this->handler = $this->createJoinPartySessionHandlerFixture();
-
-        $userId = Uuid::v4();
-        $session = $this->createActiveSession(2);
-
-        $existingMember = PartyMember::reconstitute(new PartyMemberState(
-            id: Uuid::v4(),
-            publicId: new PublicId(),
-            userId: $userId,
-            sessionId: $session->getId(),
-            joinedAt: new DateTimeImmutable('-1 hour'),
-            isConnected: false,
-        ));
-
-        $this->sessionPort->method('findByUuid')->willReturn($session);
-        $this->memberPort->method('countBySession')->willReturn(2);
-        $this->memberPort->method('findByUserAndSession')->willReturn($existingMember);
-        $this->memberPort->expects($this->never())->method('addMember');
-        $this->memberPort->expects($this->once())->method('save')->with($existingMember);
-
-        $result = ($this->handler)(new JoinPartySessionCommand($userId, $session->getId()));
-
-        $this->assertSame($existingMember, $result);
-        $this->assertTrue($result->isConnected(), 'A returning member of a full session should be reconnected.');
-    }
-
-    public function testNewMemberJoinsAndDispatchesMemberJoinedEvent(): void
-    {
-        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
-        $this->eventDispatcher = $this->createEventDispatcher(expectCalls: true);
-        $this->handler = $this->createJoinPartySessionHandlerFixture();
-
-        $userId = Uuid::v4();
-        $session = $this->createActiveSession(5);
-        $newMember = PartyMember::create($userId, $session->getId());
-
-        $this->sessionPort->method('findByUuid')->willReturn($session);
-        $this->memberPort->method('countBySession')->willReturn(1);
-        $this->memberPort->method('findByUserAndSession')->willReturn(null);
-        $this->memberPort->expects($this->once())
-            ->method('addMember')
-            ->with($userId, $session->getId())
-            ->willReturn($newMember);
-
-        self::assertInstanceOf(MockObject::class, $this->eventDispatcher);
-        $this->eventDispatcher->expects($this->once())
-            ->method('dispatch')
-            ->with($this->callback(function (object $e) use ($userId, $session): bool {
-                $this->assertInstanceOf(MemberJoined::class, $e);
-                $this->assertTrue($e->getUserId()->equals($userId));
-                $this->assertTrue($e->getSessionId()->equals($session->getId()));
-                $this->assertSame(MemberRole::Member->value, $e->getRole());
-
-                return true;
-            }));
-
-        $result = ($this->handler)(new JoinPartySessionCommand($userId, $session->getId()));
-
-        $this->assertSame($newMember, $result);
-    }
-
-    public function testThrowsWhenSessionNotFound(): void
-    {
-        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
-        $this->handler = $this->createJoinPartySessionHandlerFixture();
-
-        $this->sessionPort->method('findByUuid')->willReturn(null);
-        $this->memberPort->expects($this->never())->method('addMember');
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Party session not found or inactive.');
-
-        ($this->handler)(new JoinPartySessionCommand(Uuid::v4(), Uuid::v4()));
-    }
-
-    public function testThrowsWhenSessionInactive(): void
-    {
-        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
-        $this->handler = $this->createJoinPartySessionHandlerFixture();
-
-        $inactiveSession = SyncedPartySession::reconstitute(new SyncedPartySessionState(
-            id: Uuid::v4(),
-            publicId: new PublicId(),
-            hostUserId: Uuid::v4(),
-            videoId: Uuid::v4(),
-            transcodeJobId: Uuid::v4(),
-            maxMembers: 10,
-            playbackState: PlaybackState::Stopped,
-            wallClockPosition: 0.0,
-            playbackStartedAt: null,
-            pausedAtPosition: null,
-            isActive: false,
-            createdAt: new DateTimeImmutable('-1 hour'),
-        ));
-
-        $this->sessionPort->method('findByUuid')->willReturn($inactiveSession);
-        $this->memberPort->expects($this->never())->method('addMember');
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Party session not found or inactive.');
-
-        ($this->handler)(new JoinPartySessionCommand(Uuid::v4(), $inactiveSession->getId()));
-    }
-
-    public function testThrowsWhenSessionIsFull(): void
-    {
-        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
-        $this->handler = $this->createJoinPartySessionHandlerFixture();
-
-        $session = $this->createActiveSession(2);
-
-        $this->sessionPort->method('findByUuid')->willReturn($session);
-        $this->memberPort->method('countBySession')->willReturn(2);
-        $this->memberPort->expects($this->never())->method('addMember');
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Party session is full.');
-
-        ($this->handler)(new JoinPartySessionCommand(Uuid::v4(), $session->getId()));
-    }
-
-    private function createActiveSession(int $maxMembers = 10): SyncedPartySession
-    {
-        return SyncedPartySession::create(Uuid::v4(), Uuid::v4(), Uuid::v4(), $maxMembers);
     }
 }
