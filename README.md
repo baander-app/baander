@@ -56,7 +56,8 @@ for the settings that apply when a scan discovers new music.
 
 The music player includes a playback queue, shuffle and repeat controls. You can
 browse the catalog while listening, choose what plays next and return to the
-current track without leaving the web app. Playback preferences include crossfade.
+current track without leaving the web app. In the queue you can drag a waiting song
+to another place or remove it. Playback preferences include crossfade.
 A panel beside the queue shows the lyrics fetched from LRCLIB for the song that is
 playing. When those lyrics are synced, it highlights the current line, keeps it in
 view and moves playback to a line you select.
