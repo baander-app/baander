@@ -54,7 +54,7 @@ The music vertical is substantially complete end-to-end. This is not alpha-quali
 | **Settings** | UserPreference context (audio, layout, player prefs, server-side sync) | Volume normalization (LUFS targets), EQ integration, account management, passkey management | Conflict detection, history |
 | **Notifications** | Notification context (push, webhooks with Discord/Slack) | SSE-based bell icon, popout list | |
 | **Session** | Session context (device identity, listening sessions) | Device management, session transfer | |
-| **Party mode** | Party context (SyncedPartySession, PartyMember, 9 CQRS handlers, WebSocket-driven sync) | SSE + REST controllers | Real collaborative playback |
+| **Party mode** | Party context (SyncedPartySession, PartyMember, PartyInvitation, 11 CQRS handlers, WebSocket-driven sync) | SSE + REST controllers | Real collaborative playback |
 | **Recommendations** | Recommendation context (domain services, background jobs) | Discover view, recommendation cards | Uses old positional-arg pattern (migration pending) |
 | **Playlists** | Playlist context (Playlist, SmartPlaylist, collaborator entities) | Add-to-playlist dialog, smart playlist editor | Functional but thin |
 | **Desktop app** | — | Electron wrapper — window management, tray, menus, deep links, keyring, single-instance lock, CSP hardening | Production-quality shell |

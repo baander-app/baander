@@ -196,9 +196,9 @@ graph TD
 |-----------|--------|
 | **Responsibility** | Synchronized watch-party playback. Manages party sessions with hosts and members, coordinates playback actions via WebSocket with wall-clock synchronization and jitter compensation. |
 | **Namespace** | `App\Party` |
-| **Aggregates** | `SyncedPartySession`, `PartyMember` |
-| **Repositories** | `SyncedPartySessionRepositoryInterface`, `PartyMemberRepositoryInterface` |
-| **Ports** | `PartySessionPortInterface`, `PartyMemberPortInterface` |
+| **Aggregates** | `SyncedPartySession`, `PartyMember`, `PartyInvitation` |
+| **Repositories** | `SyncedPartySessionRepositoryInterface`, `PartyMemberRepositoryInterface`, `PartyInvitationRepositoryInterface` |
+| **Ports** | `PartySessionPortInterface`, `PartyMemberPortInterface`, `PartyInvitationPortInterface` |
 | **Events** | `PartySessionCreated`, `PartySessionEnded`, `MemberJoined`, `MemberLeft`, `PlaybackStateChanged` |
 | **Value Objects** | `MemberRole`, `PlaybackAction`, `PlaybackState` |
 | **Tech** | WebSocket (Swoole), party rooms in the shared-memory tables of `WebSocketConnectionRegistry` broadcast through `WebSocketPusher`, `PlaybackSynchronizer` for wall-clock sync |
@@ -653,7 +653,7 @@ graph TD
 | Activity | Full 4-layer | No state object | Simple record/play model. |
 | Notification | Full 4-layer | No state object | Event-driven consumer. Multi-channel delivery. |
 | Transcode | Full 4-layer | State objects | Heaviest infrastructure. FFmpeg runs in the worker deployment pair's execution unit. |
-| Party | Full 4-layer | State objects | WebSocket-driven. Real-time sync. 9 CQRS handlers. |
+| Party | Full 4-layer | State objects | WebSocket-driven. Real-time sync. 11 CQRS handlers. |
 | UserPreference | Full 4-layer | State object | Simple CRUD context for the preference subsystems. User settings are written through two command handlers and published to Auth and Notification through a narrow contract. |
 | Filesystem | Partial (no 4-layer) | None | Utility: MIME detection + file watcher. |
 | Lyrics | Full 4-layer | State object | LRCLIB integration with cached-first strategy. REST API + console commands. Anti-corruption layer for LRCLIB. |

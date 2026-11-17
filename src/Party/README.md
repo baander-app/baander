@@ -7,14 +7,19 @@ Synchronized watch-party playback over WebSocket. Hosts control playback; member
 
 ## Concepts
 
-Two aggregates:
+Three aggregates:
 
 - **SyncedPartySession** — the party room. Tracks the current playback position, media being played, and session state.
 - **PartyMember** — a participant in a session. Has a role (host/member) and playback state.
+- **PartyInvitation** — the host's standing permission for one user to join one session.
 
-The context has 9 CQRS commands covering the full lifecycle: create, join, leave, end session, start/pause/seek/sync playback, transfer host. The `PlaybackSynchronizer` service handles wall-clock sync between participants.
+The context has 11 CQRS commands covering the full lifecycle: create, invite, revoke an invitation, join, leave, end session, start/pause/seek/sync playback, transfer host. The `PlaybackSynchronizer` service handles wall-clock sync between participants.
 
-Parties are invite-only. `GET /api/party/sessions` lists only the active parties the caller hosts or has joined, and a session's details and member list answer `404` unless the caller has a member row in it. Joining with the session's public ID stays open to any signed-in user. A full session admits no new member but takes back a returning one who still has a member row.
+Parties are invite-only. `GET /api/party/sessions` lists only the active parties the caller hosts or has joined. A user joins a session as an existing member or with an invitation from its host; the session's public ID alone admits no one. Every other route that names a session answers `404` unless the caller has a member row in it, and every other `party.*` WebSocket message answers such a caller with the error it sends for a session that does not exist; neither changes or broadcasts anything. A full session admits no new member but takes back a returning one who still has a member row.
+
+The host invites a user by public ID, revokes an invitation and lists the invitations through `PartyInvitationController`; when the host role moves, the new host manages every invitation of the session. An invitation lasts until it is revoked or its session or user is deleted, and joining and leaving do not use it up. The session's creator holds one from the session's creation. A revoke also deletes the member row of a user who had joined.
+
+Changes to a session's members, invitations and host are serialized on its row. The join, leave, transfer-host, invite and revoke handlers each run in `TransactionPortInterface::run` and begin with `PartySessionPortInterface::lockByUuid`, so the second of two changes decides on what the first committed. `MemberJoined`, `MemberLeft` and `PartySessionEnded` leave these handlers after the commit, `MemberLeft` only when a member row was deleted.
 
 Only the session's host can play, pause or seek; a command from anyone else changes nothing. Each host action dispatches `PlaybackStateChanged`. When the host leaves, the earliest-joined remaining member takes the host role on the session (`transferHost()`) as well as on its member row, so only that member's playback applies.
 
@@ -26,6 +31,7 @@ Members connect over the application WebSocket: a single-use ticket from `POST /
 |------|---------|
 | `PartySessionPortInterface` | Session lifecycle |
 | `PartyMemberPortInterface` | Member management |
+| `PartyInvitationPortInterface` | Invitations: invite, revoke, check, list by session |
 | `PartyMediaAccessPortInterface` | Checks that the host may play a new party's video and that its transcode job encodes it |
 
 ## Events
@@ -34,9 +40,11 @@ Members connect over the application WebSocket: a single-use ticket from `POST /
 |-------|----------|-----------|
 | `PartySessionCreated` | — | none |
 | `PartySessionEnded` | — | `LivePartyRoomListener` (Party Infrastructure) |
-| `MemberLeft` | — | `LivePartyRoomListener` (Party Infrastructure) |
+| `MemberLeft` | — | `LivePartyRoomListener` (Party Infrastructure), which takes the member's sockets out of the party's room |
 | `MemberJoined` | — | none |
 | `PlaybackStateChanged` | — | `LivePartyRoomListener` (Party Infrastructure), which sends `party.playback_state` to the party's room |
+
+Invitations raise no events of their own. A revoke that deletes a member row raises `MemberLeft`, as a leave does.
 
 ## Interactions
 
