@@ -511,6 +511,20 @@
     },
     {
       "parent": "party_sessions",
+      "child": "party_invitations",
+      "foreign_key": "session_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "users",
+      "child": "party_invitations",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "party_sessions",
       "child": "party_members",
       "foreign_key": "session_id",
       "action": "CASCADE",
@@ -1272,6 +1286,12 @@
       "mapping": "src/Party/Infrastructure/Doctrine/Entity/PartyEventEntity.php",
       "classification": "excluded",
       "reason": "Existing transient party protocol history; no current web query consumer."
+    },
+    {
+      "table": "party_invitations",
+      "mapping": "src/Party/Infrastructure/Doctrine/Entity/PartyInvitationEntity.php",
+      "classification": "excluded",
+      "reason": "Party join permissions read only by the party handlers; the current web application has no party query consumer."
     },
     {
       "table": "party_members",

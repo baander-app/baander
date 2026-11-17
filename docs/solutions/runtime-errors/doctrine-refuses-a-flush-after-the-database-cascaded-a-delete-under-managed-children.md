@@ -143,6 +143,13 @@ the ORM as well would issue a DELETE per session for rows the cascade is about t
   entity counts as new, so detaching a song while one of its credit, genre-link or activity
   entities is managed moves the same refusal one level down. `TranscodeSessionEntity` is
   the target of no association, which is why detaching is enough here.
+- A child that is only inserted and deleted can be mapped `readOnly` instead.
+  `UnitOfWork::computeChangeSets()` skips read-only classes (ORM 3.7.6), so a loaded child
+  is not walked after its parent is removed, while `persist` and `remove` still write.
+  `PartyInvitationEntity` relies on this:
+  `PartyOwnershipPersistenceTest::testRemovingAPartySessionRemovesItsInvitationsAndLaterWritesStillFlush`
+  failed with the refusal on PostgreSQL 18.7 while the entity was not read-only
+  (2026-11-17).
 - An audit on 2026-11-11 read all 51 to-one join columns with `onDelete` (39 `CASCADE`,
   12 `SET NULL`, in 33 entity files) and every ORM removal of their parents. None meets the
   three conditions today. The closest is `PruneMissingImagesHandler`, which removes images

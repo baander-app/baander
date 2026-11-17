@@ -1247,6 +1247,8 @@ services:
         alias: App\Party\Infrastructure\Doctrine\Repository\SyncedPartySessionRepository
     App\Party\Domain\Repository\PartyMemberRepositoryInterface:
         alias: App\Party\Infrastructure\Doctrine\Repository\PartyMemberRepository
+    App\Party\Domain\Repository\PartyInvitationRepositoryInterface:
+        alias: App\Party\Infrastructure\Doctrine\Repository\PartyInvitationRepository
 
     # --- Party Application Port Aliases ---
     App\Party\Application\Port\PlaybackSynchronizationPortInterface:
@@ -1255,6 +1257,8 @@ services:
         alias: App\Party\Infrastructure\PartySessionService
     App\Party\Application\Port\PartyMemberPortInterface:
         alias: App\Party\Infrastructure\PartyMemberService
+    App\Party\Application\Port\PartyInvitationPortInterface:
+        alias: App\Party\Infrastructure\PartyInvitationService
     App\Party\Application\Port\PartyMediaAccessPortInterface:
         alias: App\Party\Infrastructure\PartyMediaAccess
 

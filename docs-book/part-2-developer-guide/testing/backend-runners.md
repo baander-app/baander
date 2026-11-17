@@ -234,7 +234,7 @@ to the backend coordinator. Functional and integration files in the selection
 therefore run on isolated PostgreSQL/Redis stacks with a fresh copy of the checkout,
 and Doctrine migrations run twice on each stack before PHPUnit starts. With no arguments the runner selects `tests/Functional`.
 A fresh database executes `Version20261017000000` and all forward migrations in
-`migrations/` (currently through `Version20261115120000`); the second run checks that
+`migrations/` (currently through `Version20261117130000`); the second run checks that
 recorded migrations leave no pending work. The paired-deployment migration must also
 reject unresolved or inconsistent singleton history and preserve confirmed retirement
 records.

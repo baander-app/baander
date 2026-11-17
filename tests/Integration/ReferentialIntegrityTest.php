@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Party\Domain\Model\PartyInvitation;
 use App\Party\Domain\Model\PartyMember;
 use App\Party\Domain\Model\SyncedPartySession;
+use App\Party\Infrastructure\Doctrine\Repository\PartyInvitationRepository;
 use App\Party\Infrastructure\Doctrine\Repository\PartyMemberRepository;
 use App\Party\Infrastructure\Doctrine\Repository\SyncedPartySessionRepository;
 use App\Shared\Domain\Model\PublicId;
@@ -323,7 +325,7 @@ final class ReferentialIntegrityTest extends TestCase
         self::assertSame(1, $this->countOwnedRows('transcode_sessions', 'job_id', $jobs[1]));
     }
 
-    public function testDeletingAVideoRemovesItsPartiesAndTheirMembers(): void
+    public function testDeletingAVideoRemovesItsPartiesWithTheirMembersAndInvitations(): void
     {
         $host = $this->createUser();
         $guest = $this->createUser();
@@ -331,11 +333,13 @@ final class ReferentialIntegrityTest extends TestCase
         $kept = $this->createVideo();
         $sessions = new SyncedPartySessionRepository($this->manager);
         $members = new PartyMemberRepository($this->manager);
+        $invitations = new PartyInvitationRepository($this->manager);
         $parties = [];
         foreach ([$deleted, $kept] as $video) {
             $parties[] = $party = SyncedPartySession::create($host, $video, $this->createTranscodeJob($video));
             $sessions->save($party);
             $members->save(PartyMember::create($guest, $party->getId()));
+            $invitations->save(PartyInvitation::issue($guest, $party->getId()));
         }
         $this->manager->clear();
 
@@ -343,8 +347,10 @@ final class ReferentialIntegrityTest extends TestCase
 
         self::assertSame(0, $this->countOwnedRows('party_sessions', 'video_id', $deleted));
         self::assertSame(0, $this->countOwnedRows('party_members', 'session_id', $parties[0]->getId()));
+        self::assertSame(0, $this->countOwnedRows('party_invitations', 'session_id', $parties[0]->getId()));
         self::assertSame(1, $this->countOwnedRows('party_sessions', 'video_id', $kept));
         self::assertSame(1, $this->countOwnedRows('party_members', 'session_id', $parties[1]->getId()));
+        self::assertSame(1, $this->countOwnedRows('party_invitations', 'session_id', $parties[1]->getId()));
     }
 
     public function testDeletingATranscodeJobLeavesItsPartiesWithoutAJob(): void

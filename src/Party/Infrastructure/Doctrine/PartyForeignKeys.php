@@ -7,7 +7,7 @@ namespace App\Party\Infrastructure\Doctrine;
 use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclaration;
 use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclarationProviderInterface;
 
-/** Constraints on party columns mapped as scalar IDs: owners, event sessions and actors, videos and transcode jobs. */
+/** Constraints on party columns mapped as scalar IDs: owners, invited users, event sessions and actors, videos and transcode jobs. */
 final class PartyForeignKeys implements ForeignKeyDeclarationProviderInterface
 {
     public function foreignKeys(): iterable
@@ -18,6 +18,7 @@ final class PartyForeignKeys implements ForeignKeyDeclarationProviderInterface
         // Deleting a job, for example in orphaned-job cleanup, leaves the party running without one.
         yield new ForeignKeyDeclaration('fk_party_sessions_transcode_job_id', 'party_sessions', 'transcode_job_id', 'transcode_jobs', 'id', 'SET NULL');
         yield new ForeignKeyDeclaration('fk_party_members_user_id', 'party_members', 'user_id', 'users', 'id', 'CASCADE');
+        yield new ForeignKeyDeclaration('fk_party_invitations_user_id', 'party_invitations', 'user_id', 'users', 'id', 'CASCADE');
         yield new ForeignKeyDeclaration('fk_party_events_session_id', 'party_events', 'session_id', 'party_sessions', 'id', 'CASCADE');
         yield new ForeignKeyDeclaration('fk_party_events_user_id', 'party_events', 'user_id', 'users', 'id', 'CASCADE');
     }

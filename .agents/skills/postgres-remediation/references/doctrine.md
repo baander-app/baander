@@ -210,6 +210,15 @@ declares their composite keys onto `(id, user_id)`, which an association cannot
 target. `readOnly` stops the unit of work computing changes for a managed row; it
 restricts neither an insert nor a DQL `UPDATE`.
 
+A row that is only inserted and deleted can also be mapped `readOnly`, with ordinary
+associations. Because the unit of work computes no changes for it, a loaded row is not
+walked in the flush after its parent was removed and the database cascaded the delete,
+which otherwise refuses the removed parent as a new entity. `persist` and `remove`
+still write.
+[PartyInvitationEntity](../../../../src/Party/Infrastructure/Doctrine/Entity/PartyInvitationEntity.php)
+relies on this; its cascade test failed on PostgreSQL 18.7 without the flag
+(2026-11-17).
+
 - An insert is persisted, flushed and detached in the method that creates it. The
   unit of work does not order inserts across scalar-referenced entities, so a parent
   row is flushed before its child, and a DQL read does not see an unflushed row.
