@@ -116,6 +116,135 @@ final class BuilderBlockRenderingTest extends TestCase
         self::assertStringNotContainsString('first', $html);
     }
 
+    public function testBorrowedManualBlocksReachThePublicPageAsTheManualPageRendersThem(): void
+    {
+        $this->source("# Manual\n\n```php\n\$name |> trim(...);\n```\n\n```json\ntrue\n```\n\n```mermaid\nflowchart LR\n    accTitle: A to B\n    accDescr: A leads to B.\nA --> B\n```\n\n```mermaid\nflowchart TB\n    accTitle: C to D\n    accDescr {\n        C leads to D.\n    }\nC --> D\n```\n");
+        file_put_contents($this->root . '/ui/site/templates/feature.php', '<?php echo json_encode($data, JSON_THROW_ON_ERROR);');
+        $this->builder()->build(
+            renderBlocks: static fn(array $blocks, string $staging): array => array_combine(
+                array_column($blocks, 'id'),
+                array_map(static fn(array $block): string => '<figure class="rendered">' . $block['language'] . ' ' . $block['ordinal'] . '</figure>', $blocks),
+            ),
+            publicPages: [$this->publicPage(
+                ['blocks' => [
+                    ['manual' => 'README.md', 'contains' => 'A --> B', 'into' => ['feature', 'hero']],
+                    ['manual' => 'README.md', 'contains' => 'C --> D', 'into' => ['feature', 'tour', 0, 'figure']],
+                    ['manual' => 'README.md', 'contains' => 'trim(...)', 'into' => ['feature', 'tour', 1, 'figure']],
+                    ['manual' => 'README.md', 'contains' => 'true', 'into' => ['feature', 'tour', 2, 'figure']],
+                ]],
+                ['feature' => ['hero' => ['contains' => 'A --> B'], 'tour' => [['figure' => []], ['figure' => []], ['id' => 'kept', 'figure' => []]]]],
+            )],
+        );
+        $data = json_decode((string) file_get_contents($this->root . '/var/website/features/console/index.html'), true, flags: JSON_THROW_ON_ERROR);
+        $manual = (string) file_get_contents($this->root . '/var/website/docs/index.html');
+        self::assertSame('<figure class="rendered">mermaid 3</figure>', $data['feature']['hero']['html']);
+        self::assertSame('A --> B', $data['feature']['hero']['contains']);
+        self::assertSame('<figure class="rendered">mermaid 4</figure>', $data['feature']['tour'][0]['figure']['html']);
+        self::assertStringContainsString('<span class="tok-operator">|&gt;</span>', $data['feature']['tour'][1]['figure']['html']);
+        self::assertSame('<figure class="rendered">json 2</figure>', $data['feature']['tour'][2]['figure']['html']);
+        self::assertSame('kept', $data['feature']['tour'][2]['id']);
+        foreach ([$data['feature']['hero'], ...array_column($data['feature']['tour'], 'figure')] as $figure) {
+            self::assertStringContainsString($figure['html'], $manual);
+        }
+    }
+
+    public function testBorrowedBlockWithoutABlockRendererIsTheManualPagesEscapedCode(): void
+    {
+        $this->source("# Manual\n\n```text\nphp bin/console app:scan <library>\n```\n");
+        file_put_contents($this->root . '/ui/site/templates/feature.php', '<?php echo $data["feature"]["hero"]["html"];');
+        $this->builder()->build(publicPages: [$this->publicPage(
+            ['blocks' => [['manual' => 'README.md', 'contains' => 'app:scan', 'into' => ['feature', 'hero']]]],
+            ['feature' => ['hero' => []]],
+        )]);
+        $block = (string) file_get_contents($this->root . '/var/website/features/console/index.html');
+        self::assertStringContainsString('app:scan &lt;library&gt;', $block);
+        self::assertStringContainsString($block, (string) file_get_contents($this->root . '/var/website/docs/index.html'));
+    }
+
+    public function testManualBlockReferenceMustMatchExactlyOneBlockOfAnExistingPage(): void
+    {
+        $this->source("# Manual\n\n```json\ntrue\n```\n\n```json\n[true]\n```\n");
+        $message = $this->failedReferences(['blocks' => [
+            ['manual' => 'README.md', 'contains' => 'false', 'into' => ['feature', 'hero']],
+            ['manual' => 'README.md', 'contains' => 'true', 'into' => ['feature', 'hero']],
+            ['manual' => 'part-1-operator-guide/absent.md', 'contains' => 'true', 'into' => ['feature', 'hero']],
+        ]]);
+        self::assertSame(implode("\n", [
+            'ui/site/features/console.php: no block of README.md contains "false"',
+            'ui/site/features/console.php: 2 blocks of README.md contain "true"; a manual block reference matches exactly one',
+            'ui/site/features/console.php: manual block reference names no manual page: part-1-operator-guide/absent.md',
+        ]), $message);
+    }
+
+    public function testBorrowedDiagramMustStateItsTitleAndDescription(): void
+    {
+        $this->source("# Manual\n\n```mermaid\nflowchart LR\n    accDescr: A leads to B.\nA --> B\n```\n\n```mermaid\nflowchart LR\n    accTitle: C to D\nC --> D\n```\n\n```mermaid\nflowchart LR\nE --> F\n```\n");
+        $message = $this->failedReferences(['blocks' => [
+            ['manual' => 'README.md', 'contains' => 'A --> B', 'into' => ['feature', 'hero']],
+            ['manual' => 'README.md', 'contains' => 'C --> D', 'into' => ['feature', 'hero']],
+            ['manual' => 'README.md', 'contains' => 'E --> F', 'into' => ['feature', 'hero']],
+        ]]);
+        self::assertSame(implode("\n", [
+            'ui/site/features/console.php: the diagram of README.md that contains "A --> B" has no accTitle',
+            'ui/site/features/console.php: the diagram of README.md that contains "C --> D" has no accDescr',
+            'ui/site/features/console.php: the diagram of README.md that contains "E --> F" has no accTitle and no accDescr',
+        ]), $message);
+    }
+
+    public function testManualLinkMustNameAnExistingPageAndHeading(): void
+    {
+        $this->source("# Manual\n\n## Install\n\n```json\ntrue\n```\n");
+        $message = $this->failedReferences(['links' => ['/docs/', '/docs/#install', '/docs/#absent', '/docs/absent/', '/docs/operator-guide/']]);
+        self::assertSame(implode("\n", [
+            'ui/site/features/console.php: manual link /docs/#absent names a heading its page does not have',
+            'ui/site/features/console.php: manual link /docs/absent/ names no manual page',
+        ]), $message);
+    }
+
+    /**
+     * Builds with one public page whose manual references must fail, proves that no block was
+     * rendered and that the published site is unchanged, and returns the failure message.
+     *
+     * @param array{links?: list<string>, blocks?: list<array{manual: string, contains: string, into: list<int|string>}>} $references
+     */
+    private function failedReferences(array $references): string
+    {
+        file_put_contents($this->root . '/ui/site/templates/feature.php', '<?php echo "feature";');
+        $builder = $this->builder();
+        $rendered = 0;
+        $render = static function (array $blocks, string $staging) use (&$rendered): array {
+            ++$rendered;
+            return array_fill_keys(array_column($blocks, 'id'), '<figure>rendered</figure>');
+        };
+        $builder->build(renderBlocks: $render);
+        $original = file_get_contents($this->root . '/var/website/docs/index.html');
+        try {
+            $builder->build(renderBlocks: $render, publicPages: [$this->publicPage($references, ['feature' => ['hero' => []]])]);
+        } catch (\RuntimeException $error) {
+            self::assertSame(1, $rendered, 'Blocks must not render when a manual reference fails.');
+            self::assertSame($original, file_get_contents($this->root . '/var/website/docs/index.html'));
+            self::assertSame([], glob($this->root . '/var/website-build-*'));
+
+            return $error->getMessage();
+        }
+        self::fail('Unresolved manual references must fail the build.');
+    }
+
+    /**
+     * @param array{links?: list<string>, blocks?: list<array{manual: string, contains: string, into: list<int|string>}>} $references
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    private function publicPage(array $references, array $data): array
+    {
+        return [
+            'template' => 'feature', 'url' => '/features/console/', 'title' => 'Console',
+            'description' => 'Run Bånder from the command line.',
+            'references' => ['file' => 'ui/site/features/console.php', 'links' => [], 'blocks' => [], ...$references],
+            'data' => $data,
+        ];
+    }
+
     private function source(string $markdown): void
     {
         file_put_contents($this->root . '/docs-book/README.md', $markdown);

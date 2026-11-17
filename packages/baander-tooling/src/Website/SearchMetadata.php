@@ -25,8 +25,8 @@ final readonly class SearchMetadata
     private const string HOME_TITLE = 'Bånder — A home for your media';
     private const string HOME_DESCRIPTION = 'Point Bånder at your music and movies, then browse and play them in your browser '
         . 'from a server you run. Read the installation and operator manuals.';
-    private const int TITLE_LIMIT = 60;
-    private const int DESCRIPTION_LIMIT = 155;
+    public const int TITLE_LIMIT = 60;
+    public const int DESCRIPTION_LIMIT = 155;
     /** Opening text shorter than this is extended with the following paragraph. */
     private const int DESCRIPTION_MINIMUM = 120;
 
@@ -157,10 +157,16 @@ final readonly class SearchMetadata
         return $paragraphs === [] ? null : implode(' ', $paragraphs) |> self::shorten(...);
     }
 
+    /** The page's name, the section it belongs to and the site's name, whatever length they come to. */
+    public static function fullTitle(string $heading, ?string $section): string
+    {
+        return implode(' — ', array_filter([$heading, $section, self::SITE_NAME]));
+    }
+
     /** The page's name, then the section it belongs to while the whole stays short enough to show in full. */
     private static function title(string $heading, ?string $section): string
     {
-        $full = implode(' — ', array_filter([$heading, $section, self::SITE_NAME]));
+        $full = self::fullTitle($heading, $section);
 
         return $section === null || mb_strlen($full) <= self::TITLE_LIMIT ? $full : $heading . ' — ' . self::SITE_NAME;
     }
