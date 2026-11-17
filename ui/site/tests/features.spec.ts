@@ -182,3 +182,40 @@ test('each feature page links to its neighbours in the overview\'s order and to 
     ]);
   }
 });
+
+test('the developers page opens on the manual\'s layers diagram, which follows the appearance and fits its column', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  for (const [colorScheme, other] of [['dark', 'light'], ['light', 'dark']] as const) {
+    await page.emulateMedia({ colorScheme });
+    await page.goto('/features/developers/');
+    const diagram = page.locator('.hero .feature-manual-block .diagram');
+    const shown = diagram.locator(`img.diagram-${colorScheme}`);
+    await expect(shown).toBeVisible();
+    await expect(diagram.locator(`img.diagram-${other}`)).toBeHidden();
+    await expect(shown).toHaveAttribute('alt', /^A bounded context with the full structure has four layers\./);
+    await expect(diagram.locator('figcaption')).toHaveText('The four layers of a bounded context and the Shared kernel');
+    const frame = await diagram.locator('.diagram-viewport').evaluate((element) => ({ content: element.scrollWidth, box: element.clientWidth }));
+    expect(frame.content, `${colorScheme}: the diagram does not scroll sideways`).toBeLessThanOrEqual(frame.box + 1);
+    expect((await shown.boundingBox())!.height, `${colorScheme}: the diagram is no taller than a hero picture`).toBeLessThanOrEqual(710);
+    // The full-size link and the diagram's source stay on the manual page.
+    await expect(diagram.locator('a:visible')).toHaveCount(0);
+    await expect(diagram.locator('details')).toBeHidden();
+  }
+});
+
+test('code borrowed from the manual keeps the manual\'s highlighting and scrolls inside its own box on a phone', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/features/developers/');
+  const code = page.locator('#generated-client .feature-manual-block pre');
+  await expect(code).toBeVisible();
+  const style = await code.evaluate((element) => ({
+    plain: getComputedStyle(element).color,
+    keyword: getComputedStyle(element.querySelector('.tok-keyword')!).color,
+    overflow: getComputedStyle(element).overflowX,
+    border: getComputedStyle(element).borderTopStyle,
+  }));
+  expect(style.keyword).not.toBe(style.plain);
+  expect(style.overflow).toBe('auto');
+  expect(style.border).toBe('solid');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+});

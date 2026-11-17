@@ -17,5 +17,11 @@ return [
             'lead' => 'Browse your collection, play it and shape how it sounds.',
             'pages' => ['equalizer'],
         ],
+        [
+            'id' => 'developers',
+            'title' => 'For building on it',
+            'lead' => 'See how the code is organized and try a change.',
+            'pages' => ['developers'],
+        ],
     ],
 ];

@@ -20,6 +20,9 @@
 .feature-manual-block { min-width: 0; }
 .feature-manual-block > :last-child { margin-bottom: 0; }
 .hero .feature-manual-block { margin-top: 48px; }
+/* A borrowed diagram stands as a picture here. Its full-size link and its source stay on the
+   manual page it comes from. The selector outranks the theme rules that show one link of the pair. */
+:root .feature-page .feature-manual-block .diagram > a, .feature-manual-block .diagram details { display: none; }
 
 /* Two equal columns: text beside its picture in the tour, a heading beside its list elsewhere. */
 .feature-page .experience-feature, .feature-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 64px; }
