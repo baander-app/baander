@@ -171,11 +171,17 @@ for (const path of featurePages) {
   });
 }
 
-test('the equalizer page shows the five pictures recorded for its scene, and the site serves each in both variants', async ({ page }) => {
+test('the equalizer page and the homepage together show the eight pictures recorded for the equalizer scene, and the site serves each in both variants', async ({ page }) => {
   const recorded = Object.keys(captures).filter((name) => captures[name].scene === 'equalizer');
-  expect(recorded).toHaveLength(5);
-  await page.goto('/features/equalizer/');
-  const sources = await page.locator('main .app-screenshot img').evaluateAll((images) => images.map((image) => image.getAttribute('src')!));
+  expect(recorded).toHaveLength(8);
+  const shown = async (path: string) => {
+    await page.goto(path);
+    return page.locator('main .app-screenshot img').evaluateAll((images) => images.map((image) => image.getAttribute('src')!));
+  };
+  const onPage = await shown('/features/equalizer/');
+  const onHomepage = (await shown('/')).filter((source) => /\/equalizer-[^/]+$/.test(source));
+  expect(onPage).toHaveLength(10);
+  const sources = [...new Set([...onPage, ...onHomepage])];
   expect([...sources].sort()).toEqual(recorded.flatMap((name) => [`/assets/site/screenshots/${name}-light.webp`, `/assets/site/screenshots/${name}.webp`]).sort());
   // The variant an appearance hides is not loaded by the page, so each file is asked for by itself.
   const served = await page.evaluate((paths) => Promise.all(paths.map(async (path) => {

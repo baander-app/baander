@@ -36,7 +36,7 @@ const card = `<!doctype html>
     <h1>Your collection. Ready to play.</h1>
     <p>Point Bånder at your music and movies. Browse and play them in your browser, from a server you run.</p>
     <div class="url">baander.app</div>
-    <img class="shot" src="/assets/site/screenshots/destinations.webp" alt="">
+    <img class="shot" src="/assets/site/screenshots/library.webp" alt="">
   </div>
 </body>
 </html>`;

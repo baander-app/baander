@@ -107,6 +107,33 @@
       "light": "966a8582e2886d580afb03e3376e3d3d5b73411c908a18654145abc23763a123"
     }
   },
+  "equalizer-window-compare": {
+    "scene": "equalizer",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "1abfa29955a31eec4cda4865508399fd8c1a518218feef5aad6679b1faf75c55",
+      "light": "c2f74b2641de39261449f0ff291a4e2896b7b864935984ae1df5f465f1cda7ba"
+    }
+  },
+  "equalizer-window-curve": {
+    "scene": "equalizer",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "19ece39691d0e580295f25b5f24f124929468fa5091f040929bfe411db71ab22",
+      "light": "1978dc47a3e102d61aa76cae1fa021a2e0fb4df4e4faf5e0947efe8f83b5b3f8"
+    }
+  },
+  "equalizer-window-dynamics": {
+    "scene": "equalizer",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "36dd103eecb1afd8609f1259ab7250ccca9df70f9e7d46881a5e9d5c1cd5e65f",
+      "light": "17578fc9b87e5f6faf3e2bed06a2f57c358f889342ee439110cc0a098c73764c"
+    }
+  },
   "libraries": {
     "scene": "libraries",
     "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
