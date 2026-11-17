@@ -25,7 +25,8 @@ libraries and rescan them as files change. The `app:watch-files` command prints
 filesystem changes as they happen; it does not start a scan or update the catalog.
 
 In the web app, move between artist pages, albums, track lists and genres, or search
-for artists, albums and songs directly. Album covers can be extracted from embedded
+for artists, albums and songs directly. Ctrl+K, or Cmd+K on a Mac, opens that search
+from any page. Album covers can be extracted from embedded
 artwork, so a tagged music collection provides the starting point for browsing.
 Recent listening on the home page helps you return to music you have already played.
 
@@ -56,11 +57,15 @@ for the settings that apply when a scan discovers new music.
 The music player includes a playback queue, shuffle and repeat controls. You can
 browse the catalog while listening, choose what plays next and return to the
 current track without leaving the web app. Playback preferences include crossfade.
+A panel beside the queue shows the lyrics of the song that is playing. When the
+lyrics are synced, it highlights the current line, keeps it in view and moves
+playback to a line you select.
 
 The equalizer offers presets and graphic or parametric controls, with saved
 profiles for different audio devices. Additional controls include compression,
 stereo width and crossfeed, allowing listeners to adjust the sound for their
-headphones or speakers.
+headphones or speakers. You can capture two sets of equalizer and processing
+settings as A and B and switch between them to compare.
 
 For clients that need another audio format, the server can transcode tracks to
 Opus, AAC or MP3. Audio transcoding must be enabled explicitly. Internet radio is
