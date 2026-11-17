@@ -21,9 +21,11 @@ interface SyncedPartySessionRepositoryInterface
     public function findByPublicId(PublicId $publicId): ?SyncedPartySession;
 
     /**
+     * Active sessions the user belongs to, as host or member, oldest first.
+     *
      * @return SyncedPartySession[]
      */
-    public function findActiveSessions(): array;
+    public function findActiveSessionsForMember(Uuid $userId): array;
 
     /**
      * @return SyncedPartySession[]

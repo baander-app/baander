@@ -49,6 +49,15 @@ final class PartySessionController
     }
 
     /**
+     * The host holds a member row from the session's creation, so a member row is what
+     * lets a caller see the session.
+     */
+    private function belongsTo(Uuid $sessionId, AuthenticatedUserIdentityInterface $user): bool
+    {
+        return $this->memberPort->findByUserAndSession(Uuid::fromString($user->getId()), $sessionId) !== null;
+    }
+
+    /**
      * Unwrap the handler result from a command-bus Envelope.
      */
     private function unwrapResult(Envelope $envelope): mixed
@@ -106,35 +115,39 @@ final class PartySessionController
 
     #[OA\Get(
         path: '/api/party/sessions/',
-        summary: 'List active party sessions',
+        description: 'Lists only the active parties the caller hosts or has joined. A party\'s public ID works as its invite: share it so others can join.',
+        summary: 'List the caller\'s active party sessions',
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')]))])),
+            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
-    public function index(): JsonResponse
+    public function index(#[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
-        $sessions = $this->sessionPort->findActiveSessions();
+        $sessions = $this->sessionPort->findActiveSessionsForMember(Uuid::fromString($user->getId()));
 
         return $this->successResponse(PartySessionResource::collection(array_map($this->identities->session(...), $sessions)));
     }
 
     #[OA\Get(
         path: '/api/party/sessions/{publicId}',
+        description: 'Returns the session and its members to the session\'s host and members only. Live updates arrive over the application WebSocket: request a single-use ticket from `POST /api/ws/tickets`, upgrade at `/api/ws`, then send `party.join` with the session public ID as `sessionId` to enter its room.',
         summary: 'Get a party session',
         parameters: [
             new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'), new OA\Property(property: 'members', type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')]))])])),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '404', description: 'The session does not exist, or the caller is neither its host nor a member', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/{publicId}', name: 'show', methods: ['GET'])]
-    public function show(string $publicId): JsonResponse
+    public function show(string $publicId, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
         $session = $this->sessionPort->findByPublicIdentifier($publicId);
-        if ($session === null) {
+        if ($session === null || !$this->belongsTo($session->getId(), $user)) {
             return $this->notFound();
         }
 

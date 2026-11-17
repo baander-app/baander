@@ -33,7 +33,7 @@ final class PartySessionControllerTest extends TestCase
 {
     private MessageBusInterface&MockObject $commandBus;
     private PartySessionPortInterface&Stub $sessionPort;
-    private PartyMemberPortInterface $memberPort;
+    private PartyMemberPortInterface&Stub $memberPort;
     private PartySessionController $controller;
     private \App\Party\Application\Port\PartyPublicIdentityPortInterface&Stub $identities;
     private PublicId $hostPublicId;
@@ -120,7 +120,7 @@ final class PartySessionControllerTest extends TestCase
         $this->assertSame($this->hostPublicId->toString(), $data['data']['userId']);
     }
 
-    public function testEveryPartyMutationResolvesThePublicIdentityContract(): void
+    public function testEveryPartyActionResolvesThePublicIdentityContract(): void
     {
         $this->commandBus->expects($this->never())->method('dispatch');
         $user = $this->principal();
@@ -129,7 +129,7 @@ final class PartySessionControllerTest extends TestCase
         $resolver = new UserValueResolver($storage);
         $metadata = new ArgumentMetadataFactory();
 
-        foreach (['create', 'join', 'leave', 'sync', 'end'] as $method) {
+        foreach (['index', 'show', 'create', 'join', 'leave', 'sync', 'end'] as $method) {
             $arguments = $metadata->createArgumentMetadata([$this->controller, $method]);
             $userArgument = array_values(array_filter($arguments, static fn ($argument): bool => $argument->getName() === 'user'))[0];
 
@@ -153,10 +153,85 @@ final class PartySessionControllerTest extends TestCase
         $this->commandBus->expects($this->never())->method('dispatch');
         $user = $this->principal();
         $id = (new Uuid())->toString();
-        self::assertSame(404, $this->controller->show($id)->getStatusCode());
+        self::assertSame(404, $this->controller->show($id, $user)->getStatusCode());
         self::assertSame(404, $this->controller->join($id, $user)->getStatusCode());
         self::assertSame(404, $this->controller->leave($id, $user)->getStatusCode());
         self::assertSame(404, $this->controller->end($id, $user)->getStatusCode());
+    }
+
+    public function testShowServesTheSessionAndItsMembersToAMember(): void
+    {
+        $this->commandBus->expects($this->never())->method('dispatch');
+        $user = $this->principal();
+        $userId = Uuid::fromString($user->getId());
+        $session = SyncedPartySession::create(new Uuid(), new Uuid(), null);
+        $host = PartyMember::create($session->getHostUserId(), $session->getId());
+        $member = PartyMember::create($userId, $session->getId());
+        $this->sessionPort->method('findByPublicIdentifier')->willReturn($session);
+        $this->memberPort->method('findByUserAndSession')->willReturnCallback(
+            static fn (Uuid $caller, Uuid $sessionId): ?PartyMember => $caller->equals($userId) && $sessionId->equals($session->getId()) ? $member : null,
+        );
+        $this->memberPort->method('findBySession')->willReturn([$host, $member]);
+
+        $response = $this->controller->show($session->getPublicId()->toString(), $user);
+        $data = json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR)['data'];
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame($session->getPublicId()->toString(), $data['publicId']);
+        self::assertSame(
+            [$host->getPublicId()->toString(), $member->getPublicId()->toString()],
+            array_column($data['members'], 'publicId'),
+        );
+    }
+
+    public function testShowHidesTheSessionFromACallerWithoutAMemberRow(): void
+    {
+        $this->commandBus->expects($this->never())->method('dispatch');
+        $user = $this->principal();
+        $session = SyncedPartySession::create(new Uuid(), new Uuid(), null);
+        $this->sessionPort->method('findByPublicIdentifier')->willReturnCallback(
+            static fn (string $publicId): ?SyncedPartySession => $publicId === $session->getPublicId()->toString() ? $session : null,
+        );
+        $this->memberPort->method('findByUserAndSession')->willReturn(null);
+
+        $hidden = $this->controller->show($session->getPublicId()->toString(), $user);
+        $missing = $this->controller->show((new PublicId())->toString(), $user);
+
+        self::assertSame(404, $hidden->getStatusCode());
+        // The answer does not reveal that the session exists.
+        self::assertSame($missing->getContent(), $hidden->getContent());
+    }
+
+    public function testShowHidesTheSessionFromAHostWhoNoLongerHoldsAMemberRow(): void
+    {
+        $this->commandBus->expects($this->never())->method('dispatch');
+        $user = $this->principal();
+        $session = SyncedPartySession::create(Uuid::fromString($user->getId()), new Uuid(), null);
+        $this->sessionPort->method('findByPublicIdentifier')->willReturn($session);
+        $this->memberPort->method('findByUserAndSession')->willReturn(null);
+
+        self::assertSame(404, $this->controller->show($session->getPublicId()->toString(), $user)->getStatusCode());
+    }
+
+    public function testIndexListsTheSessionsTheCallerBelongsTo(): void
+    {
+        $this->commandBus->expects($this->never())->method('dispatch');
+        $user = $this->principal();
+        $userId = Uuid::fromString($user->getId());
+        $own = SyncedPartySession::create($userId, new Uuid(), null);
+        $joined = SyncedPartySession::create(new Uuid(), new Uuid(), null);
+        $this->sessionPort->method('findActiveSessionsForMember')->willReturnCallback(
+            static fn (Uuid $member): array => $member->equals($userId) ? [$own, $joined] : [],
+        );
+
+        $response = $this->controller->index($user);
+        $data = json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR)['data'];
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame(
+            [$own->getPublicId()->toString(), $joined->getPublicId()->toString()],
+            array_column($data, 'publicId'),
+        );
     }
 
     private function principal(): AuthenticatedUserIdentityInterface&UserInterface

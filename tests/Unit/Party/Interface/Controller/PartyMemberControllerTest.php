@@ -26,6 +26,63 @@ use Symfony\Component\Security\Core\User\UserInterface;
 
 final class PartyMemberControllerTest extends TestCase
 {
+    public function testMemberListServesAMember(): void
+    {
+        $userId = new Uuid();
+        $session = SyncedPartySession::create(new Uuid(), new Uuid(), null);
+        $host = PartyMember::create($session->getHostUserId(), $session->getId());
+        $member = PartyMember::create($userId, $session->getId());
+        $sessions = $this->createStub(PartySessionPortInterface::class);
+        $sessions->method('findByPublicIdentifier')->willReturn($session);
+        $members = $this->createStub(PartyMemberPortInterface::class);
+        $members->method('findByUserAndSession')->willReturnCallback(
+            static fn (Uuid $caller, Uuid $sessionId): ?PartyMember => $caller->equals($userId) && $sessionId->equals($session->getId()) ? $member : null,
+        );
+        $members->method('findBySession')->willReturn([$host, $member]);
+        $controller = new PartyMemberController(
+            $this->security(new SecurityUser($userId->toString(), 'member@baander.app', '')),
+            $this->createStub(MessageBusInterface::class),
+            $sessions,
+            $this->identities(),
+            $members,
+        );
+
+        $response = $controller->index($session->getPublicId()->toString());
+        $data = json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR)['data'];
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame(
+            [$host->getPublicId()->toString(), $member->getPublicId()->toString()],
+            array_column($data, 'publicId'),
+        );
+    }
+
+    public function testMemberListIsHiddenFromACallerWithoutAMemberRow(): void
+    {
+        $session = SyncedPartySession::create(new Uuid(), new Uuid(), null);
+        $sessions = $this->createStub(PartySessionPortInterface::class);
+        $sessions->method('findByPublicIdentifier')->willReturnCallback(
+            static fn (string $publicId): ?SyncedPartySession => $publicId === $session->getPublicId()->toString() ? $session : null,
+        );
+        $members = $this->createMock(PartyMemberPortInterface::class);
+        $members->method('findByUserAndSession')->willReturn(null);
+        $members->expects($this->never())->method('findBySession');
+        $controller = new PartyMemberController(
+            $this->security(new SecurityUser((new Uuid())->toString(), 'outsider@baander.app', '')),
+            $this->createStub(MessageBusInterface::class),
+            $sessions,
+            $this->identities(),
+            $members,
+        );
+
+        $hidden = $controller->index($session->getPublicId()->toString());
+        $missing = $controller->index((new PublicId())->toString());
+
+        self::assertSame(404, $hidden->getStatusCode());
+        // The answer does not reveal that the session exists.
+        self::assertSame($missing->getContent(), $hidden->getContent());
+    }
+
     public function testUpdateUsesTheResolvedPrincipalForMemberOwnership(): void
     {
         $userId = new Uuid();
@@ -98,9 +155,11 @@ final class PartyMemberControllerTest extends TestCase
         $controller = new PartyMemberController($this->security(null), $bus, $this->createStub(PartySessionPortInterface::class), $this->identities(), $members);
         $sessionId = (new Uuid())->toString();
 
+        $list = $controller->index($sessionId);
         $update = $controller->updateMe($sessionId, new UpdatePartyMemberRequest());
         $transfer = $controller->transferHost($sessionId, new TransferHostRequest());
 
+        self::assertSame(401, $list->getStatusCode());
         self::assertSame(401, $update->getStatusCode());
         self::assertSame(401, $transfer->getStatusCode());
     }
@@ -123,9 +182,11 @@ final class PartyMemberControllerTest extends TestCase
         );
         $sessionId = (new Uuid())->toString();
 
+        $list = $controller->index($sessionId);
         $update = $controller->updateMe($sessionId, new UpdatePartyMemberRequest());
         $transfer = $controller->transferHost($sessionId, new TransferHostRequest());
 
+        self::assertSame(401, $list->getStatusCode());
         self::assertSame(401, $update->getStatusCode());
         self::assertSame(401, $transfer->getStatusCode());
     }

@@ -23,8 +23,12 @@ interface PartySessionPortInterface
 
     public function findByPublicIdentifier(string $publicId): ?SyncedPartySession;
 
-    /** @return SyncedPartySession[] */
-    public function findActiveSessions(): array;
+    /**
+     * Active sessions the user belongs to, as host or member, oldest first.
+     *
+     * @return SyncedPartySession[]
+     */
+    public function findActiveSessionsForMember(Uuid $userId): array;
 
     /** @return SyncedPartySession[] */
     public function findByVideo(Uuid $videoId): array;

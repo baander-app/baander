@@ -8,6 +8,7 @@ use App\Party\Domain\Model\SyncedPartySession;
 use App\Party\Domain\Model\SyncedPartySessionState;
 use App\Party\Domain\Repository\SyncedPartySessionRepositoryInterface;
 use App\Party\Domain\ValueObject\PlaybackState;
+use App\Party\Infrastructure\Doctrine\Entity\PartyMemberEntity;
 use App\Party\Infrastructure\Doctrine\Entity\SyncedPartySessionEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
@@ -58,14 +59,26 @@ final class SyncedPartySessionRepository implements SyncedPartySessionRepository
         return $entity !== null ? $this->toDomain($entity) : null;
     }
 
-    /** @return SyncedPartySession[] */
-    public function findActiveSessions(): array
+    /**
+     * The host holds a member row from the session's creation, so the member rows alone
+     * name everyone who belongs to the session.
+     *
+     * @return SyncedPartySession[]
+     */
+    public function findActiveSessionsForMember(Uuid $userId): array
     {
-        $entities = $this->entityManager
-            ->getRepository(SyncedPartySessionEntity::class)
-            ->findBy(['isActive' => true]);
+        /** @var list<SyncedPartySessionEntity> $entities */
+        $entities = $this->entityManager->createQuery(
+            'SELECT session FROM ' . SyncedPartySessionEntity::class . ' session'
+            . ' WHERE session.isActive = true'
+            . ' AND EXISTS (SELECT membership.id FROM ' . PartyMemberEntity::class . ' membership'
+            . ' WHERE membership.session = session AND membership.userId = :user)'
+            . ' ORDER BY session.createdAt ASC, session.id ASC',
+        )
+            ->setParameter('user', $userId, 'uuid')
+            ->getResult();
 
-        return array_map(fn(SyncedPartySessionEntity $e) => $this->toDomain($e), $entities);
+        return array_map($this->toDomain(...), $entities);
     }
 
     /** @return SyncedPartySession[] */

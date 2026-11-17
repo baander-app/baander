@@ -46,9 +46,9 @@ final readonly class PartySessionService implements PartySessionPortInterface
         return $this->sessionRepository->findByPublicId($id);
     }
 
-    public function findActiveSessions(): array
+    public function findActiveSessionsForMember(Uuid $userId): array
     {
-        return $this->sessionRepository->findActiveSessions();
+        return $this->sessionRepository->findActiveSessionsForMember($userId);
     }
 
     public function findByVideo(Uuid $videoId): array

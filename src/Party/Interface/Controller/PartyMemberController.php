@@ -38,6 +38,15 @@ final class PartyMemberController
     ) {
     }
 
+    /**
+     * The host holds a member row from the session's creation, so a member row is what
+     * lets a caller see the session.
+     */
+    private function belongsTo(Uuid $sessionId, AuthenticatedUserIdentityInterface $user): bool
+    {
+        return $this->memberPort->findByUserAndSession(Uuid::fromString($user->getId()), $sessionId) !== null;
+    }
+
     #[OA\Get(
         path: '/api/party/sessions/{publicId}/members/',
         summary: 'List members for a party session',
@@ -46,14 +55,20 @@ final class PartyMemberController
         ],
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')]))])),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '404', description: 'The session does not exist, or the caller is neither its host nor a member', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
     public function index(string $publicId): JsonResponse
     {
+        $user = $this->security->getUser();
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
+            return $this->unauthorized();
+        }
+
         $session = $this->sessionPort->findByPublicIdentifier($publicId);
-        if ($session === null) {
+        if ($session === null || !$this->belongsTo($session->getId(), $user)) {
             return $this->notFound();
         }
 
