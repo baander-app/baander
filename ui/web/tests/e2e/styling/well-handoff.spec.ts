@@ -3,11 +3,13 @@ import { test, expect } from './footer-playback'
 import { MOODS, setTheme } from '../helpers/theme-utils'
 import { contrastRatio, expectContained, expectNoPageOverflow, luminance, paintedPixels, textColor } from './helpers'
 
+// Two hours old at every run: a notification 30 days old shows a date, which the timestamp
+// locator below would not match.
 const notification = {
   publicId: 'wellNotification00001', category: 'media_changes',
   eventType: 'library.scan.completed', title: 'Music library scan finished',
   body: 'Your library is ready to browse.', parameters: null,
-  isRead: false, createdAt: '2026-11-01T12:00:00Z',
+  isRead: false, createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
 }
 
 /** One unread notification, so the pane shows its header action, a title and a timestamp. */
@@ -115,7 +117,7 @@ test('every label in the open pane stays readable over the well in every mood', 
     header: pane.getByText('Notifications', { exact: true }),
     action: pane.getByRole('button', { name: 'Mark all read', exact: true }),
     title: pane.getByText(notification.title, { exact: true }),
-    timestamp: pane.getByText(/ago$|^just now$/),
+    timestamp: pane.getByText('2h ago', { exact: true }),
   }
 
   for (const mood of MOODS) {
@@ -253,6 +255,14 @@ test('the handoff is immediate when reduced motion is requested', async ({ pause
   expect(seconds(await pane.evaluate((node) => getComputedStyle(node).animationDuration))).toBeLessThanOrEqual(0.00001)
   expect(seconds(await displayOf(page).evaluate((node) => getComputedStyle(node).transitionDuration))).toBeLessThanOrEqual(0.00001)
   await expect(displayOf(page)).toHaveAttribute('data-well', 'yielded')
+
+  await page.keyboard.press('Escape')
+  await expect(pane).toBeHidden()
+  await expect(bellOf(page)).toBeFocused()
+  await expect(displayOf(page)).toHaveAttribute('data-well', 'held')
+  const restored = await displayShading(page)
+  expect(restored.faceSpan, 'the face is shaded again').toBeGreaterThanOrEqual(3)
+  expect(restored.lip, 'the lip is back').toBe(true)
 })
 
 for (const navigation of ['collapsed', 'expanded'] as const) {
