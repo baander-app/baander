@@ -4,14 +4,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NowPlayingBar } from '../NowPlayingBar'
 import { usePlayerStore } from '../../stores/player-store'
 import { useRadioStore } from '@/features/radio/stores/radio-store'
+import type { RadioStation } from '@/features/radio/api/radio-api'
+import { useNotificationStore } from '@/features/notification/stores/notification-store'
 import '@/shared/i18n'
 
 vi.mock('@/shared/components/cover-art', () => ({ CoverArt: () => null }))
+vi.mock('@/features/radio/components/RadioPlayerBar', () => ({ RadioPlayerBar: () => <div data-testid="radio-bar" /> }))
 vi.mock('@/features/session/components/PlaybackDestinationSelector', () => ({
   PlaybackDestinationSelector: ({ compact }: { compact?: boolean }) => <span data-testid="destination" data-compact={compact} />,
 }))
 
 const initialPlayer = usePlayerStore.getInitialState()
+const station: RadioStation = {
+  publicId: 'station', sourceId: 'source', externalId: 'external', name: 'Station', country: 'DK',
+  language: null, genres: [], tags: [], streams: [], logo: null, website: null, lastCheckedAt: null,
+  createdAt: '2026-11-01T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z',
+}
 const initialRadio = useRadioStore.getInitialState()
 const setVolume = vi.fn()
 const toggleMute = vi.fn()
@@ -86,5 +94,33 @@ describe('now playing text', () => {
     expect(within(nowPlaying).getByText('直')).toHaveAttribute('lang', 'ja')
     expect(within(nowPlaying).getByText('坂本龍一')).toHaveAttribute('lang', 'en')
     expect(within(nowPlaying).getByText('音楽図鑑')).toHaveAttribute('lang', 'ja')
+  })
+})
+
+describe('the well', () => {
+  afterEach(() => {
+    useNotificationStore.getState().setPopoutOpen(false)
+  })
+
+  it('yields the well while the notification pane is open and holds it again once the pane closes', () => {
+    render(<NowPlayingBar />)
+    const nowPlaying = screen.getByRole('group', { name: 'Now playing' })
+    expect(nowPlaying).toHaveAttribute('data-well', 'held')
+
+    act(() => useNotificationStore.getState().setPopoutOpen(true))
+    expect(nowPlaying).toHaveAttribute('data-well', 'yielded')
+
+    act(() => useNotificationStore.getState().setPopoutOpen(false))
+    expect(nowPlaying).toHaveAttribute('data-well', 'held')
+  })
+
+  it('gives the radio bar no well to yield while the pane is open', () => {
+    useRadioStore.setState({ activeStation: station })
+    act(() => useNotificationStore.getState().setPopoutOpen(true))
+
+    const { container } = render(<NowPlayingBar />)
+
+    expect(screen.getByTestId('radio-bar')).toBeInTheDocument()
+    expect(container.querySelector('[data-well]')).toBeNull()
   })
 })

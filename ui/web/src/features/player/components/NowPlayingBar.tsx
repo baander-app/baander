@@ -5,11 +5,12 @@ import styled from 'styled-components'
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
 import { usePlayerStore } from '@/features/player/stores/player-store'
 import { useRadioStore } from '@/features/radio/stores/radio-store'
+import { useNotificationStore } from '@/features/notification/stores/notification-store'
 import { RadioPlayerBar } from '@/features/radio/components/RadioPlayerBar'
 import { ProgressBar } from './ProgressBar'
 import { PlaybackRecoveryAnnouncer } from './PlaybackRecoveryStatus'
 import { TrackCredits } from './TrackCredits'
-import { textRole, wellColors, wellShading } from '@/shared/theme'
+import { textRole, wellColors, wellHandoffTransition, wellShading, wellYielded } from '@/shared/theme'
 import { ContentText } from '@/shared/typography'
 import { CoverArt } from '@/shared/components/cover-art'
 import { PlaybackDestinationSelector } from '@/features/session/components/PlaybackDestinationSelector'
@@ -55,7 +56,12 @@ const TrackDisplay = styled.div`
   border-radius: var(--radius-lg);
   background-color: var(--color-muted);
   ${wellShading}
+  ${wellHandoffTransition}
   color: var(--color-foreground);
+
+  &[data-well='yielded'] {
+    ${wellYielded}
+  }
 
   [data-slot='slider-track'] {
     background-color: color-mix(in srgb, var(--color-input-boundary) 90%, var(--color-foreground));
@@ -136,6 +142,8 @@ function MusicPlayerBar() {
   const setIsPlaying = usePlayerStore((s) => s.setIsPlaying)
   const playNext = usePlayerStore((s) => s.playNext)
   const playPrevious = usePlayerStore((s) => s.playPrevious)
+  // One surface holds the well at a time: the open notification pane takes it from the display.
+  const paneHoldsWell = useNotificationStore((s) => s.isPopoutOpen)
 
   if (!currentTrack) return null
 
@@ -160,7 +168,7 @@ function MusicPlayerBar() {
           </Button>
         </TransportControls>
 
-        <TrackDisplay role="group" aria-label="Now playing">
+        <TrackDisplay role="group" aria-label="Now playing" data-well={paneHoldsWell ? 'yielded' : 'held'}>
           <CoverThumbnail>
             <CoverArt albumPublicId={currentTrack.albumPublicId} iconSize={18} />
           </CoverThumbnail>
