@@ -985,3 +985,12 @@ It selects Han glyph forms and script spacing. It is separate from the interface
 ### Type role
 
 One of the ten named text styles, from `text-hero` to `text-mono-sm`, that fixes size, weight, tracking and line-height for each platform. Every text element uses one role.
+
+## Interface material
+
+### Well
+
+The recessed surface treatment of the web interface: a face shaded darker toward its upper edge, an inset upper edge and a faint lower lip. One surface holds it at a time.
+*Avoid: recess or centerpiece for the treatment itself; the centerpiece is the footer's centre display, which is one holder of the well.*
+
+The music footer's centre display holds the well by default. The sidebar notification pane takes it while open and the footer display goes flat; the two fade over the same duration (the well handoff).
