@@ -9,7 +9,7 @@ import { RadioPlayerBar } from '@/features/radio/components/RadioPlayerBar'
 import { ProgressBar } from './ProgressBar'
 import { PlaybackRecoveryAnnouncer } from './PlaybackRecoveryStatus'
 import { TrackCredits } from './TrackCredits'
-import { textRole } from '@/shared/theme'
+import { textRole, wellColors, wellShading } from '@/shared/theme'
 import { ContentText } from '@/shared/typography'
 import { CoverArt } from '@/shared/components/cover-art'
 import { PlaybackDestinationSelector } from '@/features/session/components/PlaybackDestinationSelector'
@@ -44,10 +44,7 @@ const PlayerContent = styled.div`
 `
 
 const TrackDisplay = styled.div`
-  --recess-shade: color-mix(in srgb, var(--color-muted) 96%, black);
-  --recess-shadow: rgb(0 0 0 / 16%);
-  --recess-lip: rgb(255 255 255 / 80%);
-  --player-secondary-text: color-mix(in srgb, var(--color-muted-foreground) 85%, var(--color-foreground));
+  ${wellColors('var(--color-muted)')}
 
   display: grid;
   grid-template-columns: 3rem minmax(0, 1fr);
@@ -57,23 +54,11 @@ const TrackDisplay = styled.div`
   padding: var(--space-sm) var(--space-md);
   border-radius: var(--radius-lg);
   background-color: var(--color-muted);
-  background-image: linear-gradient(
-    to bottom,
-    var(--recess-shade),
-    var(--color-muted) 85%,
-    color-mix(in srgb, var(--color-muted) 99%, white)
-  );
-  box-shadow: inset 0 1px 2px var(--recess-shadow), 0 1px 0 var(--recess-lip);
+  ${wellShading}
   color: var(--color-foreground);
 
   [data-slot='slider-track'] {
     background-color: color-mix(in srgb, var(--color-input-boundary) 90%, var(--color-foreground));
-  }
-
-  :root[data-theme='dark'] &, :root:not([data-theme]) & {
-    --recess-shade: color-mix(in srgb, var(--color-muted) 80%, black);
-    --recess-shadow: rgb(0 0 0 / 75%);
-    --recess-lip: rgb(255 255 255 / 8%);
   }
 
   @media (max-width: 767px) {
@@ -109,7 +94,7 @@ const TrackSubtitle = styled.p`
   overflow: hidden;
   text-overflow: ellipsis;
   ${textRole('caption')}
-  color: var(--player-secondary-text);
+  color: var(--well-secondary-text);
 `
 
 const TransportControls = styled.div`

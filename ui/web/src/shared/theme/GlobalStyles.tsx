@@ -1,5 +1,6 @@
 import { createGlobalStyle } from 'styled-components';
 import { keyframes } from './keyframes';
+import { wellProperties } from './well';
 import { textRole } from './mixins';
 
 export const GlobalStyles = createGlobalStyle`
@@ -126,4 +127,5 @@ export const GlobalStyles = createGlobalStyle`
   }
 
   ${keyframes}
+  ${wellProperties}
 `;

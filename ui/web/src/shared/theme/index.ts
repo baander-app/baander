@@ -13,3 +13,4 @@ export {
   disabledStyle, ariaInvalidRing, textRole,
 } from './mixins';
 export type { TextRole } from './mixins';
+export { WELL_HANDOFF, wellColors, wellHandoffTransition, wellShading, wellYielded } from './well';

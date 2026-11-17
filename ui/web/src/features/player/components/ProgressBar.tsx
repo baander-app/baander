@@ -24,7 +24,7 @@ const ProgressRow = styled.div`
 const TimeLabel = styled.span`
   white-space: nowrap;
   ${textRole('timecode')}
-  color: var(--player-secondary-text, var(--color-muted-foreground));
+  color: var(--well-secondary-text, var(--color-muted-foreground));
 `
 
 export function ProgressBar() {
