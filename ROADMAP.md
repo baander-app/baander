@@ -807,6 +807,109 @@ Open:
 - `AudioTranscodeStreamTest::testEachSupportedFormatProducesItsCodec` fails on
   `master` in the local CI image (see the verification above).
 
+## Notification pane well
+
+Delivered on the branch `feat/notification-pane-well` on 2026-11-17 (`182ea0948` to
+this record) from the plan
+`docs/plans/2026-11-17-1705-feat-notification-pane-well-plan.md`. The branch is
+local: it is not merged into `master` and not pushed.
+
+- The handoff (`7f357281a`, `02292d5f7`). While the sidebar notification pane is open
+  it holds the well: shading toward its upper edge, an inset upper edge and a lower
+  lip over its `--color-popover` face. For that time the footer player's central
+  display is flat on `--color-muted` with no edge or lip, and it takes the well back
+  when the pane closes. The pane fades in and out and the display's shading fades out
+  and back over the same 120ms `ease-out`, from one constant; with reduced motion
+  requested both are immediate.
+- The shared definition (`5aabfc463`, `b66b5acaa`). `ui/web/src/shared/theme/well.ts`
+  holds the well's measures, its shading and the handoff timing. A number registered
+  with `@property`, `--well-presence`, sits inside each shading colour's own
+  expression: 1 computes to the declarations the footer had, 0 to a flat face. It does
+  not inherit, so a fade restyles nothing inside the display.
+- Pane text (`7f357281a`). Muted text in the pane uses `--well-secondary-text`. With
+  `--color-muted-foreground` the header label measured 4.49:1 over the warm mood's
+  shade.
+- Escape (`7f357281a`). The pane stays mounted for its 120ms exit, so it stops its own
+  Escape from reaching the sidebar's Escape handler, which would move focus to the
+  navigation toggle. Recorded before and after the change at 390px with the navigation
+  collapsed and expanded: the pane closes, focus returns to the bell and the navigation
+  keeps its state.
+- Documents (`c1634ae13`, `caaa7f0f4`). `ui/DESIGN.md` states the one-well rule, the
+  notification pane and the handoff's Motion row; `CONCEPTS.md` defines the well; the
+  browser-testing guide names the handoff spec. The plan states the mechanism that
+  shipped.
+- Footer material spec (`c249e5d4e`). The listening session answers 422 to the styling
+  suite's catalog fixture song, so the spec could not put a track in the footer. It
+  now plays a server fixture's song through `tests/e2e/styling/footer-playback.ts`.
+  Its lip-symmetry check also skips a footer border that covers two pixel rows; with
+  only the fixture change the 768px and 1280px cases failed that check by 6px against
+  the unchanged source.
+
+Four calls were shown to the user before planning and made without an answer: the pane
+also fades out over 120ms; the display keeps its flat face while it yields; the admin
+bell is out of scope, because the admin shell has no footer player; and `ui/DESIGN.md`
+changes from "the footer well never animates and is the only surface with depth" to
+"one surface holds the well at a time".
+
+The plan first put the footer's shading on a layer faded by opacity. Measured on the
+preview, the layer changed the footer at rest: the display ends between pixels, two
+stacked boxes anti-alias differently from one, and the lip came out weaker (243 to 239
+over a 235 card in the balanced mood). Registering the colours, or mixing each finished
+colour with its flat value, left one-level differences in the warm mood's gradient.
+
+Verification on 2026-11-17 at `caaa7f0f4`:
+
+- `yarn --cwd ui/web typecheck` and `yarn --cwd ui/web build` pass. `yarn --cwd ui/web
+  lint` reports 0 errors and 10 warnings, none in a changed file.
+- Vitest: 3,624 tests in 290 files pass, including the player's render-count tests.
+- Chromium on the worktree preview: `tests/e2e/styling/well-handoff.spec.ts` 10 of 10
+  and `tests/e2e/styling/footer-material.spec.ts` 4 of 4. The handoff spec reads
+  painted pixels at 390px and 1280px in the four moods, label contrast in the pane and
+  on the flat display, the reported durations and easing, reduced motion including the
+  close, and Escape.
+- Footer at rest, original source against the shipped code, at 1280px with a track
+  paused and the four moods switched through in turn. The whole footer image is
+  byte-identical in dark, cool and balanced in every capture. In warm the captures
+  vary: of five, one matched the original and four differed from it by one level in
+  one channel on 2,476 to 3,536 of 117,760 pixels, 11 after a forced repaint. Two
+  captures of the original source do not differ from each other. The plan's samples
+  (four columns through the display, from two rows above it to two below the lip,
+  1,296 in the four moods) were identical in the capture at `5aabfc463` and differed
+  on 33 in the capture at `caaa7f0f4`. The registration's `inherits` value makes no
+  difference to this.
+- Guard checks: with the yield's styling disabled the handoff test fails (the face
+  spans 7 levels in the dark mood); with the header label on `--color-muted-foreground`
+  the contrast test fails in the warm mood.
+- Code review, run `20261117-182724-92ce9f41`: one finding, applied in `77a2dc40a`.
+  The contrast test located a timestamp by its "ago" text while its fixture
+  notification had a fixed date, so it would have failed once that date was 30 days
+  old.
+
+Open:
+
+- The warm mood's one-level differences at rest are unexplained. The computed
+  declarations are the same as before, and the same code renders with and without the
+  differences from run to run, so the cause is in how the browser rasterises partial
+  repaints after a mood switch. A capture on a fresh load in the warm mood, without a
+  mood switch, was not taken.
+- `tests/e2e/playback-destinations/sidebar-notifications.spec.ts` fails on the worktree
+  preview with and without this change: a "Settings conflict" dialog for the admin
+  account covers the page before the test reaches the bell. Its cause was not
+  investigated. The handoff spec covers containment at 390px and focus return with a
+  fixture user.
+- `tests/e2e/styling/browsing-playback.spec.ts`: 11 of 20 tests fail on the worktree
+  preview, the same 11 with and without this change. Its playback cases cannot start a
+  track, because the listening session answers 422 to the catalog fixture song. They
+  need server fixture songs with the long and non-Latin titles they check, which is
+  separate work on the styling fixtures. The other failures were not attributed.
+- The admin bell's outage entry reads `--well-secondary-text` with
+  `--color-muted-foreground` as its fallback. No browser test checks that the fallback
+  applies in the admin pane.
+- Only Chromium ran. A browser without `@property` changes the footer's shading at
+  once instead of fading it; Firefox and WebKit were not run.
+- No CI job runs `tests/e2e/styling`, and the footer specs now also need the host
+  fixture executor.
+
 ## Cohesive operator manual
 
 Delivered, 2026-10-30: the [operator manual](docs-book/part-1-operator-guide/README.md)
