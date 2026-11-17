@@ -264,8 +264,8 @@ that limitation is recorded for follow-up, with no runtime change in the 2026-10
 `052e8684d`) and the roadmap cleanup with its plan retirement. Landed on 2026-11-14:
 scan artist credits and MusicBrainz matching. The persistent instance ran `6912eaaf6`
 before that push and updates itself from `master`. The website was last published on
-2026-11-16: a local build of `0d017641f`, deployed to production as
-`baander-cqu4pnh8z` and aliased to `https://baander.app`.
+2026-11-17: a local build of `31d1f8a81`, deployed to production as
+`baander-h0mkq4o71` and aliased to `https://baander.app`.
 Pushed later on 2026-11-15, on top of `23f899976`: the matching follow-ups
 (`a7d1c7466` to `6991a9f9a` and their roadmap record), with the fix for the CI cleanup
 limit. Pushed on 2026-11-16, on top of `8d119f5df`: the matching leftovers
@@ -659,6 +659,10 @@ Verification on 2026-11-17:
 - Site: `make website-build` built 243 pages; every relative link and anchor resolves;
   `corepack yarn test:browser` in `ui/site/` passed 93 tests and
   `node --test scripts/*.test.mjs` passed 11.
+- Published: a local build of `31d1f8a81`, previewed as `baander-m189h9zq0` and
+  deployed to production as `baander-h0mkq4o71`, aliased to `https://baander.app`; the
+  home page and the watch-parties, `app:monitor:prune`, real-time patterns and
+  environment variables pages answer 200 with the new text.
 - Code review: `ce-code-review` at full depth with correctness, security, adversarial
   (in-process; cross-model review is off in this checkout), API contract, testing and
   project-standards reviewers; verdict "Ready with fixes", with no P0 or P1. Its one
