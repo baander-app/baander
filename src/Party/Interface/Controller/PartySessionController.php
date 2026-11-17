@@ -39,6 +39,7 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 final class PartySessionController
 {
     use ApiResponsesTrait;
+    use PartyMembershipTrait;
 
     public function __construct(
         private readonly MessageBusInterface $commandBus,
@@ -46,15 +47,6 @@ final class PartySessionController
         private readonly PartyPublicIdentityPortInterface $identities,
         private readonly PartyMemberPortInterface $memberPort,
     ) {
-    }
-
-    /**
-     * The host holds a member row from the session's creation, so a member row is what
-     * lets a caller see the session.
-     */
-    private function belongsTo(Uuid $sessionId, AuthenticatedUserIdentityInterface $user): bool
-    {
-        return $this->memberPort->findByUserAndSession(Uuid::fromString($user->getId()), $sessionId) !== null;
     }
 
     /**

@@ -28,6 +28,7 @@ use Symfony\Component\Routing\Attribute\Route;
 final class PartyMemberController
 {
     use ApiResponsesTrait;
+    use PartyMembershipTrait;
 
     public function __construct(
         private readonly Security $security,
@@ -36,15 +37,6 @@ final class PartyMemberController
         private readonly PartyPublicIdentityPortInterface $identities,
         private readonly PartyMemberPortInterface $memberPort,
     ) {
-    }
-
-    /**
-     * The host holds a member row from the session's creation, so a member row is what
-     * lets a caller see the session.
-     */
-    private function belongsTo(Uuid $sessionId, AuthenticatedUserIdentityInterface $user): bool
-    {
-        return $this->memberPort->findByUserAndSession(Uuid::fromString($user->getId()), $sessionId) !== null;
     }
 
     #[OA\Get(

@@ -182,7 +182,7 @@ final class JobMonitorController
         requestBody: new OA\RequestBody(
             content: new OA\JsonContent(
                 properties: [
-                    new OA\Property(property: 'days', description: 'Prune jobs older than this many days', type: 'integer', default: 7, minimum: 1),
+                    new OA\Property(property: 'days', description: 'Prune jobs older than this many days', type: 'integer', default: JobMonitorAdministrationInterface::DEFAULT_PRUNE_DAYS, minimum: 1),
                 ],
             ),
         ),
@@ -205,7 +205,7 @@ final class JobMonitorController
     {
         // The body is optional: without one, as without `days`, the prune keeps the default.
         $body = $request->getContent() === '' ? [] : $request->toArray();
-        $result = $this->jobMonitor->prune(self::days($body['days'] ?? 7));
+        $result = $this->jobMonitor->prune(self::days($body['days'] ?? JobMonitorAdministrationInterface::DEFAULT_PRUNE_DAYS));
 
         return $this->successResponse([
             'pruned' => $result->count,

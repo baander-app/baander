@@ -23,6 +23,9 @@ use App\Shared\Application\JobCancelledException;
  */
 interface JobMonitorAdministrationInterface
 {
+    /** Days of finished job monitors a prune keeps when the caller names none. */
+    public const int DEFAULT_PRUNE_DAYS = 7;
+
     public function overview(): JobMonitorOverview;
 
     /** @throws InvalidInputException for an unknown status filter */

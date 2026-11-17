@@ -31,7 +31,7 @@ final class PruneJobMonitorsCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addOption('days', 'd', InputOption::VALUE_REQUIRED, 'Prune jobs older than this many days', '7')
+            ->addOption('days', 'd', InputOption::VALUE_REQUIRED, 'Prune jobs older than this many days', (string) JobMonitorAdministrationInterface::DEFAULT_PRUNE_DAYS)
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Show how many jobs would be pruned without deleting');
         AdminCommandSupport::addJsonOption($this);
     }
@@ -42,7 +42,7 @@ final class PruneJobMonitorsCommand extends Command
         $dryRun = $input->getOption('dry-run') === true;
 
         try {
-            $result = $this->jobMonitor->prune(AdminCommandSupport::integerOption($input, 'days') ?? 7, $dryRun);
+            $result = $this->jobMonitor->prune(AdminCommandSupport::integerOption($input, 'days') ?? JobMonitorAdministrationInterface::DEFAULT_PRUNE_DAYS, $dryRun);
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
         }
