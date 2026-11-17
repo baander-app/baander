@@ -171,7 +171,7 @@ External systems are isolated behind adapter patterns:
 
 | Protocol | Purpose | Transport |
 |----------|---------|-----------|
-| WebSocket | Party playback sync | Swoole WS server → Redis Pub/Sub |
+| WebSocket | Party playback sync | Swoole WS server → party rooms in shared Swoole tables |
 | SSE | Notification delivery | Redis Pub/Sub → SSE controller |
 | HTTP/2 | API + streaming | Nginx → Swoole |
 

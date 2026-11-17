@@ -14,7 +14,11 @@ Two aggregates:
 
 The context has 9 CQRS commands covering the full lifecycle: create, join, leave, end session, start/pause/seek/sync playback, transfer host. The `PlaybackSynchronizer` service handles wall-clock sync between participants.
 
-WebSocket connection is handled through `Shared\Infrastructure\Swoole\WebSocketConnectionRegistry` — the `PartyWebSocketController` at `/ws/party/{sessionPublicId}` upgrades to WebSocket.
+Parties are invite-only. `GET /api/party/sessions` lists only the active parties the caller hosts or has joined, and a session's details and member list answer `404` unless the caller has a member row in it. Joining with the session's public ID stays open to any signed-in user. A full session admits no new member but takes back a returning one who still has a member row.
+
+Only the session's host can play, pause or seek; a command from anyone else changes nothing. Each host action dispatches `PlaybackStateChanged`. When the host leaves, the earliest-joined remaining member takes the host role on the session (`transferHost()`) as well as on its member row, so only that member's playback applies.
+
+Members connect over the application WebSocket: a single-use ticket from `POST /api/ws/tickets`, an upgrade at `/api/ws`, then `party.join` with the session's public ID to enter the party's room. The shared `WebSocketController` handles the `party.*` messages, and the rooms live in `Shared\Infrastructure\Swoole\WebSocketConnectionRegistry`.
 
 ## Ports
 
@@ -32,6 +36,7 @@ WebSocket connection is handled through `Shared\Infrastructure\Swoole\WebSocketC
 | `PartySessionEnded` | — | `LivePartyRoomListener` (Party Infrastructure) |
 | `MemberLeft` | — | `LivePartyRoomListener` (Party Infrastructure) |
 | `MemberJoined` | — | none |
+| `PlaybackStateChanged` | — | `LivePartyRoomListener` (Party Infrastructure), which sends `party.playback_state` to the party's room |
 
 ## Interactions
 

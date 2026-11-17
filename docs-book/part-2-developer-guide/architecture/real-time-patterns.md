@@ -1,6 +1,6 @@
 # Real-Time Patterns
 
-Baander has one real-time transport: a WebSocket connection served by Swoole at `/api/ws`. It carries `live.*` live-update subscriptions and change hints, watch-party sync and member events, playback-session coordination, transcode position reports, and server pushes to a user's open connections. Notifications and admin views do not hold dedicated SSE streams open; they refresh through WebSocket `live.changed` hints and coordinated HTTP reads, as [Delivery without a stream](#delivery-without-a-stream) and [Live Updates](live-updates.md) describe.
+Baander has one real-time transport: a WebSocket connection served by Swoole at `/api/ws`. It carries `live.*` live-update subscriptions and change hints, watch-party sync, playback state and member events, playback-session coordination, transcode position reports, and server pushes to a user's open connections. Notifications and admin views do not hold dedicated SSE streams open; they refresh through WebSocket `live.changed` hints and coordinated HTTP reads, as [Delivery without a stream](#delivery-without-a-stream) and [Live Updates](live-updates.md) describe.
 
 ## WebSocket
 
@@ -26,7 +26,7 @@ WebSocket connections are managed through Swoole's process mode. The `WebSocketC
 |--------|--------|----------|
 | `pushToConnection(fd, payload)` | Single connection by file descriptor | Replies, error messages, `session.snapshot` pushes |
 | `push(userId, payload)` | All connections for a user | User-scoped pushes; no production code calls it |
-| `broadcast(room, payload)` | All members of a room | Party member events |
+| `broadcast(room, payload)` | All members of a room | Party member events and playback state |
 
 All payloads are JSON-encoded before sending. A failed push (a disconnected client) is logged and skipped. `live.*` frames do not go through the pusher: `LiveFrameSender` writes them itself, under the delivery limits described in [Live Updates](live-updates.md#worker-delivery).
 
@@ -36,9 +36,9 @@ A room's members receive everything broadcast to it, so a connection joins a roo
 
 | Room | Joined by | Left by | Broadcasts |
 |------|-----------|---------|------------|
-| `party:{sessionUuid}` | `party.join` (client passes party `publicId` as `sessionId`; the controller resolves it to the party's internal UUID and joins the room after `JoinPartySessionCommand` accepts the user) | Every socket of a member who leaves the party, with `party.leave` or `POST /api/party/sessions/{publicId}/leave`; every socket when the party ends; one socket with `room.leave` or by closing | `party.member_event` |
+| `party:{sessionUuid}` | `party.join` (client passes party `publicId` as `sessionId`; the controller resolves it to the party's internal UUID and joins the room after `JoinPartySessionCommand` accepts the user) | Every socket of a member who leaves the party, with `party.leave` or `POST /api/party/sessions/{publicId}/leave`; every socket when the party ends; one socket with `room.leave` or by closing | `party.member_event`, `party.playback_state` |
 
-A party room follows the party's membership. `LeavePartySessionHandler` dispatches `MemberLeft`, and `EndPartySessionHandler` (or a leave that ends the party) dispatches `PartySessionEnded`. `LivePartyRoomListener` in Party Infrastructure hears both and calls `LivePartyRoomsPortInterface`. Its implementation, `SwooleLivePartyRooms`, takes every socket of the member out of the room and sends the sockets left in it one `party.member_event` leave event, or empties the room when the party ends. The registry's tables are shared by every worker, so the worker that runs the leave changes sockets on any worker. Outside an HTTP worker of the running server (a console command, a Messenger worker, a test kernel) the port does nothing.
+A party room follows the party's membership. `LeavePartySessionHandler` dispatches `MemberLeft`, and `EndPartySessionHandler` (or a leave that ends the party) dispatches `PartySessionEnded`. The start, pause and seek handlers dispatch `PlaybackStateChanged` after the host changes the session's playback. `LivePartyRoomListener` in Party Infrastructure hears all three and calls `LivePartyRoomsPortInterface`. Its implementation, `SwooleLivePartyRooms`, takes every socket of the member out of the room and sends the sockets left in it one `party.member_event` leave event, empties the room when the party ends, or sends every socket in the room one `party.playback_state` message. The registry's tables are shared by every worker, so the worker that runs the leave or the playback change reaches sockets on any worker. Outside an HTTP worker of the running server (a console command, a Messenger worker, a test kernel) the port does nothing.
 
 No other room exists. Pushes to one user's connections, such as `session.snapshot`, go to each connection through `pushToConnection(fd, payload)` and need no room. `room.join` joins nothing: it answers a party room with `Party rooms are joined with party.join` and any other name with `Unknown room`, and logs a warning. No client sends it. A new room kind gets its join rule in `WebSocketRoomPolicy` and a row here.
 
@@ -57,10 +57,11 @@ The controller dispatches messages by `type` field:
 | `room.join` | Client to server | Refused for every room; see [Rooms](#rooms) |
 | `room.leave` | Client to server | Leave a room the connection is in; answered with `room.left` |
 | `party.join` / `party.leave` | Client to server | Join or leave a watch-party session (`party.join` answers the sender with `party.joined`) |
-| `party.playback` | Client to server | Play, pause, or seek (host only); a failure is answered with `error`, success with no reply |
+| `party.playback` | Client to server | Play, pause, or seek. Only the session host's action applies: the sender gets no direct reply, and the room receives `party.playback_state`. Another member's action changes nothing and sends nothing. A failure is answered with `error` |
 | `party.sync` | Client to server | Report client position for drift correction |
 | `party.sync_response` | Server to client | Server-adjusted position after sync |
 | `party.member_event` | Server to room broadcast | Member joined (from `party.join`) or left (from `SwooleLivePartyRooms`, for a leave over the WebSocket or HTTP) |
+| `party.playback_state` | Server to room broadcast | The session's playback state after the host plays, pauses or seeks, from `SwooleLivePartyRooms`: `sessionId` (the party's public ID), `playbackState`, `currentPosition` and `wallClockPosition` in seconds, and `updatedAt` |
 | `session.endpoint` | Client to server | Register or refresh a playback endpoint; answered with `session.snapshot` |
 | `session.transfer` | Client to server | Initiate a playback transfer to a destination; answered with `session.snapshot` |
 | `session.ack` | Client to server | Acknowledge a playback transfer on the target endpoint; answered with `session.snapshot` |
@@ -136,6 +137,10 @@ Host-initiated actions are dispatched as CQRS commands via Messenger:
 
 When the party session has an associated `transcodeJobId`, all three handlers dispatch a `PlaybackPositionChanged` (`App\Transcode\Domain\Event\PlaybackPositionChanged`) domain event via `EventDispatcherInterface` so the transcode subscriber can steer the media worker.
 
+Then, with or without a job, each handler dispatches the Party event `PlaybackStateChanged` with the session's state right after the change, and `LivePartyRoomListener` sends it to the party's room as `party.playback_state` (see [Rooms](#rooms)). A command from anyone but the session's host changes nothing and dispatches neither event.
+
+When the host leaves, `LeavePartySessionHandler` gives the host role to the earliest-joined remaining member, on the session (`transferHost()`) as well as on the member's row (`promoteToHost()`), as `TransferHostHandler` does. From then on only that member's play, pause and seek apply.
+
 ### Sync Protocol
 
 Non-host participants periodically report their local playback position to the server. The sync flow:
@@ -169,7 +174,8 @@ When the host seeks, the flow is:
 2. `SeekPlaybackHandler` calls `session.seekTo(position)` on the aggregate root.
 3. `wallClockPosition` is set to the new position. If playing, `playbackStartedAt` is also reset to `now()`; otherwise (paused or stopped), `pausedAtPosition` is set to the new position as well.
 4. When the party session has a `transcodeJobId`, a `PlaybackPositionChanged` event is dispatched.
-5. `WebSocketController` sends the host no reply on success, and participants converge to the new position through `party.sync` / `party.sync_response`.
+5. `SeekPlaybackHandler` dispatches `PlaybackStateChanged`, and every socket in the party's room receives `party.playback_state` with the new position.
+6. `WebSocketController` sends the host no other reply on success, and participants correct remaining drift through `party.sync` / `party.sync_response`.
 
 ## Authentication
 

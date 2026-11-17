@@ -22,14 +22,15 @@ The Party context implements synchronized watch-party playback. Users create a p
 | `MemberJoined` | Emitted when a user joins a party |
 | `MemberLeft` | Emitted when a user leaves a party |
 | `PartySessionEnded` | Emitted when a party is closed |
+| `PlaybackStateChanged` | Emitted when the host plays, pauses or seeks; carries the session's playback state right after the change |
 
 ## Commands and Handlers
 
 | Command | Handler | Purpose |
 |---------|---------|---------|
 | `CreatePartySessionCommand` | `CreatePartySessionHandler` | Create a new party session |
-| `JoinPartySessionCommand` | `JoinPartySessionHandler` | Add a member to an existing party |
-| `LeavePartySessionCommand` | `LeavePartySessionHandler` | Remove a member from a party |
+| `JoinPartySessionCommand` | `JoinPartySessionHandler` | Add a member to an existing party, or reconnect a returning one, which a full party still admits |
+| `LeavePartySessionCommand` | `LeavePartySessionHandler` | Remove a member from a party; a leaving host hands the session's host role to the earliest-joined remaining member |
 | `StartPlaybackCommand` | `StartPlaybackHandler` | Begin playback for all members |
 | `PausePlaybackCommand` | `PausePlaybackHandler` | Pause playback for all members |
 | `SeekPlaybackCommand` | `SeekPlaybackHandler` | Seek to a specific position |
@@ -53,13 +54,15 @@ The Party context implements synchronized watch-party playback. Users create a p
 
 REST endpoints use `/api/party/sessions`. Every session route parameter is `{publicId}` (a 21-character `PublicId`), and `PartySessionResource` exposes `publicId` rather than internal UUIDs.
 
+Parties are invite-only. The session list returns only the active parties the caller hosts or has joined. A session and its member list answer `404` unless the caller has a member row in the session, which the host holds from creation; an unauthenticated request gets `401`. Joining with the public ID stays open to any signed-in user.
+
 ### Party Sessions
 
 | Method | Path | Controller | Purpose |
 |--------|------|------------|---------|
-| GET | `/api/party/sessions/` | `PartySessionController` | List parties |
+| GET | `/api/party/sessions/` | `PartySessionController` | List the caller's active parties |
 | POST | `/api/party/sessions/` | `PartySessionController` | Create a new party |
-| GET | `/api/party/sessions/{publicId}` | `PartySessionController` | Get a single party session |
+| GET | `/api/party/sessions/{publicId}` | `PartySessionController` | Get a party session and its members (host and members only) |
 | DELETE | `/api/party/sessions/{publicId}` | `PartySessionController` | End a party session |
 
 ### Party Members
@@ -68,7 +71,7 @@ REST endpoints use `/api/party/sessions`. Every session route parameter is `{pub
 |--------|------|------------|---------|
 | POST | `/api/party/sessions/{publicId}/join` | `PartySessionController` | Join a party |
 | POST | `/api/party/sessions/{publicId}/leave` | `PartySessionController` | Leave a party |
-| GET | `/api/party/sessions/{publicId}/members/` | `PartyMemberController` | List party members |
+| GET | `/api/party/sessions/{publicId}/members/` | `PartyMemberController` | List party members (host and members only) |
 | PATCH | `/api/party/sessions/{publicId}/members/me` | `PartyMemberController` | Update the current member's playback preferences |
 | POST | `/api/party/sessions/{publicId}/members/transfer-host` | `PartyMemberController` | Transfer the host role |
 
@@ -82,9 +85,9 @@ REST endpoints use `/api/party/sessions`. Every session route parameter is `{pub
 
 | Path | Controller | Purpose |
 |------|------------|---------|
-| `GET /ws/party/{sessionPublicId}/` | `PartyWebSocketController` | HTTP lookup of session details and WebSocket connection URL |
+| `GET /api/ws` | `WebSocketController` (Shared) | The application WebSocket, which carries the `party.*` messages |
 
-The lookup takes the session's 21-character `PublicId`. It sits outside the default `/api` OpenAPI export. Playback messages and state broadcasts use the shared WebSocket runtime, not the HTTP lookup controller.
+A member requests a single-use ticket from `POST /api/ws/tickets`, upgrades at `/api/ws`, then sends `party.join` with the session's public ID as `sessionId` to enter the party's room. The room receives `party.member_event` when a member joins with `party.join` or leaves, and `party.playback_state` after each play, pause or seek by the host, with `sessionId` (the public ID), `playbackState`, `currentPosition`, `wallClockPosition` and `updatedAt`. A play, pause or seek from anyone else broadcasts nothing. See [Real-Time Patterns](../architecture/real-time-patterns.md#party-sync-protocol) for the protocol.
 
 ## Cross-Context Dependencies
 
@@ -114,8 +117,8 @@ The lookup takes the session's 21-character `PublicId`. It sits outside the defa
 | `PartyMediaAccess` | Checks video playback access and transcode job ownership via `PlaybackAccessInterface` |
 | `PartyPublicIdentity` | Translates between internal `Uuid` values and 21-character `PublicId` values |
 | `PlaybackSynchronizer` | Wall-clock sync with jitter compensation (`src/Party/Infrastructure/PlaybackSynchronizer.php`) |
-| `LivePartyRoomListener` | Removes departed members from live WebSocket party rooms on `MemberLeft` and closes rooms on `PartySessionEnded` |
+| `LivePartyRoomListener` | Removes departed members from live WebSocket party rooms on `MemberLeft`, closes rooms on `PartySessionEnded`, and sends `party.playback_state` to the room on `PlaybackStateChanged` |
 
 ### WebSocket
 
-`PartyWebSocketController` returns connection information. The shared `WebSocketController` dispatches playback commands and broadcasts events between party members.
+The shared `WebSocketController` dispatches the party commands for `party.*` messages and broadcasts member joins to the party's room. `SwooleLivePartyRooms`, called by `LivePartyRoomListener`, broadcasts leaves and the host's playback state.
