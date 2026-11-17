@@ -990,7 +990,7 @@ One of the ten named text styles, from `text-hero` to `text-mono-sm`, that fixes
 
 ### Feature page
 
-A page of the public website that presents one Bånder feature to listeners, operators or developers: an opening, pictures taken from the application, a short guide and the feature's documented limits. Its content comes from one data file, and every claim on it cites maintained documentation.
+A page of the public website that presents one Bånder feature to listeners, operators or developers: an opening, pictures taken from the application or blocks shown as the manual renders them, a short guide and the feature's documented limits. Its content comes from one data file, and every claim on it cites maintained documentation.
 
 ### Sample library
 
@@ -998,4 +998,4 @@ The generated, fictional music collection that website pictures show: invented a
 
 ### Capture record
 
-The tracked entry for one website picture: the capture scene that took it, the application commit it shows, the date, and a checksum of its dark and light files. The site build refuses a picture without a matching record.
+The tracked entry for one website picture: the capture scene that took it, the application commit it shows, the date, and a checksum of its dark and light files. The site build refuses a feature page that shows a picture without a matching record, and the site's script tests refuse any picture file without one.
