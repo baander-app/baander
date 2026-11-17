@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, type KeyboardEvent } from 'react'
 import { Popover } from 'radix-ui'
 import styled from 'styled-components'
 import { useNotificationReader } from '../hooks/use-notification-reader'
@@ -8,15 +8,22 @@ import { Button } from '@/shared/components/ui/button'
 import { useLiveOutageStore } from '@/shared/live/outage-store'
 import { LiveOutageItem } from './LiveOutageItem'
 import { NotificationItem } from './NotificationItem'
-import { textRole } from '@/shared/theme'
+import { textRole, WELL_HANDOFF, wellColors, wellShading } from '@/shared/theme'
 
 const PopoutContent = styled(Popover.Content)`
+  ${wellColors('var(--color-popover)')}
+
   z-index: 50;
   width: min(20rem, calc(100vw - 2rem));
   overflow: hidden;
   border-radius: var(--radius-xl);
   border: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);
   background-color: var(--color-popover);
+  ${wellShading}
+
+  /* The closed pane stays mounted only while an animation runs, so it fades by one. */
+  &[data-state='open'] { animation: fadeIn ${WELL_HANDOFF}; }
+  &[data-state='closed'] { animation: fadeOut ${WELL_HANDOFF}; }
 `
 
 const Header = styled.div`
@@ -30,13 +37,13 @@ const Header = styled.div`
 
 const HeaderLabel = styled.span`
   ${textRole('label')}
-  color: var(--color-muted-foreground);
+  color: var(--well-secondary-text);
 `
 
 const MarkAllButton = styled(Button).attrs({ variant: 'ghost', size: 'sm' })`
   ${textRole('caption')}
   font-weight: 500;
-  color: var(--color-muted-foreground);
+  color: var(--well-secondary-text);
   transition: color var(--duration-hover) ease-out;
 
   &:hover {
@@ -53,8 +60,16 @@ const EmptyState = styled.div`
   padding: 1.5rem 0.75rem;
   text-align: center;
   ${textRole('body-sm')}
-  color: var(--color-muted-foreground);
+  color: var(--well-secondary-text);
 `
+
+/**
+ * The pane stays mounted while it fades out. Without this its Escape would reach the sidebar,
+ * which moves focus to the navigation toggle, and focus would not return to the bell.
+ */
+function keepEscapeInPane(event: KeyboardEvent<HTMLDivElement>) {
+  if (event.key === 'Escape') event.stopPropagation()
+}
 
 export function NotificationPopout() {
   const { notifications, unreadCount, isLoading, isError, hasNextPage, isFetchingNextPage, isFetchNextPageError, loadMore, refetch } = useNotificationReader()
@@ -71,7 +86,15 @@ export function NotificationPopout() {
 
   return (
     <Popover.Portal>
-      <PopoutContent ref={contentRef} side="top" align="start" sideOffset={8} collisionPadding={8} aria-label="Notifications">
+      <PopoutContent
+        ref={contentRef}
+        side="top"
+        align="start"
+        sideOffset={8}
+        collisionPadding={8}
+        aria-label="Notifications"
+        onKeyDown={keepEscapeInPane}
+      >
         <Header>
           <HeaderLabel>
             Notifications

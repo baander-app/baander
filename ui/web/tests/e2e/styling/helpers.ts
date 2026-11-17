@@ -66,3 +66,44 @@ export async function expectNoPageOverflow(page: Page) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
   expect(overflow).toBeLessThanOrEqual(1)
 }
+
+/** The painted colour of each viewport point, as red, green and blue, read from one screenshot. */
+export async function paintedPixels(page: Page, points: { x: number; y: number }[]): Promise<number[][]> {
+  const screenshot = await page.screenshot({ scale: 'css' })
+  return page.evaluate(async ({ encoded, points }) => {
+    const image = new Image()
+    image.src = `data:image/png;base64,${encoded}`
+    await image.decode()
+    const canvas = document.createElement('canvas')
+    canvas.width = image.width
+    canvas.height = image.height
+    const context = canvas.getContext('2d')!
+    context.drawImage(image, 0, 0)
+    return points.map(({ x, y }) => [...context.getImageData(Math.round(x), Math.round(y), 1, 1).data.slice(0, 3)])
+  }, { encoded: screenshot.toString('base64'), points })
+}
+
+/** The colour an element's text is drawn in, as red, green and blue. */
+export async function textColor(locator: Locator): Promise<number[]> {
+  return locator.evaluate((element) => {
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = 1
+    const context = canvas.getContext('2d')!
+    context.fillStyle = getComputedStyle(element).color
+    context.fillRect(0, 0, 1, 1)
+    return [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)]
+  })
+}
+
+/** Relative luminance of a colour with channels from 0 to 255. */
+export function luminance(color: number[]): number {
+  return color.slice(0, 3).map((channel) => {
+    const value = channel / 255
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+  }).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0)
+}
+
+export function contrastRatio(first: number[], second: number[]): number {
+  const [lighter, darker] = [luminance(first), luminance(second)].sort((a, b) => b - a)
+  return (lighter + 0.05) / (darker + 0.05)
+}

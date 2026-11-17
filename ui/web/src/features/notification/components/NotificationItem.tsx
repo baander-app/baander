@@ -65,7 +65,7 @@ const Title = styled(ContentText)`
 
 const Time = styled.p`
   ${textRole('caption')}
-  color: var(--color-muted-foreground);
+  color: var(--well-secondary-text, var(--color-muted-foreground));
 `
 
 export function NotificationItem({ notification }: { notification: NotificationItemType }) {

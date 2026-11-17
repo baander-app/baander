@@ -46,7 +46,7 @@ const Title = styled.span`
 
 const Time = styled.span`
   ${textRole('caption')}
-  color: var(--color-muted-foreground);
+  color: var(--well-secondary-text, var(--color-muted-foreground));
 `
 
 interface LiveOutageItemProps {
