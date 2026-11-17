@@ -985,3 +985,17 @@ It selects Han glyph forms and script spacing. It is separate from the interface
 ### Type role
 
 One of the ten named text styles, from `text-hero` to `text-mono-sm`, that fixes size, weight, tracking and line-height for each platform. Every text element uses one role.
+
+## Public website
+
+### Feature page
+
+A page of the public website that presents one Bånder feature to listeners, operators or developers: an opening, pictures taken from the application, a short guide and the feature's documented limits. Its content comes from one data file, and every claim on it cites maintained documentation.
+
+### Sample library
+
+The generated, fictional music collection that website pictures show: invented artists, albums and songs with generated covers, synthesized audio and lyric files. A worktree preview scans it like any other library. It never contains a real release.
+
+### Capture record
+
+The tracked entry for one website picture: the capture scene that took it, the application commit it shows, the date, and a checksum of its dark and light files. The site build refuses a picture without a matching record.
