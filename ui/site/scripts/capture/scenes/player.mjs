@@ -2,7 +2,10 @@
 // start an album, look at the queue, open an album's menu where "Play Next" is, and open an
 // artist's page where "Shuffle" is. The album, the song it is paused on and the position are
 // stated here, and nothing is added to the queue, so a later run photographs the same state.
-import { albumCard, closeSidePanel, openFromSidebar, pausePlayback, playHere, seekTo, songInPlayer } from '../application.mjs';
+import {
+  albumCard, closeMenu, closeSidePanel, openAlbums, openFromSidebar, pausePlayback, playHere, playerBar, seekTo, songInPlayer,
+} from '../application.mjs';
+import { LISTENER } from '../checks.mjs';
 import { buildManifest } from '../library-manifest.mjs';
 
 // An album of six songs, which is as many as the Queue tab shows without scrolling.
@@ -19,19 +22,17 @@ const MENU_PICTURE_ENDS_WITH = GRID[7];
 const MENU_ENTRIES = ['Play All', 'Shuffle All', 'Play Next', 'Play Last'];
 const ARTIST = { name: 'Northbound Static', albums: ['Golden Static', 'Low Tide Radio'] };
 
-const playerBar = page => page.getByLabel('Playback', { exact: true });
 const panel = page => page.getByRole('complementary').filter({ has: page.getByRole('tab', { name: 'Queue', exact: true }) });
 const queued = (page, title) => panel(page).locator('[aria-roledescription="sortable"]').filter({ hasText: title });
 
 export default {
   name: 'player',
-  account: 'maja@baander.app',
+  account: LISTENER,
   steps: [
     {
       title: 'Start an album',
       run: async ({ page }) => {
-        await openFromSidebar(page, 'Albums', '/music/albums');
-        await page.getByRole('heading', { name: 'Albums', exact: true, level: 1 }).waitFor();
+        await openAlbums(page);
         await playHere(page);
         // A press on a cover shows the album in the panel. When the panel was closed that narrows
         // the grid, and the second press of a double press would land beside the cover, so the
@@ -103,8 +104,7 @@ export default {
     {
       title: "Close the menu and open an artist's page",
       run: async ({ page }) => {
-        await page.keyboard.press('Escape');
-        await page.getByRole('menu').waitFor({ state: 'hidden' });
+        await closeMenu(page);
         await openFromSidebar(page, 'Artists', '/music/artists');
         await page.getByRole('heading', { name: 'Artists', exact: true, level: 1 }).waitFor();
         // A press on an artist shows the artist in the panel, whose "Open" leads to the page.

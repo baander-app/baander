@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
+import { awaitedLater } from './capture/application.mjs';
 import {
   SAMPLE_ACCOUNTS, accountProblems, catalogProblems, contactSheet, coverFailures, libraryProblems, mergeRecords,
   pendingWorkProblems, recordEntry, settingProblems, settingValue,
@@ -130,6 +131,24 @@ test('the player bar cover the application answers 403 for does not stop a windo
     '/api/images/H9s_BAlfJfDLaI5I_HygT/file answered 403',
     '/api/artists/OiZ9LzCLTavQDBY5BPI2E/cover failed: net::ERR_CONNECTION_RESET',
   ]);
+});
+
+test('a promise that is awaited later stays the same promise, is not reported while nothing awaits it and still rejects when awaited', async () => {
+  const reported = [];
+  const report = reason => reported.push(reason);
+  process.on('unhandledRejection', report);
+  try {
+    const refusal = new Error('The window closed.');
+    const promise = Promise.reject(refusal);
+
+    assert.equal(awaitedLater(promise), promise);
+    // Node reports a rejection that nothing handles once the turn it happened in is over.
+    await new Promise(turn => setImmediate(turn));
+    assert.deepEqual(reported, []);
+    await assert.rejects(promise, refusal);
+  } finally {
+    process.off('unhandledRejection', report);
+  }
 });
 
 test('a record carries the scene, the commit, the date and the hash of both files', () => {

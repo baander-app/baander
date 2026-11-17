@@ -3,7 +3,10 @@
 // with a genre chosen and the search box. Every choice the pictures show is made here, and the
 // listening history the home page needs is added only when it is not there yet, so a later run
 // photographs the same state.
-import { albumCard, closeSidePanel, openFromSidebar, pausePlayback, playSong, seekTo } from '../application.mjs';
+import {
+  albumCard, awaitedLater, closeSidePanel, detailsPanel, openAlbums, openFromSidebar, pausePlayback, playSong, restPointer, seekTo,
+} from '../application.mjs';
+import { LISTENER } from '../checks.mjs';
 import { buildManifest } from '../library-manifest.mjs';
 
 // The songs the home page's "Recently Played" row begins with, the newest first: one from each of
@@ -30,7 +33,6 @@ const SEARCH = 'stat';
 
 const row = (page, title) => page.locator('main section').filter({ has: page.getByRole('heading', { name: title, exact: true }) });
 const column = (page, title) => page.getByRole('listbox', { name: title, exact: true });
-const panel = page => page.getByRole('complementary').filter({ has: page.getByRole('tab', { name: 'Details', exact: true }) });
 const searchBox = page => page.getByRole('dialog').filter({ has: page.getByPlaceholder('Search albums, artists, songs...') });
 
 const isPlayRecord = response => new URL(response.url()).pathname === '/api/activity/play' && response.request().method() === 'POST';
@@ -39,7 +41,7 @@ const isHistoryRead = response => new URL(response.url()).pathname === '/api/act
 // Plays a song until the application has recorded the play, then pauses it. A play counts as
 // soon as the song starts; how long it runs makes no difference.
 async function listenTo(page, song) {
-  const recorded = page.waitForResponse(isPlayRecord);
+  const recorded = awaitedLater(page.waitForResponse(isPlayRecord));
   await playSong(page, song);
   if (!(await recorded).ok()) throw new Error(`The application did not record that ${song.title} was played.`);
   await pausePlayback(page);
@@ -76,7 +78,7 @@ async function historyAfterListeningTo(page, song) {
 
 export default {
   name: 'library',
-  account: 'maja@baander.app',
+  account: LISTENER,
   steps: [
     {
       // The row lists the ten songs played last, newest first, one card for each song. The newest
@@ -113,8 +115,7 @@ export default {
     {
       title: 'Open Albums',
       run: async ({ page }) => {
-        await openFromSidebar(page, 'Albums', '/music/albums');
-        await page.getByRole('heading', { name: 'Albums', exact: true, level: 1 }).waitFor();
+        await openAlbums(page);
         await closeSidePanel(page);
         for (const album of FIRST_TWO_ROWS) await albumCard(page, album).waitFor();
       },
@@ -132,11 +133,11 @@ export default {
       title: 'Look inside an album',
       run: async ({ page }) => {
         await albumCard(page, OPENED_ALBUM).click();
-        await panel(page).getByRole('img', { name: OPENED_ALBUM, exact: true }).waitFor();
-        await panel(page).getByRole('button', { name: 'Open', exact: true }).waitFor();
+        await detailsPanel(page).getByRole('img', { name: OPENED_ALBUM, exact: true }).waitFor();
+        await detailsPanel(page).getByRole('button', { name: 'Open', exact: true }).waitFor();
         // The panel opened where the cover lay, so the pointer rests on one of its tracks and
         // marks it. It is moved off here, well before the picture, so the mark has faded.
-        await page.mouse.move(0, 0);
+        await restPointer(page);
       },
     },
     {
@@ -145,8 +146,8 @@ export default {
       kind: 'crop',
       margin: 10,
       region: ({ page }) => [
-        panel(page).getByRole('img', { name: OPENED_ALBUM, exact: true }),
-        panel(page).getByRole('button', { name: 'Open', exact: true }),
+        detailsPanel(page).getByRole('img', { name: OPENED_ALBUM, exact: true }),
+        detailsPanel(page).getByRole('button', { name: 'Open', exact: true }),
       ],
     },
     {
@@ -174,10 +175,10 @@ export default {
       title: 'Search for a name',
       run: async ({ page }) => {
         // The box asks for artists, albums and songs separately, a moment after the last letter.
-        const answers = Promise.all(['/api/artists/', '/api/albums/', '/api/songs/'].map(path => page.waitForResponse((response) => {
+        const answers = awaitedLater(Promise.all(['/api/artists/', '/api/albums/', '/api/songs/'].map(path => page.waitForResponse((response) => {
           const url = new URL(response.url());
           return url.pathname === path && url.searchParams.get('q') === SEARCH;
-        })));
+        }))));
         await page.keyboard.press('Control+k');
         await searchBox(page).getByPlaceholder('Search albums, artists, songs...').waitFor();
         await page.keyboard.type(SEARCH);

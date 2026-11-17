@@ -43,11 +43,6 @@ export async function takeFocusOffControls(dialog) {
   await dialog.getByRole('heading').first().click();
 }
 
-/** Moves the pointer to the corner of the window, so that no control is drawn hovered in the picture that follows. */
-export async function restPointer(page) {
-  await page.mouse.move(0, 0);
-}
-
 /** Opens the server settings from the administration's sidebar and waits until their groups are listed. */
 export async function openServerSettings(page) {
   await openFromSidebar(page, 'Settings', '/admin/settings');

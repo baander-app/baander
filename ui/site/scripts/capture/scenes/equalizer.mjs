@@ -2,7 +2,10 @@
 // play a song, open the equalizer, start from a preset and save a profile. Every setting the
 // pictures show is set here to a stated value, and the two device profiles are found by name
 // before they are created, so a later run photographs the same state.
-import { bringIntoView, card, isPlaying, openFromSidebar, pausePlayback, playSong, scrollToTop, setSlider } from '../application.mjs';
+import {
+  answerTo, bringIntoView, card, closeSidePanel, isPlaying, openFromSidebar, pausePlayback, playSong, requireStored, scrollToTop, setSlider,
+} from '../application.mjs';
+import { LISTENER } from '../checks.mjs';
 
 // The track of constant tones, one on each band of the equalizer, so the analyser stands still.
 const SONG = { album: 'Midnight Transit', title: 'Standing Wave' };
@@ -14,15 +17,11 @@ const CHANGED_BAND = { label: '1K', point: 6, gain: 3 };
 const analyser = page => page.getByRole('region', { name: 'Input analyzer', exact: true });
 const pressed = async button => await button.getAttribute('aria-pressed') === 'true';
 
-// The application's answer to a request about the account's device profiles. When the server
-// refuses one, the application keeps the profile in the window only, which no later run would find.
-function profileAnswer(page, method, path) {
-  return page.waitForResponse(response => path.test(new URL(response.url()).pathname) && response.request().method() === method);
-}
-
-async function requireStored(answer, what) {
-  if (!(await answer).ok()) throw new Error(`The application did not store ${what}.`);
-}
+// The cards of the three views that are taken twice, as a crop of the cards and as a whole window
+// with the cards in view.
+const compareCards = page => [card(page, 'Equalizer'), card(page, 'A/B Compare')];
+const curveCards = page => [card(page, 'Equalizer')];
+const dynamicsCards = page => [card(page, 'Processing')];
 
 // One module of the Processing card: the button with its name, which opens its controls, and the
 // button beside it that bypasses or enables it.
@@ -38,7 +37,7 @@ async function setModuleEnabled(page, name, enabled) {
 
 export default {
   name: 'equalizer',
-  account: 'maja@baander.app',
+  account: LISTENER,
   steps: [
     {
       title: 'Play a song',
@@ -48,13 +47,12 @@ export default {
       title: 'Open the equalizer',
       run: async ({ page }) => {
         // The page reads the account's device profiles as it opens; a profile is looked for only once the list shows them all.
-        const profilesRead = profileAnswer(page, 'GET', /^\/api\/user\/eq-profiles\/$/);
+        const profilesRead = answerTo(page, 'GET', /^\/api\/user\/eq-profiles\/$/);
         await openFromSidebar(page, 'Equalizer', '/equalizer');
         const stored = (await (await profilesRead).json()).data.length;
         if (stored > 0) await card(page, 'Device Profiles').getByRole('button', { name: 'Save', exact: true }).nth(stored - 1).waitFor();
         // The equalizer's cards stand side by side only when the panel beside the page is closed.
-        const closePanel = page.getByRole('button', { name: 'Close context panel', exact: true });
-        if (await closePanel.isVisible()) await closePanel.click();
+        await closeSidePanel(page);
         const spectrum = analyser(page).getByRole('button', { name: 'Spectrum', exact: true });
         if (!await pressed(spectrum)) await spectrum.click();
       },
@@ -68,7 +66,8 @@ export default {
           await profiles.getByRole('button', { name: '+ New', exact: true }).click();
           await profiles.getByPlaceholder('Profile name').fill(name);
           await profiles.getByTitle(icon, { exact: true }).click();
-          const created = profileAnswer(page, 'POST', /^\/api\/user\/eq-profiles\/$/);
+          // When the server refuses a profile, the application keeps it in this window only, where no later run would find it.
+          const created = answerTo(page, 'POST', /^\/api\/user\/eq-profiles\/$/);
           await profiles.getByRole('button', { name: 'Create', exact: true }).click();
           await requireStored(created, `the profile ${name}`);
           await profiles.getByText(name, { exact: true }).waitFor();
@@ -127,7 +126,7 @@ export default {
       title: 'Save a profile',
       run: async ({ page }) => {
         for (const { name } of PROFILES) {
-          const saved = profileAnswer(page, 'PUT', /^\/api\/user\/eq-profiles\/[^/]+$/);
+          const saved = answerTo(page, 'PUT', /^\/api\/user\/eq-profiles\/[^/]+$/);
           await card(page, 'Device Profiles').getByText(name, { exact: true }).locator('xpath=..').getByRole('button', { name: 'Save', exact: true }).click();
           await requireStored(saved, `the settings of the profile ${name}`);
         }
@@ -136,8 +135,14 @@ export default {
     {
       picture: 'equalizer-compare',
       kind: 'crop',
-      region: ({ page }) => [card(page, 'Equalizer'), card(page, 'A/B Compare')],
-      before: ({ page }) => bringIntoView(page, card(page, 'Equalizer'), card(page, 'A/B Compare')),
+      region: ({ page }) => compareCards(page),
+      before: ({ page }) => bringIntoView(page, ...compareCards(page)),
+    },
+    {
+      // The same view as a whole window, for the homepage, whose frame has a window's proportions.
+      picture: 'equalizer-window-compare',
+      kind: 'window',
+      before: ({ page }) => bringIntoView(page, ...compareCards(page)),
     },
     {
       picture: 'equalizer-device-profiles',
@@ -157,14 +162,24 @@ export default {
     {
       picture: 'equalizer-curve',
       kind: 'crop',
-      region: ({ page }) => [card(page, 'Equalizer')],
-      before: ({ page }) => bringIntoView(page, card(page, 'Equalizer')),
+      region: ({ page }) => curveCards(page),
+      before: ({ page }) => bringIntoView(page, ...curveCards(page)),
+    },
+    {
+      picture: 'equalizer-window-curve',
+      kind: 'window',
+      before: ({ page }) => bringIntoView(page, ...curveCards(page)),
     },
     {
       picture: 'equalizer-dynamics',
       kind: 'crop',
-      region: ({ page }) => [card(page, 'Processing')],
-      before: ({ page }) => bringIntoView(page, card(page, 'Processing')),
+      region: ({ page }) => dynamicsCards(page),
+      before: ({ page }) => bringIntoView(page, ...dynamicsCards(page)),
+    },
+    {
+      picture: 'equalizer-window-dynamics',
+      kind: 'window',
+      before: ({ page }) => bringIntoView(page, ...dynamicsCards(page)),
     },
   ],
 };

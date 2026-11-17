@@ -4,10 +4,11 @@
 // library, scanned, so the scene stops short of the two buttons that would change it: it leaves
 // the form without choosing Create and the scan dialog without choosing Start Scan. The last
 // picture shows the server settings that would look names up at a provider, which stay off.
-import { bringIntoView, openFromSidebar } from '../application.mjs';
+import { bringIntoView, openFromSidebar, restPointer } from '../application.mjs';
 import {
-  dialogNamed, openAdministration, openServerSettings, requireSettings, restPointer, settingsGroup, tabPanel, takeFocusOffControls,
+  dialogNamed, openAdministration, openServerSettings, requireSettings, settingsGroup, tabPanel, takeFocusOffControls,
 } from '../administration-steps.mjs';
+import { ADMINISTRATOR } from '../checks.mjs';
 
 // The sample library as the preview registers it: its name, and the path of its directory inside
 // the containers. The directory's path on the host names a home directory, so a page that printed
@@ -28,7 +29,7 @@ async function requirePath(printed) {
 
 export default {
   name: 'libraries',
-  account: 'signe@baander.app',
+  account: ADMINISTRATOR,
   steps: [
     {
       title: 'Open the library administration',

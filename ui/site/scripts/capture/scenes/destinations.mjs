@@ -5,7 +5,8 @@
 // the pictures are the ones Chromium and Firefox give by themselves; the second Chromium in the
 // list is the window the capture chooses the theme in. The song and the position it is paused on
 // are stated here, and the scene ends as it began, with playback in the first browser, paused.
-import { closeSidePanel, keepStoredSettings, pausePlayback, playSong, seekTo } from '../application.mjs';
+import { closeMenu, closeSidePanel, keepStoredSettings, pausePlayback, playSong, playerBar, seekTo } from '../application.mjs';
+import { LISTENER } from '../checks.mjs';
 
 // The first song in the list of an album with four songs. The list ends above the place where
 // the menu opens, so no line of it runs behind the menu's upper edge, and the line that marks
@@ -21,7 +22,6 @@ const RETURN = 'Return playback to this browser';
 const BEFORE_THE_MOVE = ['This browser — Active', THEME_WINDOW, OTHER_BROWSER];
 const AFTER_THE_MOVE = ['This browser', THEME_WINDOW, `${OTHER_BROWSER} — Active`, RETURN];
 
-const playerBar = page => page.getByLabel('Playback', { exact: true });
 // The screen icon beside the volume. It is found in the page itself: while its menu is open the
 // application hides the page behind the menu from the accessibility tree.
 const destinationButton = page => page.locator('[aria-label="Playback destination"]');
@@ -44,11 +44,6 @@ async function openMenu(page, entries) {
   });
 }
 
-async function closeMenu(page) {
-  await page.keyboard.press('Escape');
-  await page.getByRole('menu').waitFor({ state: 'hidden' });
-}
-
 // Two browsers of one account may each ask which version of the settings to keep once a song plays.
 async function answerSettingsQuestions(...windows) {
   for (const window of windows) await keepStoredSettings(window, 1000);
@@ -65,7 +60,7 @@ const menuOverBarEnd = page => [
 
 export default {
   name: 'destinations',
-  account: 'maja@baander.app',
+  account: LISTENER,
   otherBrowsers: ['firefox'],
   steps: [
     {

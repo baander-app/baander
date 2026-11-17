@@ -1,7 +1,9 @@
 // What a capture does in the application's interface, written against the labels a visitor
-// sees: opening a window, signing in, moving between pages, starting and pausing playback and
-// choosing a theme. Nothing here intercepts a request, injects a style or script that changes
-// what the application shows, or edits the page; the page is only read and operated.
+// sees: opening a window, signing in and answering the question about which settings to keep,
+// moving between pages, reading the catalog, starting, pausing and seeking playback, scrolling,
+// setting sliders and choosing a theme. Nothing here intercepts a request, injects a style or
+// script that changes what the application shows, or edits the page; the page is only read and
+// operated.
 
 // The size every picture is taken at: the website's content column, at twice the pixel density.
 export const WINDOW = { width: 1136, height: 710 };
@@ -17,7 +19,22 @@ export const THEMES = {
 const COVER_REQUEST = /^\/api\/(images\/|(albums|artists)\/[^/]+\/cover$)/;
 const PREFERENCE_READS = ['/api/user/audio-preferences/', '/api/user/player-preferences/', '/api/user/layout-preferences/'];
 
+// How many times one call answers the question about the settings before it gives up.
+const SETTINGS_ANSWERS = 5;
+
 const pathOf = message => new URL(message.url()).pathname;
+
+/**
+ * Attaches a handler that does nothing to a promise and returns the same promise, so awaiting it
+ * still throws. It is for a promise made before the action that fulfils it, such as the wait for
+ * an answer to a press. When that action throws, nothing awaits the promise any more; it rejects
+ * as the browser closes, and without a handler Node reports that rejection instead of the
+ * step's own error.
+ */
+export function awaitedLater(promise) {
+  promise.catch(() => {});
+  return promise;
+}
 
 /**
  * Opens an application window of the picture size in a browser context of its own.
@@ -41,13 +58,19 @@ export async function openWindow(browser, baseURL, deviceScaleFactor = SCALE) {
     if (COVER_REQUEST.test(pathOf(asked(request)))) covers.pending.add(asked(request));
   });
   page.on('requestfinished', async (request) => {
-    const first = asked(request);
-    if (!covers.pending.has(first)) return;
-    const response = await request.response();
-    if (response.status() >= 300 && response.status() < 400) return;
-    covers.pending.delete(first);
-    if (response.ok()) covers.failed.delete(pathOf(first));
-    else covers.failed.set(pathOf(first), `answered ${response.status()}`);
+    // Nothing awaits this listener. A window that closes while the answer is being read has no
+    // answer to give, and Node would report that failure instead of the error that ended the run.
+    try {
+      const first = asked(request);
+      if (!covers.pending.has(first)) return;
+      const response = await request.response();
+      if (response.status() >= 300 && response.status() < 400) return;
+      covers.pending.delete(first);
+      if (response.ok()) covers.failed.delete(pathOf(first));
+      else covers.failed.set(pathOf(first), `answered ${response.status()}`);
+    } catch {
+      // The cover stays pending, which stops a picture of a window that is still open.
+    }
   });
   page.on('requestfailed', (request) => {
     const first = asked(request);
@@ -66,16 +89,15 @@ export async function signIn(page, { email, password }) {
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
   await page.getByLabel('Email', { exact: true }).fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
-  const preferencesRead = Promise.all(PREFERENCE_READS.map(path => page.waitForResponse(
-    response => pathOf(response) === path && response.request().method() === 'GET',
-  )));
   // A refused sign-in is reported below; the reads it never made must not be reported as well.
-  preferencesRead.catch(() => {});
+  const preferencesRead = awaitedLater(Promise.all(PREFERENCE_READS.map(path => page.waitForResponse(
+    response => pathOf(response) === path && response.request().method() === 'GET',
+  ))));
   // The first attempt may be answered with a nonce to prove possession with; the application retries by itself.
-  const answered = page.waitForResponse(async (response) => {
+  const answered = awaitedLater(page.waitForResponse(async (response) => {
     if (pathOf(response) !== '/api/auth/login' || response.request().method() !== 'POST') return false;
     return !(response.status() === 400 && response.headers()['dpop-nonce']);
-  });
+  }));
   await page.getByRole('button', { name: 'Log in', exact: true }).click();
   const response = await answered;
   if (response.status() === 429) {
@@ -96,15 +118,18 @@ export async function signIn(page, { email, password }) {
  * Answers the application's question about which version of the settings to keep, when it asks
  * within `patience` milliseconds, by choosing the one the account has stored. A window asks after
  * signing in, and a second window of an account may ask when the first changes a setting or
- * starts a song.
+ * starts a song. A question that is asked again after it was answered five times stops the run.
  */
 export async function keepStoredSettings(page, patience) {
   const question = page.getByRole('dialog').filter({ hasText: 'Settings conflict' });
-  for (;;) {
+  for (let answers = 0; ; answers += 1) {
     try {
       await question.waitFor({ timeout: patience });
     } catch {
       return;
+    }
+    if (answers === SETTINGS_ANSWERS) {
+      throw new Error(`The "Settings conflict" dialog kept reappearing: it was answered ${SETTINGS_ANSWERS} times and opened again.`);
     }
     await question.getByRole('button', { name: 'Use server version', exact: true }).click();
     await question.waitFor({ state: 'hidden' });
@@ -126,6 +151,12 @@ export async function openFromSidebar(page, name, path) {
   await page.waitForURL(url => url.pathname === path);
 }
 
+/** Follows the sidebar's Albums link and waits until the Albums page shows its heading. */
+export async function openAlbums(page) {
+  await openFromSidebar(page, 'Albums', '/music/albums');
+  await page.getByRole('heading', { name: 'Albums', exact: true, level: 1 }).waitFor();
+}
+
 /** A card on the page, by its title. */
 export function card(page, title) {
   return page.locator('main [data-slot="card"]').filter({ has: page.locator('[data-slot="card-title"]').getByText(title, { exact: true }) });
@@ -140,7 +171,7 @@ export async function readCatalog(page) {
     const url = new URL(response.url());
     return url.pathname === path && url.searchParams.get('limit') === '100' && response.request().method() === 'GET';
   });
-  const answers = Promise.all([listing('/api/artists/'), listing('/api/albums/')]);
+  const answers = awaitedLater(Promise.all([listing('/api/artists/'), listing('/api/albums/')]));
   await openFromSidebar(page, 'Songs', '/music/songs');
   const [artists, albums] = await Promise.all((await answers).map(answer => answer.json()));
   return {
@@ -152,7 +183,25 @@ export async function readCatalog(page) {
   };
 }
 
-const playerBar = page => page.getByLabel('Playback', { exact: true });
+/**
+ * The application's answer to its next request with this method whose path matches `path`: a read
+ * that a step goes by, or a change that `requireStored` then checks. It is asked for before the
+ * press that sends the request and awaited after it.
+ */
+export function answerTo(page, method, path) {
+  return awaitedLater(page.waitForResponse(response => path.test(new URL(response.url()).pathname) && response.request().method() === method));
+}
+
+/**
+ * Stops the run unless the answer says that the application stored `what`. A change it refused
+ * shows in the window at most, so the pictures of every later run would lack it.
+ */
+export async function requireStored(answer, what) {
+  if (!(await answer).ok()) throw new Error(`The application did not store ${what}.`);
+}
+
+// The player bar, by the label the application gives it.
+export const playerBar = page => page.getByLabel('Playback', { exact: true });
 
 /**
  * Starts a song from its beginning on the Songs page and waits until it plays.
@@ -162,12 +211,7 @@ const playerBar = page => page.getByLabel('Playback', { exact: true });
  */
 export async function playSong(page, { album, title }) {
   await openFromSidebar(page, 'Songs', '/music/songs');
-  const destination = playerBar(page).getByRole('button', { name: 'Playback destination', exact: true });
-  if (await destination.count() > 0 && await destination.getAttribute('title') === 'Previous playback is unconfirmed.') {
-    await destination.click();
-    await page.getByRole('menuitem', { name: 'Play here anyway', exact: true }).click();
-    await page.getByRole('menu').waitFor({ state: 'hidden' });
-  }
+  await playHere(page);
   await page.getByRole('listbox', { name: 'Album', exact: true }).getByRole('option', { name: album }).click();
   await page.locator('main').getByText(title, { exact: true }).dblclick();
   await playerBar(page).getByRole('button', { name: 'Pause', exact: true }).waitFor();
@@ -189,8 +233,9 @@ export async function pausePlayback(page) {
 
 /**
  * Ends the hold that a browser which closed while it played keeps on the account's playback, with
- * the application's own "Play here anyway", for a scene that starts playback elsewhere than on
- * the Songs page. Without a hold it does nothing.
+ * the application's own "Play here anyway", on the page that is open. `playSong` does this on the
+ * Songs page before it starts its song; a scene that starts playback elsewhere calls it first.
+ * Without a hold it does nothing.
  */
 export async function playHere(page) {
   const destination = playerBar(page).getByRole('button', { name: 'Playback destination', exact: true });
@@ -231,6 +276,22 @@ export async function closeSidePanel(page) {
   const close = page.getByRole('button', { name: 'Close context panel', exact: true });
   if (await close.isVisible()) await close.click();
   await close.waitFor({ state: 'hidden' });
+}
+
+/** The panel beside the page, found by its Details tab. */
+export function detailsPanel(page) {
+  return page.getByRole('complementary').filter({ has: page.getByRole('tab', { name: 'Details', exact: true }) });
+}
+
+/** Closes the open menu with the Escape key and waits until it is gone. */
+export async function closeMenu(page) {
+  await page.keyboard.press('Escape');
+  await page.getByRole('menu').waitFor({ state: 'hidden' });
+}
+
+/** Moves the pointer to the corner of the window, so that no control is drawn hovered in the picture that follows. */
+export async function restPointer(page) {
+  await page.mouse.move(0, 0);
 }
 
 /**

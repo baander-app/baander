@@ -3,13 +3,12 @@
 // the Scheduler tab, and open Library access for a listener under Security. The scene changes
 // nothing: it leaves the Library access dialog with Cancel, and starts, retries, pauses and
 // deletes no job.
-import { WINDOW, openFromSidebar } from '../application.mjs';
-import { dialogNamed, openAdministration, openTab, restPointer, tabPanel, takeFocusOffControls } from '../administration-steps.mjs';
+import { WINDOW, awaitedLater, openFromSidebar, restPointer } from '../application.mjs';
+import { dialogNamed, openAdministration, openTab, tabPanel, takeFocusOffControls } from '../administration-steps.mjs';
+import { ADMINISTRATOR, LISTENER } from '../checks.mjs';
 
 // The job whose details are shown: the scan of the sample library.
 const JOB = 'ScanLibraryCommand';
-// The listener whose library access is shown.
-const LISTENER = 'maja@baander.app';
 
 // The table of scheduled jobs: the line of column headings and every row under it.
 const scheduledJobs = page => tabPanel(page, 'Scheduler').getByText('Expression', { exact: true }).locator('xpath=../..');
@@ -19,7 +18,7 @@ let jobsShown;
 
 export default {
   name: 'administration',
-  account: 'signe@baander.app',
+  account: ADMINISTRATOR,
   steps: [
     {
       title: 'Open the administration',
@@ -56,10 +55,10 @@ export default {
       title: 'Find a job and open its details',
       run: async ({ page }) => {
         const jobs = tabPanel(page, 'Jobs');
-        const listed = page.waitForResponse((response) => {
+        const listed = awaitedLater(page.waitForResponse((response) => {
           const url = new URL(response.url());
           return url.pathname === '/api/monitor/jobs' && url.searchParams.get('name') === JOB;
-        });
+        }));
         await jobs.getByPlaceholder('Filter by name...').fill(JOB);
         await listed;
         await jobs.getByTitle(JOB, { exact: true }).first().click();

@@ -46,11 +46,16 @@ const RECORD = join(ROOT, 'ui/site/features/captures.json');
 const SCRATCH = join(ROOT, 'var/site-capture');
 const ACCOUNTS_FILE = join(SCRATCH, 'accounts.json');
 const run = promisify(execFile);
+// How long a console command may take, in seconds.
+const CONSOLE_TIME_LIMIT = 120;
 
 // A picture the driver will not take, with the reason; the run goes on with the next picture.
 class NotReady extends Error {}
 
-/** Runs a console command in the preview's application container and returns what it printed. */
+/**
+ * Runs a console command in the preview's application container and returns what it printed. A
+ * command that takes longer than the time limit is stopped and reported.
+ */
 async function consoleCommand(words, input = '') {
   const quoted = words.map(word => (/^[\w@.:=/-]+$/.test(word) ? word : `'${word}'`));
   const child = spawn('make', ['--no-print-directory', 'exec', `cmd=php bin/console ${quoted.join(' ')}`], { cwd: ROOT, stdio: 'pipe' });
@@ -59,7 +64,17 @@ async function consoleCommand(words, input = '') {
   child.stdout.on('data', (chunk) => { printed += chunk; });
   child.stderr.on('data', (chunk) => { complaints += chunk; });
   child.stdin.end(input);
-  const code = await new Promise((done, failed) => child.on('error', failed).on('close', done));
+  let limit;
+  const code = await new Promise((done, failed) => {
+    child.on('error', failed).on('close', done);
+    limit = setTimeout(() => {
+      child.kill();
+      // What Make started may outlive it and keep its output open, so the end of that output is not waited for.
+      child.stdout.destroy();
+      child.stderr.destroy();
+      failed(new Error(`The console command ${words[0]} did not finish in ${CONSOLE_TIME_LIMIT} seconds and was stopped.`));
+    }, CONSOLE_TIME_LIMIT * 1000);
+  }).finally(() => clearTimeout(limit));
   if (code !== 0) {
     throw new Error(`The console command ${words[0]} failed (exit ${code}): ${(complaints || printed).trim()}`);
   }
@@ -225,6 +240,20 @@ async function takePair(session, step, scene) {
   return { name: step.picture, scene: scene.name, kind: step.kind, width, height, ...shots };
 }
 
+/**
+ * Stops the run unless ffmpeg is installed and has the libwebp encoder. The pictures are encoded
+ * only after every scene has been taken, which is too late to learn that they cannot be.
+ */
+async function requireEncoder() {
+  const { stdout: encoders } = await run('ffmpeg', ['-hide_banner', '-encoders']).catch((error) => {
+    throw new Error(`The pictures are encoded with ffmpeg, which could not be run: ${error.message}`);
+  });
+  // Each encoder is listed on a line of its own, as its capabilities, its name and a description.
+  if (!/^\s*\S+\s+libwebp\s/m.test(encoders)) {
+    throw new Error('The pictures are encoded as WebP, and this ffmpeg has no libwebp encoder.');
+  }
+}
+
 const pixels = async file => (await run('ffmpeg', ['-v', 'error', '-i', file, '-f', 'rawvideo', '-pix_fmt', 'rgba', 'pipe:1'], { encoding: 'buffer', maxBuffer: 2 ** 28 })).stdout;
 
 /** Writes a capture as a lossless WebP and requires that it decodes to the pixels the browser drew. */
@@ -247,9 +276,13 @@ async function main() {
   }
   const out = values.out ? resolve(values.out) : PICTURES;
   const recordFile = values.out ? join(out, 'captures.json') : RECORD;
+  await requireEncoder();
   const commit = await applicationCommit();
   const passwords = await ensureAccounts();
   refuseOver(await previewProblems());
+  // A directory that cannot be made stops the run here, before any browser has opened.
+  await mkdir(join(SCRATCH, 'work'), { recursive: true });
+  await mkdir(out, { recursive: true });
 
   const browser = await chromium.launch({ args: ['--mute-audio'] });
   const browsers = [browser];
@@ -308,13 +341,13 @@ async function main() {
       }
     }
   } finally {
+    // A window that cannot leave or a browser that cannot close must not take the place of the
+    // error that ended the run, and every browser is asked to close whatever the others answer.
     const windows = browsers.flatMap(each => each.contexts()).flatMap(context => context.pages());
-    await Promise.all(windows.map(window => leave(window).catch(() => {})));
-    await Promise.all(browsers.map(each => each.close()));
+    await Promise.allSettled(windows.map(window => leave(window)));
+    await Promise.allSettled(browsers.map(each => each.close()));
   }
 
-  await mkdir(join(SCRATCH, 'work'), { recursive: true });
-  await mkdir(out, { recursive: true });
   const date = new Date().toISOString().slice(0, 10);
   const entries = {};
   for (const pair of pairs) {

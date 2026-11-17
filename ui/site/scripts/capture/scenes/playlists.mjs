@@ -9,9 +9,12 @@
 // playlist lacks it, so a later run photographs the same state. The web application can neither
 // remove a song from a playlist nor move one, so the scene stops when the playlist holds anything
 // but the beginning of the songs listed here.
-import { albumCard, closeSidePanel, openFromSidebar, pausePlayback, playHere, seekTo, songInPlayer } from '../application.mjs';
+import {
+  albumCard, answerTo, closeSidePanel, detailsPanel, openAlbums, openFromSidebar, pausePlayback, playHere, playerBar, requireStored,
+  restPointer, seekTo, songInPlayer,
+} from '../application.mjs';
+import { LISTENER, SECOND_LISTENER } from '../checks.mjs';
 
-const OTHER_LISTENER = 'jonas@baander.app';
 const PLAYLIST = { name: 'Evening listening', description: 'A few favourites for the end of the day.' };
 // Two more playlists of the listener, so the dialog that adds a song has a list to choose from.
 const OTHER_PLAYLISTS = [{ name: 'Slow Sundays' }, { name: 'On the road' }];
@@ -41,8 +44,6 @@ const POSITION = 52;
 // The second listener's public id, as his own Share dialog shows it: read in one step, pasted in a later one.
 let othersPublicId = null;
 
-const playerBar = page => page.getByLabel('Playback', { exact: true });
-const panel = page => page.getByRole('complementary').filter({ has: page.getByRole('tab', { name: 'Details', exact: true }) });
 // The playlists on the Playlists page, and one of them by its name.
 const listed = page => page.locator('main a[href^="/music/playlists/"]');
 const playlist = (page, name) => listed(page).filter({ has: page.getByText(name, { exact: true }) });
@@ -51,16 +52,6 @@ const songTitles = page => page.locator('main ul > li > div > p:first-child').al
 const dialog = (page, title) => page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: title, exact: true }) });
 const editSwitch = page => dialog(page, 'Share playlist').getByRole('switch', { name: 'Let collaborators edit', exact: true });
 const collaborators = page => dialog(page, 'Share playlist').getByRole('list', { name: 'Collaborators', exact: true }).locator('code');
-
-// The application's answer to a change of a playlist. A change it refused would be missing from
-// the pictures and from every later run.
-function answerTo(page, method, path) {
-  return page.waitForResponse(response => path.test(new URL(response.url()).pathname) && response.request().method() === method);
-}
-
-async function requireStored(answer, what) {
-  if (!(await answer).ok()) throw new Error(`The application did not store ${what}.`);
-}
 
 function requireSongs(held, wanted) {
   if (held.join('\n') !== titlesOf(wanted).join('\n')) {
@@ -121,11 +112,10 @@ async function closeDialog(page) {
 
 /** Opens an album's page: a press on its cover on the Albums page shows it in the panel, whose "Open" leads there. */
 async function openAlbum(page, title) {
-  await openFromSidebar(page, 'Albums', '/music/albums');
-  await page.getByRole('heading', { name: 'Albums', exact: true, level: 1 }).waitFor();
+  await openAlbums(page);
   await albumCard(page, title).click();
-  await panel(page).getByRole('img', { name: title, exact: true }).waitFor();
-  await panel(page).getByRole('button', { name: 'Open', exact: true }).click();
+  await detailsPanel(page).getByRole('img', { name: title, exact: true }).waitFor();
+  await detailsPanel(page).getByRole('button', { name: 'Open', exact: true }).click();
   await page.waitForURL(url => /^\/music\/albums\/[^/]+$/.test(url.pathname));
 }
 
@@ -147,7 +137,7 @@ async function addSong(page, { album, title }, name) {
 
 export default {
   name: 'playlists',
-  account: 'maja@baander.app',
+  account: LISTENER,
   steps: [
     {
       title: 'Create the playlists',
@@ -168,7 +158,7 @@ export default {
     },
     {
       title: 'The second listener creates a playlist of his own and reads his public id in its Share dialog',
-      account: OTHER_LISTENER,
+      account: SECOND_LISTENER,
       run: async ({ page }) => {
         await openPlaylists(page);
         await createUnlessListed(page, OWN_PLAYLIST);
@@ -200,7 +190,7 @@ export default {
     },
     {
       title: 'The second listener opens the shared playlist and adds a song unless it is there',
-      account: OTHER_LISTENER,
+      account: SECOND_LISTENER,
       run: async ({ page }) => {
         await openPlaylist(page, PLAYLIST.name);
         // A collaborator's page of the playlist has "Leave playlist" where the owner's has "Share".
@@ -249,7 +239,7 @@ export default {
         // dialog's own description, which does nothing, takes the cursor out, and the pointer is
         // moved off the list here, well before the picture, so no playlist stays marked.
         await dialog(page, 'Add to Playlist').getByText('Choose an existing playlist or create a new one.', { exact: true }).click();
-        await page.mouse.move(0, 0);
+        await restPointer(page);
       },
     },
     {
@@ -266,7 +256,7 @@ export default {
         await openShare(page, PLAYLIST.name);
         await collaborators(page).getByText(othersPublicId, { exact: true }).waitFor();
         await editSwitch(page).and(page.locator('[aria-checked="true"]')).waitFor();
-        await page.mouse.move(0, 0);
+        await restPointer(page);
       },
     },
     {
@@ -282,7 +272,7 @@ export default {
     },
     {
       title: 'The second listener opens his Playlists page',
-      account: OTHER_LISTENER,
+      account: SECOND_LISTENER,
       run: async ({ page }) => {
         await openPlaylists(page);
         await playlist(page, PLAYLIST.name).getByText('Shared with you', { exact: true }).waitFor();
@@ -295,7 +285,7 @@ export default {
       // The heading with its "+" and the list, in which the shared playlist carries its label.
       picture: 'playlists-shared',
       kind: 'crop',
-      account: OTHER_LISTENER,
+      account: SECOND_LISTENER,
       margin: 8,
       region: ({ page }) => [
         page.getByRole('heading', { name: 'Playlists', exact: true, level: 1 }),

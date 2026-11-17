@@ -6,12 +6,18 @@ import { createHash } from 'node:crypto';
 // The slug of the only library the preview may have, the generated sample library.
 export const SAMPLE_LIBRARY = 'music';
 
+// The addresses of the sample accounts, by the part each has in the scenes: the listener, the
+// second listener, whom a playlist is shared with, and the administrator.
+export const LISTENER = 'maja@baander.app';
+export const SECOND_LISTENER = 'jonas@baander.app';
+export const ADMINISTRATOR = 'signe@baander.app';
+
 // The only accounts the preview may have. A listener is granted the sample library; an
 // administrator sees every library without a grant.
 export const SAMPLE_ACCOUNTS = [
-  { email: 'maja@baander.app', name: 'Maja Lind', roles: ['user'], library: SAMPLE_LIBRARY },
-  { email: 'jonas@baander.app', name: 'Jonas Lind', roles: ['user'], library: SAMPLE_LIBRARY },
-  { email: 'signe@baander.app', name: 'Signe Holm', roles: ['admin', 'super-admin'] },
+  { email: LISTENER, name: 'Maja Lind', roles: ['user'], library: SAMPLE_LIBRARY },
+  { email: SECOND_LISTENER, name: 'Jonas Lind', roles: ['user'], library: SAMPLE_LIBRARY },
+  { email: ADMINISTRATOR, name: 'Signe Holm', roles: ['admin', 'super-admin'] },
 ];
 
 // Server settings that would send sample names to a metadata or lyrics provider when on.
