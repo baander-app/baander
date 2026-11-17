@@ -22,7 +22,7 @@ include __DIR__ . '/header.php';
       ];
       include __DIR__ . '/screenshot.php';
       ?>
-      <figcaption>Music browsing and playback · Captured in Bånder</figcaption>
+      <figcaption><a href="/features/library/">Music browsing and playback</a> · Captured in Bånder</figcaption>
     </figure>
   </section>
 
@@ -31,6 +31,7 @@ include __DIR__ . '/header.php';
       <p class="eyebrow">The equalizer</p>
       <h2 id="equalizer-title">Find your sound.</h2>
       <p>Start with a preset or adjust the sound yourself. Compare settings and save profiles for the way you listen.</p>
+      <a class="text-action" href="/features/equalizer/">Read the equalizer page <span class="arrow" aria-hidden="true">→</span></a>
     </div>
     <div class="carousel-slides">
       <div class="experience-feature carousel-slide" id="eq-graphic" data-carousel-slide data-slide-title="Graphic EQ and input analyzer">
@@ -127,8 +128,9 @@ include __DIR__ . '/header.php';
     <div class="section-intro">
       <p class="eyebrow">Your playlists</p>
       <h2 id="playlists-title">Choose the songs.<br>Share the list.</h2>
-      <p>Pick the songs yourself and put them in the order you want. Each playlist has its own page to browse and play.</p>
-      <p>Share playlists with other people on your server, and choose whether collaborators can change the track list.</p>
+      <p>Pick the songs yourself. Each playlist has its own page to browse and play.</p>
+      <p>Share playlists with other people on your server, and choose whether collaborators can add songs.</p>
+      <a class="text-action" href="/features/playlists/">Read the playlists page <span class="arrow" aria-hidden="true">→</span></a>
     </div>
     <figure class="app-screenshot feature-screenshot">
       <?php
@@ -155,6 +157,7 @@ include __DIR__ . '/header.php';
         <aside class="feature-note" aria-label="Planned casting support">
           <p><strong>Planned: AirPlay, Chromecast and DLNA.</strong> Casting to these receivers is in development and isn't available yet.</p>
         </aside>
+        <a class="text-action" href="/features/destinations/">Read the destinations page <span class="arrow" aria-hidden="true">→</span></a>
       </div>
     </div>
     <figure class="app-screenshot feature-screenshot">

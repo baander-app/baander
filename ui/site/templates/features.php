@@ -33,6 +33,7 @@ include __DIR__ . '/header.php';
     <section class="home-section feature-columns" aria-labelledby="more-title">
       <div class="section-intro">
         <h2 id="more-title">More in Bånder</h2>
+        <p>Parts of Bånder without a tour page. Each links to a manual page with more about it.</p>
       </div>
       <ul class="feature-more">
         <?php foreach ($features['more'] as $entry): ?>

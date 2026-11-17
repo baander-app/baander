@@ -61,6 +61,10 @@ test('equalizer slides respond to controls and keyboard, and stay still without 
   await carousel.press('ArrowLeft');
   await active(2);
   await expect(carousel).toBeFocused();
+  // The link to the equalizer's own page belongs to the section, not to a slide, so it stays on show.
+  const tour = carousel.getByRole('link', { name: 'Read the equalizer page' });
+  await expect(tour).toBeVisible();
+  expect(await tour.evaluate((link) => link.closest('[data-carousel-slide]'))).toBeNull();
 });
 
 for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
@@ -99,6 +103,7 @@ test.describe('static homepage', () => {
       await expect(slides.nth(index).getByRole('heading')).toBeVisible();
       await loadedImage(slides.nth(index).getByRole('img'));
     }
+    await expect(page.locator('[data-carousel]').getByRole('link', { name: 'Read the equalizer page' })).toBeVisible();
   });
 });
 

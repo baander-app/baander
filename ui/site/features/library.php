@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 return [
     'name' => 'Music library',
-    'summary' => 'Browse your collection by artist, album, song and genre, and find anything in it by typing.',
+    'summary' => 'Browse your collection by artist, album, song and genre, and find an artist, album or song by typing.',
     'description' => "Bånder's music library: browse by artist, album, song and genre, return to what you played recently, and search from any page with Ctrl+K.",
     'headline' => 'Your collection,<br>ready to browse.',
     'lead' => [

@@ -78,6 +78,7 @@ code, kbd, samp, pre { font-family: var(--font-mono); }
 .feature-note { margin-top: 0; padding: 16px 20px; border-left: 2px solid var(--color-accent-text); background: var(--color-card); font-size: 14px; }
 .section-intro .feature-note p { margin: 0; color: var(--color-muted-foreground); }
 .feature-note strong { color: var(--color-foreground); font-weight: 600; }
+.feature-note + .text-action { margin-top: 24px; }
 .experience-feature-reversed .section-intro { order: 2; }
 .experience-feature-reversed .feature-screenshot { order: 1; }
 .carousel-intro { max-width: 640px; margin-bottom: 32px; }

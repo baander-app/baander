@@ -288,3 +288,36 @@ test('no picture on a feature page describes itself with an address of a develop
     for (const text of words) expect(text, path).not.toMatch(/baander\.test/);
   }
 });
+
+test('the homepage leads into the feature pages from its hero picture and from its equalizer, playlists and destinations sections', async ({ page }) => {
+  const links = [
+    { within: '.hero figcaption', name: 'Music browsing and playback', path: '/features/library/' },
+    { within: 'section[aria-labelledby="equalizer-title"] .carousel-intro', name: 'Read the equalizer page', path: '/features/equalizer/' },
+    { within: 'section[aria-labelledby="playlists-title"]', name: 'Read the playlists page', path: '/features/playlists/' },
+    { within: 'section[aria-labelledby="destinations-title"]', name: 'Read the destinations page', path: '/features/destinations/' },
+  ];
+  for (const { within, name, path } of links) {
+    await page.goto('/');
+    await page.locator(within).getByRole('link', { name }).click();
+    await expect(page, name).toHaveURL(new RegExp(`${path}$`));
+    await expect(page.locator('main h1'), name).toBeVisible();
+  }
+});
+
+test('every entry under More in Bånder links to a manual page the site serves, at a heading that exists', async ({ page }) => {
+  await page.goto('/features/');
+  const entries = page.locator('section[aria-labelledby="more-title"] .feature-more > li');
+  const targets = await entries.evaluateAll((items) => items.map((item) => ({
+    name: item.querySelector('h3')!.textContent!,
+    links: [...item.querySelectorAll('a')].map((link) => link.getAttribute('href')!),
+  })));
+  expect(targets.length).toBeGreaterThan(0);
+  for (const { name, links } of targets) {
+    expect(links, name).toHaveLength(1);
+    expect(links[0], name).toMatch(/^\/docs\//);
+    const response = await page.goto(links[0]);
+    expect(response?.status(), links[0]).toBe(200);
+    const fragment = new URL(links[0], 'https://baander.app').hash.slice(1);
+    if (fragment) await expect(page.locator(`[id="${fragment}"]`), links[0]).toHaveCount(1);
+  }
+});
