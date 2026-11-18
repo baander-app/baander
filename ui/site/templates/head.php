@@ -35,6 +35,9 @@ $image = $site['origin'] . SearchMetadata::SOCIAL_IMAGE;
     <script type="application/ld+json"><?= $meta->structuredData ?></script>
   <?php endif; ?>
   <link rel="icon" type="image/svg+xml" href="/assets/site/logo.svg">
+  <!-- Hold the first paint until the whole header has parsed: its menu markup is long, and a paint
+       part-way through it would show the header controls before the last of them arrives. -->
+  <link rel="expect" href="#header-end" blocking="render">
   <link rel="stylesheet" href="/assets/site/theme.css">
   <link rel="stylesheet" href="/assets/site/site.css">
   <?php if (isset($page['stylesheet'])): ?>

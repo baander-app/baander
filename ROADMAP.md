@@ -719,13 +719,15 @@ Verification on 2026-11-18, at `ad1c246f1` unless stated:
 
 Open items:
 
-- The two intermittent layout-shift failures above have no established cause. Later on
-  2026-11-18, with the same eight containers running on the host, `stability.spec.ts`
-  run three times passed 234 of 234 on `master` (`60fe9186d`, built in a separate
-  worktree) and 234 of 234 on this branch at `920b8ca4f`. Across both of the branch's
-  three-run batches it failed 1 of 468, and each failure was on a page this work did not
-  change. The host's known timing failures under load are the likely cause; a run on a
-  quiet host or in CI would settle it.
+- Resolved on 2026-11-18 in the commit after this record's first version: the
+  release build's browser run failed a layout-shift check at 390px on
+  `/features/console/`, and repeating it alone failed 4 of 25. The header's actions
+  grew from 52px to 112px after first paint: on a slow load the browser painted after
+  parsing the Menu disclosure but before the theme toggle, which follows the long
+  menu markup. The head now holds the first paint with `<link rel="expect"
+  href="#header-end" blocking="render">` until a marker after the header has parsed.
+  The same check then passed 25 of 25 and the full browser suite passed 219 of 219.
+  The other intermittent failures recorded above are not explained by this.
 - The Strategy and Concepts pages publish their source documents as they stand,
   including the competitor table in `STRATEGY.md` and the maintenance note at the top
   of `CONCEPTS.md`.

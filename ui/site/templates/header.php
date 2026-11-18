@@ -52,3 +52,4 @@ $menuColumns = static function (array $columns) use ($escape, $markCurrent): voi
     </div>
   </div>
 </header>
+<span id="header-end" hidden></span>
