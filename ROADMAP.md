@@ -264,8 +264,8 @@ that limitation is recorded for follow-up, with no runtime change in the 2026-10
 `052e8684d`) and the roadmap cleanup with its plan retirement. Landed on 2026-11-14:
 scan artist credits and MusicBrainz matching. The persistent instance ran `6912eaaf6`
 before that push and updates itself from `master`. The website was last published on
-2026-11-18: a local build of `464fad883`, deployed to production as
-`baander-1xz9pz3lx` and aliased to `https://baander.app`.
+2026-11-18: a local build of `1dec6bcc5`, deployed to production as
+`baander-2vuoa3grt` and aliased to `https://baander.app`.
 Pushed later on 2026-11-17, on top of `0660fb943`: party invitations (`3a666d381` to
 their roadmap record).
 Pushed later on 2026-11-15, on top of `23f899976`: the matching follow-ups
@@ -595,6 +595,18 @@ Verification on 2026-11-18, at `8bf62a06f` unless stated:
   pictures, a nested manual page, the search script, the sitemap and the social card
   returned 200, and an unknown URL returned 404. The live site serves the overview
   over HTTPS with HSTS.
+
+- Republication (2026-11-18): a local build of `1dec6bcc5` brings the site up to
+  `master`. It differs from the `464fad883` build only in
+  `docs-book/part-2-developer-guide/testing/frontend-and-browser.md`, changed in
+  `d4a78bf9b`; no `ui/site` file changed in between. The build made 243 manual
+  pages and passed all 207 tests of `corepack yarn test:browser`. It went to the
+  preview `baander-1pawf1v95` and then, unchanged, to production as
+  `baander-2vuoa3grt`, aliased to `https://baander.app`. On both, the homepage,
+  `/features/`, `/features/library/`, the changed manual page, the sitemap,
+  `robots.txt`, the search script and the social card returned 200, and an unknown
+  URL returned 404. The live site serves HTTPS with HSTS, and its copy of the
+  changed manual page is byte-identical to the build.
 
 Still to do:
 
