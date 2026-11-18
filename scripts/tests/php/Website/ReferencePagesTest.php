@@ -77,8 +77,9 @@ final class ReferencePagesTest extends TestCase
         self::assertCount(1, $titles);
         self::assertSame('concepts', $titles->item(0)?->getAttribute('id'));
         $opening = self::nextElement($titles->item(0));
-        self::assertSame('reference-opening', $opening?->getAttribute('class'));
-        self::assertStringContainsString('The shared vocabulary of the manual.', (string) $opening?->textContent);
+        self::assertNotNull($opening);
+        self::assertSame('reference-opening', $opening->getAttribute('class'));
+        self::assertStringContainsString('The shared vocabulary of the manual.', $opening->textContent);
         self::assertSame(
             ['#identity', '#playback'],
             array_map(static fn(\DOMElement $link): string => $link->getAttribute('href'), iterator_to_array(self::query($page, '//nav[@aria-label="On this page"]//a'))),
@@ -186,6 +187,17 @@ final class ReferencePagesTest extends TestCase
             static fn(self $test) => $test->preset('8', 'transcode', ['videoSlots' => 6]),
             self::PRESETS . 'example-8gb-transcode.json: size.audioSlots: missing',
         ];
+        yield 'preset that is not valid JSON' => [
+            static fn(self $test) => $test->overwrite(self::PRESETS . 'example-8gb-remux.json', '{'),
+            self::PRESETS . 'example-8gb-remux.json: is not valid JSON',
+        ];
+        yield 'size setting that is not a whole number' => [
+            static fn(self $test) => $test->overwrite(
+                self::PRESETS . 'example-8gb-remux.json',
+                json_encode(['capability' => 'remux', 'size' => ['webWorkers' => '3', 'databaseSlots' => 6, 'ordinaryConsumers' => 2, 'sharedBuffersMiB' => 384, 'workMemMiB' => 12, 'copySlots' => 4]], JSON_THROW_ON_ERROR),
+            ),
+            self::PRESETS . 'example-8gb-remux.json: size.webWorkers: must be a whole number',
+        ];
         yield 'capability that disagrees with the file name' => [
             static fn(self $test) => $test->preset('4', 'transcode', ['copySlots' => 2], capability: 'remux'),
             self::PRESETS . 'example-4gb-transcode.json: capability: "remux" disagrees with the file name, which names "transcode"',
@@ -211,6 +223,11 @@ final class ReferencePagesTest extends TestCase
     public function data(string $name, array $value): void
     {
         file_put_contents($this->root . '/ui/site/reference/' . $name . '.php', '<?php return ' . var_export($value, true) . ';');
+    }
+
+    public function overwrite(string $path, string $content): void
+    {
+        file_put_contents($this->root . '/' . $path, $content);
     }
 
     public function remove(string $path): void

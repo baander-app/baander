@@ -163,6 +163,6 @@ final class ReferencePages
             $errors[] = $path . ': size.' . $unknown . ': unknown key';
         }
 
-        return [array_intersect_key($size, array_flip($known)), array_values(array_filter($errors, is_string(...)))];
+        return [array_filter(array_intersect_key($size, array_flip($known)), is_int(...)), array_values(array_filter($errors, is_string(...)))];
     }
 }

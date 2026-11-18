@@ -11,15 +11,15 @@ use Baander\Tooling\Process\ProcessSpec;
 
 final class Command
 {
-    /** Repository paths whose commit dates become the sitemap's last-modified values. */
+    /**
+     * Repository paths whose commit dates become the sitemap's last-modified values; the reference pages add the
+     * documents they publish.
+     */
     private const array SITE_SOURCES = [
         'docs-book',
         'ui/site/templates',
         FeaturePages::DIRECTORY,
         ReferencePages::DIRECTORY,
-        'STRATEGY.md',
-        'CONCEPTS.md',
-        'THIRD_PARTY.md',
         ReferencePages::PRESETS,
         Screenshots::DIRECTORY,
         'ui/site/assets/typography.css',
@@ -68,7 +68,7 @@ final class Command
             $evidence = new AacEvidence()->load($root);
             $features = FeaturePages::load($root);
             $references = ReferencePages::load($root);
-            $history = $executor->run(new ProcessSpec([...SourceHistory::GIT_LOG, '--', ...self::SITE_SOURCES]))->stdout
+            $history = $executor->run(new ProcessSpec([...SourceHistory::GIT_LOG, '--', ...self::SITE_SOURCES, ...array_column($references, 'markdown')]))->stdout
                 |> SourceHistory::fromGitLog(...);
             $typography = [
                 'template' => 'typography',
