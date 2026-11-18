@@ -33,6 +33,26 @@ describe('context-panel-store', () => {
     })
   })
 
+  describe('layoutPreferencesRead', () => {
+    it('starts unset and is kept out of local storage', () => {
+      useContextPanelStore.setState({ layoutPreferencesRead: false })
+      useContextPanelStore.getState().setLayoutPreferencesRead(true)
+      expect(useContextPanelStore.getState().layoutPreferencesRead).toBe(true)
+      useContextPanelStore.getState().setMode('compact')
+      expect(localStorage.getItem('baander-context-panel')).not.toContain('layoutPreferencesRead')
+    })
+  })
+
+  describe('selectItemKeepingTab', () => {
+    it('selects the item and opens the panel without changing the tab', () => {
+      useContextPanelStore.setState({ activeTab: 'queue', isOpen: false })
+      useContextPanelStore.getState().selectItemKeepingTab({ type: 'song', publicId: 'song-1' })
+      expect(useContextPanelStore.getState()).toMatchObject({
+        selectedItem: { type: 'song', publicId: 'song-1' }, activeTab: 'queue', isOpen: true,
+      })
+    })
+  })
+
   describe('persist', () => {
     it('persists mode to localStorage', () => {
       useContextPanelStore.getState().setMode('compact')

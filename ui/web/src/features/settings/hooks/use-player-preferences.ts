@@ -28,10 +28,11 @@ function readPlayerPreferences(payload: Record<string, unknown>): PlayerPreferen
   }
 }
 
-export function usePlayerPreferences(isActive?: () => boolean) {
+export function usePlayerPreferences(isActive?: () => boolean, onFirstRead?: () => void) {
 
   const sync = usePreferenceSync<PlayerPreferenceState>({
     isActive,
+    onFirstRead,
     baseUrl: '/api/user/player-preferences/',
     toPayload: (state) => ({
       shuffle: state.shuffle,

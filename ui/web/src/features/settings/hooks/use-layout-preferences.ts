@@ -6,10 +6,11 @@ import { usePreferenceSync } from './use-preference-sync'
 
 type LayoutPreferences = Pick<ContextPanelState, 'mode' | 'activeTab'>
 
-export function useLayoutPreferences(isActive?: () => boolean) {
+export function useLayoutPreferences(isActive?: () => boolean, onFirstRead?: () => void) {
 
   const sync = usePreferenceSync<LayoutPreferences>({
     isActive,
+    onFirstRead,
     baseUrl: '/api/user/layout-preferences/',
     toPayload: (state) => ({
       mode: state.mode,

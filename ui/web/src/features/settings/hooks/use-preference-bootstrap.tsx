@@ -35,6 +35,10 @@ export function PreferenceSyncProvider({ children }: { children: React.ReactNode
   )
 }
 
+function markLayoutPreferencesRead() {
+  useContextPanelStore.getState().setLayoutPreferencesRead(true)
+}
+
 function PreferenceSyncSession({ userPublicId }: { userPublicId: string }) {
   const coordinator = useLiveCoordinator()
   const isActive = useCallback(() => {
@@ -42,8 +46,18 @@ function PreferenceSyncSession({ userPublicId }: { userPublicId: string }) {
     return auth.isAuthenticated && auth.user?.publicId === userPublicId
   }, [userPublicId])
   const audioSync = useAudioPreferences(isActive)
-  const playerSync = usePlayerPreferences(isActive)
-  const layoutSync = useLayoutPreferences(isActive)
+  // The volume reaches the player store only as the listening session reports it, the user's
+  // own changes included. Until this session's saved player settings have been read, a volume
+  // change is shown but not saved: saving it against settings this page has not seen would be
+  // reported as a settings conflict, and the read then applies the saved volume.
+  const playerPreferencesRead = useRef(false)
+  const markPlayerPreferencesRead = useCallback(() => { playerPreferencesRead.current = true }, [])
+  const playerSync = usePlayerPreferences(isActive, markPlayerPreferencesRead)
+  const layoutSync = useLayoutPreferences(isActive, markLayoutPreferencesRead)
+
+  // Until this session's first layout read has finished, showing the playing track leaves the
+  // panel's tab alone, so that no tab switch is saved against a layout this page has not seen.
+  useEffect(() => () => useContextPanelStore.getState().setLayoutPreferencesRead(false), [])
 
   // The sync objects returned by the preference hooks are fresh each render, and the
   // callbacks inside them are not referentially stable (their useCallback deps include
@@ -152,9 +166,10 @@ function PreferenceSyncSession({ userPublicId }: { userPublicId: string }) {
       const keys: (keyof typeof state)[] = [
         'shuffle', 'repeat', 'volume', 'muted', 'crossfadeEnabled', 'crossfadeDuration',
       ]
-      if (keys.some((k) => state[k] !== prevState[k])) {
-        playerPushRef.current(state)
-      }
+      const changed = keys.filter((k) => state[k] !== prevState[k])
+      if (changed.length === 0) return
+      if (!playerPreferencesRead.current && changed.every((k) => k === 'volume' || k === 'muted')) return
+      playerPushRef.current(state)
     })
 
     const unsubLayout = useContextPanelStore.subscribe((state, prevState) => {

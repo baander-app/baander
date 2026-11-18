@@ -43,7 +43,7 @@ vi.mock('@/features/auth/stores/auth-store', () => ({
 vi.mock('@/features/equalizer/stores/eq-bands-store', () => ({ useEqBandsStore: { subscribe: mocks.subscribe } }))
 vi.mock('@/features/equalizer/stores/eq-processing-store', () => ({ useEqProcessingStore: { subscribe: mocks.subscribe } }))
 vi.mock('@/features/player/stores/player-store', () => ({ usePlayerStore: { subscribe: mocks.subscribe, getState: () => ({ volume: 42 }) } }))
-vi.mock('@/features/layout/stores/context-panel-store', () => ({ useContextPanelStore: { subscribe: mocks.subscribe, getState: () => ({ mode: 'preview' }) } }))
+vi.mock('@/features/layout/stores/context-panel-store', () => ({ useContextPanelStore: { subscribe: mocks.subscribe, getState: () => ({ mode: 'preview', setLayoutPreferencesRead: () => undefined }) } }))
 vi.mock('@/shared/api-client/axios-instance', () => ({ AXIOS_INSTANCE: { get: mocks.get } }))
 vi.mock('../components/PreferenceConflictDialog', () => ({
   PreferenceConflictDialog: ({ open, serverVersion, onResolve }: {
@@ -97,7 +97,7 @@ describe('PreferenceSyncProvider conflicts', () => {
     rerender(provider())
     expect(screen.getByText('Version 3')).toBeInTheDocument()
     fireEvent.click(screen.getByText('Use theirs'))
-    expect(mocks.layout.resolveConflict).toHaveBeenCalledWith('theirs', { mode: 'preview' })
+    expect(mocks.layout.resolveConflict).toHaveBeenCalledWith('theirs', expect.objectContaining({ mode: 'preview' }))
 
     mocks.layout.conflict = { type: 'none', serverVersion: null }
     rerender(provider())

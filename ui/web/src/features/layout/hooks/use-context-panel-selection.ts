@@ -37,8 +37,14 @@ export function useContextPanelSelection() {
     }
   }, [selectedId, selectedType, setSelectedItem])
 
-  // Auto-select currently playing track when it changes and no explicit selection exists
-  const currentTrack = usePlayerStore((s) => s.currentTrack)
+  // Auto-select the playing track when it changes and no explicit selection exists. Until this
+  // session's saved layout has been read, the panel keeps its tab: the listening session's track
+  // can arrive first, and a switch to the Details tab would then count as an edit of a layout
+  // this page has not seen, which the read reports as a settings conflict.
+  // The playing track's ID, not its object: a session's track arrives as a placeholder and is
+  // replaced when its details load, and that must not reopen a panel the user has closed.
+  const currentTrackId = usePlayerStore((s) => s.currentTrack?.publicId)
+  const selectItemKeepingTab = useContextPanelStore((s) => s.selectItemKeepingTab)
   const userSelectedRef = useRef(false)
 
   // Track whether the user has made an explicit selection
@@ -49,8 +55,12 @@ export function useContextPanelSelection() {
   }, [selectedId])
 
   useEffect(() => {
-    if (currentTrack && !userSelectedRef.current) {
-      setSelectedItem({ type: 'song', publicId: currentTrack.publicId })
+    if (!currentTrackId || userSelectedRef.current) return
+    const item = { type: 'song' as const, publicId: currentTrackId }
+    if (useContextPanelStore.getState().layoutPreferencesRead) {
+      setSelectedItem(item)
+    } else {
+      selectItemKeepingTab(item)
     }
-  }, [currentTrack, setSelectedItem])
+  }, [currentTrackId, setSelectedItem, selectItemKeepingTab])
 }

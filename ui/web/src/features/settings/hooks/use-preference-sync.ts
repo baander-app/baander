@@ -20,6 +20,8 @@ interface UsePreferenceSyncOptions<T> {
   fromPayload: (payload: Record<string, unknown>) => T
   onRemoteUpdate: (data: T, version: number) => void
   isActive?: () => boolean
+  /** Called once, when the first read of this session has finished, whatever it found. */
+  onFirstRead?: () => void
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -53,7 +55,7 @@ type PreferenceReadResult = 'applied' | 'absent' | 'deferred' | 'failed'
 const alwaysActive = () => true
 
 export function usePreferenceSync<T>({
-  baseUrl, toPayload, fromPayload, onRemoteUpdate, isActive = alwaysActive,
+  baseUrl, toPayload, fromPayload, onRemoteUpdate, isActive = alwaysActive, onFirstRead,
 }: UsePreferenceSyncOptions<T>) {
   const coordinator = useLiveCoordinator()
   const versionRef = useRef(0)
@@ -78,6 +80,9 @@ export function usePreferenceSync<T>({
   const resolving = useRef<Promise<boolean> | null>(null)
   const requests = useRef(new Set<AbortController>())
   const [conflict, setConflict] = useState<ConflictState>({ type: 'none', serverVersion: null })
+  const firstReadReported = useRef(false)
+  const onFirstReadRef = useRef(onFirstRead)
+  useEffect(() => { onFirstReadRef.current = onFirstRead })
   const [syncing, setSyncing] = useState(false)
 
   useEffect(() => {
@@ -147,6 +152,10 @@ export function usePreferenceSync<T>({
       return 'failed'
     } finally {
       request.finish()
+      if (!firstReadReported.current && request.current()) {
+        firstReadReported.current = true
+        onFirstReadRef.current?.()
+      }
     }
   }, [baseUrl, beginRequest, applyRemote, cancelRetry])
 
