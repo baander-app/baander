@@ -1005,6 +1005,10 @@ A page of the public website that presents one Bånder feature to listeners, ope
 
 The generated, fictional music collection that website pictures show: invented artists, albums and songs with generated covers, synthesized audio and lyric files. A worktree preview scans it like any other library. It never contains a real release.
 
+### Reference page
+
+A page of the public website that publishes a tracked repository document as it stands, such as the strategy, the concepts glossary, the third-party licensing notes or the deploy preset guide. Only its title, search description and a short opening under its heading are written for the website; an edit to the document changes the page on the next build.
+
 ### Capture record
 
 The tracked entry for one website picture: the capture scene that took it, the application commit it shows, the date, and a checksum of its dark and light files. The site build refuses a feature page that shows a picture without a matching record, and the site's script tests refuse any picture file without one.

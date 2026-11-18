@@ -19,6 +19,17 @@ CSS instead of the application's React shell, styled-components and Radix
 primitives. Ordinary links, native disclosure elements and locally bundled scripts
 provide its navigation and manual search without application authentication or APIs.
 
+The top menu groups the site into two fold-out panels, Product and Resources, beside
+the source link and the theme toggle. Each panel is a native disclosure element; the
+two share a name so only one is open, and both open and close without JavaScript. A
+small script closes an open panel on Escape, an outside click or focus leaving it,
+and moves focus to a panel's first entry when it opens. An open panel lies over the page inside a
+bordered surface, without a shadow, so opening it moves nothing, and it scrolls
+within itself when it is taller than the window. Every entry shows its title and a
+one-line description. At 860px and narrower the Resources columns stack; at 640px
+and narrower one Menu disclosure replaces the panels and the source link, holding
+both groups with the source link last.
+
 Its page composition adapts to a public introduction and long-form manuals. Body
 copy may use 16px text, the homepage may use larger responsive headings, and section
 spacing may use the shared 48px and 64px spacing tokens. Keep the shared typography,

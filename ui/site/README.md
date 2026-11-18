@@ -1,7 +1,10 @@
 # Public website
 
 The website publishes the maintained `docs-book/` manuals with a static homepage,
-shared design tokens and local Pagefind search. The PHP builder writes a complete
+shared design tokens and local Pagefind search. Its reference pages publish four
+repository documents as they stand: `STRATEGY.md` at `/strategy/`, `CONCEPTS.md`
+at `/concepts/`, `THIRD_PARTY.md` at `/licensing/` and `deploy/preset/README.md`
+at `/deploy/`. The PHP builder writes a complete
 artifact to `var/website/`, including `.vercel/output/` for Vercel. Serving the site
 requires no application server, account, database or worker deployment.
 
@@ -25,11 +28,15 @@ credentials or other personal files under `var/website/`.
 
 Each build also writes `sitemap.xml` and `robots.txt` at the site root, so the
 sitemap follows every change without a separate step. It lists the homepage, the
-features overview, each feature page, the Bånder Audio Core page and every manual
-page at its `https://baander.app` URL, and never the 404 page. Each `<lastmod>` is
-the date of the newest commit that touched the page's sources:
+features overview, each feature page, the Bånder Audio Core page, the reference
+pages and every manual page at its `https://baander.app` URL, and never the 404
+page. Each `<lastmod>` is the date of the newest commit that touched the page's
+sources:
 
 - **Manual page:** its Markdown file.
+- **Reference page:** its source document, its data file in `ui/site/reference/`
+  and `ui/site/templates/reference.php`; for the deploy preset page, the whole
+  `deploy/preset/` directory, whose example files fill its comparison table.
 - **Homepage and Bånder Audio Core page:** the template and the data it renders.
 - **Feature page:** its data file, the feature templates, its pictures and the
   manual pages it borrows blocks from.
@@ -59,9 +66,19 @@ Every page also carries its search and link-preview metadata, built by
 
 Manual text belongs in `docs-book/`. Homepage text and layout belong in
 `ui/site/templates/`, and the text of the feature pages in `ui/site/features/`
-(see [Feature pages](#feature-pages)). Site styles and the pictures of the
-application belong in `ui/site/assets/`. The build copies shared token CSS, SVG branding and licensed
-fonts, then builds search from the rendered manual pages. For each rendered page it
+(see [Feature pages](#feature-pages)). A reference page's body is its repository
+document; the page's title, search description and the short opening shown under
+its heading belong in its data file in `ui/site/reference/`. The top menu's titles
+and one-line descriptions belong in `ui/site/menu.php`, except the feature pages,
+which bring their own name and summary; the footer lists the same entries. Site
+styles and the pictures of the application belong in `ui/site/assets/`. The build
+copies shared token CSS, SVG branding and licensed fonts, then builds search from
+the rendered manual and reference pages, labelling each result with its page.
+
+A link in a manual or reference document to a manual page or to one of the four
+published documents opens that page on the site, and the build fails when its
+`#fragment` names no heading there. A link to any other repository path opens the
+file in the source repository. For each rendered page it
 also copies the Geist and Noto slices that the page's text reaches first along the
 font stack, beyond the shared Latin faces, and links their rules from the page's
 head. Search results get one such stylesheet for all indexed text, which the
