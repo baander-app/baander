@@ -2,12 +2,14 @@ interface SearchSection {
   title: string;
   url: string;
   plain_excerpt: string;
+  weighted_locations: { balanced_score: number }[];
 }
 
 interface SearchPage {
   url: string;
   plain_excerpt: string;
-  meta: { title: string };
+  // `label` names the manual or reference page a result comes from; each indexed page sets it.
+  meta: { title: string; label: string };
   sub_results: SearchSection[];
 }
 
@@ -48,7 +50,7 @@ function mountSearch(container: HTMLElement, input: HTMLInputElement, status: HT
     const query = input.value.trim();
     results.setAttribute('aria-busy', query ? 'true' : 'false');
     if (!query) {
-      status.textContent = 'Search the operator and developer guides.';
+      status.textContent = 'Search the operator and developer guides and the reference pages.';
       return;
     }
     status.textContent = 'Searching…';
@@ -80,15 +82,13 @@ function mountSearch(container: HTMLElement, input: HTMLInputElement, status: HT
       const item = document.createElement('li');
       const context = document.createElement('p');
       context.className = 'search-context';
-      context.textContent = page.url.startsWith('/docs/operator-guide/')
-        ? 'Operator guide'
-        : 'Developer guide';
+      context.textContent = page.meta.label;
       item.append(context);
       const title = document.createElement('a');
       title.href = page.url;
       title.textContent = page.meta.title;
       item.append(title);
-      const sections = page.sub_results.length ? page.sub_results.slice(0, 3) : [{
+      const sections = page.sub_results.length ? bestSections(page.sub_results) : [{
         title: page.meta.title,
         url: page.url,
         plain_excerpt: page.plain_excerpt,
@@ -119,6 +119,14 @@ function mountSearch(container: HTMLElement, input: HTMLInputElement, status: HT
     status.textContent = response.results.length > pages.length
       ? `Showing ${pages.length} of ${response.results.length} matching pages.`
       : `${pages.length} matching ${pages.length === 1 ? 'page' : 'pages'}.`;
+  }
+
+  // Pagefind lists a page's sections in page order; on a long page such as the glossary the matching
+  // section would fall outside the first three, so the sections with the strongest matches are shown.
+  function bestSections(sections: SearchSection[]): SearchSection[] {
+    const score = (section: SearchSection) => section.weighted_locations
+      .reduce((total, location) => total + location.balanced_score, 0);
+    return [...sections].sort((first, second) => score(second) - score(first)).slice(0, 3);
   }
 
   container.addEventListener('keydown', (event) => {

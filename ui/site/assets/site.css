@@ -199,6 +199,17 @@ code, kbd, samp, pre { font-family: var(--font-mono); }
 .manual-article hr { margin: 32px 0; border: 0; border-top: 1px solid var(--color-border); }
 .manual-source { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--color-border); font-size: 12px; }
 .manual-source a { color: var(--color-muted-foreground); }
+/* Reference pages render one repository document; the opening below its title reads as a lede. */
+.reference-page { max-width: 824px; margin: auto; padding: 32px; }
+.reference-opening { color: var(--color-muted-foreground); font-size: 18px; }
+/* The preset comparison is a real table, so it keeps table layout and scrolls inside its own region.
+   The region is positioned so the visually hidden cell text, which is absolutely positioned, stays
+   inside its scroll area instead of widening the page. */
+.preset-table { position: relative; max-width: 100%; margin-bottom: 24px; overflow-x: auto; overscroll-behavior-x: contain; }
+.manual-article .preset-table table { display: table; width: 100%; margin: 0; font-variant-numeric: tabular-nums; }
+.manual-article .preset-table th, .manual-article .preset-table td { min-width: 0; white-space: nowrap; }
+.manual-article .preset-table td { text-align: right; }
+.preset-table:focus-visible { outline-offset: 2px; }
 .not-found { max-width: 760px; margin: 64px auto; padding: 32px; }
 .not-found h1 { font-size: 40px; margin: 16px 0 24px; }
 .not-found > p:not(.eyebrow) { color: var(--color-muted-foreground); }
@@ -227,6 +238,7 @@ code, kbd, samp, pre { font-family: var(--font-mono); }
   .manual-chapters { grid-template-columns: 1fr; }
   .site-footer { padding: 24px; }
   .manual-layout { display: block; padding: 24px; }
+  .reference-page { padding: 24px; }
   .chapter-sidebar { position: static; max-height: none; padding: 0 0 0 var(--focus-room); margin-bottom: 32px; }
   .chapter-navigation { border-bottom: 1px solid var(--color-border); }
   .chapter-navigation nav { max-height: 240px; overflow: auto; padding-bottom: 16px; }

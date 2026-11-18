@@ -30,10 +30,13 @@ use Throwable;
  * A public page names its template and data. Its trail lists the ancestors below the homepage. Its
  * references are what it takes from the manual: links to manual pages, and blocks borrowed from
  * them, each placed as `html` at the path `into` of the data; `file` is the repository file that
- * states the references and is named when one does not resolve.
+ * states the references and is named when one does not resolve. A page that names `markdown`, a
+ * repository Markdown file, is rendered from it: the file's title, its only level-1 heading and its
+ * first block, reaches the template as `heading`, the rest as `html`, and links elsewhere in the site
+ * to the file open the page.
  *
  * @phpstan-type ManualBlockReference array{manual:string,contains:string,into:list<int|string>}
- * @phpstan-type PublicPage array{template:string,url:string,title:string,description:string,stylesheet?:string,script?:string,sources?:list<string>,trail?:list<array{name:string,url:string}>,references?:array{file:string,links:list<string>,blocks:list<ManualBlockReference>},data:array<string,mixed>}
+ * @phpstan-type PublicPage array{template:string,url:string,title:string,description:string,stylesheet?:string,script?:string,sources?:list<string>,markdown?:string,trail?:list<array{name:string,url:string}>,references?:array{file:string,links:list<string>,blocks:list<ManualBlockReference>},data:array<string,mixed>}
  */
 final class WebsiteBuilder
 {
@@ -43,6 +46,8 @@ final class WebsiteBuilder
     private array $pages = [];
     /** @var array<string,Document> */
     private array $documents = [];
+    /** @var array<string,array{url:string,document:Document,headings:list<array{id:string,title:string,level:int}>}> the Markdown files public pages are rendered from, by repository path */
+    private array $references = [];
     /** @var array<string,string> */
     private array $assets = [];
     /** @var array<string,array{width:int,height:int}> the dimensions of each application picture, by name */
@@ -110,10 +115,11 @@ final class WebsiteBuilder
      */
     public function build(?Closure $afterRender = null, ?Closure $renderBlocks = null, array $publicPages = [], ?SourceHistory $history = null): array
     {
-        $this->pages = $this->documents = $this->assets = [];
+        $this->pages = $this->documents = $this->references = $this->assets = [];
         $this->navigation = ['operator' => [], 'developer' => []];
         $this->checkOutput();
         $this->discover();
+        $this->discoverReferences($publicPages);
         $this->transformLinks();
         $this->buildNavigation();
         $borrowed = $this->manualReferences($publicPages);
@@ -162,7 +168,7 @@ final class WebsiteBuilder
                 foreach ($borrowed[$position] ?? [] as ['into' => $into, 'block' => $block]) {
                     $data = self::withValue($data, [...$into, 'html'], $renderer->renderNodes([$block]));
                 }
-                $page = $descriptor + ['source' => '', 'guide' => null, 'html' => '', 'headings' => [], 'meta' => $meta];
+                $page = $this->referenceContent($renderer, $descriptor) + $descriptor + ['source' => '', 'guide' => null, 'html' => '', 'headings' => [], 'meta' => $meta];
                 $this->write($staging . $url . 'index.html', $this->template($descriptor['template'], $page, $data));
             }
             $this->write($staging . '/sitemap.xml', $this->sitemap($publicPages, $history));
@@ -216,7 +222,7 @@ final class WebsiteBuilder
     {
         $blocks = [];
         $nodes = [];
-        foreach ($this->documents as $source => $document) {
+        foreach ($this->blockSources() as $source => $document) {
             $ordinal = 0;
             foreach ($document->iterator() as $node) {
                 if (!$node instanceof FencedCode) {
@@ -262,6 +268,20 @@ final class WebsiteBuilder
             }
         } catch (Throwable $error) {
             throw new RuntimeException($context . ': ' . $error->getMessage(), 0, $error);
+        }
+    }
+
+    /**
+     * Every parsed document by the name its blocks are reported under: a manual page by its path in
+     * the book, a reference source by its repository path.
+     *
+     * @return \Generator<string,Document>
+     */
+    private function blockSources(): \Generator
+    {
+        yield from $this->documents;
+        foreach ($this->references as $source => $reference) {
+            yield $source => $reference['document'];
         }
     }
 
@@ -389,6 +409,71 @@ final class WebsiteBuilder
         ksort($this->pages);
     }
 
+    /**
+     * Parses the Markdown file each public page names. A file must exist, hold more than white space
+     * and open with its title, its only level-1 heading; every failure is reported at once.
+     *
+     * @param list<PublicPage> $publicPages
+     */
+    private function discoverReferences(array $publicPages): void
+    {
+        $parser = new MarkdownParser($this->environment);
+        $errors = [];
+        foreach ($publicPages as $descriptor) {
+            $source = $descriptor['markdown'] ?? null;
+            if ($source === null) {
+                continue;
+            }
+            try {
+                $absolute = $this->checkedSource($this->root . '/' . $source);
+            } catch (RuntimeException) {
+                $errors[] = 'Missing or escaping reference source for ' . $descriptor['url'] . ': ' . $source;
+                continue;
+            }
+            $markdown = (string) file_get_contents($absolute);
+            if (trim($markdown) === '') {
+                $errors[] = $source . ': the reference source is empty';
+                continue;
+            }
+            $document = $parser->parse($markdown);
+            $headings = $this->headings($document);
+            $first = $document->firstChild();
+            if (!$first instanceof Heading || $first->getLevel() !== 1 || count(array_keys(array_column($headings, 'level'), 1, true)) !== 1) {
+                $errors[] = $source . ': a reference source opens with its title, its only level-1 heading';
+                continue;
+            }
+            $this->references[$source] = ['url' => $descriptor['url'], 'document' => $document, 'headings' => $headings];
+        }
+        if ($errors !== []) {
+            throw new RuntimeException(implode("\n", $errors));
+        }
+    }
+
+    /**
+     * The rendered title, body and headings of a page built from a Markdown file; nothing for any
+     * other page.
+     *
+     * @param PublicPage $descriptor
+     * @return array{heading?:string,html?:string,headings?:list<array{id:string,title:string,level:int}>,source?:string}
+     */
+    private function referenceContent(HtmlRenderer $renderer, array $descriptor): array
+    {
+        $source = $descriptor['markdown'] ?? null;
+        if ($source === null) {
+            return [];
+        }
+        ['document' => $document, 'headings' => $headings] = $this->references[$source];
+        $title = $document->firstChild();
+        $body = array_slice([...$document->children()], 1);
+
+        return [
+            'heading' => (string) $renderer->renderNodes([$title]),
+            'html' => (string) $renderer->renderNodes($body),
+            'headings' => $headings,
+            'source' => $source,
+        ];
+    }
+
     /** @return list<array{id:string,title:string,level:int}> */
     private function headings(Document $document): array
     {
@@ -416,24 +501,45 @@ final class WebsiteBuilder
     {
         $errors = [];
         foreach ($this->documents as $source => $document) {
-            foreach ($document->iterator() as $node) {
-                if ($node instanceof HeadingPermalink) {
-                    $node->data->set('attributes/data-pagefind-ignore', 'all');
-                }
-                if ($node instanceof Link || $node instanceof Image) {
-                    try {
-                        $node->setUrl($this->resolveLink($source, $node->getUrl(), $node instanceof Image));
-                    } catch (RuntimeException $error) {
-                        $errors[] = $error->getMessage();
-                    }
-                }
-            }
+            $errors = [...$errors, ...$this->transformDocumentLinks('docs-book/' . $source, $document)];
+        }
+        foreach ($this->references as $source => $reference) {
+            $errors = [...$errors, ...$this->transformDocumentLinks($source, $reference['document'])];
         }
         if ($errors !== []) {
             throw new RuntimeException(implode("\n", array_unique($errors)));
         }
     }
 
+    /**
+     * @param string $source the document's repository path, which its relative links start from
+     * @return list<string> the links that do not resolve
+     */
+    private function transformDocumentLinks(string $source, Document $document): array
+    {
+        $errors = [];
+        foreach ($document->iterator() as $node) {
+            if ($node instanceof HeadingPermalink) {
+                $node->data->set('attributes/data-pagefind-ignore', 'all');
+            }
+            if ($node instanceof Link || $node instanceof Image) {
+                try {
+                    $node->setUrl($this->resolveLink($source, $node->getUrl(), $node instanceof Image));
+                } catch (RuntimeException $error) {
+                    $errors[] = $error->getMessage();
+                }
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Resolves a link from the directory of the repository file at `$source`. A manual page or a
+     * file a public page is rendered from opens that page, with its fragment checked against the
+     * page's headings; a book picture is copied into the site; any other repository path opens in
+     * the source repository.
+     */
     private function resolveLink(string $source, string $url, bool $image): string
     {
         if (preg_match('~^(https?://|mailto:)~i', $url)) {
@@ -449,29 +555,35 @@ final class WebsiteBuilder
         if (str_contains($path, '?')) {
             throw new RuntimeException('Local query link is not supported in ' . $source . ': ' . $url);
         }
-        $absolute = $path === '' ? $this->root . '/docs-book/' . $source : Paths::absolutePath($this->root . '/docs-book/' . dirname($source) . '/' . rawurldecode($path));
-        $absolute = $this->checkedSource($absolute);
-        if (is_dir($absolute) && is_file($absolute . '/README.md') && str_starts_with($absolute, $this->root . '/docs-book')) {
+        $suffix = $fragment !== null ? '#' . $fragment : '';
+        try {
+            $absolute = $this->checkedSource($path === '' ? $this->root . '/' . $source : Paths::absolutePath($this->root . '/' . dirname($source) . '/' . rawurldecode($path)));
+        } catch (RuntimeException) {
+            throw new RuntimeException('Missing or escaping repository target in ' . $source . ': ' . $url);
+        }
+        $book = $this->root . '/docs-book';
+        $inBook = $absolute === $book || str_starts_with($absolute, $book . '/');
+        if ($inBook && is_dir($absolute) && is_file($absolute . '/README.md')) {
             $absolute .= '/README.md';
         }
-        $relative = substr($absolute, strlen($this->root . '/docs-book/'));
-        if (isset($this->pages[$relative])) {
-            $page = $this->pages[$relative];
+        $page = $inBook ? $this->pages[substr($absolute, strlen($book) + 1)] ?? null : null;
+        $page ??= $this->references[substr($absolute, strlen($this->root) + 1)] ?? null;
+        if ($page !== null) {
             if ($fragment !== null && $fragment !== '' && !in_array(rawurldecode($fragment), array_column($page['headings'], 'id'), true)) {
                 throw new RuntimeException('Missing fragment in ' . $source . ': ' . $url);
             }
-            return $page['url'] . ($fragment !== null ? '#' . $fragment : '');
+            return $page['url'] . $suffix;
         }
-        if (str_starts_with($absolute, $this->root . '/docs-book/') && $this->isAsset($absolute)) {
-            $assetUrl = '/assets/manual/' . substr($absolute, strlen($this->root . '/docs-book/'));
+        if ($inBook && $this->isAsset($absolute)) {
+            $assetUrl = '/assets/manual/' . substr($absolute, strlen($book) + 1);
             $this->assets[$assetUrl] = $absolute;
-            return $assetUrl . ($fragment !== null ? '#' . $fragment : '');
+            return $assetUrl . $suffix;
         }
         if ($image) {
             throw new RuntimeException('Manual image must be a supported book asset: ' . $source . ': ' . $url);
         }
         $browser = preg_replace('~/(tree|blob)/~', is_dir($absolute) ? '/tree/' : '/blob/', $this->revisionUrl);
-        return $browser . '/' . implode('/', array_map(rawurlencode(...), explode('/', substr($absolute, strlen($this->root) + 1)))) . ($fragment !== null ? '#' . $fragment : '');
+        return $browser . '/' . implode('/', array_map(rawurlencode(...), explode('/', substr($absolute, strlen($this->root) + 1)))) . $suffix;
     }
 
     private function isAsset(string $path): bool

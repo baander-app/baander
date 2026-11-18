@@ -8,7 +8,7 @@ include __DIR__ . '/header.php';
       <label for="manual-search-input">Search manuals</label>
       <input id="manual-search-input" type="search" placeholder="Find a task or topic" autocomplete="off" spellcheck="false" aria-describedby="manual-search-status" aria-controls="manual-search-results" disabled>
       <noscript>Search needs JavaScript. Browse the chapters below to find a topic.</noscript>
-      <p id="manual-search-status" role="status" aria-live="polite">Search the operator and developer guides.</p>
+      <p id="manual-search-status" role="status" aria-live="polite">Search the operator and developer guides and the reference pages.</p>
       <ol id="manual-search-results" hidden></ol>
     </section>
     <details class="chapter-navigation" open>
@@ -87,7 +87,11 @@ include __DIR__ . '/header.php';
       </details>
     <?php endif; ?>
     <article class="manual-article" data-pagefind-body>
-      <span class="visually-hidden" data-pagefind-meta="guide"><?= $page['guide'] === 'developer' ? 'Developer guide' : 'Operator manual' ?></span>
+      <span class="visually-hidden" data-pagefind-meta="label"><?= match ($page['guide']) {
+          'operator' => 'Operator guide',
+          'developer' => 'Developer guide',
+          default => 'Manual',
+      } ?></span>
       <?= $page['html'] ?>
     </article>
     <div class="manual-source"><a href="<?= $escape(preg_replace('~/tree/~', '/blob/', $site['revisionUrl']) . '/docs-book/' . $page['source']) ?>">Read this page's source <span class="arrow" aria-hidden="true">↗</span></a></div>

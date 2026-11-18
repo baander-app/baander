@@ -265,6 +265,40 @@ test('real Pagefind results include shareable sections and keyboard navigation',
   await expect(page.locator(`[id="${fragment}"]`)).toBeInViewport();
 });
 
+test('search results carry the label of the page they come from', async ({ page }) => {
+  await page.goto('/docs/');
+  const input = page.getByRole('searchbox', { name: 'Search manuals' });
+  const results = page.locator('#manual-search-results');
+  await input.fill('Selected video endpoint');
+  const concepts = results.locator('li').filter({ has: page.locator('a[href="/concepts/"]') });
+  await expect(concepts.locator('.search-context')).toHaveText('Concepts');
+  await expect(concepts.locator('a.search-section[href="/concepts/#selected-video-endpoint"]')).toBeVisible();
+
+  await input.fill('scanning');
+  await expect(results).toBeVisible();
+  const labels = await results.locator('li').evaluateAll((items) => items.map((item) => ({
+    url: item.querySelector<HTMLAnchorElement>('a')!.getAttribute('href')!,
+    label: item.querySelector('.search-context')!.textContent,
+  })));
+  const guides = labels.filter(({ url }) => /^\/docs\/(operator|developer)-guide\//.test(url));
+  expect(guides.map(({ url }) => url.split('/')[2])).toEqual(expect.arrayContaining(['operator-guide', 'developer-guide']));
+  for (const { url, label } of guides) {
+    expect(label, url).toBe(url.startsWith('/docs/operator-guide/') ? 'Operator guide' : 'Developer guide');
+  }
+});
+
+test('the preset comparison scrolls inside its own focusable region on a phone', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.goto('/deploy/');
+  const region = page.getByRole('region', { name: 'Size settings of the example presets' });
+  await region.focus();
+  await expect(region).toBeFocused();
+  expect(await region.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(() => region.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+});
+
 test('unmatched and empty queries have distinct states', async ({ page }) => {
   await page.goto('/docs/');
   const input = page.getByRole('searchbox', { name: 'Search manuals' });
@@ -272,7 +306,7 @@ test('unmatched and empty queries have distinct states', async ({ page }) => {
   await expect(page.getByRole('status')).toContainText('No matches');
   await expect(page.locator('#manual-search-results')).toBeHidden();
   await input.fill('');
-  await expect(page.getByRole('status')).toHaveText('Search the operator and developer guides.');
+  await expect(page.getByRole('status')).toHaveText('Search the operator and developer guides and the reference pages.');
   await expect(page.locator('#manual-search-results')).toHaveAttribute('aria-busy', 'false');
 });
 
@@ -303,7 +337,7 @@ test('late real index load cannot restore results after query is cleared', async
   const loaded = page.waitForResponse('**/pagefind/pagefind.js');
   release();
   await loaded;
-  await expect(page.getByRole('status')).toHaveText('Search the operator and developer guides.');
+  await expect(page.getByRole('status')).toHaveText('Search the operator and developer guides and the reference pages.');
   await expect(page.locator('#manual-search-results')).toBeHidden();
   await input.fill('scanning');
   await expect(page.locator('#manual-search-results')).toBeVisible();

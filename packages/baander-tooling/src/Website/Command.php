@@ -12,7 +12,20 @@ use Baander\Tooling\Process\ProcessSpec;
 final class Command
 {
     /** Repository paths whose commit dates become the sitemap's last-modified values. */
-    private const array SITE_SOURCES = ['docs-book', 'ui/site/templates', FeaturePages::DIRECTORY, Screenshots::DIRECTORY, 'ui/site/assets/typography.css', 'ui/design-tokens/tokens/base/type.json', 'packages/baander-audio-core/bench/results'];
+    private const array SITE_SOURCES = [
+        'docs-book',
+        'ui/site/templates',
+        FeaturePages::DIRECTORY,
+        ReferencePages::DIRECTORY,
+        'STRATEGY.md',
+        'CONCEPTS.md',
+        'THIRD_PARTY.md',
+        ReferencePages::PRESETS,
+        Screenshots::DIRECTORY,
+        'ui/site/assets/typography.css',
+        'ui/design-tokens/tokens/base/type.json',
+        'packages/baander-audio-core/bench/results',
+    ];
 
     /**
      * The site's elements, besides code, kbd, samp and pre, whose styles set the mono stack; a typography
@@ -54,6 +67,7 @@ final class Command
             $revisionUrl = 'https://github.com/baander-app/baander/tree/' . $revision;
             $evidence = new AacEvidence()->load($root);
             $features = FeaturePages::load($root);
+            $references = ReferencePages::load($root);
             $history = $executor->run(new ProcessSpec([...SourceHistory::GIT_LOG, '--', ...self::SITE_SOURCES]))->stdout
                 |> SourceHistory::fromGitLog(...);
             $typography = [
@@ -93,7 +107,7 @@ final class Command
                         'charts' => new AacCharts()->render($evidence),
                         'sourceBase' => 'https://github.com/baander-app/baander/blob/' . $codecRevision . '/packages/baander-audio-core/',
                     ]],
-                ], $typography, ...$features],
+                ], $typography, ...$features, ...$references],
                 $history,
             );
             fwrite(STDOUT, 'Built ' . count($pages) . ' manual pages in var/website.' . "\n");

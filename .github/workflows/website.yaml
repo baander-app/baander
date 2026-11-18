@@ -6,6 +6,10 @@ on:
             - master
         paths:
             - 'docs-book/**'
+            - 'STRATEGY.md'
+            - 'CONCEPTS.md'
+            - 'THIRD_PARTY.md'
+            - 'deploy/preset/**'
             - 'ui/site/**'
             - 'tests/browser/**'
             - 'ui/design-tokens/**'
@@ -26,6 +30,10 @@ on:
         types: [ opened, synchronize, reopened ]
         paths:
             - 'docs-book/**'
+            - 'STRATEGY.md'
+            - 'CONCEPTS.md'
+            - 'THIRD_PARTY.md'
+            - 'deploy/preset/**'
             - 'ui/site/**'
             - 'tests/browser/**'
             - 'ui/design-tokens/**'

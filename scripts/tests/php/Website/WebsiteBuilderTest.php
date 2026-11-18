@@ -318,6 +318,102 @@ final class WebsiteBuilderTest extends TestCase
         self::assertSame($before, file_get_contents($artifact));
     }
 
+    public function testReferenceSourceResolvesLinksFromItsOwnDirectory(): void
+    {
+        mkdir($this->root . '/packages/x', 0700, true);
+        mkdir($this->root . '/deploy/preset', 0700, true);
+        file_put_contents($this->root . '/packages/x/LICENSE', 'MIT');
+        file_put_contents($this->root . '/NOTES.md', "# Notes\n## Licences\n[Licence](packages/x/LICENSE)\n[Same page](#licences)");
+        file_put_contents($this->root . '/deploy/preset/README.md', "# Preset\n[Repeat](../../docs-book/part-1-operator-guide/chapter.md#repeat-1)\n[Notes](../../NOTES.md#licences)");
+        $this->referenceTemplate();
+        $this->builder()->build(publicPages: [self::reference('/notes/', 'NOTES.md'), self::reference('/preset/', 'deploy/preset/README.md')]);
+
+        $notes = (string) file_get_contents($this->root . '/var/website/notes/index.html');
+        self::assertStringContainsString('href="https://github.com/baander-app/baander/blob/abc123/packages/x/LICENSE"', $notes);
+        self::assertStringContainsString('href="/notes/#licences"', $notes);
+        $preset = (string) file_get_contents($this->root . '/var/website/preset/index.html');
+        self::assertStringContainsString('href="/docs/operator-guide/chapter/#repeat-1"', $preset);
+        self::assertStringContainsString('href="/notes/#licences"', $preset);
+    }
+
+    public function testManualLinkToAPublishedFileOpensItsPageAndMustNameOneOfItsHeadings(): void
+    {
+        file_put_contents($this->root . '/TERMS.md', "# Terms\n## Identity\n### Public ID\nA short identifier.");
+        $this->referenceTemplate();
+        $this->source('part-1-operator-guide/nested/README.md', "# Nested\n[Public ID](../../../TERMS.md#public-id)");
+        $terms = [self::reference('/terms/', 'TERMS.md')];
+        $this->builder()->build(publicPages: $terms);
+        self::assertStringContainsString(
+            'href="/terms/#public-id"',
+            (string) file_get_contents($this->root . '/var/website/docs/operator-guide/nested/index.html'),
+        );
+
+        $this->source('part-1-operator-guide/nested/README.md', "# Nested\n[Public ID](../../../TERMS.md#renamed-term)");
+        try {
+            $this->builder()->build(publicPages: $terms);
+            self::fail('A link to a heading the published file does not have must fail the build.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('Missing fragment in docs-book/part-1-operator-guide/nested/README.md: ../../../TERMS.md#renamed-term', $error->getMessage());
+        }
+    }
+
+    public function testMissingRepositoryTargetFromARootFileNamesTheFile(): void
+    {
+        file_put_contents($this->root . '/NOTES.md', "# Notes\n[Gone](packages/gone/LICENSE)");
+        $this->referenceTemplate();
+        $this->expectExceptionMessage('Missing or escaping repository target in NOTES.md: packages/gone/LICENSE');
+        $this->builder()->build(publicPages: [self::reference('/notes/', 'NOTES.md')]);
+    }
+
+    public function testReferencePageReceivesItsHeadingApartFromTheBodyAndItsHeadings(): void
+    {
+        file_put_contents($this->root . '/NOTES.md', "# Notes\nThe body.\n## First\n### Term");
+        file_put_contents(
+            $this->root . '/ui/site/templates/reference.php',
+            '<?php echo json_encode(["heading" => $page["heading"], "html" => $page["html"], "headings" => $page["headings"], "source" => $page["source"]], JSON_THROW_ON_ERROR | JSON_HEX_TAG);',
+        );
+        $this->builder()->build(publicPages: [self::reference('/notes/', 'NOTES.md')]);
+        $page = json_decode((string) file_get_contents($this->root . '/var/website/notes/index.html'), true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertStringStartsWith('<h1 id="notes">Notes', $page['heading']);
+        self::assertStringStartsWith('<p>The body.</p>', $page['html']);
+        self::assertStringNotContainsString('<h1', $page['html']);
+        self::assertSame(['notes', 'first', 'term'], array_column($page['headings'], 'id'));
+        self::assertSame('NOTES.md', $page['source']);
+    }
+
+    /** @return iterable<string, array{?string, string}> */
+    public static function unusableReferenceSources(): iterable
+    {
+        yield 'missing' => [null, 'Missing or escaping reference source for /notes/: NOTES.md'];
+        yield 'empty' => [" \n", 'NOTES.md: the reference source is empty'];
+        yield 'text before the title' => ["Intro\n# Notes", 'NOTES.md: a reference source opens with its title, its only level-1 heading'];
+        yield 'no title' => ['## Notes', 'NOTES.md: a reference source opens with its title, its only level-1 heading'];
+        yield 'second title' => ["# Notes\n# More", 'NOTES.md: a reference source opens with its title, its only level-1 heading'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('unusableReferenceSources')]
+    public function testReferenceSourceMustExistHaveContentAndOpenWithItsOnlyTitle(?string $content, string $problem): void
+    {
+        if ($content !== null) {
+            file_put_contents($this->root . '/NOTES.md', $content);
+        }
+        $this->referenceTemplate();
+        $this->expectExceptionMessage($problem);
+        $this->builder()->build(publicPages: [self::reference('/notes/', 'NOTES.md')]);
+    }
+
+    /** @return array{template:string,url:string,title:string,description:string,markdown:string,data:array<string,mixed>} */
+    private static function reference(string $url, string $markdown): array
+    {
+        return ['template' => 'reference', 'url' => $url, 'title' => 'Reference', 'description' => 'A reference page', 'markdown' => $markdown, 'data' => []];
+    }
+
+    private function referenceTemplate(): void
+    {
+        file_put_contents($this->root . '/ui/site/templates/reference.php', '<?php echo $page["heading"], $page["html"];');
+    }
+
     private function source(string $path, string $content): void
     {
         file_put_contents($this->root . '/docs-book/' . $path, $content);
