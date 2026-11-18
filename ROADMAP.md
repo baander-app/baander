@@ -725,6 +725,14 @@ reference pages, the sitemap, `robots.txt`, the search and menu scripts, the Pag
 index and the social card returned 200, and an unknown URL returned 404. The live site
 serves HTTPS with HSTS, and its `/concepts/` page is byte-identical to the build.
 
+Republished on 2026-11-18 from `ca22fd7b6`, which stops the desktop menu panels at
+30rem so the Product panel shows about six entries and scrolls; it had listed every
+feature page down a tall window. `corepack yarn test:browser` passed 220 of 220 on the
+build. It went to the preview `baander-2cr9xfg7n` and then, unchanged, to production as
+`baander-g3bu8azg4`. On both, the homepage, `/features/` and the reference pages
+returned 200 and an unknown URL returned 404; the live `site.css` is byte-identical to
+the build.
+
 Open items:
 
 - Resolved on 2026-11-18 in the commit after this record's first version: the
