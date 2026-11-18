@@ -1,7 +1,4 @@
 <?php declare(strict_types=1);
-// The panels are native disclosures, so they open, close and show every link without JavaScript;
-// site-menu.js adds Escape, closing on a click outside or when focus leaves, and focus on the
-// first entry. The phone menu repeats both groups from the same menu data.
 $markCurrent = static fn (?string $mark): string => $mark === null ? '' : ' aria-current="' . $mark . '"';
 $menuColumns = static function (array $columns) use ($escape, $markCurrent): void {
     foreach ($columns as $column): ?>
@@ -36,7 +33,7 @@ $menuColumns = static function (array $columns) use ($escape, $markCurrent): voi
         <?php endforeach; ?>
         <a class="menu-source" href="<?= $escape($site['repositoryUrl']) ?>">Source <span class="arrow" aria-hidden="true">↗</span></a>
         <details class="menu-phone" name="site-menu" data-site-menu>
-          <summary<?= in_array(true, array_column($site['menu'], 'current'), true) ? ' aria-current="true"' : '' ?>>Menu</summary>
+          <summary<?= array_any($site['menu'], static fn (array $panel): bool => $panel['current']) ? ' aria-current="true"' : '' ?>>Menu</summary>
           <div class="menu-panel-body">
             <?php foreach ($site['menu'] as $panel): ?>
               <div class="menu-section">

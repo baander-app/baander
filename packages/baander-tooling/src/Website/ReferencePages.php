@@ -46,7 +46,7 @@ final class ReferencePages
         );
         $errors = array_merge(...array_map(static fn(FeatureFile $file): array => $file->errors, $files));
         $presets = null;
-        if (in_array(self::PRESET_GUIDE, array_map(static fn(FeatureFile $file): mixed => $file->data['source'] ?? null, $files), true)) {
+        if (array_any($files, self::comparesPresets(...))) {
             [$presets, $presetErrors] = self::presets($root);
             $errors = [...$errors, ...$presetErrors];
         }
@@ -57,6 +57,11 @@ final class ReferencePages
         return array_map(static fn(FeatureFile $file): array => self::page($file, $presets), $files);
     }
 
+    private static function comparesPresets(FeatureFile $file): bool
+    {
+        return ($file->data['source'] ?? null) === self::PRESET_GUIDE;
+    }
+
     /**
      * @param ?array{columns: list<string>, rows: list<array{setting: string, values: list<?int>}>} $presets
      * @return PublicPage
@@ -64,7 +69,7 @@ final class ReferencePages
     private static function page(FeatureFile $file, ?array $presets): array
     {
         ['source' => $source, 'title' => $title] = $file->data;
-        $comparesPresets = $source === self::PRESET_GUIDE;
+        $comparesPresets = self::comparesPresets($file);
 
         return [
             'template' => self::TEMPLATE,

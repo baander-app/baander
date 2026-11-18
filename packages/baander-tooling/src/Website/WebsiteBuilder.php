@@ -439,7 +439,7 @@ final class WebsiteBuilder
             $document = $parser->parse($markdown);
             $headings = $this->headings($document);
             $first = $document->firstChild();
-            if (!$first instanceof Heading || $first->getLevel() !== 1 || count(array_keys(array_column($headings, 'level'), 1, true)) !== 1) {
+            if (!$first instanceof Heading || $first->getLevel() !== 1 || count(array_filter($headings, static fn(array $heading): bool => $heading['level'] === 1)) !== 1) {
                 $errors[] = $source . ': a reference source opens with its title, its only level-1 heading';
                 continue;
             }

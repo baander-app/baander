@@ -124,9 +124,14 @@ function mountSearch(container: HTMLElement, input: HTMLInputElement, status: HT
   // Pagefind lists a page's sections in page order; on a long page such as the glossary the matching
   // section would fall outside the first three, so the sections with the strongest matches are shown.
   function bestSections(sections: SearchSection[]): SearchSection[] {
-    const score = (section: SearchSection) => section.weighted_locations
-      .reduce((total, location) => total + location.balanced_score, 0);
-    return [...sections].sort((first, second) => score(second) - score(first)).slice(0, 3);
+    return sections
+      .map((section) => ({
+        section,
+        score: section.weighted_locations.reduce((total, location) => total + location.balanced_score, 0),
+      }))
+      .sort((first, second) => second.score - first.score)
+      .slice(0, 3)
+      .map(({ section }) => section);
   }
 
   container.addEventListener('keydown', (event) => {

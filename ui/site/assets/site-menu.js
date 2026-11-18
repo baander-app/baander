@@ -1,8 +1,5 @@
 (() => {
-  // The header menu's panels are native disclosures that open and close without this script. It
-  // adds what a native disclosure lacks: opening a panel moves focus to its first entry, and Escape,
-  // a click outside the panel or focus moving out of it closes the panel. The listeners sit on the
-  // document, so they work from the first paint, before the body has parsed.
+  // The listeners sit on the document, so they work from the first paint, before the body has parsed.
   const panels = 'details[data-site-menu]';
   const openPanels = () => document.querySelectorAll(`${panels}[open]`);
   const close = (panel) => {
