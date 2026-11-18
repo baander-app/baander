@@ -1063,13 +1063,14 @@ Open:
 
 ## Styling specs and sign-in settings conflict
 
-Delivered on the branch `fix/styling-specs-and-login-settings-conflict` on 2026-11-18
-(`81f4163b9` to this record) from the plan
-`docs/plans/2026-11-18-0004-fix-styling-specs-and-login-settings-conflict-plan.md`. The
-user asked on 2026-11-17 to repair the playback specs and close the test gaps the
-notification pane well left, and decided on 2026-11-18 to fix the volume path in this
-branch and to run the sidebar notification spec as a fixture user. The branch is local:
-not merged into `master` and not pushed.
+Delivered on `master` on 2026-11-18, rebased onto the website feature pages and
+fast-forwarded from `fix/styling-specs-and-login-settings-conflict` (`ecf82e931` to this
+record) from the plan
+`docs/plans/2026-11-18-0004-fix-styling-specs-and-login-settings-conflict-plan.md`, and
+pushed. The user asked on 2026-11-17 to repair the playback specs and close the test
+gaps the notification pane well left, and decided on 2026-11-18 to fix the volume path
+in this branch, to run the sidebar notification spec as a fixture user, and to merge and
+push. Commit IDs below are from before the rebase; the subjects are unchanged.
 
 - Sign-in conflict (`a01a62d12`). A fresh page knows no preference version. When the
   listening session's track or volume arrived before a preference family's first read,
