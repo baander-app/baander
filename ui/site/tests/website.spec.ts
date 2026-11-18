@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { test as base, expect } from '@playwright/test';
 
 const test = base.extend<{ outbound: string[] }>({
@@ -59,7 +61,8 @@ test('visitor reaches operating model and source-based installation', async ({ p
   const screenshot = page.getByRole('img', { name: /music library/ });
   await expect(screenshot).toBeVisible();
   expect(await screenshot.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
-  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'How it works' }).click();
+  await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'How it works' })).toHaveCount(0);
+  await page.locator('.hero').getByRole('link', { name: /How Bånder works/ }).click();
   await expect(page).toHaveURL(/#how-it-works$/);
   await expect(page.getByRole('heading', { name: 'Your files. A connected library.' })).toBeInViewport();
   await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: /Source/ }))
@@ -512,7 +515,11 @@ test('each script rule sample differs from its sample without the rule', async (
   expect(proportional.family).toMatch(/^"Geist Variable",/);
 });
 
-for (const path of ['/', '/docs/developer-guide/testing/', '/bac/']) {
+// The specs cannot read the site's data files, so the built sitemap says which feature pages exist.
+const sitemap = readFileSync(fileURLToPath(new URL('../../../var/website/sitemap.xml', import.meta.url)), 'utf8');
+const featurePages = [...sitemap.matchAll(/<loc>https:\/\/baander\.app(\/features\/[^<]+)<\/loc>/g)].map((match) => match[1]);
+
+for (const path of ['/', '/docs/developer-guide/testing/', '/bac/', '/features/', ...featurePages]) {
   test(`${path}: every character renders from a bundled face and only the slices the text reaches load`, async ({ page }) => {
     await page.goto(path);
     await expect(page.locator('main h1')).toBeVisible();

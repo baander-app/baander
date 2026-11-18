@@ -13,7 +13,7 @@ does not refresh a separately managed worker.
 
 ## Push Notifications (VAPID)
 
-Browser push notifications use the [Web Push protocol](https://developer.mozilla.org/en-US/docs/Web/API/Push_API) with VAPID (Voluntary Application Server Identification) for server authentication. Users subscribe from their browser after you configure the keys.
+Browser push notifications use the [Web Push protocol](https://developer.mozilla.org/en-US/docs/Web/API/Push_API) with VAPID (Voluntary Application Server Identification) for server authentication. A client subscribes through `POST /api/push/subscribe` after you configure the keys. The web application has no screen that subscribes, so a browser that only runs the web application receives no push.
 
 ### Setup
 
@@ -39,7 +39,7 @@ VAPID_PRIVATE_KEY=MIGT...
    [Background work](../workers/background-work.md). Recreate containers when changing values
    injected by Compose; restarting an existing container retains its environment.
 
-Users can then enable push notifications from their browser or client. To rotate the keys later, follow [VAPID key rotation](../maintenance/security.md#rotating-vapid-keys) in the security guide.
+A client that implements the subscription can then register for push notifications; the web application does not. To rotate the keys later, follow [VAPID key rotation](../maintenance/security.md#rotating-vapid-keys) in the security guide.
 
 ## Webhooks
 

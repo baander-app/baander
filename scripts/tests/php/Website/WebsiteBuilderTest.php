@@ -147,6 +147,51 @@ final class WebsiteBuilderTest extends TestCase
         self::assertSame('Bånder Audio Core', file_get_contents($this->root . '/var/website/bac/index.html'));
     }
 
+    public function testPublicPageTrailReachesItsTitleAndBreadcrumbs(): void
+    {
+        file_put_contents(
+            $this->root . '/ui/site/templates/feature.php',
+            '<?php echo json_encode(["title" => $page["meta"]->title, "breadcrumbs" => $page["meta"]->breadcrumbs, "structured" => json_decode($page["meta"]->structuredData, true)], JSON_THROW_ON_ERROR);',
+        );
+        $this->builder()->build(publicPages: [[
+            'template' => 'feature', 'url' => '/features/equalizer/', 'title' => 'Equalizer',
+            'description' => 'Shape the sound of every song.',
+            'trail' => [['name' => 'Features', 'url' => '/features/']], 'data' => [],
+        ]]);
+        $meta = json_decode((string) file_get_contents($this->root . '/var/website/features/equalizer/index.html'), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('Equalizer — Features — Bånder', $meta['title']);
+        self::assertSame([['name' => 'Bånder', 'url' => '/'], ['name' => 'Features', 'url' => '/features/']], $meta['breadcrumbs']);
+        self::assertSame(
+            ['https://baander.app/', 'https://baander.app/features/', 'https://baander.app/features/equalizer/'],
+            array_column($meta['structured']['@graph'][1]['itemListElement'], 'item'),
+        );
+    }
+
+    public function testEveryTemplateReceivesTheDimensionsOfEachPictureWithBothFiles(): void
+    {
+        mkdir($this->root . '/ui/site/assets/screenshots', 0700, true);
+        $fixtures = dirname(__DIR__) . '/Fixtures/';
+        copy($fixtures . 'picture-4x2.webp', $this->root . '/ui/site/assets/screenshots/music.webp');
+        copy($fixtures . 'picture-4x2.webp', $this->root . '/ui/site/assets/screenshots/music-light.webp');
+        copy($fixtures . 'picture-6x2.webp', $this->root . '/ui/site/assets/screenshots/dark-only.webp');
+        foreach (['home', 'page', 'extra'] as $template) {
+            file_put_contents($this->root . '/ui/site/templates/' . $template . '.php', '<?php echo json_encode($site["screenshots"], JSON_THROW_ON_ERROR);');
+        }
+        $this->builder()->build(publicPages: [['template' => 'extra', 'url' => '/extra/', 'title' => 'Extra', 'description' => 'Extra page', 'data' => []]]);
+        foreach (['index.html', 'docs/index.html', 'extra/index.html'] as $artifact) {
+            self::assertSame('{"music":{"width":4,"height":2}}', file_get_contents($this->root . '/var/website/' . $artifact), $artifact);
+        }
+
+        file_put_contents($this->root . '/ui/site/assets/screenshots/music.webp', 'not a picture');
+        try {
+            $this->builder()->build();
+            self::fail('A picture whose dimensions cannot be read must fail the build.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('Cannot read picture dimensions: ' . $this->root . '/ui/site/assets/screenshots/music.webp', $error->getMessage());
+        }
+        self::assertSame('{"music":{"width":4,"height":2}}', file_get_contents($this->root . '/var/website/index.html'));
+    }
+
     public function testInvalidPublicRouteKeepsPreviousArtifact(): void
     {
         $this->builder()->build();

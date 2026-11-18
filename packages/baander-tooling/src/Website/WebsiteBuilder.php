@@ -26,6 +26,15 @@ use RecursiveIteratorIterator;
 use RuntimeException;
 use Throwable;
 
+/**
+ * A public page names its template and data. Its trail lists the ancestors below the homepage. Its
+ * references are what it takes from the manual: links to manual pages, and blocks borrowed from
+ * them, each placed as `html` at the path `into` of the data; `file` is the repository file that
+ * states the references and is named when one does not resolve.
+ *
+ * @phpstan-type ManualBlockReference array{manual:string,contains:string,into:list<int|string>}
+ * @phpstan-type PublicPage array{template:string,url:string,title:string,description:string,stylesheet?:string,script?:string,sources?:list<string>,trail?:list<array{name:string,url:string}>,references?:array{file:string,links:list<string>,blocks:list<ManualBlockReference>},data:array<string,mixed>}
+ */
 final class WebsiteBuilder
 {
     private readonly Environment $environment;
@@ -36,6 +45,13 @@ final class WebsiteBuilder
     private array $documents = [];
     /** @var array<string,string> */
     private array $assets = [];
+    /** @var array<string,array{width:int,height:int}> the dimensions of each application picture, by name */
+    private array $screenshots = [];
+    /** The Mermaid statements the diagram renderer takes a figure's caption and alternative text from. */
+    private const array DIAGRAM_ACCESSIBILITY = [
+        'accTitle' => '/^\s*accTitle\s*:\s*.+$/m',
+        'accDescr' => '/^\s*accDescr\s*(?::\s*.+$|\{[\s\S]*?\})/m',
+    ];
     /** The public origin named by canonical links and the sitemap. */
     public const string ORIGIN = 'https://baander.app';
     /** Repository paths whose changes update the homepage's last-modified date. */
@@ -88,7 +104,7 @@ final class WebsiteBuilder
      * Any exception retains the previous complete artifact.
      * @param ?Closure(string,array<string,array{source:string,url:string,title:string,guide:?string,html:string,headings:list<array{id:string,title:string,level:int}>}>):void $afterRender
      * @param ?Closure(list<array{id:string,source:string,language:string,page:string,ordinal:int}>,string):array<string,string> $renderBlocks
-     * @param list<array{template:string,url:string,title:string,description:string,stylesheet?:string,script?:string,sources?:list<string>,data:array<string,mixed>}> $publicPages
+     * @param list<PublicPage> $publicPages
      * @param ?SourceHistory $history commit dates for the sitemap's last-modified values; without it they are omitted
      * @return array<string,array{source:string,url:string,title:string,guide:?string,html:string,headings:list<array{id:string,title:string,level:int}>}>
      */
@@ -100,6 +116,8 @@ final class WebsiteBuilder
         $this->discover();
         $this->transformLinks();
         $this->buildNavigation();
+        $borrowed = $this->manualReferences($publicPages);
+        $this->screenshots = Screenshots::pairs($this->root);
         $staging = $this->root . '/var/website-build-' . bin2hex(random_bytes(8));
         mkdir($staging, 0755, true);
         try {
@@ -122,7 +140,7 @@ final class WebsiteBuilder
             ]));
             $routes = array_fill_keys(array_column($this->pages, 'url'), true);
             $routes['/'] = $routes['/404.html'] = true;
-            foreach ($publicPages as $descriptor) {
+            foreach ($publicPages as $position => $descriptor) {
                 $url = $descriptor['url'];
                 if (!preg_match('~^/(?:[a-z0-9]+(?:-[a-z0-9]+)*/)+$~', $url) || isset($routes[$url]) || str_starts_with($url, '/docs/')) {
                     throw new RuntimeException('Invalid or duplicate public page URL: ' . $url);
@@ -136,12 +154,16 @@ final class WebsiteBuilder
                     url: $url,
                     heading: $descriptor['title'],
                     description: $descriptor['description'],
-                    trail: [],
+                    trail: $descriptor['trail'] ?? [],
                     lastModified: $history?->lastModified($descriptor['sources'] ?? ['ui/site/templates/' . $descriptor['template'] . '.php']),
                     schemaType: 'WebPage',
                 );
+                $data = $descriptor['data'];
+                foreach ($borrowed[$position] ?? [] as ['into' => $into, 'block' => $block]) {
+                    $data = self::withValue($data, [...$into, 'html'], $renderer->renderNodes([$block]));
+                }
                 $page = $descriptor + ['source' => '', 'guide' => null, 'html' => '', 'headings' => [], 'meta' => $meta];
-                $this->write($staging . $url . 'index.html', $this->template($descriptor['template'], $page, $descriptor['data']));
+                $this->write($staging . $url . 'index.html', $this->template($descriptor['template'], $page, $data));
             }
             $this->write($staging . '/sitemap.xml', $this->sitemap($publicPages, $history));
             $this->write($staging . '/robots.txt', Sitemap::robots(self::ORIGIN));
@@ -201,10 +223,7 @@ final class WebsiteBuilder
                     continue;
                 }
                 ++$ordinal;
-                $language = strtolower($node->getInfoWords()[0] ?? '');
-                if (str_starts_with($language, 'language-')) {
-                    $language = substr($language, strlen('language-'));
-                }
+                $language = self::language($node);
                 $id = 'block-' . substr(hash('sha256', $source . ':' . $ordinal), 0, 16);
                 if ($language === 'php') {
                     try {
@@ -244,6 +263,105 @@ final class WebsiteBuilder
         } catch (Throwable $error) {
             throw new RuntimeException($context . ': ' . $error->getMessage(), 0, $error);
         }
+    }
+
+    private static function language(FencedCode $block): string
+    {
+        $language = strtolower($block->getInfoWords()[0] ?? '');
+
+        return str_starts_with($language, 'language-') ? substr($language, strlen('language-')) : $language;
+    }
+
+    /**
+     * Checks what the public pages take from the manual against the discovered manual pages and
+     * reports every failure at once, each under the file that states the reference.
+     *
+     * @param list<PublicPage> $publicPages
+     * @return array<int, list<array{into: list<int|string>, block: FencedCode}>> the blocks each public page borrows, by the page's position
+     */
+    private function manualReferences(array $publicPages): array
+    {
+        $errors = [];
+        $borrowed = [];
+        foreach ($publicPages as $position => $descriptor) {
+            $references = $descriptor['references'] ?? ['file' => '', 'links' => [], 'blocks' => []];
+            foreach ($references['links'] as $href) {
+                $problem = $this->manualLinkProblem($href);
+                if ($problem !== null) {
+                    $errors[] = $references['file'] . ': ' . $problem;
+                }
+            }
+            foreach ($references['blocks'] as $reference) {
+                try {
+                    $borrowed[$position][] = ['into' => $reference['into'], 'block' => $this->manualBlock($reference)];
+                } catch (RuntimeException $error) {
+                    $errors[] = $references['file'] . ': ' . $error->getMessage();
+                }
+            }
+        }
+        if ($errors !== []) {
+            throw new RuntimeException(implode("\n", array_unique($errors)));
+        }
+
+        return $borrowed;
+    }
+
+    private function manualLinkProblem(string $href): ?string
+    {
+        [$url, $fragment] = array_pad(explode('#', $href, 2), 2, '');
+        $page = array_find($this->pages, static fn(array $page): bool => $page['url'] === $url);
+
+        return match (true) {
+            $page === null => 'manual link ' . $href . ' names no manual page',
+            $fragment !== '' && !in_array(rawurldecode($fragment), array_column($page['headings'], 'id'), true)
+                => 'manual link ' . $href . ' names a heading its page does not have',
+            default => null,
+        };
+    }
+
+    /**
+     * The one block of a manual page whose source contains the reference's text. A diagram must
+     * state its title and description, which the page that borrows it shows as caption and
+     * alternative text.
+     *
+     * @param ManualBlockReference $reference
+     */
+    private function manualBlock(array $reference): FencedCode
+    {
+        ['manual' => $source, 'contains' => $text] = $reference;
+        $document = $this->documents[$source] ?? throw new RuntimeException('manual block reference names no manual page: ' . $source);
+        $matches = [];
+        foreach ($document->iterator() as $node) {
+            if ($node instanceof FencedCode && str_contains($node->getLiteral(), $text)) {
+                $matches[] = $node;
+            }
+        }
+        if (count($matches) !== 1) {
+            throw new RuntimeException($matches === []
+                ? 'no block of ' . $source . ' contains "' . $text . '"'
+                : count($matches) . ' blocks of ' . $source . ' contain "' . $text . '"; a manual block reference matches exactly one');
+        }
+        $missing = self::language($matches[0]) === 'mermaid'
+            ? array_filter(self::DIAGRAM_ACCESSIBILITY, static fn(string $statement): bool => preg_match($statement, $matches[0]->getLiteral()) !== 1)
+            : [];
+        if ($missing !== []) {
+            throw new RuntimeException('the diagram of ' . $source . ' that contains "' . $text . '" has no ' . implode(' and no ', array_keys($missing)));
+        }
+
+        return $matches[0];
+    }
+
+    /**
+     * @param array<mixed> $data
+     * @param non-empty-list<int|string> $path
+     * @return array<mixed> the data with the value set at the path
+     */
+    private static function withValue(array $data, array $path, string $value): array
+    {
+        $key = array_shift($path);
+        $data[$key] = $path === [] ? $value : self::withValue($data[$key], $path, $value);
+
+        return $data;
     }
 
     private function discover(): void
@@ -478,7 +596,12 @@ final class WebsiteBuilder
     private function template(string $name, array $page, array $data = []): string
     {
         $navigation = $this->navigation;
-        $site = ['origin' => self::ORIGIN, 'repositoryUrl' => 'https://github.com/baander-app/baander', 'revisionUrl' => $this->revisionUrl];
+        $site = [
+            'origin' => self::ORIGIN,
+            'repositoryUrl' => 'https://github.com/baander-app/baander',
+            'revisionUrl' => $this->revisionUrl,
+            'screenshots' => $this->screenshots,
+        ];
         $template = $this->checkedSource($this->root . '/ui/site/templates/' . $name . '.php');
         if (function_exists('opcache_invalidate')) {
             opcache_invalidate($template, true);

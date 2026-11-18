@@ -1,4 +1,7 @@
-<?php declare(strict_types=1); ?>
+<?php declare(strict_types=1);
+// A picture reserves the size of its files unless the page that shows it states another.
+$screenshot += $site['screenshots'][$screenshot['name']];
+?>
 <?php foreach (['dark' => '', 'light' => '-light'] as $appearance => $suffix): ?>
   <img
     class="screenshot-<?= $appearance ?>"

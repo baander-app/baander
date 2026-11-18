@@ -25,12 +25,17 @@ credentials or other personal files under `var/website/`.
 
 Each build also writes `sitemap.xml` and `robots.txt` at the site root, so the
 sitemap follows every change without a separate step. It lists the homepage, the
-Bånder Audio Core page and every manual page at its `https://baander.app` URL, and never the
-404 page. Each `<lastmod>` is the date of the newest commit that touched the
-page's sources: the Markdown file for a manual page, and the template plus the
-data it renders for the homepage and the Bånder Audio Core page. Uncommitted edits do not move
-these dates, and a page whose sources have no commit yet is listed without one, so
-publish a build made from a commit.
+features overview, each feature page, the Bånder Audio Core page and every manual
+page at its `https://baander.app` URL, and never the 404 page. Each `<lastmod>` is
+the date of the newest commit that touched the page's sources:
+
+- **Manual page:** its Markdown file.
+- **Homepage and Bånder Audio Core page:** the template and the data it renders.
+- **Feature page:** its data file, the feature templates, its pictures and the
+  manual pages it borrows blocks from.
+
+Uncommitted edits do not move these dates, and a page whose sources have no commit
+yet is listed without one, so publish a build made from a commit.
 
 Every page also carries its search and link-preview metadata, built by
 `SearchMetadata` in the website tooling:
@@ -48,13 +53,14 @@ Every page also carries its search and link-preview metadata, built by
   describes the site and the software, including the ASCII spelling Baander.
 - **Link previews:** Open Graph and Twitter tags point to `assets/social-card.png`.
   The card repeats the homepage headline and hero description, written into
-  `scripts/social-card.mjs`. After changing the branding, the playback destinations
-  screenshot or that copy, rebuild and regenerate the card with
+  `scripts/social-card.mjs`, beside the homepage's hero picture, `library`. After
+  changing the branding, that picture or that copy, rebuild and regenerate the card with
   `(cd ui/site && node scripts/social-card.mjs)`.
 
 Manual text belongs in `docs-book/`. Homepage text and layout belong in
-`ui/site/templates/`; site styles and reviewed screenshots belong in
-`ui/site/assets/`. The build copies shared token CSS, SVG branding and licensed
+`ui/site/templates/`, and the text of the feature pages in `ui/site/features/`
+(see [Feature pages](#feature-pages)). Site styles and the pictures of the
+application belong in `ui/site/assets/`. The build copies shared token CSS, SVG branding and licensed
 fonts, then builds search from the rendered manual pages. For each rendered page it
 also copies the Geist and Noto slices that the page's text reaches first along the
 font stack, beyond the shared Latin faces, and links their rules from the page's
@@ -102,35 +108,9 @@ and dark SVG images that embed the Latin Geist face. Code and diagrams remain
 readable without JavaScript. The build uses the configured `tooling.budgets.website`
 deadline, which defaults to 600 seconds; set it in `dev.local.json` when needed.
 
-The music browsing and playback screenshot was captured from an isolated
-application preview on 2026-10-31, after the user requested library scans. The user
-reviewed and approved that image. Additional captures from the same date show the
-graphic equalizer, parametric controls, audio processing, A/B comparison and device
-profiles, and playlists. The playlist capture uses a demonstration playlist with
-eight real tracks, created only in the isolated preview. Dark and light variants
-were recaptured from matching paused views: each pair retains the same items,
-playback position, controls and scroll position. The processing slide captures
-the complete processing panel. Normal website builds reuse these checked-in
-images and do not need a running application.
-
-Screenshots are stored as lossless WebP, which is about half the size of the
-equivalent PNG with identical pixels. Encode new captures losslessly, for example
-with Pillow's `lossless=True`: lossy WebP blurs small interface text.
-
-The playback destinations screenshot was captured from an isolated application
-preview on 2026-11-04. A disposable live-updates fixture run supplied one user and
-twelve silent tracks; the run was cleaned up after capture. Four real browser
-sessions signed in as that user under the device names Studio MacBook, Living
-room, Kitchen iPad and iPhone. The captured session played a track, transferred it
-to Living room through the destination menu, then sought and paused it remotely,
-so the menu shows the real state after a transfer. Only the display metadata is
-staged: the capturing browser replaced the fixture's track, artist, album and
-genre names with fictional ones and served generated cover art. The light
-variant uses the same paused view with the application theme switched. Both use
-a 1136 × 710 viewport at device scale 2, which matches the full-width homepage
-column, so the image appears at its captured size with no downscaled text. AirPlay,
-Chromecast and DLNA are not shown because they are not available yet; the
-homepage marks them as planned. The user reviewed and approved both images.
+The pictures of the application are checked in under
+`ui/site/assets/screenshots/`, so a website build does not need a running
+application. [Pictures](#pictures) describes how they are taken.
 
 Run the rendering fixtures and dedicated site browser suite after building:
 
@@ -140,9 +120,154 @@ Run the rendering fixtures and dedicated site browser suite after building:
 ```
 
 The suite starts its own disposable static server. It uses a locally routed
-`website.baander.app` origin and does not require the application preview. Real
-application screenshot capture uses the separate worktree preview described in
-the [development environment guide](../../docs-book/part-2-developer-guide/getting-started/development-environment.md).
+`website.baander.app` origin and does not require the application preview. Only
+taking pictures needs a preview; see [Pictures](#pictures).
+
+## Feature pages
+
+`/features/` is an overview, and each feature has a page below it: an opening, a
+picture, a tour of two to four sections, a short guide, the feature's limits and
+links into the manual. The templates hold the layout and the fixed headings; the
+text of each page is data:
+
+- `ui/site/features/index.php` lists the pages in order under their groups, and
+  holds the overview's opening and its "More in Bånder" entries.
+- `ui/site/features/<slug>.php` holds one page, published at `/features/<slug>/`.
+
+`FeaturePages` in the website tooling states the fields of both files. To add a
+page:
+
+1. Copy an existing page file to `ui/site/features/<slug>.php` and rewrite it. The
+   composed title, `<name> — Features — Bånder`, may be at most 60 characters long,
+   and the description at most 155.
+2. Add the slug to a group's `pages` in `index.php`. That order is the order of the
+   overview and of each page's links to its neighbours.
+3. Give each figure a picture or a block of the manual:
+   - A picture is named as the capture script names it, with alternative text and
+     a caption: `'picture' => 'player-queue', 'alt' => '…', 'caption' => '…'`.
+   - A manual block names a manual file and a text that occurs in exactly one
+     code block or diagram of it:
+     `'manual' => 'part-2-developer-guide/…/x.md', 'contains' => '…'`. The page
+     shows the block as the manual renders it, so it changes with the manual.
+4. Run `make website-build`. The build reports every problem in the data files at
+   once, each under the file that has it.
+5. Run the browser suite. The specs read the list of feature pages from the built
+   sitemap, so a new page is tested without a change to a spec.
+
+Three rules apply to the text:
+
+- **Every claim has a source.** A statement about what Bånder does must be stated
+  by `README.md`, the operator guide or the developer guide. Correct the document
+  first when it is wrong. The commit that adds or changes a page carries the list
+  of its claims with the sentence and line that supports each.
+- **Limits are on the page.** What the feature does not do goes under `limits`,
+  and a feature that is not available yet appears only under `planned`.
+- **Registers.** The [house style](../../.agents/skills/prose-fix/references/project-house-style.md)
+  names the register of each part: the name, headline and lead use the Jobs
+  register, and the tour sections and guide steps the Chen register.
+
+`stability.spec.ts` paints every page in the fallback faces and in Geist. It fails
+when a block of text takes a different number of lines, when a line of the first
+screen breaks at a different word, or when a one-line link such as a `text-action`
+differs in width by 2.5 % or more. A sentence that just fills its line, or a short
+link label in the medium weight, can do that. Reword the text; do not change the
+CSS.
+
+## Pictures
+
+`ui/site/scripts/capture/capture.mjs` takes every picture of the application on
+the site. It signs in to a preview that holds a fictional sample library, does
+what each feature page's guide tells a visitor to do, and takes each picture twice
+from one state, in the dark and in the light theme. The pairs go to
+`ui/site/assets/screenshots/` as `<name>.webp` and `<name>-light.webp`.
+
+`ui/site/features/captures.json` records each picture: the scene that took it, the
+newest commit of the application's source, the date and the SHA-256 of both files.
+The build refuses a feature page that shows a picture without a record, or a file
+that is not the recorded one, so a picture cannot be edited by hand or retaken in
+one theme only.
+
+The script needs ffmpeg with its `libwebp` encoder, Playwright's Chromium and
+Firefox, and a worktree preview. It checks ffmpeg before it opens a browser. To
+retake the pictures from an empty preview:
+
+1. Generate the sample library: 12 artists, 15 albums and 92 tracks with tags and
+   covers, none of them real.
+
+   ```bash
+   node ui/site/scripts/capture/sample-library.mjs var/site-capture/library
+   ```
+
+2. Make it the preview's only library. Write `dev.local.json` in the worktree's
+   root with the absolute path of that directory:
+
+   ```json
+   {
+       "libraries": [
+           { "slug": "music", "name": "Music", "type": "music", "path": "/absolute/path/to/var/site-capture/library" }
+       ]
+   }
+   ```
+
+3. Start the preview, switch off the two lookups at outside services, and scan the
+   library. Both settings are off by default, but a preview keeps what was set in it
+   before, and with either one on the scan would send the sample names to
+   MusicBrainz or LRCLIB:
+
+   ```bash
+   make preview-up
+   make exec cmd="php bin/console app:settings:set metadata.auto_sync false"
+   make exec cmd="php bin/console app:settings:set lyrics.auto_fetch false"
+   make exec cmd="php bin/console app:library:scan music"
+   ```
+
+4. Delete the two development accounts a preview starts with. The script creates
+   three sample accounts of its own and refuses a preview that holds any other:
+
+   ```bash
+   make exec cmd="php bin/console app:user:delete admin@baander.test --force"
+   make exec cmd="php bin/console app:user:delete user@baander.test --force"
+   ```
+
+5. Take the pictures:
+
+   ```bash
+   (cd ui/site && corepack yarn playwright install chromium firefox)
+   node ui/site/scripts/capture/capture.mjs --base-url "$(make preview-url)"
+   ```
+
+   `--scene <name>` runs one scene. `--out <directory>` writes a trial run and its
+   record into that directory and leaves the site's files alone.
+
+6. Look at every pair in `var/site-capture/contact-sheet.html`, then run
+   `make website-build` and the browser suite.
+
+Before the first picture the script checks the preview and stops when anything
+differs:
+
+- The catalog holds exactly the sample library's artists and albums, and the
+  sample library is the only library.
+- The accounts are exactly the three sample accounts.
+- `metadata.auto_sync` and `lyrics.auto_fetch` are off, so that no sample name is
+  sent to a metadata or lyrics provider. The scenes open no screen that asks one.
+- No scan and no background job is unfinished.
+
+The script resets and deletes nothing. It keeps the sample accounts' passwords in
+`var/site-capture/accounts.json`, which is untracked; do not commit it. A scene
+that needs state, such as a playlist or a device profile, looks for it by name
+before it creates it, so a second run photographs the same state.
+
+A window picture shows a 1136 × 710 window at device scale 2. The site's full
+column is 1136 px wide, so text in the picture is never scaled up. A crop shows
+one part of the window, and a page shows it at no more than half its pixel width.
+The files are lossless WebP, compared pixel for pixel with what the browser drew;
+lossy WebP blurs small interface text.
+
+The playback destinations scene signs one account in to Chromium and Firefox and
+expects the application to list them as "Chrome on Linux" and "Firefox on Linux".
+On another operating system, change those two names in
+`ui/site/scripts/capture/scenes/destinations.mjs`. After retaking `library`,
+regenerate the link-preview card.
 
 ## CI artifact
 

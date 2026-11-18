@@ -1,0 +1,71 @@
+/* The features overview and the feature pages use the homepage's column, hero and sections; this
+   sheet adds what those lack. */
+.feature-page, .features-page { max-width: 1200px; margin: auto; padding: 0 32px; }
+.feature-breadcrumb { margin: 0; padding-top: 24px; }
+.feature-page .hero { padding-top: 48px; }
+/* The lead is a paragraph, not the homepage's two short lines, so it gets a reading measure. Lines
+   filled to the edge often break at different words in the fallback face and in Geist, and a
+   centred paragraph then slides sideways when Geist arrives. Balanced lines break at the same
+   words in both unless the number of lines differs. */
+:is(.feature-page, .features-page) .hero-description { max-width: 720px; margin-inline: auto; text-wrap: balance; }
+.hero-description + .hero-description { margin-top: 16px; }
+/* A section heading here opens its column; the homepage's stands below an eyebrow. */
+:is(.feature-page, .features-page) .section-intro h2:first-child { margin-top: 0; }
+.features-page .hero { padding-bottom: 64px; border-bottom: 1px solid var(--color-border); }
+.features-page .home-section:last-child { border-bottom: 0; }
+
+/* A picture is shown at half its pixel size at most. The figure carries that width and the picture
+   fills the figure, so it scales down with a narrow column and is never enlarged. */
+.feature-page .app-screenshot { width: 100%; max-width: var(--picture-width); margin-inline: auto; }
+.feature-manual-block { min-width: 0; }
+.feature-manual-block > :last-child { margin-bottom: 0; }
+.hero .feature-manual-block { margin-top: 48px; }
+/* A borrowed diagram stands as a picture here. Its full-size link and its source stay on the
+   manual page it comes from. The selector outranks the theme rules that show one link of the pair. */
+:root .feature-page .feature-manual-block .diagram > a, .feature-manual-block .diagram details { display: none; }
+
+/* Two equal columns: text beside its picture in the tour, a heading beside its list elsewhere. */
+.feature-page .experience-feature, .feature-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 64px; }
+.feature-columns { align-items: baseline; }
+.feature-columns .section-intro > :last-child { margin-bottom: 0; }
+.feature-text .section-intro { max-width: 720px; }
+.feature-text .section-intro p:last-child { margin-bottom: 0; }
+
+.feature-limits p { font-size: 16px; }
+.feature-page .feature-note { margin-top: 32px; }
+.feature-page .feature-note + .feature-note { margin-top: 16px; }
+.feature-page .feature-note p { color: var(--color-muted-foreground); }
+
+/* Rows of the overview: a page to open, or a feature the manual describes. */
+.feature-more { list-style: none; margin: 0; padding: 0; }
+.feature-cards > a, .feature-more > li { padding: 24px 0; border-bottom: 1px solid var(--color-border); }
+.feature-cards > a:first-child, .feature-more > li:first-child { padding-top: 0; }
+.feature-cards > a:last-child, .feature-more > li:last-child { border-bottom: 0; padding-bottom: 0; }
+.feature-cards > a { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; color: var(--color-foreground); text-decoration: none; }
+.feature-cards h3 { font-size: 20px; }
+.feature-cards p { grid-column: 1; color: var(--color-muted-foreground); font-size: 14px; }
+.feature-cards .arrow { grid-area: 1 / 2; }
+.feature-cards > a:hover h3 { color: var(--color-accent-text); text-decoration: underline; text-underline-offset: .2em; }
+.feature-more h3 { margin-bottom: 8px; font-size: 18px; }
+.feature-more p { margin-bottom: 16px; color: var(--color-muted-foreground); font-size: 14px; }
+
+/* Previous, overview, next. Each keeps its place when a neighbour is absent. */
+.feature-pager { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: baseline; gap: 24px; padding: 32px 0; }
+.feature-pager > a { grid-row: 1; }
+.feature-pager [rel="prev"] { grid-column: 1; justify-self: start; }
+.feature-pager-overview { grid-column: 2; }
+.feature-pager [rel="next"] { grid-column: 3; justify-self: end; text-align: right; }
+
+@media (max-width: 860px) {
+  .feature-page .experience-feature, .feature-columns { gap: 32px; }
+}
+@media (max-width: 640px) {
+  .feature-page, .features-page { padding-inline: 24px; }
+  .feature-page .hero { padding-top: 32px; }
+  .features-page .hero { padding-bottom: 48px; }
+  .feature-page .experience-feature, .feature-columns { grid-template-columns: minmax(0, 1fr); }
+  .feature-pager { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .feature-pager > a { grid-row: 2; }
+  .feature-pager [rel="next"] { grid-column: 2; }
+  .feature-pager .feature-pager-overview { grid-area: 1 / 1 / auto / -1; justify-self: center; }
+}

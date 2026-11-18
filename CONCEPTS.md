@@ -994,3 +994,17 @@ The recessed surface treatment of the web interface: a face shaded darker toward
 *Avoid: recess or centerpiece for the treatment itself; the centerpiece is the footer's central display, which is one holder of the well.*
 
 The music footer's central display holds the well by default. The sidebar notification pane takes it while open and the footer display goes flat; the two fade over the same duration (the well handoff).
+
+## Public website
+
+### Feature page
+
+A page of the public website that presents one Bånder feature to listeners, operators or developers: an opening, pictures taken from the application or blocks shown as the manual renders them, a short guide and the feature's documented limits. Its content comes from one data file, and every claim on it cites maintained documentation.
+
+### Sample library
+
+The generated, fictional music collection that website pictures show: invented artists, albums and songs with generated covers, synthesized audio and lyric files. A worktree preview scans it like any other library. It never contains a real release.
+
+### Capture record
+
+The tracked entry for one website picture: the capture scene that took it, the application commit it shows, the date, and a checksum of its dark and light files. The site build refuses a feature page that shows a picture without a matching record, and the site's script tests refuse any picture file without one.

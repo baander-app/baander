@@ -1,0 +1,290 @@
+{
+  "administration": {
+    "scene": "administration",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "d5a16d31cf5ebfd2f9316ecdeee67e01c46994f3d3f6729b39af2d52b82142e7",
+      "light": "a9d72b08b8adac4934fd8da820eeb12b0649b8d6fdd5f41ba9076f82c23dd921"
+    }
+  },
+  "administration-access": {
+    "scene": "administration",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "3ffb8a2a11d7096b07ea09322b835443f42b7d5cfe44160cdfc4fee44f852fa2",
+      "light": "fa6abac4579930d3607a9f1c5ee39fc973abbe3ee67db5b3a3ff02aec93dd7c9"
+    }
+  },
+  "administration-job": {
+    "scene": "administration",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "680409b62ee30ee47d7defa80e0df46ec1e3bda5c981ae966d4ad144c7042dcd",
+      "light": "beae1976763396a666acee2c61d1e354382e4a73036721b813d0c551498005b8"
+    }
+  },
+  "administration-scheduler": {
+    "scene": "administration",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "7b1709939b21c45730a8283117125f85305c64906518290b3284e5564b67c0a8",
+      "light": "3d4d926d388e07cb8336a4c8b97aa64489aed5dcee868a69c3bdba1976b912b2"
+    }
+  },
+  "destinations-menu": {
+    "scene": "destinations",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "f06cc68f17a4ae8ec4c7be039457c518f02227e7280a1c061f80c17786b59a92",
+      "light": "9b73ae52a98c07c38af69db48cf10392706f8c7fe692e6226cdf1a3588338145"
+    }
+  },
+  "destinations-return": {
+    "scene": "destinations",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "23e9d62dbb3233935f8e3011c311e89ff7e97d03c9077125afaffacd7c299461",
+      "light": "307f9c0666d6e34274fda7b4ffc065181a75e907ec7b01ac276cf675589f56c6"
+    }
+  },
+  "destinations-window": {
+    "scene": "destinations",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "1261d399be68fdb31c75c1eccfb6ca4c3a3ddbb0a76cdcbb61ba4d4da74593f8",
+      "light": "b813587fae95fcb690f1074ac6e4f2736d53a527d5c1a46d442518912e8e2cf2"
+    }
+  },
+  "equalizer-compare": {
+    "scene": "equalizer",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "ded0913e671a0f1d5283630f02fa815828093399b9d55dfc8cd299ef71374ffb",
+      "light": "0dcedb6dae034611879582be649c199b6b5fbf7da1877270568c2ef11c0c139b"
+    }
+  },
+  "equalizer-curve": {
+    "scene": "equalizer",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "cd700ead7f558d4a1a4922320621fef4fc95e191af785301f8ed598106972af2",
+      "light": "6b637b2cc853b32d9696188565dbfce444d78d6f4cfefbf9fa3d2f49bb7796db"
+    }
+  },
+  "equalizer-device-profiles": {
+    "scene": "equalizer",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "188112e50e2c4d9900a655f4f5eca9fa1ca55dbf2ee24958902d991026191326",
+      "light": "5281b6f548e2e9d24098060916d4304c245551fc0754e1cc7e012928223adf2f"
+    }
+  },
+  "equalizer-dynamics": {
+    "scene": "equalizer",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "39cdf19deec09a4759486311ffecc6f8f940b94d978f51b90c390f7dd4f8a171",
+      "light": "75ce21a0ba01fc7598a82c0c35a12cf87ec6efeef98ed6783f1f6e83251535d1"
+    }
+  },
+  "equalizer-window": {
+    "scene": "equalizer",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "12e123fc4f3ded1c9bcdc2c5b99a5a778eb3fdad447926a20fe0b385607804a9",
+      "light": "966a8582e2886d580afb03e3376e3d3d5b73411c908a18654145abc23763a123"
+    }
+  },
+  "equalizer-window-compare": {
+    "scene": "equalizer",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "1abfa29955a31eec4cda4865508399fd8c1a518218feef5aad6679b1faf75c55",
+      "light": "c2f74b2641de39261449f0ff291a4e2896b7b864935984ae1df5f465f1cda7ba"
+    }
+  },
+  "equalizer-window-curve": {
+    "scene": "equalizer",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "19ece39691d0e580295f25b5f24f124929468fa5091f040929bfe411db71ab22",
+      "light": "1978dc47a3e102d61aa76cae1fa021a2e0fb4df4e4faf5e0947efe8f83b5b3f8"
+    }
+  },
+  "equalizer-window-dynamics": {
+    "scene": "equalizer",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "36dd103eecb1afd8609f1259ab7250ccca9df70f9e7d46881a5e9d5c1cd5e65f",
+      "light": "17578fc9b87e5f6faf3e2bed06a2f57c358f889342ee439110cc0a098c73764c"
+    }
+  },
+  "libraries": {
+    "scene": "libraries",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "c09176e0f5d2b492b332a275620a919e6983afe926f1e134a7f122323cb92c44",
+      "light": "3b68a4be222b0efb3722d4d3524bd568c040c1dd7efcab912fe3aa421e9da85c"
+    }
+  },
+  "libraries-add": {
+    "scene": "libraries",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "00702d43e73b4398c3ef140f1f668a7936406ec154eea70ded76280ac0544df9",
+      "light": "565ed817a3ba61a99463abccc31a28b8ae1b694866f618c706b11fccb7ed1e1c"
+    }
+  },
+  "libraries-enrichment": {
+    "scene": "libraries",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "318b3c1ec26bfc741536b3835dabaef8f798eceffa0776c39ba2125377c64eb8",
+      "light": "e461d0154cc2d2464e3c62083a72d83206129e9af9b27cf9651c30d9948713fe"
+    }
+  },
+  "libraries-scan": {
+    "scene": "libraries",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "28fe0672f0e53ec19d5b9ab103953a540b64dc3956d6fa1d78328794cc4dd649",
+      "light": "81d6ea77059a214cb55019293b0e462ef732402cfb5c7234eaf308e28dcae742"
+    }
+  },
+  "library": {
+    "scene": "library",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "767181a6a59315299c8e27b86bed8799cca928aa43ef52b5642b6b0729aa22d0",
+      "light": "de04099c2e2a6af7f7f2b19a73a06e97dc42d2d94cb4fd6f365c40d4b0f3ce93"
+    }
+  },
+  "library-album": {
+    "scene": "library",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "7796717bb86db4baff7f7a4b6b85136369d8d52a6f6b58e5eee14c3c49be523b",
+      "light": "582aa92ecbac0a66c9510c4270f48635e1cc9029925fb79206e53c047eb61e7d"
+    }
+  },
+  "library-albums": {
+    "scene": "library",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "5355124b5afd2bafea64e6392feec46246eec2eee3a85108950eb8fe93cb7a10",
+      "light": "d2dee796208f9ec151baa7b0dbfc31cc1fa94f6453dc5b48387ed776c6a40050"
+    }
+  },
+  "library-search": {
+    "scene": "library",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "e04b975a93c679d0c2b013a4b390decb4bc8d473d23c92f946bce63d0aaa4ff8",
+      "light": "b77e58070c2c436ab5699afd2a2c0475507916976e9780eaa68e75d1eaccc8b2"
+    }
+  },
+  "library-songs": {
+    "scene": "library",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "f4afa1d191d0af36e2061f17cdeb1816359bbc3b86939521e9ddeeedc8fa9243",
+      "light": "4ebc8d39a11bce3935b6a602473ef8dcd246f4996fa7236f8aadd04993e97b29"
+    }
+  },
+  "player": {
+    "scene": "player",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "1c73a5f2e3f2a626b1b9802d9d707645ec0a1e309fd4fb0a5164b52bf7a9a1ab",
+      "light": "bf175db5059efc81dfeb618df2b46a31611894c87ae296818a596706afdbefd5"
+    }
+  },
+  "player-next": {
+    "scene": "player",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "12777b2bd1fdde2527dc868be4bd541b1241a4d46a1e073ac43700990959d94a",
+      "light": "ec9e5d7ee2a57a8db716694875d24e961f7b45e9eca9e8c8391581fb3f36f764"
+    }
+  },
+  "player-queue": {
+    "scene": "player",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "387829eb41a4efdcbccb7559575f8502f81d31393e9c4c0b03ecd15c1b79847e",
+      "light": "d4230e641f336bf3561447fc3a4a51e37b91a6855d7290cbdf62af9a48745988"
+    }
+  },
+  "player-shuffle": {
+    "scene": "player",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "dee6df87562000c0994a1fb2a898894aedd07f1b8b9b0f71f0c54bcddc2a446c",
+      "light": "22b0c5afb2ab5f669a8415c26390d27d9eaf0a8d79f22c2f57de8c875310de41"
+    }
+  },
+  "playlists-add": {
+    "scene": "playlists",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "bd41a2ef582b79a0550ee89740e2ace846d1f258eee40f3f084a0dfb684056c2",
+      "light": "58d7a01a9dee5f43cd6b2a87b9b01931c29a732e72820f55500493d943ce06a6"
+    }
+  },
+  "playlists-share": {
+    "scene": "playlists",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "b91458837f8909e11f6f98d9d92658e134c0767cff220a96032fc004962d2a66",
+      "light": "37b34b63a3dc3cb3e48bf48faa966d0c0eee31e47b8ddb77ff2875720aa16068"
+    }
+  },
+  "playlists-shared": {
+    "scene": "playlists",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "b744bd6a55c6c237fb2a6b4b7a976d503f44fe470b189701109106e79fc17a63",
+      "light": "c7aeabd15d88d75103cb596b9721b9193a7cbfda76992b7255cd7f15b465ff1e"
+    }
+  },
+  "playlists-window": {
+    "scene": "playlists",
+    "commit": "0326c6acb67e44ab6ac79bac9bb61e230e04c878",
+    "date": "2026-11-17",
+    "sha256": {
+      "dark": "37dbf39260d5ba8ef463248605eab36a210e4ee31268af50193e6ae55fb7ff80",
+      "light": "639c3ba2f6e7ee738de5bef77f49a8cef8aacf551081f8c562630a64e12675c8"
+    }
+  }
+}

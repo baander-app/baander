@@ -21,11 +21,12 @@ on your server.
 A library connects a named collection to a directory of media files. Scanning it
 finds files and queues them for ingestion. Workers read their tags and technical
 information and add them to the catalog. You can keep collections in separate
-libraries and rescan them as files change. Continuous filesystem watching is
-available through a separately started watcher.
+libraries and rescan them as files change. The `app:watch-files` command prints
+filesystem changes as they happen; it does not start a scan or update the catalog.
 
 In the web app, move between artist pages, albums, track lists and genres, or search
-for artists, albums and songs directly. Album covers can be extracted from embedded
+for artists, albums and songs directly. Ctrl+K, or Cmd+K on a Mac, opens that search
+from any page. Album covers can be extracted from embedded
 artwork, so a tagged music collection provides the starting point for browsing.
 Recent listening on the home page helps you return to music you have already played.
 
@@ -35,10 +36,12 @@ scanning, supported file formats, cover extraction and file watching.
 ## Add metadata, artwork and lyrics
 
 Bånder can supplement file tags with information from external services.
-MusicBrainz provides the primary music metadata source, Discogs supplies fallback
-release information and artwork, and Last.fm supports optional lookups for artist
-biographies, tags and related artists. Provider configuration determines which sources are
-available; enrichment sends requests to those services.
+MusicBrainz is the source for matching albums, songs and artists, and a match can
+add the release's front cover from the Cover Art Archive. Discogs answers metadata
+searches that name it as their source, and Last.fm supplies artist search and artist
+information for metadata browsing; neither takes part in matching. Provider
+configuration determines which sources are available; enrichment sends requests to
+those services.
 
 Lyrics can come from `.lrc` files alongside your tracks or be fetched from LRCLIB.
 Automatic metadata synchronization and automatic lyrics fetching for newly indexed
@@ -53,12 +56,17 @@ for the settings that apply when a scan discovers new music.
 
 The music player includes a playback queue, shuffle and repeat controls. You can
 browse the catalog while listening, choose what plays next and return to the
-current track without leaving the web app. Playback preferences include crossfade.
+current track without leaving the web app. In the queue you can drag a waiting song
+to another place or remove it. Playback preferences include crossfade.
+A panel beside the queue shows the lyrics fetched from LRCLIB for the song that is
+playing. When those lyrics are synced, it highlights the current line, keeps it in
+view and moves playback to a line you select.
 
 The equalizer offers presets and graphic or parametric controls, with saved
 profiles for different audio devices. Additional controls include compression,
 stereo width and crossfeed, allowing listeners to adjust the sound for their
-headphones or speakers.
+headphones or speakers. You can capture two sets of equalizer and processing
+settings as A and B and switch between them to compare.
 
 For clients that need another audio format, the server can transcode tracks to
 Opus, AAC or MP3. Audio transcoding must be enabled explicitly. Internet radio is
@@ -66,10 +74,11 @@ also available in the web interface, with country browsing and starred stations.
 
 ## Build and share playlists
 
-Create playlists by choosing songs yourself, or use smart playlists whose rules
-select music from the catalog. Playlists have their own pages for browsing and
-playback, and can be shared with other users on the same server. Collaborator
-permissions control who can contribute to a shared playlist.
+Create playlists by choosing songs yourself. Playlists have their own pages for
+browsing and playback, and can be shared with other users on the same server.
+Collaborator permissions control who can contribute to a shared playlist. The create
+form also has a smart playlist switch: Bånder stores the rules entered there and
+does not evaluate them, so they select no music.
 
 ## Browse and play movies
 
@@ -90,9 +99,11 @@ personal settings. Authentication includes password login, passkeys and TOTP
 two-factor authentication. Users can manage registered devices and passkeys, while
 operators manage accounts and roles.
 
-Notifications can appear in the application or be delivered through configured
-email, browser push and webhook channels. Email and push require their respective
-service settings and keys; webhooks are managed by administrators.
+Notifications appear in the application and can be delivered through configured
+email and webhook channels. Email requires mail service settings; webhooks are
+managed by administrators. With VAPID keys configured, the server also sends Web
+Push to clients that subscribe through its API; the web application has no way to
+subscribe.
 
 The [user-management guide](docs-book/part-1-operator-guide/administration/user-management.md)
 explains account administration. The [notification guide](docs-book/part-1-operator-guide/administration/notifications.md)
@@ -109,10 +120,10 @@ and media encoding.
 
 Web and workers need access to the same media paths through shared named volumes.
 Source media and generated output have different access requirements. The worker
-controller runs on the trusted Docker host and admits separate control and
-execution containers with explicit CPU and memory budgets. Read the deployment
-prerequisites before choosing hardware: the worker requirements are larger than
-those of the web process alone.
+controller runs on the trusted Docker host and admits a pair of control and
+execution containers. The pair carries no CPU or memory limit; the configured media
+slots bound its work. Read the deployment prerequisites before choosing hardware:
+the worker requirements are larger than those of the web process alone.
 
 Health endpoints, background-job monitoring and console commands help operators
 inspect scans, failures and worker availability. The [operator guide](docs-book/part-1-operator-guide/README.md)

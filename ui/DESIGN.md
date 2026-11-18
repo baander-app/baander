@@ -23,7 +23,11 @@ Its page composition adapts to a public introduction and long-form manuals. Body
 copy may use 16px text, the homepage may use larger responsive headings, and section
 spacing may use the shared 48px and 64px spacing tokens. Keep the shared typography,
 semantic color roles, radii, visible focus and restrained surfaces. Use the generated
-light and dark themes and existing SVG branding. The website adds no surface
+light and dark themes and existing SVG branding. The feature pages under `/features/`
+follow the homepage's composition: a centred opening, a full-width picture, and
+sections that set a short text beside a picture. A picture on a feature page is shown
+at half its pixel size at most and is never enlarged, so a capture taken at device
+scale 2 appears at the size it was captured. The website adds no surface
 gradients or shadows; the player material remains inside real application
 screenshots.
 

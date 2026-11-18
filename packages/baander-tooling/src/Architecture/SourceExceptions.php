@@ -30,6 +30,13 @@ final class SourceExceptions
             'reason' => 'Render a repository-owned website template after source containment checks; implementation classes still load through Composer.',
         ],
         [
+            'path' => 'packages/baander-tooling/src/Website/FeatureFile.php',
+            'rule' => 'manual-loader',
+            'anchor' => '        $data = (static fn(): mixed => require $absolute)();',
+            'count' => 1,
+            'reason' => 'Read a repository-owned feature data file, which returns its page as an array; implementation classes still load through Composer.',
+        ],
+        [
             'path' => 'scripts/tests/php/DevelopmentRetainedStateTest.php',
             'rule' => 'application-root',
             'anchor' => '        yield \'literal environment\' => ["ENV APP_HOME=/var/www/html \\\\\\n    APP_ENV=prod\\nWORKDIR \\${APP_HOME}\\n", true];',

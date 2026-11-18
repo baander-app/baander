@@ -93,6 +93,21 @@ src/<Context>/
 
 **Dependency flow:** Interface → Application → Domain. Infrastructure implements Domain repository interfaces and Application ports, but Domain never depends on Infrastructure. This inversion keeps business logic framework-free and testable.
 
+The diagram draws this flow for a context with the full structure. A solid arrow is a dependency, a dotted arrow marks the interfaces that Infrastructure implements, and the arrow that leaves the context points to the Shared kernel that all contexts use.
+
+```mermaid
+flowchart TB
+    accTitle: The four layers of a bounded context and the Shared kernel
+    accDescr: A bounded context with the full structure has four layers. Dependencies run from Interface to Application to Domain. Infrastructure implements the Domain repository interfaces and the Application ports, and Domain never depends on Infrastructure. Every context uses the Shared kernel in src/Shared, which is not a bounded context.
+    subgraph context[Bounded context]
+        interface[Interface] --> application[Application]
+        application --> domain[Domain]
+        infrastructure[Infrastructure] -.->|implements| application
+        infrastructure -.->|implements| domain
+    end
+    context --> shared[Shared kernel]
+```
+
 ### Domain
 
 Entities, value objects, repository interfaces and domain services: this is where business rules live. In the bounded contexts it is pure PHP with no framework dependencies. The [architecture rules](../../../.agents/rules/architecture-rules.md) record two exceptions in the Shared kernel: the `Uuid` value type wraps Symfony UID, and the outbox repository and compiler pass under `Domain/Event/Outbox/` use DBAL and the service container.

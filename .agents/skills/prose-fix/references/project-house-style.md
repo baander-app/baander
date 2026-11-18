@@ -12,11 +12,11 @@ skill; choose by section when a document mixes explanation, reference, and proce
 
 | Register | Documents and sections |
 |---|---|
-| Chen | `README.md`; introductions and task explanations in `docs-book/part-1-operator-guide/`; tutorials, troubleshooting, and development guides in `docs-book/part-2-developer-guide/` and `dev-docs/` |
+| Chen | `README.md`; introductions and task explanations in `docs-book/part-1-operator-guide/`; tutorials, troubleshooting, and development guides in `docs-book/part-2-developer-guide/` and `dev-docs/`; the tour sections and guide steps of the feature pages in `ui/site/features/` |
 | Knuth | Ordered deployment, upgrade, recovery, and key-management procedures, including procedural sections of `docs-book/part-1-operator-guide/getting-started/installation.md`, `maintenance/upgrading.md`, and `maintenance/security.md` |
 | Stroustrup | Architecture, bounded-context descriptions, API and configuration references, coding conventions, and designs in `docs/plans/` and `STRATEGY.md` |
 | Mixed | CLI pages in `docs-book/part-1-operator-guide/commands/`: Stroustrup for arguments, options, and behavior; Knuth for ordered procedures; Chen for examples and troubleshooting. Contribution guides: Stroustrup for rules and Chen for workflow explanations. |
-| Jobs | Openings of page copy written in `ui/site/templates/`: the hero of `home.php` and the lead of `bac.php`, meaning the copy before the page's first section heading. The rest of each page keeps its other registers. Manual pages the site renders from `docs-book/` keep the rows above. Anywhere else, only when the request names Jobs. |
+| Jobs | Openings of page copy written in `ui/site/templates/`: the hero of `home.php` and the lead of `bac.php`, meaning the copy before the page's first section heading. Openings of the feature pages and of the features overview in `ui/site/features/`: the name, headline and lead of each data file and the opening of `index.php`. The rest of each page keeps its other registers. Manual pages the site renders from `docs-book/` keep the rows above. Anywhere else, only when the request names Jobs. |
 
 A user-specified voice overrides these defaults.
 
@@ -40,6 +40,10 @@ A user-specified voice overrides these defaults.
   Domain/Application/Infrastructure/Interface layers, commands, events, and queries
   are not interchangeable synonyms. Keep existing identifiers and product spelling
   (`Bånder` or `Baander`) as written unless naming changes are requested.
+- On a feature page in `ui/site/features/`, the claim rules of "Present a feature" in
+  `../SKILL.md` apply to every sentence, whichever register it is written in, and the
+  page's claim ledger covers the whole page. A feature a page leads with keeps its
+  documented limits in the page's `limits` list.
 - Presentation copy in the Jobs register names no competing product. The competitor
   table in `STRATEGY.md` is positioning, not a source for copy, and measured
   comparisons stay on pages that report the measurement, such as the Bånder Audio

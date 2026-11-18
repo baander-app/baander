@@ -17,14 +17,12 @@ include __DIR__ . '/header.php';
     <figure class="app-screenshot hero-screenshot">
       <?php
       $screenshot = [
-          'name' => 'music',
-          'alt' => "Bånder's music library in the browser, with album artwork and playback controls.",
-          'width' => 1600,
-          'height' => 1000,
+          'name' => 'library',
+          'alt' => "Bånder's music library in the browser: the home page with recently played songs, albums and the player.",
       ];
       include __DIR__ . '/screenshot.php';
       ?>
-      <figcaption>Music browsing and playback · Captured in Bånder</figcaption>
+      <figcaption><a href="/features/library/">Music browsing and playback</a> · Captured in Bånder with sample music</figcaption>
     </figure>
   </section>
 
@@ -33,6 +31,7 @@ include __DIR__ . '/header.php';
       <p class="eyebrow">The equalizer</p>
       <h2 id="equalizer-title">Find your sound.</h2>
       <p>Start with a preset or adjust the sound yourself. Compare settings and save profiles for the way you listen.</p>
+      <a class="text-action" href="/features/equalizer/">Read the equalizer page <span class="arrow" aria-hidden="true">→</span></a>
     </div>
     <div class="carousel-slides">
       <div class="experience-feature carousel-slide" id="eq-graphic" data-carousel-slide data-slide-title="Graphic EQ and input analyzer">
@@ -45,15 +44,13 @@ include __DIR__ . '/header.php';
         <figure class="app-screenshot feature-screenshot">
           <?php
           $screenshot = [
-              'name' => 'equalizer',
-              'alt' => "Bånder's graphic equalizer, presets and live input analyzer.",
-              'width' => 1600,
-              'height' => 1000,
+              'name' => 'equalizer-window',
+              'alt' => "Bånder's equalizer page: the live input analyzer, the presets and two device profiles.",
               'loading' => 'lazy',
           ];
           include __DIR__ . '/screenshot.php';
           ?>
-          <figcaption>Graphic EQ and input analyzer · Captured in Bånder</figcaption>
+          <figcaption>Input analyzer and presets · Captured in Bånder with sample music</figcaption>
         </figure>
       </div>
       <div class="experience-feature carousel-slide" id="eq-parametric" data-carousel-slide data-slide-title="Parametric controls">
@@ -66,15 +63,13 @@ include __DIR__ . '/header.php';
         <figure class="app-screenshot feature-screenshot">
           <?php
           $screenshot = [
-              'name' => 'equalizer-parametric',
-              'alt' => "Bånder's parametric equalizer with a response curve and selectable band points.",
-              'width' => 1600,
-              'height' => 1000,
+              'name' => 'equalizer-window-curve',
+              'alt' => "Bånder's parametric equalizer: a response curve with a point for each band and the selected band's frequency, gain and Q.",
               'loading' => 'lazy',
           ];
           include __DIR__ . '/screenshot.php';
           ?>
-          <figcaption>Parametric EQ · Captured in Bånder</figcaption>
+          <figcaption>Parametric EQ · Captured in Bånder with sample music</figcaption>
         </figure>
       </div>
       <div class="experience-feature carousel-slide" id="eq-processing" data-carousel-slide data-slide-title="Audio processing">
@@ -87,15 +82,13 @@ include __DIR__ . '/header.php';
         <figure class="app-screenshot feature-screenshot">
           <?php
           $screenshot = [
-              'name' => 'equalizer-processing',
-              'alt' => "Bånder's audio processing controls for compression, stereo width, crossfeed, loudness and master gain.",
-              'width' => 652,
-              'height' => 517,
+              'name' => 'equalizer-window-dynamics',
+              'alt' => "Bånder's audio processing controls: the compressor's five settings, stereo width, crossfeed, loudness and master gain with a loudness target.",
               'loading' => 'lazy',
           ];
           include __DIR__ . '/screenshot.php';
           ?>
-          <figcaption>Audio processing · Captured in Bånder</figcaption>
+          <figcaption>Audio processing · Captured in Bånder with sample music</figcaption>
         </figure>
       </div>
       <div class="experience-feature carousel-slide" id="eq-profiles" data-carousel-slide data-slide-title="A/B comparison and device profiles">
@@ -108,15 +101,13 @@ include __DIR__ . '/header.php';
         <figure class="app-screenshot feature-screenshot">
           <?php
           $screenshot = [
-              'name' => 'equalizer-profiles',
-              'alt' => "Bånder's A/B comparison slots and named device profiles.",
-              'width' => 1600,
-              'height' => 1000,
+              'name' => 'equalizer-window-compare',
+              'alt' => "Bånder's ten equalizer bands above the A/B Compare card, with both slots captured.",
               'loading' => 'lazy',
           ];
           include __DIR__ . '/screenshot.php';
           ?>
-          <figcaption>A/B comparison and device profiles · Captured in Bånder</figcaption>
+          <figcaption>Bands and A/B comparison · Captured in Bånder with sample music</figcaption>
         </figure>
       </div>
     </div>
@@ -136,22 +127,21 @@ include __DIR__ . '/header.php';
   <section class="home-section experience-feature experience-feature-reversed" aria-labelledby="playlists-title">
     <div class="section-intro">
       <p class="eyebrow">Your playlists</p>
-      <h2 id="playlists-title">Choose the songs.<br>Or set the rules.</h2>
-      <p>Pick songs yourself, or create smart playlists with rules that select music from your catalog.</p>
-      <p>Share playlists with other people on your server, and choose whether collaborators can change the track list.</p>
+      <h2 id="playlists-title">Choose the songs.<br>Share the list.</h2>
+      <p>Each playlist has its own page to browse and play.</p>
+      <p>Share playlists with other people on your server, and choose whether collaborators can add songs.</p>
+      <a class="text-action" href="/features/playlists/">Read the playlists page <span class="arrow" aria-hidden="true">→</span></a>
     </div>
     <figure class="app-screenshot feature-screenshot">
       <?php
       $screenshot = [
-          'name' => 'playlists',
-          'alt' => "Bånder's playlists view in the browser.",
-          'width' => 1600,
-          'height' => 1000,
+          'name' => 'playlists-window',
+          'alt' => "Bånder's playlists view in the browser: a playlist's page with its songs, Play all and Share.",
           'loading' => 'lazy',
       ];
       include __DIR__ . '/screenshot.php';
       ?>
-      <figcaption>Playlists · Captured in Bånder</figcaption>
+      <figcaption>A playlist · Captured in Bånder with sample music</figcaption>
     </figure>
   </section>
 
@@ -167,15 +157,14 @@ include __DIR__ . '/header.php';
         <aside class="feature-note" aria-label="Planned casting support">
           <p><strong>Planned: AirPlay, Chromecast and DLNA.</strong> Casting to these receivers is in development and isn't available yet.</p>
         </aside>
+        <a class="text-action" href="/features/destinations/">Read the destinations page <span class="arrow" aria-hidden="true">→</span></a>
       </div>
     </div>
     <figure class="app-screenshot feature-screenshot">
       <?php
       $screenshot = [
-          'name' => 'destinations',
-          'alt' => "Bånder's playback destination menu, showing music playing on the living-room device with other signed-in devices listed.",
-          'width' => 2272,
-          'height' => 1420,
+          'name' => 'destinations-window',
+          'alt' => "Bånder's playback destination menu after a move: entries for this browser, Chrome on Linux and Firefox on Linux, which is active, and one that returns playback.",
           'loading' => 'lazy',
       ];
       include __DIR__ . '/screenshot.php';

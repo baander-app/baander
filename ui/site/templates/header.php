@@ -4,7 +4,11 @@
     <a class="brand" href="/" aria-label="Bånder home"><img src="/assets/site/logo.svg" width="40" height="40" alt="">Bånder</a>
     <div class="header-actions">
       <nav aria-label="Main navigation">
-        <a href="/#how-it-works">How it works</a>
+        <a href="/features/"<?= match (true) {
+            $page['url'] === '/features/' => ' aria-current="page"',
+            str_starts_with($page['url'], '/features/') => ' aria-current="true"',
+            default => '',
+        } ?>>Features</a>
         <a href="/docs/operator-guide/"<?= $page['guide'] === 'operator' ? ' aria-current="true"' : '' ?>>Manual</a>
         <a href="/bac/"<?= $page['url'] === '/bac/' ? ' aria-current="page"' : '' ?>>Audio Core</a>
         <a href="/typography/"<?= $page['url'] === '/typography/' ? ' aria-current="page"' : '' ?>>Typography</a>

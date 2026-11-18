@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { test as base, expect, type Page } from '@playwright/test';
 
 // A reader who follows a link sees every layout shift between the first paint and the settled page
@@ -45,7 +47,11 @@ declare global {
   }
 }
 
-const pages = ['/', '/docs/operator-guide/', '/bac/'];
+// The specs cannot read the site's data files, so the built sitemap says which feature pages exist.
+const sitemap = readFileSync(fileURLToPath(new URL('../../../var/website/sitemap.xml', import.meta.url)), 'utf8');
+const featurePages = [...sitemap.matchAll(/<loc>https:\/\/baander\.app(\/features\/[^<]+)<\/loc>/g)].map((match) => match[1]);
+
+const pages = ['/', '/docs/operator-guide/', '/bac/', '/features/', ...featurePages];
 const viewports = [{ width: 1440, height: 900 }, { width: 390, height: 844 }];
 const fontFiles = '**/assets/site/fonts/*.woff2';
 
@@ -162,6 +168,11 @@ const geometryPages = [
     blocks: '.manual-article pre',
     rows: '.manual-article :is(p, li) > code',
   },
+  ...['/features/', ...featurePages].map((path) => ({
+    path,
+    blocks: '.hero-copy :is(h1, p), .home-section :is(h2, h3, p, li), .site-header nav, .feature-breadcrumb, .feature-pager',
+    rows: '.site-header nav, .feature-breadcrumb',
+  })),
 ];
 const rowTolerance = 0.025;
 
