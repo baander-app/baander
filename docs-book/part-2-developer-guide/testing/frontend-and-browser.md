@@ -35,11 +35,18 @@ E2E_BASE_URL="$(make preview-url)" yarn --cwd ui/web e2e:headless \
   tests/e2e/styling tests/e2e/settings/preferences.spec.ts tests/e2e/layout/layout.spec.ts
 ```
 
-The styling suite signs in through the real login flow. Deterministic catalog GET
+The styling suite signs in through the real login flow, as a fresh server fixture
+user: the `emptyCatalog` and `populatedCatalog` fixtures in
+`tests/e2e/styling/fixtures.ts` create a fixture run and sign its admin in, with
+`superAdmin` set so the administration specs reach the views only a super admin sees.
+A fresh account has no listening session and no saved preferences, so the state of the
+preview's own accounts cannot change what a test sees. Deterministic catalog GET
 fixtures cover empty and populated views without library scans or
-authentication-store injection. They no longer give an active player, and the
-playback cases of `browsing-playback.spec.ts` that rely on them fail; the footer
-specs below explain why and how they play a track. Its DOM appearance
+authentication-store injection. The listening session accepts only songs the server
+knows and answers 422 to any other, so the populated catalog puts its long and
+non-Latin titles on three 30-second songs the fixture's `catalog` operation creates;
+album and playlist IDs stay invented. Because every test starts and removes a fixture
+run through the preview's fixture executor, the suite runs one worker at a time. Its DOM appearance
 matrix checks all 32 mood/accent combinations; separate Settings tests exercise
 saved preferences through the application. Playback and mocked command-palette cases
 block service workers so the fixtures can intercept requests deterministically;
@@ -71,10 +78,8 @@ the subtle recess and lower edge.
 Browser pixels establish rendered contrast, not the near-black behavior of a
 physical OLED panel; record hardware observations separately when available.
 
-The listening session accepts only songs the server knows. It answers 422 to a song
-from the catalog GET fixtures, so those fixtures cannot put a track in the footer.
-The footer specs therefore sign in as a server fixture user and play that fixture's
-song, through the `pausedFooter` fixture in `tests/e2e/styling/footer-playback.ts`.
+The footer specs sign in as a server fixture user and play that fixture's own song,
+through the `pausedFooter` fixture in `tests/e2e/styling/footer-playback.ts`.
 
 The well handoff between the footer and the sidebar notification pane has its own
 spec:
@@ -92,7 +97,17 @@ dithers the gradient it is painted with. The spec also checks four things: label
 contrast over the pane's shading and on the flat centerpiece; that the pane's fade
 and the centerpiece's shading report the same duration and easing; that both are
 immediate when reduced motion is requested; and that Escape returns focus to the
-bell.
+bell. A last case checks that the admin bell's outage entry, which holds no well, keeps
+the muted text colour; it lists the entry at once with `listOutageEntry` from
+`tests/e2e/live-updates/recovery-fixtures.ts`, without waiting the two counted minutes
+the application waits.
+
+`tests/e2e/settings/sign-in-conflict.spec.ts` signs one fixture user in on a second,
+fresh browser while the first holds a listening session, and holds the second
+browser's first read of the layout or player preferences for three seconds, so the
+session's track or volume always arrives first. Preference writes stay real in both
+browsers: a write refused for its stale version is one way a "Settings conflict"
+dialog appears, and a stubbed write would hide it.
 
 The Electron app has its own Node test suite, run with Node 26:
 

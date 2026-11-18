@@ -1055,27 +1055,90 @@ Open:
   switch and vary from run to run, which points at how the browser rasterises partial
   repaints; 11 pixels differ without one. The plan made a changed rest state a reason
   to stop and ask, and the user accepted this difference on 2026-11-17.
-- The sidebar notification spec's failure may have been helped along by this work:
-  diagnostic runs signed in as the preview's admin account and sent play, transfer and
-  a rejected acknowledgement to that account's leftover listening session before the
-  spec was first run.
-- `tests/e2e/playback-destinations/sidebar-notifications.spec.ts` fails on the worktree
-  preview with and without this change: a "Settings conflict" dialog for the admin
-  account covers the page before the test reaches the bell. Its cause was not
-  investigated. The handoff spec covers containment at 390px and focus return with a
-  fixture user.
-- `tests/e2e/styling/browsing-playback.spec.ts`: 11 of 20 tests fail on the worktree
-  preview, the same 11 with and without this change. Its playback cases cannot start a
-  track, because the listening session answers 422 to the catalog fixture song. They
-  need server fixture songs with the long and non-Latin titles they check, which is
-  separate work on the styling fixtures. The other failures were not attributed.
-- The admin bell's outage entry reads `--well-secondary-text` with
-  `--color-muted-foreground` as its fallback. No browser test checks that the fallback
-  applies in the admin pane.
-- Only Chromium ran. A browser without `@property` changes the footer's shading at
-  once instead of fading it; Firefox and WebKit were not run.
-- No CI job runs `tests/e2e/styling`, and the footer specs now also need the host
-  fixture executor.
+- No CI job runs `tests/e2e/styling`, and its specs now all need the preview's fixture
+  executor. The other open items of this delivery were closed on 2026-11-18 by
+  "Styling specs and sign-in settings conflict" below: the sidebar notification spec's
+  dialog was a defect in the app, the playback cases play again, the admin bell's
+  fallback has a browser check, and Firefox passes the handoff spec.
+
+## Styling specs and sign-in settings conflict
+
+Delivered on the branch `fix/styling-specs-and-login-settings-conflict` on 2026-11-18
+(`81f4163b9` to this record) from the plan
+`docs/plans/2026-11-18-0004-fix-styling-specs-and-login-settings-conflict-plan.md`. The
+user asked on 2026-11-17 to repair the playback specs and close the test gaps the
+notification pane well left, and decided on 2026-11-18 to fix the volume path in this
+branch and to run the sidebar notification spec as a fixture user. The branch is local:
+not merged into `master` and not pushed.
+
+- Sign-in conflict (`a01a62d12`). A fresh page knows no preference version. When the
+  listening session's track or volume arrived before a preference family's first read,
+  the change counted as an edit at version 0, and the read, or the server refusing the
+  version-0 write with 409, raised "Settings conflict" although no other device had
+  changed anything. The preference sync now reports when a family's first read has
+  finished. Until then, the playing track is selected and the context panel opened
+  without switching to the Details tab, and a change of only the volume or mute is not
+  saved; the read then applies the saved settings. Every volume change reaches the store
+  as the session reports it, so a volume change the user makes in that moment is not
+  saved either. The conflict rules themselves are unchanged.
+- Panel reopening (`a01a62d12`). The playing track's selection followed the track
+  object, and a session's track arrives as a placeholder that is replaced when its
+  details load, so the second object reopened a panel the user had just closed. It now
+  follows the track's ID.
+- Styling fixtures (`703cfc27e`). The styling specs sign in as a fresh fixture run's
+  admin, a super admin through the fixture's new `superAdmin` option, and the populated
+  catalog keeps its long and non-Latin titles on three 30-second fixture songs, whose
+  IDs the fixture's `catalog` receipt now returns. `sidebar-notifications.spec.ts`
+  signs in as a fresh fixture user.
+- Spec drift (`446ae8d01`). Three checks in `browsing-playback.spec.ts` described the
+  interface before later changes: the volume slider shows a dragged value once the
+  session reports it, a song title's parent no longer holds the playing indicator, and
+  the sidebar is a complementary landmark too. No expected value changed.
+- Admin bell (`60c35b152`). A browser check shows the admin bell's outage entry keeps
+  the muted text colour. `interruptDelivery` imported the live transport by its bare
+  path, which loads a second copy on a preview whose dev server re-versioned the module,
+  so no outage began; it now imports the URL the page loaded.
+
+The plan first deferred the playing track's selection until the layout read had
+finished. When the read came late, the selection opened the panel after the user had
+closed it, and the notification pane closed with it at 390px; the tab-keeping rule
+replaced it.
+
+Verification on 2026-11-18 on the worktree preview, Chromium, without retries:
+
+- `tests/e2e/settings/sign-in-conflict.spec.ts`: the layout and volume cases failed on
+  the unchanged source with the dialog visible and pass now; the album-page reload case
+  passes either way.
+- `browsing-playback.spec.ts` 20 of 20 in two consecutive runs, up from 8 or 9 of 20
+  on 2026-11-17.
+- `sidebar-notifications.spec.ts` 2 of 2 in three runs.
+- `layout.spec.ts`, `forms-admin.spec.ts`, `visualizer-calibration.spec.ts` and
+  `characterization/visual-baseline.spec.ts`, two runs before and after the fixture
+  move: 26 of 33 passed both runs before, 31 of 33 after. The two that fail in all four
+  runs are the `visualizer-calibration.spec.ts` tests.
+- `well-handoff.spec.ts` 11 of 11 in Chromium and in Firefox. With the outage entry's
+  fallback removed, the admin bell check fails.
+- `yarn --cwd ui/web test`: 3,640 tests pass. The preference conflict suites
+  (`preference-conflict-lifecycle.test.ts`, `preferences-consumers.test.tsx`) are
+  unchanged.
+- `tests/Integration/LiveUpdates/CapacityFixtureTest.php` passes in a CI image built
+  locally with `php scripts/build-application.php --buildx --target ci --tag
+  baander-ci:local`.
+
+Open:
+
+- On a narrow screen, a playing track that arrives after sign-in opens the context
+  panel as an overlay, which takes focus and closes an open popover such as the
+  notification pane. This predates the work; the user chose to record it as a product
+  question.
+- After a volume drag, the footer slider shows the previous value until the listening
+  session reports the new one. The spec now waits for the value; how long the snap-back
+  shows was not measured.
+- Both `visualizer-calibration.spec.ts` tests fail before and after this work; their
+  cause was not investigated.
+- WebKit could not launch on this host: Playwright reports missing `libicu74`,
+  `libxml2` and `libflite1`. The handoff spec did not run in WebKit, and no container
+  route exists for preview-backed specs.
 
 ## Cohesive operator manual
 
