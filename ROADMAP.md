@@ -280,11 +280,11 @@ top of `c47af96fb`: the docs-book rewrite (`20be3f1df` to `0d017641f` and its ro
 record). Pushed on 2026-11-17, on top of `f5065dcfe`: the docs-book rewrite follow-ups
 (`9b72c2185` to their roadmap record).
 
-- **Website feature pages.** On the branch `feat/site-feature-pages` since
-  2026-11-18 (`0ac2a3205` to this record), not merged, pushed or published: the
-  `/features/` overview and nine feature pages, and the homepage's pictures retaken
-  from the sample library. Next: the user reviews the pictures and decides how `.lrc`
-  lyrics should reach the lyrics panel; see
+- **Website feature pages.** On `master` since 2026-11-18, merged from
+  `feat/site-feature-pages` (`0ac2a3205` to this record): the `/features/` overview
+  and nine feature pages, and the homepage's pictures retaken from the sample
+  library. Next: the user reviews the pictures and decides how `.lrc` lyrics should
+  reach the lyrics panel; see the "Still to do" list under
   [Website feature pages](#website-feature-pages).
 - **Master CI.** No `CI` run on `master` has been green since 2026-11-05. Run
   43826408058 on `44e315ee3` passed the whole quality gate on 2026-11-16, step 41 in
@@ -516,9 +516,8 @@ Open:
 
 ## Website feature pages
 
-Delivered on the branch `feat/site-feature-pages` on 2026-11-18, not merged, pushed or
-published: `docs/plans/2026-11-17-1757-feat-site-feature-pages-plan.md`, except the
-lyrics page. The public website gains `/features/`: an overview in three groups and
+Delivered on `master` on 2026-11-18, merged from `feat/site-feature-pages`:
+`docs/plans/2026-11-17-1757-feat-site-feature-pages-plan.md`, except the lyrics page. The public website gains `/features/`: an overview in three groups and
 nine feature pages. Listeners get the music library, the player, the equalizer,
 playlists and playback destinations; operators get libraries and scanning,
 administration and the console; developers get one page. Each page opens in the
@@ -535,10 +534,11 @@ Commits, in order: `0ac2a3205` (plan), `4be4a630a` (data validation), `e29a7368c
 `2a263b2fb` (listener pages), `e9b5c7a8b` (operator pages), `aa601e211` (README:
 rearranging the queue), `c95251d0d` (overview completed, homepage links), `0ddb0b2ca`
 (capture helpers shared, failure paths hardened), `a0c6ccc7d` (homepage pictures),
-`13dad7ed5` (site README, house style, `ui/DESIGN.md`, `CONCEPTS.md`) and `8bf62a06f`
-(the code review's fixes).
+`13dad7ed5` (site README, house style, `ui/DESIGN.md`, `CONCEPTS.md`), `8bf62a06f`
+(the code review's fixes), `c05c2f684` (this record) and `a2453db0f` (wording after
+the writing check).
 
-Verification on 2026-11-18, at `8bf62a06f`:
+Verification on 2026-11-18, at `8bf62a06f` unless stated:
 
 - Site: `make website-build` built 243 manual pages. In `ui/site/`,
   `corepack yarn typecheck` was clean, `corepack yarn test:browser` passed 207 tests
@@ -550,10 +550,22 @@ Verification on 2026-11-18, at `8bf62a06f`:
   `scripts/check-tooling-source-policy.php` exited 0. The full tooling suite was not
   run.
 - Pictures: 32 pairs, each with a capture record in `ui/site/features/captures.json`,
-  taken against the worktree preview at application commit `0326c6acb`. A full run of
-  the final capture scripts on 2026-11-18 took all 32 pairs and exited 0. The
-  playback destinations pictures show a real move between Chromium and Firefox
-  signed in to one account; nothing in the browser was staged.
+  taken against the worktree preview at application commit `0326c6acb` on 2026-11-17
+  and 2026-11-18. The playback destinations pictures show a real move between
+  Chromium and Firefox signed in to one account; nothing in the browser was staged.
+  The capture scripts ran in full twice into scratch directories, leaving the site's
+  pictures as they were. At `0ddb0b2ca` the run took all 32 pairs. At `8bf62a06f`
+  it took 31; it refused the administration picture because the Jobs tab changed
+  between its two variants, and it kept the other pairs. That scene, run alone
+  afterwards, took its four pairs at the second attempt. The first attempt stopped
+  at sign-in: the login page's Email field did not appear within 30 seconds.
+- Fonts: the browser suite ran on this host, which resolves Arial to Liberation
+  Sans. Several page sentences were reworded until both faces broke them into the
+  same lines. The closest case is a link label whose width differs by 2.14 % between
+  the faces, against a tolerance of 2.5 %.
+  The CI image's fallback faces were not checked, so the `Public website` workflow
+  is the authoritative run of these checks. That workflow also runs
+  `node --test scripts/*.test.mjs`, including `pictures.test.mjs`.
 - Code review: `ce-code-review` at full depth with correctness, project standards,
   testing, maintainability, reliability, adversarial (in-process; cross-model review
   is off in this checkout) and learnings; verdict "Ready with fixes". An independent
@@ -561,11 +573,25 @@ Verification on 2026-11-18, at `8bf62a06f`:
   transient check that ended the whole capture run. Both are fixed in `8bf62a06f`,
   together with the review's README suggestion to switch the provider lookups off
   before the scan.
+- Writing check: the plan's ce-noslop detect pass over the ten feature data files and
+  the homepage's new lines found 25 points; `a2453db0f` rewords the pages for them
+  without changing a claim. At `a2453db0f`, the line and wrap comparisons of both
+  fonts found no difference on any feature page or the homepage,
+  `node --test scripts/*.test.mjs` passed 35, and `corepack yarn test:browser`
+  passed 205 of 207. Both failures came from the environment and were not rerun:
+  one page load ended with `net::ERR_NETWORK_CHANGED`, and a manual page's diagram
+  image (`rendering.spec.ts`, untouched by this branch) did not load within 8
+  seconds.
 
-Open:
+Still to do:
 
+- Rerun `corepack yarn test:browser` in `ui/site/` on `master` and check the
+  `Public website` workflow's run of the merge, since the last local run had the
+  two failures above.
 - The user has not reviewed the pictures yet; the plan's Definition of Done requires
-  it. Contact sheet: `var/site-capture/contact-sheet.html` after a capture run.
+  it. Run `make website-build && make website-preview` and open
+  `http://localhost:4177/` and `http://localhost:4177/features/`. The contact sheet
+  in `var/site-capture/` shows the last capture run, not the committed pictures.
 - No lyrics page. `README.md:46` and
   `docs-book/part-1-operator-guide/media/library-management.md:64` say lyrics come
   from `.lrc` files beside the tracks, and the scan stores them on the song. The
@@ -604,14 +630,24 @@ Open:
     application never calls the refresh route.
   - `library-management.md:131-139` presents cover extraction as a step after each
     scan, but ingestion already queues it.
-- Capture tooling: the playlists scene's create branch has not run in its final form,
-  because the preview already holds its playlists. The destinations scene expects
+- Capture tooling: sign-in occasionally times out waiting for the login form; a
+  second run gets past it. The playlists scene's create branch has not run in its
+  final form, because the preview already holds its playlists. The destinations scene expects
   the names "Chrome on Linux" and "Firefox on Linux", and WebKit does not start on
   this host. The preview checks run through `make exec`, which honours `INSTANCE`,
   while the browser follows `--base-url`; nothing ties the two together.
 - The homepage's font-arrival stability test at 1440 px failed its own precondition
   (Geist had not arrived) once in eleven local runs.
 - The plan still says ten pages (R2, U7); the lyrics page is the difference.
+- Smaller copy follow-ups from the claim and writing checks:
+  - The overview's Internet radio entry could say that stations come from the
+    countries listeners subscribe to (`commands/app-radio-sync.md:3,39`).
+  - Two "More in Bånder" links point at pages that state only part of their entry.
+    For Internet radio, `/docs/developer-guide/contexts/radio/` states all of it;
+    for accounts, `/docs/operator-guide/commands/app-library-member-grant/` states
+    who grants library access.
+  - The homepage's fourth equalizer slide speaks of device profiles, which its new
+    picture does not show; the first slide's picture shows them.
 
 ## Presentation register and homepage hero
 
