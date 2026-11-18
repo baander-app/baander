@@ -12,10 +12,10 @@ execution: code
 ## Goal Capsule
 
 - **Objective:** The browser specs that guard the web interface's styling run to a meaningful result on a worktree preview whatever state its admin account is in, and a user who signs in on a fresh browser no longer gets a "Settings conflict" dialog because the playing track was shown before their layout settings were read.
-- **Means:** The styling fixtures sign in as the server fixture's admin user and play that fixture's songs (KTD1, KTD2); the playing track is selected in the context panel only once the layout preference's first read has finished (KTD4).
-- **Authority:** The user's selection on 2026-11-17 ("Repair playback specs", "Close the test gaps") and R1–R10 govern scope. KTD1–KTD6 govern mechanism. `ui/DESIGN.md` and `.agents/rules/frontend.md` apply unchanged.
+- **Means:** The styling fixtures sign in as the server fixture's admin user and play that fixture's songs (KTD1, KTD2); until a preference family's first read has finished, the session's track and volume are shown without being saved as edits (KTD4, KTD7).
+- **Authority:** The user's selection on 2026-11-17 ("Repair playback specs", "Close the test gaps"), the user's decisions on 2026-11-18 (fix the volume path in this branch; run the sidebar notification spec as a fixture user), and R1–R10 govern scope. KTD1–KTD8 govern mechanism. `ui/DESIGN.md` and `.agents/rules/frontend.md` apply unchanged.
 - **Execution profile:** Standard. Seven units on one branch named after this plan; browser checks against the worktree preview, one Playwright run at a time, without retries.
-- **Stop conditions:** Stop and ask when the conflict fix needs an existing preference-conflict test to change; when the layout reproduction in U1 passes before the fix; when U1's volume or reload case shows the dialog; or when a failing styling assertion turns out to be a product regression whose fix is a product decision.
+- **Stop conditions:** Stop and ask when the conflict fix needs an existing preference-conflict test to change; when the layout reproduction in U1 passes before the fix; or when a failing styling assertion turns out to be a product regression whose fix is a product decision.
 - **Finishing:** `ce-work` lands the units as local commits, runs `ce-simplify-code` and `ce-code-review`, and records the delivery in `ROADMAP.md`. Nothing is pushed unless the user asks.
 
 ---
@@ -24,7 +24,7 @@ execution: code
 
 ### Summary
 
-The styling suite's catalog fixtures move off the preview's admin account onto the server fixture's admin user and onto songs the server knows, so `browsing-playback.spec.ts` can start playback again. The context panel waits for the layout preference's first read before it selects the playing track, which removes a self-inflicted "Settings conflict" dialog at sign-in. A browser test covers the admin bell's outage entry colour, and the handoff spec is tried in Firefox and WebKit.
+The styling suite's catalog fixtures move off the preview's admin account onto the server fixture's admin user and onto songs the server knows, so `browsing-playback.spec.ts` can start playback again. Until a preference family's first read has finished, the listening session's track and volume are shown without being saved as edits, which removes a self-inflicted "Settings conflict" dialog at sign-in. A browser test covers the admin bell's outage entry colour, and the handoff spec is tried in Firefox and WebKit.
 
 ### Problem Frame
 
@@ -39,16 +39,16 @@ The second problem is in the application. `use-context-panel-selection.ts` selec
 **Sign-in**
 
 - R1. A user who signs in on a fresh browser, while their account has a listening session with a track and saved layout preferences, sees no "Settings conflict" dialog caused by the playing track being shown.
-- R2. The rules for real conflicts do not change: a setting the user edits before the first read, or one changed on another device, still raises the dialog as it does today.
-- R3. When the layout preference's first read comes first, the result is the same as today: the playing track's details are shown and the Details tab is saved.
-- R4. Two neighbouring paths are reproduced and their result reported: a listening session whose volume differs from the browser's default, for an account with saved player preferences; and a reload of an album page for an account with saved layout preferences.
+- R2. The rules for real conflicts do not change: a setting the user edits before the first read, or one changed on another device, still raises the dialog as it does today. The volume is the exception R4 states.
+- R3. When the layout preference's first read comes first, the result is the same as today: the playing track's details are shown and the Details tab is saved. When the track comes first, it is selected on the panel's current tab, and the saved layout is then applied.
+- R4. A user who signs in on a fresh browser while their listening session plays at a volume other than their saved one sees no "Settings conflict" dialog. Until the saved player settings have been read, a volume change is shown but not saved; the read then applies the saved volume. Every volume change reaches the store as the session reports it, so a change the user makes in that window is not saved either. A reload of an album page is reproduced and its result reported.
 
 **Styling specs**
 
 - R5. `ui/web/tests/e2e/styling/browsing-playback.spec.ts` passes on the worktree preview whatever state the preview's admin account is in, and its playback cases play a track.
 - R6. No assertion in a repaired spec is loosened to make it pass. A changed expectation states which change in the product or the fixture made the old one wrong.
 - R7. The other specs that use the styling catalog fixtures do at least as well as before the change: `tests/e2e/layout/layout.spec.ts`, `tests/e2e/styling/forms-admin.spec.ts`, `tests/e2e/styling/visualizer-calibration.spec.ts` and `tests/e2e/characterization/visual-baseline.spec.ts`.
-- R8. `ui/web/tests/e2e/playback-destinations/sidebar-notifications.spec.ts` passes on the preview's admin account.
+- R8. `ui/web/tests/e2e/playback-destinations/sidebar-notifications.spec.ts` passes on the worktree preview, signed in as a fixture user.
 
 **Test gaps from the notification pane well**
 
@@ -61,15 +61,18 @@ The second problem is in the application. `use-context-panel-selection.ts` selec
 ### Key Decisions
 
 - **The conflict gets a fix, not only a diagnosis.** The user asked to look into the dialog; the cause is a defect in the application, shown by the trace above. Governs R1, R2, R3.
-- **Only the playing track's selection is deferred.** It is the one selection that arrives after sign-in without a user action. Clicks, keyboard shortcuts and the album or artist in the page's address are the user's navigation and stay edits, as today. R4 measures whether a reload on an album page also races. Governs R1, R4.
+- **Only the playing track's selection keeps the tab.** It is the one selection that arrives after sign-in without a user action. Clicks, keyboard shortcuts and the album or artist in the page's address are the user's navigation and stay edits, as today. U1 shows that a reload on an album page does not race. Governs R1, R3.
+- **The volume path is fixed in this branch.** (session-settled: user-directed — chosen over recording it as open and over never saving an observed session volume: same rule as the tab, a session volume applied before the saved player settings are read is shown but not saved.) Governs R4.
+- **The sidebar notification spec signs in as a fixture user.** (session-settled: user-directed — chosen over stopping the panel's automatic opening on narrow screens and over leaving the spec on the admin account: the overlay that opens when a late session track arrives is recorded as an open product question.) Governs R8.
 
 ### Scope Boundaries
 
-- The session's volume, which also writes the player preference, is not changed. Changing when it is applied or saved is a product call; R4 reproduces it and the stop condition asks.
+- On a narrow screen, a playing track that arrives after sign-in opens the context panel as an overlay, which takes focus and closes an open popover. This is older than this work and is recorded as an open product question, not changed.
 - A container route that runs preview-backed specs in WebKit is out of scope. If WebKit cannot launch on the host, R9 records that.
 - No CI job is added for `tests/e2e/styling`.
 - `ui/rn` is not touched.
 - Considered and not built: not saving the automatic Details tab. Every preference save is followed by a re-read of every preference family, and a read replaces the panel's tab, so the playing track's Details would snap back to the saved tab whenever the user changed the volume. It would also change what is saved.
+- Built and replaced: selecting the playing track only after the layout read had finished. When the read came late, the deferred selection opened the panel after the user had closed it, closing the notification pane in `sidebar-notifications.spec.ts` at 390px.
 - Considered and not built: holding every preference push until the first read has answered. It changes the rule the existing conflict tests pin.
 - Considered and not built: treating a local edit equal to the server's value as no conflict. It covers only accounts whose saved tab is already Details.
 
@@ -82,7 +85,9 @@ The second problem is in the application. `use-context-panel-selection.ts` selec
 - KTD1. **The styling fixtures sign in as the server fixture's admin user.** `tests/Fixtures/LiveUpdates/capacity-fixture.php` creates 32 ordinary users and one admin, the manifest's `observer`, all with access to one library. A fresh user has no listening session and no saved preferences, so the preview admin account's state stops mattering. `forms-admin.spec.ts` needs an admin.
 - KTD2. **Catalog fixtures keep their mocked titles on real song IDs.** Probed on the preview on 2026-11-18: with the catalog GET mocks keyed on a fixture song's real ID, the session accepted the load, and the footer, the context panel and the queue showed the mocked long title. The footer's duration came from the real audio (1:00 for the fixture's original 60-second song), so the styling songs must be fixture songs of 30 seconds. The fixture's `catalog` operation creates them with `durations: [30]`. Its receipt returns counts today; it gains the identities of the songs it created, which the browser fixture reads before signing in. Album and playlist IDs stay invented, because only songs reach the session.
 - KTD3. **The specs keep their imports.** `catalogSong`, `thaiSong` and `burmeseSong` stay exported as templates for display fields; the fixture builds each test's resources from them with the real IDs. The stream route keeps answering for the template IDs, which the radio case uses as a station stream.
-- KTD4. **The playing track is selected once the layout preference's first read has finished.** The layout family's sync reports when its first read has finished, whether it applied a saved layout, found none, or failed. The context panel store holds that as a flag, which resets when the preference session ends, and the selection hook waits for it before selecting the playing track. The order is then always today's usual one: the saved layout is applied, then the playing track is shown and its Details tab saved at the right version. The conflict rules in `use-preference-sync.ts` do not change; the new report is additive.
+- KTD4. **Before the layout preference's first read has finished, the playing track keeps the panel's tab.** The sync reports when a family's first read has finished, whether it applied saved settings, found none, or failed; the report is additive and the conflict rules in `use-preference-sync.ts` do not change. The context panel store holds the layout family's report as a flag, which resets when the preference session ends. Until it is set, the selection hook selects the playing track and opens the panel without switching to the Details tab, so nothing is saved; the read then applies the saved layout. Afterwards, a new playing track switches to Details and saves it, as today.
+- KTD7. **Before the player preference's first read has finished, a volume change is not saved.** The preference session keeps the player family's report in a ref and skips a push whose only changes are the volume and mute. Other player settings changed in that window are still saved as edits.
+- KTD8. **The playing track's selection follows the track's ID.** A session's track arrives as a placeholder and is replaced when its details load. The selection effect ran on each new track object, so the second one reopened a panel the user had closed; a unit test shows it on the unchanged hook. Found while tracing the 390px failure; it is in the hook U2 changes.
 - KTD5. **The reproduction orders the race on purpose.** A second browser context of the same fixture user signs in with the layout preference's first read held for a few seconds, so the track always arrives first. Neither context stubs preference writes: with the read held past the 500 ms save delay, the dialog comes from the server refusing the second context's version-0 write, and a stubbed write would hide it.
 - KTD6. **The admin bell check lists the outage entry through the app's own store.** A real outage needs 120 counted seconds before its entry is listed. The claim under test is a CSS fallback, so the test starts a real interruption with `interruptDelivery` from `tests/e2e/live-updates/recovery-fixtures.ts` and calls the store's `listEntry()`, resolving the store module's URL from the resources the page loaded.
 
@@ -100,12 +105,10 @@ sequenceDiagram
     S-->>B: 409, current version 6
     Note over B: Settings conflict
   else with KTD4
-    Note over B: playing track waits for the first layout read
+    Note over B: playing track selected, tab kept, nothing saved
     B->>S: first read of layout preferences
     S-->>B: version 6
-    Note over B: saved layout applied, then the playing track selected
-    B->>S: layout write at version 6
-    S-->>B: version 7
+    Note over B: saved layout applied, later tracks switch to Details and save at version 6
   end
 ```
 
@@ -114,7 +117,7 @@ sequenceDiagram
 - **Fixture cost.** Each styling test creates and removes a server fixture run. The footer specs already do this at about ten seconds a test; twenty more tests add minutes.
 - **The volume drag.** Two cases expect a dragged volume between 35 and 65 and read 75 and 100 on the admin account. That may be the leftover session refusing the change or a regression in the slider. It is classified with the fixture user before any expectation moves.
 - **Module identity in the page.** A bare-path import of an app module can return a second instance on a preview whose dev server has re-versioned modules; `nativeAudio` in `session-tabs.ts` reported "paused" for a playing footer that way on 2026-11-17. U5 resolves the module URL from the page's loaded resources.
-- **A first read that never comes.** With KTD4 the playing track waits for the layout read. A failed read also releases the wait; a read held back for a long time, for example while live updates recover, delays the automatic selection by the same time.
+- **A first read that never comes.** With KTD4 and KTD7 nothing waits; until a family's first read finishes, the session's track keeps the tab and its volume is not saved. A failed read counts as finished.
 
 ### Sources
 
@@ -139,38 +142,40 @@ sequenceDiagram
   1. Layout case: the first context plays the fixture song and waits until a layout preference write has been answered 200. A second, fresh context signs in with `GET /api/user/layout-preferences/` held for three seconds.
   2. Volume case: the first context sets a volume other than 75 while playing and waits for the player preference write. A second context signs in with the player preference read held.
   3. Reload case: on a context whose layout preference is saved, open an album page and reload it.
-- **Execution note:** Run the layout case before U2 and record the failure. If it passes before the fix, stop: the trace was misread. Record the volume and reload cases' results before and after U2; if either shows the dialog after U2, stop and ask.
+- **Execution note:** Run the layout case before U2 and record the failure. If it passes before the fix, stop: the trace was misread. Record the reload case's result before and after U2.
 - **Patterns to follow:** `openSessionTab` (without its write stub) and `fixtureSongRow` in `ui/web/tests/e2e/playback-destinations/session-tabs.ts`; `FixtureClient` in `ui/web/tests/e2e/live-updates/capacity-fixtures.ts`.
 - **Test scenarios:**
   - Layout case: no "Settings conflict" dialog appears while the read is held or after it answers; the panel shows the playing track's details and the Details tab is saved.
-  - Volume case and reload case: the dialog's presence and the preference requests are recorded.
-- **Verification:** The layout case fails on the unchanged source with the dialog visible and passes after U2; the other two cases have a recorded result.
+  - Volume case: no "Settings conflict" dialog appears while the player read is held or after it answers.
+  - Reload case: no dialog after the reload.
+- **Verification:** The layout and volume cases fail on the unchanged source with the dialog visible and pass after U2; the reload case passes either way.
 
-### U2. Select the playing track after the first layout read
+### U2. Keep the session's track and volume out of the preference edits until the first read
 
-- **Goal:** Showing the playing track can no longer race the layout preference's first read.
-- **Requirements:** R1, R2, R3, R8.
+- **Goal:** Showing the session's track and volume can no longer race the preferences' first reads.
+- **Requirements:** R1, R2, R3, R4.
 - **Dependencies:** U1.
-- **Files:** `ui/web/src/features/settings/hooks/use-preference-sync.ts`, `ui/web/src/features/settings/hooks/use-layout-preferences.ts`, `ui/web/src/features/settings/hooks/use-preference-bootstrap.tsx`, `ui/web/src/features/layout/stores/context-panel-store.ts`, `ui/web/src/features/layout/hooks/use-context-panel-selection.ts`, `ui/web/tests/features/layout/stores/context-panel-store.test.ts`, `ui/web/src/features/settings/__tests__/preference-store-subscriptions.test.tsx`, `ui/web/src/features/layout/hooks/__tests__/use-context-panel-selection.test.tsx` (new).
-- **Approach:** Per KTD4.
+- **Files:** `ui/web/src/features/settings/hooks/use-preference-sync.ts`, `ui/web/src/features/settings/hooks/use-layout-preferences.ts`, `ui/web/src/features/settings/hooks/use-player-preferences.ts`, `ui/web/src/features/settings/hooks/use-preference-bootstrap.tsx`, `ui/web/src/features/layout/stores/context-panel-store.ts`, `ui/web/src/features/layout/hooks/use-context-panel-selection.ts`, `ui/web/tests/features/layout/stores/context-panel-store.test.ts`, `ui/web/src/features/settings/__tests__/preference-store-subscriptions.test.tsx`, `ui/web/src/features/settings/__tests__/use-preference-bootstrap.test.tsx` (its store mock gains the new action), `ui/web/src/features/layout/hooks/__tests__/use-context-panel-selection.test.tsx` (new).
+- **Approach:** Per KTD4, KTD7 and KTD8.
 - **Execution note:** The conflict tests named under Sources pass unmodified. If one needs editing, stop.
 - **Test scenarios:**
-  - Vitest: a playing track that arrives before the layout read is not selected until the read finishes, and then is selected with the Details tab.
-  - Vitest: the read finishing as applied, as absent and as failed each releases the wait.
-  - Vitest: with a saved layout at a newer version, a track before the read, then the read: no conflict, the saved mode is applied, and the Details tab is saved at the read's version.
+  - Vitest: the layout read finishing as applied, as absent and as failed is each reported.
+  - Vitest: the report resets when the preference session ends.
+  - Vitest: a track before the layout read is selected on the current tab with nothing saved, and the read's saved layout is then applied without a conflict.
+  - Vitest: a track after the layout read switches to Details and saves it at the read's version.
   - Vitest: a user's own selection before the read still switches to Details and counts as an edit, as today.
-  - Vitest: the flag resets when the preference session ends, so a second sign-in waits again.
-  - Browser: U1's layout case passes.
-  - Browser: `sidebar-notifications.spec.ts` passes on the preview's admin account in three runs.
-- **Verification:** U1's layout case is green, the existing preference suites pass unchanged, and three admin sign-ins in a row show no dialog.
+  - Vitest: a session volume before the player read is shown and not saved; one after it is saved at the read's version; another player setting before it is still saved as an edit.
+  - Vitest: the same track gaining its details keeps a closed panel closed; the next track opens it.
+  - Browser: U1's three cases pass.
+- **Verification:** U1's cases are green, the preference conflict suites pass unchanged, and the full unit suite passes.
 
 ### U3. Move the styling fixtures to the fixture admin and real songs
 
 - **Goal:** `emptyCatalog` and `populatedCatalog` no longer depend on the preview's admin account, and a load of a styling song is accepted.
-- **Requirements:** R5, R7.
+- **Requirements:** R5, R7, R8.
 - **Dependencies:** none.
-- **Files:** `ui/web/tests/e2e/styling/fixtures.ts`, `tests/Fixtures/LiveUpdates/capacity-fixture.php`, `tests/Integration/LiveUpdates/CapacityFixtureTest.php`, `ui/web/tests/e2e/live-updates/capacity-fixtures.ts` (only if a helper must be exported).
-- **Approach:** Per KTD1–KTD3. The fixtures start a fixture run, create three 30-second songs for the populated state, read their identities from the receipt, install the catalog routes with those IDs, sign the fixture admin in, and remove the run afterwards. `pausedFooter` stays as it is.
+- **Files:** `ui/web/tests/e2e/styling/fixtures.ts`, `ui/web/tests/e2e/playback-destinations/sidebar-notifications.spec.ts`, `tests/Fixtures/LiveUpdates/capacity-fixture.php`, `tests/Integration/LiveUpdates/CapacityFixtureTest.php`, `ui/web/tests/e2e/live-updates/capacity-fixtures.ts` (only if a helper must be exported).
+- **Approach:** Per KTD1–KTD3. The fixtures start a fixture run, create three 30-second songs for the populated state, read their identities from the receipt, install the catalog routes with those IDs, sign the fixture admin in, and remove the run afterwards. `pausedFooter` stays as it is. `sidebar-notifications.spec.ts` signs in as a fixture user too (R8).
 - **Test scenarios:**
   - A load of the mocked album's song is answered 200, and the footer shows the mocked title and a duration of 0:30.
   - The four dependent specs, compared per test with the baseline below: no test that passed in both baseline runs fails after the switch.
