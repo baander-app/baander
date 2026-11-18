@@ -34,7 +34,7 @@ return [
             'id' => 'album',
             'heading' => 'Open an album.',
             'text' => [
-                'Click a cover and the album opens in the panel beside the grid, with its tracks and how long they run. <strong>Play</strong> starts the album, and a double-click on a track starts it there.',
+                'Click a cover and the album opens in the panel beside the grid, with its tracks and how long they run. <strong>Play</strong> starts the album, and a double-click on a track starts the album at that track.',
             ],
             'figure' => [
                 'picture' => 'library-album',
@@ -46,7 +46,7 @@ return [
             'id' => 'songs',
             'heading' => 'Narrow it down.',
             'text' => [
-                '<strong>Songs</strong> puts three columns above the song list: genre, artist and album. Pick a genre and the artists narrow to that genre. Pick an artist and you see their albums, and an album leaves only its own songs in the list below.',
+                '<strong>Songs</strong> puts three columns above the song list: genre, artist and album. Pick a genre and the artists narrow to that genre. Pick an artist and you see their albums; pick an album and only its songs stay in the list below.',
                 'Double-click a song to play it. The songs listed with it become the <a href="/features/player/">queue</a>.',
             ],
             'figure' => [
@@ -79,7 +79,7 @@ return [
         ],
     ],
     'limits' => [
-        'You see the libraries an administrator has given your account access to.',
+        'You see the libraries a super administrator has given your account access to.',
         'New files show up after a scan, which an administrator starts. Bånder does not import files by watching a folder.',
         'A scan picks up MP3, FLAC, OGG, Opus, WAV, AAC and WMA files by their extension. That does not guarantee your browser can play every one of them, and audio transcoding is off by default.',
         'Only administrators change the catalog: albums, songs, genres and covers.',

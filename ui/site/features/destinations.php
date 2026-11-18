@@ -8,7 +8,7 @@ return [
     'description' => "Bånder's playback destinations: move what is playing to another browser signed in to your account, control it from the first, and bring it back.",
     'headline' => 'Start in one room.<br>Keep listening in another.',
     'lead' => [
-        'You start an album at your desk and want to hear the rest in the kitchen. Any browser tab signed in to your Bånder account can take over: the song, the queue and the position move with it, and so does whether it was playing or paused.',
+        'You start an album at your desk and want to hear the rest in the kitchen. Any browser tab signed in to your Bånder account can take over: the song, the queue and the position move to it, and so does whether it was playing or paused.',
     ],
     'hero' => [
         'picture' => 'destinations-window',
@@ -61,7 +61,8 @@ return [
         "Sound processing and volume depend on the browser that plays. This browser's <a href=\"/features/equalizer/\">equalizer</a> does not apply to music playing in another one.",
         'A second browser signed in to the same account can show a <strong>Settings conflict</strong> dialog. Choose either answer to carry on.',
         'When the browser that is playing crashes or loses its connection, the others wait about 30 seconds before the menu offers <strong>Play here anyway</strong>.',
-        'Letting go of playback when a page closes, and <strong>Play here anyway</strong>, are tested in Chromium. Safari does not pick its own playback up again after a reload.',
+        'A closing page reports to the server that it has stopped, but the server can refuse the report. The other browsers then offer <strong>Play here anyway</strong>, as after a crash.',
+        'The close report and <strong>Play here anyway</strong> are tested in Chromium only. Safari does not resume its own playback after a reload.',
     ],
     'manual' => [
         ['label' => 'Developer guide: sessions and playback transfer', 'href' => '/docs/developer-guide/contexts/session/'],

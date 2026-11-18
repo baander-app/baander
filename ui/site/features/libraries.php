@@ -33,7 +33,7 @@ return [
             'id' => 'scan',
             'heading' => 'A scan finds the files.<br>Workers build the catalog.',
             'text' => [
-                'Start a scan and discovery walks the directory, picks out the files it recognizes by extension and queues each directory that changed. Workers then read the tags in the background and create the albums and tracks.',
+                'Start a scan and its first stage, discovery, walks the directory, picks out the files it recognizes by extension and queues each directory that changed. Workers then read the tags in the background and create the albums and tracks.',
                 "So a scan marked <strong>Completed</strong> has only finished finding files, and the catalog may still be filling. The counts on the library's own page show what has arrived.",
             ],
             'figure' => [
@@ -84,7 +84,7 @@ return [
         "A scan's totals and its Completed status describe discovery. They do not show that every queued directory has reached the catalog.",
         'File watching imports nothing. <code>app:watch-files</code> prints filesystem events; run a scan when files change.',
         'The types Podcast, Audiobook and TV show can be registered, but scanning them is not implemented.',
-        'A scan picks files by extension. Being found does not guarantee that a browser can play the codec inside, and tags in M4A files are not read.',
+        'A scan picks files by extension. Finding a file does not guarantee that a browser can play the codec inside it, and tags in M4A files are not read.',
         'A scan does not promise to remove catalog entries for deleted files: a missing file stays in the catalog, marked unavailable.',
         'With automatic matching on, Bånder sends requests about your music to MusicBrainz and the Cover Art Archive. With lyrics fetching on, it sends them to LRCLIB.',
     ],

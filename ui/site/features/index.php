@@ -20,7 +20,7 @@ return [
         [
             'id' => 'operators',
             'title' => 'For running it',
-            'lead' => 'Add libraries, follow the work and manage an instance.',
+            'lead' => 'Add libraries, follow the jobs and manage an instance.',
             'pages' => ['libraries', 'administration', 'console'],
         ],
         [

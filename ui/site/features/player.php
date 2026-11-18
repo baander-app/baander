@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 return [
     'name' => 'Player',
-    'summary' => 'A player that stays with you while you browse, with a queue you can see and rearrange.',
+    'summary' => 'A player that stays available while you browse, with a queue you can see and rearrange.',
     'description' => "Bånder's web player keeps playing while you browse, shows its queue and lets you choose what plays next.",
     'headline' => 'Look around.<br>The music plays on.',
     'lead' => [

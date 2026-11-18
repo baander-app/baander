@@ -33,7 +33,7 @@ return [
             'id' => 'parametric',
             'heading' => 'See the shape of your EQ.',
             'text' => [
-                "Switch to the parametric view to work with the bands on a response graph. Drag a point to change its frequency and gain, and read the selected band's frequency, gain and Q beside it.",
+                "Switch to the parametric view to work with the bands on a response curve. Drag a point to change its frequency and gain, and read the selected band's frequency, gain and Q beside it.",
                 'The curve draws all the bands together, so a boost in one place and a cut in another show in one view.',
             ],
             'figure' => [
@@ -48,7 +48,7 @@ return [
             'heading' => 'More than frequency bands.',
             'text' => [
                 "Set the compressor's threshold, ratio, knee, attack and release. Change the stereo width, or switch on crossfeed for headphone listening.",
-                'A loudness contour and master gain, with optional normalization to a loudness target, set the level.',
+                'A loudness contour and master gain set the level, with optional normalization to a loudness target.',
             ],
             'figure' => [
                 'picture' => 'equalizer-dynamics',

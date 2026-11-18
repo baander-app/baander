@@ -8,7 +8,7 @@ return [
     'description' => "Bånder's administration pages: the job monitor, the scheduler, user accounts and library access, server settings, and health alerts in the app.",
     'headline' => 'See what the server<br>is doing.',
     'lead' => [
-        "Someone at home wants to know why last night's album still isn't showing up. Bånder's administration pages let you look: they list background jobs such as scans with their status, and hold the schedules, accounts and server settings.",
+        "Someone at home wants to know why last night's album still isn't showing up. Bånder's administration pages let you find out. They list background jobs such as scans with their status, and hold the schedules, accounts and server settings.",
     ],
     'hero' => [
         'picture' => 'administration',
@@ -32,7 +32,7 @@ return [
             'id' => 'scheduler',
             'heading' => 'Work that repeats itself.',
             'text' => [
-                'Some work should happen whether or not anyone remembers it. The <strong>Scheduler</strong> tab lists every scheduled job with its cron expression, the command it runs, its status, and its last and next run.',
+                'The <strong>Scheduler</strong> tab lists every scheduled job with its cron expression, the command it runs, its status, and its last and next run.',
                 'Pause one, change its schedule, run it now, or create another from the commands Bånder offers for scheduling.',
             ],
             'figure' => [
@@ -46,7 +46,7 @@ return [
             'id' => 'access',
             'heading' => 'Decide who sees which library.',
             'text' => [
-                'Accounts are listed under <strong>Security</strong>. What an account may listen to is a separate matter: administrators see every library, and other users see only the libraries they have been granted.',
+                'Accounts are listed under <strong>Security</strong>. What an account may listen to is set separately. Administrators see every library, and other users see only the libraries they have been granted.',
                 'A super administrator opens <strong>Library access</strong> for an account and ticks the libraries that person may see.',
             ],
             'figure' => [
@@ -59,7 +59,7 @@ return [
             'id' => 'settings',
             'heading' => 'Settings without a restart.',
             'text' => [
-                'Server settings live in the database, and Bånder reads each one when it acts on it, so a change applies without a restart.',
+                'Server settings live in the database, and Bånder reads a setting each time it uses one, so a change applies without a restart.',
                 'Four features start switched off for you to turn on: audio transcoding, automatic MusicBrainz matching, automatic lyrics fetching and scheduled recommendations.',
             ],
             'figure' => [
@@ -83,7 +83,7 @@ return [
         "Transcodes have no record in the job monitor. They run in the worker deployment's media coordinator.",
         'Jobs and schedules run in the separate worker deployment. Without running workers, queued and scheduled work waits.',
         'Cancelling is cooperative: a job stops at its next checkpoint, and jobs without checkpoints run to the end.',
-        'When a component such as Redis or the background worker turns unhealthy, each administrator gets a notification in the app and nothing else: no email, push or webhook. Watch the server from outside too.',
+        'When a component such as Redis or the background worker turns unhealthy, each administrator gets a notification in the app and nothing else: no email, push or webhook. Watch the server from outside too, because it cannot report its own outage.',
         'Only super administrators edit accounts, assign roles, grant library access and change server settings. Other administrators see the settings read-only.',
         'These role checks apply to the browser and the API. The <a href="/features/console/">console</a> acts with full authority for anyone who has shell access to the installation.',
     ],

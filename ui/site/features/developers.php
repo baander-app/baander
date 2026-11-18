@@ -33,7 +33,7 @@ return [
             'heading' => 'The client is generated.',
             'text' => [
                 "Add an endpoint, and the web client has to learn its shape. The REST API's OpenAPI description is generated from the attributes on controllers, request DTOs and response resources, and Orval turns it into typed React Query hooks and TypeScript types.",
-                'A component imports a hook and calls it. After you change the API, export the description and run <code>yarn generate</code>; <code>yarn generate:check</code> fails when the committed client differs.',
+                'A component imports a hook and calls it. After you change the API, export the description and run <code>yarn generate</code>; <code>yarn generate:check</code> fails when the committed client is out of date.',
             ],
             'figure' => [
                 'manual' => 'part-2-developer-guide/development/frontend-development.md',
@@ -53,7 +53,7 @@ return [
             'id' => 'previews-and-tests',
             'heading' => 'A preview for every worktree.',
             'text' => [
-                'You have a change on a branch and want to see it run. <code>make preview-up</code> starts an instance for your worktree alone, with its own hostname, database, Redis, keys and storage, and PHP and Vite read your files as you edit them.',
+                'You have a change on a branch and want to see it run. <code>make preview-up</code> starts an instance for your worktree alone, with its own hostname, database, Redis, keys and storage. PHP and Vite read your files as you edit them.',
                 'Tests are isolated too. Four backend PHPUnit suites (Unit, StaticAnalysisRules, Functional and Integration) run in disposable containers, and a fifth, Tooling, covers the build and deployment tooling. Vitest runs the web unit tests, and Playwright drives a browser against your preview.',
             ],
             'figure' => [
@@ -69,7 +69,7 @@ return [
             ['title' => 'Install the host controller', 'text' => 'From the repository root, run <code>composer --working-dir=scripts install --no-dev</code>.'],
             ['title' => 'Set up local names and certificates', 'text' => 'Run <code>make dev-host-setup</code> and follow the quick start for the DNS files and the local certificate authority.'],
             ['title' => 'Start your preview', 'text' => 'Run <code>make preview-up</code>, then <code>make preview-url</code>, and open the address it prints.'],
-            ['title' => 'Change something', 'text' => 'Edit a file under <code>ui/web/</code> and Vite updates the browser; edit a PHP file and it reloads on save.'],
+            ['title' => 'Change something', 'text' => 'Edit a file under <code>ui/web/</code> and Vite updates the browser; edit a PHP file and PHP reloads it on save.'],
             ['title' => 'Run the checks', 'text' => 'Before you open a pull request, the <a href="/docs/developer-guide/contributing/contributing/#pull-request-process">contribution guide</a> names the checks to run.'],
         ],
     ],

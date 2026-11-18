@@ -128,7 +128,7 @@ include __DIR__ . '/header.php';
     <div class="section-intro">
       <p class="eyebrow">Your playlists</p>
       <h2 id="playlists-title">Choose the songs.<br>Share the list.</h2>
-      <p>Pick the songs yourself. Each playlist has its own page to browse and play.</p>
+      <p>Each playlist has its own page to browse and play.</p>
       <p>Share playlists with other people on your server, and choose whether collaborators can add songs.</p>
       <a class="text-action" href="/features/playlists/">Read the playlists page <span class="arrow" aria-hidden="true">→</span></a>
     </div>
@@ -164,7 +164,7 @@ include __DIR__ . '/header.php';
       <?php
       $screenshot = [
           'name' => 'destinations-window',
-          'alt' => "Bånder's playback destination menu after a move: this browser, Chrome on Linux, and Firefox on Linux, which now plays, with an entry that returns playback.",
+          'alt' => "Bånder's playback destination menu after a move: entries for this browser, Chrome on Linux and Firefox on Linux, which is active, and one that returns playback.",
           'loading' => 'lazy',
       ];
       include __DIR__ . '/screenshot.php';

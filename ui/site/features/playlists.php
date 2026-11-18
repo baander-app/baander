@@ -6,7 +6,7 @@ return [
     'name' => 'Playlists',
     'summary' => 'Collect songs into playlists and share them with other people on your server.',
     'description' => "Bånder's playlists: choose the songs yourself, play a playlist from its own page, share it with other accounts on your server and let them add songs.",
-    'headline' => 'Pick the songs.<br>Share the list.',
+    'headline' => 'Choose the songs.<br>Share the list.',
     'lead' => [
         'Some songs belong together, whatever albums they came from. Put them in a playlist, play it from its own page, and share it with other people on your server. Switch on collaboration and they can add songs to it too.',
     ],
@@ -67,10 +67,10 @@ return [
     'limits' => [
         'The create form has a <strong>Smart playlist</strong> switch. Bånder stores the rules entered there and does not evaluate them, so the rules select no music.',
         'The web application adds songs to a playlist. It has no control for removing a song or changing the order.',
-        'After you create a playlist on the Playlists page, the list can stay blank until you open the page again.',
-        'You share a playlist with named accounts on the same server, one public id at a time.',
+        'After you create a playlist on the Playlists page, the list of playlists can stay blank until you open the page again.',
+        'You share a playlist with specific accounts on the same server, one public id at a time.',
         'Only the owner deletes a playlist or decides who it is shared with.',
-        'A collaborator can add only songs that their own library access lets them see, and each person sees the songs of a shared playlist that their libraries include.',
+        'A collaborator can add only songs that their own library access lets them see, and in a shared playlist, each person sees the songs their libraries include.',
     ],
     'manual' => [
         ['label' => 'Operator guide: who can share a playlist', 'href' => '/docs/operator-guide/maintenance/security/#who-can-change-the-catalog-and-who-can-share-a-playlist'],

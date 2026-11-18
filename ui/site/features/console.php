@@ -19,7 +19,7 @@ return [
             'id' => 'same-actions',
             'heading' => 'What a page does, a command does.',
             'text' => [
-                'Add a library in the browser or run <code>app:library:create</code>: both run the same use case, with the same validation and the same conflicts. Every action on the <a href="/features/administration/">administration pages</a> has a command like it, so what you can click you can also type.',
+                'Add a library in the browser or run <code>app:library:create</code>. Both run the same use case, with the same validation and the same conflicts. Every action on the <a href="/features/administration/">administration pages</a> has a command like it.',
             ],
             'figure' => [
                 'manual' => 'part-1-operator-guide/commands/app-library-create.md',
@@ -76,7 +76,7 @@ return [
     ],
     'limits' => [
         'Console commands need trusted shell access to the installation. They apply no role check, so anyone with that access can do everything.',
-        'Commands run inside the application container, and the paths they take are container paths. The worker pair is operated from the host through its own entry point.',
+        'Commands run inside the application container, and the paths they take are container paths. The worker deployment is operated from the host, not through these commands.',
         'Most reference pages show their examples as <code>make exec cmd="php bin/console …"</code>, which targets a development preview. On an installed instance, run the same arguments with <code>dc exec app php bin/console …</code>.',
         'The 153 include five commands for development and documentation and a few you do not run yourself, such as <code>app:worker</code>.',
         "The exit status of <code>app:health:check</code> describes the web container; it leaves out the background worker.",
