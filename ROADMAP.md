@@ -675,9 +675,9 @@ Still to do:
 
 ## Website reference pages and fold-out menu
 
-Delivered on `feat/site-reference-pages-and-menu` on 2026-11-18 from
-`docs/plans/2026-11-18-1647-feat-site-reference-pages-and-menu-plan.md`; not merged or
-pushed. The public website publishes four repository documents as reference pages:
+Delivered on `master` on 2026-11-18, fast-forwarded from
+`feat/site-reference-pages-and-menu` and pushed, from
+`docs/plans/2026-11-18-1647-feat-site-reference-pages-and-menu-plan.md`. The public website publishes four repository documents as reference pages:
 `STRATEGY.md` at `/strategy/`, `CONCEPTS.md` at `/concepts/`, `THIRD_PARTY.md` at
 `/licensing/` and `deploy/preset/README.md` at `/deploy/`. Each opens with a short
 website introduction kept in `ui/site/reference/`, and the deploy page adds a table of
