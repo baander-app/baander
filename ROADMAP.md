@@ -264,8 +264,8 @@ that limitation is recorded for follow-up, with no runtime change in the 2026-10
 `052e8684d`) and the roadmap cleanup with its plan retirement. Landed on 2026-11-14:
 scan artist credits and MusicBrainz matching. The persistent instance ran `6912eaaf6`
 before that push and updates itself from `master`. The website was last published on
-2026-11-17: a local build of `7a3460fef`, deployed to production as
-`baander-ht5ywd4ja` and aliased to `https://baander.app`.
+2026-11-18: a local build of `464fad883`, deployed to production as
+`baander-1xz9pz3lx` and aliased to `https://baander.app`.
 Pushed later on 2026-11-17, on top of `0660fb943`: party invitations (`3a666d381` to
 their roadmap record).
 Pushed later on 2026-11-15, on top of `23f899976`: the matching follow-ups
@@ -281,9 +281,11 @@ record). Pushed on 2026-11-17, on top of `f5065dcfe`: the docs-book rewrite foll
 (`9b72c2185` to their roadmap record).
 
 - **Website feature pages.** On `master` since 2026-11-18, merged from
-  `feat/site-feature-pages` (`0ac2a3205` to this record): the `/features/` overview
-  and nine feature pages, and the homepage's pictures retaken from the sample
-  library. Next: the user reviews the pictures and decides how `.lrc` lyrics should
+  `feat/site-feature-pages` in `464fad883`, pushed to both forges and published to
+  `https://baander.app`: the `/features/` overview and nine feature pages, and the
+  homepage's pictures retaken from the sample library. The merged local branches
+  were deleted the same day; `fix/notification-pane-well-inset` stays because its
+  worktree still has it checked out. Next: the user reviews the pictures and decides how `.lrc` lyrics should
   reach the lyrics panel; see the "Still to do" list under
   [Website feature pages](#website-feature-pages).
 - **Master CI.** No `CI` run on `master` has been green since 2026-11-05. Run
@@ -583,15 +585,23 @@ Verification on 2026-11-18, at `8bf62a06f` unless stated:
   image (`rendering.spec.ts`, untouched by this branch) did not load within 8
   seconds.
 
+- Master and publication: the merge commit `464fad883` on `master` built 243 manual
+  pages, passed 172 tooling tests with 1,551 assertions, 35 site script tests and
+  all 207 tests of `corepack yarn test:browser`, and was pushed to GitHub and
+  Forgejo. A local build of `464fad883` was deployed as the preview
+  `baander-5zlw24mxu` and then to production as `baander-1xz9pz3lx`, aliased to
+  `https://baander.app`. On both, the homepage, `/features/`, two feature pages, two
+  pictures, a nested manual page, the search script, the sitemap and the social card
+  returned 200, and an unknown URL returned 404. The live site serves the overview
+  over HTTPS with HSTS.
+
 Still to do:
 
-- Rerun `corepack yarn test:browser` in `ui/site/` on `master` and check the
-  `Public website` workflow's run of the merge, since the last local run had the
-  two failures above.
-- The user has not reviewed the pictures yet; the plan's Definition of Done requires
-  it. Run `make website-build && make website-preview` and open
-  `http://localhost:4177/` and `http://localhost:4177/features/`. The contact sheet
-  in `var/site-capture/` shows the last capture run, not the committed pictures.
+- Check the `Public website` and `CI` workflow runs of `464fad883` on both forges.
+- The user has not reviewed the pictures; the plan's Definition of Done requires it.
+  They are live on `https://baander.app/` and `https://baander.app/features/`. The
+  contact sheet in `var/site-capture/` shows the last capture run, not the
+  committed pictures.
 - No lyrics page. `README.md:46` and
   `docs-book/part-1-operator-guide/media/library-management.md:64` say lyrics come
   from `.lrc` files beside the tracks, and the scan stores them on the song. The
