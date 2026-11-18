@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-11-17. This roadmap selects future work and records unresolved
+Updated: 2026-11-18. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
@@ -280,6 +280,12 @@ top of `c47af96fb`: the docs-book rewrite (`20be3f1df` to `0d017641f` and its ro
 record). Pushed on 2026-11-17, on top of `f5065dcfe`: the docs-book rewrite follow-ups
 (`9b72c2185` to their roadmap record).
 
+- **Website feature pages.** On the branch `feat/site-feature-pages` since
+  2026-11-18 (`0ac2a3205` to this record), not merged, pushed or published: the
+  `/features/` overview and nine feature pages, and the homepage's pictures retaken
+  from the sample library. Next: the user reviews the pictures and decides how `.lrc`
+  lyrics should reach the lyrics panel; see
+  [Website feature pages](#website-feature-pages).
 - **Master CI.** No `CI` run on `master` has been green since 2026-11-05. Run
   43826408058 on `44e315ee3` passed the whole quality gate on 2026-11-16, step 41 in
   2,276 of its 3,600 seconds, and failed the `build-and-push` job at its check that
@@ -507,6 +513,105 @@ Open:
   not investigated.
 - The admin bell keeps its own relative-time helper, which has no date fallback
   after 30 days, beside the shared one; consolidating it changes old admin rows.
+
+## Website feature pages
+
+Delivered on the branch `feat/site-feature-pages` on 2026-11-18, not merged, pushed or
+published: `docs/plans/2026-11-17-1757-feat-site-feature-pages-plan.md`, except the
+lyrics page. The public website gains `/features/`: an overview in three groups and
+nine feature pages. Listeners get the music library, the player, the equalizer,
+playlists and playback destinations; operators get libraries and scanning,
+administration and the console; developers get one page. Each page opens in the
+prose-fix Jobs register and shows the feature in pictures taken from the application
+with a fictional sample library, or in blocks the manual renders. It gives a short
+guide and lists the feature's limits. Every claim cites `README.md` or a manual page,
+and each page's claim ledger is in the commit that adds it. The homepage links into the
+pages, and its seven pictures are retaken from the sample library.
+
+Commits, in order: `0ac2a3205` (plan), `4be4a630a` (data validation), `e29a7368c`,
+`edc0080f1` and `21f262127` (README and notification guide corrections),
+`c7c79881d` (sample library), `38527f87f` (overview and equalizer page), `38596b3c2`
+(developers page), `0b3e71733` and `dc601544a` (capture driver, scenes and pictures),
+`2a263b2fb` (listener pages), `e9b5c7a8b` (operator pages), `aa601e211` (README:
+rearranging the queue), `c95251d0d` (overview completed, homepage links), `0ddb0b2ca`
+(capture helpers shared, failure paths hardened), `a0c6ccc7d` (homepage pictures),
+`13dad7ed5` (site README, house style, `ui/DESIGN.md`, `CONCEPTS.md`) and `8bf62a06f`
+(the code review's fixes).
+
+Verification on 2026-11-18, at `8bf62a06f`:
+
+- Site: `make website-build` built 243 manual pages. In `ui/site/`,
+  `corepack yarn typecheck` was clean, `corepack yarn test:browser` passed 207 tests
+  and `node --test scripts/*.test.mjs` passed 35.
+- Tooling: `phpunit-tooling.xml.dist` on `scripts/tests/php/Website`,
+  `ToolingSourcePolicyTest.php` and `ToolingArchitectureTest.php` passed 172 tests and
+  1,551 assertions. PHPStan with `phpstan-tooling.neon` reported no errors,
+  `php-cs-fixer check` with `.php-cs-fixer.tooling.php` found nothing to fix, and
+  `scripts/check-tooling-source-policy.php` exited 0. The full tooling suite was not
+  run.
+- Pictures: 32 pairs, each with a capture record in `ui/site/features/captures.json`,
+  taken against the worktree preview at application commit `0326c6acb`. A full run of
+  the final capture scripts on 2026-11-18 took all 32 pairs and exited 0. The
+  playback destinations pictures show a real move between Chromium and Firefox
+  signed in to one account; nothing in the browser was staged.
+- Code review: `ce-code-review` at full depth with correctness, project standards,
+  testing, maintainability, reliability, adversarial (in-process; cross-model review
+  is off in this checkout) and learnings; verdict "Ready with fixes". An independent
+  validator confirmed both findings: a library grant that was never retried, and a
+  transient check that ended the whole capture run. Both are fixed in `8bf62a06f`,
+  together with the review's README suggestion to switch the provider lookups off
+  before the scan.
+
+Open:
+
+- The user has not reviewed the pictures yet; the plan's Definition of Done requires
+  it. Contact sheet: `var/site-capture/contact-sheet.html` after a capture run.
+- No lyrics page. `README.md:46` and
+  `docs-book/part-1-operator-guide/media/library-management.md:64` say lyrics come
+  from `.lrc` files beside the tracks, and the scan stores them on the song. The
+  lyrics panel reads only lyrics fetched from LRCLIB
+  (`src/Lyrics/Interface/Controller/LyricsController.php:71-87`), so `.lrc` lyrics
+  never reach it. Either the panel reads the stored lyrics, which needs an
+  application change, or the two documents change; the page waits for that decision.
+- Application defects seen while taking the pictures, none fixed here:
+  - Player: while music plays, the player bar has no shuffle or repeat button; the S
+    and R keys work and show no state. Crossfade is a stored preference with no
+    control. The player bar's cover request is answered 403, so it shows a
+    placeholder.
+  - Playlists: the web application cannot remove a song or change the order. An
+    album's "Add to Playlist" adds only the first track. Rows are numbered from 0.
+    After a create on the Playlists page, the list stays blank until the page is
+    opened again. Collaborators are listed by public id, not name. The share
+    dialog's switch thumb overhangs its track when on.
+  - Library: the album details panel lists tracks out of order for 5 of the 15
+    sample albums. The home page's "Recently Added" row is sorted by title, not
+    date. A double-click on an album card fails while the side panel is closed.
+  - Destinations: the menu names a browser only as it registers itself, and "Rename
+    device" does not change that name. A further window of one account raises a
+    "Settings conflict" dialog at sign-in.
+  - Administration: the AAC select in the Media settings group is cut off, job rows
+    have seven cells in a six-column grid, and the job panel prints durations such as
+    `0.208213ms`. The Add Library form offers types whose scanning is not
+    implemented.
+- Documents and the application disagree:
+  - Passkey sign-in: `docs-book/part-1-operator-guide/administration/user-management.md:83,88`
+    state it, and the web login form has no control for it. The overview no longer
+    mentions passkeys.
+  - The homepage says movies move between devices like music. A test shows it
+    (`ui/web/tests/e2e/playback-destinations/video-transfer.spec.ts`), and no
+    maintained document states it.
+  - `app:radio:sync` syncs only countries a user subscribes to, and the web
+    application never calls the refresh route.
+  - `library-management.md:131-139` presents cover extraction as a step after each
+    scan, but ingestion already queues it.
+- Capture tooling: the playlists scene's create branch has not run in its final form,
+  because the preview already holds its playlists. The destinations scene expects
+  the names "Chrome on Linux" and "Firefox on Linux", and WebKit does not start on
+  this host. The preview checks run through `make exec`, which honours `INSTANCE`,
+  while the browser follows `--base-url`; nothing ties the two together.
+- The homepage's font-arrival stability test at 1440 px failed its own precondition
+  (Geist had not arrived) once in eleven local runs.
+- The plan still says ten pages (R2, U7); the lyrics page is the difference.
 
 ## Presentation register and homepage hero
 
