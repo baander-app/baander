@@ -1,7 +1,7 @@
 import { test as base, expect } from '../fixtures'
 import type { Page, Route } from '@playwright/test'
 import type { SongResource } from '../../../src/shared/api-client/gen/endpoints'
-import { FixtureClient, login, type FixtureManifest, type FixtureResource } from '../live-updates/capacity-fixtures'
+import { login, withFixtureRun, type FixtureResource } from '../live-updates/capacity-fixtures'
 
 export const catalogAlbum = {
   publicId: 'stylingAlbum0000000001',
@@ -156,11 +156,8 @@ export async function installCatalogFixtures(
  * the audio the server streams.
  */
 async function signInOverCatalog(page: Page, state: 'empty' | 'populated', run: (page: Page) => Promise<void>) {
-  const fixture = FixtureClient.start()
-  let removeRoutes: (() => Promise<void>) | undefined
-  try {
-    // A super admin, because the administration specs also check views only a super admin sees.
-    const manifest = (await fixture.request<FixtureManifest>({ op: 'create', superAdmin: true })).receipt
+  // A super admin, because the administration specs also check views only a super admin sees.
+  await withFixtureRun(async (manifest, fixture) => {
     let songs: CatalogSongs | undefined
     if (state === 'populated') {
       const created = (await fixture.request<{ createdSongs: FixtureResource[] }>(
@@ -172,18 +169,15 @@ async function signInOverCatalog(page: Page, state: 'empty' | 'populated', run: 
         burmeseSong: { ...burmeseSong, publicId: created[2].publicId },
       }
     }
-    removeRoutes = await installCatalogFixtures(page, state, songs)
-    await login(page, manifest.observer)
-    await expect(page.locator('main').getByRole('heading', { name: 'Home', exact: true, level: 1 })).toBeVisible()
-    await run(page)
-  } finally {
-    await removeRoutes?.()
+    const removeRoutes = await installCatalogFixtures(page, state, songs)
     try {
-      if (fixture.run) expect((await fixture.request({ op: 'cleanup' })).receipt.complete).toBe(true)
+      await login(page, manifest.observer)
+      await expect(page.locator('main').getByRole('heading', { name: 'Home', exact: true, level: 1 })).toBeVisible()
+      await run(page)
     } finally {
-      await fixture.close()
+      await removeRoutes()
     }
-  }
+  }, { superAdmin: true })
 }
 
 export const test = base.extend<{ emptyCatalog: Page; populatedCatalog: Page }>({

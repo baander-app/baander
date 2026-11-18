@@ -1,5 +1,5 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test'
-import { FixtureClient, login, type FixtureManifest, type FixtureUser } from '../live-updates/capacity-fixtures'
+import { login, withFixtureRun, type FixtureUser } from '../live-updates/capacity-fixtures'
 import { fixtureSongRow } from '../playback-destinations/session-tabs'
 
 /**
@@ -94,24 +94,11 @@ async function expectNoConflict(page: Page, exchanges: PreferenceExchange[], fam
   expect(exchanges.filter((exchange) => exchange.status === 409), 'no preference write was refused for its version').toEqual([])
 }
 
-async function withFixture(run: (manifest: FixtureManifest) => Promise<void>) {
-  const fixture = FixtureClient.start()
-  try {
-    await run((await fixture.request<FixtureManifest>({ op: 'create' })).receipt)
-  } finally {
-    try {
-      if (fixture.run) expect((await fixture.request({ op: 'cleanup' })).receipt.complete).toBe(true)
-    } finally {
-      await fixture.close()
-    }
-  }
-}
-
 test.describe('signing in on a fresh browser', () => {
   test.setTimeout(120_000)
 
   test('shows the playing track without a settings conflict when the layout read comes last', async ({ browser, baseURL }) => {
-    await withFixture(async (manifest) => {
+    await withFixtureRun(async (manifest) => {
       const first = await startSession(browser, baseURL, manifest.users[0])
       const second = await openContext(browser, baseURL)
       try {
@@ -132,7 +119,7 @@ test.describe('signing in on a fresh browser', () => {
   })
 
   test('applies the session volume without a settings conflict when the player read comes last', async ({ browser, baseURL }) => {
-    await withFixture(async (manifest) => {
+    await withFixtureRun(async (manifest) => {
       const first = await startSession(browser, baseURL, manifest.users[0])
       const second = await openContext(browser, baseURL)
       try {
@@ -149,6 +136,8 @@ test.describe('signing in on a fresh browser', () => {
         await holdFirstRead(second.context, 'player', 3_000)
         await login(second.page, manifest.users[0])
         await expectNoConflict(second.page, second.exchanges, 'player')
+        await expect(second.page.getByRole('region', { name: 'Playback', exact: true })
+          .getByRole('slider', { name: 'Volume', exact: true })).toHaveAttribute('aria-valuenow', '40')
       } finally {
         await second.context.close()
         await first.context.close()
@@ -157,7 +146,7 @@ test.describe('signing in on a fresh browser', () => {
   })
 
   test('reloads an album page without a settings conflict when the layout read comes last', async ({ browser, baseURL }) => {
-    await withFixture(async (manifest) => {
+    await withFixtureRun(async (manifest) => {
       const first = await startSession(browser, baseURL, manifest.users[0])
       try {
         await first.page.goto(`/music/albums/${manifest.album.publicId}`)

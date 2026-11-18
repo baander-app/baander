@@ -1,5 +1,5 @@
 import { act, cleanup, render, screen } from '@testing-library/react'
-import { AxiosError } from 'axios'
+import { AxiosError, CanceledError } from 'axios'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -227,6 +227,14 @@ describe('the layout preference\'s first read', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(0) })
 
     expect(useContextPanelStore.getState().layoutPreferencesRead).toBe(true)
+  })
+
+  it('is not reported for a read given up before it answered, and is reported by the next one', async () => {
+    answerLayout(() => Promise.reject(new CanceledError()))
+    const view = await mountProvider()
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+    expect(useContextPanelStore.getState().layoutPreferencesRead).toBe(false)
+    view.unmount()
   })
 
   it('is forgotten when the preference session ends, so the next sign-in waits again', async () => {

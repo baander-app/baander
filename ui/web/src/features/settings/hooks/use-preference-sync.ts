@@ -129,6 +129,7 @@ export function usePreferenceSync<T>({
     const request = beginRequest()
     if (!request) return 'failed'
     const revision = localRevision.current
+    let cancelled = false
     try {
       const response = await AXIOS_INSTANCE.get<unknown>(baseUrl, { signal: signal ?? request.signal })
       const data = readData(response.data)
@@ -147,12 +148,15 @@ export function usePreferenceSync<T>({
       acknowledgedRevision.current = revision
       return 'applied'
     } catch (error) {
+      cancelled = isCancel(error)
       if (isAxiosError(error) && error.response?.status === 404 && request.current() && !signal?.aborted
         && versionRef.current === 0 && remoteVersionRef.current === 0) return 'absent'
       return 'failed'
     } finally {
       request.finish()
-      if (!firstReadReported.current && request.current()) {
+      // A read given up before it answered says nothing about the saved settings; the next one reports.
+      cancelled ||= signal?.aborted === true || request.signal.aborted
+      if (!firstReadReported.current && !cancelled && request.current()) {
         firstReadReported.current = true
         onFirstReadRef.current?.()
       }

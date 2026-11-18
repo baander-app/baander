@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 import { test, expect } from '../fixtures'
 import { setTheme } from '../helpers/theme-utils'
-import { FixtureClient, login, type FixtureManifest } from '../live-updates/capacity-fixtures'
+import { login, withFixtureRun } from '../live-updates/capacity-fixtures'
 import { expectContained, expectNoPageOverflow, expectReadable } from '../styling/helpers'
 
 /**
@@ -10,18 +10,10 @@ import { expectContained, expectNoPageOverflow, expectReadable } from '../stylin
  * opens over the pane and takes its focus.
  */
 async function withFixtureUser(page: Page, run: () => Promise<void>) {
-  const fixture = FixtureClient.start()
-  try {
-    const manifest = (await fixture.request<FixtureManifest>({ op: 'create' })).receipt
+  await withFixtureRun(async (manifest) => {
     await login(page, manifest.users[0])
     await run()
-  } finally {
-    try {
-      if (fixture.run) expect((await fixture.request({ op: 'cleanup' })).receipt.complete).toBe(true)
-    } finally {
-      await fixture.close()
-    }
-  }
+  })
 }
 
 for (const width of [390, 1280]) {

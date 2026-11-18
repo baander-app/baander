@@ -88,6 +88,26 @@ export class FixtureClient {
   }
 }
 
+/**
+ * Creates a fixture run with `options` added to the create command, runs `run` with its
+ * manifest and client, and removes the run afterwards, also when `run` fails.
+ */
+export async function withFixtureRun<T>(
+  run: (manifest: FixtureManifest, fixture: FixtureClient) => Promise<T>,
+  options: Record<string, unknown> = {},
+): Promise<T> {
+  const fixture = FixtureClient.start()
+  try {
+    return await run((await fixture.request<FixtureManifest>({ op: 'create', ...options })).receipt, fixture)
+  } finally {
+    try {
+      if (fixture.run) expect((await fixture.request({ op: 'cleanup' })).receipt.complete).toBe(true)
+    } finally {
+      await fixture.close()
+    }
+  }
+}
+
 /** Conservatively reserves both the initial login and its one nonce retry. */
 export class LoginAdmission {
   readonly attempts: { epochMs: number }[] = []

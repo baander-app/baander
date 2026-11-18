@@ -1,6 +1,6 @@
 import type { BrowserContext, Locator, Page } from '@playwright/test'
 import { test, expect } from './footer-playback'
-import { FixtureClient, login, type FixtureManifest } from '../live-updates/capacity-fixtures'
+import { login, withFixtureRun } from '../live-updates/capacity-fixtures'
 import { interruptDelivery, listOutageEntry, navigate } from '../live-updates/recovery-fixtures'
 import { MOODS, setTheme } from '../helpers/theme-utils'
 import { contrastRatio, expectContained, expectNoPageOverflow, luminance, paintedPixels, textColor } from './helpers'
@@ -290,9 +290,7 @@ for (const navigation of ['collapsed', 'expanded'] as const) {
 
 test('the admin bell\'s outage entry keeps the muted text colour, outside the well', async ({ page }) => {
   test.setTimeout(90_000)
-  const fixture = FixtureClient.start()
-  try {
-    const manifest = (await fixture.request<FixtureManifest>({ op: 'create' })).receipt
+  await withFixtureRun(async (manifest) => {
     await page.setViewportSize({ width: 1280, height: 800 })
     await login(page, manifest.observer)
     await navigate(page, '/admin')
@@ -318,11 +316,5 @@ test('the admin bell\'s outage entry keeps the muted text colour, outside the we
     } finally {
       await restoreDelivery()
     }
-  } finally {
-    try {
-      if (fixture.run) expect((await fixture.request({ op: 'cleanup' })).receipt.complete).toBe(true)
-    } finally {
-      await fixture.close()
-    }
-  }
+  })
 })
