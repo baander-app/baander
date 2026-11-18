@@ -10,15 +10,22 @@ import { LiveOutageItem } from './LiveOutageItem'
 import { NotificationItem } from './NotificationItem'
 import { textRole, WELL_HANDOFF, wellColors, wellShading } from '@/shared/theme'
 
+/**
+ * The pane holds the well on the footer display's face. Like the display it has no outline: the
+ * inset edge and the lip mark its bounds, and the overlay shadow lifts it off what lies beneath.
+ * It is taller than the display, so its shade fades over a fixed length that matches the
+ * display's profile.
+ */
 const PopoutContent = styled(Popover.Content)`
-  ${wellColors('var(--color-popover)')}
+  ${wellColors('var(--color-muted)')}
+  --well-fade: 4rem;
+  --well-lift: 0 4px 24px rgb(0 0 0 / 0.4);
 
   z-index: 50;
   width: min(20rem, calc(100vw - 2rem));
   overflow: hidden;
   border-radius: var(--radius-xl);
-  border: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);
-  background-color: var(--color-popover);
+  background-color: var(--color-muted);
   ${wellShading}
 
   /* The closed pane stays mounted only while an animation runs, so it fades by one. */

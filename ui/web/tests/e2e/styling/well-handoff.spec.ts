@@ -103,6 +103,8 @@ for (const width of [390, 1280]) {
       ])
       expect(luminance(edge), `${mood}: the inset upper edge is darker than the face`).toBeLessThan(luminance(face))
       expect(luminance(lip), `${mood}: the lip below the pane is lighter than what is under it`).toBeGreaterThan(luminance(below))
+      // Like the footer display, the pane has no outline to run into its shade.
+      expect(await pane.evaluate((node) => getComputedStyle(node).borderTopWidth), `${mood}: no outline`).toBe('0px')
       await expectContained(pane)
       await expectNoPageOverflow(page)
     }

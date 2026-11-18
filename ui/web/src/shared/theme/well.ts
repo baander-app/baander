@@ -20,12 +20,15 @@ export const wellProperties = css`
 
 /**
  * The well's measures on a surface of the given colour: how far the face darkens at its upper
- * edge, the opacity of the inset edge and of the lower lip, and the secondary text colour that
- * stays readable over the shade. Set them on the element that holds the well.
+ * edge, how far down that shade fades into the face, the opacity of the inset edge and of the
+ * lower lip, and the secondary text colour that stays readable over the shade. Set them on the
+ * element that holds the well. The fade is a share of a short surface's height; a tall surface
+ * sets a fixed length instead, so its shade keeps the same profile however tall it grows.
  */
 export const wellColors = (surface: string) => css`
   --well-surface: ${surface};
   --well-depth: 4%;
+  --well-fade: 85%;
   --well-edge-opacity: 16%;
   --well-lip-opacity: 80%;
   --well-secondary-text: color-mix(in srgb, var(--color-muted-foreground) 85%, var(--color-foreground));
@@ -44,17 +47,22 @@ export const wellColors = (surface: string) => css`
  */
 const present = (amount: string) => `calc(${amount} * var(--well-presence, 1))`;
 
-/** The well's shading over a surface that carries `wellColors`: the gradient, the inset upper edge and the lower lip. */
+/**
+ * The well's shading over a surface that carries `wellColors`: the gradient, the inset upper edge
+ * and the lower lip. A surface that floats above the page, such as an overlay, sets `--well-lift`
+ * to its drop shadow; it stays while the shading fades, because it lifts the surface, not the well.
+ */
 export const wellShading = css`
   background-image: linear-gradient(
     to bottom,
     color-mix(in srgb, var(--well-surface) calc(100% - ${present('var(--well-depth)')}), black),
-    var(--well-surface) 85%,
+    var(--well-surface) var(--well-fade),
     color-mix(in srgb, var(--well-surface) calc(100% - ${present('1%')}), white)
   );
   box-shadow:
     inset 0 1px 2px rgb(0 0 0 / ${present('var(--well-edge-opacity)')}),
-    0 1px 0 rgb(255 255 255 / ${present('var(--well-lip-opacity)')});
+    0 1px 0 rgb(255 255 255 / ${present('var(--well-lip-opacity)')}),
+    var(--well-lift, 0 0 transparent);
 `;
 
 /** A surface that has given the well up: its face is flat and it has no edge or lip. */

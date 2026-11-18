@@ -122,9 +122,14 @@ transient menus and overlays retain their existing rules.
 ### Notification pane
 
 The sidebar bell opens the notification pane above it. While open, the pane holds
-the well over its `--color-popover` face, so the one depth cue on screen marks the
-surface the user just opened. It keeps its border and overlay radius and has no
-drop shadow. Muted text in the pane uses the well's secondary text color,
+the well, so the one depth cue on screen marks the surface the user just opened.
+The well sits on `--color-muted`, the centerpiece's face, which leaves the shade
+room to darken in the dark mood. Like the centerpiece the pane has no border: the
+inset edge and the lip mark its bounds, so no outline meets the shade. It keeps
+the overlay radius and the overlay drop shadow, which lifts it off the sidebar and
+page beneath. Its shade fades over a fixed 4rem
+rather than a share of its height, so a long list keeps the centerpiece's
+profile. Muted text in the pane uses the well's secondary text color,
 `--well-secondary-text`, which keeps 4.5:1 over the shaded upper edge in every
 mood; `--color-muted-foreground` does not in the warm mood. The pane fades in and out
 over the well handoff time, and the centerpiece's shading fades out and back over
@@ -137,7 +142,7 @@ shell has no footer player to take it from.
 - Sidebar: `var(--color-sidebar)`
 - Borders: `var(--color-border)` — used sparingly, not between every element
 - Surface colors follow the selected mood; dark-mode values are not universal defaults.
-- No gradients except on the surface that holds the well, described above. No drop shadows except on context menus and overlays (subtle, `0 4px 24px rgba(0,0,0,0.4)`); the well uses a shallow inset edge and faint lower lip.
+- No gradients except on the surface that holds the well, described above. No drop shadows except on context menus and overlays, including the notification pane (subtle, `0 4px 24px rgba(0,0,0,0.4)`); the well uses a shallow inset edge and faint lower lip.
 
 ### Border radius
 - Cards: 12px radius. Do not use 16px for card surfaces.
