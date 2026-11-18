@@ -1,4 +1,5 @@
 import { test as base, expect, type Locator } from '@playwright/test';
+import { openMenuPanel } from './site-menu';
 
 const test = base.extend<{ localRequests: void }>({
   localRequests: [async ({ context, baseURL }, use) => {
@@ -121,7 +122,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme });
     await page.emulateMedia({ colorScheme: opposite });
     await expect(page.locator('html')).toHaveAttribute('data-theme', initial);
-    await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Manual', exact: true }).click();
+    await (await openMenuPanel(page, 'Resources')).getByRole('link', { name: 'Operator manual', exact: true }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', initial);
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('data-theme', initial);

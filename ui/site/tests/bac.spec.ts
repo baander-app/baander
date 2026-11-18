@@ -1,5 +1,6 @@
 import { test as base, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
+import { openMenuPanel } from './site-menu';
 
 const packageVersion = JSON.parse(readFileSync(new URL('../../../packages/baander-audio-core/package.json', import.meta.url), 'utf8')).version as string;
 
@@ -21,7 +22,7 @@ const test = base.extend<{ localRequests: void }>({
 
 test('visitors discover Bånder Audio Core and its direct route has one canonical URL', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Audio Core', exact: true }).click();
+  await (await openMenuPanel(page, 'Product')).getByRole('link', { name: 'Audio Core', exact: true }).click();
   await expect(page).toHaveURL(/\/bac\/$/);
   await expect(page.getByRole('heading', { name: 'Bånder Audio Core', exact: true })).toBeVisible();
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://baander.app/bac/');
@@ -31,7 +32,7 @@ test('visitors discover Bånder Audio Core and its direct route has one canonica
   await expect(page.locator('#integration')).toContainText('libbac');
   await expect(page.locator('#integration').getByRole('link', { name: 'AAC implementation' }))
     .toHaveAttribute('href', '/docs/operator-guide/media/transcoding/#aac-implementation');
-  await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Audio Core', exact: true }))
+  await expect((await openMenuPanel(page, 'Product')).getByRole('link', { name: 'Audio Core', exact: true }))
     .toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('navigation', { name: 'Footer navigation' }).getByRole('link', { name: 'Audio Core', exact: true }))
     .toHaveAttribute('href', '/bac/');
@@ -39,7 +40,7 @@ test('visitors discover Bånder Audio Core and its direct route has one canonica
   await expect(page).toHaveURL(/\/bac\/$/);
   await expect(page.getByRole('heading', { name: 'Bånder Audio Core', exact: true })).toBeVisible();
   await page.goto('/docs/operator-guide/');
-  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Audio Core', exact: true }).click();
+  await (await openMenuPanel(page, 'Product')).getByRole('link', { name: 'Audio Core', exact: true }).click();
   await expect(page).toHaveURL(/\/bac\/$/);
 });
 

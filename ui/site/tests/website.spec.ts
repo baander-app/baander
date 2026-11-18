@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { test as base, expect } from '@playwright/test';
+import { openMenuPanel } from './site-menu';
 
 const test = base.extend<{ outbound: string[] }>({
   outbound: [async ({ context, baseURL }, use) => {
@@ -61,7 +62,8 @@ test('visitor reaches operating model and source-based installation', async ({ p
   const screenshot = page.getByRole('img', { name: /music library/ });
   await expect(screenshot).toBeVisible();
   expect(await screenshot.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
-  await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'How it works' })).toHaveCount(0);
+  // Counts the links inside closed menu panels too, which role locators skip.
+  await expect(page.locator('.site-header nav a', { hasText: 'How it works' })).toHaveCount(0);
   await page.locator('.hero').getByRole('link', { name: /How Bånder works/ }).click();
   await expect(page).toHaveURL(/#how-it-works$/);
   await expect(page.getByRole('heading', { name: 'Your files. A connected library.' })).toBeInViewport();
@@ -492,12 +494,12 @@ function spacing(page: import('@playwright/test').Page, selector: string) {
 
 test('visitors reach the typography page from the header and it describes itself', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Typography', exact: true }).click();
+  await (await openMenuPanel(page, 'Resources')).getByRole('link', { name: 'Typography', exact: true }).click();
   await expect(page).toHaveURL(/\/typography\/$/);
   await expect(page).toHaveTitle(/^Typography/);
-  await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Typography', exact: true }))
+  await expect((await openMenuPanel(page, 'Resources')).getByRole('link', { name: 'Typography', exact: true }))
     .toHaveAttribute('aria-current', 'page');
-  await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Audio Core', exact: true }))
+  await expect((await openMenuPanel(page, 'Product')).getByRole('link', { name: 'Audio Core', exact: true }))
     .not.toHaveAttribute('aria-current');
   await expect(page.getByRole('navigation', { name: 'Footer navigation' }).getByRole('link', { name: 'Typography', exact: true }))
     .toHaveAttribute('href', '/typography/');

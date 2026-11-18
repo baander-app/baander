@@ -79,7 +79,7 @@ final class Command
                 'sources' => ['ui/site/templates/typography.php', 'ui/site/assets/typography.css', 'ui/design-tokens/tokens/base/type.json'],
                 'data' => ['typography' => self::typography($root)],
             ];
-            $pages = new WebsiteBuilder($root, $revisionUrl)->build(
+            $pages = new WebsiteBuilder($root, $revisionUrl, SiteMenu::load($root, $features))->build(
                 static function (string $staging) use ($executor, $root): void {
                     $latinFaces = Publication::assets($root, $staging);
                     Publication::pageFonts($root, $staging, self::MONO_SELECTOR, $latinFaces);

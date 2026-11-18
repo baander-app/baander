@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { test as base, expect, type Locator } from '@playwright/test';
+import { openMenuPanel } from './site-menu';
 
 const test = base.extend<{ localRequests: void }>({
   localRequests: [async ({ context, baseURL }, use) => {
@@ -41,20 +42,21 @@ async function overviewLinks(page: import('@playwright/test').Page): Promise<str
 }
 
 test('visitors reach the features overview from the header and the footer, and the header marks it on every feature page', async ({ page }) => {
-  const header = page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Features', exact: true });
+  const header = async () => (await openMenuPanel(page, 'Product')).getByRole('link', { name: 'Features', exact: true });
   await page.goto('/');
-  await expect(header).not.toHaveAttribute('aria-current');
+  await expect(await header()).not.toHaveAttribute('aria-current');
   await expect(page.getByRole('navigation', { name: 'Footer navigation' }).getByRole('link', { name: 'Features', exact: true }))
     .toHaveAttribute('href', '/features/');
-  await header.click();
+  await (await header()).click();
   await expect(page).toHaveURL(/\/features\/$/);
   await expect(page.locator('main h1')).toBeVisible();
-  await expect(header).toHaveAttribute('aria-current', 'page');
-  await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Manual', exact: true }))
+  await expect(await header()).toHaveAttribute('aria-current', 'page');
+  await expect((await openMenuPanel(page, 'Resources')).getByRole('link', { name: 'Operator manual', exact: true }))
     .not.toHaveAttribute('aria-current');
   for (const path of featurePages) {
     await page.goto(path);
-    await expect(header, path).toHaveAttribute('aria-current', 'true');
+    await expect(await header(), path).toHaveAttribute('aria-current', 'true');
+    await expect((await openMenuPanel(page, 'Product')).locator(`a[href="${path}"]`), path).toHaveAttribute('aria-current', 'page');
   }
 });
 

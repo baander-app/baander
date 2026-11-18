@@ -86,7 +86,8 @@ final class WebsiteBuilder
     /** @var array<string,list<array{url:string,title:string,children?:list<array{url:string,title:string,group?:string}>}>> */
     private array $navigation = ['operator' => [], 'developer' => []];
 
-    public function __construct(string $root, private readonly string $revisionUrl)
+    /** @param ?SiteMenu $menu the top menu every page's header and footer render; templates that render neither may go without */
+    public function __construct(string $root, private readonly string $revisionUrl, private readonly ?SiteMenu $menu = null)
     {
         $this->root = realpath($root) ?: throw new RuntimeException('Repository root does not exist.');
         if (!preg_match('~^https://github\.com/baander-app/baander/(?:tree|blob)/[a-zA-Z0-9._-]+$~', $revisionUrl)) {
@@ -713,6 +714,7 @@ final class WebsiteBuilder
             'repositoryUrl' => 'https://github.com/baander-app/baander',
             'revisionUrl' => $this->revisionUrl,
             'screenshots' => $this->screenshots,
+            'menu' => $this->menu?->forPage((string) $page['url']),
         ];
         $template = $this->checkedSource($this->root . '/ui/site/templates/' . $name . '.php');
         if (function_exists('opcache_invalidate')) {
