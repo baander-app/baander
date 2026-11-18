@@ -129,6 +129,20 @@ test.describe('desktop panels', () => {
       .toEqual(await page.locator('.site-header details.menu-panel :is(.menu-group-title, .menu-column-title)').allTextContents());
   });
 
+  test('a long panel stops after about six entries and scrolls within itself', async ({ page }) => {
+    await page.goto('/');
+    const productBody = (await openMenuPanel(page, 'Product')).locator('.menu-panel-body');
+    const product = await productBody.evaluate((element) => ({ client: element.clientHeight, scroll: element.scrollHeight }));
+    expect(product.client).toBeLessThanOrEqual(480);
+    expect(product.scroll).toBeGreaterThan(product.client);
+    const last = productBody.getByRole('link', { name: 'Developers', exact: true });
+    await last.scrollIntoViewIfNeeded();
+    await expect(last).toBeInViewport();
+    const resourcesBody = (await openMenuPanel(page, 'Resources')).locator('.menu-panel-body');
+    const resources = await resourcesBody.evaluate((element) => ({ client: element.clientHeight, scroll: element.scrollHeight }));
+    expect(resources.scroll).toBe(resources.client);
+  });
+
   test('at 760px the Resources panel opens inside the viewport with its columns stacked', async ({ page }) => {
     await page.setViewportSize({ width: 760, height: 900 });
     await page.goto('/');
