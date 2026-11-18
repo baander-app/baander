@@ -115,7 +115,11 @@ final class CapacityFixtureTest extends TestCase
     public function testProducerCapturesEveryNotificationAndCleanupPreservesOtherRuns(): void
     {
         $owned = $this->fixture->execute(['op' => 'create', 'run' => 'owned']);
-        $other = $this->fixture->execute(['op' => 'create', 'run' => 'other']);
+        $other = $this->fixture->execute(['op' => 'create', 'run' => 'other', 'superAdmin' => true]);
+        $roles = fn (array $user): array => json_decode((string) $this->observer->fetchOne('SELECT roles FROM users WHERE id = ?', [$user['id']]), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(['ROLE_ADMIN', 'ROLE_USER'], $roles($owned['observer']));
+        self::assertSame(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER'], $roles($other['observer']));
+        self::assertSame(['ROLE_USER'], $roles($other['users'][0]));
         self::assertSame($this->root . '/owned', $owned['directory']);
         self::assertSame($this->mediaRoot . '/owned', $owned['mediaDirectory']);
         self::assertSame($owned['mediaDirectory'], $owned['library']['path']);
@@ -165,6 +169,8 @@ final class CapacityFixtureTest extends TestCase
         self::assertSame($expectedCounts, $actualCounts);
         $catalog = $this->fixture->execute(['op' => 'catalog', 'run' => 'owned', 'albums' => 12, 'songs' => 10]);
         self::assertSame(12, $catalog['albums']);
+        self::assertCount(9, $catalog['createdSongs']);
+        self::assertSame(9, (int) $this->observer->fetchOne('SELECT count(*) FROM songs WHERE id IN (?)', [array_column($catalog['createdSongs'], 'id')], [ArrayParameterType::STRING]));
         $sample = $this->fixture->execute(['op' => 'sample', 'run' => 'owned']);
         self::assertSame(['albums' => 12, 'songs' => 10], $sample['catalog']);
         $changed = $this->fixture->execute(['op' => 'change', 'run' => 'owned', 'target' => 'album', 'value' => 'Remote title']);

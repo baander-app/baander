@@ -54,7 +54,7 @@ final class LiveCapacityFixture
         $op = $command['op'] ?? '';
         $directory = $this->root . '/' . $run;
         if ($op === 'create') {
-            return $this->create($run, $directory);
+            return $this->create($run, $directory, ($command['superAdmin'] ?? false) === true);
         }
         $this->manifest = json_decode((string) file_get_contents($directory . '/manifest.json'), true, flags: JSON_THROW_ON_ERROR);
         return match ($op) {
@@ -183,9 +183,12 @@ final class LiveCapacityFixture
     }
 
     /**
+     * Creates the run's 32 users, its admin observer and its library. With $superAdmin the observer
+     * also holds ROLE_SUPER_ADMIN, for browser checks of the views only a super admin sees.
+     *
      * @return array<string, mixed>
      */
-    private function create(string $run, string $directory): array
+    private function create(string $run, string $directory, bool $superAdmin = false): array
     {
         $mediaDirectory = ($this->mediaRoot ?? $this->root) . '/' . $run;
         if (is_dir($directory)) {
@@ -234,12 +237,13 @@ final class LiveCapacityFixture
         if (!$hasher->verify($password, $hash)) {
             throw new RuntimeException('Configured password hash did not verify.');
         }
-        $this->connection->transactional(function () use ($users, $hash): void {
+        $adminRoles = $superAdmin ? ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER'] : ['ROLE_ADMIN', 'ROLE_USER'];
+        $this->connection->transactional(function () use ($users, $hash, $adminRoles): void {
             foreach ($users as $user) {
                 $this->insert('users', $user, [
                     'name' => 'Live ' . $this->manifest['run'], 'email' => $user['email'], 'password' => $hash,
                     'totp_secret' => '',
-                    'roles' => json_encode($user['admin'] ? ['ROLE_ADMIN', 'ROLE_USER'] : ['ROLE_USER'], JSON_THROW_ON_ERROR),
+                    'roles' => json_encode($user['admin'] ? $adminRoles : ['ROLE_USER'], JSON_THROW_ON_ERROR),
                     'email_verified_at' => $this->now(),
                 ]);
             }
@@ -315,7 +319,7 @@ final class LiveCapacityFixture
                 $this->connection->insert('library_file_index', ['id' => $source['id'], 'library_id' => $this->manifest['library']['id'], 'path' => $source['path'], 'hash' => $source['hash'], 'size' => $source['size'], 'extension' => 'wav', 'modified_at' => $source['modifiedAt'], 'discovered_at' => $this->now(), 'available' => 'true']);
             }
         });
-        return ['albums' => $albums, 'songs' => $songs, 'library' => $this->manifest['library'], 'album' => $this->manifest['album'], 'song' => $this->manifest['song'], 'commitStartEpochMs' => $start, 'commitEndEpochMs' => microtime(true) * 1000];
+        return ['albums' => $albums, 'songs' => $songs, 'createdSongs' => array_map(static fn (array $song): array => ['id' => $song['id'], 'publicId' => $song['publicId']], $this->manifest['songs']), 'library' => $this->manifest['library'], 'album' => $this->manifest['album'], 'song' => $this->manifest['song'], 'commitStartEpochMs' => $start, 'commitEndEpochMs' => microtime(true) * 1000];
     }
 
     /**

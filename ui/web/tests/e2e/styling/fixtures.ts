@@ -1,6 +1,7 @@
-import { test as base, expect, authenticate } from '../fixtures'
+import { test as base, expect } from '../fixtures'
 import type { Page, Route } from '@playwright/test'
 import type { SongResource } from '../../../src/shared/api-client/gen/endpoints'
+import { FixtureClient, login, type FixtureManifest, type FixtureResource } from '../live-updates/capacity-fixtures'
 
 export const catalogAlbum = {
   publicId: 'stylingAlbum0000000001',
@@ -44,7 +45,12 @@ export const burmeseSong: SongResource = {
   lockedFields: [], createdAt: '2026-01-01T00:00:00Z',
 }
 
-const scriptSongs = [thaiSong, burmeseSong]
+/** The populated catalog's songs. Their IDs must be ones the server knows for playback to start. */
+export interface CatalogSongs {
+  catalogSong: SongResource
+  thaiSong: SongResource
+  burmeseSong: SongResource
+}
 
 export const catalogPlaylist = {
   publicId: 'stylingPlaylist000001',
@@ -74,10 +80,17 @@ function localAudio(): Buffer {
   return wav
 }
 
-/** Replace catalog reads only. Login, preferences and account APIs stay real. */
-export async function installCatalogFixtures(page: Page, state: 'empty' | 'populated') {
+/**
+ * Replace catalog reads only. Login, preferences and account APIs stay real. The songs default to
+ * the exported templates, whose IDs the server does not know; the fixtures below pass songs with
+ * a server fixture's IDs and the templates' titles.
+ */
+export async function installCatalogFixtures(
+  page: Page, state: 'empty' | 'populated', catalogSongs: CatalogSongs = { catalogSong, thaiSong, burmeseSong },
+) {
   const albums = state === 'populated' ? [catalogAlbum, scriptAlbum] : []
-  const songs = state === 'populated' ? [catalogSong, ...scriptSongs] : []
+  const scriptSongs = [catalogSongs.thaiSong, catalogSongs.burmeseSong]
+  const songs = state === 'populated' ? [catalogSongs.catalogSong, ...scriptSongs] : []
   const pageMeta = { current_page: 1, last_page: 1, per_page: 20, total: albums.length }
   const cursorMeta = {
     next_cursor: null, prev_cursor: null, has_next_page: false,
@@ -92,13 +105,13 @@ export async function installCatalogFixtures(page: Page, state: 'empty' | 'popul
       data: { ...scriptAlbum, songs: songs.filter((song) => song.albumId === scriptAlbum.publicId) },
     },
     '/api/songs': { data: songs, meta: cursorMeta },
-    [`/api/songs/${catalogSong.publicId}`]: { data: catalogSong },
+    [`/api/songs/${catalogSongs.catalogSong.publicId}`]: { data: catalogSongs.catalogSong },
     ...Object.fromEntries(scriptSongs.map((song) => [`/api/songs/${song.publicId}`, { data: song }])),
     '/api/artists': { data: [], meta: { ...pageMeta, total: 0 } },
     '/api/genres': { data: [] },
     '/api/playlists': { data: state === 'populated' ? [catalogPlaylist] : [] },
     [`/api/playlists/${catalogPlaylist.publicId}`]: {
-      data: { ...catalogPlaylist, songs: songs.filter((song) => song.publicId === catalogSong.publicId) },
+      data: { ...catalogPlaylist, songs: songs.filter((song) => song.publicId === catalogSongs.catalogSong.publicId) },
     },
     '/api/activity/history': { data: [] },
     '/api/recommendations/for-you': { data: [] },
@@ -109,6 +122,7 @@ export async function installCatalogFixtures(page: Page, state: 'empty' | 'popul
     const url = new URL(request.url())
     const path = url.pathname.replace(/\/$/, '')
     if (request.method() !== 'GET') return route.fallback()
+    // The template song's ID stays streamable: the radio case plays it as a station stream.
     const streamed = [catalogSong, ...songs].some((song) => song.publicId === url.searchParams.get('id'))
     if (path === '/api/stream/track' && streamed) {
       const audio = localAudio()
@@ -134,24 +148,50 @@ export async function installCatalogFixtures(page: Page, state: 'empty' | 'popul
   return () => page.context().unroute('**/api/**', handler)
 }
 
+/**
+ * Signs the server fixture's admin, a super admin, in over the catalog fixtures. A fresh account has no listening
+ * session and no saved preferences, so the preview's own accounts cannot change what a test sees.
+ * The populated catalog's songs are the fixture's 30-second songs under the templates' titles: the
+ * listening session refuses a song the server does not know, and the footer shows the duration of
+ * the audio the server streams.
+ */
+async function signInOverCatalog(page: Page, state: 'empty' | 'populated', run: (page: Page) => Promise<void>) {
+  const fixture = FixtureClient.start()
+  let removeRoutes: (() => Promise<void>) | undefined
+  try {
+    // A super admin, because the administration specs also check views only a super admin sees.
+    const manifest = (await fixture.request<FixtureManifest>({ op: 'create', superAdmin: true })).receipt
+    let songs: CatalogSongs | undefined
+    if (state === 'populated') {
+      const created = (await fixture.request<{ createdSongs: FixtureResource[] }>(
+        { op: 'catalog', albums: 1, songs: 4, durations: [30] },
+      )).receipt.createdSongs
+      songs = {
+        catalogSong: { ...catalogSong, publicId: created[0].publicId },
+        thaiSong: { ...thaiSong, publicId: created[1].publicId },
+        burmeseSong: { ...burmeseSong, publicId: created[2].publicId },
+      }
+    }
+    removeRoutes = await installCatalogFixtures(page, state, songs)
+    await login(page, manifest.observer)
+    await expect(page.locator('main').getByRole('heading', { name: 'Home', exact: true, level: 1 })).toBeVisible()
+    await run(page)
+  } finally {
+    await removeRoutes?.()
+    try {
+      if (fixture.run) expect((await fixture.request({ op: 'cleanup' })).receipt.complete).toBe(true)
+    } finally {
+      await fixture.close()
+    }
+  }
+}
+
 export const test = base.extend<{ emptyCatalog: Page; populatedCatalog: Page }>({
   emptyCatalog: async ({ page }, providePage) => {
-    const cleanup = await installCatalogFixtures(page, 'empty')
-    try {
-      await authenticate(page)
-      await providePage(page)
-    } finally {
-      await cleanup()
-    }
+    await signInOverCatalog(page, 'empty', providePage)
   },
   populatedCatalog: async ({ page }, providePage) => {
-    const cleanup = await installCatalogFixtures(page, 'populated')
-    try {
-      await authenticate(page)
-      await providePage(page)
-    } finally {
-      await cleanup()
-    }
+    await signInOverCatalog(page, 'populated', providePage)
   },
 })
 

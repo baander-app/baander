@@ -1,9 +1,32 @@
-import { test, expect, authenticate } from '../fixtures'
+import type { Page } from '@playwright/test'
+import { test, expect } from '../fixtures'
 import { setTheme } from '../helpers/theme-utils'
+import { FixtureClient, login, type FixtureManifest } from '../live-updates/capacity-fixtures'
 import { expectContained, expectNoPageOverflow, expectReadable } from '../styling/helpers'
+
+/**
+ * Signs a fresh fixture user in. On a shared account, a listening session left from earlier can
+ * deliver its track after the pane has opened, and on a narrow screen the context panel then
+ * opens over the pane and takes its focus.
+ */
+async function withFixtureUser(page: Page, run: () => Promise<void>) {
+  const fixture = FixtureClient.start()
+  try {
+    const manifest = (await fixture.request<FixtureManifest>({ op: 'create' })).receipt
+    await login(page, manifest.users[0])
+    await run()
+  } finally {
+    try {
+      if (fixture.run) expect((await fixture.request({ op: 'cleanup' })).receipt.complete).toBe(true)
+    } finally {
+      await fixture.close()
+    }
+  }
+}
 
 for (const width of [390, 1280]) {
   test(`sidebar notifications remain reachable and readable at ${width}px`, async ({ page }) => {
+    test.setTimeout(90_000)
     let isRead = false
     await page.context().route('**/api/notifications/**', async (route) => {
       const path = new URL(route.request().url()).pathname
@@ -27,39 +50,40 @@ for (const width of [390, 1280]) {
       }
     })
     await page.setViewportSize({ width, height: 700 })
-    await authenticate(page)
-    const closeContext = page.getByRole('button', { name: 'Close context panel', exact: true })
-    if (await closeContext.isVisible()) await closeContext.click()
-    const sidebar = page.locator('aside').first()
-    const bell = sidebar.getByRole('button', { name: '1 unread notifications', exact: true })
-    await expect(bell).toBeVisible()
-    await bell.focus()
-    await page.keyboard.press('Enter')
-    const dialog = page.getByRole('dialog', { name: 'Notifications', exact: true })
-    await expect(dialog.getByText('Music library scan finished', { exact: true })).toBeVisible()
+    await withFixtureUser(page, async () => {
+      const closeContext = page.getByRole('button', { name: 'Close context panel', exact: true })
+      if (await closeContext.isVisible()) await closeContext.click()
+      const sidebar = page.locator('aside').first()
+      const bell = sidebar.getByRole('button', { name: '1 unread notifications', exact: true })
+      await expect(bell).toBeVisible()
+      await bell.focus()
+      await page.keyboard.press('Enter')
+      const dialog = page.getByRole('dialog', { name: 'Notifications', exact: true })
+      await expect(dialog.getByText('Music library scan finished', { exact: true })).toBeVisible()
 
-    for (const mood of ['dark', 'balanced']) {
-      await setTheme(page, mood, 'violet')
-      await expectContained(dialog)
-      await expectReadable(dialog.getByText('Music library scan finished', { exact: true }))
-      await expectNoPageOverflow(page)
-      await page.screenshot({ path: test.info().outputPath(`notifications-${width}-${mood}.png`) })
-    }
+      for (const mood of ['dark', 'balanced']) {
+        await setTheme(page, mood, 'violet')
+        await expectContained(dialog)
+        await expectReadable(dialog.getByText('Music library scan finished', { exact: true }))
+        await expectNoPageOverflow(page)
+        await page.screenshot({ path: test.info().outputPath(`notifications-${width}-${mood}.png`) })
+      }
 
-    await dialog.getByRole('button', { name: 'Mark all read', exact: true }).click()
-    const readBell = sidebar.getByRole('button', { name: '0 unread notifications', exact: true })
-    await expect(readBell).toBeVisible()
-    await page.keyboard.press('Escape')
-    await expect(dialog).toBeHidden()
-    await expect(readBell).toBeFocused()
-
-    if (width < 1024) {
-      await sidebar.getByRole('button', { name: 'Expand navigation', exact: true }).click()
-      await readBell.click()
-      await expect(dialog).toBeVisible()
-      await expectContained(dialog)
+      await dialog.getByRole('button', { name: 'Mark all read', exact: true }).click()
+      const readBell = sidebar.getByRole('button', { name: '0 unread notifications', exact: true })
+      await expect(readBell).toBeVisible()
       await page.keyboard.press('Escape')
+      await expect(dialog).toBeHidden()
       await expect(readBell).toBeFocused()
-    }
+
+      if (width < 1024) {
+        await sidebar.getByRole('button', { name: 'Expand navigation', exact: true }).click()
+        await readBell.click()
+        await expect(dialog).toBeVisible()
+        await expectContained(dialog)
+        await page.keyboard.press('Escape')
+        await expect(readBell).toBeFocused()
+      }
+    })
   })
 }
