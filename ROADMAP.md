@@ -285,8 +285,9 @@ record). Pushed on 2026-11-17, on top of `f5065dcfe`: the docs-book rewrite foll
   `https://baander.app`: the `/features/` overview and nine feature pages, and the
   homepage's pictures retaken from the sample library. The merged local branches
   were deleted the same day; `fix/notification-pane-well-inset` stays because its
-  worktree still has it checked out. Next: the user reviews the pictures and decides how `.lrc` lyrics should
-  reach the lyrics panel; see the "Still to do" list under
+  worktree still has it checked out. Next: the user reviews the pictures, and a plan
+  makes the lyrics panel show stored `.lrc` lyrics so the lyrics page can follow
+  (user decision, 2026-11-18); see the "Still to do" list under
   [Website feature pages](#website-feature-pages).
 - **Master CI.** No `CI` run on `master` has been green since 2026-11-05. Run
   43826408058 on `44e315ee3` passed the whole quality gate on 2026-11-16, step 41 in
@@ -607,8 +608,9 @@ Still to do:
   from `.lrc` files beside the tracks, and the scan stores them on the song. The
   lyrics panel reads only lyrics fetched from LRCLIB
   (`src/Lyrics/Interface/Controller/LyricsController.php:71-87`), so `.lrc` lyrics
-  never reach it. Either the panel reads the stored lyrics, which needs an
-  application change, or the two documents change; the page waits for that decision.
+  never reach it. User decision, 2026-11-18: the panel is to show the stored lyrics
+  too, and the two documents stay as they are. Next: plan that application change,
+  then add the lyrics feature page with its scene and pictures.
 - Application defects seen while taking the pictures, none fixed here:
   - Player: while music plays, the player bar has no shuffle or repeat button; the S
     and R keys work and show no state. Crossfade is a stored preference with no
