@@ -673,6 +673,58 @@ Still to do:
   - The homepage's fourth equalizer slide speaks of device profiles, which its new
     picture does not show; the first slide's picture shows them.
 
+## Website reference pages and fold-out menu
+
+Delivered on `feat/site-reference-pages-and-menu` on 2026-11-18 from
+`docs/plans/2026-11-18-1647-feat-site-reference-pages-and-menu-plan.md`; not merged or
+pushed. The public website publishes four repository documents as reference pages:
+`STRATEGY.md` at `/strategy/`, `CONCEPTS.md` at `/concepts/`, `THIRD_PARTY.md` at
+`/licensing/` and `deploy/preset/README.md` at `/deploy/`. Each opens with a short
+website introduction kept in `ui/site/reference/`, and the deploy page adds a table of
+the six example presets' size settings. Links in the manuals and these documents to a
+manual page or to one of the four documents stay on the site with checked fragments.
+Search results carry their page's label. The top menu has Product and Resources
+fold-out panels whose entries each have a one-line description, a Menu disclosure at
+phone width, and a footer with the same groups.
+
+The user decided on 2026-11-18 to drop the package inventory page from this work. It
+needs a per-package snapshot refreshed with the shipped images, and a rule for Debian
+license declarations that are copyright text rather than license names.
+
+Commits, in order: `d6b00cdf4` (plan), `1d2a1946a` (reference pages, link resolution,
+search labels), `914bce1fd` (menu), `4de66bee5` (site README, `ui/DESIGN.md`,
+`CONCEPTS.md`), `b980d19e3` (simplification) and `ad1c246f1` (the code review's fixes).
+
+Verification on 2026-11-18, at `ad1c246f1` unless stated:
+
+- Site: `make website-build` built 243 manual pages, and the sitemap dates the four
+  reference pages from their sources. In `ui/site/`, `corepack yarn typecheck` was
+  clean and `node --test scripts/*.test.mjs` passed 35. `corepack yarn test:browser` ran
+  at `b980d19e3`, after which only tooling code changed: 218 of 219 passed. The failure
+  was a layout-shift check on the operator manual's index table at 1440px. A rerun of
+  `stability.spec.ts` three times failed once, on a different check (the equalizer page
+  at 390px when the fonts arrive), and both checks passed 12 of 12 when repeated on
+  their own. Neither page's layout changed in this work; the cause is not established.
+  The menu worker's earlier full run at `914bce1fd` passed 219 of 219.
+- Tooling: `phpunit-tooling.xml.dist` on `scripts/tests/php/Website` passed 164 tests
+  and 1,520 assertions; `ToolingSourcePolicyTest.php` and `ToolingArchitectureTest.php`
+  passed 35 tests and 123 assertions. PHPStan with `phpstan-tooling.neon` on the website
+  tooling and its tests reported no errors, `php-cs-fixer` with
+  `.php-cs-fixer.tooling.php` found nothing to fix, and
+  `scripts/check-tooling-source-policy.php` exited 0. The full tooling suite was not run.
+- Review: `ce-code-review` ran a full review with six reviewers (verdict "Ready with
+  fixes"). Both findings were confirmed and fixed in `ad1c246f1`. The new test for a
+  non-numeric preset size exposed a type error that stopped the build before naming the
+  file, and the fix makes the build report the file and the setting.
+
+Open items:
+
+- The two intermittent layout-shift failures above need a cause before this branch is
+  merged, or evidence that they also occur on `master`.
+- The Strategy and Concepts pages publish their source documents as they stand,
+  including the competitor table in `STRATEGY.md` and the maintenance note at the top
+  of `CONCEPTS.md`.
+
 ## Presentation register and homepage hero
 
 Delivered on `master` on 2026-11-16, fast-forwarded from
