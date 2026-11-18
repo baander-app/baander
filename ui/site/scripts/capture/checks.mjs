@@ -1,7 +1,13 @@
 // The parts of the picture capture that need no browser and no running application: what the
-// preview must hold before a picture is taken, how each difference is worded, and what the capture
-// record and the contact sheet contain.
+// preview must hold before a picture is taken, how each difference is worded, how a single picture
+// is refused, and what the capture record and the contact sheet contain.
 import { createHash } from 'node:crypto';
+
+/**
+ * A picture the driver will not take, with the reason as a lowercase phrase. The run records it as
+ * not taken and goes on with the next picture; any other error ends the run.
+ */
+export class NotReady extends Error {}
 
 // The slug of the only library the preview may have, the generated sample library.
 export const SAMPLE_LIBRARY = 'music';

@@ -3,11 +3,13 @@
 //   node ui/site/scripts/capture/capture.mjs --base-url <preview url> [--out <directory>] [--scene <name>]
 //
 // The preview must hold the sample library of sample-library.mjs and nothing else. The script
-// creates the three sample accounts when they are missing, then checks the preview and refuses
-// to take a picture while anything differs: the accounts, the libraries, the catalog's artists
-// and albums, the two settings that would look names up at a provider, and unfinished scans or
-// background jobs. It never resets or deletes anything, and it opens no screen that asks a
-// metadata or lyrics provider about a name.
+// first requires that the sample library is the preview's only library, creates the three sample
+// accounts when they are missing, then checks the preview and refuses to take a picture while
+// anything differs: the accounts, the libraries, the catalog's artists and albums, the two
+// settings that would look names up at a provider, and unfinished scans or background jobs. Once
+// the preview passes, it grants the two listeners the sample library, on every run. It never
+// resets or deletes anything, and it opens no screen that asks a metadata or lyrics provider
+// about a name.
 //
 // A scene signs in through the login page and does what its feature page tells a visitor to do.
 // A step of it may work in the window of another sample account, and a scene about several
@@ -26,7 +28,7 @@ import { parseArgs, promisify } from 'node:util';
 import { chromium, firefox } from '@playwright/test';
 import { SCALE, THEMES, WINDOW, chooseTheme, leave, openFromSidebar, openWindow, readCatalog, signIn } from './application.mjs';
 import {
-  SAMPLE_ACCOUNTS, SETTINGS_KEPT_OFF, accountProblems, catalogProblems, contactSheet, coverFailures, libraryProblems,
+  NotReady, SAMPLE_ACCOUNTS, SETTINGS_KEPT_OFF, accountProblems, catalogProblems, contactSheet, coverFailures, libraryProblems,
   mergeRecords, pendingWorkProblems, recordEntry, settingProblems, settingValue,
 } from './checks.mjs';
 import { buildManifest } from './library-manifest.mjs';
@@ -48,9 +50,6 @@ const ACCOUNTS_FILE = join(SCRATCH, 'accounts.json');
 const run = promisify(execFile);
 // How long a console command may take, in seconds.
 const CONSOLE_TIME_LIMIT = 120;
-
-// A picture the driver will not take, with the reason; the run goes on with the next picture.
-class NotReady extends Error {}
 
 /**
  * Runs a console command in the preview's application container and returns what it printed. A
@@ -83,6 +82,7 @@ async function consoleCommand(words, input = '') {
 
 const consoleJson = async words => JSON.parse(await consoleCommand([...words, '--json']));
 const listUsers = () => consoleJson(['app:user:list', '--limit=100']);
+const listLibraries = () => consoleJson(['app:library:list']);
 
 /** Creates the sample accounts the preview lacks and returns every sample account's password, by address. */
 async function ensureAccounts() {
@@ -98,9 +98,6 @@ async function ensureAccounts() {
       ['app:user:create', account.email, account.name, '--password', ...account.roles.map(role => `--role=${role}`), ...(elevated ? ['--force'] : [])],
       passwords[account.email],
     );
-    if (account.library) {
-      await consoleCommand(['app:library:member:grant', account.email, account.library]);
-    }
     console.log(`Created the sample account ${account.email}.`);
   }
   for (const { email } of SAMPLE_ACCOUNTS) {
@@ -111,9 +108,19 @@ async function ensureAccounts() {
   return passwords;
 }
 
+/**
+ * Grants each sample listener the sample library. Granting twice changes nothing, so this runs on
+ * every capture, which also repairs a grant that failed after its account was created.
+ */
+async function grantSampleLibrary() {
+  for (const { email, library } of SAMPLE_ACCOUNTS.filter(account => account.library)) {
+    await consoleCommand(['app:library:member:grant', email, library]);
+  }
+}
+
 /** What the console can tell is wrong with the preview. */
 async function previewProblems() {
-  const libraries = await consoleJson(['app:library:list']);
+  const libraries = await listLibraries();
   const settings = {};
   for (const key of SETTINGS_KEPT_OFF) {
     settings[key] = settingValue(await consoleCommand(['app:settings:get', key]));
@@ -278,8 +285,12 @@ async function main() {
   const recordFile = values.out ? join(out, 'captures.json') : RECORD;
   await requireEncoder();
   const commit = await applicationCommit();
+  // A preview whose libraries are not the sample library alone gets no accounts, and a grant
+  // never names a library that does not exist.
+  refuseOver(libraryProblems(await listLibraries()));
   const passwords = await ensureAccounts();
   refuseOver(await previewProblems());
+  await grantSampleLibrary();
   // A directory that cannot be made stops the run here, before any browser has opened.
   await mkdir(join(SCRATCH, 'work'), { recursive: true });
   await mkdir(out, { recursive: true });

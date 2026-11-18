@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { awaitedLater } from './capture/application.mjs';
 import {
-  SAMPLE_ACCOUNTS, accountProblems, catalogProblems, contactSheet, coverFailures, libraryProblems, mergeRecords,
+  NotReady, SAMPLE_ACCOUNTS, accountProblems, catalogProblems, contactSheet, coverFailures, libraryProblems, mergeRecords,
   pendingWorkProblems, recordEntry, settingProblems, settingValue,
 } from './capture/checks.mjs';
 import { buildManifest } from './capture/library-manifest.mjs';
@@ -171,6 +171,14 @@ test('new records replace their pictures, keep the others and are ordered by nam
   assert.deepEqual(Object.keys(merged), ['destinations', 'equalizer-window', 'music']);
   assert.equal(merged['equalizer-window'].date, '2026-11-17');
   assert.deepEqual(merged.music, earlier.music);
+});
+
+test('a refused picture is an error the driver tells apart from one that ends the run', () => {
+  const refused = new NotReady('the Jobs tab changed between the two variants');
+
+  assert.ok(refused instanceof Error);
+  assert.equal(refused.message, 'the Jobs tab changed between the two variants');
+  assert.ok(!(new Error('the run cannot go on') instanceof NotReady));
 });
 
 test('the contact sheet shows each pair with its name and size, at half its pixel size', () => {

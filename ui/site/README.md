@@ -209,10 +209,15 @@ retake the pictures from an empty preview:
    }
    ```
 
-3. Start the preview and scan the library:
+3. Start the preview, switch off the two lookups at outside services, and scan the
+   library. Both settings are off by default, but a preview keeps what was set in it
+   before, and with either one on the scan would send the sample names to
+   MusicBrainz or LRCLIB:
 
    ```bash
    make preview-up
+   make exec cmd="php bin/console app:settings:set metadata.auto_sync false"
+   make exec cmd="php bin/console app:settings:set lyrics.auto_fetch false"
    make exec cmd="php bin/console app:library:scan music"
    ```
 

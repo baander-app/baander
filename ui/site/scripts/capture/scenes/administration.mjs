@@ -5,7 +5,7 @@
 // deletes no job.
 import { WINDOW, awaitedLater, openFromSidebar, restPointer } from '../application.mjs';
 import { dialogNamed, openAdministration, openTab, tabPanel, takeFocusOffControls } from '../administration-steps.mjs';
-import { ADMINISTRATOR, LISTENER } from '../checks.mjs';
+import { ADMINISTRATOR, LISTENER, NotReady } from '../checks.mjs';
 
 // The job whose details are shown: the scan of the sample library.
 const JOB = 'ScanLibraryCommand';
@@ -45,10 +45,11 @@ export default {
         if (transport.y < WINDOW.height) {
           throw new Error('The list of jobs is too short to keep the Transport Health card out of the window.');
         }
-        // Each job is listed with how long ago it was created, and a minute can turn between the two variants.
+        // Each job is listed with how long ago it was created, and a minute can turn between the two
+        // variants. Only this picture is then refused; the pictures taken before it are kept.
         const shown = await jobs.innerText();
         jobsShown ??= shown;
-        if (shown !== jobsShown) throw new Error('The Jobs tab changed between the two variants of its picture; run the scene again.');
+        if (shown !== jobsShown) throw new NotReady('the Jobs tab changed between the two variants');
       },
     },
     {
