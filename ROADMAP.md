@@ -717,6 +717,14 @@ Verification on 2026-11-18, at `ad1c246f1` unless stated:
   non-numeric preset size exposed a type error that stopped the build before naming the
   file, and the fix makes the build report the file and the setting.
 
+Published on 2026-11-18: a local build of `c1873a134` (243 manual pages; `corepack yarn
+test:browser` passed 219 of 219 on the same content) went to the preview
+`baander-74l0fr40r` and then, unchanged, to production as `baander-5p4na31ks`, aliased to
+`https://baander.app`. On both, the homepage, `/features/`, the operator guide, the four
+reference pages, the sitemap, `robots.txt`, the search and menu scripts, the Pagefind
+index and the social card returned 200, and an unknown URL returned 404. The live site
+serves HTTPS with HSTS, and its `/concepts/` page is byte-identical to the build.
+
 Open items:
 
 - Resolved on 2026-11-18 in the commit after this record's first version: the
