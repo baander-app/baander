@@ -92,9 +92,11 @@ test.describe('footer volume handle', () => {
         await page.mouse.down()
         await page.mouse.move((start.x + end.x + end.width) / 2, end.y + end.height / 2, { steps: 5 })
         await page.mouse.up()
-        const value = Number(await volume.getAttribute('aria-valuenow'))
-        expect(value).toBeGreaterThan(35)
-        expect(value).toBeLessThan(65)
+        // A volume change goes through the listening session; the slider shows it once the session
+        // reports it back, so the value right after release can still be the previous one.
+        const settled = () => volume.getAttribute('aria-valuenow').then(Number)
+        await expect.poll(settled).toBeGreaterThan(35)
+        await expect.poll(settled).toBeLessThan(65)
         await expectNoPageOverflow(page)
         await page.screenshot({ path: test.info().outputPath(`volume-${mood}.png`) })
       }
@@ -169,7 +171,8 @@ test.describe('local audio playback', () => {
       for (const mood of ['dark', 'warm', 'cool', 'balanced']) {
         await setTheme(page, mood, 'violet')
         await expectReadable(song)
-        const indicator = song.locator('..').locator('svg').first()
+        // The playing indicator sits in the song's row, beside the cell that holds its title.
+        const indicator = song.locator('xpath=ancestor::*[.//*[local-name()="svg"]][1]').locator('svg').first()
         await expectReadable(indicator, 3)
         await expect(indicator).toHaveCSS('fill', await indicator.evaluate((element) => getComputedStyle(element).color))
         await expectReadable(pause, 3)
@@ -336,7 +339,8 @@ test.describe('non-Latin catalog text', () => {
     await expectScriptTextRules(main, 'column browser')
 
     await main.getByText(thaiSong.title, { exact: true }).click()
-    const panel = page.getByRole('complementary')
+    // The sidebar is a complementary landmark too; the context panel is the one with tabs.
+    const panel = page.getByRole('complementary').filter({ has: page.getByRole('tab', { name: 'Details' }) })
     await expect(panel.getByText(thaiSong.title, { exact: true })).toBeVisible()
     await expectScriptTextRules(panel, 'context panel')
 
