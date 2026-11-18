@@ -231,6 +231,20 @@ export async function liveOutage(page: Page): Promise<{ active: boolean; toastRa
   }, moduleUrl)
 }
 
+/**
+ * Lists the current outage's bell entry at once. The application lists it only after two
+ * counted minutes of outage; a check of how the entry looks need not wait for them.
+ */
+export async function listOutageEntry(page: Page) {
+  const moduleUrl = await appModuleUrl(page, OUTAGE_STORE_MODULE)
+  await page.evaluate(async (url) => {
+    const { useLiveOutageStore } = await import(/* @vite-ignore */ url) as {
+      useLiveOutageStore: { getState: () => { listEntry: () => void } }
+    }
+    useLiveOutageStore.getState().listEntry()
+  }, moduleUrl)
+}
+
 interface LiveOutageHistory {
   began: boolean
   toastRaised: boolean
@@ -265,13 +279,13 @@ export async function liveOutageHistory(page: Page): Promise<LiveOutageHistory> 
 
 export async function interruptDelivery(page: Page) {
   await page.route('**/api/ws/tickets', route => route.abort('connectionfailed'))
-  await page.evaluate(async () => {
-    const modulePath = '/src/shared/live/transport.ts'
-    const { authenticatedTransport } = await import(/* @vite-ignore */ modulePath) as {
+  const transportUrl = await appModuleUrl(page, '/src/shared/live/transport.ts')
+  await page.evaluate(async (url) => {
+    const { authenticatedTransport } = await import(/* @vite-ignore */ url) as {
       authenticatedTransport: { reconnect: () => void }
     }
     authenticatedTransport.reconnect()
-  })
+  }, transportUrl)
   await expect.poll(async () => (await liveOutage(page)).active, { timeout: 20_000 }).toBe(true)
   return async () => { await page.unroute('**/api/ws/tickets') }
 }

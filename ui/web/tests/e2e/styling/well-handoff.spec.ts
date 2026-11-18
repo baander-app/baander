@@ -1,5 +1,7 @@
 import type { BrowserContext, Locator, Page } from '@playwright/test'
 import { test, expect } from './footer-playback'
+import { FixtureClient, login, type FixtureManifest } from '../live-updates/capacity-fixtures'
+import { interruptDelivery, listOutageEntry, navigate } from '../live-updates/recovery-fixtures'
 import { MOODS, setTheme } from '../helpers/theme-utils'
 import { contrastRatio, expectContained, expectNoPageOverflow, luminance, paintedPixels, textColor } from './helpers'
 
@@ -285,3 +287,42 @@ for (const navigation of ['collapsed', 'expanded'] as const) {
     await expect(sidebar).toHaveAttribute('data-collapsed', String(navigation === 'collapsed'))
   })
 }
+
+test('the admin bell\'s outage entry keeps the muted text colour, outside the well', async ({ page }) => {
+  test.setTimeout(90_000)
+  const fixture = FixtureClient.start()
+  try {
+    const manifest = (await fixture.request<FixtureManifest>({ op: 'create' })).receipt
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await login(page, manifest.observer)
+    await navigate(page, '/admin')
+    const restoreDelivery = await interruptDelivery(page)
+    try {
+      await listOutageEntry(page)
+      await page.locator('main').locator('..').getByRole('button', { name: /^Notifications/ }).first().click()
+      await expect(page.getByText('Admin Notifications', { exact: true })).toBeVisible()
+      const entry = page.getByRole('button', { name: /Live updates unavailable/ })
+      const timestamp = entry.getByText(/ago$|^just now$/)
+      await expect(timestamp).toBeVisible()
+
+      // A probe in the same place resolves the muted colour from the same inherited properties.
+      const expected = await timestamp.evaluate((element) => {
+        const probe = document.createElement('span')
+        probe.style.color = 'var(--color-muted-foreground)'
+        element.parentElement!.append(probe)
+        const color = getComputedStyle(probe).color
+        probe.remove()
+        return color
+      })
+      await expect(timestamp).toHaveCSS('color', expected)
+    } finally {
+      await restoreDelivery()
+    }
+  } finally {
+    try {
+      if (fixture.run) expect((await fixture.request({ op: 'cleanup' })).receipt.complete).toBe(true)
+    } finally {
+      await fixture.close()
+    }
+  }
+})
