@@ -1118,7 +1118,16 @@ Verification on 2026-11-18 on the worktree preview, Chromium, without retries:
   runs are the `visualizer-calibration.spec.ts` tests.
 - `well-handoff.spec.ts` 11 of 11 in Chromium and in Firefox. With the outage entry's
   fallback removed, the admin bell check fails.
-- `yarn --cwd ui/web test`: 3,640 tests pass. The preference conflict suites
+- Final run of the sign-in, sidebar notification and whole `tests/e2e/styling` set at
+  `bfb074d2c`: 91 of 105 pass. The 14 failures are the two
+  `visualizer-calibration.spec.ts` tests, and 4 `controls.spec.ts` and 8
+  `appearance-matrix.spec.ts` cases, both specs signing in as the preview's admin
+  account. On the code this branch started from (`8b1a251fa`), the same two specs fail
+  31 of 50 on the same preview, against 12 now.
+- Code review, run `20261118-015022-149e89e7`: one finding, applied in `bfb074d2c`: a
+  first read cancelled before it answered counted as finished. The simplification pass
+  merged four copies of the fixture-run wrapper into `withFixtureRun`.
+- `yarn --cwd ui/web test`: 3,641 tests pass. The preference conflict suites
   (`preference-conflict-lifecycle.test.ts`, `preferences-consumers.test.tsx`) are
   unchanged.
 - `tests/Integration/LiveUpdates/CapacityFixtureTest.php` passes in a CI image built
@@ -1136,6 +1145,15 @@ Open:
   shows was not measured.
 - Both `visualizer-calibration.spec.ts` tests fail before and after this work; their
   cause was not investigated.
+- `tests/e2e/live-updates/recovery.spec.ts` was not usable as a check on this preview:
+  its managed-restart case restarted the preview, whose release preparation then
+  failed, and every later test failed against it until `make preview-up`. Its delivery
+  outage case did start an outage through the repaired `interruptDelivery`.
+- `controls.spec.ts` "admin library tabs" and parts of `appearance-matrix.spec.ts` fail
+  on the preview's admin account before and after this work; they were not attributed.
+- If a preference family's first read never runs in a session, for example while live
+  updates never become ready, the playing track keeps the panel's tab and volume
+  changes are not saved for that session.
 - WebKit could not launch on this host: Playwright reports missing `libicu74`,
   `libxml2` and `libflite1`. The handoff spec did not run in WebKit, and no container
   route exists for preview-backed specs.
