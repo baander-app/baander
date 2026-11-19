@@ -441,6 +441,13 @@ services:
         arguments:
             $redisClientFactory: '@App\Shared\Infrastructure\Redis\RedisClientFactory'
 
+    App\Auth\Infrastructure\Security\OAuth\ClientKeySetProvider:
+        arguments:
+            $cache: '@cache.app'
+            $redisClientFactory: '@App\Shared\Infrastructure\Redis\RedisClientFactory'
+            $cacheTtlSeconds: '%auth.client_jwks.cache_ttl%'
+            $refetchIntervalSeconds: '%auth.client_jwks.refetch_interval%'
+
     App\Auth\Infrastructure\Security\OAuth\ClientAssertionVerifier:
         arguments:
             $issuer: '%auth.oauth.issuer%'

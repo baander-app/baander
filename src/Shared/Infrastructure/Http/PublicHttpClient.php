@@ -8,6 +8,7 @@ use GuzzleHttp\Psr7\Uri;
 use GuzzleHttp\Psr7\UriResolver;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
+use Symfony\Contracts\HttpClient\ResponseStreamInterface;
 
 /** Provider requests with independent DNS validation and no automatic redirects. */
 final class PublicHttpClient
@@ -88,6 +89,12 @@ final class PublicHttpClient
             // URLs can contain API keys. Do not retain transport exception chains.
             throw new \RuntimeException('The provider request failed.');
         }
+    }
+
+    /** Yields a returned response's chunks as they arrive, so the caller can stop reading early. */
+    public function stream(ResponseInterface $response): ResponseStreamInterface
+    {
+        return $this->httpClient->stream($response);
     }
 
     private function duration(mixed $value): float
