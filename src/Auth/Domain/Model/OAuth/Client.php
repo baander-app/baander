@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Domain\Model\OAuth;
 
+use App\Auth\Domain\Model\OAuth\ValueObject\ClientKeySource;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
@@ -15,7 +16,9 @@ use InvalidArgumentException;
  * OAuth 2.0 Client aggregate root.
  *
  * A client application that requests tokens on behalf of users. A confidential
- * client's secret is stored only as its SHA-256 digest (see ClientSecret).
+ * client authenticates with exactly one method, fixed at registration: a secret,
+ * stored only as its SHA-256 digest (see ClientSecret), or its own signing keys
+ * (see ClientKeySource). Public clients have neither.
  */
 final class Client
 {
@@ -31,8 +34,10 @@ final class Client
     /**
      * Create a new OAuth client from explicit flags.
      *
-     * Administrators register clients through registerDevice(), registerPublic()
-     * and registerConfidential(), which also validate the redirect URIs.
+     * Administrators register clients through registerDevice(), registerPublic(),
+     * registerConfidential() and registerConfidentialWithKeys(), which also validate
+     * the redirect URIs. A confidential client holds either a secret or keys; its
+     * authentication method follows from which one it holds.
      *
      * @param string[] $redirectUris
      * @param ?PublicId $publicId Pre-assigned public ID for seeding clients with a known
@@ -49,6 +54,7 @@ final class Client
         bool $deviceClient = false,
         ?Uuid $userId = null,
         ?PublicId $publicId = null,
+        ?ClientKeySource $keySource = null,
     ): self {
         $name = trim($name);
         if ($name === '') {
@@ -58,11 +64,14 @@ final class Client
             throw new InvalidArgumentException(sprintf('Client name cannot be longer than %d characters.', self::MAX_NAME_LENGTH));
         }
 
-        if ($confidential && $secret === null) {
-            throw new InvalidArgumentException('Confidential clients must have a secret.');
+        if ($confidential && ($secret === null) === ($keySource === null)) {
+            throw new InvalidArgumentException('Confidential clients must have a secret or keys, not both.');
         }
         if (!$confidential && $secret !== null) {
             throw new InvalidArgumentException('Only confidential clients have a secret.');
+        }
+        if (!$confidential && $keySource !== null) {
+            throw new InvalidArgumentException('Only confidential clients have keys.');
         }
 
         $now = new DateTimeImmutable();
@@ -72,6 +81,12 @@ final class Client
             publicId: $publicId ?? new PublicId(),
             name: $name,
             secretHash: $secret?->hash(),
+            authMethod: match (true) {
+                $secret !== null => ClientAuthMethod::ClientSecretPost,
+                $keySource !== null => ClientAuthMethod::PrivateKeyJwt,
+                default => ClientAuthMethod::None,
+            },
+            keySource: $keySource,
             redirectUris: array_values($redirectUris),
             personalAccessClient: $personalAccessClient,
             passwordClient: $passwordClient,
@@ -112,6 +127,22 @@ final class Client
             redirectUris: self::validRedirectUris($redirectUris),
             secret: $secret,
             confidential: true,
+        );
+    }
+
+    /**
+     * A confidential client of the authorization code grant, authenticated with a JWT
+     * assertion signed by one of its own keys (`private_key_jwt`).
+     *
+     * @param string[] $redirectUris
+     */
+    public static function registerConfidentialWithKeys(string $name, array $redirectUris, ClientKeySource $keys): self
+    {
+        return self::create(
+            name: $name,
+            redirectUris: self::validRedirectUris($redirectUris),
+            confidential: true,
+            keySource: $keys,
         );
     }
 
@@ -169,18 +200,36 @@ final class Client
     /**
      * Replaces a confidential client's secret; the previous one stops working at once.
      *
-     * @throws DomainException The client is public or revoked
+     * @throws DomainException The client does not authenticate with a secret, or is revoked
      */
     public function rotateSecret(ClientSecret $secret): void
     {
-        if (!$this->state->confidential) {
-            throw new DomainException('Only confidential clients have a secret.');
+        if ($this->state->authMethod !== ClientAuthMethod::ClientSecretPost) {
+            throw new DomainException('Only clients that authenticate with a secret have a secret.');
         }
         if ($this->state->revoked) {
             throw new DomainException('A revoked client cannot get a new secret.');
         }
 
         $this->state->secretHash = $secret->hash();
+        $this->state->updatedAt = new DateTimeImmutable();
+    }
+
+    /**
+     * Replaces a key client's inline key set or `jwks_uri`; the previous keys stop working at once.
+     *
+     * @throws DomainException The client does not authenticate with keys, or is revoked
+     */
+    public function replaceKeys(ClientKeySource $keys): void
+    {
+        if ($this->state->authMethod !== ClientAuthMethod::PrivateKeyJwt) {
+            throw new DomainException('Only clients that authenticate with keys have keys.');
+        }
+        if ($this->state->revoked) {
+            throw new DomainException('A revoked client cannot get new keys.');
+        }
+
+        $this->state->keySource = $keys;
         $this->state->updatedAt = new DateTimeImmutable();
     }
 
@@ -223,6 +272,17 @@ final class Client
     public function getSecretHash(): ?string
     {
         return $this->state->secretHash;
+    }
+
+    public function getAuthMethod(): ClientAuthMethod
+    {
+        return $this->state->authMethod;
+    }
+
+    /** The public signing keys of a `private_key_jwt` client; null for every other method. */
+    public function getKeySource(): ?ClientKeySource
+    {
+        return $this->state->keySource;
     }
 
     /**

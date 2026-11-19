@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Domain\Model\OAuth;
 
+use App\Auth\Domain\Model\OAuth\ValueObject\ClientKeySource;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
@@ -26,6 +27,9 @@ final class ClientState
         public string $name,
         /** SHA-256 digest of a confidential client's secret; the secret itself is never stored. */
         public ?string $secretHash,
+        public readonly ClientAuthMethod $authMethod,
+        /** The public signing keys of a `private_key_jwt` client; null for every other method. */
+        public ?ClientKeySource $keySource,
         array $redirectUris,
         public bool $personalAccessClient,
         public bool $passwordClient,

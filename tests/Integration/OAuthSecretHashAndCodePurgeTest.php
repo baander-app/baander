@@ -22,23 +22,37 @@ final class OAuthSecretHashAndCodePurgeTest extends TestCase
 {
     use OwnershipPersistenceHarness;
 
-    public function testClientChecksTieTheSecretDigestToConfidentiality(): void
+    public function testClientChecksTieTheSecretAndKeysToTheAuthenticationMethod(): void
     {
         self::assertSame([
-            'chk_oauth_clients_confidential_secret_hash' => 'CHECK ((confidential = (secret_hash IS NOT NULL)))',
+            'chk_oauth_clients_confidential_auth_method' => "CHECK ((confidential = (token_endpoint_auth_method <> 'none'::text)))",
+            'chk_oauth_clients_key_source_auth_method' => "CHECK ((num_nonnulls(jwks, jwks_uri) = ((token_endpoint_auth_method = 'private_key_jwt'::text))::integer))",
+            'chk_oauth_clients_secret_hash_auth_method' => "CHECK (((secret_hash IS NOT NULL) = (token_endpoint_auth_method = 'client_secret_post'::text)))",
             'chk_oauth_clients_secret_hash_format' => "CHECK ((secret_hash ~ '^[0-9a-f]{64}$'::text))",
+            'chk_oauth_clients_token_endpoint_auth_method' => "CHECK ((token_endpoint_auth_method = ANY (ARRAY['none'::text, 'client_secret_post'::text, 'private_key_jwt'::text])))",
         ], $this->checks('oauth_clients'));
 
         $digest = hash('sha256', 'constraint-secret');
-        $this->insertClient(confidential: true, secretHash: $digest);
-        $this->insertClient(confidential: false, secretHash: null);
+        $jwks = '{"keys":[{"kty":"EC","crv":"P-256","x":"f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU","y":"x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"}]}';
+        $jwksUri = 'https://keys.baander.app/jwks.json';
+        $this->insertClient(method: 'client_secret_post', secretHash: $digest);
+        $this->insertClient(method: 'none');
+        $this->insertClient(method: 'private_key_jwt', jwks: $jwks);
+        $this->insertClient(method: 'private_key_jwt', jwksUri: $jwksUri);
 
         // DBAL 4.4 has no CHECK violation exception class; 23514 is check_violation.
-        $this->assertRejected(fn () => $this->insertClient(confidential: true, secretHash: null));
-        $this->assertRejected(fn () => $this->insertClient(confidential: false, secretHash: $digest));
-        $this->assertRejected(fn () => $this->insertClient(confidential: true, secretHash: strtoupper($digest)));
-        $this->assertRejected(fn () => $this->insertClient(confidential: true, secretHash: substr($digest, 1)));
-        $this->assertRejected(fn () => $this->insertClient(confidential: true, secretHash: 'plain-text-secret'));
+        $this->assertRejected(fn () => $this->insertClient(method: 'client_secret_post'));
+        $this->assertRejected(fn () => $this->insertClient(method: 'none', secretHash: $digest));
+        $this->assertRejected(fn () => $this->insertClient(method: 'none', confidential: true));
+        $this->assertRejected(fn () => $this->insertClient(method: 'client_secret_post', confidential: false, secretHash: $digest));
+        $this->assertRejected(fn () => $this->insertClient(method: 'client_secret_post', secretHash: strtoupper($digest)));
+        $this->assertRejected(fn () => $this->insertClient(method: 'client_secret_post', secretHash: substr($digest, 1)));
+        $this->assertRejected(fn () => $this->insertClient(method: 'client_secret_post', secretHash: 'plain-text-secret'));
+        $this->assertRejected(fn () => $this->insertClient(method: 'private_key_jwt', secretHash: $digest, jwks: $jwks));
+        $this->assertRejected(fn () => $this->insertClient(method: 'private_key_jwt', jwks: $jwks, jwksUri: $jwksUri));
+        $this->assertRejected(fn () => $this->insertClient(method: 'private_key_jwt'));
+        $this->assertRejected(fn () => $this->insertClient(method: 'client_secret_post', secretHash: $digest, jwksUri: $jwksUri));
+        $this->assertRejected(fn () => $this->insertClient(method: 'client_secret_basic', secretHash: $digest));
     }
 
     public function testDeviceCodeChecksRequireOneDecisionAndAnApprovingUser(): void
@@ -150,16 +164,25 @@ final class OAuthSecretHashAndCodePurgeTest extends TestCase
         }
     }
 
-    private function insertClient(bool $confidential = false, ?string $secretHash = null): Uuid
-    {
+    /** @param ?bool $confidential Defaults to whether the method authenticates the client */
+    private function insertClient(
+        string $method = 'none',
+        ?bool $confidential = null,
+        ?string $secretHash = null,
+        ?string $jwks = null,
+        ?string $jwksUri = null,
+    ): Uuid {
         $id = Uuid::generate();
         $this->manager->getConnection()->insert('oauth_clients', [
             'id' => $id->toString(),
             'public_id' => (new PublicId())->toString(),
             'name' => 'Constraint client',
             'redirect' => '["https://app.baander.app/callback"]',
-            'confidential' => $confidential ? 'true' : 'false',
+            'confidential' => ($confidential ?? $method !== 'none') ? 'true' : 'false',
+            'token_endpoint_auth_method' => $method,
             'secret_hash' => $secretHash,
+            'jwks' => $jwks,
+            'jwks_uri' => $jwksUri,
             'created_at' => '2026-10-07 12:00:00+00',
             'updated_at' => '2026-10-07 12:00:00+00',
         ]);

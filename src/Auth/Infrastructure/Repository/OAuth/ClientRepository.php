@@ -49,6 +49,8 @@ final class ClientRepository implements ClientRepositoryInterface
             $client->isConfidential(),
             $client->isFirstParty(),
             id: $client->getId(),
+            tokenEndpointAuthMethod: $client->getAuthMethod(),
+            keySource: $client->getKeySource(),
         );
         $entity->setUserId($client->getUserId());
 
@@ -140,6 +142,8 @@ final class ClientRepository implements ClientRepositoryInterface
             publicId: $entity->getPublicId(),
             name: $entity->getName(),
             secretHash: $entity->getSecretHash(),
+            authMethod: $entity->getTokenEndpointAuthMethod(),
+            keySource: $entity->getKeySource(),
             redirectUris: $this->parseRedirectUris($entity->getRedirect()),
             personalAccessClient: $entity->isPersonalAccessClient(),
             passwordClient: $entity->isPasswordClient(),
@@ -159,6 +163,7 @@ final class ClientRepository implements ClientRepositoryInterface
         $entity->setRedirect($this->jsonEncoder->encode($client->getRedirectUris(), 'json'));
 
         $entity->setSecretHash($client->getSecretHash());
+        $entity->setKeySource($client->getKeySource());
 
         if ($client->isRevoked()) {
             $entity->revoke();

@@ -25,7 +25,7 @@ enum ClientType: string
     /** Public client of the authorization code grant with PKCE, such as a native or browser app. */
     case Public = 'public';
 
-    /** Confidential client of the authorization code grant, authenticated with a client secret. */
+    /** Confidential client of the authorization code grant, authenticated with a client secret or its own signing keys. */
     case Confidential = 'confidential';
 
     /** Administrators may register, rotate and revoke clients of this type. */

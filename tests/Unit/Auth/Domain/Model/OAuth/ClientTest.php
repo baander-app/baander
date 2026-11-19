@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Auth\Domain\Model;
 
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\ClientAuthMethod;
 use App\Auth\Domain\Model\OAuth\ClientType;
+use App\Auth\Domain\Model\OAuth\ValueObject\ClientKeySource;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
 use App\Auth\Domain\Model\OAuth\ClientState;
 use App\Shared\Domain\Model\Uuid;
@@ -79,6 +81,8 @@ final class ClientTest extends TestCase
             publicId: \App\Shared\Domain\Model\PublicId::fromString('cli_abc123def456ghjkl'),
             name: 'Test',
             secretHash: null,
+            authMethod: ClientAuthMethod::None,
+            keySource: null,
             redirectUris: [],
             personalAccessClient: false,
             passwordClient: false,
@@ -288,6 +292,8 @@ final class ClientTest extends TestCase
             publicId: \App\Shared\Domain\Model\PublicId::fromString('cli_abc123def456ghjkl'),
             name: 'Test',
             secretHash: null,
+            authMethod: ClientAuthMethod::None,
+            keySource: null,
             redirectUris: [],
             personalAccessClient: false,
             passwordClient: false,
@@ -303,5 +309,89 @@ final class ClientTest extends TestCase
         $this->assertNotNull($client->getUserId());
         $this->assertTrue($client->getUserId()->equals($userId));
         $this->assertTrue($client->isOwnedBy($userId));
+    }
+
+    public function testEachRegistrationFactoryStoresItsAuthenticationMethod(): void
+    {
+        self::assertSame(ClientAuthMethod::ClientSecretPost, Client::registerConfidential('Server', ['https://server.baander.app/cb'], ClientSecret::generate())->getAuthMethod());
+        self::assertSame(ClientAuthMethod::None, Client::registerPublic('Player', ['app.baander.player:/callback'])->getAuthMethod());
+        self::assertSame(ClientAuthMethod::None, Client::registerDevice('TV')->getAuthMethod());
+        self::assertSame(ClientAuthMethod::None, Client::createPersonalAccess('CLI')->getAuthMethod());
+        self::assertSame(ClientAuthMethod::None, Client::create('SPA', ['http://localhost'], firstParty: true, passwordClient: true)->getAuthMethod());
+    }
+
+    public function testAKeyClientIsConfidentialWithoutASecret(): void
+    {
+        $keys = self::keys('signing-1');
+
+        $client = Client::registerConfidentialWithKeys('Server', ['https://server.baander.app/cb'], $keys);
+
+        self::assertSame(ClientType::Confidential, $client->getType());
+        self::assertSame(ClientAuthMethod::PrivateKeyJwt, $client->getAuthMethod());
+        self::assertTrue($client->isConfidential());
+        self::assertSame($keys, $client->getKeySource());
+        self::assertNull($client->getSecretHash());
+        self::assertFalse($client->authenticatesWith('anything'));
+    }
+
+    public function testAClientCannotHoldBothASecretAndKeys(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        Client::create('Server', [], secret: ClientSecret::generate(), confidential: true, keySource: self::keys('signing-1'));
+    }
+
+    public function testAPublicClientCannotHoldKeys(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        Client::create('Player', [], keySource: self::keys('signing-1'));
+    }
+
+    public function testReplaceKeysSwapsTheKeySourceAndTouchesTheClient(): void
+    {
+        $client = Client::registerConfidentialWithKeys('Server', ['https://server.baander.app/cb'], self::keys('signing-1'));
+        $before = $client->getUpdatedAt();
+        $uri = ClientKeySource::fromJwksUri('https://server.baander.app/jwks.json');
+
+        $client->replaceKeys($uri);
+
+        self::assertSame($uri, $client->getKeySource());
+        self::assertGreaterThanOrEqual($before, $client->getUpdatedAt());
+        self::assertNotSame($before, $client->getUpdatedAt());
+    }
+
+    public function testReplaceKeysRequiresAnActiveKeyClient(): void
+    {
+        $secretClient = Client::registerConfidential('Server', ['https://server.baander.app/cb'], ClientSecret::generate());
+        try {
+            $secretClient->replaceKeys(self::keys('signing-1'));
+            self::fail('A client that authenticates with a secret has no keys to replace.');
+        } catch (\DomainException) {
+        }
+
+        $keyClient = Client::registerConfidentialWithKeys('Server', ['https://server.baander.app/cb'], self::keys('signing-1'));
+        $keyClient->revoke();
+        $this->expectException(\DomainException::class);
+        $keyClient->replaceKeys(self::keys('signing-2'));
+    }
+
+    public function testRotateSecretRefusesAKeyClient(): void
+    {
+        $client = Client::registerConfidentialWithKeys('Server', ['https://server.baander.app/cb'], self::keys('signing-1'));
+
+        $this->expectException(\DomainException::class);
+        $client->rotateSecret(ClientSecret::generate());
+    }
+
+    private static function keys(string $kid): ClientKeySource
+    {
+        return ClientKeySource::fromJwks(['keys' => [[
+            'kty' => 'EC',
+            'crv' => 'P-256',
+            'kid' => $kid,
+            'x' => 'f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU',
+            'y' => 'x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0',
+        ]]]);
     }
 }

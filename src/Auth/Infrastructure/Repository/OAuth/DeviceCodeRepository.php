@@ -236,6 +236,8 @@ final class DeviceCodeRepository implements DeviceCodeRepositoryInterface
             publicId: $entity->getPublicId(),
             name: $entity->getName(),
             secretHash: $entity->getSecretHash(),
+            authMethod: $entity->getTokenEndpointAuthMethod(),
+            keySource: $entity->getKeySource(),
             redirectUris: $this->parseRedirectUris($entity->getRedirect()),
             personalAccessClient: $entity->isPersonalAccessClient(),
             passwordClient: $entity->isPasswordClient(),

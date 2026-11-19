@@ -383,6 +383,8 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
             publicId: $entity->getClient()->getPublicId(),
             name: $entity->getClient()->getName(),
             secretHash: $entity->getClient()->getSecretHash(),
+            authMethod: $entity->getClient()->getTokenEndpointAuthMethod(),
+            keySource: $entity->getClient()->getKeySource(),
             redirectUris: $this->parseRedirectUris($entity->getClient()->getRedirect()),
             personalAccessClient: $entity->getClient()->isPersonalAccessClient(),
             passwordClient: $entity->getClient()->isPasswordClient(),

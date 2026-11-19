@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Auth\Infrastructure\Doctrine\Entity\OAuth;
 
+use App\Auth\Domain\Model\OAuth\ClientAuthMethod;
+use App\Auth\Domain\Model\OAuth\ValueObject\ClientKeySource;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\Mapping as ORM;
@@ -29,6 +31,20 @@ class ClientEntity implements ClientEntityInterface
     /** SHA-256 digest of a confidential client's secret. */
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $secretHash = null;
+
+    #[ORM\Column(type: 'text', options: ['default' => 'none'], enumType: ClientAuthMethod::class)]
+    private ClientAuthMethod $tokenEndpointAuthMethod;
+
+    /**
+     * Inline public JWK Set of a `private_key_jwt` client.
+     *
+     * @var array<array-key, mixed>|null
+     */
+    #[ORM\Column(type: 'json', nullable: true, options: ['jsonb' => true])]
+    private ?array $jwks = null;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $jwksUri = null;
 
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $provider = null;
@@ -75,6 +91,8 @@ class ClientEntity implements ClientEntityInterface
         bool $confidential = false,
         bool $firstParty = false,
         ?Uuid $id = null,
+        ClientAuthMethod $tokenEndpointAuthMethod = ClientAuthMethod::None,
+        ?ClientKeySource $keySource = null,
     ) {
         $this->id = $id ?? new Uuid();
         $this->publicId = $publicId;
@@ -87,6 +105,9 @@ class ClientEntity implements ClientEntityInterface
         $this->deviceClient = $deviceClient;
         $this->confidential = $confidential;
         $this->firstParty = $firstParty;
+        $this->tokenEndpointAuthMethod = $tokenEndpointAuthMethod;
+        $this->jwks = $keySource?->jwks();
+        $this->jwksUri = $keySource?->jwksUri();
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
     }
@@ -136,6 +157,27 @@ class ClientEntity implements ClientEntityInterface
     public function setSecretHash(?string $secretHash): void
     {
         $this->secretHash = $secretHash;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function getTokenEndpointAuthMethod(): ClientAuthMethod
+    {
+        return $this->tokenEndpointAuthMethod;
+    }
+
+    public function getKeySource(): ?ClientKeySource
+    {
+        return match (true) {
+            $this->jwks !== null => ClientKeySource::fromJwks($this->jwks),
+            $this->jwksUri !== null => ClientKeySource::fromJwksUri($this->jwksUri),
+            default => null,
+        };
+    }
+
+    public function setKeySource(?ClientKeySource $keySource): void
+    {
+        $this->jwks = $keySource?->jwks();
+        $this->jwksUri = $keySource?->jwksUri();
         $this->updatedAt = new \DateTimeImmutable();
     }
 
