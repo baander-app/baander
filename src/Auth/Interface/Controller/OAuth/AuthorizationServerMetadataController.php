@@ -59,7 +59,8 @@ final class AuthorizationServerMetadataController
                         new OA\Property(property: 'scopes_supported', type: 'array', items: new OA\Items(type: 'string')),
                         new OA\Property(property: 'dpop_signing_alg_values_supported', type: 'array', items: new OA\Items(type: 'string')),
                         new OA\Property(property: 'authorization_response_iss_parameter_supported', type: 'boolean'),
-                        new OA\Property(property: 'require_pushed_authorization_requests', type: 'boolean'),
+                        new OA\Property(property: 'pushed_authorization_request_endpoint', description: 'Where a client pushes every authorization request first (RFC 9126)', type: 'string', format: 'uri'),
+                        new OA\Property(property: 'require_pushed_authorization_requests', description: 'Always true: the authorization endpoint accepts only pushed requests', type: 'boolean'),
                     ],
                 ),
             ),
@@ -95,7 +96,8 @@ final class AuthorizationServerMetadataController
             'code_challenge_methods_supported'      => ['S256'],
             'dpop_signing_alg_values_supported'     => self::DPOP_SIGNING_ALGORITHMS,
             'authorization_response_iss_parameter_supported' => true,
-            'require_pushed_authorization_requests' => false,
+            'pushed_authorization_request_endpoint' => $this->generateUrl('oauth_par'),
+            'require_pushed_authorization_requests' => true,
         ];
     }
 

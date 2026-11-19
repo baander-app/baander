@@ -34,7 +34,7 @@ final class AuthCodeState
         public readonly string $redirectUri,
         public readonly string $codeChallenge,
         public readonly string $codeChallengeMethod,
-        public readonly ?string $dpopJkt,
+        public readonly string $dpopJkt,
         public bool $revoked = false,
     ) {
         $this->scopes = $scopes;

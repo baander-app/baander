@@ -8,10 +8,12 @@ use App\Auth\Application\Command\OAuth\CreateAuthorizationCodeCommand;
 use App\Auth\Application\Command\OAuth\ExchangeAuthorizationCodeCommand;
 use App\Auth\Application\Command\OAuth\ExchangeRefreshTokenCommand;
 use App\Auth\Application\Command\OAuth\IssueTokenCommand;
+use App\Auth\Application\Command\OAuth\PushAuthorizationRequestCommand;
 use App\Auth\Application\Command\User\DisableUserCommand;
 use App\Auth\Application\Command\User\EnableUserCommand;
 use App\Auth\Application\DTO\AuthorizationResponseDTO;
 use App\Auth\Application\DTO\ClientCredentials;
+use App\Auth\Application\DTO\PushedAuthorizationRequestDTO;
 use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Service\WebSocketOriginPolicy;
@@ -45,7 +47,8 @@ use Symfony\Component\Security\Core\Exception\AuthenticationException;
  */
 final class DisabledUserAccessTest extends TestCase
 {
-    private const string DPOP_JKT = 'disabled-user-access-test-jkt';
+    /** A JWK SHA-256 thumbprint, which a pushed authorization request binds its code to. */
+    private const string DPOP_JKT = 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs';
 
     /** @var array<string, string> client UUIDs by public ID */
     private array $clientUuids = [];
@@ -117,8 +120,12 @@ final class DisabledUserAccessTest extends TestCase
         $this->service(ClientRepositoryInterface::class)->saveClient($client);
         $clientId = $client->getPublicId()->toString();
 
+        $pushed = $this->bus()
+            ->dispatch(new PushAuthorizationRequestCommand(new ClientCredentials($clientId), 'code', $redirectUri, [], null, $challenge, 'S256', null, self::DPOP_JKT))
+            ->last(HandledStamp::class)?->getResult();
+        self::assertInstanceOf(PushedAuthorizationRequestDTO::class, $pushed);
         $authorization = $this->bus()
-            ->dispatch(new CreateAuthorizationCodeCommand($user->getId(), 'code', $clientId, $redirectUri, $challenge, 'S256'))
+            ->dispatch(new CreateAuthorizationCodeCommand($user->getId(), $clientId, $pushed->requestUri))
             ->last(HandledStamp::class)?->getResult();
         self::assertInstanceOf(AuthorizationResponseDTO::class, $authorization);
         self::assertIsString($authorization->code);

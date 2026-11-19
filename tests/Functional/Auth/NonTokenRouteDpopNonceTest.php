@@ -7,8 +7,9 @@ namespace App\Tests\Functional\Auth;
 use App\Tests\Functional\TestCase;
 
 /**
- * Only the token endpoints issue DPoP nonces, and only after storing them. An ordinary
- * API response carries none, so the client keeps the stored nonce a token endpoint gave it.
+ * Only the token endpoints and the pushed authorization request endpoint issue DPoP nonces,
+ * and only after storing them. An ordinary API response carries none, so the client keeps the
+ * stored nonce one of those endpoints gave it.
  */
 final class NonTokenRouteDpopNonceTest extends TestCase
 {

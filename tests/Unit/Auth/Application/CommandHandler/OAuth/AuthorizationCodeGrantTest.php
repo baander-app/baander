@@ -18,25 +18,36 @@ use App\Auth\Application\Service\AuthorizationRequestValidator;
 use App\Auth\Application\ScopeAllowlist;
 use App\Auth\Domain\Model\OAuth\AuthCode;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\PushedAuthorizationRequest;
+use App\Auth\Domain\Model\OAuth\PushedAuthorizationRequestState;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
+use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\OAuth\AuthCodeRepositoryInterface;
+use App\Auth\Domain\Repository\OAuth\PushedAuthorizationRequestRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\Uuid;
+use App\Tests\Fixtures\Catalog\PassThroughTransaction;
+use DateInterval;
+use DateTimeImmutable;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Clock\MockClock;
 
 /**
- * The authorization code grant with mandatory S256 PKCE, from the authorization
- * request to the token exchange (RFC 6749 section 4.1, RFC 7636).
+ * The authorization code grant from a pushed authorization request (RFC 9126) to the token
+ * exchange, with mandatory S256 PKCE (RFC 7636) and the code bound to the pushed request's
+ * DPoP key (RFC 9449 section 10).
  */
 final class AuthorizationCodeGrantTest extends TestCase
 {
     use IssuesTokenPairs;
 
     private const string REDIRECT = 'https://app.baander.app/callback';
-    private const string JKT = 'proof-key-thumbprint';
+    private const string JKT = 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs';
+    private const string OTHER_JKT = '0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I';
     // RFC 7636 appendix B.
     private const string VERIFIER = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
     private const string CHALLENGE = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
@@ -45,66 +56,164 @@ final class AuthorizationCodeGrantTest extends TestCase
     private array $codes = [];
     /** @var array<string, true> */
     private array $redeemed = [];
+    /** @var array<string, PushedAuthorizationRequest> */
+    private array $pushed = [];
     private User $user;
     private Client $client;
+    private MockClock $clock;
 
     protected function setUp(): void
     {
+        $this->clock = new MockClock();
         $this->user = User::register(new Email('listener@baander.app'), 'hashed', 'Listener');
         $this->client = $this->register(Client::create('Third-party player', [self::REDIRECT, 'https://app.baander.app/other']));
     }
 
-    public function testAuthorizationIssuesAPkceBoundCode(): void
+    public function testApprovalIssuesACodeBoundToThePushedChallengeAndKey(): void
     {
-        $result = $this->authorize();
+        $request = $this->pushRequest();
+
+        $result = $this->decide($request);
 
         self::assertSame(self::REDIRECT, $result->redirectUri);
+        self::assertSame('pushed-state', $result->state);
         self::assertIsString($result->code);
         $code = $this->codes[$result->code];
         self::assertSame(self::CHALLENGE, $code->getCodeChallenge());
         self::assertSame(self::REDIRECT, $code->getRedirectUri());
-        self::assertSame(['library'], $code->getScopeIdentifiers(), 'Scopes outside the allowlist are dropped.');
-        self::assertNotNull($code->getExpiresAt());
+        self::assertSame(self::JKT, $code->getDpopJkt());
+        self::assertSame(['library'], $code->getScopeIdentifiers());
+        $lifetime = $code->getExpiresAt()?->getTimestamp() - $code->getCreatedAt()->getTimestamp();
+        self::assertSame(60, $lifetime);
+        self::assertTrue($this->pushed[$request->getRequestId()->toString()]->isConsumed(), 'The decision uses the request up.');
     }
 
-    public function testTheConsentPageSeesTheClientAndTheGrantedScopesWithoutACodeBeingIssued(): void
+    public function testTheConsentPageSeesThePushedClientAndScopesWithoutACodeBeingIssued(): void
     {
-        $request = $this->describe();
+        $request = $this->pushRequest();
 
-        self::assertSame($this->client->getPublicId()->toString(), $request->clientId);
-        self::assertSame('Third-party player', $request->clientName);
-        self::assertSame('public', $request->clientType);
-        self::assertSame(['library'], $request->scopes);
-        self::assertSame(self::REDIRECT, $request->redirectUri);
-        self::assertTrue($request->consentRequired);
+        $details = $this->describe($request);
+
+        self::assertSame($this->client->getPublicId()->toString(), $details->clientId);
+        self::assertSame('Third-party player', $details->clientName);
+        self::assertSame('public', $details->clientType);
+        self::assertSame(['library'], $details->scopes);
+        self::assertSame(self::REDIRECT, $details->redirectUri);
+        self::assertTrue($details->consentRequired);
         self::assertSame([], $this->codes);
-        self::assertSame(['access-api'], $this->describe(scopes: ['admin'])->scopes, 'No allowed scope means the default scopes.');
+        self::assertFalse($this->pushed[$request->getRequestId()->toString()]->isConsumed(), 'Looking a request up does not use it up.');
+        self::assertSame(['access-api'], $this->describe($this->pushRequest(scopes: []))->scopes, 'No allowed scope means the default scopes.');
     }
 
-    public function testTheConsentCheckRedirectsParameterErrorsOnly(): void
+    public function testLookingARequestUpTwiceThenApprovingIssuesOneCode(): void
     {
-        $exception = $this->assertProtocolError('invalid_request', fn () => $this->describe(method: 'plain'));
-        self::assertSame(self::REDIRECT, $exception->redirectUri);
+        $request = $this->pushRequest();
 
-        $unknown = $this->assertProtocolError('invalid_client', fn () => $this->describe(clientId: 'unknown_client_000001'), 401);
-        self::assertNull($unknown->redirectUri);
+        $this->describe($request);
+        $this->describe($request);
+        $this->decide($request);
+
+        self::assertCount(1, $this->codes);
     }
 
-    public function testDenialAnswersAccessDeniedAtTheRedirectUriWithoutACode(): void
+    public function testASecondApprovalOfTheSameRequestIsRejectedWithoutASecondCode(): void
     {
-        $answer = $this->authorize(approved: false);
+        $request = $this->pushRequest();
+        $this->decide($request);
+
+        $this->assertUnusableRequest(fn () => $this->decide($request));
+        $this->assertUnusableRequest(fn () => $this->describe($request));
+        self::assertCount(1, $this->codes);
+    }
+
+    public function testAnExpiredRequestIsRejectedWithoutARedirect(): void
+    {
+        $request = $this->pushRequest();
+        $this->clock->sleep(301);
+
+        $this->assertUnusableRequest(fn () => $this->describe($request));
+        $this->assertUnusableRequest(fn () => $this->decide($request));
+        self::assertSame([], $this->codes);
+    }
+
+    public function testAnotherClientsIdWithTheRequestIsRejected(): void
+    {
+        $request = $this->pushRequest();
+        $other = $this->register(Client::create('Other app', [self::REDIRECT]));
+
+        $this->assertUnusableRequest(fn () => $this->describe($request, clientId: $other->getPublicId()->toString()));
+        $this->assertUnusableRequest(fn () => $this->decide($request, clientId: $other->getPublicId()->toString()));
+        self::assertFalse($this->pushed[$request->getRequestId()->toString()]->isConsumed());
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function unusableRequestUris(): iterable
+    {
+        yield 'unknown request' => [PushedAuthorizationRequest::REQUEST_URI_PREFIX . TokenId::generate()->toString()];
+        yield 'another prefix' => ['urn:example:' . TokenId::generate()->toString()];
+        yield 'no identifier' => [PushedAuthorizationRequest::REQUEST_URI_PREFIX];
+        yield 'an https URI' => ['https://app.baander.app/request/1'];
+    }
+
+    #[DataProvider('unusableRequestUris')]
+    public function testAnUnknownOrMalformedRequestUriIsRejected(string $requestUri): void
+    {
+        $this->assertUnusableRequest(fn () => (new GetAuthorizationRequestHandler($this->validator()))(
+            new GetAuthorizationRequestQuery($this->user->getId(), $this->client->getPublicId()->toString(), $requestUri),
+        ));
+    }
+
+    public function testAnUnknownClientIsNotRedirected(): void
+    {
+        $exception = $this->assertProtocolError('invalid_client', fn () => $this->describe($this->pushRequest(), clientId: 'unknown_client_000001'), 401);
+
+        self::assertNull($exception->redirectUri);
+    }
+
+    public function testDenialUsesTheRequestUpAndAnswersAccessDeniedWithThePushedState(): void
+    {
+        $request = $this->pushRequest();
+
+        $answer = $this->decide($request, approved: false);
 
         self::assertNull($answer->code);
         self::assertSame('access_denied', $answer->error);
         self::assertSame(self::REDIRECT, $answer->redirectUri);
+        self::assertSame('pushed-state', $answer->state);
         self::assertSame([], $this->codes);
+        $this->assertUnusableRequest(fn () => $this->decide($request));
+    }
 
-        $this->assertProtocolError('invalid_request', fn () => $this->authorize(redirectUri: 'https://evil.baander.app/callback', approved: false));
+    public function testADisabledUserIsSentBackWithAccessDeniedAndTheRequestStaysPending(): void
+    {
+        $request = $this->pushRequest();
+        $this->user->disable();
+
+        $exception = $this->assertProtocolError('access_denied', fn () => $this->decide($request));
+
+        self::assertSame(self::REDIRECT, $exception->redirectUri);
+        self::assertSame('pushed-state', $exception->state);
+        self::assertFalse($this->pushed[$request->getRequestId()->toString()]->isConsumed());
+        self::assertSame([], $this->codes);
+    }
+
+    public function testAPersonalAccessClientServesOnlyItsOwnerWithoutConsent(): void
+    {
+        $own = $this->register(Client::createPersonalAccess('CLI', $this->user->getId()));
+        $foreign = $this->register(Client::createPersonalAccess('Other CLI', Uuid::generate()));
+
+        self::assertFalse($this->describe($this->pushRequest($own, 'http://localhost'), clientId: $own->getPublicId()->toString())->consentRequired);
+
+        $foreignRequest = $this->pushRequest($foreign, 'http://localhost');
+        $exception = $this->assertProtocolError('unauthorized_client', fn () => $this->decide($foreignRequest, clientId: $foreign->getPublicId()->toString()));
+        self::assertSame('http://localhost', $exception->redirectUri);
+        self::assertSame('pushed-state', $exception->state);
+        self::assertFalse($this->pushed[$foreignRequest->getRequestId()->toString()]->isConsumed());
     }
 
     public function testExchangeIssuesAProofBoundTokenPairAndRedeemsTheCode(): void
     {
-        $code = (string) $this->authorize()->code;
+        $code = $this->issuedCode();
 
         $tokens = ($this->exchanger())(new ExchangeAuthorizationCodeCommand(
             credentials: new ClientCredentials($this->client->getPublicId()->toString()),
@@ -126,6 +235,27 @@ final class AuthorizationCodeGrantTest extends TestCase
         self::assertArrayHasKey($code, $this->redeemed);
     }
 
+    public function testExchangeWithAProofFromAnotherKeyIsRejectedAndTheCodeStaysUnredeemed(): void
+    {
+        $code = $this->issuedCode();
+
+        $this->assertProtocolError('invalid_grant', fn () => ($this->exchanger())($this->exchange($code, jkt: self::OTHER_JKT)));
+        self::assertSame([], $this->issuedAccessTokens);
+        self::assertSame([], $this->redeemed);
+
+        ($this->exchanger())($this->exchange($code));
+        self::assertCount(1, $this->issuedAccessTokens, 'The bound key can still redeem the code.');
+    }
+
+    public function testACodeExchangedAfterItsLifetimeIsRejected(): void
+    {
+        $code = $this->issuedCode();
+        $this->codes[$code]->getState()->expiresAt = new DateTimeImmutable('-1 second');
+
+        $this->assertProtocolError('invalid_grant', fn () => ($this->exchanger())($this->exchange($code)));
+        self::assertSame([], $this->issuedAccessTokens);
+    }
+
     /** @return iterable<string, array{?string}> */
     public static function wrongVerifiers(): iterable
     {
@@ -137,7 +267,7 @@ final class AuthorizationCodeGrantTest extends TestCase
     #[DataProvider('wrongVerifiers')]
     public function testExchangeRejectsAMissingOrWrongVerifier(?string $verifier): void
     {
-        $code = (string) $this->authorize()->code;
+        $code = $this->issuedCode();
 
         $this->assertProtocolError('invalid_grant', fn () => ($this->exchanger())($this->exchange($code, verifier: $verifier)));
         self::assertSame([], $this->issuedAccessTokens);
@@ -146,7 +276,7 @@ final class AuthorizationCodeGrantTest extends TestCase
 
     public function testExchangeRejectsAnotherRedirectUri(): void
     {
-        $code = (string) $this->authorize()->code;
+        $code = $this->issuedCode();
 
         $this->assertProtocolError('invalid_grant', fn () => ($this->exchanger())($this->exchange($code, redirectUri: 'https://app.baander.app/other')));
         $this->assertProtocolError('invalid_request', fn () => ($this->exchanger())($this->exchange($code, redirectUri: null)));
@@ -154,7 +284,7 @@ final class AuthorizationCodeGrantTest extends TestCase
 
     public function testExchangeRejectsACodeOfAnotherClient(): void
     {
-        $code = (string) $this->authorize()->code;
+        $code = $this->issuedCode();
         $other = $this->register(Client::create('Other app', [self::REDIRECT]));
 
         $this->assertProtocolError('invalid_grant', fn () => ($this->exchanger())(new ExchangeAuthorizationCodeCommand(
@@ -164,7 +294,7 @@ final class AuthorizationCodeGrantTest extends TestCase
 
     public function testACodeIsRedeemedOnce(): void
     {
-        $code = (string) $this->authorize()->code;
+        $code = $this->issuedCode();
         ($this->exchanger())($this->exchange($code));
 
         $this->assertProtocolError('invalid_grant', fn () => ($this->exchanger())($this->exchange($code)));
@@ -173,7 +303,7 @@ final class AuthorizationCodeGrantTest extends TestCase
 
     public function testAConcurrentRedemptionLosesWithoutIssuingTokens(): void
     {
-        $code = (string) $this->authorize()->code;
+        $code = $this->issuedCode();
         $this->redeemed[$code] = true;
 
         $this->assertProtocolError('invalid_grant', fn () => ($this->exchanger())($this->exchange($code)));
@@ -183,7 +313,7 @@ final class AuthorizationCodeGrantTest extends TestCase
     public function testConfidentialClientsMustSendTheirSecret(): void
     {
         $confidential = $this->register(Client::create('Server app', [self::REDIRECT], secret: ClientSecret::fromString('shared-secret'), confidential: true));
-        $code = (string) $this->authorize(clientId: $confidential->getPublicId()->toString())->code;
+        $code = $this->issuedCode($confidential);
 
         $this->assertProtocolError('invalid_client', fn () => ($this->exchanger())(new ExchangeAuthorizationCodeCommand(
             new ClientCredentials($confidential->getPublicId()->toString(), 'wrong'), $code, self::REDIRECT, self::VERIFIER, self::JKT,
@@ -195,106 +325,52 @@ final class AuthorizationCodeGrantTest extends TestCase
         self::assertNotSame('', $tokens->getAccessToken());
     }
 
-    /** @return iterable<string, array{?string, ?string, string}> */
-    public static function invalidPkceRequests(): iterable
+    /** @param list<string> $scopes */
+    private function pushRequest(?Client $client = null, string $redirectUri = self::REDIRECT, array $scopes = ['library']): PushedAuthorizationRequest
     {
-        yield 'no challenge' => [null, 'S256', 'invalid_request'];
-        yield 'no method (would mean plain)' => [self::CHALLENGE, null, 'invalid_request'];
-        yield 'plain method' => [self::VERIFIER, 'plain', 'invalid_request'];
-        yield 'challenge that is no S256 digest' => ['short', 'S256', 'invalid_request'];
+        $request = PushedAuthorizationRequest::create(
+            ($client ?? $this->client)->getId(),
+            $redirectUri,
+            array_map(static fn (string $scope): Scope => new Scope($scope), $scopes),
+            'pushed-state',
+            self::CHALLENGE,
+            'S256',
+            self::JKT,
+            new DateInterval('PT300S'),
+            $this->clock->now(),
+        );
+        $this->pushed[$request->getRequestId()->toString()] = $request;
+
+        return $request;
     }
 
-    #[DataProvider('invalidPkceRequests')]
-    public function testAuthorizationRequiresAnS256Challenge(?string $challenge, ?string $method, string $error): void
+    private function issuedCode(?Client $client = null): string
     {
-        $exception = $this->assertProtocolError($error, fn () => $this->authorize(challenge: $challenge, method: $method));
+        $client ??= $this->client;
+        $code = $this->decide($this->pushRequest($client), clientId: $client->getPublicId()->toString())->code;
+        self::assertIsString($code);
 
-        self::assertSame(self::REDIRECT, $exception->redirectUri, 'Once the redirect URI is valid, errors go to the client.');
-        self::assertSame([], $this->codes);
+        return $code;
     }
 
-    public function testUnknownClientOrRedirectUriIsNotRedirected(): void
+    private function decide(PushedAuthorizationRequest $request, ?string $clientId = null, bool $approved = true): AuthorizationResponseDTO
     {
-        $unknownClient = $this->assertProtocolError('invalid_client', fn () => $this->authorize(clientId: 'unknown_client_000001'), 401);
-        self::assertNull($unknownClient->redirectUri);
-
-        $foreignRedirect = $this->assertProtocolError('invalid_request', fn () => $this->authorize(redirectUri: 'https://evil.baander.app/callback'));
-        self::assertNull($foreignRedirect->redirectUri);
-    }
-
-    public function testRedirectUriMayBeOmittedOnlyForASingleRegisteredUri(): void
-    {
-        $this->assertProtocolError('invalid_request', fn () => $this->authorize(redirectUri: null));
-
-        $single = $this->register(Client::create('Single', [self::REDIRECT]));
-        self::assertSame(self::REDIRECT, $this->authorize(clientId: $single->getPublicId()->toString(), redirectUri: null)->redirectUri);
-    }
-
-    public function testLoopbackRedirectUrisMatchOnAnyPort(): void
-    {
-        $native = $this->register(Client::createPersonalAccess('CLI', $this->user->getId()));
-
-        $result = $this->authorize(clientId: $native->getPublicId()->toString(), redirectUri: 'http://localhost:53682');
-
-        self::assertSame('http://localhost:53682', $result->redirectUri);
-        $this->assertProtocolError('invalid_request', fn () => $this->authorize(clientId: $native->getPublicId()->toString(), redirectUri: 'http://localhost.baander.app:53682'));
-    }
-
-    public function testAPersonalAccessClientServesOnlyItsOwnerWithoutConsent(): void
-    {
-        $own = $this->register(Client::createPersonalAccess('CLI', $this->user->getId()));
-        $foreign = $this->register(Client::createPersonalAccess('Other CLI', \App\Shared\Domain\Model\Uuid::generate()));
-
-        self::assertFalse($this->describe(clientId: $own->getPublicId()->toString(), redirectUri: 'http://localhost')->consentRequired);
-        $exception = $this->assertProtocolError('unauthorized_client', fn () => $this->authorize(clientId: $foreign->getPublicId()->toString(), redirectUri: 'http://localhost'));
-        self::assertSame('http://localhost', $exception->redirectUri);
-    }
-
-    public function testOnlyTheCodeResponseTypeIsSupported(): void
-    {
-        $this->assertProtocolError('unsupported_response_type', fn () => $this->authorize(responseType: 'token'));
-    }
-
-    public function testDeviceClientsCannotUseTheAuthorizationEndpoint(): void
-    {
-        $device = $this->register(Client::create('TV', [self::REDIRECT], deviceClient: true));
-
-        $this->assertProtocolError('unauthorized_client', fn () => $this->authorize(clientId: $device->getPublicId()->toString()));
-    }
-
-    private function authorize(
-        ?string $clientId = null,
-        ?string $redirectUri = self::REDIRECT,
-        ?string $challenge = self::CHALLENGE,
-        ?string $method = 'S256',
-        string $responseType = 'code',
-        bool $approved = true,
-    ): AuthorizationResponseDTO {
-        $handler = new CreateAuthorizationCodeHandler($this->validator(), $this->authCodes(), 600);
+        $handler = new CreateAuthorizationCodeHandler($this->validator(), $this->pushedRequests(), $this->authCodes(), new PassThroughTransaction(), 60);
 
         return $handler(new CreateAuthorizationCodeCommand(
             userId: $this->user->getId(),
-            responseType: $responseType,
             clientId: $clientId ?? $this->client->getPublicId()->toString(),
-            redirectUri: $redirectUri,
-            codeChallenge: $challenge,
-            codeChallengeMethod: $method,
-            scopes: ['library', 'admin'],
+            requestUri: $request->requestUri(),
             approved: $approved,
         ));
     }
 
-    /** @param string[] $scopes */
-    private function describe(?string $clientId = null, ?string $method = 'S256', array $scopes = ['library', 'admin'], string $redirectUri = self::REDIRECT): AuthorizationRequestDTO
+    private function describe(PushedAuthorizationRequest $request, ?string $clientId = null): AuthorizationRequestDTO
     {
         return (new GetAuthorizationRequestHandler($this->validator()))(new GetAuthorizationRequestQuery(
             userId: $this->user->getId(),
-            responseType: 'code',
             clientId: $clientId ?? $this->client->getPublicId()->toString(),
-            redirectUri: $redirectUri,
-            codeChallenge: self::CHALLENGE,
-            codeChallengeMethod: $method,
-            scopes: $scopes,
+            requestUri: $request->requestUri(),
         ));
     }
 
@@ -307,7 +383,45 @@ final class AuthorizationCodeGrantTest extends TestCase
             $this->clientAuthenticator(),
             $users,
             new ScopeAllowlist(['profile', 'email', 'library', 'playlist']),
+            $this->pushedRequests(),
+            $this->clock,
         );
+    }
+
+    /** An in-memory store that uses a request up only while it is unexpired, unused and the named client's. */
+    private function pushedRequests(): PushedAuthorizationRequestRepositoryInterface
+    {
+        $repository = $this->createStub(PushedAuthorizationRequestRepositoryInterface::class);
+        $repository->method('findByRequestId')->willReturnCallback(fn (TokenId $id): ?PushedAuthorizationRequest => $this->pushed[$id->toString()] ?? null);
+        $repository->method('consume')->willReturnCallback(function (TokenId $id, Uuid $clientId): bool {
+            $request = $this->pushed[$id->toString()] ?? null;
+            if ($request === null || $request->isConsumed() || $request->isExpired($this->clock->now()) || !$request->getClientId()->equals($clientId)) {
+                return false;
+            }
+            $this->pushed[$id->toString()] = self::usedUp($request, $this->clock->now());
+
+            return true;
+        });
+
+        return $repository;
+    }
+
+    private static function usedUp(PushedAuthorizationRequest $request, DateTimeImmutable $at): PushedAuthorizationRequest
+    {
+        return PushedAuthorizationRequest::reconstitute(new PushedAuthorizationRequestState(
+            id: $request->getId(),
+            requestId: $request->getRequestId(),
+            clientId: $request->getClientId(),
+            redirectUri: $request->getRedirectUri(),
+            scopes: $request->getScopes(),
+            state: $request->getState(),
+            codeChallenge: $request->getCodeChallenge(),
+            codeChallengeMethod: $request->getCodeChallengeMethod(),
+            dpopJkt: $request->getDpopJkt(),
+            expiresAt: $request->getExpiresAt(),
+            createdAt: $request->getCreatedAt(),
+            consumedAt: $at,
+        ));
     }
 
     private function exchanger(): ExchangeAuthorizationCodeHandler
@@ -315,9 +429,9 @@ final class AuthorizationCodeGrantTest extends TestCase
         return new ExchangeAuthorizationCodeHandler($this->clientAuthenticator(), $this->authCodes(), $this->tokenPairIssuer());
     }
 
-    private function exchange(string $code, ?string $redirectUri = self::REDIRECT, ?string $verifier = self::VERIFIER): ExchangeAuthorizationCodeCommand
+    private function exchange(string $code, ?string $redirectUri = self::REDIRECT, ?string $verifier = self::VERIFIER, string $jkt = self::JKT): ExchangeAuthorizationCodeCommand
     {
-        return new ExchangeAuthorizationCodeCommand(new ClientCredentials($this->client->getPublicId()->toString()), $code, $redirectUri, $verifier, self::JKT);
+        return new ExchangeAuthorizationCodeCommand(new ClientCredentials($this->client->getPublicId()->toString()), $code, $redirectUri, $verifier, $jkt);
     }
 
     private function authCodes(): AuthCodeRepositoryInterface
@@ -339,6 +453,14 @@ final class AuthorizationCodeGrantTest extends TestCase
         });
 
         return $repository;
+    }
+
+    /** An unusable request is shown to the user and never redirected to the client. */
+    private function assertUnusableRequest(callable $action): void
+    {
+        $exception = $this->assertProtocolError('invalid_request_uri', $action);
+
+        self::assertNull($exception->redirectUri);
     }
 
     private function assertProtocolError(string $error, callable $action, int $status = 400): OAuthProtocolException

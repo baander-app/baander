@@ -9,16 +9,22 @@ use App\Auth\Application\DTO\AuthorizationResponseDTO;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Service\AuthorizationRequestValidator;
 use App\Auth\Domain\Model\OAuth\AuthCode;
+use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\PushedAuthorizationRequest;
 use App\Auth\Domain\Repository\OAuth\AuthCodeRepositoryInterface;
+use App\Auth\Domain\Repository\OAuth\PushedAuthorizationRequestRepositoryInterface;
+use App\Shared\Application\Port\TransactionPortInterface;
 use DateInterval;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
- * Records the signed-in user's decision on an authorization request (RFC 6749 section 4.1.2).
+ * Records the signed-in user's decision on a pushed authorization request (RFC 6749 section 4.1.2).
  *
- * Approval issues a single-use, PKCE-bound authorization code for the
- * validated redirect URI. Denial answers access_denied at the same redirect
- * URI once the client and redirect URI are valid.
+ * Either decision uses the request up, so it is decided once. Approval issues a
+ * single-use authorization code bound to the pushed PKCE challenge, redirect URI and
+ * DPoP key thumbprint, in the transaction that uses the request up; of two concurrent
+ * approvals one issues a code. Denial answers access_denied at the pushed redirect URI.
+ * A check that fails for the user leaves the request unused.
  */
 final readonly class CreateAuthorizationCodeHandler
 {
@@ -26,7 +32,9 @@ final readonly class CreateAuthorizationCodeHandler
 
     public function __construct(
         private AuthorizationRequestValidator $validator,
+        private PushedAuthorizationRequestRepositoryInterface $pushedRequests,
         private AuthCodeRepositoryInterface $authCodeRepository,
+        private TransactionPortInterface $transaction,
         int $authCodeTtl,
     ) {
         $this->authCodeTtl = new DateInterval(sprintf('PT%dS', $authCodeTtl));
@@ -37,32 +45,40 @@ final readonly class CreateAuthorizationCodeHandler
     public function __invoke(CreateAuthorizationCodeCommand $command): AuthorizationResponseDTO
     {
         if (!$command->approved) {
-            [, $redirectUri] = $this->validator->validateClient($command->clientId, $command->redirectUri);
+            [$client, $pushedRequest] = $this->validator->resolvePushedRequest($command->clientId, $command->requestUri);
+            $this->useUp($pushedRequest, $client);
 
-            return AuthorizationResponseDTO::denied($redirectUri);
+            return AuthorizationResponseDTO::denied($pushedRequest->getRedirectUri(), $pushedRequest->getState());
         }
 
-        $request = $this->validator->validate(
-            $command->userId,
-            $command->responseType,
-            $command->clientId,
-            $command->redirectUri,
-            $command->codeChallenge,
-            $command->codeChallengeMethod,
-            $command->scopes,
-        );
+        $request = $this->validator->validate($command->userId, $command->clientId, $command->requestUri);
+        $pushedRequest = $request->pushedRequest;
 
-        $code = AuthCode::create(
-            $request->user,
-            $request->client,
-            $request->redirectUri,
-            $request->codeChallenge,
-            $request->codeChallengeMethod,
-            $request->scopes,
-            $this->authCodeTtl,
-        );
-        $this->authCodeRepository->save($code);
+        $code = $this->transaction->run(function () use ($request, $pushedRequest): AuthCode {
+            $this->useUp($pushedRequest, $request->client);
+            $code = AuthCode::create(
+                $request->user,
+                $request->client,
+                $pushedRequest->getRedirectUri(),
+                $pushedRequest->getCodeChallenge(),
+                $pushedRequest->getCodeChallengeMethod(),
+                $pushedRequest->getDpopJkt(),
+                $pushedRequest->getScopes(),
+                $this->authCodeTtl,
+            );
+            $this->authCodeRepository->save($code);
 
-        return AuthorizationResponseDTO::code($request->redirectUri, $code->getCodeId()->toString());
+            return $code;
+        });
+
+        return AuthorizationResponseDTO::code($pushedRequest->getRedirectUri(), $pushedRequest->getState(), $code->getCodeId()->toString());
+    }
+
+    /** @throws OAuthProtocolException invalid_request_uri when another decision, or expiry, came first */
+    private function useUp(PushedAuthorizationRequest $pushedRequest, Client $client): void
+    {
+        if (!$this->pushedRequests->consume($pushedRequest->getRequestId(), $client->getId())) {
+            throw OAuthProtocolException::invalidRequestUri('The request_uri was already used or has expired.');
+        }
     }
 }

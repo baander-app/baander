@@ -29,7 +29,7 @@ use Symfony\Component\HttpFoundation\Response;
  * Token-minting entry points through the production firewall, with real PostgreSQL and Redis.
  *
  * Password login, passkey login and refresh mint first-party tokens; the authorization
- * code grant with PKCE and the device grant mint tokens for other clients under the same
+ * code grant from a pushed request with PKCE, and the device grant, mint tokens for other clients under the same
  * DPoP and fingerprint binding. Passkey login signs a real WebAuthn assertion with an
  * ES256 test authenticator.
  */
@@ -480,6 +480,8 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertSame('https://baander.app/api/oauth/token', $metadata['token_endpoint']);
         self::assertSame('https://baander.app/oauth/authorize', $metadata['authorization_endpoint'], 'The web app consent page.');
         self::assertSame('https://baander.app/api/oauth/device/authorize', $metadata['device_authorization_endpoint']);
+        self::assertSame('https://baander.app/api/oauth/par', $metadata['pushed_authorization_request_endpoint']);
+        self::assertTrue($metadata['require_pushed_authorization_requests']);
         self::assertSame(['S256'], $metadata['code_challenge_methods_supported']);
         self::assertContains('urn:ietf:params:oauth:grant-type:device_code', $metadata['grant_types_supported']);
     }
@@ -627,22 +629,21 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
     }
 
     /**
-     * Authorization code with mandatory S256 PKCE, through the production firewall: the web app's
-     * consent page checks the request, sends the approval and navigates to the returned URI.
+     * Authorization code with mandatory S256 PKCE from a pushed request, through the production
+     * firewall: the client pushes the request with a proof from its key, the web app's consent
+     * page looks it up, sends the approval and navigates to the returned URI, and the client
+     * exchanges the code with a proof from the same key.
      */
     public function testAuthorizationCodeGrantRequiresTheMatchingVerifier(): void
     {
         $clientId = $this->publicClient();
-        $verifier = rtrim(strtr(base64_encode(random_bytes(48)), '+/', '-_'), '=');
-        $challenge = rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '=');
+        [$verifier, $challenge] = self::pkcePair();
+        $app = new SignedDpopProof();
         $web = new SignedDpopProof();
         $login = $this->login($web);
-        $request = [
-            'response_type' => 'code', 'client_id' => $clientId, 'redirect_uri' => self::REDIRECT,
-            'scope' => 'library admin', 'state' => 'state-123', 'code_challenge' => $challenge, 'code_challenge_method' => 'S256',
-        ];
+        $requestUri = $this->push($clientId, $challenge, proof: $app);
 
-        $check = $this->asUser($login['accessToken'], $web, 'GET', '/api/oauth/authorize', query: $request);
+        $check = $this->asUser($login['accessToken'], $web, 'GET', '/api/oauth/authorize', query: ['client_id' => $clientId, 'request_uri' => $requestUri]);
         self::assertSame(200, $check->getStatusCode(), (string) $check->getContent());
         self::assertStringContainsString('no-store', (string) $check->headers->get('Cache-Control'));
         self::assertSame([
@@ -655,12 +656,11 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         ], json_decode((string) $check->getContent(), true, flags: JSON_THROW_ON_ERROR));
         self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM oauth_auth_codes WHERE user_id = ?', [$this->user->getId()->toString()]), 'Checking issues no code.');
 
-        $redirect = $this->decide($login['accessToken'], $web, [...$request, 'decision' => 'approve']);
+        $redirect = $this->decide($login['accessToken'], $web, ['client_id' => $clientId, 'request_uri' => $requestUri, 'decision' => 'approve']);
         self::assertSame('state-123', $redirect['state']);
         self::assertSame('https://baander.app', $redirect['iss']);
         self::assertArrayHasKey('code', $redirect);
 
-        $app = new SignedDpopProof();
         $exchange = ['grant_type' => 'authorization_code', 'client_id' => $clientId, 'code' => $redirect['code'], 'redirect_uri' => self::REDIRECT];
         [$missing, $nonce] = $this->tokenRequest($app, $this->nonce(), $exchange);
         self::assertSame(['invalid_grant', 400], [$missing['error'], $missing['status']]);
@@ -678,15 +678,78 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertSame('invalid_grant', $replay['error'], 'A code is redeemed once.');
     }
 
-    public function testDenialSendsAccessDeniedWithTheStateToTheClient(): void
+    /** RFC 9449 section 10.1: the dpop_jkt parameter alone binds the code to the key it names. */
+    public function testAPushWithOnlyTheDpopJktParameterBindsTheCodeToThatKey(): void
     {
+        $clientId = $this->publicClient();
+        [$verifier, $challenge] = self::pkcePair();
+        $app = new SignedDpopProof();
         $web = new SignedDpopProof();
         $login = $this->login($web);
+        $requestUri = $this->push($clientId, $challenge, dpopJkt: $app->thumbprint());
 
-        $redirect = $this->decide($login['accessToken'], $web, [
-            'decision' => 'deny', 'response_type' => 'code', 'client_id' => $this->publicClient(), 'redirect_uri' => self::REDIRECT,
-            'state' => 'denied-state', 'code_challenge' => str_repeat('c', 43), 'code_challenge_method' => 'S256',
+        $redirect = $this->decide($login['accessToken'], $web, ['client_id' => $clientId, 'request_uri' => $requestUri, 'decision' => 'approve']);
+        [$tokens] = $this->tokenRequest($app, $this->nonce(), [
+            'grant_type' => 'authorization_code', 'client_id' => $clientId, 'code' => $redirect['code'],
+            'redirect_uri' => self::REDIRECT, 'code_verifier' => $verifier,
         ]);
+
+        self::assertSame(200, $tokens['status'], json_encode($tokens, JSON_THROW_ON_ERROR));
+        self::assertSame(['jkt' => $app->thumbprint()], self::claims($tokens['access_token'])['cnf']);
+    }
+
+    public function testACodeExchangedWithAProofFromAnotherKeyIsRejected(): void
+    {
+        $clientId = $this->publicClient();
+        [$verifier, $challenge] = self::pkcePair();
+        $app = new SignedDpopProof();
+        $web = new SignedDpopProof();
+        $login = $this->login($web);
+        $requestUri = $this->push($clientId, $challenge, proof: $app);
+        $redirect = $this->decide($login['accessToken'], $web, ['client_id' => $clientId, 'request_uri' => $requestUri, 'decision' => 'approve']);
+        $exchange = [
+            'grant_type' => 'authorization_code', 'client_id' => $clientId, 'code' => $redirect['code'],
+            'redirect_uri' => self::REDIRECT, 'code_verifier' => $verifier,
+        ];
+
+        [$foreign, $nonce] = $this->tokenRequest(new SignedDpopProof(), $this->nonce(), $exchange);
+        self::assertSame(['invalid_grant', 400], [$foreign['error'], $foreign['status']]);
+
+        [$tokens] = $this->tokenRequest($app, $nonce, $exchange);
+        self::assertSame(200, $tokens['status'], 'The refused exchange left the code unredeemed for its key.');
+    }
+
+    public function testACodeExchangedAfterItsSixtySecondLifetimeIsRejected(): void
+    {
+        $clientId = $this->publicClient();
+        [$verifier, $challenge] = self::pkcePair();
+        $app = new SignedDpopProof();
+        $web = new SignedDpopProof();
+        $login = $this->login($web);
+        $requestUri = $this->push($clientId, $challenge, proof: $app);
+        $redirect = $this->decide($login['accessToken'], $web, ['client_id' => $clientId, 'request_uri' => $requestUri, 'decision' => 'approve']);
+        // The code was issued 61 seconds ago.
+        $this->connection->executeStatement(
+            "UPDATE oauth_auth_codes SET created_at = created_at - interval '61 seconds', expires_at = expires_at - interval '61 seconds' WHERE code_id = ?",
+            [$redirect['code']],
+        );
+
+        [$late] = $this->tokenRequest($app, $this->nonce(), [
+            'grant_type' => 'authorization_code', 'client_id' => $clientId, 'code' => $redirect['code'],
+            'redirect_uri' => self::REDIRECT, 'code_verifier' => $verifier,
+        ]);
+
+        self::assertSame(['invalid_grant', 400], [$late['error'], $late['status']]);
+    }
+
+    public function testDenialSendsAccessDeniedWithThePushedStateToTheClient(): void
+    {
+        $clientId = $this->publicClient();
+        $web = new SignedDpopProof();
+        $login = $this->login($web);
+        $requestUri = $this->push($clientId, self::pkcePair()[1], dpopJkt: (new SignedDpopProof())->thumbprint(), state: 'denied-state');
+
+        $redirect = $this->decide($login['accessToken'], $web, ['client_id' => $clientId, 'request_uri' => $requestUri, 'decision' => 'deny', 'state' => 'browser-state']);
 
         self::assertSame('access_denied', $redirect['error']);
         self::assertSame('denied-state', $redirect['state']);
@@ -695,46 +758,37 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM oauth_auth_codes WHERE user_id = ?', [$this->user->getId()->toString()]));
     }
 
-    public function testAuthorizationRejectsThePlainPkceMethodAtTheRedirectUri(): void
+    /** The plain PKCE method is refused at the push, where the client reads the error itself. */
+    public function testAPushWithThePlainPkceMethodIsRejected(): void
     {
-        $web = new SignedDpopProof();
-        $login = $this->login($web);
-        $request = [
-            'response_type' => 'code', 'client_id' => $this->publicClient(), 'redirect_uri' => self::REDIRECT,
-            'state' => 'plain-state', 'code_challenge' => str_repeat('p', 43), 'code_challenge_method' => 'plain',
-        ];
+        $response = $this->send('POST', '/api/oauth/par', form: [
+            ...$this->pushParameters($this->publicClient(), str_repeat('p', 43), 'plain-state'),
+            'code_challenge_method' => 'plain',
+            'dpop_jkt' => (new SignedDpopProof())->thumbprint(),
+        ]);
 
-        foreach ([['GET', $request, null], ['POST', null, [...$request, 'decision' => 'approve']]] as [$method, $query, $json]) {
-            $response = $this->asUser($login['accessToken'], $web, $method, '/api/oauth/authorize', json: $json, query: $query ?? []);
-            self::assertSame(400, $response->getStatusCode(), (string) $response->getContent());
-            self::assertFalse($response->headers->has('Location'));
-            $error = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
-            self::assertSame('invalid_request', $error['error']);
-            self::assertStringStartsWith(self::REDIRECT . '?', $error['redirect_uri']);
-            parse_str((string) parse_url($error['redirect_uri'], PHP_URL_QUERY), $redirect);
-            self::assertSame('invalid_request', $redirect['error']);
-            self::assertSame('plain-state', $redirect['state']);
-            self::assertSame('https://baander.app', $redirect['iss']);
-            self::assertArrayNotHasKey('code', $redirect);
-        }
+        self::assertSame(400, $response->getStatusCode(), (string) $response->getContent());
+        $error = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('invalid_request', $error['error']);
+        self::assertArrayNotHasKey('redirect_uri', $error);
     }
 
-    /** RFC 6749 section 4.1.2.1: an invalid client or redirect URI is shown, never redirected. */
-    public function testAnUnregisteredRedirectUriOrUnknownClientIsNeverRedirected(): void
+    /** RFC 6749 section 4.1.2.1: an invalid client or pushed request is shown, never redirected. */
+    public function testAnUnknownClientOrRequestUriIsNeverRedirected(): void
     {
         $web = new SignedDpopProof();
         $login = $this->login($web);
-        $request = [
-            'response_type' => 'code', 'client_id' => $this->publicClient(), 'redirect_uri' => 'https://evil.baander.app/callback',
-            'state' => 'evil', 'code_challenge' => str_repeat('c', 43), 'code_challenge_method' => 'S256',
-        ];
+        $clientId = $this->publicClient();
+        $requestUri = $this->push($clientId, self::pkcePair()[1], dpopJkt: (new SignedDpopProof())->thumbprint());
+        $unknown = 'urn:ietf:params:oauth:request_uri:' . str_repeat('u', 80);
 
-        foreach ([$request, [...$request, 'client_id' => 'unknown_client_000001', 'redirect_uri' => self::REDIRECT]] as $query) {
-            foreach ([['GET', null], ['POST', [...$query, 'decision' => 'approve']], ['POST', [...$query, 'decision' => 'deny']]] as [$method, $json]) {
-                $response = $this->asUser($login['accessToken'], $web, $method, '/api/oauth/authorize', json: $json, query: $method === 'GET' ? $query : []);
+        foreach ([['unknown_client_000001', $requestUri], [$clientId, $unknown]] as [$client, $uri]) {
+            foreach ([['GET', null], ['POST', ['client_id' => $client, 'request_uri' => $uri, 'decision' => 'approve']], ['POST', ['client_id' => $client, 'request_uri' => $uri, 'decision' => 'deny']]] as [$method, $json]) {
+                $query = $method === 'GET' ? ['client_id' => $client, 'request_uri' => $uri] : [];
+                $response = $this->asUser($login['accessToken'], $web, $method, '/api/oauth/authorize', json: $json, query: $query);
                 self::assertSame(400, $response->getStatusCode(), (string) $response->getContent());
                 $error = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
-                self::assertContains($error['error'], ['invalid_request', 'invalid_client']);
+                self::assertContains($error['error'], ['invalid_client', 'invalid_request_uri']);
                 self::assertArrayNotHasKey('redirect_uri', $error);
                 self::assertFalse($response->headers->has('Location'));
             }
@@ -744,8 +798,10 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
 
     public function testAuthorizationRequiresASignedInUser(): void
     {
-        self::assertSame(401, $this->send('GET', '/api/oauth/authorize', query: ['response_type' => 'code', 'client_id' => $this->publicClient()])->getStatusCode());
-        self::assertSame(401, $this->send('POST', '/api/oauth/authorize', json: ['decision' => 'approve', 'client_id' => $this->publicClient()])->getStatusCode());
+        $reference = ['client_id' => $this->publicClient(), 'request_uri' => 'urn:ietf:params:oauth:request_uri:' . str_repeat('s', 80)];
+
+        self::assertSame(401, $this->send('GET', '/api/oauth/authorize', query: $reference)->getStatusCode());
+        self::assertSame(401, $this->send('POST', '/api/oauth/authorize', json: [...$reference, 'decision' => 'approve'])->getStatusCode());
     }
 
     public function testDeviceAuthorizationErrorsAreOAuthErrors(): void
@@ -773,6 +829,44 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertSame('denied', json_decode((string) $denial->getContent(), true, flags: JSON_THROW_ON_ERROR)['data']['decision']);
         $decided = $this->asUser($login['accessToken'], $web, 'GET', '/api/oauth/device/verify', query: ['user_code' => $codes['user_code']]);
         self::assertSame('device_already_processed', json_decode((string) $decided->getContent(), true, flags: JSON_THROW_ON_ERROR)['error']['details']['reason']);
+    }
+
+    /** @return array{string, string} a PKCE code verifier and its S256 challenge */
+    private static function pkcePair(): array
+    {
+        $verifier = rtrim(strtr(base64_encode(random_bytes(48)), '+/', '-_'), '=');
+
+        return [$verifier, rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '=')];
+    }
+
+    /** @return array<string, string> */
+    private function pushParameters(string $clientId, string $challenge, string $state): array
+    {
+        return [
+            'response_type' => 'code', 'client_id' => $clientId, 'redirect_uri' => self::REDIRECT,
+            'scope' => 'library admin', 'state' => $state, 'code_challenge' => $challenge, 'code_challenge_method' => 'S256',
+        ];
+    }
+
+    /**
+     * Pushes an authorization request bound to a key through a nonce-bearing proof, the dpop_jkt
+     * parameter, or both, and answers its request URI.
+     */
+    private function push(string $clientId, string $challenge, ?SignedDpopProof $proof = null, ?string $dpopJkt = null, string $state = 'state-123'): string
+    {
+        $form = $this->pushParameters($clientId, $challenge, $state);
+        if ($dpopJkt !== null) {
+            $form['dpop_jkt'] = $dpopJkt;
+        }
+        $headers = $proof === null ? [] : ['DPoP' => $proof->createWithNonce('POST', self::ORIGIN . '/api/oauth/par', $this->nonce())];
+        $response = $this->send('POST', '/api/oauth/par', form: $form, headers: $headers);
+        self::assertSame(201, $response->getStatusCode(), (string) $response->getContent());
+        self::assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+        self::assertSame($proof !== null, $response->headers->has('DPoP-Nonce'), 'A verified proof earns the next nonce.');
+        $answer = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(300, $answer['expires_in']);
+
+        return $answer['request_uri'];
     }
 
     /**

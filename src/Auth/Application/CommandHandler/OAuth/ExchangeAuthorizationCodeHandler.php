@@ -20,7 +20,8 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * The authorization code grant (RFC 6749 section 4.1.3) with mandatory PKCE (RFC 7636).
  *
  * The code must belong to the authenticated client, be unexpired and unused, have
- * been issued for the same redirect URI, and match the code verifier. It is
+ * been issued for the same redirect URI, match the code verifier, and be redeemed
+ * with a DPoP proof from the key it is bound to (RFC 9449 section 10). It is
  * redeemed in the transaction that stores the new DPoP-bound token pair, so
  * concurrent redemptions yield one pair.
  */
@@ -47,6 +48,9 @@ final readonly class ExchangeAuthorizationCodeHandler
 
         if (!$authCode->matchesCodeVerifier($command->codeVerifier)) {
             throw OAuthProtocolException::invalidGrant('The code_verifier does not match the code challenge.');
+        }
+        if (!$authCode->isBoundTo($command->dpopJkt)) {
+            throw OAuthProtocolException::invalidGrant('The DPoP proof is not signed by the key the authorization code is bound to.');
         }
 
         $user = $authCode->getUser();

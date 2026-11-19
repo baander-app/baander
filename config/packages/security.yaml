@@ -42,7 +42,7 @@ security:
         - { path: '^/api/debug', roles: ROLE_ADMIN }
         - { path: '^/api/auth/', roles: PUBLIC_ACCESS }
         # OAuth clients call these without a user token; the device client or the DPoP-bound grant identifies them.
-        - { path: '^/api/oauth/(token|device/authorize)$', roles: PUBLIC_ACCESS, methods: [POST] }
+        - { path: '^/api/oauth/(token|par|device/authorize)$', roles: PUBLIC_ACCESS, methods: [POST] }
         - { path: '^/api/discovery/register$', roles: ROLE_ADMIN, methods: [POST] }
         - { path: '^/api/discovery/', roles: IS_AUTHENTICATED_FULLY }
         - { path: '^/api/stream/(video|original/track)$', roles: PUBLIC_ACCESS, methods: [GET, HEAD] }

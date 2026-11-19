@@ -134,6 +134,14 @@ final class AuthCodeTest extends TestCase
         $this->assertFalse($code->isIssuedFor(self::REDIRECT . '/other'));
     }
 
+    public function testTheCodeIsBoundToItsDpopKey(): void
+    {
+        $code = $this->code();
+
+        $this->assertTrue($code->isBoundTo(self::THUMBPRINT));
+        $this->assertFalse($code->isBoundTo('0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I'));
+    }
+
     public function testRevoke(): void
     {
         $code = $this->code();
@@ -181,6 +189,6 @@ final class AuthCodeTest extends TestCase
     /** @param Scope[] $scopes */
     private function code(array $scopes = [], ?DateInterval $ttl = null): AuthCode
     {
-        return AuthCode::create($this->user, $this->client, self::REDIRECT, self::CHALLENGE, 'S256', $scopes, $ttl, self::THUMBPRINT);
+        return AuthCode::create($this->user, $this->client, self::REDIRECT, self::CHALLENGE, 'S256', self::THUMBPRINT, $scopes, $ttl);
     }
 }

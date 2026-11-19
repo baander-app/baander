@@ -183,15 +183,21 @@ final class CorsConfigurationTest extends TestCase
             ->headers->get('Access-Control-Allow-Origin'));
     }
 
-    /** Third-party and device clients reach the token and device authorization endpoints from any origin. */
-    public function testTokenAndDeviceAuthorizationAllowAnyOrigin(): void
+    /**
+     * Third-party and device clients reach the token, pushed authorization request and device
+     * authorization endpoints from any origin, send a DPoP proof and read the next nonce.
+     */
+    public function testTokenPushedRequestAndDeviceAuthorizationAllowAnyOrigin(): void
     {
         $origin = 'https://tv.baander.app';
-        foreach (['/api/oauth/token', '/api/oauth/device/authorize'] as $path) {
+        foreach (['/api/oauth/token', '/api/oauth/par', '/api/oauth/device/authorize'] as $path) {
             $preflight = $this->preflight($path, 'POST', 'Content-Type, DPoP', $origin);
             self::assertSame(200, $preflight->getStatusCode(), $path);
             self::assertNotNull($preflight->headers->get('Access-Control-Allow-Origin'), $path);
-            self::assertSame($origin, $this->actual($path, $origin, new Response())->headers->get('Access-Control-Allow-Origin'), $path);
+            self::assertStringContainsStringIgnoringCase('DPoP', (string) $preflight->headers->get('Access-Control-Allow-Headers'), $path);
+            $actual = $this->actual($path, $origin, new Response());
+            self::assertSame($origin, $actual->headers->get('Access-Control-Allow-Origin'), $path);
+            self::assertStringContainsStringIgnoringCase('DPoP-Nonce', (string) $actual->headers->get('Access-Control-Expose-Headers'), $path);
         }
     }
 

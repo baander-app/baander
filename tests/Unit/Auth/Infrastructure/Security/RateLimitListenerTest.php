@@ -32,6 +32,8 @@ final class RateLimitListenerTest extends TestCase
     private RateLimiterFactoryInterface&MockObject $emailVerificationIpLimiter;
     private RateLimiterFactoryInterface&MockObject $oauthTokenIpLimiter;
     private RateLimiterFactoryInterface&MockObject $oauthTokenClientLimiter;
+    private RateLimiterFactoryInterface&MockObject $oauthParIpLimiter;
+    private RateLimiterFactoryInterface&MockObject $oauthParClientLimiter;
     private RateLimiterFactoryInterface&MockObject $oauthAuthorizeIpLimiter;
     private RateLimiterFactoryInterface&MockObject $oauthDeviceAuthorizeIpLimiter;
     private RateLimiterFactoryInterface&MockObject $oauthDeviceVerifyIpLimiter;
@@ -53,6 +55,8 @@ final class RateLimitListenerTest extends TestCase
         $this->emailVerificationIpLimiter = $this->createMock(RateLimiterFactoryInterface::class);
         $this->oauthTokenIpLimiter = $this->createMock(RateLimiterFactoryInterface::class);
         $this->oauthTokenClientLimiter = $this->createMock(RateLimiterFactoryInterface::class);
+        $this->oauthParIpLimiter = $this->createMock(RateLimiterFactoryInterface::class);
+        $this->oauthParClientLimiter = $this->createMock(RateLimiterFactoryInterface::class);
         $this->oauthAuthorizeIpLimiter = $this->createMock(RateLimiterFactoryInterface::class);
         $this->oauthDeviceAuthorizeIpLimiter = $this->createMock(RateLimiterFactoryInterface::class);
         $this->oauthDeviceVerifyIpLimiter = $this->createMock(RateLimiterFactoryInterface::class);
@@ -68,6 +72,8 @@ final class RateLimitListenerTest extends TestCase
             authEmailVerificationIpLimiter: $this->emailVerificationIpLimiter,
             oauthTokenIpLimiter: $this->oauthTokenIpLimiter,
             oauthTokenClientLimiter: $this->oauthTokenClientLimiter,
+            oauthParIpLimiter: $this->oauthParIpLimiter,
+            oauthParClientLimiter: $this->oauthParClientLimiter,
             oauthAuthorizeIpLimiter: $this->oauthAuthorizeIpLimiter,
             oauthDeviceAuthorizeIpLimiter: $this->oauthDeviceAuthorizeIpLimiter,
             oauthDeviceVerifyIpLimiter: $this->oauthDeviceVerifyIpLimiter,
@@ -413,6 +419,19 @@ final class RateLimitListenerTest extends TestCase
 
         $this->oauthTokenIpLimiter->method('create')->willReturn($this->createAcceptedLimit());
         $this->oauthTokenClientLimiter->expects($this->never())->method('create');
+
+        $this->listener->onKernelRequest($this->createRequestEvent($request));
+    }
+
+    public function testPushedAuthorizationRequestsAreLimitedPerIpAndPerClient(): void
+    {
+        $request = Request::create('/api/oauth/par', 'POST', ['client_id' => 'tv_client_000000000001'], server: ['REMOTE_ADDR' => '10.0.0.10']);
+
+        $this->oauthParIpLimiter->expects($this->once())->method('create')->with('10.0.0.10')->willReturn($this->createAcceptedLimit());
+        $this->oauthParClientLimiter->expects($this->once())->method('create')->with('tv_client_000000000001')->willReturn($this->createRejectedLimit(30));
+        $this->oauthTokenClientLimiter->expects($this->never())->method('create');
+
+        $this->expectException(TooManyRequestsHttpException::class);
 
         $this->listener->onKernelRequest($this->createRequestEvent($request));
     }

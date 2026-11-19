@@ -22,14 +22,16 @@ use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 
 /**
- * The OAuth token endpoint's proof listener while the DPoP store is unavailable.
+ * The proof listener of the OAuth token and pushed authorization request endpoints.
  *
- * The outage answers 503 with Retry-After and no nonce before any grant runs; a
- * genuine nonce miss keeps its use_dpop_nonce challenge with a fresh nonce.
+ * The token endpoint requires a proof; the pushed authorization request endpoint checks one
+ * when the client sends it. A store outage answers 503 with Retry-After and no nonce before
+ * any grant runs; a genuine nonce miss keeps its use_dpop_nonce challenge with a fresh nonce.
  */
 final class TokenEndpointDpopListenerTest extends TestCase
 {
     private const string URI = 'https://baander.app/api/oauth/token';
+    private const string PAR_URI = 'https://baander.app/api/oauth/par';
 
     private Redis&Stub $redis;
     private TokenEndpointDpopListener $listener;
@@ -110,6 +112,55 @@ final class TokenEndpointDpopListenerTest extends TestCase
         self::assertNotSame('', $proof->nextNonce);
     }
 
+    public function testAPushedRequestWithoutAProofHeaderPassesWithoutAVerifiedProof(): void
+    {
+        $event = $this->request(null, self::PAR_URI, TokenEndpointDpopListener::PAR_ROUTE);
+        $this->listener->onKernelRequest($event);
+
+        self::assertNull($event->getResponse(), 'The pushed request may bind its key through dpop_jkt instead.');
+        self::assertFalse($event->getRequest()->attributes->has(VerifiedDpopProof::class));
+    }
+
+    public function testAPushedRequestWithAProofGetsTheTokenEndpointsCheck(): void
+    {
+        $this->redis->method('getDel')->willReturn('1');
+        $this->redis->method('setex')->willReturn(true);
+        $key = new SignedDpopProof();
+
+        $event = $this->request($key->createWithNonce('POST', self::PAR_URI, 'issued-nonce'), self::PAR_URI, TokenEndpointDpopListener::PAR_ROUTE);
+        $this->listener->onKernelRequest($event);
+
+        self::assertNull($event->getResponse());
+        $proof = $event->getRequest()->attributes->get(VerifiedDpopProof::class);
+        self::assertInstanceOf(VerifiedDpopProof::class, $proof);
+        self::assertSame($key->thumbprint(), $proof->jkt);
+    }
+
+    public function testAPushedRequestWithAProofWithoutANonceIsChallenged(): void
+    {
+        $this->redis->method('setex')->willReturn(true);
+
+        $event = $this->request((new SignedDpopProof())->create('POST', self::PAR_URI, 'no-access-token'), self::PAR_URI, TokenEndpointDpopListener::PAR_ROUTE);
+        $this->listener->onKernelRequest($event);
+
+        $response = $event->getResponse();
+        self::assertNotNull($response);
+        self::assertSame('use_dpop_nonce', json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR)['error']);
+        self::assertIsString($response->headers->get('DPoP-Nonce'));
+    }
+
+    public function testATokenRequestWithoutAProofHeaderIsRefused(): void
+    {
+        $this->redis->method('setex')->willReturn(true);
+
+        $event = $this->request(null);
+        $this->listener->onKernelRequest($event);
+
+        $response = $event->getResponse();
+        self::assertNotNull($response);
+        self::assertSame('invalid_dpop_proof', json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR)['error']);
+    }
+
     private static function assertStoreUnavailable(RequestEvent $event): void
     {
         $response = $event->getResponse();
@@ -125,11 +176,13 @@ final class TokenEndpointDpopListenerTest extends TestCase
         self::assertFalse($event->getRequest()->attributes->has(VerifiedDpopProof::class));
     }
 
-    private function request(string $proof): RequestEvent
+    private function request(?string $proof, string $uri = self::URI, string $route = TokenEndpointDpopListener::TOKEN_ROUTE): RequestEvent
     {
-        $request = Request::create(self::URI, 'POST', ['grant_type' => 'refresh_token', 'client_id' => 'client'], server: ['REMOTE_ADDR' => '10.0.0.7']);
-        $request->attributes->set('_route', TokenEndpointDpopListener::ROUTE);
-        $request->headers->set('DPoP', $proof);
+        $request = Request::create($uri, 'POST', ['grant_type' => 'refresh_token', 'client_id' => 'client'], server: ['REMOTE_ADDR' => '10.0.0.7']);
+        $request->attributes->set('_route', $route);
+        if ($proof !== null) {
+            $request->headers->set('DPoP', $proof);
+        }
 
         return new RequestEvent($this->createStub(HttpKernelInterface::class), $request, HttpKernelInterface::MAIN_REQUEST);
     }
