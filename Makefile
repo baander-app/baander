@@ -33,6 +33,11 @@ typephp-build: typephp-check-dependencies ## Package the console and operator in
 	mkdir -p var/typephp/cache
 	docker run --rm --workdir /var/www/html --volume "$(CURDIR):/var/www/html:ro,z" --volume "$(CURDIR)/var/typephp:/var/www/html/var/typephp:z" --volume "$(CURDIR)/var/typephp/cache:/home/typephp/.typephp:z" "$(TYPEPHP_IMAGE)" tools/typephp/application.yml --no-progress --no-color --job "$(TYPEPHP_JOBS)"
 
+.PHONY: typephp-test-process-cache
+typephp-test-process-cache: ## Check embedded class and callable caches across fork
+	mkdir -p var/typephp/cache
+	docker run --rm --network none --entrypoint php --workdir /var/www/html --volume "$(CURDIR):/var/www/html:ro,z" --volume "$(CURDIR)/var/typephp:/var/www/html/var/typephp:z" --volume "$(CURDIR)/var/typephp/cache:/home/typephp/.typephp:z" "$(TYPEPHP_IMAGE)" tools/typephp/tests/process-cache/build.php "$(TYPEPHP_JOBS)"
+
 .PHONY: typephp-qualification-image
 typephp-qualification-image: ## Build the candidate image for existing runtime qualification runners
 	docker build --file docker/typephp/qualification.Dockerfile --build-arg QUALIFICATION_BASE="$(TYPEPHP_QUALIFICATION_BASE)" --build-context typephp-artifacts=var/typephp --tag "$(TYPEPHP_QUALIFICATION_IMAGE)" .
