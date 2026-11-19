@@ -46,11 +46,12 @@ final class OAuthClientListCommand extends Command
             $input,
             $io,
             AdminOAuthClientResource::collection($clients),
-            ['Client ID', 'Name', 'Type', 'Redirect URIs', 'Revoked', 'Created'],
+            ['Client ID', 'Name', 'Type', 'Authentication', 'Redirect URIs', 'Revoked', 'Created'],
             static fn (array $client): array => [
                 $client['clientId'],
                 $client['name'],
                 $client['type'],
+                $client['authMethod'],
                 $client['redirectUris'] === [] ? '-' : implode("\n", $client['redirectUris']),
                 AdminCommandSupport::yesNo($client['revoked']),
                 $client['createdAt'],

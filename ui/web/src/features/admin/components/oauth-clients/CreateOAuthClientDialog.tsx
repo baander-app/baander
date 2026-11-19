@@ -18,11 +18,17 @@ import { parseApiError } from '@/features/auth/lib/parse-api-error'
 import { useCreateOAuthClient } from '../../hooks/use-oauth-clients'
 import { ClientSecretReveal } from './ClientSecretReveal'
 import {
+  AUTH_METHOD_LABELS,
   CLIENT_TYPE_LABELS,
+  CONFIDENTIAL_AUTH_METHODS,
   CREATABLE_CLIENT_TYPES,
+  type ConfidentialAuthMethod,
   type CreatableClientType,
+  isConfidentialAuthMethod,
   isCreatableClientType,
 } from './client-type-labels'
+import { KeySourceFields } from './KeySourceFields'
+import { keySourcePayload, type KeySourceKind, type KeySourcePayload } from './key-source-rules'
 import { parseRedirectUris, redirectUrisProblem } from './redirect-uri-rules'
 
 const Form = styled.form`
@@ -59,7 +65,12 @@ const MonoTextarea = styled(Textarea)`
 const TYPE_HINTS: Record<CreatableClientType, string> = {
   device: 'For devices without a browser, such as TV apps. Uses the device flow; no redirect URI.',
   public: 'For apps that cannot keep a secret, such as mobile and desktop apps. Uses PKCE.',
-  confidential: 'For server-side apps. Gets a client secret, shown once.',
+  confidential: 'For server-side apps. Authenticates with a client secret, shown once, or with its own signing keys.',
+}
+
+const AUTH_METHOD_HINTS: Record<ConfidentialAuthMethod, string> = {
+  client_secret_post: 'Bånder generates a secret and shows it once.',
+  private_key_jwt: 'The app signs each request with its private key; Bånder keeps only the public keys. Fixed once the client exists.',
 }
 
 function needsRedirectUris(type: CreatableClientType): boolean {
@@ -75,6 +86,9 @@ export function CreateOAuthClientDialog({ open, onOpenChange }: CreateOAuthClien
   const [name, setName] = useState('')
   const [type, setType] = useState<CreatableClientType>('public')
   const [redirectText, setRedirectText] = useState('')
+  const [authMethod, setAuthMethod] = useState<ConfidentialAuthMethod>('client_secret_post')
+  const [keyKind, setKeyKind] = useState<KeySourceKind>('jwksUri')
+  const [keyValue, setKeyValue] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
   const createClient = useCreateOAuthClient()
   const { reset: resetSecret } = createClient
@@ -90,6 +104,9 @@ export function CreateOAuthClientDialog({ open, onOpenChange }: CreateOAuthClien
     setName('')
     setType('public')
     setRedirectText('')
+    setAuthMethod('client_secret_post')
+    setKeyKind('jwksUri')
+    setKeyValue('')
     setFormError(null)
     // Drops the answer, and with it the secret; it is never shown again.
     createClient.reset()
@@ -118,12 +135,24 @@ export function CreateOAuthClientDialog({ open, onOpenChange }: CreateOAuthClien
       }
     }
 
+    const usesKeys = type === 'confidential' && authMethod === 'private_key_jwt'
+    let keys: KeySourcePayload | null = null
+    if (usesKeys) {
+      const keySource = keySourcePayload(keyKind, keyValue)
+      if (keySource.payload === null) {
+        setFormError(keySource.problem)
+        return
+      }
+      keys = keySource.payload
+    }
+
     const stamp = captureOwnership()
     try {
       const result = await createClient.mutateAsync({
         name: name.trim(),
         type,
         ...(needsRedirectUris(type) ? { redirectUris } : {}),
+        ...(keys !== null ? { authMethod: 'private_key_jwt', ...keys } : {}),
       })
       if (!isCurrentOwnership(stamp)) return
       if (result.clientSecret === null) close()
@@ -197,6 +226,36 @@ export function CreateOAuthClientDialog({ open, onOpenChange }: CreateOAuthClien
                     matches), or a private-use scheme such as app.baander.tv:/callback.
                   </Hint>
                 </FieldGroup>
+              )}
+              {type === 'confidential' && (
+                <FieldGroup>
+                  <Label id="oauth-client-auth-method-label">Authentication</Label>
+                  <Select value={authMethod} onValueChange={(value) => {
+                    if (isConfidentialAuthMethod(value)) setAuthMethod(value)
+                  }}>
+                    <SelectTrigger aria-labelledby="oauth-client-auth-method-label">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CONFIDENTIAL_AUTH_METHODS.map((option) => (
+                        <SelectItem key={option} value={option}>{AUTH_METHOD_LABELS[option]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Hint>{AUTH_METHOD_HINTS[authMethod]}</Hint>
+                </FieldGroup>
+              )}
+              {type === 'confidential' && authMethod === 'private_key_jwt' && (
+                <KeySourceFields
+                  idPrefix="oauth-client"
+                  kind={keyKind}
+                  value={keyValue}
+                  onKindChange={(next) => {
+                    setKeyKind(next)
+                    setKeyValue('')
+                  }}
+                  onValueChange={setKeyValue}
+                />
               )}
               {formError !== null && <ErrorText role="alert">{formError}</ErrorText>}
               <DialogFooter>

@@ -17,9 +17,4 @@ final class ClientNotFoundException extends RuntimeException
     {
         return new self('Client not found.');
     }
-
-    public static function forPublicId(string $publicId): self
-    {
-        return new self(sprintf('No OAuth client has the ID "%s".', $publicId));
-    }
 }

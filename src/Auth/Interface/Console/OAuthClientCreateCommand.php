@@ -35,7 +35,9 @@ final class OAuthClientCreateCommand extends Command
         $this
             ->addArgument('name', InputArgument::REQUIRED, 'Name the user sees when approving the client')
             ->addOption('type', 't', InputOption::VALUE_REQUIRED, 'device, public or confidential')
-            ->addOption('redirect-uri', 'r', InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Redirect URI of a public or confidential client (repeatable)');
+            ->addOption('redirect-uri', 'r', InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Redirect URI of a public or confidential client (repeatable)')
+            ->addOption('auth-method', null, InputOption::VALUE_REQUIRED, 'How a confidential client authenticates: client_secret_post (default) or private_key_jwt');
+        OAuthClientMessageDispatcher::addKeySourceOptions($this);
         AdminCommandSupport::addJsonOption($this);
     }
 
@@ -53,10 +55,14 @@ final class OAuthClientCreateCommand extends Command
         $redirectUris = array_values((array) $input->getOption('redirect-uri'));
 
         try {
+            [$jwks, $jwksUri] = OAuthClientMessageDispatcher::keySource($input);
             $registered = $this->dispatcher->dispatch(new RegisterClientCommand(
                 name: (string) $input->getArgument('name'),
                 type: $type,
                 redirectUris: $redirectUris,
+                authMethod: AdminCommandSupport::stringOption($input, 'auth-method'),
+                jwks: $jwks,
+                jwksUri: $jwksUri,
             ));
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);

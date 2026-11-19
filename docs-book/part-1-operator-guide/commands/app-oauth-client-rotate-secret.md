@@ -1,6 +1,6 @@
 # app:oauth:client:rotate-secret
 
-Give a confidential OAuth client a new secret. Use it when a secret was lost or may have leaked. The command does what `POST /api/admin/oauth/clients/{clientId}/rotate-secret` does in the admin API.
+Give an OAuth client that authenticates with a secret (`client_secret_post`) a new one. Use it when a secret was lost or may have leaked. The command does what `POST /api/admin/oauth/clients/{clientId}/rotate-secret` does in the admin API.
 
 ## Quick start
 
@@ -31,11 +31,11 @@ The new secret replaces the old one at once: from then on the old secret no long
 
 The command prints the client and its new secret, followed by a warning to store the secret now. Baander keeps only a SHA-256 digest and cannot show the secret again.
 
-With `--json` the command prints only the client as the API's `data` object, the same resource `POST /api/admin/oauth/clients/{clientId}/rotate-secret` returns: `clientId`, `name`, `type`, `redirectUris`, `revoked`, `createdAt`, `updatedAt` and the new `clientSecret`. The JSON is the only copy of the secret, so store it before the output is discarded.
+With `--json` the command prints only the client as the API's `data` object, the same resource `POST /api/admin/oauth/clients/{clientId}/rotate-secret` returns: `clientId`, `name`, `type`, `authMethod`, `jwksUri`, `redirectUris`, `revoked`, `createdAt`, `updatedAt` and the new `clientSecret`. The JSON is the only copy of the secret, so store it before the output is discarded.
 
-Only confidential clients have a secret. The command refuses:
+Only confidential clients registered with `client_secret_post` have a secret. The command refuses:
 
-- device and public clients, which have no secret;
+- device and public clients, and `private_key_jwt` clients, which have no secret; replace a key client's keys with [app:oauth:client:replace-keys](app-oauth-client-replace-keys.md) instead;
 - revoked clients;
 - the first-party client and personal access clients, which administrators do not manage.
 

@@ -32,6 +32,8 @@ const SPA: AdminOAuthClientResource = {
   clientId: '01920000-0000-7000-8000-000000000001',
   name: 'Bånder Web',
   type: 'first_party',
+  authMethod: 'none',
+  jwksUri: null,
   redirectUris: ['https://baander.app/'],
   revoked: false,
   createdAt: '2026-10-01T09:00:00+00:00',
@@ -42,6 +44,8 @@ const SYNC: AdminOAuthClientResource = {
   clientId: '01920000-0000-7000-8000-000000000002',
   name: 'Bånder Sync',
   type: 'confidential',
+  authMethod: 'client_secret_post',
+  jwksUri: null,
   redirectUris: ['https://sync.baander.app/callback'],
   revoked: false,
   createdAt: '2026-10-02T09:00:00+00:00',
@@ -52,6 +56,8 @@ const TV: AdminOAuthClientResource = {
   clientId: '01920000-0000-7000-8000-000000000003',
   name: 'Bånder TV',
   type: 'device',
+  authMethod: 'none',
+  jwksUri: null,
   redirectUris: [],
   revoked: false,
   createdAt: '2026-10-03T09:00:00+00:00',
@@ -62,10 +68,35 @@ const OLD: AdminOAuthClientResource = {
   clientId: '01920000-0000-7000-8000-000000000004',
   name: 'Old Sync',
   type: 'confidential',
+  authMethod: 'client_secret_post',
+  jwksUri: null,
   redirectUris: ['https://old.baander.app/callback'],
   revoked: true,
   createdAt: '2026-09-01T09:00:00+00:00',
   updatedAt: '2026-09-01T09:00:00+00:00',
+}
+
+const SIGNER: AdminOAuthClientResource = {
+  clientId: '01920000-0000-7000-8000-000000000006',
+  name: 'Bånder Signer',
+  type: 'confidential',
+  authMethod: 'private_key_jwt',
+  jwksUri: 'https://signer.baander.app/jwks.json',
+  redirectUris: ['https://signer.baander.app/callback'],
+  revoked: false,
+  createdAt: '2026-10-04T09:00:00+00:00',
+  updatedAt: '2026-10-04T09:00:00+00:00',
+}
+
+const OLD_SIGNER: AdminOAuthClientResource = {
+  ...SIGNER,
+  clientId: '01920000-0000-7000-8000-000000000007',
+  name: 'Old Signer',
+  revoked: true,
+}
+
+const SIGNER_JWKS = {
+  keys: [{ kty: 'EC', crv: 'P-256', kid: 'signer-2', x: 'WKn-ZIGevcwGIyyrzFoZNBdaq9_TsqzGl96oc0CWuis', y: 'y77t-RvAHRKTsSGdIYUfweuOvwrvDD-Q3Hv5J0fSKbE' }],
 }
 
 let clients: AdminOAuthClientResource[]
@@ -89,7 +120,7 @@ function row(name: string) {
 describe('OAuthClientsPage', () => {
   beforeEach(() => {
     authState.roles = ['ROLE_ADMIN']
-    clients = [SPA, SYNC, TV, OLD]
+    clients = [SPA, SYNC, TV, OLD, SIGNER, OLD_SIGNER]
     mockRequest.mockReset()
     post = () => { throw new Error('Unexpected POST') }
     mockRequest.mockImplementation(async (url: string, options: RequestInit) => {
@@ -134,6 +165,113 @@ describe('OAuthClientsPage', () => {
     expect(within(row('Bånder TV')).getByRole('button', { name: 'Revoke' })).toBeInTheDocument()
     expect(within(row('Bånder Web')).queryByRole('button')).not.toBeInTheDocument()
     expect(within(row('Old Sync')).queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('offers key replacement only for active key clients and rotation only for secret clients', async () => {
+    authState.roles = ['ROLE_SUPER_ADMIN']
+    mount()
+
+    await screen.findByText('Bånder Signer')
+    expect(within(row('Bånder Signer')).getByText('Signing keys')).toBeInTheDocument()
+    expect(within(row('Bånder Sync')).getByText('Client secret')).toBeInTheDocument()
+    expect(within(row('Bånder Signer')).getByRole('button', { name: 'Replace keys' })).toBeInTheDocument()
+    expect(within(row('Bånder Signer')).queryByRole('button', { name: 'Rotate secret' })).not.toBeInTheDocument()
+    expect(within(row('Bånder Sync')).queryByRole('button', { name: 'Replace keys' })).not.toBeInTheDocument()
+    expect(within(row('Bånder TV')).queryByRole('button', { name: 'Replace keys' })).not.toBeInTheDocument()
+    expect(within(row('Old Signer')).queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('registers a key client with a jwks_uri and lists its method', async () => {
+    authState.roles = ['ROLE_SUPER_ADMIN']
+    const created: AdminOAuthClientResource = {
+      ...SIGNER,
+      clientId: '01920000-0000-7000-8000-000000000008',
+      name: 'Bånder Relay',
+      jwksUri: 'https://relay.baander.app/jwks.json',
+      redirectUris: ['https://relay.baander.app/callback'],
+    }
+    post = () => {
+      clients = [...clients, created]
+      return { data: { ...created, clientSecret: null } }
+    }
+    mount()
+    await screen.findByText('Bånder Sync')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /Create client/ }))
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByLabelText('Name'), 'Bånder Relay')
+    await user.click(within(dialog).getByRole('combobox', { name: 'Type' }))
+    await user.click(await screen.findByRole('option', { name: 'Confidential' }))
+    await user.click(within(dialog).getByLabelText('Redirect URIs'))
+    await user.paste('https://relay.baander.app/callback')
+    await user.click(within(dialog).getByRole('combobox', { name: 'Authentication' }))
+    await user.click(await screen.findByRole('option', { name: 'Signing keys' }))
+    await user.click(within(dialog).getByLabelText('Key set URL'))
+    await user.paste('https://relay.baander.app/jwks.json')
+    await user.click(within(dialog).getByRole('button', { name: 'Create' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(JSON.parse(String(postCalls()[0][1].body))).toEqual({
+      name: 'Bånder Relay',
+      type: 'confidential',
+      redirectUris: ['https://relay.baander.app/callback'],
+      authMethod: 'private_key_jwt',
+      jwksUri: 'https://relay.baander.app/jwks.json',
+    })
+    expect(within(await screen.findByRole('row', { name: 'Bånder Relay' })).getByText('Signing keys')).toBeInTheDocument()
+  })
+
+  it('checks a key client\'s key source before sending it', async () => {
+    authState.roles = ['ROLE_SUPER_ADMIN']
+    mount()
+    await screen.findByText('Bånder Sync')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /Create client/ }))
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByLabelText('Name'), 'Bånder Relay')
+    await user.click(within(dialog).getByRole('combobox', { name: 'Type' }))
+    await user.click(await screen.findByRole('option', { name: 'Confidential' }))
+    await user.click(within(dialog).getByLabelText('Redirect URIs'))
+    await user.paste('https://relay.baander.app/callback')
+    await user.click(within(dialog).getByRole('combobox', { name: 'Authentication' }))
+    await user.click(await screen.findByRole('option', { name: 'Signing keys' }))
+    await user.click(within(dialog).getByLabelText('Key set URL'))
+    await user.paste('http://relay.baander.app/jwks.json')
+    await user.click(within(dialog).getByRole('button', { name: 'Create' }))
+
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Use an https URL on the default port')
+    expect(postCalls()).toHaveLength(0)
+  })
+
+  it('replaces a key client\'s keys with an inline key set', async () => {
+    authState.roles = ['ROLE_SUPER_ADMIN']
+    post = () => ({ data: { ...SIGNER, jwksUri: null } })
+    mount()
+    await screen.findByText('Bånder Signer')
+
+    const user = userEvent.setup()
+    await user.click(within(row('Bånder Signer')).getByRole('button', { name: 'Replace keys' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(/Assertions signed with the current keys stop working at once/)).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('combobox', { name: 'Key source' }))
+    await user.click(await screen.findByRole('option', { name: 'Inline key set' }))
+
+    const keySet = within(dialog).getByLabelText('Key set (JWKS)')
+    await user.type(keySet, 'not json')
+    await user.click(within(dialog).getByRole('button', { name: 'Replace keys' }))
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('The key set must be a JSON object with a "keys" list.')
+    expect(postCalls()).toHaveLength(0)
+
+    await user.clear(keySet)
+    await user.click(keySet)
+    await user.paste(JSON.stringify(SIGNER_JWKS))
+    await user.click(within(dialog).getByRole('button', { name: 'Replace keys' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(postCalls().map(([url]) => url)).toEqual([`/api/admin/oauth/clients/${SIGNER.clientId}/keys`])
+    expect(JSON.parse(String(postCalls()[0][1].body))).toEqual({ jwks: SIGNER_JWKS })
   })
 
   it('creates a confidential client and shows its secret once', async () => {

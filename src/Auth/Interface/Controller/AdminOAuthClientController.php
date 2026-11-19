@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace App\Auth\Interface\Controller;
 
 use App\Auth\Application\Command\OAuth\RegisterClientCommand;
+use App\Auth\Application\Command\OAuth\ReplaceClientKeysCommand;
 use App\Auth\Application\Command\OAuth\RevokeRegisteredClientCommand;
 use App\Auth\Application\Command\OAuth\RotateClientSecretCommand;
 use App\Auth\Application\DTO\RegisteredClientDTO;
-use App\Auth\Application\Exception\ClientManagementException;
-use App\Auth\Application\Exception\ClientNotFoundException;
 use App\Auth\Application\Query\OAuth\ListRegisteredClientsQuery;
+use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Interface\Request\Admin\AdminCreateOAuthClientRequest;
+use App\Auth\Interface\Request\Admin\AdminReplaceOAuthClientKeysRequest;
 use App\Auth\Interface\Resource\AdminOAuthClientCredentialsResource;
 use App\Auth\Interface\Resource\AdminOAuthClientResource;
 use App\Shared\Domain\Model\PublicId;
@@ -25,7 +26,6 @@ use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
-use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
@@ -35,8 +35,9 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  * OAuth client registration for administrators.
  *
  * Administrators list clients; super administrators register device, public and
- * confidential clients, rotate a confidential client's secret and revoke clients.
- * The app:oauth:client:* console commands dispatch the same application messages.
+ * confidential clients, rotate a secret client's secret, replace a key client's
+ * keys and revoke clients. The app:oauth:client:* console commands dispatch the
+ * same application messages, and the handlers' outcome exceptions decide the status.
  */
 #[OA\Tag(name: 'Admin / OAuth clients', description: 'OAuth client registration for administrators')]
 #[Route('/api/admin/oauth/clients', name: 'admin_oauth_clients_')]
@@ -75,7 +76,7 @@ final class AdminOAuthClientController
 
     #[OA\Post(
         path: '/api/admin/oauth/clients',
-        description: 'Registers a device client (public, device authorization grant), a public client (authorization code with PKCE) or a confidential client (authorization code with a client secret). A confidential client\'s secret is in this response only.',
+        description: 'Registers a device client (public, device authorization grant), a public client (authorization code with PKCE) or a confidential client (authorization code with client authentication). A confidential client authenticates with a generated secret (client_secret_post, the default), which is in this response only, or with its own signing keys (private_key_jwt), given as exactly one of an inline JWK Set and a jwks_uri.',
         summary: 'Register an OAuth client',
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: AdminCreateOAuthClientRequest::class))),
         responses: [
@@ -85,7 +86,7 @@ final class AdminOAuthClientController
             )),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
             new OA\Response(response: '403', description: 'Not a super administrator', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid name, type or redirect URIs; `error.details.reason` is `invalid_registration` when the registration rules reject them', content: new OA\JsonContent(ref: new Model(type: ValidationError::class))),
+            new OA\Response(response: '422', description: 'Invalid name, type, redirect URIs, authentication method or keys; `error.details.reason` is `invalid_registration` when the registration rules reject them', content: new OA\JsonContent(ref: new Model(type: ValidationError::class))),
         ],
     )]
     #[Route('', name: 'create', methods: ['POST'])]
@@ -93,15 +94,14 @@ final class AdminOAuthClientController
     #[CliCounterpart('app:oauth:client:create')]
     public function create(#[MapRequestPayload] AdminCreateOAuthClientRequest $payload): JsonResponse
     {
-        try {
-            $registered = $this->dispatch(new RegisterClientCommand(
-                name: $payload->name,
-                type: $payload->type,
-                redirectUris: $payload->redirectUris,
-            ));
-        } catch (ClientManagementException $exception) {
-            return $this->managementError($exception);
-        }
+        $registered = $this->dispatch(new RegisterClientCommand(
+            name: $payload->name,
+            type: $payload->type,
+            redirectUris: $payload->redirectUris,
+            authMethod: $payload->authMethod,
+            jwks: $payload->jwks,
+            jwksUri: $payload->jwksUri,
+        ));
         assert($registered instanceof RegisteredClientDTO);
 
         return self::noStore($this->successResponse(AdminOAuthClientCredentialsResource::from($registered), Response::HTTP_CREATED));
@@ -109,8 +109,8 @@ final class AdminOAuthClientController
 
     #[OA\Post(
         path: '/api/admin/oauth/clients/{clientId}/rotate-secret',
-        description: 'Confidential clients only. The old secret stops working at once; tokens already issued stay valid. The new secret is in this response only.',
-        summary: 'Rotate a confidential client\'s secret',
+        description: 'Clients that authenticate with client_secret_post only. The old secret stops working at once; tokens already issued stay valid. The new secret is in this response only.',
+        summary: 'Rotate a client\'s secret',
         parameters: [new OA\Parameter(name: 'clientId', description: 'The OAuth client_id', in: 'path', required: true, schema: new OA\Schema(type: 'string'))],
         responses: [
             new OA\Response(response: '200', description: 'New secret issued', content: new OA\JsonContent(
@@ -133,16 +133,44 @@ final class AdminOAuthClientController
             return $this->notFound('OAuth client not found.');
         }
 
-        try {
-            $registered = $this->dispatch(new RotateClientSecretCommand($publicId));
-        } catch (ClientNotFoundException) {
-            return $this->notFound('OAuth client not found.');
-        } catch (ClientManagementException $exception) {
-            return $this->managementError($exception);
-        }
+        $registered = $this->dispatch(new RotateClientSecretCommand($publicId));
         assert($registered instanceof RegisteredClientDTO);
 
         return self::noStore($this->successResponse(AdminOAuthClientCredentialsResource::from($registered)));
+    }
+
+    #[OA\Post(
+        path: '/api/admin/oauth/clients/{clientId}/keys',
+        description: 'Clients that authenticate with private_key_jwt only. Replaces the inline JWK Set or the jwks_uri; the new source may be of the other kind. Assertions signed with the old keys stop working at once; tokens already issued stay valid.',
+        summary: 'Replace a client\'s public keys',
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: AdminReplaceOAuthClientKeysRequest::class))),
+        parameters: [new OA\Parameter(name: 'clientId', description: 'The OAuth client_id', in: 'path', required: true, schema: new OA\Schema(type: 'string'))],
+        responses: [
+            new OA\Response(response: '200', description: 'Keys replaced', content: new OA\JsonContent(
+                required: ['data'],
+                properties: [new OA\Property(property: 'data', ref: new Model(type: AdminOAuthClientResource::class))],
+            )),
+            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '403', description: 'Not a super administrator', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '404', description: 'Unknown client', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '409', description: 'The client is first-party (`error.details.reason` = `protected_client`), does not authenticate with keys (`no_keys`) or is revoked (`revoked`)', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '422', description: 'Not exactly one key source, or keys the rules reject; `error.details.reason` is `invalid_keys`', content: new OA\JsonContent(ref: new Model(type: ValidationError::class))),
+        ],
+    )]
+    #[Route('/{clientId}/keys', name: 'replace_keys', methods: ['POST'])]
+    #[IsGranted('ROLE_SUPER_ADMIN')]
+    #[CliCounterpart('app:oauth:client:replace-keys')]
+    public function replaceKeys(string $clientId, #[MapRequestPayload] AdminReplaceOAuthClientKeysRequest $payload): JsonResponse
+    {
+        $publicId = self::publicId($clientId);
+        if ($publicId === null) {
+            return $this->notFound('OAuth client not found.');
+        }
+
+        $client = $this->dispatch(new ReplaceClientKeysCommand($publicId, $payload->jwks, $payload->jwksUri));
+        assert($client instanceof Client);
+
+        return self::noStore($this->successResponse(AdminOAuthClientResource::from($client)));
     }
 
     #[OA\Post(
@@ -171,42 +199,14 @@ final class AdminOAuthClientController
             return $this->notFound('OAuth client not found.');
         }
 
-        try {
-            $client = $this->dispatch(new RevokeRegisteredClientCommand($publicId));
-        } catch (ClientNotFoundException) {
-            return $this->notFound('OAuth client not found.');
-        } catch (ClientManagementException $exception) {
-            return $this->managementError($exception);
-        }
+        $client = $this->dispatch(new RevokeRegisteredClientCommand($publicId));
 
         return $this->successResponse(AdminOAuthClientResource::from($client));
     }
 
-    /**
-     * Dispatches synchronously and rethrows the client management errors the handlers raise.
-     */
     private function dispatch(object $message): mixed
     {
-        try {
-            return $this->bus->dispatch($message)->last(HandledStamp::class)?->getResult();
-        } catch (HandlerFailedException $exception) {
-            foreach ($exception->getWrappedExceptions() as $wrapped) {
-                if ($wrapped instanceof ClientNotFoundException || $wrapped instanceof ClientManagementException) {
-                    throw $wrapped;
-                }
-            }
-
-            throw $exception;
-        }
-    }
-
-    private function managementError(ClientManagementException $exception): JsonResponse
-    {
-        $status = $exception->reason === ClientManagementException::INVALID_REGISTRATION
-            ? Response::HTTP_UNPROCESSABLE_ENTITY
-            : Response::HTTP_CONFLICT;
-
-        return $this->errorResponse($exception->getMessage(), $status, ['reason' => $exception->reason]);
+        return $this->bus->dispatch($message)->last(HandledStamp::class)?->getResult();
     }
 
     private static function publicId(string $value): ?PublicId
@@ -218,7 +218,10 @@ final class AdminOAuthClientController
         }
     }
 
-    /** A response carrying a client secret must not be cached (RFC 6749 section 5.1 applies the same rule to tokens). */
+    /**
+     * A response carrying a client secret must not be cached (RFC 6749 section 5.1 applies
+     * the same rule to tokens); a key replacement's answer follows the same rule.
+     */
     private static function noStore(JsonResponse $response): JsonResponse
     {
         $response->headers->set('Cache-Control', 'no-store');

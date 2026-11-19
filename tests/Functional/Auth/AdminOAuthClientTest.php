@@ -6,9 +6,11 @@ namespace App\Tests\Functional\Auth;
 
 use App\Auth\Application\Command\OAuth\IssueTokenCommand;
 use App\Auth\Application\DTO\TokenResponseDTO;
+use App\Auth\Application\Port\ClientAssertionVerifierInterface;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Shared\Domain\Model\PublicId;
+use App\Tests\Fixtures\Auth\SignedClientAssertion;
 use App\Tests\Functional\TestCase;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
@@ -20,6 +22,15 @@ use Symfony\Component\Messenger\Stamp\HandledStamp;
 final class AdminOAuthClientTest extends TestCase
 {
     private const string PATH = '/api/admin/oauth/clients';
+
+    /** @var list<string> */
+    private array $jwksFiles = [];
+
+    protected function tearDown(): void
+    {
+        array_map(unlink(...), $this->jwksFiles);
+        parent::tearDown();
+    }
 
     public function testOnlyAdministratorsListAndOnlySuperAdministratorsChangeClients(): void
     {
@@ -40,6 +51,7 @@ final class AdminOAuthClientTest extends TestCase
             ['POST', self::PATH, ['name' => 'Denied TV', 'type' => 'device']],
             ['POST', self::PATH . '/' . $device['clientId'] . '/rotate-secret', []],
             ['POST', self::PATH . '/' . $device['clientId'] . '/revoke', []],
+            ['POST', self::PATH . '/' . $device['clientId'] . '/keys', ['jwksUri' => 'https://keys.baander.app/jwks.json']],
         ];
         foreach ([$user, $admin] as $caller) {
             foreach ($routes as [$method, $path, $body]) {
@@ -194,6 +206,130 @@ final class AdminOAuthClientTest extends TestCase
         self::assertTrue($this->clients()->findClientByPublicId(PublicId::fromString($printed['clientId']))?->authenticatesWith($printed['clientSecret']));
     }
 
+    public function testAKeyClientRegistersWithoutASecretOnBothSurfaces(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $jwks = (new SignedClientAssertion())->jwks();
+
+        $created = $this->registerClient($superAdmin, [
+            'name' => 'Signing server',
+            'type' => 'confidential',
+            'redirectUris' => ['https://signing.baander.app/callback'],
+            'authMethod' => 'private_key_jwt',
+            'jwks' => $jwks,
+        ]);
+
+        self::assertSame('confidential', $created['type']);
+        self::assertSame('private_key_jwt', $created['authMethod']);
+        self::assertNull($created['jwksUri']);
+        self::assertNull($created['clientSecret']);
+        self::assertSame('private_key_jwt', $this->listed($superAdmin, $created['clientId'])['authMethod']);
+        $stored = $this->clients()->findClientByPublicId(PublicId::fromString($created['clientId']));
+        self::assertSame($jwks, $stored?->getKeySource()?->jwks());
+
+        $file = $this->jwksFile($jwks);
+        $console = $this->command('app:oauth:client:create');
+        self::assertSame(Command::SUCCESS, $console->execute([
+            'name' => 'Signing server',
+            '--type' => 'confidential',
+            '--redirect-uri' => ['https://signing.baander.app/callback'],
+            '--auth-method' => 'private_key_jwt',
+            '--jwks-file' => $file,
+            '--json' => true,
+        ]), $console->getDisplay());
+        $printed = json_decode($console->getDisplay(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertIsArray($printed);
+        $sameFields = static fn (array $client): array => array_diff_key($client, array_flip(['clientId', 'createdAt', 'updatedAt']));
+        self::assertSame($sameFields($created), $sameFields($printed), 'The CLI prints the API data.');
+    }
+
+    public function testAKeyClientNeedsExactlyOneKeySourceOnBothSurfaces(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $jwks = (new SignedClientAssertion())->jwks();
+        $base = ['name' => 'Signing server', 'type' => 'confidential', 'redirectUris' => ['https://signing.baander.app/callback'], 'authMethod' => 'private_key_jwt'];
+
+        foreach (['neither' => [], 'both' => ['jwks' => $jwks, 'jwksUri' => 'https://signing.baander.app/jwks.json']] as $case => $keys) {
+            $error = $this->assertJsonResponse($this->authenticatedRequest('POST', self::PATH, $superAdmin, [...$base, ...$keys]), 422, 'error');
+            self::assertSame('invalid_registration', $error['error']['details']['reason'], $case);
+        }
+
+        $console = ['name' => 'Signing server', '--type' => 'confidential', '--redirect-uri' => ['https://signing.baander.app/callback'], '--auth-method' => 'private_key_jwt'];
+        self::assertSame(Command::INVALID, $this->command('app:oauth:client:create')->execute($console));
+        self::assertSame(Command::INVALID, $this->command('app:oauth:client:create')->execute([
+            ...$console,
+            '--jwks-file' => $this->jwksFile($jwks),
+            '--jwks-uri' => 'https://signing.baander.app/jwks.json',
+        ]));
+    }
+
+    public function testReplacingKeysSwitchesTheKeySourceAndRetiresTheOldKeys(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $oldKey = new SignedClientAssertion('old-key');
+        $created = $this->registerClient($superAdmin, [
+            'name' => 'Signing server',
+            'type' => 'confidential',
+            'redirectUris' => ['https://signing.baander.app/callback'],
+            'authMethod' => 'private_key_jwt',
+            'jwks' => $oldKey->jwks(),
+        ]);
+        $path = self::PATH . '/' . $created['clientId'] . '/keys';
+        $connection = $this->entityManager->getConnection();
+        $updatedBefore = $connection->fetchOne('SELECT updated_at FROM oauth_clients WHERE public_id = ?', [$created['clientId']]);
+
+        $response = $this->authenticatedRequest('POST', $path, $superAdmin, ['jwksUri' => 'https://signing.baander.app/jwks.json']);
+        $replaced = $this->assertJsonResponse($response, 200, 'data')['data'];
+        self::assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+        self::assertSame('https://signing.baander.app/jwks.json', $replaced['jwksUri']);
+        self::assertSame('private_key_jwt', $replaced['authMethod']);
+        self::assertArrayNotHasKey('clientSecret', $replaced);
+        $row = $connection->fetchAssociative('SELECT jwks, jwks_uri, updated_at > ? AS advanced FROM oauth_clients WHERE public_id = ?', [$updatedBefore, $created['clientId']]);
+        self::assertSame(['jwks' => null, 'jwks_uri' => 'https://signing.baander.app/jwks.json', 'advanced' => true], $row, 'The stored updated time advances, which retires key sets fetched from the old source.');
+
+        $newKey = new SignedClientAssertion('new-key');
+        $replace = $this->command('app:oauth:client:replace-keys');
+        self::assertSame(Command::SUCCESS, $replace->execute(['client-id' => $created['clientId'], '--jwks-file' => $this->jwksFile($newKey->jwks())]), $replace->getDisplay());
+
+        $this->entityManager->clear();
+        $client = $this->clients()->findClientByPublicId(PublicId::fromString($created['clientId']));
+        self::assertNotNull($client);
+        self::assertNull($client->getKeySource()?->jwksUri());
+        $verifier = static::getContainer()->get(ClientAssertionVerifierInterface::class);
+        self::assertInstanceOf(ClientAssertionVerifierInterface::class, $verifier);
+        $issuer = static::getContainer()->getParameter('auth.oauth.issuer');
+        self::assertIsString($issuer);
+        self::assertFalse($verifier->verify($oldKey->create($created['clientId'], $issuer), $client), 'The old key no longer authenticates.');
+        self::assertTrue($verifier->verify($newKey->create($created['clientId'], $issuer), $client));
+    }
+
+    public function testOnlyActiveKeyClientsGetNewKeysOnBothSurfaces(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $secretClient = $this->registerClient($superAdmin, ['name' => 'Secret server', 'type' => 'confidential', 'redirectUris' => ['https://secret.baander.app/callback']]);
+        $keyClient = $this->registerClient($superAdmin, [
+            'name' => 'Signing server',
+            'type' => 'confidential',
+            'redirectUris' => ['https://signing.baander.app/callback'],
+            'authMethod' => 'private_key_jwt',
+            'jwksUri' => 'https://signing.baander.app/jwks.json',
+        ]);
+        $keys = ['jwksUri' => 'https://signing.baander.app/rotated.json'];
+
+        $error = $this->assertJsonResponse($this->authenticatedRequest('POST', self::PATH . '/' . $secretClient['clientId'] . '/keys', $superAdmin, $keys), 409, 'error');
+        self::assertSame('no_keys', $error['error']['details']['reason']);
+        $this->assertJsonResponse($this->authenticatedRequest('POST', self::PATH . '/AAAAAAAAAAAAAAAAAAAAA/keys', $superAdmin, $keys), 404);
+        $error = $this->assertJsonResponse($this->authenticatedRequest('POST', self::PATH . '/' . $keyClient['clientId'] . '/rotate-secret', $superAdmin), 409, 'error');
+        self::assertSame('no_secret', $error['error']['details']['reason']);
+        $error = $this->assertJsonResponse($this->authenticatedRequest('POST', self::PATH . '/' . $keyClient['clientId'] . '/keys', $superAdmin, ['jwksUri' => 'http://signing.baander.app/jwks.json']), 422, 'error');
+        self::assertSame('invalid_keys', $error['error']['details']['reason']);
+
+        $console = ['--jwks-uri' => 'https://signing.baander.app/rotated.json'];
+        self::assertSame(Command::FAILURE, $this->command('app:oauth:client:replace-keys')->execute(['client-id' => $secretClient['clientId'], ...$console]));
+        self::assertSame(Command::FAILURE, $this->command('app:oauth:client:replace-keys')->execute(['client-id' => 'AAAAAAAAAAAAAAAAAAAAA', ...$console]));
+        self::assertSame(Command::INVALID, $this->command('app:oauth:client:replace-keys')->execute(['client-id' => $keyClient['clientId']]));
+    }
+
     /**
      * @param array<string, mixed> $body
      * @return array<string, mixed>
@@ -266,6 +402,17 @@ final class AdminOAuthClientTest extends TestCase
         self::assertInstanceOf(ClientRepositoryInterface::class, $clients);
 
         return $clients;
+    }
+
+    /** @param array<string, mixed> $jwks */
+    private function jwksFile(array $jwks): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'baander-jwks-');
+        self::assertIsString($path);
+        file_put_contents($path, json_encode($jwks, JSON_THROW_ON_ERROR));
+        $this->jwksFiles[] = $path;
+
+        return $path;
     }
 
     private function command(string $name): CommandTester

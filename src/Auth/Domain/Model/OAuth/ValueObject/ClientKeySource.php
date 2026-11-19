@@ -43,6 +43,21 @@ final readonly class ClientKeySource
         return new self(null, $uri);
     }
 
+    /**
+     * The key source an administrator gave, which must be exactly one of the two.
+     *
+     * @param array<array-key, mixed>|null $jwks
+     */
+    public static function fromEither(?array $jwks, ?string $uri): self
+    {
+        return match (true) {
+            $jwks !== null && $uri !== null => throw new InvalidArgumentException('Give either a JWK Set or a jwks_uri, not both.'),
+            $jwks !== null => self::fromJwks($jwks),
+            $uri !== null => self::fromJwksUri($uri),
+            default => throw new InvalidArgumentException('A private_key_jwt client needs a JWK Set or a jwks_uri.'),
+        };
+    }
+
     /** @return array{keys: list<array<string, mixed>>}|null The inline JWK Set; null for a `jwks_uri` client */
     public function jwks(): ?array
     {
