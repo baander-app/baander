@@ -705,6 +705,21 @@ Verification on 2026-11-19:
   code review's sole finding was resolved by updating the static website contract
   in `ui/DESIGN.md` to describe compact feature links and the footer layout.
 
+Published on 2026-11-19 from `77067f2ff80493c8dcf0cd1a4dee67c76c207712`,
+on the public GitHub branch `release/site-2026-11-19`. The release applies the site
+change to `870bc574e`, the previously published branch base. Its fresh build
+produced 243 manual pages; all 35 rendering and asset checks passed. The menu and
+website browser suites passed 55 of 56 initially; the remaining navigation failed
+with `net::ERR_NETWORK_CHANGED` and passed unchanged on its targeted rerun.
+
+The build went to preview `baander-jmocaye1h` and then, unchanged, to production
+`baander-a98wytie8`, aliased to [baander.app](https://baander.app). On both deployments,
+browser checks passed for the desktop and phone navigation, both themes, footer
+links, real search results and section fragments, exact-revision source links,
+nested manual and reference pages, HTTPS and an unknown URL returning 404. The live
+CSS matches the release build. The prebuilt output's SHA-256 before both uploads
+was `a5c12f3ba3b0dfd72b8e4e29f67359706637a06ed53572aa6f257621bbed48bf`.
+
 ## Website reference pages and fold-out menu
 
 Delivered on `master` on 2026-11-18, fast-forwarded from
