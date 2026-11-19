@@ -509,6 +509,13 @@ services:
             $authenticatedApiLimiter: '@limiter.authenticated_api'
             $environment: '%kernel.environment%'
 
+    App\Auth\Application\Port\LoginFailureThrottleInterface:
+        alias: App\Auth\Infrastructure\Security\RateLimiterLoginFailureThrottle
+
+    App\Auth\Infrastructure\Security\RateLimiterLoginFailureThrottle:
+        arguments:
+            $authLoginEmailFailuresLimiter: '@limiter.auth_login_email_failures'
+
     App\Auth\Application\Port\PasswordResetRequestThrottleInterface:
         alias: App\Auth\Infrastructure\Security\RateLimiterPasswordResetRequestThrottle
 

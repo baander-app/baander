@@ -7,6 +7,7 @@ namespace App\Auth\Infrastructure\Security\User;
 use App\Auth\Application\DTO\VerifiedPasswordLogin;
 use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use App\Auth\Application\Exception\TotpSecretUnavailableException;
+use App\Auth\Application\Port\LoginFailureThrottleInterface;
 use App\Auth\Application\Port\PasswordHasherInterface;
 use App\Auth\Application\Port\TotpVerifierInterface;
 use App\Auth\Domain\Model\LoginBlock;
@@ -23,6 +24,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
+use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Exception\AuthenticationException;
 use Symfony\Component\Security\Core\Exception\BadCredentialsException;
@@ -40,9 +42,18 @@ use Symfony\Component\Serializer\Exception\NotEncodableValueException;
  * TOTP code unspent for the client's retry. The code is matched here and its time step
  * spent later, in the transaction that stores the tokens. On success it stores a
  * VerifiedPasswordLogin on the request; the login controller issues tokens only from it.
+ *
+ * Unknown, disabled and wrong-password accounts get the same answer after the same work:
+ * an unknown address is checked against a dummy hash, and a disabled account is reported
+ * only once its password matches. Each rejected password or code is charged to the address
+ * whether or not an account holds it, and an address over its failure limit is refused
+ * before any account is looked up.
  */
 final class PasswordAuthenticator extends AbstractAuthenticator
 {
+    /** A hash of a random password, made once per worker with the configured hasher. */
+    private ?string $dummyHash = null;
+
     public function __construct(
         private readonly TotpVerifierInterface $totpVerifier,
         private readonly UserRepositoryInterface $userRepository,
@@ -52,6 +63,7 @@ final class PasswordAuthenticator extends AbstractAuthenticator
         private readonly JsonEncoder $jsonEncoder,
         private readonly AuthenticationFailureMessage $failureMessage,
         private readonly DpopTokenRequestVerifier $dpopVerifier,
+        private readonly LoginFailureThrottleInterface $failureThrottle,
     ) {
     }
 
@@ -113,28 +125,22 @@ final class PasswordAuthenticator extends AbstractAuthenticator
             throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
         }
 
-        $user = $this->userRepository->findByEmail($address);
+        $this->refuseOverTheFailureLimit($address);
 
-        if ($user === null) {
-            $this->logger->debug('Password authentication failed: user not found.', ['email' => $email]);
-            throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
-        }
+        try {
+            $user = $this->verifiedUser($address, $password);
+            $totpStep = $user->hasTotp() ? $this->matchTotpStep($user, $totpCode) : null;
+        } catch (BadCredentialsException $failure) {
+            $this->failureThrottle->recordFailure($address);
 
-        if ($user->isDisabled()) {
-            $this->logger->debug('Password authentication failed: user is disabled.', ['email' => $email]);
-            throw new CustomUserMessageAuthenticationException(AuthenticationFailureMessage::ACCOUNT_DISABLED);
-        }
-
-        if (!$this->passwordHasher->verify($password, $user->getPassword())) {
-            $this->logger->debug('Password authentication failed: invalid password.', ['email' => $email]);
-            throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
+            throw $failure;
         }
 
         $request->attributes->set(VerifiedPasswordLogin::class, new VerifiedPasswordLogin(
             $user->getId(),
             $proofKey,
             $nextNonce,
-            $user->hasTotp() ? $this->matchTotpStep($user, $totpCode) : null,
+            $totpStep,
         ));
 
         return new SelfValidatingPassport(
@@ -177,6 +183,57 @@ final class PasswordAuthenticator extends AbstractAuthenticator
         }
 
         return new JsonResponse($error, Response::HTTP_UNAUTHORIZED);
+    }
+
+    /**
+     * @throws TooManyRequestsHttpException when the address has used up its failed logins
+     */
+    private function refuseOverTheFailureLimit(Email $address): void
+    {
+        $retryAfter = $this->failureThrottle->retryAfter($address);
+        if ($retryAfter === null) {
+            return;
+        }
+
+        // The address stays out of the log: it may not belong to any account.
+        $this->logger->warning('Login per-account failure limit exceeded.', ['retry_after' => $retryAfter]);
+
+        throw new TooManyRequestsHttpException($retryAfter, 'Too many requests. Please try again later.');
+    }
+
+    /**
+     * The account the password belongs to. The disabled state is reported only after the
+     * password matches, so it reveals nothing to someone who does not know the password.
+     *
+     * @throws BadCredentialsException for an unknown address or a wrong password
+     */
+    private function verifiedUser(Email $address, string $password): User
+    {
+        $user = $this->userRepository->findByEmail($address);
+
+        if ($user === null) {
+            // The same hash check a known account costs, so timing does not tell them apart.
+            $this->passwordHasher->verify($password, $this->dummyHash());
+            $this->logger->debug('Password authentication failed: user not found.', ['email' => $address->toString()]);
+            throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
+        }
+
+        if (!$this->passwordHasher->verify($password, $user->getPassword())) {
+            $this->logger->debug('Password authentication failed: invalid password.', ['email' => $address->toString()]);
+            throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
+        }
+
+        if ($user->isDisabled()) {
+            $this->logger->debug('Password authentication failed: user is disabled.', ['email' => $address->toString()]);
+            throw new CustomUserMessageAuthenticationException(AuthenticationFailureMessage::ACCOUNT_DISABLED);
+        }
+
+        return $user;
+    }
+
+    private function dummyHash(): string
+    {
+        return $this->dummyHash ??= $this->passwordHasher->hash(bin2hex(random_bytes(16)));
     }
 
     /**

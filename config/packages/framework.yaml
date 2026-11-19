@@ -8,6 +8,7 @@ parameters:
         authenticated_api: 'Authenticated /api requests per user'
         auth_login_ip: 'Login attempts per IP (brute-force protection)'
         auth_login_ip_email: 'Login attempts per IP+email (distributed brute-force protection)'
+        auth_login_email_failures: 'Failed logins per account (normalized email), from any IP; an account under attack can be locked out for a few minutes'
         auth_register_ip: 'Registration attempts per IP'
         auth_password_reset_ip: 'Password reset requests and redemptions per IP'
         auth_password_reset_email: 'Password reset requests per account (normalized email)'
@@ -82,6 +83,10 @@ framework:
             policy: fixed_window
             limit: '%auth.rate_limit.login_per_email.max_attempts%'
             interval: '%auth.rate_limit.login.window% seconds'
+        auth_login_email_failures:
+            policy: sliding_window
+            limit: '%auth.rate_limit.login_failures_per_email.max_attempts%'
+            interval: '%auth.rate_limit.login_failures_per_email.window% seconds'
         auth_register_ip:
             policy: fixed_window
             limit: '%auth.rate_limit.register.max_attempts%'
@@ -200,6 +205,8 @@ when@test:
             auth_login_ip:
                 limit: 10000
             auth_login_ip_email:
+                limit: 10000
+            auth_login_email_failures:
                 limit: 10000
             auth_register_ip:
                 limit: 10000

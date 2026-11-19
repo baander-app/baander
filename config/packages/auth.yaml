@@ -165,6 +165,13 @@ parameters:
     # Maximum login attempts per IP+email within the window (prevents distributed brute force). Default: 10 per 5 minutes.
     auth.rate_limit.login_per_email.max_attempts: 10
 
+    # Maximum failed logins per account (normalized email) from all IPs together, in a
+    # sliding window. Only a wrong password, an unknown address or a rejected TOTP code is
+    # charged; once it is reached, every login for that address, the right password
+    # included, waits until older failures slide out of the window. Default: 10 per 5 minutes.
+    auth.rate_limit.login_failures_per_email.max_attempts: 10
+    auth.rate_limit.login_failures_per_email.window: 300
+
     # Maximum registration attempts per IP within the window. Default: 10 per 15 minutes.
     auth.rate_limit.register.max_attempts: 10
     auth.rate_limit.register.window: 900

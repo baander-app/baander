@@ -23,6 +23,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Tests\Fixtures\Auth\AuthenticationFailureMessages;
+use App\Tests\Fixtures\Auth\RecordingLoginFailureThrottle;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\Stub;
@@ -33,6 +34,7 @@ use RedisException;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
+use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Exception\AuthenticationException;
 use Symfony\Component\Security\Core\Exception\BadCredentialsException;
@@ -48,9 +50,11 @@ final class PasswordAuthenticatorTest extends TestCase
     private UserRepositoryInterface&Stub $userRepository;
     private PasswordHasherInterface&Stub $passwordHasher;
     private Redis&Stub $redis;
+    private RecordingLoginFailureThrottle $throttle;
 
     protected function setUp(): void
     {
+        $this->throttle = new RecordingLoginFailureThrottle();
         $this->totpVerifier = $this->createStub(TotpVerifierInterface::class);
         $this->userRepository = $this->createStub(UserRepositoryInterface::class);
         $this->passwordHasher = $this->createStub(PasswordHasherInterface::class);
@@ -72,6 +76,7 @@ final class PasswordAuthenticatorTest extends TestCase
             new JsonEncoder(),
             AuthenticationFailureMessages::create(),
             new DpopTokenRequestVerifier(new DpopProofValidator($jtiCache, publicUrl: 'https://baander.app'), new DpopNonceManager($factory)),
+            $this->throttle,
         );
     }
 
@@ -127,6 +132,120 @@ final class PasswordAuthenticatorTest extends TestCase
         $this->expectExceptionMessage('Invalid credentials.');
 
         $this->authenticator->authenticate($this->request(['email' => 'alice@baander.app', 'password' => 'wrong']));
+    }
+
+    /** An unknown address costs one password hash check, like a known one. */
+    public function testAnUnknownUserIsCheckedAgainstADummyHash(): void
+    {
+        $this->userRepository->method('findByEmail')->willReturn(null);
+        $this->passwordHasher->method('hash')->willReturn('$argon2id$dummy');
+        $verified = [];
+        $this->passwordHasher->method('verify')->willReturnCallback(static function (string $plain, string $hash) use (&$verified): bool {
+            $verified[] = [$plain, $hash];
+
+            return false;
+        });
+
+        $this->failure($this->request(['email' => 'alice@baander.app', 'password' => 'secret']));
+        $this->failure($this->request(['email' => 'bob@baander.app', 'password' => 'other']));
+
+        $this->assertSame([['secret', '$argon2id$dummy'], ['other', '$argon2id$dummy']], $verified);
+    }
+
+    public function testADisabledAccountWithAWrongPasswordIsInvalid(): void
+    {
+        $this->userRepository->method('findByEmail')->willReturn($this->createUser(disabled: true));
+        $this->passwordHasher->method('verify')->willReturn(false);
+
+        $this->expectException(BadCredentialsException::class);
+        $this->expectExceptionMessage('Invalid credentials.');
+
+        $this->authenticator->authenticate($this->request(['email' => 'alice@baander.app', 'password' => 'wrong']));
+    }
+
+    public function testADisabledAccountIsReportedOnlyAfterTheRightPassword(): void
+    {
+        $this->userRepository->method('findByEmail')->willReturn($this->createUser(disabled: true));
+        $this->passwordHasher->method('verify')->willReturn(true);
+        $request = $this->request(['email' => 'alice@baander.app', 'password' => 'secret']);
+
+        $response = $this->authenticator->onAuthenticationFailure($request, $this->failure($request));
+
+        $this->assertSame(
+            ['error' => ['message' => 'This account has been disabled.', 'code' => 'AUTH_INVALID_CREDENTIALS']],
+            json_decode((string) $response->getContent(), true),
+        );
+        $this->assertSame([], $this->throttle->failures, 'A correct password is not a failed guess.');
+    }
+
+    /** @return iterable<string, array{?bool, bool}> whether the account exists and is disabled, and whether the password matches */
+    public static function rejectedAccounts(): iterable
+    {
+        yield 'unknown' => [null, false];
+        yield 'disabled, wrong password' => [true, false];
+        yield 'enabled, wrong password' => [false, false];
+    }
+
+    #[DataProvider('rejectedAccounts')]
+    public function testRejectedAccountsGetTheSameAnswer(?bool $disabled, bool $passwordMatches): void
+    {
+        $this->userRepository->method('findByEmail')->willReturn($disabled === null ? null : $this->createUser(disabled: $disabled));
+        $this->passwordHasher->method('hash')->willReturn('$argon2id$dummy');
+        $this->passwordHasher->method('verify')->willReturn($passwordMatches);
+        $request = $this->request(['email' => 'alice@baander.app', 'password' => 'wrong']);
+
+        $response = $this->authenticator->onAuthenticationFailure($request, $this->failure($request));
+
+        $this->assertSame(401, $response->getStatusCode());
+        $this->assertSame('{"error":{"message":"Invalid credentials.","code":"AUTH_INVALID_CREDENTIALS"}}', $response->getContent());
+        $this->assertSame(['alice@baander.app'], $this->throttle->failures, 'Every rejected guess is charged to the address.');
+    }
+
+    public function testARejectedCodeIsChargedToTheAddress(): void
+    {
+        $this->userRepository->method('findByEmail')->willReturn($this->createUser('sealed-secret'));
+        $this->passwordHasher->method('verify')->willReturn(true);
+        $this->totpVerifier->method('matchEnrolledStep')->willReturn(null);
+
+        $this->failure($this->request(['email' => 'Alice@baander.app', 'password' => 'secret', 'totpCode' => '000000']));
+
+        $this->assertSame(['alice@baander.app'], $this->throttle->failures);
+    }
+
+    public function testAskingForTheCodeIsNotCharged(): void
+    {
+        $this->userRepository->method('findByEmail')->willReturn($this->createUser('sealed-secret'));
+        $this->passwordHasher->method('verify')->willReturn(true);
+
+        $this->failure($this->request(['email' => 'alice@baander.app', 'password' => 'secret']));
+
+        $this->assertSame([], $this->throttle->failures);
+    }
+
+    /** Once the address has used up its failures, even the right password waits, known account or not. */
+    public function testAnAddressOverItsFailureLimitIsRefusedBeforeTheCredentialsAreChecked(): void
+    {
+        $this->throttle->retryAfter = 120;
+        $this->userRepository->method('findByEmail')->willReturnCallback(static fn (): never => self::fail('The account must not be looked up over the limit.'));
+        $this->passwordHasher->method('verify')->willReturnCallback(static fn (): never => self::fail('The password must not be checked over the limit.'));
+
+        try {
+            $this->authenticator->authenticate($this->request(['email' => 'alice@baander.app', 'password' => 'secret']));
+            self::fail('The login must be refused.');
+        } catch (TooManyRequestsHttpException $exception) {
+            self::assertSame(['Retry-After' => 120], $exception->getHeaders());
+        }
+        $this->assertSame([], $this->throttle->failures);
+    }
+
+    public function testASuccessfulLoginIsNotCharged(): void
+    {
+        $this->userRepository->method('findByEmail')->willReturn($this->createUser());
+        $this->passwordHasher->method('verify')->willReturn(true);
+
+        $this->authenticator->authenticate($this->request(['email' => 'alice@baander.app', 'password' => 'secret']));
+
+        $this->assertSame([], $this->throttle->failures);
     }
 
     public function testAPasswordSignsInAnAccountWithoutTotp(): void
@@ -305,7 +424,7 @@ final class PasswordAuthenticatorTest extends TestCase
         self::fail('The login must not authenticate.');
     }
 
-    private function createUser(?string $totpSecretCiphertext = null): User
+    private function createUser(?string $totpSecretCiphertext = null, bool $disabled = false): User
     {
         return User::reconstitute(new UserState(
             id: Uuid::fromString('01959fae-7c5b-7f00-8e00-000000000001'),
@@ -316,6 +435,7 @@ final class PasswordAuthenticatorTest extends TestCase
             totpSecretCiphertext: $totpSecretCiphertext,
             createdAt: new \DateTimeImmutable(),
             updatedAt: new \DateTimeImmutable(),
+            disabled: $disabled,
         ));
     }
 }
