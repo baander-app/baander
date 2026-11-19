@@ -11,6 +11,8 @@ INSIDE_DOCKER_CONTAINER ?= 0
 ERROR_ONLY_FOR_HOST = @echo "Run this command on the host."
 TYPEPHP_IMAGE ?= baander-typephp-toolchain:local
 TYPEPHP_JOBS ?= 2
+TYPEPHP_QUALIFICATION_BASE ?= baander-ci:local
+TYPEPHP_QUALIFICATION_IMAGE ?= baander-typephp-qualification:local
 
 .PHONY: typephp-setup typephp-version typephp-toolchain
 typephp-setup: ## Install the locked, isolated TypePHP compiler
@@ -29,11 +31,15 @@ typephp-check-dependencies:
 
 typephp-build: typephp-check-dependencies ## Package the console used by web and worker processes
 	mkdir -p var/typephp/cache
-	docker run --rm --volume "$(CURDIR):/app:ro,z" --volume "$(CURDIR)/var/typephp:/app/var/typephp:z" --volume "$(CURDIR)/var/typephp/cache:/home/typephp/.typephp:z" "$(TYPEPHP_IMAGE)" tools/typephp/console.yml --no-progress --no-color --job "$(TYPEPHP_JOBS)"
+	docker run --rm --workdir /var/www/html --volume "$(CURDIR):/var/www/html:ro,z" --volume "$(CURDIR)/var/typephp:/var/www/html/var/typephp:z" --volume "$(CURDIR)/var/typephp/cache:/home/typephp/.typephp:z" "$(TYPEPHP_IMAGE)" tools/typephp/console.yml --no-progress --no-color --job "$(TYPEPHP_JOBS)"
 
 typephp-build-operator: typephp-check-dependencies ## Package the separate worker deployment operator
 	mkdir -p var/typephp/cache
-	docker run --rm --volume "$(CURDIR):/app:ro,z" --volume "$(CURDIR)/var/typephp:/app/var/typephp:z" --volume "$(CURDIR)/var/typephp/cache:/home/typephp/.typephp:z" "$(TYPEPHP_IMAGE)" tools/typephp/operator.yml --no-progress --no-color --job "$(TYPEPHP_JOBS)"
+	docker run --rm --workdir /var/www/html --volume "$(CURDIR):/var/www/html:ro,z" --volume "$(CURDIR)/var/typephp:/var/www/html/var/typephp:z" --volume "$(CURDIR)/var/typephp/cache:/home/typephp/.typephp:z" "$(TYPEPHP_IMAGE)" tools/typephp/operator.yml --no-progress --no-color --job "$(TYPEPHP_JOBS)"
+
+.PHONY: typephp-qualification-image
+typephp-qualification-image: ## Build the candidate image for existing runtime qualification runners
+	docker build --file docker/typephp/qualification.Dockerfile --build-arg QUALIFICATION_BASE="$(TYPEPHP_QUALIFICATION_BASE)" --build-context typephp-artifacts=var/typephp --tag "$(TYPEPHP_QUALIFICATION_IMAGE)" .
 
 help: ## List available commands
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "%-25s %s\n", $$1, $$2}' Makefile

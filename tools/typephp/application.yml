@@ -9,24 +9,33 @@ php-builder:
     - curl
     - dom
     - exif
+    - excimer
     - ffi
     - filter
     - gettext
     - igbinary
+    - imagick
     - intl
+    - mailparse
     - mbstring
     - msgpack
+    - mysqlnd
     - pdo_pgsql
+    - pdo_sqlite
     - phar
+    - readline
     - session
     - shmop
     - simplexml
     - sodium
+    - sqlite3
     - sysvmsg
     - tokenizer
+    - uv
     - xml
     - xmlreader
     - xmlwriter
+    - yaml
     - zip
     - zlib
 embedded-files:

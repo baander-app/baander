@@ -1,0 +1,9 @@
+--- a/src/misc/typephp_sapi.cc
++++ b/src/misc/typephp_sapi.cc
+@@ -11,0 +12 @@
++#include <sys/stat.h>
+@@ -18 +19,3 @@
+-        php_cli_mode = strcmp((*argv)[1], "-") == 0 || strcmp((*argv)[1], "--") == 0;
++        struct stat script_status {};
++        php_cli_mode = (stat((*argv)[1], &script_status) == 0 && S_ISREG(script_status.st_mode))
++            || strcmp((*argv)[1], "-") == 0 || strcmp((*argv)[1], "--") == 0;

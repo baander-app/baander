@@ -19,7 +19,7 @@ The rebuilt Makefile contains 145 Swoole object inputs, including the previously
 The focused code review and simplification pass found no remaining setup issues.
 Both patches apply with zero fuzz and reproduce the reviewed builder files byte for byte; the complete change passes `git diff --check`.
 
-Both `make typephp-build` and `make typephp-build-operator` passed with eight compilation jobs.
+The initial `make typephp-build` and `make typephp-build-operator` runs passed with eight compilation jobs.
 Each package contains 13,217 files and 12,191 opcode blobs; nine skipped PHP files are IDE-helper declarations and Swoole library copies outside Composer's autoload paths, with no application PHP files skipped.
 The operator build reused 9,498 vendor opcode blobs from the console build with the same runtime signature and source paths.
 The console executable is 311,125,560 bytes; the operator is 311,125,912 bytes.
@@ -31,12 +31,25 @@ Explicit application `--version` dispatch reported Symfony 8.1.10.
 The initial 128 MiB default failed during container compilation; `-d ... list` without `-f` treated `list` as a PHP filename.
 The separate operator's explicit `--help` dispatch passed without loading its services or accessing Docker.
 
+Runtime qualification preparation on 2026-11-19:
+
+- The reviewed continuation builds at `/var/www/html`, preserves bare script dispatch through `PHP_BINARY`, and supplies an external development autoloader for the existing CI runners. Production dependencies retain their embedded mappings. The candidate dispatcher selects the independent operator executable even when PHP settings precede its script; the executable-identity regression failed before that correction and passed afterward.
+- The private builder now locks PHP 8.5.12 and ten PECL source archives by version and SHA-256. Its runtime-lock regression passes inside the built toolchain, including corrupt-cache rejection and cache invalidation. All common extension versions match the existing CI image, including Swoole 6.2.4. Each runtime loads 58 extensions: the candidate adds required build dependency msgpack 3.0.1 and omits test-only Xdebug 3.5.0. GD capabilities and Redis serializer/compression constants match the baseline.
+- Enabling the application's extension features exposed three native build/runtime defects. Derived-source patches correct Redis's bundled LZF include path, isolate 26 PostgreSQL and two SQLite symbols belonging to Swoole's copied PDO drivers, and return intermediate PostgreSQL COPY statuses to the caller for data transfer. The private runtime builds with the required features; downloaded source archives remain unchanged.
+- Against disposable PostgreSQL and in-memory SQLite, the existing CI PHP, rebuilt private PHP and packaged console pass synchronous and coroutine checks for prepared queries, COPY array/file round trips, binary large objects, backend PID, notifications, SQLite commit/rollback and scheduler yielding. Malformed COPY input raises SQLSTATE `22P02`; rollback restores the same connection. Both runtime variants expose the existing legacy PDO methods rather than the modern `Pdo\Pgsql` API.
+
+Both rebuilt packages contain 13,217 files and 12,191 opcode blobs, with the same nine IDE-helper skips and no application PHP skipped. The operator reused 9,498 vendor opcode blobs.
+The console is 317,522,704 bytes, SHA-256 `a617e9c9d44350a19c13db44de2f552e4d18d2f0a878b5608f1f52f6c31baebe`; the operator is 317,523,056 bytes, SHA-256 `2dc61d0e75c9abcd9daf4fa90246f0c36737b76b1fcc8580c5bfc71b06f84205`.
+Both pass interpreter, script, argument, stdin and nested `PHP_BINARY` checks. Four dispatcher cases select the expected ELF, including operator calls with leading PHP settings. Default and explicit console listings, Symfony's unknown-command error, production cache warmup and independent operator help pass.
+In a disposable image copy, ordinary PHP executed a deliberately changed physical kernel file while the packaged console loaded the original embedded `App\Kernel`.
+The qualification image adds missing development package records to `Composer\InstalledVersions` while preserving production versions and root metadata; this fixes the observed profiler boot failure without changing the packaged dependency graph.
+Focused native tests pass through the candidate: Doctrine coroutine isolation has two tests and 16 assertions; coroutine logging has two tests and six assertions. The full backend run selected 13,247 tests in 1,193 files and is still running.
+
 Open acceptance:
 
 - Package generation and console boot passed; application runtime qualification remains open.
-- The private PHP builder resolves patch and PECL versions outside Composer's lock. This build selected PHP 8.5.12, igbinary 3.2.17RC1, inotify 3.0.1, msgpack 3.0.1, Redis 6.3.0 and Swoole 6.2.6; the latter differs from the application's current Swoole 6.2.4.
-- Remaining runtime gates cover ZEngine/source reflection during coroutine execution, extension feature parity, HTTP/worker behavior, coroutine isolation, drain/reload, operator separation and `PHP_BINARY` subprocess dispatch. The ordinary PHP runtime and physical resource tree remain required until those checks pass.
-- No backend suites or browser checks have run against a packaged application.
+- Remaining runtime gates cover the complete backend suites, HTTP/worker behavior, drain/reload and the independent operator lifecycle. The ordinary PHP runtime and physical resource tree remain required until those checks pass.
+- No browser checks have run against a packaged application.
 
 ## Forge-neutral CI
 
