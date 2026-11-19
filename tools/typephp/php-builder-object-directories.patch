@@ -1,9 +1,6 @@
 --- a/src/Build/SapiPhpBuilder.php
 +++ b/src/Build/SapiPhpBuilder.php
-@@ -131,6 +131,12 @@
-                 AtomicFile::write($configured, $configuration);
-             }
- 
+@@ -134,3 +134,9 @@
 +            // Some PECL configurations omit their nested out-of-tree object directories.
 +            preg_match_all('/^([^\s:]+\.lo):/m', (string) file_get_contents($build . '/Makefile'), $objectTargets);
 +            foreach ($objectTargets[1] as $target) {

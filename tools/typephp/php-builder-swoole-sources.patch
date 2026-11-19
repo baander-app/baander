@@ -1,7 +1,6 @@
 --- a/src/Build/PhpBuilderSource.php
 +++ b/src/Build/PhpBuilderSource.php
-@@ -47,7 +47,7 @@
- 
+@@ -48,6 +48,6 @@
          ksort($external, SORT_STRING);
          $version = OfficialPhpSource::version($officialSource);
 -        $fingerprint = substr(hash('sha256', json_encode($external, JSON_THROW_ON_ERROR)), 0, 16);

@@ -17,6 +17,7 @@ Root application Composer manifests are unchanged.
 Two builder-only patches address failures observed in real builds: missing nested igbinary object directories and Swoole's relative source-directory discovery.
 The rebuilt Makefile contains 145 Swoole object inputs, including the previously omitted module entry and coroutine system sources; the original PECL source remains unchanged.
 The focused code review and simplification pass found no remaining setup issues.
+Both patches apply with zero fuzz and reproduce the reviewed builder files byte for byte; the complete change passes `git diff --check`.
 
 Both `make typephp-build` and `make typephp-build-operator` passed with eight compilation jobs.
 Each package contains 13,217 files and 12,191 opcode blobs; nine skipped PHP files are IDE-helper declarations and Swoole library copies outside Composer's autoload paths, with no application PHP files skipped.
