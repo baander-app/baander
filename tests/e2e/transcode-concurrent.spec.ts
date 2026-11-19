@@ -1,4 +1,5 @@
 import { chromium, Browser, Page, expect, test } from '@playwright/test';
+import { openFixturePage } from './fixture-page';
 
 const SERVER_URL = process.env.SERVER_URL || 'http://localhost:9501';
 const VIEWER_COUNT = 3;
@@ -65,7 +66,7 @@ async function runViewer(context: Awaited<ReturnType<typeof browser.newContext>>
     }
   });
 
-  await page.goto(`${SERVER_URL}/__e2e/transcode.html`, { waitUntil: 'load' });
+  await openFixturePage(page, SERVER_URL, 'transcode.html');
 
   await page.waitForFunction(
     () => (window as any).manifestParsed === true && (window as any).levelCount >= 3,

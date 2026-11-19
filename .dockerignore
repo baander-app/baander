@@ -40,6 +40,8 @@ var/
 .env.local.php
 relay/honeypots/
 storage/muzak
+# Browser test pages load third-party players; they stay out of every image.
+tests/e2e
 storage/logs/*.{log,json}
 qodana.yaml
 

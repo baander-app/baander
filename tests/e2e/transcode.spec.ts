@@ -1,5 +1,6 @@
 import { chromium, Browser, Page } from 'playwright';
 import { test, expect } from '@playwright/test';
+import { openFixturePage } from './fixture-page';
 
 const SERVER_URL = process.env.SERVER_URL || 'http://localhost:9501';
 const VIDEO_ID = '019f66d8-d5a4-7f46-b7ad-34560b35bc2b';
@@ -24,7 +25,7 @@ test.describe('Baander on-the-fly transcode', () => {
 
     // Navigate to the E2E player page. Use 'load' because the player keeps
     // fetching HLS segments, so 'networkidle' would never fire.
-    await page.goto(`${SERVER_URL}/__e2e/transcode.html`, { waitUntil: 'load' });
+    await openFixturePage(page, SERVER_URL, 'transcode.html');
 
     // Wait for hls.js to parse the manifest and expose at least 3 levels.
     await page.waitForFunction(

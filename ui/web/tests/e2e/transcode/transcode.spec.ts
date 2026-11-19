@@ -21,7 +21,7 @@ const testHtml = (masterUrl: string) => `<!DOCTYPE html>
 <head>
   <meta charset="utf-8">
   <title>Transcode e2e</title>
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.7.4/dist/hls.min.js" integrity="sha384-p9vgU/7IYJWd3I4STrtqxqR/2cAQlhIX7D/HrTnIMEjjcUox165b7se7sxmm3zDg" crossorigin="anonymous"></script>
 </head>
 <body>
   <video id="video" controls width="640" height="360"></video>

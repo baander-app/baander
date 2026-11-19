@@ -14,7 +14,7 @@
   <video id="video" controls muted></video>
   <div id="status">Loading...</div>
   <div id="log"></div>
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.7.4/dist/hls.min.js" integrity="sha384-p9vgU/7IYJWd3I4STrtqxqR/2cAQlhIX7D/HrTnIMEjjcUox165b7se7sxmm3zDg" crossorigin="anonymous"></script>
   <script>
     const video = document.getElementById('video');
     const status = document.getElementById('status');
@@ -47,7 +47,7 @@
       // after the manifest request triggers session creation. The signed
       // segment endpoint waits up to 60s server-side, so raise hls.js's own
       // fragment-load timeout above that to avoid fragLoadTimeOut racing the
-      // encoder (KTD-2).
+      // encoder.
       fragLoadingTimeOut: 70000,
       manifestLoadingTimeOut: 30000,
     });

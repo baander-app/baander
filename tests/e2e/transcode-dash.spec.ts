@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openFixturePage } from './fixture-page';
 
 const SERVER_URL = process.env.SERVER_URL || 'http://localhost:9501';
 
@@ -20,7 +21,7 @@ test.describe('Baander on-the-fly DASH transcode', () => {
       }
     });
 
-    await page.goto(`${SERVER_URL}/__e2e/transcode-dash.html`, { waitUntil: 'load' });
+    await openFixturePage(page, SERVER_URL, 'transcode-dash.html');
 
     await page.waitForFunction(
       () => (window as any).manifestLoaded === true && (window as any).streamInitialized === true,
