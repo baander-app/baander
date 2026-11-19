@@ -12,6 +12,14 @@ namespace App\Shared\Infrastructure\Swoole;
  */
 final class Async
 {
+    /** @throws CoroutineCanceledException when the current coroutine has been cancelled */
+    public static function throwIfCanceled(): void
+    {
+        if (self::inCoroutine() && \Swoole\Coroutine::isCanceled()) {
+            throw new CoroutineCanceledException('The coroutine was cancelled.');
+        }
+    }
+
     /**
      * Outside a coroutine a signal ends this sleep early; sleepThroughSignals() lasts its full time.
      *

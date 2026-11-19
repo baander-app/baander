@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Media;
 use App\Transcode\Application\DTO\AudioRenditionInput;
 use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
+use App\Shared\Infrastructure\Swoole\CoroutineCanceledException;
 use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Application\DTO\AudioRenditionRuntimeSnapshot;
 use App\Transcode\Application\Exception\AudioRenditionBusyException;
@@ -18,6 +19,7 @@ use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
 use App\Transcode\Infrastructure\Transcode\AudioRenditionCache;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\{PreserveGlobalState, RunInSeparateProcess};
 use Psr\Log\NullLogger;
 
 final class AudioRenditionCacheTest extends TestCase
@@ -107,6 +109,73 @@ final class AudioRenditionCacheTest extends TestCase
         self::assertSame('second', $chunks->current());
         $chunks->next();
         self::assertFalse($chunks->valid());
+    }
+
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testCancelledConsumerStopsBeforeAnotherRuntimeLookupOrBufferedChunk(): void
+    {
+        $lookups = 0;
+        $this->runtime->method('find')->willReturnCallback(function () use (&$lookups): AudioRenditionRuntimeSnapshot {
+            ++$lookups;
+            if (!is_file($this->path().'.part')) {
+                $this->write(str_repeat('x', 131_072), true);
+            }
+            return $this->snapshot('running');
+        });
+        $rendition = $this->cache()->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
+        $observed = [];
+        $partialPath = $this->path().'.part';
+        $hasOpenPartial = static function () use ($partialPath): bool {
+            foreach (get_resources('stream') as $stream) {
+                if ((stream_get_meta_data($stream)['uri'] ?? null) === $partialPath) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        \Swoole\Coroutine\run(static function () use ($rendition, &$lookups, &$observed, $hasOpenPartial): void {
+            $consumer = \Swoole\Coroutine::create(static function () use ($rendition, &$lookups, &$observed, $hasOpenPartial): void {
+                $chunks = $rendition->chunks();
+                if (!$chunks instanceof \Generator) {
+                    throw new \LogicException('Expected a progressive rendition generator.');
+                }
+                $observed['first_chunk'] = $chunks->current();
+                $observed['file_open_before'] = $hasOpenPartial();
+                $before = $lookups;
+                // A cancelled response write resumes its consumer the same way: the raw wait
+                // returns false, and iteration resumes the producer immediately after its yield.
+                $observed['waiting'] = true;
+                $observed['wait'] = \Swoole\Coroutine::sleep(10);
+                try {
+                    $chunks->next();
+                    $observed['exception'] = null;
+                } catch (CoroutineCanceledException $error) {
+                    $observed['exception'] = $error::class;
+                }
+                $observed['further_lookups'] = $lookups - $before;
+                $observed['valid'] = $chunks->valid();
+                $observed['file_open_after'] = $hasOpenPartial();
+            });
+            $deadline = microtime(true) + 2;
+            while (!($observed['waiting'] ?? false) && microtime(true) < $deadline) {
+                \Swoole\Coroutine::sleep(.001);
+            }
+            $observed['cancelled'] = \Swoole\Coroutine::cancel($consumer);
+        });
+
+        self::assertNotSame('', $observed['first_chunk']);
+        self::assertStringStartsWith($observed['first_chunk'], str_repeat('x', 131_072));
+        self::assertGreaterThan(strlen($observed['first_chunk']), filesize($partialPath));
+        self::assertSame(str_repeat('x', 131_072), file_get_contents($partialPath));
+        self::assertTrue($observed['file_open_before']);
+        self::assertFalse($observed['wait']);
+        self::assertTrue($observed['cancelled']);
+        self::assertSame(CoroutineCanceledException::class, $observed['exception']);
+        self::assertSame(0, $observed['further_lookups']);
+        self::assertFalse($observed['valid']);
+        self::assertFalse($observed['file_open_after']);
     }
 
     public function testPinnedReaderRejectsAReplacementBeforeYieldingMoreBytes(): void

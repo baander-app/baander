@@ -12,6 +12,8 @@ declare(strict_types=1);
  *   /throws   a stream whose generator throws after its first chunk
  *   /held     a stream that waits forever after its first 16 KB chunk, as a rendition still encoding does
  *   /range    a byte-range file response of <directory>/range.bin
+ *   /buffered sends buffered chunks until cancelled; /buffered-state confirms a blocked write
+ *   /abort-buffered cuts that stream and reports producer progress and cleanup
  *   /abort    cuts every stream in flight (InFlightStreamAborter, as WorkerDrain does) and answers
  *             how many were in flight
  *   /stats    the requests and streams in flight, not counting this one
@@ -58,7 +60,32 @@ $processor = new ResponseHeadersAndStatusProcessor(new StreamedResponseProcessor
     $streams,
 ));
 
-$server->on('request', static function (SwooleRequest $request, SwooleResponse $response) use ($server, $streams, $aborter, $processor, $rangeFile, $record): void {
+$bufferedProduced = 0;
+$bufferedFinished = false;
+$bufferedCid = null;
+$bufferedChunks = static function () use (&$bufferedProduced, &$bufferedFinished, &$bufferedCid, $record): Generator {
+    $bufferedCid = \Swoole\Coroutine::getCid();
+    $chunk = str_pad('buffered-body-', 65_536, '.');
+    try {
+        for ($index = 0; $index < 1024; ++$index) {
+            ++$bufferedProduced;
+            yield $chunk;
+            Async::throwIfCanceled();
+            // Stand in for the producer's next runtime lookup and filesystem work.
+            for ($work = 0; $work < 8; ++$work) {
+                hash('sha256', $chunk, true);
+            }
+        }
+        for (;;) {
+            Async::sleep(.05);
+        }
+    } finally {
+        $bufferedFinished = true;
+        $record('buffered_finally');
+    }
+};
+
+$server->on('request', static function (SwooleRequest $request, SwooleResponse $response) use ($server, $streams, $aborter, $processor, $rangeFile, $record, $bufferedChunks, &$bufferedProduced, &$bufferedFinished, &$bufferedCid): void {
     $foundation = match ($request->server['request_uri']) {
         '/ends' => new StreamedResponse(static function (): void {
             echo 'first-';
@@ -86,6 +113,12 @@ $server->on('request', static function (SwooleRequest $request, SwooleResponse $
                 throw $cancelled;
             }
         }),
+        '/buffered' => new StreamedResponse(static function () use ($bufferedChunks): void {
+            foreach ($bufferedChunks() as $chunk) {
+                echo $chunk;
+                flush();
+            }
+        }),
         '/range' => new SwooleRangeFileResponse($rangeFile, 0, (int) filesize($rangeFile), (int) filesize($rangeFile), 'application/octet-stream'),
         default => null,
     };
@@ -95,6 +128,22 @@ $server->on('request', static function (SwooleRequest $request, SwooleResponse $
         return;
     }
     $response->end(match ($request->server['request_uri']) {
+        '/buffered-state' => (static function () use (&$bufferedCid, &$bufferedProduced): string {
+            $blocked = false;
+            $frames = $bufferedCid === null ? [] : (\Swoole\Coroutine::getBackTrace($bufferedCid, DEBUG_BACKTRACE_IGNORE_ARGS, 12) ?: []);
+            foreach ($frames as $frame) {
+                if (($frame['class'] ?? '') === SwooleResponse::class && ($frame['function'] ?? '') === 'write') {
+                    $blocked = true;
+                }
+            }
+            return json_encode(['blocked' => $blocked, 'produced' => $bufferedProduced], JSON_THROW_ON_ERROR);
+        })(),
+        '/abort-buffered' => (static function () use ($streams, $aborter, &$bufferedProduced, &$bufferedFinished): string {
+            $before = $bufferedProduced;
+            $inFlight = $streams->count();
+            $aborter->abortAll();
+            return json_encode(['cut' => $inFlight, 'before' => $before, 'after' => $bufferedProduced, 'finished' => $bufferedFinished], JSON_THROW_ON_ERROR);
+        })(),
         '/abort' => (static function () use ($streams, $aborter): string {
             $inFlight = $streams->count();
             $aborter->abortAll();
