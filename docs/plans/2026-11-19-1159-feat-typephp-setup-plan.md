@@ -118,13 +118,13 @@ flowchart TB
   Candidate --> Paired[Existing paired operator and lifecycle drills]
 ```
 
-The current setup's successful package builds and console listing are recorded in `tools/typephp/README.md` and `ROADMAP.md`; they do not establish runtime acceptance. `packages/baander-tooling/src/Backend/Runtime.php` invokes literal `php` and requires the canonical root, while `scripts/backend-test-runner.php` starts PHPUnit and ParaTest through `PHP_BINARY`. The web and worker fixtures also launch scripts through ordinary PHP command shapes. Therefore a candidate image tag alone does not prove that these tests execute the generated artifact.
+The initial setup's successful package builds and console listing are recorded in `tools/typephp/README.md` and `ROADMAP.md`; they do not establish runtime acceptance. `packages/baander-tooling/src/Backend/Runtime.php` invokes literal `php` and requires the canonical root, while `scripts/backend-test-runner.php` starts PHPUnit and ParaTest through `PHP_BINARY`. The web and worker fixtures also launch scripts through ordinary PHP command shapes. Therefore a candidate image tag alone does not prove that these tests execute the generated artifact.
 
 ### Open Questions and Execution Gates
 
 - Setup can proceed independently of runtime qualification. The matching build image is part of setup; a known host NTS mismatch alone does not complete the package attempt.
 - Package generation must verify the selected PHP/PHPX prerequisites and production dependency tree before running; `--dry` also provisions runtime dependencies and is not a syntax-only check.
-- Runtime qualification proceeds through U4–U7 using disposable services only. Application acceptance remains blocked until the generated executable proves ZEngine, source reflection, extensions, path resolution and subprocess behavior. Failures must be recorded with the failing command and diagnostic, then resolved within the packaging design or brought back as a concrete design decision.
+- Runtime qualification proceeds through U4–U7 using disposable services only. Application acceptance requires the generated executable to prove ZEngine, source reflection, extensions, path resolution and subprocess behavior. Failures must be recorded with the failing command and diagnostic, then resolved within the packaging design or brought back as a concrete design decision.
 - A distributable runtime must use verified PHP 8.5.12 ZTS and extension versions matching the application. The builder image alone does not pin the private PHP runtime; KTD10 supplies exact PHP and PECL source selection. Verify the generated runtime against that lock before publication.
 
 ## Implementation Units
@@ -198,6 +198,8 @@ The current setup's successful package builds and console listing are recorded i
 
 - Stream-cancellation verification: retain the real blocked Swoole response-write regression as a failing-before/passing-after check for the checkpoint. Require prompt cancellation, generator cleanup, no payload on process stdout and the existing partial-transfer contract. The temporary ordinary/candidate probe verifies the sender is blocked in `Response::write()` and then records one reset, no terminating chunk, empty stream/request registries and generator cleanup; turn that probe into maintained coverage without weakening these assertions. Cover the uncancelled and non-coroutine helper paths and the actual audio generator, not only a synthetic yielding loop. Run the focused checks under ordinary CI and the candidate, then rebuild the application and repeat the unchanged complete shutdown drill, production boot, native focused fixtures and full backend/runtime matrix on the final single artifact. A successful diagnostic probe does not close the application gate.
 
+- Current runtime checkpoint: the single application ELF `fbef8d92218d62ec93dfa774de5879e170609f782667851b3ab3d247261d7452` in image `sha256:688281c69ffd9719c9f01139ed8f3b34d76afac462960b8032730900f6a6b315` passes the complete unchanged shutdown drill in 212.7 seconds, including the stalled-client case in 4.3 seconds. Outbox, producer, web runtime and worker-command drills pass in 40.5, 35.5, 94.6 and 470.6 seconds. Operator and Redis/PostgreSQL lifecycle drills pass in 165.7 and 512.2 seconds. Five observed boot groups cover the operator boot and both predecessor/successor pairs; actual operator, control and execution processes plus explicit `baander operator status` calls identify that ELF. The lifecycle evidence matches the exact container identities and verifies cleanup in both phases. Production boot without the test loader, embedded entry-script provenance, PDO and focused candidate checks also pass. The final backend gate passes with four workers and coverage disabled: 13,257 tests and 145,892 assertions across six lanes, with zero errors, failures or skipped tests. All expected test identities match the observed results, and owned-resource cleanup passes. Executable inspection records 26 representative category/lane captures matching the same ELF: the discovery runner and its PHPUnit child, plus each lane's runner, ParaTest, PHPUnit wrapper and a nested `PHP_BINARY` child. These captures establish representative process identity, not observation of every child. This completes application qualification for the documented Linux/PHP 8.5.12 ZTS profile; the physical resource tree, native libraries and external writable state remain required. The separate root Composer normalization issue remains open.
+
 ### U7. Consolidate entry points into one executable
 
 - Goal: deliver the user-selected single application binary with explicit `console` and `operator` arguments (R1, R2; AE5; KTD1, KTD3, KTD7, KTD8).
@@ -210,6 +212,8 @@ The current setup's successful package builds and console listing are recorded i
 ## Verification Contract
 
 Setup gates are `composer --working-dir=tools/typephp validate --strict`, a locked install, compiler version/help, YAML parsing, embedding-scope inspection and `git diff --check`.
+
+Static checks use the ordinary CI interpreter against the final source and locked dependencies. Composer validation and PHPStan pass; Deptrac reports zero violations with 452 existing baseline skips. The Composer normalization check exits 1 because the existing root `composer.json` orders its script entries differently from the normalizer. The root Composer files are unchanged from `9542816c9`; normalization remains a separate pre-existing metadata issue.
 A real package build is the integration check for the new configuration; failure is a blocker to package acceptance, not a passing build.
 No backend behavior changes are planned during setup, so backend suites do not substitute for this compiler check.
 
