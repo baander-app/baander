@@ -105,6 +105,7 @@ It includes igbinary and msgpack because the pinned builder's static scan treats
 The supplemental extension list includes the application's Imagick, mailparse, Excimer, YAML and UV modules, plus mysqlnd, PDO SQLite, SQLite3 and readline.
 The lock selects Swoole 6.2.4 to match the current application image; the initial packages used Swoole 6.2.6.
 The GD, Redis and Swoole feature flags are recorded in [runtime-lock.json](runtime-lock.json); Swoole keeps its existing thread backend with io_uring disabled.
+The private runtime loads 58 extensions. The console package loads one additional generated module, `typephp_baander`, for a total of 59.
 Qualification must compare the resulting extension inventory and features with the current application image; source selection alone does not prove the generated runtime behaves correctly.
 
 The [upstream embedding contract](https://github.com/swoole/typephp/blob/41d91fe69d2f7ec99dffe252a95244793000c6d2/docs/en/EMBEDDED_FILES.md) describes bytecode/runtime compatibility and filesystem limits.
@@ -170,10 +171,30 @@ The candidate INI sets `register_argc_argv=0`, matching CI. Enabling it emits a 
 Development dependencies remain outside both packaged executables.
 The ordinary CI PHP is retained for diagnostics; executable-identity checks must prove each runner uses the packaged runtime.
 The paired worker drills create and remove their own Docker resources. They require the documented host resources and a controlled Docker endpoint; operator help alone does not qualify deployment behavior.
+The worker-command drill keeps its disposable checkout at the configured application root. With image checkout enabled, Docker populates its named volume from the image; host checkout mode disables that population and stages the selected files explicitly. Relocating the console to `/workspace` caused its physical Composer loader to redeclare the embedded initializer.
+
+Run the focused interpreter and filesystem regressions after building the qualification image:
+
+```sh
+for typephp_executable in baander baander-operator; do
+  docker run --rm --network none --entrypoint php baander-typephp-qualification:local \
+    tools/typephp/tests/cli.php "/usr/local/lib/typephp/$typephp_executable"
+  docker run --rm --network none --entrypoint php baander-typephp-qualification:local \
+    tools/typephp/tests/bootstrap.php "/usr/local/lib/typephp/$typephp_executable"
+  docker run --rm --network none \
+    --entrypoint "/usr/local/lib/typephp/$typephp_executable" baander-typephp-qualification:local \
+    tools/typephp/tests/filesystem.php
+done
+docker run --rm --network none --entrypoint php baander-typephp-qualification:local \
+  tools/typephp/tests/dispatch.php
+```
+
+The PDO fixture requires an explicit disposable PostgreSQL connection through `TYPEPHP_TEST_PG_DSN`, `TYPEPHP_TEST_PG_USER` and `TYPEPHP_TEST_PG_PASSWORD`. It does not infer a connection from the application's database settings.
 
 The rebuilt private runtime and final packaged console passed the synchronous and coroutine PostgreSQL COPY, LOB, PID and notification checks, SQLite queries and coroutine-yield check in [the PDO fixture](tests/pdo.php).
 Both final executables passed [the CLI regression checks](tests/cli.php); [the dispatcher checks](tests/dispatch.php) passed all four executable-identity cases.
 The console booted through its default entry and explicit script entry, listed commands and warmed the production cache. It also booted with the qualification loader after the development package metadata correction.
+Production cache warmup also passed with `APP_ENV=prod`, `APP_DEBUG=0`, `BAANDER_TYPEPHP_QUALIFICATION=0` and `-d auto_prepend_file=`, disabling the external test loader.
 In a disposable copied tree, ordinary PHP threw the marker inserted into the physical kernel while the packaged runtime loaded its embedded kernel, proving that the check executed embedded application code.
 The focused native tests passed: [ContextualDoctrineRegistryTest](../../tests/Unit/Shared/Infrastructure/Swoole/ContextualDoctrineRegistryTest.php) ran 2 tests and 16 assertions, and [CoroutineSafeLoggingTest](../../tests/Unit/Shared/Infrastructure/Swoole/CoroutineSafeLoggingTest.php) ran 2 tests and 6 assertions.
 Both executables passed all 11 [qualification bootstrap checks](tests/bootstrap.php), including explicit prepend exits and failure statuses, and all 142 [filesystem checks](tests/filesystem.php). Embedded-file and directory access and kernel autoload also passed after removing the physical source tree in a disposable container.

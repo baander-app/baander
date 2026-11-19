@@ -51,7 +51,10 @@ Matching CI's disabled `register_argc_argv` removes the PHP 8.5 diagnostic that 
 The focused rerun of ten affected test files passes: 71 tests and 5,315 assertions, including isolated heap tests, ZEngine, worker subprocesses, socket cleanup and progressive media publication. Code review and the simplification pass have no remaining findings; PHP syntax, patch application and whitespace checks pass.
 
 The current console is 317,524,712 bytes, SHA-256 `d93a46dad8106c87254f750f06a8654021c3765739bd340087ef9ee8e5a714d4`; the operator is 317,525,056 bytes, SHA-256 `e9158bec9839eb88b6a874f1da0dc0315808a143027f6799e2f0fc941b9b0c73`. File/blob counts and skipped-file scope are unchanged.
+The packaged console loads 59 extensions: the private runtime's 58 plus the generated `typephp_baander` module. Production cache warmup passes with the qualification marker and external test loader disabled.
 The qualification image is `sha256:00366efff99fa1bc79eeeb37c842782a7aaf7fd6b573d2ec21c16ce39eeb13c2`. Process inspection confirms the backend runner, ParaTest and test children use the packaged executable. A fresh full run selected 13,247 tests in 1,193 files across six lanes with four workers; results remain pending.
+
+The worker-command fixture's relocation to `/workspace` caused a duplicate Composer initializer declaration in a disposable candidate probe. The reviewed fixture correction keeps its shared volume, working directory and added listener at the configured application root. Image mode uses Docker's initial volume population; host mode disables that population and stages its checkout explicitly. The candidate passes the relevant tooling checks: 53 tests and 187 assertions across worker drill, application layout and source-policy tests. PHP syntax, the tooling formatter, simplification and focused review pass; the actual worker-command drill remains pending.
 
 Open acceptance:
 
