@@ -280,6 +280,10 @@ top of `c47af96fb`: the docs-book rewrite (`20be3f1df` to `0d017641f` and its ro
 record). Pushed on 2026-11-17, on top of `f5065dcfe`: the docs-book rewrite follow-ups
 (`9b72c2185` to their roadmap record).
 
+- **OAuth pushed authorization requests.** In progress on
+  `fix/compact-site-navigation-footer`, draft pull request baander-app/baander#15,
+  which also carries the finished compact site navigation; see
+  [OAuth pushed authorization requests and private_key_jwt](#oauth-pushed-authorization-requests-and-private_key_jwt).
 - **Website feature pages.** On `master` since 2026-11-18, merged from
   `feat/site-feature-pages` in `464fad883`, pushed to both forges and published to
   `https://baander.app`: the `/features/` overview and nine feature pages, and the
@@ -672,6 +676,37 @@ Still to do:
     who grants library access.
   - The homepage's fourth equalizer slide speaks of device profiles, which its new
     picture does not show; the first slide's picture shows them.
+
+## OAuth pushed authorization requests and private_key_jwt
+
+In progress since 2026-11-19 on `fix/compact-site-navigation-footer`, from
+`docs/plans/2026-11-19-1148-feat-oauth-pushed-authorization-requests-plan.md`. The
+branch is published as draft pull request baander-app/baander#15 and pushed to
+Forgejo. Every authorization-code request is to go through a pushed authorization
+request (RFC 9126) bound to a DPoP key. Confidential clients gain `private_key_jwt`
+(RFC 7523 as updated by RFC 10070), with an inline JWKS or a `jwks_uri`.
+
+Landed on the branch:
+
+- `1ef91019b`: the consent page sends only `client_id` and `request_uri`, and takes
+  the redirect target from the server.
+- `6b6b6c013`: each client stores its authentication method and key source, with
+  check constraints tying the secret and the keys to the method.
+- `7f891d6b9`: pushed requests are stored as single-use rows, purged with expired
+  codes. Authorization codes carry a required DPoP thumbprint and live 60 seconds.
+- `9f61ef0be`: the token endpoint authenticates each client by its registered
+  method, including client assertions with a single-use `jti`.
+
+Open:
+
+- The pushed request endpoint, the authorization endpoint on pushed requests, and
+  the key check at the token endpoint. Until the authorization endpoint moves,
+  `OAuthGrantPathAcceptanceTest` (verifier case) and `DisabledUserAccessTest`
+  (pre-disable code case) fail, and consent fails end to end.
+- Fetching `jwks_uri` key sets; a `jwks_uri` client fails closed until then.
+- Registering key clients and replacing keys in the admin API, the console and the
+  web admin.
+- The operator and developer guides.
 
 ## Compact website navigation and footer
 
