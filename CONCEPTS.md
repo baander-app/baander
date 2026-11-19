@@ -79,6 +79,20 @@ The user's public ID encoded for passkey registration, authentication and accoun
 
 It identifies the account independently of the authenticator's credential ID.
 
+### First-party client
+
+The OAuth client registered for Baander's own web, desktop and mobile apps, named by `AUTH_SPA_CLIENT_ID`. Password and passkey login issue tokens only to it, and its tokens act with the user's full authority.
+
+A personal access client is not first-party, even though it skips the consent screen.
+
+### Delegated token
+
+An access token issued to any client other than the first-party client: a third-party app, a device or a personal access client. It reaches only the routes its granted scopes cover; every other route answers `insufficient_scope`.
+
+### Step-up re-authentication
+
+Proof of the current password, plus a current TOTP code when TOTP is enabled, that a signed-in user gives before a sensitive change to their own account: their email address, a new TOTP factor or a new passkey.
+
 ### Refresh token chain
 
 The sequence of refresh tokens one sign-in produces through rotation. Each rotation consumes the presented token and issues a replacement that links back to it; every token in the chain is bound to the same DPoP key. Revoking the chain ends that sign-in everywhere it was in use and closes the WebSocket connections it opened; it is what logout and reuse detection do.
