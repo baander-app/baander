@@ -27,7 +27,7 @@ interface AccessTokenRepositoryInterface
      * is stored, not revoked and not expired on the database clock. A rotation revokes the
      * access token it replaces, so a socket opened with that token stays open while its chain
      * lives; the chain is dead once every access token of it is revoked or expired. An id the
-     * database never stored is not returned. The list may be long: it is sent in chunks.
+     * database never stored, or one whose account is disabled, is not returned. The list may be long: it is sent in chunks.
      *
      * @param list<string> $tokenIds
      *

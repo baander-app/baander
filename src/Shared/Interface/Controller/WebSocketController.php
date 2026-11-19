@@ -42,6 +42,18 @@ final class WebSocketController extends AbstractWebSocketController
 {
     private const int MAX_MESSAGES_PER_SECOND = 30;
 
+    /** Frames past the rate limit are refused; at this many in one second the socket is closed. */
+    private const int CLOSE_AT_MESSAGES_PER_SECOND = 300;
+
+    /**
+     * Largest frame a client may send. Swoole's package_max_length also bounds HTTP
+     * request bodies, so it stays large and the controller enforces this cap.
+     */
+    private const int MAX_FRAME_BYTES = 65536;
+
+    private const int CLOSE_POLICY_VIOLATION = 1008;
+    private const int CLOSE_MESSAGE_TOO_BIG = 1009;
+
     /** @var array<int, string> FD => userId (populated on open, cleared on close) */
     private array $fdUsers = [];
 
@@ -51,6 +63,9 @@ final class WebSocketController extends AbstractWebSocketController
 
     /** @var array<int, list<float>> FD => list of microsecond timestamps */
     private array $rateLimitWindows = [];
+
+    /** @var array<int, true> FDs this controller closed; their remaining frames are dropped. */
+    private array $closingFds = [];
 
     public function __construct(
         private readonly WebSocketConnectionRegistry $registry,
@@ -123,9 +138,26 @@ final class WebSocketController extends AbstractWebSocketController
 
     public function onMessage(int $fd, string $data): void
     {
-        $payload = $this->deserialize($fd, $data);
+        if (isset($this->closingFds[$fd])) {
+            return;
+        }
 
-        if (!$this->checkRateLimit($fd)) {
+        if (strlen($data) > self::MAX_FRAME_BYTES) {
+            $this->logger?->warning('WebSocket frame too big', ['fd' => $fd, 'bytes' => strlen($data)]);
+            $this->closeAbusiveConnection($fd, self::CLOSE_MESSAGE_TOO_BIG, 'Message too big');
+
+            return;
+        }
+
+        $framesInLastSecond = $this->recordFrame($fd);
+        if ($framesInLastSecond >= self::CLOSE_AT_MESSAGES_PER_SECOND) {
+            $this->logger?->warning('WebSocket closed for sustained rate limit excess', ['fd' => $fd]);
+            $this->closeAbusiveConnection($fd, self::CLOSE_POLICY_VIOLATION, 'Message rate limit exceeded');
+
+            return;
+        }
+
+        if ($framesInLastSecond > self::MAX_MESSAGES_PER_SECOND) {
             $this->logger?->warning('WebSocket rate limited', ['fd' => $fd]);
 
             $this->pusher->pushToConnection($fd, [
@@ -136,6 +168,7 @@ final class WebSocketController extends AbstractWebSocketController
             return;
         }
 
+        $payload = $this->deserialize($fd, $data);
         if ($payload === null) {
             return;
         }
@@ -217,7 +250,8 @@ final class WebSocketController extends AbstractWebSocketController
         $this->liveSubscriptions->subscribe($fd, Uuid::fromString($userId));
     }
 
-    private function checkRateLimit(int $fd): bool
+    /** Records a frame and answers how many frames the connection sent in the last second. */
+    private function recordFrame(int $fd): int
     {
         $now = microtime(true);
         $window = $this->rateLimitWindows[$fd] ?? [];
@@ -225,7 +259,14 @@ final class WebSocketController extends AbstractWebSocketController
         $window[] = $now;
         $this->rateLimitWindows[$fd] = array_values($window);
 
-        return count($window) <= self::MAX_MESSAGES_PER_SECOND;
+        return count($window);
+    }
+
+    private function closeAbusiveConnection(int $fd, int $code, string $reason): void
+    {
+        $this->closingFds[$fd] = true;
+        unset($this->rateLimitWindows[$fd]);
+        $this->pusher->close($fd, $code, $reason);
     }
 
     /** @param array<array-key, mixed> $payload */
@@ -706,7 +747,7 @@ final class WebSocketController extends AbstractWebSocketController
         $this->liveSubscriptions->unsubscribe($fd);
         $this->listeningSessions->disconnectPlayback($fd);
         $this->registry->removeConnection($fd);
-        unset($this->fdUsers[$fd], $this->rateLimitWindows[$fd], $this->playbackEndpoints[$fd], $this->connectionGenerations[$fd]);
+        unset($this->fdUsers[$fd], $this->rateLimitWindows[$fd], $this->closingFds[$fd], $this->playbackEndpoints[$fd], $this->connectionGenerations[$fd]);
 
         $this->logger?->debug('WebSocket closed', ['fd' => $fd, 'userId' => $userId]);
     }

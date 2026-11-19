@@ -57,7 +57,7 @@ final class AccessTokenRepositoryTest extends TestCase
     // findTokenIdsOfLiveChains: the ids whose chain still has a live access token
     // =========================================================================
 
-    private const string LIVE_CHAIN_IDS_SQL = 'SELECT a.token_id FROM oauth_access_tokens a WHERE a.token_id IN (:ids) AND EXISTS (SELECT 1 FROM oauth_access_tokens live WHERE live.chain_id = a.chain_id AND live.revoked = FALSE AND (live.expires_at IS NULL OR live.expires_at > NOW()))';
+    private const string LIVE_CHAIN_IDS_SQL = 'SELECT a.token_id FROM oauth_access_tokens a JOIN users account ON account.id = a.user_id WHERE a.token_id IN (:ids) AND NOT account.disabled AND EXISTS (SELECT 1 FROM oauth_access_tokens live WHERE live.chain_id = a.chain_id AND live.revoked = FALSE AND (live.expires_at IS NULL OR live.expires_at > NOW()))';
 
     public function testFindTokenIdsOfLiveChainsAsksTheDatabaseWhichOfTheIdsBelongToAChainWithALiveAccessToken(): void
     {

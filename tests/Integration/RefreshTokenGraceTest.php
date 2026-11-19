@@ -23,6 +23,7 @@ use Doctrine\DBAL\Tools\DsnParser;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
+use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -485,6 +486,35 @@ final class RefreshTokenGraceTest extends TestCase
         self::assertSame([], $logger->records, 'A complete close logs nothing.');
         self::assertSame(200, $this->me($livePair['accessToken'])->getStatusCode(), 'The live token still works.');
         self::assertSame(200, $this->me($rotated['accessToken'])->getStatusCode(), 'The rotated chain still works.');
+    }
+
+    /** A disabled account's sockets are closed even though its chains were never revoked. */
+    public function testTheReconciliationClosesTheConnectionsOfADisabledAccount(): void
+    {
+        $pair = $this->login();
+        $tokenId = self::claims($pair['accessToken'])['jti'];
+        $registry = WebSocketConnectionRegistry::create(maxConnections: 16, maxRoomMembers: 16);
+        $registry->addConnection(1, $this->user->getId()->toString(), 0, $tokenId);
+        self::assertSame(1, $this->connection->executeStatement(
+            'UPDATE users SET disabled = TRUE WHERE id = ?',
+            [$this->user->getId()->toString()],
+        ));
+
+        $reconciler = new RevokedSocketReconciler(
+            $registry,
+            new AccessTokenRepository($this->manager, new JsonEncoder()),
+            new RecordingLiveConnections(RecordingLiveConnections::path(self::$sharedDirectory)),
+            new NullLogger(),
+            60,
+        );
+        $offset = RecordingLiveConnections::size(self::$sharedDirectory);
+
+        $reconciler->tick();
+
+        self::assertSame(
+            [[$tokenId]],
+            RecordingLiveConnections::closedAccessTokens(self::$sharedDirectory, (int) getmypid(), $offset),
+        );
     }
 
     // --- Rows and logs ---

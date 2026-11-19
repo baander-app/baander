@@ -78,7 +78,7 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
         foreach (array_chunk($tokenIds, self::LIVE_TOKEN_IDS_CHUNK) as $chunk) {
             /** @var list<string> $found */
             $found = $this->entityManager->getConnection()->fetchFirstColumn(
-                'SELECT a.token_id FROM oauth_access_tokens a WHERE a.token_id IN (:ids) AND EXISTS (SELECT 1 FROM oauth_access_tokens live WHERE live.chain_id = a.chain_id AND live.revoked = FALSE AND (live.expires_at IS NULL OR live.expires_at > NOW()))',
+                'SELECT a.token_id FROM oauth_access_tokens a JOIN users account ON account.id = a.user_id WHERE a.token_id IN (:ids) AND NOT account.disabled AND EXISTS (SELECT 1 FROM oauth_access_tokens live WHERE live.chain_id = a.chain_id AND live.revoked = FALSE AND (live.expires_at IS NULL OR live.expires_at > NOW()))',
                 ['ids' => $chunk],
                 ['ids' => ArrayParameterType::STRING],
             );

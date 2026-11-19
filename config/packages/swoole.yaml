@@ -52,7 +52,8 @@ swoole:
             pid_file: null
             # 2MB output buffer — balance between memory and streaming throughput
             buffer_output_size: 8388608
-            # 16MB max request body
+            # 16MB max request body. Swoole applies this to WebSocket frames too and has no
+            # separate frame limit, so WebSocketController closes frames over 64 KB itself.
             package_max_length: 16777216
             # The deployment profile bounds web processes and their database pools together.
             worker_count: '%env(baander_web_workers:BAANDER_DEPLOYMENT_PROFILE)%'

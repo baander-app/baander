@@ -1048,6 +1048,58 @@ final class WebSocketControllerTest extends TestCase
         $this->assertCount(32, $this->pushedMessages);
     }
 
+    public function testFramesOverTheRateLimitAreRefusedBeforeTheyAreDecoded(): void
+    {
+        $this->controller->onOpen(1, 'user-1', 'token-1');
+
+        for ($i = 0; $i < 31; ++$i) {
+            $this->controller->onMessage(1, '{not json');
+        }
+
+        $messages = array_column(array_column($this->allPushedPayloads(), 'payload'), 'message');
+        self::assertCount(30, array_keys($messages, 'Invalid JSON', true));
+        $this->assertLastPushMatches(1, 'error', ['message' => 'Rate limit exceeded']);
+    }
+
+    public function testSustainedTrafficOverTheRateLimitClosesTheSocketWithPolicyViolation(): void
+    {
+        $this->controller->onOpen(1, 'user-1', 'token-1');
+
+        for ($i = 0; $i < 299; ++$i) {
+            $this->controller->onMessage(1, json_encode(['type' => 'ping']));
+        }
+        self::assertSame([], $this->closedConnections);
+
+        $this->controller->onMessage(1, json_encode(['type' => 'ping']));
+        $this->controller->onMessage(1, json_encode(['type' => 'ping']));
+
+        self::assertSame([['fd' => 1, 'code' => 1008, 'reason' => 'Message rate limit exceeded']], $this->closedConnections);
+    }
+
+    public function testAFrameOverTheSizeCapClosesTheSocketWithMessageTooBigBeforeDecoding(): void
+    {
+        $this->controller->onOpen(1, 'user-1', 'token-1');
+        $pushedBefore = count($this->pushedMessages);
+
+        $this->controller->onMessage(1, json_encode(['type' => 'ping', 'padding' => str_repeat('a', 65536)]));
+
+        self::assertSame([['fd' => 1, 'code' => 1009, 'reason' => 'Message too big']], $this->closedConnections);
+        self::assertCount($pushedBefore, $this->pushedMessages, 'An oversized frame gets no answer.');
+    }
+
+    public function testAFrameAtTheSizeCapIsHandled(): void
+    {
+        $this->controller->onOpen(1, 'user-1', 'token-1');
+        $frame = json_encode(['type' => 'ping', 'padding' => '']);
+        $frame = json_encode(['type' => 'ping', 'padding' => str_repeat('a', 65536 - strlen($frame))]);
+
+        $this->controller->onMessage(1, $frame);
+
+        self::assertSame(65536, strlen($frame));
+        self::assertSame([], $this->closedConnections);
+        $this->assertLastPushMatches(1, 'pong');
+    }
+
     // --- onClose ---
 
     public function testOnCloseRemovesConnectionFromRegistry(): void
