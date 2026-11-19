@@ -1,7 +1,0 @@
-include: application.yml
-name: baander
-entry: console-entry.php
-sources:
-  - console-entry.php
-build-dir: ../../var/typephp/console
-output: ../../var/typephp/baander

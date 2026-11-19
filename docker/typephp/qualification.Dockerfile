@@ -20,14 +20,14 @@ RUN mkdir -p config/secrets/oauth var coverage \
     && composer tooling:autoload \
     && mkdir -p /usr/local/lib/typephp /usr/local/etc/typephp/conf.d \
     && php tools/typephp/dump-test-support.php /var/www/html /usr/local/lib/typephp/test-autoload.php \
-    && mv /usr/local/bin/php /usr/local/lib/typephp/ordinary-php \
+    && rm /usr/local/bin/php \
     && chown -R www-data:www-data var coverage config/secrets
 
-COPY --from=typephp-artifacts /baander /baander-operator /usr/local/lib/typephp/
+COPY --from=typephp-artifacts /baander /usr/local/lib/typephp/
 COPY tools/typephp/test-support.php /usr/local/lib/typephp/test-support.php
 COPY tools/typephp/qualification.ini /usr/local/etc/typephp/qualification.ini
-COPY tools/typephp/qualification-php /usr/local/bin/php
-RUN chmod 0755 /usr/local/bin/php /usr/local/lib/typephp/baander /usr/local/lib/typephp/baander-operator
+RUN chmod 0755 /usr/local/lib/typephp/baander \
+    && ln -s /usr/local/lib/typephp/baander /usr/local/bin/php
 ENV PHPRC=/usr/local/etc/typephp/qualification.ini \
     PHP_INI_SCAN_DIR=/usr/local/etc/typephp/conf.d \
     BAANDER_TYPEPHP_QUALIFICATION=1

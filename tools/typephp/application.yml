@@ -1,3 +1,9 @@
+name: baander
+entry: application-entry.php
+sources:
+  - application-entry.php
+build-dir: ../../var/typephp/application
+output: ../../var/typephp/baander
 mode: bin
 sapi: cli
 php-version: '8.5'
@@ -40,6 +46,7 @@ php-builder:
     - zlib
 embedded-files:
   - ../../bin/console
+  - ../../bin/worker-deployment.php
   - ../../src
   - ../../vendor
   - ../../packages/swoole-bundle/src
