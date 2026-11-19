@@ -69,7 +69,7 @@ test('visitor reaches operating model and source-based installation', async ({ p
   await expect(page.getByRole('heading', { name: 'Your files. A connected library.' })).toBeInViewport();
   await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: /Source/ }))
     .toHaveAttribute('href', 'https://github.com/baander-app/baander');
-  await expect(page.getByRole('navigation', { name: 'Footer navigation' }).getByRole('link', { name: 'Source', exact: true }))
+  await expect(page.getByRole('contentinfo').getByRole('link', { name: 'Source', exact: true }))
     .toHaveAttribute('href', 'https://github.com/baander-app/baander');
   await page.getByRole('link', { name: /Start hosting/ }).click();
   await expect(page).toHaveURL(/\/docs\/operator-guide\/getting-started\/$/);
