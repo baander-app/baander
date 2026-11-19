@@ -16,7 +16,8 @@ final class OAuthAccessTokenJwt
      *
      * An override replaces the derived claim verbatim, so `aud` can become a list or an object and a
      * claim can carry any JSON shape; a null override removes the claim. `exp` is the row's expiry,
-     * so an expired token is a row whose expiry lies in the past and the JWT and the row agree.
+     * so an expired token is a row whose expiry lies in the past and the JWT and the row agree. Baander
+     * is its own issuer and audience, so `iss` is the audience too.
      *
      * @param array<string, mixed> $claims
      */
@@ -29,7 +30,7 @@ final class OAuthAccessTokenJwt
         }
 
         $claims = array_filter([
-            'iss' => 'https://baander.app',
+            'iss' => $audience,
             'jti' => $token->getTokenId(),
             'sub' => $subject,
             'aud' => $audience,
