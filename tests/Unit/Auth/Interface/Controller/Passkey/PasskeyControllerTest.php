@@ -267,7 +267,7 @@ final class PasskeyControllerTest extends TestCase
     public function testAnAccountWithTotpOnNeedsAVerifiedUser(bool $verifiesUser, int $status): void
     {
         $owner = \App\Auth\Domain\Model\User::register(new \App\Shared\Domain\Model\Email('passkey@baander.app'), 'hash', 'Owner');
-        $owner->setTotpSecret('JBSWY3DPEHPK3PXP');
+        $owner->enableTotp('sealed-totp-secret');
         $credential = new \App\Tests\Fixtures\Auth\WebAuthnTestCredential($owner->getPublicId()->toString(), 'baander.app', verifiesUser: $verifiesUser);
         $passkey = $credential->passkey();
         $service = $this->authenticationOptionsService();

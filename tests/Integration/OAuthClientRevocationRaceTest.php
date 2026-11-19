@@ -59,7 +59,7 @@ final class OAuthClientRevocationRaceTest extends TestCase
 
         $this->userId = Uuid::generate();
         $this->userPublicId = new PublicId();
-        $this->manager->persist(new UserEntity($this->userPublicId, 'Race', OAuthRevocationRace::USER_EMAIL, 'hashed', '', $this->userId));
+        $this->manager->persist(new UserEntity($this->userPublicId, 'Race', OAuthRevocationRace::USER_EMAIL, 'hashed', $this->userId));
         $this->manager->flush();
         $this->client = Client::createPersonalAccess('Race client', $this->userId);
         (new ClientRepository($this->manager, new JsonEncoder()))->saveClient($this->client);

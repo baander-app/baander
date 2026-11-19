@@ -30,8 +30,8 @@ final class PushSubscriptionRegistrationRepositoryTest extends TestCase
 {
     public function testOwnerRotationPreservesForeignRowsAndDeliveryUsesPersistedNewKeys(): void
     {
-        $owner = new UserEntity(new PublicId(), 'Owner', 'push-register-owner@baander.app', 'test-only', '');
-        $other = new UserEntity(new PublicId(), 'Other', 'push-register-other@baander.app', 'test-only', '');
+        $owner = new UserEntity(new PublicId(), 'Owner', 'push-register-owner@baander.app', 'test-only');
+        $other = new UserEntity(new PublicId(), 'Other', 'push-register-other@baander.app', 'test-only');
         $this->entityManager->persist($owner);
         $this->entityManager->persist($other);
         $this->entityManager->flush();

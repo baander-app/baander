@@ -17,7 +17,7 @@ final class ThirdPartyCredentialRepositoryTest extends TestCase
 {
     public function testSavingExistingCredentialSynchronizesTokensWithoutChangingProvider(): void
     {
-        $user = new UserEntity(new PublicId(), 'Credential user', 'credential@baander.app', 'hashed', '');
+        $user = new UserEntity(new PublicId(), 'Credential user', 'credential@baander.app', 'hashed');
         $credential = ThirdPartyCredential::create($user->getId(), 'provider', 'new-token', 'refresh', metadata: ['scope' => 'read']);
         $entity = new ThirdPartyCredentialEntity(new PublicId(), $user, 'provider', 'old-token', id: $credential->getId());
         $repository = $this->createStub(EntityRepository::class);

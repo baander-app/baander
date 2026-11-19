@@ -120,7 +120,7 @@ final class OAuthAccessTokenJwtTest extends TestCase
     private function token(\DateTimeImmutable $expiresAt): AccessTokenEntity
     {
         $client = new ClientEntity(new PublicId(), 'Disposable client', json_encode(['https://baander.app/callback'], JSON_THROW_ON_ERROR));
-        $user = new UserEntity(new PublicId(), 'Actor', 'actor@baander.app', 'test-only-password-hash', 'test-only-totp-secret');
+        $user = new UserEntity(new PublicId(), 'Actor', 'actor@baander.app', 'test-only-password-hash');
         $token = new AccessTokenEntity((new Uuid())->toString(), $client, $user, scopes: ['library'], expiresAt: $expiresAt);
         $token->setDpopJkt('thumbprint-of-the-row');
 

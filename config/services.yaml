@@ -407,6 +407,13 @@ services:
     App\Auth\Application\Port\TotpVerifierInterface:
         alias: App\Auth\Infrastructure\Security\Totp\TotpVerifier
 
+    App\Auth\Infrastructure\Security\Totp\SodiumTotpSecretCipher:
+        arguments:
+            $encodedKey: '%env(AUTH_TOTP_ENCRYPTION_KEY)%'
+
+    App\Auth\Application\Port\TotpSecretCipherInterface:
+        alias: App\Auth\Infrastructure\Security\Totp\SodiumTotpSecretCipher
+
     # --- DPoP (RFC 9449) ---
     App\Auth\Application\Port\DpopJtiCacheInterface:
         alias: App\Auth\Infrastructure\Cache\RedisDpopJtiCache
@@ -458,13 +465,12 @@ services:
             $maxLifetimeSeconds: '%auth.client_assertion.max_lifetime%'
             $clockSkewSeconds: '%auth.dpop.clock_skew%'
 
-    App\Auth\Application\CommandHandler\Totp\EnableTotpHandler:
+    App\Auth\Application\Service\PendingTotpSecrets:
         arguments:
             $cache: '@cache.tags'
 
     App\Auth\Interface\Controller\Totp\TotpController:
         arguments:
-            $cache: '@cache.tags'
             $appName: '%app.name%'
 
     App\Auth\Application\Port\AccessTokenSigningKeyInterface:

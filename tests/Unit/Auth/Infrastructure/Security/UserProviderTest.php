@@ -43,7 +43,7 @@ final class UserProviderTest extends TestCase
             name: 'Test User',
             email: $email,
             password: $password,
-            totpSecret: null,
+            totpSecretCiphertext: null,
             createdAt: new \DateTimeImmutable(),
             updatedAt: new \DateTimeImmutable(),
         ));

@@ -4,262 +4,266 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Infrastructure\Security;
 
+use App\Auth\Application\DTO\VerifiedPasswordLogin;
+use App\Auth\Application\Exception\DpopStoreUnavailableException;
+use App\Auth\Application\Exception\TotpSecretUnavailableException;
+use App\Auth\Application\Port\DpopJtiCacheInterface;
 use App\Auth\Application\Port\PasswordHasherInterface;
+use App\Auth\Application\Port\TotpVerifierInterface;
 use App\Auth\Domain\Model\User;
+use App\Auth\Domain\Model\UserState;
 use App\Auth\Domain\Repository\LoginBlockRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
+use App\Auth\Infrastructure\Security\OAuth\DpopNonceManager;
+use App\Auth\Infrastructure\Security\OAuth\DpopProofValidator;
+use App\Auth\Infrastructure\Security\OAuth\DpopTokenRequestVerifier;
+use App\Auth\Infrastructure\Security\Passkey\DpopProofRejectedException;
 use App\Auth\Infrastructure\Security\User\PasswordAuthenticator;
-use App\Auth\Infrastructure\Security\Passkey\PasskeyAuthenticator;
-use App\Auth\Infrastructure\Security\Totp\TotpService;
-use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Tests\Fixtures\Auth\AuthenticationFailureMessages;
+use App\Tests\Fixtures\Auth\SignedDpopProof;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\HttpFoundation\Request;
+use Redis;
+use RedisException;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Exception\AuthenticationException;
+use Symfony\Component\Security\Core\Exception\BadCredentialsException;
+use Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class PasswordAuthenticatorTest extends TestCase
 {
+    private const string URI = 'https://baander.app/api/auth/login';
+
     private PasswordAuthenticator $authenticator;
-    private TotpService $totpService;
+    private TotpVerifierInterface&Stub $totpVerifier;
     private UserRepositoryInterface&Stub $userRepository;
     private PasswordHasherInterface&Stub $passwordHasher;
-    private LoggerInterface&Stub $logger;
+    private Redis&Stub $redis;
 
     protected function setUp(): void
     {
-        $this->totpService = new TotpService(issuer: 'Test', window: 0);
+        $this->totpVerifier = $this->createStub(TotpVerifierInterface::class);
         $this->userRepository = $this->createStub(UserRepositoryInterface::class);
         $this->passwordHasher = $this->createStub(PasswordHasherInterface::class);
-        $this->logger = $this->createStub(LoggerInterface::class);
+        $this->redis = $this->createStub(Redis::class);
+        // The proof's nonce was issued and is consumed once.
+        $this->redis->method('getDel')->willReturn('1');
+        $redis = $this->redis;
+        $factory = $this->createStub(RedisClientFactory::class);
+        $factory->method('borrow')->willReturnCallback(static fn (callable $callback): mixed => $callback($redis));
+        $jtiCache = $this->createStub(DpopJtiCacheInterface::class);
+        $jtiCache->method('isReplay')->willReturn(false);
+
         $this->authenticator = new PasswordAuthenticator(
-            $this->totpService,
+            $this->totpVerifier,
             $this->userRepository,
             $this->passwordHasher,
             $this->createStub(LoginBlockRepositoryInterface::class),
-            $this->logger,
+            $this->createStub(LoggerInterface::class),
             new JsonEncoder(),
             AuthenticationFailureMessages::create(),
+            new DpopTokenRequestVerifier(new DpopProofValidator($jtiCache), new DpopNonceManager($factory)),
         );
     }
 
     public function testSupportsCorrectRoute(): void
     {
-        $request = Request::create('/api/auth/login', 'POST');
-
-        $this->assertTrue($this->authenticator->supports($request));
+        $this->assertTrue($this->authenticator->supports(Request::create('/api/auth/login', 'POST')));
     }
 
     public function testDoesNotSupportWrongMethod(): void
     {
-        $request = Request::create('/api/auth/login', 'GET');
-
-        $this->assertFalse($this->authenticator->supports($request));
+        $this->assertFalse($this->authenticator->supports(Request::create('/api/auth/login', 'GET')));
     }
 
     public function testDoesNotSupportWrongPath(): void
     {
-        $request = Request::create('/api/auth/register', 'POST');
-
-        $this->assertFalse($this->authenticator->supports($request));
+        $this->assertFalse($this->authenticator->supports(Request::create('/api/auth/register', 'POST')));
     }
 
-    public function testAuthenticateThrowsOnMissingFields(): void
+    /** @return iterable<string, array{array<string, string>}> */
+    public static function incompleteCredentials(): iterable
     {
-        $request = Request::create('/api/auth/login', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], '{}');
+        yield 'no fields' => [[]];
+        yield 'no email' => [['password' => 'secret']];
+        yield 'no password' => [['email' => 'alice@baander.app']];
+    }
 
-        $this->expectException(\Symfony\Component\Security\Core\Exception\BadCredentialsException::class);
+    /** @param array<string, string> $body */
+    #[DataProvider('incompleteCredentials')]
+    public function testIncompleteCredentialsAreInvalid(array $body): void
+    {
+        $this->expectException(BadCredentialsException::class);
         $this->expectExceptionMessage('Invalid credentials.');
 
-        $this->authenticator->authenticate($request);
+        $this->authenticator->authenticate($this->request($body));
     }
 
-    public function testAuthenticateThrowsOnMissingEmail(): void
-    {
-        $payload = json_encode(['password' => 'secret']);
-        $request = Request::create('/api/auth/login', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], $payload);
-
-        $this->expectException(\Symfony\Component\Security\Core\Exception\BadCredentialsException::class);
-        $this->expectExceptionMessage('Invalid credentials.');
-
-        $this->authenticator->authenticate($request);
-    }
-
-    public function testAuthenticateThrowsOnMissingPassword(): void
-    {
-        $payload = json_encode(['email' => 'alice@baander.app']);
-        $request = Request::create('/api/auth/login', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], $payload);
-
-        $this->expectException(\Symfony\Component\Security\Core\Exception\BadCredentialsException::class);
-        $this->expectExceptionMessage('Invalid credentials.');
-
-        $this->authenticator->authenticate($request);
-    }
-
-    public function testAuthenticateThrowsOnUserNotFound(): void
+    public function testAnUnknownUserIsInvalid(): void
     {
         $this->userRepository->method('findByEmail')->willReturn(null);
 
-        $payload = json_encode(['email' => 'alice@baander.app', 'password' => 'secret']);
-        $request = Request::create('/api/auth/login', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], $payload);
-
-        $this->expectException(\Symfony\Component\Security\Core\Exception\BadCredentialsException::class);
+        $this->expectException(BadCredentialsException::class);
         $this->expectExceptionMessage('Invalid credentials.');
 
-        $this->authenticator->authenticate($request);
+        $this->authenticator->authenticate($this->request(['email' => 'alice@baander.app', 'password' => 'secret']));
     }
 
-    public function testAuthenticateThrowsOnInvalidPassword(): void
+    public function testAWrongPasswordIsInvalid(): void
     {
-        $user = $this->createUser(totpSecret: null);
-        $this->userRepository->method('findByEmail')->willReturn($user);
+        $this->userRepository->method('findByEmail')->willReturn($this->createUser());
         $this->passwordHasher->method('verify')->willReturn(false);
 
-        $payload = json_encode(['email' => 'alice@baander.app', 'password' => 'wrong']);
-        $request = Request::create('/api/auth/login', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], $payload);
-
-        $this->expectException(\Symfony\Component\Security\Core\Exception\BadCredentialsException::class);
+        $this->expectException(BadCredentialsException::class);
         $this->expectExceptionMessage('Invalid credentials.');
 
+        $this->authenticator->authenticate($this->request(['email' => 'alice@baander.app', 'password' => 'wrong']));
+    }
+
+    public function testAPasswordSignsInAnAccountWithoutTotp(): void
+    {
+        $user = $this->createUser();
+        $this->userRepository->method('findByEmail')->willReturn($user);
+        $this->passwordHasher->method('verify')->willReturn(true);
+        $request = $this->request(['email' => 'alice@baander.app', 'password' => 'secret']);
+
+        $passport = $this->authenticator->authenticate($request);
+
+        $this->assertSame($user->getEmail(), $passport->getUser()->getUserIdentifier());
+        $login = $request->attributes->get(VerifiedPasswordLogin::class);
+        $this->assertInstanceOf(VerifiedPasswordLogin::class, $login);
+        $this->assertNull($login->totpStep);
+    }
+
+    /** The matched step travels to the controller, which spends it with the tokens. */
+    public function testAMatchingCodeCarriesItsStepToIssuance(): void
+    {
+        $user = $this->createUser('sealed-secret');
+        $this->userRepository->method('findByEmail')->willReturn($user);
+        $this->passwordHasher->method('verify')->willReturn(true);
+        $this->totpVerifier->method('matchEnrolledStep')->willReturn(58_000_001);
+        $request = $this->request(['email' => 'alice@baander.app', 'password' => 'secret', 'totpCode' => '123456']);
+
         $this->authenticator->authenticate($request);
+
+        $login = $request->attributes->get(VerifiedPasswordLogin::class);
+        $this->assertInstanceOf(VerifiedPasswordLogin::class, $login);
+        $this->assertSame(58_000_001, $login->totpStep);
+        $this->assertSame($user->getId(), $login->userId);
     }
 
-    public function testAuthenticateSucceedsWithPasswordOnlyForUserWithoutTotp(): void
+    /** @return iterable<string, array{array<string, string>}> */
+    public static function withoutCode(): iterable
     {
-        $user = $this->createUser(totpSecret: null);
-        $this->userRepository->method('findByEmail')->willReturn($user);
-        $this->passwordHasher->method('verify')->willReturn(true);
-
-        $payload = json_encode(['email' => 'alice@baander.app', 'password' => 'secret']);
-        $request = Request::create('/api/auth/login', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], $payload);
-
-        $passport = $this->authenticator->authenticate($request);
-
-        $this->assertSame($user->getEmail(), $passport->getUser()->getUserIdentifier());
+        yield 'no code' => [['email' => 'alice@baander.app', 'password' => 'secret']];
+        yield 'empty code' => [['email' => 'alice@baander.app', 'password' => 'secret', 'totpCode' => '']];
     }
 
-    public function testAuthenticateSucceedsWithValidTotpCode(): void
+    /** @param array<string, string> $body */
+    #[DataProvider('withoutCode')]
+    public function testATotpAccountWithoutACodeIsAskedForOne(array $body): void
     {
-        $secret = 'JBSWY3DPEHPK3PXP';
-        $user = $this->createUser(totpSecret: $secret);
-        $this->userRepository->method('findByEmail')->willReturn($user);
+        $this->userRepository->method('findByEmail')->willReturn($this->createUser('sealed-secret'));
         $this->passwordHasher->method('verify')->willReturn(true);
 
-        // Generate a real TOTP code that will pass verification
-        $totp = \OTPHP\TOTP::create($secret);
-        $validCode = $totp->now();
+        $exception = $this->failure($this->request($body));
 
-        $payload = json_encode(['email' => 'alice@baander.app', 'password' => 'secret', 'totpCode' => $validCode]);
-        $request = Request::create('/api/auth/login', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], $payload);
-
-        $passport = $this->authenticator->authenticate($request);
-
-        $this->assertSame($user->getEmail(), $passport->getUser()->getUserIdentifier());
+        $this->assertInstanceOf(CustomUserMessageAuthenticationException::class, $exception);
+        $this->assertSame('AUTH_TOTP_REQUIRED', $exception->getMessageData()['error_code']);
     }
 
-    public function testAuthenticateThrowsTotpRequiredWhenTotpEnabledAndNoCode(): void
+    public function testACodeThatMatchesNoStepIsInvalid(): void
     {
-        $user = $this->createUser(totpSecret: 'JBSWY3DPEHPK3PXP');
-        $this->userRepository->method('findByEmail')->willReturn($user);
+        $this->userRepository->method('findByEmail')->willReturn($this->createUser('sealed-secret'));
         $this->passwordHasher->method('verify')->willReturn(true);
+        $this->totpVerifier->method('matchEnrolledStep')->willReturn(null);
 
-        $payload = json_encode(['email' => 'alice@baander.app', 'password' => 'secret']);
-        $request = Request::create('/api/auth/login', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], $payload);
+        $this->expectException(BadCredentialsException::class);
+        $this->expectExceptionMessage('Invalid credentials.');
 
-        $this->expectException(\Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException::class);
-        $this->expectExceptionMessage('TOTP code is required.');
+        $this->authenticator->authenticate($this->request(['email' => 'alice@baander.app', 'password' => 'secret', 'totpCode' => '000000']));
+    }
+
+    public function testASecretThatCannotBeOpenedIsUnavailableNotOff(): void
+    {
+        $this->userRepository->method('findByEmail')->willReturn($this->createUser('sealed-under-another-key'));
+        $this->passwordHasher->method('verify')->willReturn(true);
+        $this->totpVerifier->method('matchEnrolledStep')->willThrowException(TotpSecretUnavailableException::forStoredSecret());
+        $request = $this->request(['email' => 'alice@baander.app', 'password' => 'secret', 'totpCode' => '123456']);
+
+        $response = $this->authenticator->onAuthenticationFailure($request, $this->failure($request));
+
+        $this->assertSame(401, $response->getStatusCode());
+        $this->assertSame(
+            ['error' => ['message' => 'Two-factor sign-in is unavailable for this account. Ask your administrator to reset its two-factor authentication.', 'code' => 'AUTH_TOTP_UNAVAILABLE']],
+            json_decode((string) $response->getContent(), true),
+        );
+        $this->assertFalse($request->attributes->has(VerifiedPasswordLogin::class));
+    }
+
+    /** A nonce challenge comes before the credentials, so the code stays unspent for the retry. */
+    public function testAProofWithoutANonceIsChallengedBeforeTheCredentialsAreRead(): void
+    {
+        $this->userRepository->method('findByEmail')->willReturnCallback(static fn (): never => self::fail('Credentials must not be read before the proof is accepted.'));
+        $request = $this->request(['email' => 'alice@baander.app', 'password' => 'secret', 'totpCode' => '123456'], (new SignedDpopProof())->create('POST', self::URI, 'no-access-token'));
+
+        $exception = $this->failure($request);
+
+        $this->assertInstanceOf(DpopProofRejectedException::class, $exception);
+        $response = $this->authenticator->onAuthenticationFailure($request, $exception);
+        $this->assertSame(400, $response->getStatusCode());
+        $this->assertTrue($response->headers->has('DPoP-Nonce'));
+    }
+
+    public function testAStoreOutageIsAnsweredWith503BeforeTheCredentials(): void
+    {
+        $this->redis->method('setex')->willThrowException(new RedisException('Connection refused'));
+        $this->userRepository->method('findByEmail')->willReturnCallback(static fn (): never => self::fail('Credentials must not be read during the outage.'));
 
         try {
-            $this->authenticator->authenticate($request);
-        } catch (\Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException $e) {
-            $this->assertTrue($e->getMessageData()['totp_required'] ?? false);
-            $this->assertSame('AUTH_TOTP_REQUIRED', $e->getMessageData()['error_code']);
-
-            throw $e;
+            $this->authenticator->authenticate($this->request(['email' => 'alice@baander.app', 'password' => 'secret']));
+            self::fail('The outage must not be reported as an authentication failure.');
+        } catch (ServiceUnavailableHttpException $exception) {
+            self::assertSame(503, $exception->getStatusCode());
+            self::assertEqualsCanonicalizing(['retry-after' => '5', 'cache-control' => 'no-store'], array_change_key_case(array_map(strval(...), $exception->getHeaders()), CASE_LOWER));
+            self::assertInstanceOf(DpopStoreUnavailableException::class, $exception->getPrevious());
         }
-    }
-
-    public function testAuthenticateThrowsInvalidCredentialsOnInvalidTotpCode(): void
-    {
-        $user = $this->createUser(totpSecret: 'JBSWY3DPEHPK3PXP');
-        $this->userRepository->method('findByEmail')->willReturn($user);
-        $this->passwordHasher->method('verify')->willReturn(true);
-
-        // '000000' will not match any valid TOTP code with window=0
-        $payload = json_encode(['email' => 'alice@baander.app', 'password' => 'secret', 'totpCode' => '000000']);
-        $request = Request::create('/api/auth/login', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], $payload);
-
-        $this->expectException(\Symfony\Component\Security\Core\Exception\BadCredentialsException::class);
-        $this->expectExceptionMessage('Invalid credentials.');
-
-        $this->authenticator->authenticate($request);
-    }
-
-    public function testAuthenticateThrowsInvalidCredentialsOnEmptyTotpCode(): void
-    {
-        $user = $this->createUser(totpSecret: 'JBSWY3DPEHPK3PXP');
-        $this->userRepository->method('findByEmail')->willReturn($user);
-        $this->passwordHasher->method('verify')->willReturn(true);
-
-        $payload = json_encode(['email' => 'alice@baander.app', 'password' => 'secret', 'totpCode' => '']);
-        $request = Request::create('/api/auth/login', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], $payload);
-
-        $this->expectException(\Symfony\Component\Security\Core\Exception\BadCredentialsException::class);
-        $this->expectExceptionMessage('Invalid credentials.');
-
-        $this->authenticator->authenticate($request);
     }
 
     public function testOnAuthenticationSuccessReturnsNull(): void
     {
-        $result = $this->authenticator->onAuthenticationSuccess(
-            Request::create('/'),
-            $this->createStub(TokenInterface::class),
-            'main',
-        );
-
-        $this->assertNull($result);
+        $this->assertNull($this->authenticator->onAuthenticationSuccess(Request::create('/'), $this->createStub(TokenInterface::class), 'main'));
     }
 
     public function testOnAuthenticationFailureReturnsStructuredError(): void
     {
-        $result = $this->authenticator->onAuthenticationFailure(
-            Request::create('/'),
-            new \Symfony\Component\Security\Core\Exception\BadCredentialsException('Invalid credentials'),
-        );
+        $result = $this->authenticator->onAuthenticationFailure(Request::create('/'), new BadCredentialsException('Invalid credentials'));
 
         $this->assertInstanceOf(JsonResponse::class, $result);
         $this->assertSame(401, $result->getStatusCode());
-
-        $data = json_decode((string) $result->getContent(), true);
-        $this->assertArrayHasKey('error', $data);
-        $this->assertArrayHasKey('message', $data['error']);
-        $this->assertArrayHasKey('code', $data['error']);
-        $this->assertSame('AUTH_INVALID_CREDENTIALS', $data['error']['code']);
-        $this->assertSame('Invalid credentials.', $data['error']['message']);
+        $this->assertSame(
+            ['error' => ['message' => 'Invalid credentials.', 'code' => 'AUTH_INVALID_CREDENTIALS']],
+            json_decode((string) $result->getContent(), true),
+        );
     }
 
     public function testAWrongPasswordIsReportedInTheAcceptLanguageWithTheSameCode(): void
     {
         $this->userRepository->method('findByEmail')->willReturn($this->createUser());
         $this->passwordHasher->method('verify')->willReturn(false);
-        $request = Request::create('/api/auth/login', 'POST', server: [
-            'CONTENT_TYPE' => 'application/json',
-            'HTTP_ACCEPT_LANGUAGE' => 'da-DK,da;q=0.9,en;q=0.5',
-        ], content: json_encode(['email' => 'alice@baander.app', 'password' => 'wrong'], JSON_THROW_ON_ERROR));
+        $request = $this->request(['email' => 'alice@baander.app', 'password' => 'wrong']);
+        $request->headers->set('Accept-Language', 'da-DK,da;q=0.9,en;q=0.5');
 
-        try {
-            $this->authenticator->authenticate($request);
-            self::fail('A wrong password must not authenticate.');
-        } catch (AuthenticationException $exception) {
-            $result = $this->authenticator->onAuthenticationFailure($request, $exception);
-        }
+        $result = $this->authenticator->onAuthenticationFailure($request, $this->failure($request));
 
         $this->assertSame(401, $result->getStatusCode());
         $this->assertSame(
@@ -270,34 +274,46 @@ final class PasswordAuthenticatorTest extends TestCase
 
     public function testOnAuthenticationFailureReturnsTotpRequiredError(): void
     {
-        $exception = new \Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException(
+        $exception = new CustomUserMessageAuthenticationException(
             'TOTP code is required.',
             ['totp_required' => true, 'error_code' => 'AUTH_TOTP_REQUIRED'],
         );
 
-        $result = $this->authenticator->onAuthenticationFailure(
-            Request::create('/'),
-            $exception,
-        );
+        $data = json_decode((string) $this->authenticator->onAuthenticationFailure(Request::create('/'), $exception)->getContent(), true);
 
-        $this->assertInstanceOf(JsonResponse::class, $result);
-        $this->assertSame(401, $result->getStatusCode());
-
-        $data = json_decode((string) $result->getContent(), true);
         $this->assertSame('AUTH_TOTP_REQUIRED', $data['error']['code']);
         $this->assertSame('TOTP code is required.', $data['error']['message']);
         $this->assertTrue($data['error']['details']['totp_required']);
     }
 
-    private function createUser(?string $totpSecret = null): User
+    /** @param array<string, string> $body */
+    private function request(array $body, ?string $proof = null): Request
     {
-        return User::reconstitute(new \App\Auth\Domain\Model\UserState(
+        $request = Request::create(self::URI, 'POST', server: ['CONTENT_TYPE' => 'application/json'], content: json_encode($body, JSON_THROW_ON_ERROR));
+        $request->headers->set('DPoP', $proof ?? (new SignedDpopProof())->createWithNonce('POST', self::URI, 'issued-nonce'));
+
+        return $request;
+    }
+
+    private function failure(Request $request): AuthenticationException
+    {
+        try {
+            $this->authenticator->authenticate($request);
+        } catch (AuthenticationException $exception) {
+            return $exception;
+        }
+        self::fail('The login must not authenticate.');
+    }
+
+    private function createUser(?string $totpSecretCiphertext = null): User
+    {
+        return User::reconstitute(new UserState(
             id: Uuid::fromString('01959fae-7c5b-7f00-8e00-000000000001'),
             publicId: new PublicId(),
             name: 'Alice',
             email: 'alice@baander.app',
             password: '$hashed$',
-            totpSecret: $totpSecret,
+            totpSecretCiphertext: $totpSecretCiphertext,
             createdAt: new \DateTimeImmutable(),
             updatedAt: new \DateTimeImmutable(),
         ));

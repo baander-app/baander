@@ -86,7 +86,7 @@ final class PlaybackCostFixture
 
     public static function owner(EntityManager $manager): Uuid
     {
-        $owner = new UserEntity(new PublicId(), 'Playback cost owner', new Uuid()->toString() . '@baander.app', 'unused-password', '');
+        $owner = new UserEntity(new PublicId(), 'Playback cost owner', new Uuid()->toString() . '@baander.app', 'unused-password');
         $manager->persist($owner);
         $manager->flush();
         return $owner->getId();

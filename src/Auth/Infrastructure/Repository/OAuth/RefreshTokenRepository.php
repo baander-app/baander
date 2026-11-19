@@ -369,7 +369,7 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
                 name: $entity->getUser()->getName(),
                 email: $entity->getUser()->getEmail(),
                 password: $entity->getUser()->getPassword(),
-                totpSecret: $entity->getUser()->getTotpSecret(),
+                totpSecretCiphertext: $entity->getUser()->getTotpSecretCiphertext(),
                 createdAt: $entity->getUser()->getCreatedAt(),
                 updatedAt: $entity->getUser()->getUpdatedAt(),
                 emailVerifiedAt: $entity->getUser()->getEmailVerifiedAt(),

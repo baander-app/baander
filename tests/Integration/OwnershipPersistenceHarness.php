@@ -136,7 +136,6 @@ trait OwnershipPersistenceHarness
             'Ownership test owner',
             $id->toString() . '@baander.app',
             'unused-test-password',
-            '',
             $id,
         ));
         $this->manager->flush();

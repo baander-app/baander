@@ -41,7 +41,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
             $now = new \DateTimeImmutable();
             return \App\Auth\Domain\Model\User::reconstitute(new \App\Auth\Domain\Model\UserState(
                 id: $id, publicId: new \App\Shared\Domain\Model\PublicId($id->toString() === self::OWNER_ID ? self::OWNER_PUBLIC_ID : str_repeat('v', 21)),
-                name: 'Owner', email: 'owner@baander.app', password: 'hash', totpSecret: null, createdAt: $now, updatedAt: $now,
+                name: 'Owner', email: 'owner@baander.app', password: 'hash', totpSecretCiphertext: null, createdAt: $now, updatedAt: $now,
             ));
         });
         $this->handler = new AuthenticatePasskeyHandler($this->passkeyRepository, $this->passkeyVerifier, $this->users);

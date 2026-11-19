@@ -6,7 +6,9 @@ namespace App\Auth\Interface\Controller\Totp;
 
 use App\Auth\Application\Command\Totp\DisableTotpCommand;
 use App\Auth\Application\Command\Totp\EnableTotpCommand;
-use App\Auth\Application\Port\TotpVerifierInterface;
+use App\Auth\Application\Command\Totp\StartTotpSetupCommand;
+use App\Auth\Application\Exception\TotpChangeRefusal;
+use App\Auth\Application\Exception\TotpChangeRefusedException;
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Auth\Interface\Request\Totp\DisableTotpRequest;
 use App\Auth\Interface\Request\Totp\EnableTotpRequest;
@@ -15,11 +17,14 @@ use App\Shared\Interface\Controller\TranslatorTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\SecurityBundle\Security;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
+use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Contracts\Cache\CacheInterface;
 
 #[OA\Tag(name: 'Auth', description: 'User registration, login, and profile management')]
 #[Route('/api/auth/totp', name: 'totp_')]
@@ -28,13 +33,10 @@ final class TotpController
     use ApiResponsesTrait;
     use TranslatorTrait;
 
-    private const PENDING_SECRET_TTL = 600; // 10 minutes
-
     public function __construct(
         private readonly Security $security,
-        private readonly TotpVerifierInterface $totpVerifier,
-        private readonly CacheInterface $cache,
         private readonly MessageBusInterface $commandBus,
+        private readonly LoggerInterface $logger,
         private readonly string $appName,
     ) {
     }
@@ -42,6 +44,7 @@ final class TotpController
     #[OA\Post(
         path: '/api/auth/totp/setup',
         summary: 'Generate TOTP secret and provisioning URI',
+        description: 'Refused while TOTP is on. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.',
         responses: [
             new OA\Response(
                 response: '200',
@@ -57,6 +60,7 @@ final class TotpController
                 ),
             ),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '409', description: 'TOTP is already on', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/setup', name: 'setup', methods: ['POST'])]
@@ -67,20 +71,18 @@ final class TotpController
             return $this->unauthorized();
         }
 
-        // Generate a server-side TOTP secret (base32-encoded, suitable for OTPHP)
-        $secret = $this->totpVerifier->generateSecret();
-        $provisioningUri = $this->buildProvisioningUri($secret, $user->getEmail());
-
-        // Store the pending secret in Redis with a 10-minute TTL
-        $this->cache->get(
-            $this->pendingSecretKey($user->getId()),
-            fn () => $secret,
-            self::PENDING_SECRET_TTL,
-        );
+        try {
+            $secret = $this->commandBus->dispatch(new StartTotpSetupCommand($user->getId()))->last(HandledStamp::class)?->getResult();
+        } catch (\Throwable $exception) {
+            return $this->refusal($exception);
+        }
+        if (!is_string($secret)) {
+            throw new \LogicException('TOTP setup returned no secret.');
+        }
 
         return $this->successResponse([
             'secret' => $secret,
-            'provisioningUri' => $provisioningUri,
+            'provisioningUri' => $this->buildProvisioningUri($secret, $user->getEmail()),
         ]);
     }
 
@@ -108,6 +110,7 @@ final class TotpController
             ),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '400', description: 'Invalid TOTP code or no pending setup', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '409', description: 'TOTP is already on', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
@@ -126,8 +129,8 @@ final class TotpController
 
         try {
             $this->commandBus->dispatch($command);
-        } catch (\Throwable $e) {
-            return $this->errorResponse($e->getMessage());
+        } catch (\Throwable $exception) {
+            return $this->refusal($exception);
         }
 
         return $this->successResponse([
@@ -177,8 +180,8 @@ final class TotpController
 
         try {
             $this->commandBus->dispatch($command);
-        } catch (\Throwable $e) {
-            return $this->errorResponse($e->getMessage());
+        } catch (\Throwable $exception) {
+            return $this->refusal($exception);
         }
 
         return $this->successResponse([
@@ -200,9 +203,20 @@ final class TotpController
         return $user;
     }
 
-    private function pendingSecretKey(string $userId): string
+    /** A translated refusal the user can act on; anything else is logged and answered as a server fault. */
+    private function refusal(\Throwable $exception): JsonResponse
     {
-        return sprintf('totp_pending_secret_%s', $userId);
+        $cause = $exception instanceof HandlerFailedException ? ($exception->getPrevious() ?? $exception) : $exception;
+        if (!$cause instanceof TotpChangeRefusedException) {
+            $this->logger->error('TOTP command failed.', ['exception' => $cause]);
+
+            return $this->errorResponse($this->trans('errors.internal', domain: 'auth'), Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        return $this->errorResponse(
+            $this->trans($cause->refusal->translationKey(), domain: 'auth'),
+            $cause->refusal === TotpChangeRefusal::AlreadyEnabled ? Response::HTTP_CONFLICT : Response::HTTP_BAD_REQUEST,
+        );
     }
 
     private function buildProvisioningUri(string $secret, string $email): string

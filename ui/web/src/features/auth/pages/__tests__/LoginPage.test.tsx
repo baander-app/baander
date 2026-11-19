@@ -52,9 +52,9 @@ function pendingPersistence() {
   return resolve
 }
 
-function refusal(code: string, message: string) {
+function refusal(code: string, message: string, status = 400) {
   return new AxiosError('Refused', undefined, undefined, undefined, {
-    data: { error: { code, message } }, status: 400, statusText: 'Bad Request', headers: {},
+    data: { error: { code, message } }, status, statusText: 'Refused', headers: {},
     config: { headers: new AxiosHeaders() },
   })
 }
@@ -103,6 +103,36 @@ describe('login navigation ownership', () => {
     await screen.findByText('Device destination')
     expect(login).toHaveBeenLastCalledWith('login@baander.app', 'test-password', '123456', '')
     expect(router.state.location.search).toBe('?user_code=BCDF-GHJK')
+  })
+
+  it('focuses the code field when the account asks for a second factor', async () => {
+    login.mockRejectedValueOnce(refusal('AUTH_TOTP_REQUIRED', 'Enter your code.', 401))
+    mount()
+    await submit()
+    const code = await screen.findByLabelText('Authentication code')
+    expect(code).toHaveFocus()
+    expect(screen.queryByText('Enter your code.')).not.toBeInTheDocument()
+  })
+
+  it('clears a rejected or already used code and says to wait for the next one', async () => {
+    login.mockRejectedValueOnce(refusal('AUTH_TOTP_REQUIRED', 'Enter your code.', 401))
+    mount()
+    await submit()
+    const code = await screen.findByLabelText('Authentication code')
+    login.mockRejectedValueOnce(refusal('AUTH_INVALID_CREDENTIALS', 'Invalid credentials.', 401))
+    await userEvent.type(code, '123456')
+    await userEvent.click(screen.getByRole('button', { name: 'Log in' }))
+    await screen.findByText('That code was not accepted. Wait for the next code and try again.')
+    expect(screen.getByLabelText('Authentication code')).toHaveValue('')
+    expect(screen.queryByText('Invalid credentials.')).not.toBeInTheDocument()
+  })
+
+  it('answers a throttled login with one message and no account detail', async () => {
+    login.mockRejectedValueOnce(refusal('429', 'Too many requests for login@baander.app.', 429))
+    mount()
+    await submit()
+    await screen.findByText('Too many sign-in attempts. Wait a minute and try again.')
+    expect(screen.queryByText(/login@baander\.app/)).not.toBeInTheDocument()
   })
 
   it('preserves credentials and remains on login after a rejected password', async () => {

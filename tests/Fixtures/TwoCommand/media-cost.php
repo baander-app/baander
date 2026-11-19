@@ -31,7 +31,7 @@ $owners = [];
 foreach (range(0, 7) as $index) {
     $email = 'media-cost-' . $index . '@baander.app';
     $owner = new App\Auth\Infrastructure\Doctrine\Entity\UserEntity(
-        new App\Shared\Domain\Model\PublicId(), 'Media cost ' . $index, $email, 'unused-password', '', roles: ['ROLE_ADMIN'],
+        new App\Shared\Domain\Model\PublicId(), 'Media cost ' . $index, $email, 'unused-password', roles: ['ROLE_ADMIN'],
     );
     $owner->markEmailAsVerified();
     $manager->persist($owner);

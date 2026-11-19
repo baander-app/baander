@@ -5,12 +5,18 @@ declare(strict_types=1);
 namespace App\Auth\Infrastructure\Security\Totp;
 
 use OTPHP\TOTP;
+use Psr\Clock\ClockInterface;
 
-final class TotpService
+/** RFC 6238 codes with the authenticator-app defaults: SHA-1, six digits, 30-second steps. */
+final readonly class TotpService
 {
+    /**
+     * @param int $window Steps accepted on either side of the current one, for clock skew (0 = current step only)
+     */
     public function __construct(
-        private readonly string $issuer = 'Bånder',
-        private readonly int $window = 1,
+        private ClockInterface $clock,
+        private string $issuer = 'Bånder',
+        private int $window = 1,
     ) {
     }
 
@@ -21,21 +27,26 @@ final class TotpService
      */
     public function generateSecret(): string
     {
-        return TOTP::create()->getSecret();
+        return $this->totp()->getSecret();
     }
 
     /**
-     * Verify a TOTP code against a given secret.
+     * The time step whose code matches, searched from the current step minus the window to
+     * the current step plus the window. When the codes of two steps collide, the later step
+     * is returned, so spending it also retires the earlier one.
      *
      * @param string $secret The base32-encoded shared secret
-     * @param string $code   The 6-digit TOTP code to verify
+     * @param string $code   The code the user entered
      */
-    public function verifyCode(string $secret, string $code): bool
+    public function matchStep(string $secret, string $code): ?int
     {
-        $totp = TOTP::create($secret);
+        $totp = $this->totp($secret);
+        $current = intdiv($this->clock->now()->getTimestamp() - $totp->getEpoch(), $totp->getPeriod());
+        $matches = static fn (int $step): bool => hash_equals($totp->at($totp->getEpoch() + $step * $totp->getPeriod()), $code);
 
-        // Allow a configurable window for clock skew
-        return $totp->verify($code, null, $this->window);
+        $matched = array_filter(range(max(0, $current - $this->window), $current + $this->window), $matches);
+
+        return $matched === [] ? null : max($matched);
     }
 
     /**
@@ -46,10 +57,15 @@ final class TotpService
      */
     public function getProvisioningUri(string $secret, string $email): string
     {
-        $totp = TOTP::create($secret);
+        $totp = $this->totp($secret);
         $totp->setLabel($email);
         $totp->setIssuer($this->issuer);
 
         return $totp->getProvisioningUri();
+    }
+
+    private function totp(?string $secret = null): TOTP
+    {
+        return TOTP::create($secret, clock: $this->clock);
     }
 }

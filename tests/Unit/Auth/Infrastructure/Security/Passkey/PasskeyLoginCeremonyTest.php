@@ -63,7 +63,7 @@ final class PasskeyLoginCeremonyTest extends TestCase
     public function testAnAccountWithTotpOnNeedsAVerifiedUser(bool $totp, bool $verifiesUser, bool $accepted): void
     {
         if ($totp) {
-            $this->user->setTotpSecret('JBSWY3DPEHPK3PXP');
+            $this->user->enableTotp('sealed-totp-secret');
         }
         $credential = new WebAuthnTestCredential($this->user->getPublicId()->toString(), 'baander.app', verifiesUser: $verifiesUser);
         $passkey = $credential->passkey();

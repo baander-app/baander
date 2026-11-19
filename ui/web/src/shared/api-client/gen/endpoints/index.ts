@@ -13392,6 +13392,7 @@ export const getPostTotpSetupUrl = () => {
 }
 
 /**
+ * Refused while TOTP is on. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.
  * @summary Generate TOTP secret and provisioning URI
  */
 export const postTotpSetup = async ( options?: Parameters<typeof customInstance>[1]): Promise<PostTotpSetup200> => {

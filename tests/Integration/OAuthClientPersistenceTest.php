@@ -194,7 +194,7 @@ final class OAuthClientPersistenceTest extends TestCase
             'refresh token' => str_repeat('r', 40),
         ];
         $this->writer->insert('users', ['id' => $user, 'public_id' => (new \App\Shared\Domain\Model\PublicId())->toString(),
-            'name' => 'Key client user', 'email' => 'key-client@baander.app', 'password' => 'test-only', 'totp_secret' => 'test-only-totp-secret', ...$times]);
+            'name' => 'Key client user', 'email' => 'key-client@baander.app', 'password' => 'test-only', ...$times]);
         $this->writer->insert('oauth_auth_codes', ['id' => Uuid::generate()->toString(), 'code_id' => $tokens['auth code'],
             'client_id' => $client->toString(), 'user_id' => $user, 'redirect_uri' => 'https://server.baander.app/callback',
             'code_challenge' => 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM', 'code_challenge_method' => 'S256',

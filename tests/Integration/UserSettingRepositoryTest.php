@@ -249,7 +249,6 @@ final class UserSettingRepositoryTest extends TestCase
             'Settings test user',
             'settings-' . $id->toString() . '@baander.app',
             'unused-test-password',
-            '',
             $id,
         ));
         $this->manager->flush();

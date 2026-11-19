@@ -242,7 +242,6 @@ final class LiveCapacityFixture
             foreach ($users as $user) {
                 $this->insert('users', $user, [
                     'name' => 'Live ' . $this->manifest['run'], 'email' => $user['email'], 'password' => $hash,
-                    'totp_secret' => '',
                     'roles' => json_encode($user['admin'] ? $adminRoles : ['ROLE_USER'], JSON_THROW_ON_ERROR),
                     'email_verified_at' => $this->now(),
                 ]);

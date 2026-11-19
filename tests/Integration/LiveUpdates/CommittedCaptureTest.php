@@ -142,9 +142,9 @@ final class CommittedCaptureTest extends TestCase
     public function testSecretTimestampAndHeartbeatUpdatesDoNotCapture(): void
     {
         $user = $this->user();
-        $this->writer->executeStatement("UPDATE users SET totp_secret = 'initial-secret' WHERE id = ?", [$user]);
+        $this->writer->executeStatement("UPDATE users SET totp_secret_ciphertext = 'initial-secret'::bytea WHERE id = ?", [$user]);
         $this->clearInbox();
-        $this->writer->executeStatement("UPDATE users SET password = 'new-secret', totp_secret = 'another-secret', updated_at = clock_timestamp() WHERE id = ?", [$user]);
+        $this->writer->executeStatement("UPDATE users SET password = 'new-secret', totp_secret_ciphertext = 'another-secret'::bytea, totp_last_used_step = 58000000, updated_at = clock_timestamp() WHERE id = ?", [$user]);
         self::assertSame(0, $this->pendingCount());
         $this->library();
         $this->clearInbox();
@@ -159,12 +159,12 @@ final class CommittedCaptureTest extends TestCase
     {
         $user = $this->user();
         $this->clearInbox();
-        $this->writer->executeStatement("UPDATE users SET totp_secret = 'private-secret' WHERE id = ?", [$user]);
+        $this->writer->executeStatement("UPDATE users SET totp_secret_ciphertext = 'private-secret'::bytea WHERE id = ?", [$user]);
         self::assertSame([['family' => 'account', 'scope_kind' => 'user', 'scope_id' => $user]], $this->scopes());
         $this->clearInbox();
-        $this->writer->executeStatement("UPDATE users SET totp_secret = 'rotated-private-secret' WHERE id = ?", [$user]);
+        $this->writer->executeStatement("UPDATE users SET totp_secret_ciphertext = 'rotated-private-secret'::bytea WHERE id = ?", [$user]);
         self::assertSame(0, $this->pendingCount());
-        $this->writer->executeStatement('UPDATE users SET totp_secret = NULL WHERE id = ?', [$user]);
+        $this->writer->executeStatement('UPDATE users SET totp_secret_ciphertext = NULL WHERE id = ?', [$user]);
         self::assertSame([['family' => 'account', 'scope_kind' => 'user', 'scope_id' => $user]], $this->scopes());
         self::assertStringNotContainsString('secret', json_encode($this->observer->fetchAllAssociative('SELECT * FROM query_change_inbox'), JSON_THROW_ON_ERROR));
     }

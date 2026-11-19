@@ -91,7 +91,7 @@ try {
     $orm->setNamingStrategy(new UnderscoreNamingStrategy());
     $orm->enableNativeLazyObjects(true);
     $manager = new EntityManager($connection, $orm);
-    $actor = new UserEntity(new PublicId(), 'Plan Actor', 'image-plan@baander.app', 'test-only', '');
+    $actor = new UserEntity(new PublicId(), 'Plan Actor', 'image-plan@baander.app', 'test-only');
     $allowed = new LibraryEntity('Allowed', 'plan-allowed', '/plan/allowed', 'music', 'local');
     $denied = new LibraryEntity('Denied', 'plan-denied', '/plan/denied', 'music', 'local');
     $album = new AlbumEntity(new PublicId(), $allowed, 'Reverse Album', 'album');

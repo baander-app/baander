@@ -35,4 +35,11 @@ interface UserRepositoryInterface
     public function findAll(?string $roleFilter = null, ?bool $disabledFilter = null, int $limit = 50, int $offset = 0): array;
 
     public function count(?string $roleFilter = null, ?bool $disabledFilter = null): int;
+
+    /**
+     * Spends a TOTP time step: records it as the user's last used step when it is later than
+     * the recorded one, in one conditional statement. Returns false when that step or a later
+     * one was already spent, so each code is accepted once, also by concurrent requests.
+     */
+    public function spendTotpStep(Uuid $id, int $step): bool;
 }

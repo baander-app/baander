@@ -34,8 +34,16 @@ class UserEntity
     #[ORM\Column(type: 'text')]
     private string $password;
 
-    #[ORM\Column(type: 'text', nullable: true)]
-    private ?string $totp_secret = null;
+    /** The sealed TOTP secret (libsodium secretbox, nonce first); null while TOTP is off. */
+    #[ORM\Column(type: 'binary', nullable: true)]
+    private ?string $totpSecretCiphertext = null;
+
+    /**
+     * The last TOTP time step a login or verification spent. Only the conditional update in
+     * UserRepository::spendTotpStep() writes it, so saving an aggregate never moves it back.
+     */
+    #[ORM\Column(type: 'bigint', nullable: true, insertable: false, updatable: false)]
+    private ?int $totpLastUsedStep = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
@@ -56,7 +64,6 @@ class UserEntity
         string $name,
         string $email,
         string $password,
-        string $totp_secret,
         ?Uuid $id = null,
         array $roles = ['ROLE_USER'],
     ) {
@@ -65,7 +72,6 @@ class UserEntity
         $this->name = $name;
         $this->email = $email;
         $this->password = $password;
-        $this->totp_secret = $totp_secret;
         $this->roles = $roles;
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
@@ -151,14 +157,14 @@ class UserEntity
         $this->updatedAt = $updatedAt;
     }
 
-    public function getTotpSecret(): string
+    public function getTotpSecretCiphertext(): ?string
     {
-        return $this->totp_secret;
+        return $this->totpSecretCiphertext;
     }
 
-    public function setTotpSecret(string $totp_secret): void
+    public function setTotpSecretCiphertext(?string $totpSecretCiphertext): void
     {
-        $this->totp_secret = $totp_secret;
+        $this->totpSecretCiphertext = $totpSecretCiphertext;
     }
 
     /** @return array<array-key, string> */

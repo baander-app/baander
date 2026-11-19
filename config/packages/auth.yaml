@@ -123,7 +123,8 @@ parameters:
     # Issuer name displayed in authenticator apps.
     auth.totp.issuer: '%app.name%'
 
-    # Number of 30-second periods to allow for clock skew (0 = exact match only).
+    # Number of 30-second steps accepted on either side of the current one, for clock
+    # skew (0 = the current step only). Each step's code is accepted once.
     auth.totp.window: 1
 
     # --- DPoP (RFC 9449) ---

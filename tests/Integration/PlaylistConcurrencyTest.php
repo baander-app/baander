@@ -59,8 +59,8 @@ final class PlaylistConcurrencyTest extends TestCase
         $this->observer->executeStatement('SET search_path TO ' . $this->schema . ', public');
         FinalSchemaBootstrap::bootstrap($this->observer);
         $manager = $this->manager();
-        $owner = new UserEntity(new PublicId(), 'Owner', 'owner@baander.app', 'hash', '');
-        $collaborator = new UserEntity(new PublicId(), 'Collaborator', 'collaborator@baander.app', 'hash', '');
+        $owner = new UserEntity(new PublicId(), 'Owner', 'owner@baander.app', 'hash');
+        $collaborator = new UserEntity(new PublicId(), 'Collaborator', 'collaborator@baander.app', 'hash');
         $library = new LibraryEntity('Race', 'race', '/race', 'music', 'local');
         $album = new AlbumEntity(new PublicId(), $library, 'Race', 'album');
         $first = new SongEntity(new PublicId(), $album, 'First', '/race/first.flac', 1, 'audio/flac');
@@ -352,7 +352,7 @@ final class PlaylistConcurrencyTest extends TestCase
         $childPublicId = $this->collaboratorPublicId;
         $expectedCollaborators = [$this->collaboratorId->toString()];
         if (!$sameCollaborator) {
-            $other = new UserEntity(new PublicId(), 'Other collaborator', 'other@baander.app', 'hash', '');
+            $other = new UserEntity(new PublicId(), 'Other collaborator', 'other@baander.app', 'hash');
             $manager->persist($other);
             $manager->flush();
             $childPublicId = $other->getPublicId();

@@ -20,6 +20,11 @@ errors:
   invalid_credentials: "Invalid credentials."
   account_disabled: "This account has been disabled."
   totp_required: "TOTP code is required."
+  totp_unavailable: "Two-factor sign-in is unavailable for this account. Ask your administrator to reset its two-factor authentication."
+  totp_already_enabled: "Two-factor authentication is already on. Turn it off before setting it up again."
+  totp_setup_missing: "No two-factor setup is in progress, or it expired. Start the setup again."
+  totp_code_invalid: "That code was not accepted. Wait for the next code and try again."
+  totp_not_enabled: "Two-factor authentication is not on for this account."
   invalid_token: "Invalid or expired token."
 
 success:
@@ -27,7 +32,7 @@ success:
   password_reset_sent: "If the email exists, a password reset link has been sent."
   email_verified: "Email verified."
   totp_enabled: "TOTP enabled successfully."
-  totp_disable_not_implemented: "TOTP disable is not yet fully implemented."
+  totp_disabled: "Two-factor authentication turned off."
   client_revoked: "Client revoked successfully."
   device_approved: "Device approved successfully."
   device_denied: "Device access denied."

@@ -22,7 +22,7 @@ final class UserTest extends TestCase
         $this->assertSame('hashed-pw', $user->getPassword());
         $this->assertFalse($user->isEmailVerified());
         $this->assertNull($user->getEmailVerifiedAt());
-        $this->assertNull($user->getTotpSecret());
+        $this->assertFalse($user->hasTotp());
     }
 
     public function testRegisterThrowsOnEmptyName(): void
@@ -42,7 +42,7 @@ final class UserTest extends TestCase
             name: 'Bob',
             email: 'bob@baander.app',
             password: 'hashed',
-            totpSecret: null,
+            totpSecretCiphertext: null,
             createdAt: $now,
             updatedAt: $now,
             emailVerifiedAt: $verifiedAt,
@@ -61,7 +61,7 @@ final class UserTest extends TestCase
             name: 'Bob',
             email: 'bob@baander.app',
             password: 'hashed',
-            totpSecret: null,
+            totpSecretCiphertext: null,
             createdAt: new \DateTimeImmutable(),
             updatedAt: new \DateTimeImmutable(),
             roles: ['ROLE_USER'],
@@ -173,13 +173,17 @@ final class UserTest extends TestCase
         $this->assertSame(['ROLE_USER'], $user->getRoles());
     }
 
-    public function testSetTotpSecret(): void
+    public function testTotpIsOnExactlyWhileASealedSecretIsStored(): void
     {
         $user = User::register(new Email('test@baander.app'), 'hashed-pw', 'Alice');
 
-        $user->setTotpSecret('secret123');
+        $user->enableTotp('sealed-secret');
+        $this->assertTrue($user->hasTotp());
+        $this->assertSame('sealed-secret', $user->getTotpSecretCiphertext());
 
-        $this->assertSame('secret123', $user->getTotpSecret());
+        $user->disableTotp();
+        $this->assertFalse($user->hasTotp());
+        $this->assertNull($user->getTotpSecretCiphertext());
     }
 
     public function testGettersReturnExpectedTypes(): void

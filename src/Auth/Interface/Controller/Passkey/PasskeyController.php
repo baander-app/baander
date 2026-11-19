@@ -381,7 +381,7 @@ final class PasskeyController
                 $payload->response,
                 $expectedOptions,
                 $storedCredential,
-                $owner->hasTotpEnabled(),
+                $owner->hasTotp(),
             );
         } catch (\Throwable $e) {
             return $this->errorResponse($this->trans('errors.passkey_auth_failed', ['{details}' => $e->getMessage()], 'auth'), Response::HTTP_UNAUTHORIZED);

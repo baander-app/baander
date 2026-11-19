@@ -26,6 +26,8 @@
     "password": "Password",
     "confirmPassword": "Confirm password",
     "totpCode": "Authentication code",
+    "totpRejected": "That code was not accepted. Wait for the next code and try again.",
+    "loginThrottled": "Too many sign-in attempts. Wait a minute and try again.",
     "passkey": "Passkey",
     "name": "Name",
     "passwordMismatch": "The passwords do not match.",

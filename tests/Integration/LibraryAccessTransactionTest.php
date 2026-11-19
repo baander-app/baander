@@ -56,7 +56,7 @@ final class LibraryAccessTransactionTest extends TestCase
         $orm->enableNativeLazyObjects(true);
         $this->manager = new EntityManager($this->writer, $orm);
         $this->repository = new LibraryAccessRepository($this->manager);
-        $user = new UserEntity(new PublicId(), 'Transaction User', 'library-transaction@baander.app', 'test-only', '');
+        $user = new UserEntity(new PublicId(), 'Transaction User', 'library-transaction@baander.app', 'test-only');
         $library = new LibraryEntity('Transaction Library', 'transaction-library', '/media/transaction', 'music', 'local');
         $this->manager->persist($user);
         $this->manager->persist($library);

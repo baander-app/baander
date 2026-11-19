@@ -132,7 +132,7 @@ final class SongReferencePersistenceTest extends TestCase
 
     public function testDeletingASongCascadesItsLyricsAndPlaylistEntriesOnly(): void
     {
-        $owner = new UserEntity(new PublicId(), 'Song reference owner', 'song-reference-' . bin2hex(random_bytes(6)) . '@baander.app', 'unused', '');
+        $owner = new UserEntity(new PublicId(), 'Song reference owner', 'song-reference-' . bin2hex(random_bytes(6)) . '@baander.app', 'unused');
         $library = new LibraryEntity('Song references', 'song-references-' . bin2hex(random_bytes(6)), '/song-references', 'music', 'local');
         $album = new AlbumEntity(new PublicId(), $library, 'References', 'album');
         $doomed = new SongEntity(new PublicId(), $album, 'Doomed', '/song-references/doomed.flac', 1, 'audio/flac');

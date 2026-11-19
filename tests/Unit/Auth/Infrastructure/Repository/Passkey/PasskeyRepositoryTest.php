@@ -18,7 +18,7 @@ final class PasskeyRepositoryTest extends TestCase
 {
     public function testSavingNewPasskeyPreservesDomainIdentifier(): void
     {
-        $user = new UserEntity(new PublicId(), 'Passkey owner', 'passkey-owner@baander.app', 'unused', '');
+        $user = new UserEntity(new PublicId(), 'Passkey owner', 'passkey-owner@baander.app', 'unused');
         $passkey = Passkey::create(Uuid::v4(), 'Device', 'credential', ['key' => 'value'], 0);
 
         $passkeyEntities = $this->createMock(EntityRepository::class);

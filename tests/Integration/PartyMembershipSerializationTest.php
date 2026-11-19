@@ -436,7 +436,7 @@ final class PartyMembershipSerializationTest extends TestCase
     /** A user the first manager stores with its next flush. */
     private function user(): UserEntity
     {
-        $user = new UserEntity(new PublicId(), 'Party member', bin2hex(random_bytes(8)) . '@baander.app', 'test-only', '');
+        $user = new UserEntity(new PublicId(), 'Party member', bin2hex(random_bytes(8)) . '@baander.app', 'test-only');
         $this->manager->persist($user);
 
         return $user;

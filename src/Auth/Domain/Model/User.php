@@ -39,7 +39,7 @@ final class User
             name: $name,
             email: $email->toString(),
             password: $hashedPassword,
-            totpSecret: null,
+            totpSecretCiphertext: null,
             createdAt: new DateTimeImmutable(),
             updatedAt: new DateTimeImmutable(),
             roles: ['ROLE_USER'],
@@ -142,20 +142,28 @@ final class User
         return $this->state->updatedAt;
     }
 
-    public function getTotpSecret(): ?string
+    /** TOTP is on exactly when a sealed secret is stored, whether or not it can be opened. */
+    public function hasTotp(): bool
     {
-        return $this->state->totpSecret;
+        return $this->state->totpSecretCiphertext !== null;
     }
 
-    /** Whether sign-in asks for a TOTP code: a secret is stored and it is not empty. */
-    public function hasTotpEnabled(): bool
+    /** The sealed TOTP secret; only the application's TOTP cipher can open it. */
+    public function getTotpSecretCiphertext(): ?string
     {
-        return ($this->state->totpSecret ?? '') !== '';
+        return $this->state->totpSecretCiphertext;
     }
 
-    public function setTotpSecret(?string $totp_secret): void
+    public function enableTotp(string $secretCiphertext): void
     {
-        $this->state->totpSecret = $totp_secret;
+        $this->state->totpSecretCiphertext = $secretCiphertext;
+        $this->state->updatedAt = new DateTimeImmutable();
+    }
+
+    public function disableTotp(): void
+    {
+        $this->state->totpSecretCiphertext = null;
+        $this->state->updatedAt = new DateTimeImmutable();
     }
 
     public function disable(): void
@@ -193,7 +201,7 @@ final class User
             name: $name,
             email: $email->toString(),
             password: $hashedPassword,
-            totpSecret: null,
+            totpSecretCiphertext: null,
             createdAt: new DateTimeImmutable(),
             updatedAt: new DateTimeImmutable(),
             emailVerifiedAt: new DateTimeImmutable(),

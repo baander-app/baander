@@ -1107,7 +1107,7 @@ final class PlaybackStoreContractTest extends TestCase
 
     private function owner(): string
     {
-        $owner = new UserEntity(new PublicId(), 'Playback store owner', new Uuid()->toString() . '@baander.app', 'unused-password', '');
+        $owner = new UserEntity(new PublicId(), 'Playback store owner', new Uuid()->toString() . '@baander.app', 'unused-password');
         $this->manager->persist($owner);
         $this->manager->flush();
         return $owner->getId()->toString();

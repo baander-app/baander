@@ -167,7 +167,6 @@ final class LibraryAccessOwnershipPersistenceTest extends TestCase
             'Library access owner',
             $id->toString() . '@baander.app',
             'unused-test-password',
-            '',
             $id,
         ));
         $this->manager->flush();

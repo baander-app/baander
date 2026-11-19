@@ -1714,15 +1714,15 @@
       "classification": "capture",
       "operations": ["INSERT", "UPDATE", "DELETE"],
       "relevant_columns": ["id", "public_id", "name", "email", "email_verified_at", "created_at", "roles", "disabled"],
-      "excluded_columns": ["password", "totp_secret", "updated_at"],
+      "excluded_columns": ["password", "totp_secret_ciphertext", "totp_last_used_step", "updated_at"],
       "families": ["account", "admin-users", "activity"],
       "scope_routes": ["self", "admin"],
       "readers": ["src/Auth/Infrastructure/Doctrine/UserRepository.php"],
       "response_cache": "authoritative-read",
       "derived_changes": [
         {
-          "column": "totp_secret",
-          "predicate": "(OLD.totp_secret IS NULL) IS DISTINCT FROM (NEW.totp_secret IS NULL)",
+          "column": "totp_secret_ciphertext",
+          "predicate": "(OLD.totp_secret_ciphertext IS NULL) IS DISTINCT FROM (NEW.totp_secret_ciphertext IS NULL)",
           "families": ["account"],
           "reason": "A secret value stays private; enabling or disabling TOTP changes the visible security status."
         }

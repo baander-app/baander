@@ -162,7 +162,7 @@ final class AuthCodeRepository implements AuthCodeRepositoryInterface
             name: $entity->getName(),
             email: $entity->getEmail(),
             password: $entity->getPassword(),
-            totpSecret: $entity->getTotpSecret(),
+            totpSecretCiphertext: $entity->getTotpSecretCiphertext(),
             createdAt: $entity->getCreatedAt(),
             updatedAt: $entity->getUpdatedAt(),
             emailVerifiedAt: $entity->getEmailVerifiedAt(),

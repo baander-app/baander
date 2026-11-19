@@ -485,7 +485,6 @@ final class RefreshTokenRepositoryTest extends TestCase
             'Test User',
             'test@baander.app',
             'hashed-password',
-            '',
         );
     }
 

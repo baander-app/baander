@@ -50,7 +50,7 @@ final class PasskeyAuthenticatorResolutionTest extends TestCase
         $now = new DateTimeImmutable();
         $user = User::reconstitute(new UserState(
             id: $id, publicId: new PublicId(), name: 'Owner', email: 'owner@baander.app',
-            password: 'stored-password-hash', totpSecret: null, createdAt: $now, updatedAt: $now,
+            password: 'stored-password-hash', totpSecretCiphertext: null, createdAt: $now, updatedAt: $now,
             roles: ['ROLE_USER', 'ROLE_ADMIN'],
         ));
         $repository->expects($this->once())->method('findByUuid')->with($id)->willReturn($user);
@@ -131,7 +131,7 @@ final class PasskeyAuthenticatorResolutionTest extends TestCase
         $now = new DateTimeImmutable();
         $user = User::reconstitute(new UserState(
             id: Uuid::fromString(self::OWNER), publicId: new PublicId(), name: 'Owner', email: 'owner@baander.app',
-            password: 'stored-password-hash', totpSecret: null, createdAt: $now, updatedAt: $now,
+            password: 'stored-password-hash', totpSecretCiphertext: null, createdAt: $now, updatedAt: $now,
             roles: ['ROLE_USER'], disabled: true,
         ));
         $repository->expects($this->once())->method('findByUuid')->willReturn($user);

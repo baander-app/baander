@@ -578,7 +578,7 @@ if ($mode === 'seed-outbox') {
     $kernel = new App\Kernel('prod', false);
     $kernel->boot();
     $em = $kernel->getContainer()->get('doctrine')->getManager();
-    $user = new App\Auth\Infrastructure\Doctrine\Entity\UserEntity(new App\Shared\Domain\Model\PublicId(), 'Worker Command User', 'worker-command@baander.app', 'unused-password', '');
+    $user = new App\Auth\Infrastructure\Doctrine\Entity\UserEntity(new App\Shared\Domain\Model\PublicId(), 'Worker Command User', 'worker-command@baander.app', 'unused-password');
     $em->persist($user); // Unverified: CreateNotificationHandler does not enqueue email.
     foreach (['email', 'push', 'webhook'] as $channel) {
         $preference = new App\Notification\Infrastructure\Doctrine\Entity\NotificationPreferenceEntity(App\Shared\Domain\Model\Uuid::v7());

@@ -164,6 +164,24 @@ final class UserRepository implements UserRepositoryInterface
         return (int) $conn->executeQuery($sql, $params, $types)->fetchOne();
     }
 
+    public function spendTotpStep(Uuid $id, int $step): bool
+    {
+        // One statement: under concurrent spends of one step, the row lock serializes them and
+        // the later one re-evaluates the condition against the committed step and matches no row.
+        $spent = $this->entityManager->getConnection()->executeStatement(
+            <<<'SQL'
+                UPDATE users
+                   SET totp_last_used_step = :step
+                 WHERE id = :id
+                   AND (totp_last_used_step IS NULL OR totp_last_used_step < :step)
+                SQL,
+            ['step' => $step, 'id' => $id->toString()],
+            ['step' => ParameterType::INTEGER],
+        );
+
+        return $spent === 1;
+    }
+
     private function toDomain(UserEntity $entity): User
     {
         return User::reconstitute(new UserState(
@@ -172,7 +190,7 @@ final class UserRepository implements UserRepositoryInterface
             name: $entity->getName(),
             email: $entity->getEmail(),
             password: $entity->getPassword(),
-            totpSecret: $entity->getTotpSecret(),
+            totpSecretCiphertext: $entity->getTotpSecretCiphertext(),
             createdAt: $entity->getCreatedAt(),
             updatedAt: $entity->getUpdatedAt(),
             emailVerifiedAt: $entity->getEmailVerifiedAt(),
@@ -186,7 +204,7 @@ final class UserRepository implements UserRepositoryInterface
         $entity->setName($user->getName());
         $entity->setEmail($user->getEmail());
         $entity->setPassword($user->getPassword());
-        $entity->setTotpSecret($user->getTotpSecret() ?? '');
+        $entity->setTotpSecretCiphertext($user->getTotpSecretCiphertext());
         $entity->setRoles($user->getRoles());
         $entity->setDisabled($user->isDisabled());
         // The domain clears verification when the address changes, so copy it both ways.
@@ -209,7 +227,6 @@ final class UserRepository implements UserRepositoryInterface
             $user->getName(),
             $user->getEmail(),
             $user->getPassword(),
-            $user->getTotpSecret() ?? '',
             $user->getId(),
             $user->getRoles(),
         );

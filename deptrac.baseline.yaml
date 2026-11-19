@@ -57,8 +57,6 @@ deptrac:
     App\Auth\Interface\Controller\User\LoginController:
       - App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface
       - App\Auth\Domain\Repository\UserRepositoryInterface
-      - App\Auth\Infrastructure\Security\OAuth\DpopNonceManager
-      - App\Auth\Infrastructure\Security\OAuth\DpopProofValidator
     App\Catalog\Application\CommandHandler\BatchExtractCoversHandler:
       - App\Metadata\Application\Command\ExtractAlbumCoverCommand
     App\Catalog\Application\CommandHandler\FilesDiscoveredHandler:

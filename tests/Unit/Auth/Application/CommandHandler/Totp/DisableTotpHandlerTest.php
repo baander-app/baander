@@ -6,106 +6,88 @@ namespace App\Tests\Unit\Auth\Application\CommandHandler;
 
 use App\Auth\Application\Command\Totp\DisableTotpCommand;
 use App\Auth\Application\CommandHandler\Totp\DisableTotpHandler;
+use App\Auth\Application\Exception\TotpChangeRefusal;
+use App\Auth\Application\Exception\TotpChangeRefusedException;
+use App\Auth\Application\Exception\TotpSecretUnavailableException;
+use App\Auth\Application\Exception\UserNotFoundException;
 use App\Auth\Application\Port\TotpVerifierInterface;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 
 final class DisableTotpHandlerTest extends TestCase
 {
-    private UserRepositoryInterface&Stub $userRepository;
+    private UserRepositoryInterface&MockObject $userRepository;
     private TotpVerifierInterface&Stub $totpVerifier;
     private DisableTotpHandler $handler;
+    private User $user;
 
     protected function setUp(): void
     {
-        $this->userRepository = $this->createStub(UserRepositoryInterface::class);
+        $this->user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
+        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
+        $this->userRepository->method('findByUuid')->willReturn($this->user);
         $this->totpVerifier = $this->createStub(TotpVerifierInterface::class);
-        $this->handler = $this->createDisableTotpHandlerFixture();
+        $this->handler = new DisableTotpHandler($this->userRepository, $this->totpVerifier);
     }
 
-    private function createDisableTotpHandlerFixture(): DisableTotpHandler
+    public function testAnUnspentCodeTurnsTotpOff(): void
     {
-        $fixture = new DisableTotpHandler($this->userRepository, $this->totpVerifier);
-        return $fixture;
+        $this->user->enableTotp('sealed-secret');
+        $this->totpVerifier->method('verifyAndSpend')->willReturn(true);
+        $this->userRepository->expects($this->once())->method('save')->with($this->user);
+
+        ($this->handler)(new DisableTotpCommand($this->user->getId()->toString(), '123456'));
+
+        $this->assertFalse($this->user->hasTotp());
     }
 
-    public function testDisablesTotpWithValidCode(): void
+    public function testAnUnknownUserIsNotFound(): void
     {
-        $this->totpVerifier = $this->createMock(TotpVerifierInterface::class);
-        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
-        $this->handler = $this->createDisableTotpHandlerFixture();
-
-        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
-        $user->setTotpSecret('JBSWY3DPEHPK3PXP');
-
-        $this->userRepository->method('findByUuid')->willReturn($user);
-        $this->totpVerifier->expects($this->once())->method('verifyCode')->with('JBSWY3DPEHPK3PXP', '123456')->willReturn(true);
-        $this->userRepository->expects($this->once())->method('save');
-
-        ($this->handler)(new DisableTotpCommand($user->getId()->toString(), '123456'));
-
-        $this->assertNull($user->getTotpSecret());
-    }
-
-    public function testThrowsOnUserNotFound(): void
-    {
-        $this->userRepository->method('findByUuid')->willReturn(null);
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('not found');
-
-        ($this->handler)(new DisableTotpCommand(\App\Shared\Domain\Model\Uuid::v4()->toString(), '123456'));
-    }
-
-    public function testThrowsOnInvalidCode(): void
-    {
-        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
-        $user->setTotpSecret('JBSWY3DPEHPK3PXP');
-
-        $this->userRepository->method('findByUuid')->willReturn($user);
-        $this->totpVerifier->method('verifyCode')->willReturn(false);
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Invalid TOTP code');
-
-        ($this->handler)(new DisableTotpCommand($user->getId()->toString(), '000000'));
-    }
-
-    public function testThrowsWhenTotpNotEnabled(): void
-    {
-        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
-        // User has no TOTP secret set
-
-        $this->userRepository->method('findByUuid')->willReturn($user);
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('TOTP is not enabled');
-
-        ($this->handler)(new DisableTotpCommand($user->getId()->toString(), '123456'));
-    }
-
-    public function testDoesNotClearSecretOnInvalidCode(): void
-    {
-        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
-        $this->handler = $this->createDisableTotpHandlerFixture();
-
-        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
-        $user->setTotpSecret('JBSWY3DPEHPK3PXP');
-
-        $this->userRepository->method('findByUuid')->willReturn($user);
-        $this->totpVerifier->method('verifyCode')->willReturn(false);
+        $users = $this->createStub(UserRepositoryInterface::class);
+        $users->method('findByUuid')->willReturn(null);
         $this->userRepository->expects($this->never())->method('save');
 
-        try {
-            ($this->handler)(new DisableTotpCommand($user->getId()->toString(), '000000'));
-        } catch (RuntimeException) {
-            // Expected
-        }
+        $this->expectException(UserNotFoundException::class);
 
-        $this->assertSame('JBSWY3DPEHPK3PXP', $user->getTotpSecret());
+        (new DisableTotpHandler($users, $this->totpVerifier))(new DisableTotpCommand(Uuid::v4()->toString(), '123456'));
+    }
+
+    public function testWithoutTotpTheRequestIsRefused(): void
+    {
+        $this->assertRefused(TotpChangeRefusal::NotEnabled);
+    }
+
+    public function testAWrongOrSpentCodeIsRefusedAndTotpStaysOn(): void
+    {
+        $this->user->enableTotp('sealed-secret');
+        $this->totpVerifier->method('verifyAndSpend')->willReturn(false);
+
+        $this->assertRefused(TotpChangeRefusal::InvalidCode);
+        $this->assertTrue($this->user->hasTotp());
+    }
+
+    public function testASecretThatCannotBeOpenedIsRefusedAndTotpStaysOn(): void
+    {
+        $this->user->enableTotp('sealed-under-another-key');
+        $this->totpVerifier->method('verifyAndSpend')->willThrowException(TotpSecretUnavailableException::forStoredSecret());
+
+        $this->assertRefused(TotpChangeRefusal::SecretUnavailable);
+        $this->assertTrue($this->user->hasTotp());
+    }
+
+    private function assertRefused(TotpChangeRefusal $refusal): void
+    {
+        $this->userRepository->expects($this->never())->method('save');
+        try {
+            ($this->handler)(new DisableTotpCommand($this->user->getId()->toString(), '123456'));
+            self::fail('The request must be refused.');
+        } catch (TotpChangeRefusedException $exception) {
+            $this->assertSame($refusal, $exception->refusal);
+        }
     }
 }

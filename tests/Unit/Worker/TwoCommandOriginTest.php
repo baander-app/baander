@@ -22,7 +22,7 @@ final class TwoCommandOriginTest extends TestCase
 
     public function testFixtureTokenMatchesTheConfiguredLocalResourceServer(): void
     {
-        $user = new \App\Auth\Infrastructure\Doctrine\Entity\UserEntity(new \App\Shared\Domain\Model\PublicId(), 'Fixture listener', 'listener@baander.app', 'unused', '');
+        $user = new \App\Auth\Infrastructure\Doctrine\Entity\UserEntity(new \App\Shared\Domain\Model\PublicId(), 'Fixture listener', 'listener@baander.app', 'unused');
         $repository = $this->createStub(\Doctrine\ORM\EntityRepository::class);
         $repository->method('findOneBy')->willReturn($user);
         $manager = $this->createStub(\Doctrine\ORM\EntityManagerInterface::class);

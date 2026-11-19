@@ -33,8 +33,8 @@ final class PlaylistScopedReadRepositoryTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->owner = new UserEntity(new PublicId(), 'Owner', 'owner@baander.app', 'hash', '');
-        $other = new UserEntity(new PublicId(), 'Other', 'other@baander.app', 'hash', '');
+        $this->owner = new UserEntity(new PublicId(), 'Owner', 'owner@baander.app', 'hash');
+        $other = new UserEntity(new PublicId(), 'Other', 'other@baander.app', 'hash');
         $allowedLibrary = new LibraryEntity('Allowed', 'allowed', '/allowed', 'music', 'local');
         $deniedLibrary = new LibraryEntity('Denied', 'denied', '/denied', 'music', 'local');
         $allowedAlbum = new AlbumEntity(new PublicId(), $allowedLibrary, 'Allowed', 'album');

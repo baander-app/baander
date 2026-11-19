@@ -1,4 +1,5 @@
 import { type FormEvent, useState } from 'react';
+import { AxiosError } from 'axios';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../stores/auth-store';
 import { useTranslation } from '@/shared/i18n';
@@ -75,12 +76,19 @@ export function LoginForm() {
 
     if (honeypot) return;
 
+    const sentCode = showTotp && totpCode !== '';
     try {
       await login(email, password, showTotp ? totpCode : undefined, honeypot);
     } catch (err: unknown) {
       const parsed = parseApiError(err, t('common.error'));
-      if (parsed.code === 'AUTH_TOTP_REQUIRED') {
+      if (err instanceof AxiosError && err.response?.status === 429) {
+        setError(t('auth.loginThrottled'));
+      } else if (parsed.code === 'AUTH_TOTP_REQUIRED') {
         setShowTotp(true);
+      } else if (sentCode && parsed.code === 'AUTH_INVALID_CREDENTIALS') {
+        // The password was accepted before the code was asked for; a code counts once.
+        setTotpCode('');
+        setError(t('auth.totpRejected'));
       } else {
         setError(parsed.message);
       }

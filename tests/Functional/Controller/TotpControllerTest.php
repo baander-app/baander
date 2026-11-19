@@ -6,6 +6,8 @@ namespace App\Tests\Functional\Controller;
 
 use App\Auth\Domain\Model\User;
 use App\Tests\Functional\TestCase;
+use OTPHP\TOTP;
+use Symfony\Component\Clock\MockClock;
 
 final class TotpControllerTest extends TestCase
 {
@@ -59,6 +61,39 @@ final class TotpControllerTest extends TestCase
         $this->assertSame($data['data']['secret'], $parameters['secret']);
     }
 
+    /** TOTP is turned off first, which takes a current code. */
+    public function testSetupIsRefusedWhileTotpIsOn(): void
+    {
+        $user = $this->createTestUser();
+        $secret = $this->startSetup($user);
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/auth/totp/enable', $user, ['code' => self::code($secret)]), 200);
+
+        $data = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/auth/totp/setup', $user), 409);
+
+        $this->assertSame('Two-factor authentication is already on. Turn it off before setting it up again.', $data['error']['message']);
+    }
+
+    public function testASecondSetupReplacesThePendingSecretAndEnableUsesTheNewest(): void
+    {
+        $user = $this->createTestUser();
+        $first = $this->startSetup($user);
+        $second = $this->startSetup($user);
+        $this->assertNotSame($first, $second);
+
+        $refused = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/auth/totp/enable', $user, ['code' => self::code($first)]), 400);
+        $this->assertSame('That code was not accepted. Wait for the next code and try again.', $refused['error']['message']);
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/auth/totp/enable', $user, ['code' => self::code($second)]), 200);
+    }
+
+    public function testEnableWithoutASetupIsRefusedWithATranslatedMessage(): void
+    {
+        $user = $this->createTestUser();
+
+        $data = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/auth/totp/enable', $user, ['code' => '123456']), 400);
+
+        $this->assertSame('No two-factor setup is in progress, or it expired. Start the setup again.', $data['error']['message']);
+    }
+
     // ---------------------------------------------------------------
     // POST /api/auth/totp/enable — unauthenticated
     // ---------------------------------------------------------------
@@ -110,5 +145,17 @@ final class TotpControllerTest extends TestCase
         ]);
 
         $this->assertJsonResponse($response, 401);
+    }
+
+    private function startSetup(User $user): string
+    {
+        $data = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/auth/totp/setup', $user), 200, 'data');
+
+        return $data['data']['secret'];
+    }
+
+    private static function code(string $secret): string
+    {
+        return TOTP::create($secret, clock: new MockClock())->at(time());
     }
 }

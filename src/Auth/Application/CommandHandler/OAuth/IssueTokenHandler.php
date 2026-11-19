@@ -6,6 +6,7 @@ namespace App\Auth\Application\CommandHandler\OAuth;
 
 use App\Auth\Application\Command\OAuth\IssueTokenCommand;
 use App\Auth\Application\DTO\TokenResponseDTO;
+use App\Auth\Application\Exception\TotpStepAlreadySpentException;
 use App\Auth\Application\Service\TokenPairIssuer;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
@@ -16,7 +17,8 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * Issues first-party token pairs after password or passkey login.
  *
  * The Symfony authenticators verify the user's credentials; this handler mints a
- * DPoP-bound access token and a refresh token that starts a new rotation chain.
+ * DPoP-bound access token and a refresh token that starts a new rotation chain, and
+ * spends the TOTP step a password login matched in the same transaction.
  * The authorization code and device code grants issue through the same
  * TokenPairIssuer in their own handlers.
  */
@@ -54,6 +56,27 @@ final readonly class IssueTokenHandler
             clientFingerprint: $command->getClientFingerprint(),
             userAgent: $command->getUserAgent(),
             ipAddress: $command->getIpAddress(),
+            persistWithTokens: $this->spendTotpStep($command),
         );
+    }
+
+    /**
+     * The login's TOTP step is spent in the transaction that stores the tokens: when another
+     * request spent it first, no row matches and the tokens roll back with it.
+     *
+     * @return (callable(): void)|null
+     */
+    private function spendTotpStep(IssueTokenCommand $command): ?callable
+    {
+        $step = $command->getTotpStep();
+        if ($step === null) {
+            return null;
+        }
+
+        return function () use ($command, $step): void {
+            if (!$this->userRepository->spendTotpStep($command->getUserId(), $step)) {
+                throw new TotpStepAlreadySpentException();
+            }
+        };
     }
 }

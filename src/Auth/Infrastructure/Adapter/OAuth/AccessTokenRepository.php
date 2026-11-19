@@ -64,7 +64,6 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
                 $domainUser->getName(),
                 $domainUser->getEmail(),
                 $domainUser->getPassword(),
-                $domainUser->getTotpSecret() ?? '',
                 $domainUser->getId(),
             );
         }

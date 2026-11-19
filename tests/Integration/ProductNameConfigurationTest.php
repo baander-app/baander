@@ -134,7 +134,7 @@ final class ProductNameConfigurationTest extends TestCase
             parse_str((string) parse_url($uri, PHP_URL_QUERY), $query);
             self::assertSame('Bånder', $query['issuer']);
             self::assertSame($secret, $query['secret']);
-            self::assertTrue($totp->verifyCode($secret, TOTP::create($secret)->now()));
+            self::assertIsInt($totp->matchStep($secret, TOTP::create($secret)->now()));
             self::assertSame('Bånder', $container->getParameter('app.name'));
         } finally {
             $kernel->shutdown();

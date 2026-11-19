@@ -31,7 +31,7 @@ final class UserTimestampPersistenceTest extends TestCase
             name: 'Timestamp owner',
             email: 'timestamps@baander.app',
             password: 'unused-test-password',
-            totpSecret: null,
+            totpSecretCiphertext: null,
             createdAt: new DateTimeImmutable($created),
             updatedAt: new DateTimeImmutable($updated),
         ));

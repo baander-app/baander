@@ -20,6 +20,7 @@ final readonly class AuthenticationFailureMessage
     public const string INVALID_CREDENTIALS = 'Invalid credentials.';
     public const string ACCOUNT_DISABLED = 'This account has been disabled.';
     public const string TOTP_REQUIRED = 'TOTP code is required.';
+    public const string TOTP_UNAVAILABLE = 'Two-factor sign-in is unavailable for this account.';
     public const string INVALID_TOKEN = 'Invalid or expired token.';
 
     /** Each authenticator message's key in the auth domain. */
@@ -27,6 +28,7 @@ final readonly class AuthenticationFailureMessage
         self::INVALID_CREDENTIALS => 'errors.invalid_credentials',
         self::ACCOUNT_DISABLED => 'errors.account_disabled',
         self::TOTP_REQUIRED => 'errors.totp_required',
+        self::TOTP_UNAVAILABLE => 'errors.totp_unavailable',
         self::INVALID_TOKEN => 'errors.invalid_token',
     ];
 

@@ -4,24 +4,23 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Controller\User;
 
-use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Application\Command\OAuth\IssueTokenCommand;
-use App\Auth\Application\Exception\DpopStoreUnavailableException;
+use App\Auth\Application\DTO\VerifiedPasswordLogin;
+use App\Auth\Application\Exception\TotpStepAlreadySpentException;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
-use App\Auth\Infrastructure\Security\OAuth\DpopNonceManager;
-use App\Auth\Infrastructure\Security\OAuth\DpopProofValidator;
 use App\Auth\Interface\Resource\TokenResource;
 use App\Auth\Interface\Resource\UserResource;
 use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\Controller\TranslatorTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
-use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
@@ -31,14 +30,12 @@ use Symfony\Component\Routing\Attribute\Route;
 final class LoginController
 {
     use ApiResponsesTrait;
+    use TranslatorTrait;
 
     public function __construct(
-        private readonly Security $security,
         private readonly MessageBusInterface $bus,
         private readonly ClientRepositoryInterface $clientRepository,
         private readonly UserRepositoryInterface $userRepository,
-        private readonly DpopProofValidator $dpopProofValidator,
-        private readonly DpopNonceManager $dpopNonceManager,
         private readonly string $spaClientId,
     ) {
     }
@@ -69,8 +66,9 @@ final class LoginController
     #[Route('/login', name: 'login', methods: ['POST'])]
     public function __invoke(Request $request): JsonResponse
     {
-        $securityUser = $this->security->getUser();
-        if (!$securityUser instanceof AuthenticatedUserIdentityInterface) {
+        // Only the password authenticator sets this, after verifying the proof and the credentials.
+        $login = $request->attributes->get(VerifiedPasswordLogin::class);
+        if (!$login instanceof VerifiedPasswordLogin) {
             return $this->unauthorized();
         }
 
@@ -80,54 +78,29 @@ final class LoginController
             return $this->errorResponse('Invalid client configuration.', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        $user = $this->userRepository->findByUuid(
-            \App\Shared\Domain\Model\Uuid::fromString($securityUser->getId()),
-        );
+        $user = $this->userRepository->findByUuid($login->userId);
 
         if ($user === null) {
             return $this->unauthorized();
         }
 
-        // Validate DPoP proof
-        $dpopHeader = $request->headers->get('DPoP');
-        if ($dpopHeader === null || $dpopHeader === '') {
-            return $this->errorResponse('DPoP proof header is required.', Response::HTTP_BAD_REQUEST);
-        }
-
         try {
-            // Nonce challenge-response (Auth0-style): require nonce in proof
-            $proofNonce = $this->dpopProofValidator->extractNonce($dpopHeader);
-            if ($proofNonce === null || $proofNonce === '') {
-                return $this->dpopNonceManager->createChallengeResponse();
+            $envelope = $this->bus->dispatch(new IssueTokenCommand(
+                clientId: $client->getId(),
+                userId: $user->getId(),
+                ipAddress: $request->getClientIp(),
+                userAgent: $request->headers->get('User-Agent'),
+                clientFingerprint: $request->headers->get(BaanderHeader::ClientFingerprint->value),
+                dpopJkt: $login->dpopJkt,
+                totpStep: $login->totpStep,
+            ));
+        } catch (HandlerFailedException $exception) {
+            if ($exception->getPrevious() instanceof TotpStepAlreadySpentException) {
+                // Another request spent the code first; the tokens were rolled back with the step.
+                return $this->invalidCredentials();
             }
-
-            // Validate the nonce
-            if (!$this->dpopNonceManager->isValid($proofNonce)) {
-                return $this->dpopNonceManager->createChallengeResponse(
-                    'Authorization server requires a fresh nonce in DPoP proof.',
-                );
-            }
-
-            $result = $this->dpopProofValidator->validate($dpopHeader, $request);
-            $proofKey = $result->getJkt();
-            if (!$result->isValid() || $proofKey === null) {
-                return $this->dpopNonceManager->createChallengeResponse(
-                    $result->getErrorDescription() ?? $result->getError() ?? 'DPoP proof validation failed.',
-                );
-            }
-        } catch (DpopStoreUnavailableException) {
-            // Not a verdict on the proof: the store that logged the failure could not answer.
-            return $this->serviceUnavailable();
+            throw $exception;
         }
-
-        $envelope = $this->bus->dispatch(new IssueTokenCommand(
-            clientId: $client->getId(),
-            userId: $user->getId(),
-            ipAddress: $request->getClientIp(),
-            userAgent: $request->headers->get('User-Agent'),
-            clientFingerprint: $request->headers->get(BaanderHeader::ClientFingerprint->value),
-            dpopJkt: $proofKey,
-        ));
 
         $tokenResponse = $envelope->last(HandledStamp::class)?->getResult();
 
@@ -135,18 +108,19 @@ final class LoginController
             ...TokenResource::from($tokenResponse),
             'user' => UserResource::from($user),
         ]);
-        $this->dpopNonceManager->attachNextNonce($response);
+        $response->headers->set('DPoP-Nonce', $login->nextNonce);
 
         return $response;
     }
 
-    /** 503 with Retry-After: the client retries the same login; no nonce and no refusal header. */
-    private function serviceUnavailable(): JsonResponse
+    /** The answer a wrong password or code gets from the password authenticator. */
+    private function invalidCredentials(): JsonResponse
     {
-        $response = $this->errorResponse(DpopStoreUnavailableException::CLIENT_MESSAGE, Response::HTTP_SERVICE_UNAVAILABLE);
-        $response->headers->set('Retry-After', (string) DpopStoreUnavailableException::RETRY_AFTER_SECONDS);
-        $response->headers->set('Cache-Control', 'no-store');
-
-        return $response;
+        return new JsonResponse([
+            'error' => [
+                'message' => $this->trans('errors.invalid_credentials', domain: 'auth'),
+                'code' => 'AUTH_INVALID_CREDENTIALS',
+            ],
+        ], Response::HTTP_UNAUTHORIZED);
     }
 }

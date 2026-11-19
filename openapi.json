@@ -3428,6 +3428,7 @@
                     "Auth"
                 ],
                 "summary": "Generate TOTP secret and provisioning URI",
+                "description": "Refused while TOTP is on. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.",
                 "operationId": "post_totp_setup",
                 "responses": {
                     "200": {
@@ -3457,6 +3458,16 @@
                     },
                     "401": {
                         "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "TOTP is already on",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3528,6 +3539,16 @@
                     },
                     "400": {
                         "description": "Invalid TOTP code or no pending setup",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "TOTP is already on",
                         "content": {
                             "application/json": {
                                 "schema": {

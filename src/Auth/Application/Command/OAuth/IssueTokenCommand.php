@@ -18,6 +18,7 @@ final readonly class IssueTokenCommand
      * @param string[] $scopes
      * @param string $dpopJkt Thumbprint of the DPoP key the tokens are bound to (RFC 9449)
      * @param string|null $clientFingerprint Device fingerprint the access token is bound to, when the client sent one
+     * @param int|null $totpStep TOTP time step the login's code matched; spent in the transaction that stores the tokens
      */
     public function __construct(
         private Uuid $clientId,
@@ -28,6 +29,7 @@ final readonly class IssueTokenCommand
         private ?string $ipAddress = null,
         private ?string $userAgent = null,
         private ?string $clientFingerprint = null,
+        private ?int $totpStep = null,
     ) {
     }
 
@@ -72,5 +74,10 @@ final readonly class IssueTokenCommand
     public function getClientFingerprint(): ?string
     {
         return $this->clientFingerprint;
+    }
+
+    public function getTotpStep(): ?int
+    {
+        return $this->totpStep;
     }
 }

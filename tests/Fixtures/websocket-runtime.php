@@ -109,7 +109,7 @@ $manager = $kernel->getContainer()->get('doctrine')->getManager();
 wsCheck($manager instanceof EntityManagerInterface, 'No entity manager.');
 // The fixture uses mapped entities to seed disposable credentials, then the real HTTP firewall.
 $email = 'websocket-' . bin2hex(random_bytes(6)) . '@baander.app';
-$user = new App\Auth\Infrastructure\Doctrine\Entity\UserEntity(new PublicId(), 'WebSocket runtime', $email, 'test-only-unused-password', '');
+$user = new App\Auth\Infrastructure\Doctrine\Entity\UserEntity(new PublicId(), 'WebSocket runtime', $email, 'test-only-unused-password');
 $manager->persist($user);
 $manager->flush();
 $client = new StreamClient($manager, $email, (string) file_get_contents('config/secrets/oauth/private.key'), WS_SERVER . '/api/stream/track');

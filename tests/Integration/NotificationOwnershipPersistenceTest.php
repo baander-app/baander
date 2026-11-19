@@ -253,7 +253,6 @@ final class NotificationOwnershipPersistenceTest extends TestCase
             'Notification owner',
             $id->toString() . '@baander.app',
             'unused-test-password',
-            '',
             $id,
         ));
         $this->manager->flush();

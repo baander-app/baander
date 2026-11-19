@@ -30,7 +30,7 @@ final class AccessTokenJwtTest extends TestCase
         $details = openssl_pkey_get_details($rsa);
         self::assertNotFalse($details);
         $client = new ClientEntity(new PublicId(), 'JWT client', '["https://baander.app/callback"]');
-        $user = $withUser ? new UserEntity(new PublicId(), 'JWT user', 'jwt@baander.app', 'hashed', '', id: Uuid::generate()) : null;
+        $user = $withUser ? new UserEntity(new PublicId(), 'JWT user', 'jwt@baander.app', 'hashed', id: Uuid::generate()) : null;
         $expiry = new \DateTimeImmutable('+10 minutes');
         $entity = new AccessTokenEntity('jwt-token-identifier', $client, $user, scopes: ['profile', 'library:read'], expiresAt: $expiry);
         $entity->setPrivateKey(new CryptKey($pem));

@@ -1222,7 +1222,7 @@ final class RefreshTokenHandlerTest extends TestCase
             name: 'Test User',
             email: 'user@baander.app',
             password: 'hashed-pw',
-            totpSecret: null,
+            totpSecretCiphertext: null,
             createdAt: new \DateTimeImmutable(),
             updatedAt: new \DateTimeImmutable(),
             disabled: isset($this->disabledUserIds[$id->toString()]),

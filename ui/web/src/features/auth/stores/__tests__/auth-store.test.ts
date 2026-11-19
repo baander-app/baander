@@ -253,6 +253,21 @@ describe('useAuthStore', () => {
       expect(mockPostTokenToWorker).toHaveBeenCalledWith('access-token-123')
     })
 
+    it('sends a TOTP code only when one was entered', async () => {
+      mockAxios.post.mockResolvedValue(validLoginResponse())
+
+      await useAuthStore.getState().login('test@baander.app', 'secret')
+      await useAuthStore.getState().login('test@baander.app', 'secret', '')
+      await useAuthStore.getState().login('test@baander.app', 'secret', '123456')
+
+      const bodies = mockAxios.post.mock.calls.map((call: unknown[]) => call[1])
+      expect(bodies).toEqual([
+        { email: 'test@baander.app', password: 'secret' },
+        { email: 'test@baander.app', password: 'secret' },
+        { email: 'test@baander.app', password: 'secret', totpCode: '123456' },
+      ])
+    })
+
     it('writes through the auth lock and tells the other tabs', async () => {
       mockAxios.post.mockResolvedValue(validLoginResponse())
 

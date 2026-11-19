@@ -28,8 +28,8 @@ final class PlaylistCollaboratorListRepositoryTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->owner = new UserEntity(new PublicId(), 'Owner', 'owner@baander.app', 'hash', '');
-        $this->collaborator = new UserEntity(new PublicId(), 'Collaborator', 'collaborator@baander.app', 'hash', '');
+        $this->owner = new UserEntity(new PublicId(), 'Owner', 'owner@baander.app', 'hash');
+        $this->collaborator = new UserEntity(new PublicId(), 'Collaborator', 'collaborator@baander.app', 'hash');
         $this->collaboratorLibrary = new LibraryEntity('Visible', 'visible', '/visible', 'music', 'local');
         $ownerOnlyLibrary = new LibraryEntity('Hidden', 'hidden', '/hidden', 'music', 'local');
         $visibleAlbum = new AlbumEntity(new PublicId(), $this->collaboratorLibrary, 'Visible', 'album');

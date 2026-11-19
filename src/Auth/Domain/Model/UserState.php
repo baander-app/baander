@@ -23,7 +23,8 @@ final class UserState
         public string $name,
         public string $email,
         public string $password,
-        public ?string $totpSecret,
+        /** The TOTP secret sealed by the application's TOTP cipher; null while TOTP is off. */
+        public ?string $totpSecretCiphertext,
         public readonly DateTimeImmutable $createdAt,
         public DateTimeImmutable $updatedAt,
         public ?DateTimeImmutable $emailVerifiedAt = null,

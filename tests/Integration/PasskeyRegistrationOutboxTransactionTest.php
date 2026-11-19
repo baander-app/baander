@@ -99,7 +99,7 @@ final class PasskeyRegistrationOutboxTransactionTest extends TestCase
 
     public function testOutboxFailureRollsBackCredentialThenRetryPersistsMatchingIdentityAndEvent(): void
     {
-        $userEntity = new UserEntity(new PublicId(), 'Passkey owner', 'passkey-owner@baander.app', 'unused', '');
+        $userEntity = new UserEntity(new PublicId(), 'Passkey owner', 'passkey-owner@baander.app', 'unused');
         $this->manager->persist($userEntity);
         $this->manager->flush();
         $userId = $userEntity->getId();

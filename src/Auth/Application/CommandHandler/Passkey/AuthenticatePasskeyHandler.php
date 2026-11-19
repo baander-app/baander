@@ -65,7 +65,7 @@ final class AuthenticatePasskeyHandler
             $response,
             $expectedOptions,
             $storedCredential,
-            $owner->hasTotpEnabled(),
+            $owner->hasTotp(),
         );
 
         if (!hash_equals($owner->getPublicId()->toString(), $storedCredential->userHandle)) {

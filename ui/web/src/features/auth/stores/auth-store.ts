@@ -216,7 +216,8 @@ export const useAuthStore = create<AuthState>()(withStoreDebug('auth.auth', with
         const keyPair = await generateDpopKeyPair()
         if (owner !== generation) return
         setDpopKeyPair(keyPair)
-        const request = { email, password, totpCode: totpCode ?? '', ...(honeypot ? { username: honeypot } : {}) } satisfies LoginRequest
+        // No code is sent until the server asks for one; an empty code would read as a wrong code.
+        const request = { email, password, ...(totpCode ? { totpCode } : {}), ...(honeypot ? { username: honeypot } : {}) } satisfies LoginRequest
         const response = await AXIOS_INSTANCE.post('/api/auth/login', request, {
           headers: { 'Content-Type': 'application/json' }, _skipAuth: true,
         } as AxiosRequestConfig)

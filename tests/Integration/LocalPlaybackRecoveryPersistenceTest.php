@@ -60,7 +60,7 @@ final class LocalPlaybackRecoveryPersistenceTest extends TestCase
 
     private function createUser(): Uuid
     {
-        $owner = new UserEntity(new PublicId(), 'Playback owner', new Uuid()->toString() . '@baander.app', 'unused-password', '');
+        $owner = new UserEntity(new PublicId(), 'Playback owner', new Uuid()->toString() . '@baander.app', 'unused-password');
         $this->manager->persist($owner);
         $this->manager->flush();
         return $owner->getId();

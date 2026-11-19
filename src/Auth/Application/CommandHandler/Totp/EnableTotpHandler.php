@@ -5,23 +5,28 @@ declare(strict_types=1);
 namespace App\Auth\Application\CommandHandler\Totp;
 
 use App\Auth\Application\Command\Totp\EnableTotpCommand;
+use App\Auth\Application\Exception\TotpChangeRefusal;
+use App\Auth\Application\Exception\TotpChangeRefusedException;
+use App\Auth\Application\Exception\UserNotFoundException;
+use App\Auth\Application\Port\TotpSecretCipherInterface;
 use App\Auth\Application\Port\TotpVerifierInterface;
+use App\Auth\Application\Service\PendingTotpSecrets;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
-use Psr\Cache\CacheItemPoolInterface;
-use Psr\Cache\InvalidArgumentException;
-use RuntimeException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
-final class EnableTotpHandler
+/**
+ * Turns TOTP on with the secret the user's latest setup generated, once a code from it
+ * matches. The secret is stored sealed, and the code's step is spent, so the code that
+ * confirmed the setup cannot also sign in.
+ */
+final readonly class EnableTotpHandler
 {
-    /**
-     * @param CacheItemPoolInterface $cache Redis-backed cache for pending TOTP secrets
-     */
     public function __construct(
-        private readonly UserRepositoryInterface $userRepository,
-        private readonly TotpVerifierInterface $totpVerifier,
-        private readonly CacheItemPoolInterface $cache,
+        private UserRepositoryInterface $userRepository,
+        private TotpVerifierInterface $totpVerifier,
+        private TotpSecretCipherInterface $cipher,
+        private PendingTotpSecrets $pendingSecrets,
     ) {
     }
 
@@ -29,53 +34,18 @@ final class EnableTotpHandler
     public function __invoke(EnableTotpCommand $command): void
     {
         $userId = Uuid::fromString($command->getUserId());
-
-        $user = $this->userRepository->findByUuid($userId);
-        if ($user === null) {
-            throw new RuntimeException(sprintf('User "%s" not found.', $userId->toString()));
+        $user = $this->userRepository->findByUuid($userId) ?? throw UserNotFoundException::forIdentifier($userId->toString());
+        if ($user->hasTotp()) {
+            throw new TotpChangeRefusedException(TotpChangeRefusal::AlreadyEnabled);
         }
 
-        // Retrieve the pending TOTP secret that was stored during setup
-        $pendingSecret = $this->getPendingSecret($userId->toString());
-        if ($pendingSecret === null) {
-            throw new RuntimeException(
-                'No pending TOTP setup found. Please start the setup process again by calling /api/auth/totp/setup.'
-            );
-        }
+        $secret = $this->pendingSecrets->find($userId) ?? throw new TotpChangeRefusedException(TotpChangeRefusal::SetupMissing);
+        $step = $this->totpVerifier->matchStep($secret, $command->getCode())
+            ?? throw new TotpChangeRefusedException(TotpChangeRefusal::InvalidCode);
 
-        // Verify the TOTP code provided by the user against the server-generated secret
-        if (!$this->totpVerifier->verifyCode($pendingSecret, $command->getCode())) {
-            throw new RuntimeException('Invalid TOTP code. Please verify the code from your authenticator app.');
-        }
-
-        $user->setTotpSecret($pendingSecret);
+        $user->enableTotp($this->cipher->seal($secret));
         $this->userRepository->save($user);
-
-        // Remove the pending secret after successful enable to prevent replay
-        $this->cache->deleteItem($this->pendingSecretKey($userId->toString()));
-    }
-
-    private function pendingSecretKey(string $userId): string
-    {
-        return sprintf('totp_pending_secret_%s', $userId);
-    }
-
-    /**
-     * Retrieve the pending TOTP secret from Redis.
-     *
-     * Returns null if no secret exists or it has expired (TTL elapsed).
-     */
-    private function getPendingSecret(string $userId): ?string
-    {
-        try {
-            $item = $this->cache->getItem($this->pendingSecretKey($userId));
-            if (!$item->isHit()) {
-                return null;
-            }
-
-            return $item->get();
-        } catch (InvalidArgumentException $e) {
-            throw new RuntimeException('Failed to retrieve pending TOTP secret from cache.', 0, $e);
-        }
+        $this->userRepository->spendTotpStep($userId, $step);
+        $this->pendingSecrets->forget($userId);
     }
 }

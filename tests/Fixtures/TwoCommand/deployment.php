@@ -526,7 +526,7 @@ function profileSlots(): array
 function drillOwner(Doctrine\ORM\EntityManagerInterface $manager, string $project, string $name): StreamClient
 {
     $email = $name . '@baander.app';
-    $owner = new App\Auth\Infrastructure\Doctrine\Entity\UserEntity(new PublicId(), ucfirst(str_replace('-', ' ', $name)), $email, 'unused-password', '', roles: ['ROLE_ADMIN']);
+    $owner = new App\Auth\Infrastructure\Doctrine\Entity\UserEntity(new PublicId(), ucfirst(str_replace('-', ' ', $name)), $email, 'unused-password', roles: ['ROLE_ADMIN']);
     $owner->markEmailAsVerified();
     $manager->persist($owner);
     $manager->flush();

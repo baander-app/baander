@@ -27,9 +27,9 @@ $assertCount = static function (string $sql, int $expected) use ($db): void {
 if ($mode === 'prepare') {
     App\Tests\Support\FinalSchemaBootstrap::bootstrap($db);
 
-    $user = new UserEntity(new PublicId(), 'Outbox User', 'outbox-user@baander.app', 'unused-password', '');
+    $user = new UserEntity(new PublicId(), 'Outbox User', 'outbox-user@baander.app', 'unused-password');
     $user->markEmailAsVerified();
-    $admin = new UserEntity(new PublicId(), 'Outbox Admin', 'outbox-admin@baander.app', 'unused-password', '', roles: ['ROLE_USER', 'ROLE_ADMIN']);
+    $admin = new UserEntity(new PublicId(), 'Outbox Admin', 'outbox-admin@baander.app', 'unused-password', roles: ['ROLE_USER', 'ROLE_ADMIN']);
     $admin->markEmailAsVerified();
     $em->persist($user);
     $em->persist($admin);

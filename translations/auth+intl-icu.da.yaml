@@ -20,6 +20,11 @@ errors:
   invalid_credentials: "Ugyldige loginoplysninger."
   account_disabled: "Denne konto er deaktiveret."
   totp_required: "TOTP-kode er påkrævet."
+  totp_unavailable: "Totrinslogin er ikke tilgængeligt for denne konto. Bed din administrator om at nulstille kontoens totrinsgodkendelse."
+  totp_already_enabled: "Totrinsgodkendelse er allerede slået til. Slå den fra, før du sætter den op igen."
+  totp_setup_missing: "Ingen opsætning af totrinsgodkendelse er i gang, eller den er udløbet. Start opsætningen igen."
+  totp_code_invalid: "Koden blev ikke godkendt. Vent på den næste kode, og prøv igen."
+  totp_not_enabled: "Totrinsgodkendelse er ikke slået til for denne konto."
   invalid_token: "Ugyldigt eller udløbet token."
 
 success:
@@ -27,7 +32,7 @@ success:
   password_reset_sent: "Hvis e-mailadressen findes, er der sendt et link til nulstilling af adgangskode."
   email_verified: "E-mail bekræftet."
   totp_enabled: "TOTP aktiveret."
-  totp_disable_not_implemented: "TOTP-deaktivering er endnu ikke fuldt implementeret."
+  totp_disabled: "Totrinsgodkendelse slået fra."
   client_revoked: "Klient tilbagekaldt."
   device_approved: "Enhed godkendt."
   device_denied: "Enhedsadgang nægtet."

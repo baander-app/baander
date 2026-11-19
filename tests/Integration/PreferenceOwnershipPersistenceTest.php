@@ -230,7 +230,6 @@ final class PreferenceOwnershipPersistenceTest extends TestCase
             'Preference owner',
             $id->toString() . '@baander.app',
             'unused-test-password',
-            '',
             $id,
         );
 

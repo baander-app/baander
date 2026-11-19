@@ -59,7 +59,7 @@ final class ConfirmedPausedRunnerPersistenceTest extends TestCase
     /** @return array{owner:Uuid,incarnation:string,session:string,command:string,queue:list<string>} */
     private function pausedBrowser(): array
     {
-        $user = new UserEntity(new PublicId(), 'Paused browser owner', new Uuid()->toString() . '@baander.app', 'unused-password', '');
+        $user = new UserEntity(new PublicId(), 'Paused browser owner', new Uuid()->toString() . '@baander.app', 'unused-password');
         $this->manager->persist($user);
         $this->manager->flush();
         $owner = $user->getId();

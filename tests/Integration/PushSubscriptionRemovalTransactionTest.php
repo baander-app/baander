@@ -72,7 +72,7 @@ final class PushSubscriptionRemovalTransactionTest extends TestCase
 
     public function testOuterRollbackRestoresDeletedRowAndSubsequentOrmReadUsesFreshIdentity(): void
     {
-        $owner = new UserEntity(new PublicId(), 'Owner', 'push-transaction@baander.app', 'test-only', '');
+        $owner = new UserEntity(new PublicId(), 'Owner', 'push-transaction@baander.app', 'test-only');
         $target = new PushSubscriptionEntity($owner->getId(), 'https://push.baander.app/transaction', 'pk', 'ak', 'aes128gcm');
         $this->manager->persist($owner);
         $this->manager->persist($target);
@@ -103,7 +103,7 @@ final class PushSubscriptionRemovalTransactionTest extends TestCase
 
     public function testCommittedRemovalDetachesLazyReferenceWithoutInitializingDeletedRow(): void
     {
-        $owner = new UserEntity(new PublicId(), 'Owner', 'push-lazy@baander.app', 'test-only', '');
+        $owner = new UserEntity(new PublicId(), 'Owner', 'push-lazy@baander.app', 'test-only');
         $target = new PushSubscriptionEntity($owner->getId(), 'https://push.baander.app/lazy', 'pk', 'ak', 'aes128gcm');
         $this->manager->persist($owner);
         $this->manager->persist($target);
@@ -132,7 +132,7 @@ final class PushSubscriptionRemovalTransactionTest extends TestCase
     #[DataProvider('managedStates')]
     public function testRotationPreservesIdentityPendingWorkAndRollback(bool $lazy): void
     {
-        $owner = new UserEntity(new PublicId(), 'Stored name', 'push-rotation@baander.app', 'test-only', '');
+        $owner = new UserEntity(new PublicId(), 'Stored name', 'push-rotation@baander.app', 'test-only');
         $target = new PushSubscriptionEntity($owner->getId(), 'https://push.baander.app/rotation', 'old-public', 'old-auth', 'aes128gcm', 'old-agent');
         $this->manager->persist($owner);
         $this->manager->persist($target);
@@ -180,8 +180,8 @@ final class PushSubscriptionRemovalTransactionTest extends TestCase
 
     public function testRemoveAllPreservesForeignLazyIdentityAndCallerTransaction(): void
     {
-        $owner = new UserEntity(new PublicId(), 'Owner', 'push-all-owner@baander.app', 'test-only', '');
-        $other = new UserEntity(new PublicId(), 'Other', 'push-all-other@baander.app', 'test-only', '');
+        $owner = new UserEntity(new PublicId(), 'Owner', 'push-all-owner@baander.app', 'test-only');
+        $other = new UserEntity(new PublicId(), 'Other', 'push-all-other@baander.app', 'test-only');
         $target = new PushSubscriptionEntity($owner->getId(), 'https://push.baander.app/all', 'pk', 'ak', 'aes128gcm');
         $foreign = new PushSubscriptionEntity($other->getId(), 'https://push.baander.app/foreign', 'pk', 'ak', 'aes128gcm');
         foreach ([$owner, $other, $target, $foreign] as $entity) {
@@ -216,8 +216,8 @@ final class PushSubscriptionRemovalTransactionTest extends TestCase
     #[DataProvider('managedStates')]
     public function testConcurrentRegistrationSerializesSameOrDifferentOwners(bool $differentOwner): void
     {
-        $owner = new UserEntity(new PublicId(), 'Owner', 'push-race-owner@baander.app', 'test-only', '');
-        $other = new UserEntity(new PublicId(), 'Other', 'push-race-other@baander.app', 'test-only', '');
+        $owner = new UserEntity(new PublicId(), 'Owner', 'push-race-owner@baander.app', 'test-only');
+        $other = new UserEntity(new PublicId(), 'Other', 'push-race-other@baander.app', 'test-only');
         $this->manager->persist($owner);
         $this->manager->persist($other);
         $this->manager->flush();

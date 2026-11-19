@@ -37,8 +37,8 @@ final class ImageReadScopeRepositoryTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $user = new UserEntity(new PublicId(), 'Member', 'image-member@baander.app', 'test-only', '');
-        $other = new UserEntity(new PublicId(), 'Other', 'image-other@baander.app', 'test-only', '');
+        $user = new UserEntity(new PublicId(), 'Member', 'image-member@baander.app', 'test-only');
+        $other = new UserEntity(new PublicId(), 'Other', 'image-other@baander.app', 'test-only');
         $allowed = new LibraryEntity('Allowed', 'allowed', '/media/allowed', 'music', 'local');
         $denied = new LibraryEntity('Denied', 'denied', '/media/denied', 'music', 'local');
         $this->allowedAlbum = new AlbumEntity(new PublicId(), $allowed, 'Allowed Album', 'album');
