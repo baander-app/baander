@@ -50,6 +50,27 @@ final class ClientAssertionVerifierTest extends TestCase
         self::assertTrue($this->verify($this->assertion()));
     }
 
+    public function testAPs256AssertionFromAnRsaKeyAuthenticates(): void
+    {
+        $this->useKey(new SignedClientAssertion(algorithm: 'PS256'));
+
+        self::assertTrue($this->verify($this->assertion()));
+    }
+
+    public function testAPs256AssertionFromAKeyUnder2048BitsFails(): void
+    {
+        $this->useKey(new SignedClientAssertion(algorithm: 'PS256', rsaBits: 1024));
+
+        self::assertFalse($this->verify($this->assertion()));
+    }
+
+    public function testAnRs256SignatureLabelledPs256Fails(): void
+    {
+        $this->useKey(new SignedClientAssertion(algorithm: 'RS256'));
+
+        self::assertFalse($this->verify($this->assertion(headers: ['alg' => 'PS256'])));
+    }
+
     public function testTheIssuerAsAOneElementAudienceArrayAuthenticates(): void
     {
         self::assertTrue($this->verify($this->assertion(['aud' => [self::ISSUER]])));
@@ -252,6 +273,13 @@ final class ClientAssertionVerifierTest extends TestCase
 
         $this->expectExceptionObject($outage);
         $this->verifier($store)->verify($this->assertion(), $this->client);
+    }
+
+    private function useKey(SignedClientAssertion $key): void
+    {
+        $this->key = $key;
+        $this->client = Client::registerConfidentialWithKeys('Key client', ['https://baander.app/callback'], ClientKeySource::fromJwks($key->jwks()));
+        $this->clientId = $this->client->getPublicId()->toString();
     }
 
     private function verify(string $assertion): bool

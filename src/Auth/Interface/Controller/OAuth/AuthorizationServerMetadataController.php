@@ -19,10 +19,10 @@ final class AuthorizationServerMetadataController
     use ApiResponsesTrait;
 
     /** The proof algorithms DpopProofValidator accepts; a unit test keeps the two lists equal. */
-    public const array DPOP_SIGNING_ALGORITHMS = ['EdDSA', 'ES256', 'ES384', 'ES512', 'RS256', 'RS384', 'RS512'];
+    public const array DPOP_SIGNING_ALGORITHMS = ['EdDSA', 'ES256', 'ES384', 'ES512', 'PS256', 'RS256', 'RS384', 'RS512'];
 
     /** The client assertion algorithms ClientAssertionVerifier accepts; a unit test keeps the two lists equal. */
-    public const array CLIENT_ASSERTION_SIGNING_ALGORITHMS = ['EdDSA', 'ES256', 'ES384', 'ES512', 'RS256', 'RS384', 'RS512'];
+    public const array CLIENT_ASSERTION_SIGNING_ALGORITHMS = ['EdDSA', 'ES256', 'ES384', 'ES512', 'PS256', 'RS256', 'RS384', 'RS512'];
 
     public function __construct(
         private readonly UrlGeneratorInterface $urlGenerator,

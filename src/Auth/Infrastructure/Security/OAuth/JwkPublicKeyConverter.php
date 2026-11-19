@@ -6,6 +6,8 @@ namespace App\Auth\Infrastructure\Security\OAuth;
 
 use InvalidArgumentException;
 use Lcobucci\JWT\Signer;
+use Jose\Component\Core\JWK;
+use Jose\Component\Signature\Algorithm\PS256;
 use Lcobucci\JWT\Signer\Ecdsa\Sha256 as ES256;
 use Lcobucci\JWT\Signer\Ecdsa\Sha384 as ES384;
 use Lcobucci\JWT\Signer\Ecdsa\Sha512 as ES512;
@@ -24,7 +26,7 @@ use Lcobucci\JWT\Signer\Rsa\Sha512 as RS512;
 final class JwkPublicKeyConverter
 {
     /** The signing algorithms DPoP proofs and client assertions may use. */
-    public const array SIGNING_ALGORITHMS = ['EdDSA', 'ES256', 'ES384', 'ES512', 'RS256', 'RS384', 'RS512'];
+    public const array SIGNING_ALGORITHMS = ['EdDSA', 'ES256', 'ES384', 'ES512', 'PS256', 'RS256', 'RS384', 'RS512'];
 
     /** JWK members that carry private key material (RFC 7518 section 6). */
     public const array PRIVATE_KEY_MEMBERS = ['d', 'p', 'q', 'dp', 'dq', 'qi'];
@@ -51,9 +53,31 @@ final class JwkPublicKeyConverter
      */
     public static function verify(array $jwk, string $alg, string $payload, string $encodedSignature): bool
     {
+        // lcobucci/jwt has no RSA-PSS signer; web-token's PS256 verifies against the JWK itself.
+        if ($alg === 'PS256') {
+            return self::verifyRsaPss($jwk, $payload, self::base64urlDecode($encodedSignature));
+        }
+
         $signer = self::signer($alg) ?? throw new InvalidArgumentException(sprintf('Unsupported algorithm "%s".', $alg));
 
         return $signer->verify(self::base64urlDecode($encodedSignature), $payload, self::toVerificationKey($jwk));
+    }
+
+    /**
+     * @param array<string, mixed> $jwk
+     * @throws InvalidArgumentException when the JWK is not a usable RSA public key
+     */
+    private static function verifyRsaPss(array $jwk, string $payload, string $signature): bool
+    {
+        if (($jwk['kty'] ?? null) !== 'RSA') {
+            throw new InvalidArgumentException('PS256 needs an RSA key.');
+        }
+        // lcobucci/jwt refuses RSA keys under 2048 bits for the RS algorithms; PS256 holds the same floor.
+        if (strlen(ltrim(self::base64urlDecode(self::member($jwk, 'n')), "\0")) < 256) {
+            throw new InvalidArgumentException('RSA keys must be at least 2048 bits.');
+        }
+
+        return new PS256()->verify(new JWK(['kty' => 'RSA', 'n' => self::member($jwk, 'n'), 'e' => self::member($jwk, 'e')]), $payload, $signature);
     }
 
     /**

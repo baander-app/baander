@@ -73,7 +73,8 @@
     "symfony/workflow": "~8.1.8",
     "symfony/yaml": "~8.1.10",
     "tsduck/php": "@dev",
-    "web-auth/webauthn-lib": "^5.3.9"
+    "web-auth/webauthn-lib": "^5.3.9",
+    "web-token/jwt-library": "^4.2.4"
   },
   "require-dev": {
     "baander/phpstan-rules": "@dev",

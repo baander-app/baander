@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace App\Tests\Fixtures\Auth;
 
+use Jose\Component\KeyManagement\JWKFactory;
+use Jose\Component\Signature\Algorithm\PS256;
 use Lcobucci\JWT\Signer\Ecdsa\Sha256;
 use Lcobucci\JWT\Signer\Key\InMemory;
+use Lcobucci\JWT\Signer\Rsa\Sha256 as RsaSha256;
 use RuntimeException;
 
 /**
- * A `private_key_jwt` client's disposable ES256 key and the client assertions it signs
- * (RFC 7523 as updated by RFC 10070).
+ * A `private_key_jwt` client's disposable key and the client assertions it signs
+ * (RFC 7523 as updated by RFC 10070): ES256 by default, or an RSA key signing RS256
+ * or PS256.
  */
 final readonly class SignedClientAssertion
 {
@@ -20,8 +24,13 @@ final readonly class SignedClientAssertion
     /** @var array<string, string> */
     private array $jwk;
 
-    public function __construct(private ?string $kid = 'client-key-1')
+    public function __construct(private ?string $kid = 'client-key-1', private string $algorithm = 'ES256', int $rsaBits = 2048)
     {
+        if ($algorithm !== 'ES256') {
+            [$this->privateKey, $this->jwk] = self::rsaKey($kid, $rsaBits);
+
+            return;
+        }
         $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
         if ($key === false || !openssl_pkey_export($key, $exportedPrivateKey)) {
             throw new RuntimeException('Cannot generate a disposable client key.');
@@ -70,13 +79,42 @@ final readonly class SignedClientAssertion
             'iat' => $now,
             'exp' => $now + 120,
         ], $claims);
-        $headers = self::merge(['typ' => 'client-authentication+jwt', 'alg' => 'ES256', 'kid' => $this->kid], $headers);
+        $headers = self::merge(['typ' => 'client-authentication+jwt', 'alg' => $this->algorithm, 'kid' => $this->kid], $headers);
 
         $body = SignedDpopProof::encode(json_encode($headers, JSON_THROW_ON_ERROR)) . '.'
             . SignedDpopProof::encode(json_encode($claims, JSON_THROW_ON_ERROR));
-        $signature = (new Sha256())->sign($body, InMemory::plainText($this->privateKey));
 
-        return $body . '.' . SignedDpopProof::encode($signature);
+        return $body . '.' . SignedDpopProof::encode($this->sign($body));
+    }
+
+    private function sign(string $body): string
+    {
+        return match ($this->algorithm) {
+            'ES256' => (new Sha256())->sign($body, InMemory::plainText($this->privateKey)),
+            'RS256' => (new RsaSha256())->sign($body, InMemory::plainText($this->privateKey)),
+            'PS256' => (new PS256())->sign(JWKFactory::createFromKey($this->privateKey), $body),
+            default => throw new RuntimeException(sprintf('Unsupported fixture algorithm "%s".', $this->algorithm)),
+        };
+    }
+
+    /** @return array{string, array<string, string>} The PEM private key and the public JWK */
+    private static function rsaKey(?string $kid, int $bits): array
+    {
+        $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_RSA, 'private_key_bits' => $bits]);
+        if ($key === false || !openssl_pkey_export($key, $exportedPrivateKey)) {
+            throw new RuntimeException('Cannot generate a disposable client key.');
+        }
+        $details = openssl_pkey_get_details($key);
+        if ($details === false) {
+            throw new RuntimeException('Cannot read the disposable client public key.');
+        }
+
+        return [$exportedPrivateKey, [
+            'kty' => 'RSA',
+            'n' => SignedDpopProof::encode($details['rsa']['n']),
+            'e' => SignedDpopProof::encode($details['rsa']['e']),
+            ...($kid === null ? [] : ['kid' => $kid]),
+        ]];
     }
 
     /**
