@@ -109,7 +109,7 @@ test.describe('desktop panels', () => {
       .toHaveAttribute('aria-current', 'page');
   });
 
-  test('every entry shows its title and a description, and the footer lists the same groups and entries', async ({ page }) => {
+  test('feature groups use compact links, other entries keep descriptions, and the footer keeps every destination', async ({ page }) => {
     await page.goto('/');
     for (const title of ['Product', 'Resources'] as const) {
       const open = await openMenuPanel(page, title);
@@ -117,7 +117,11 @@ test.describe('desktop panels', () => {
       expect(await entries.count()).toBeGreaterThan(0);
       for (const entry of await entries.all()) {
         await expect(entry.getByRole('link')).toBeVisible();
-        await expect(entry.locator('.menu-entry-description')).toHaveText(/\S/);
+        if (await entry.evaluate((element) => element.closest('.menu-subgroup-compact') !== null)) {
+          await expect(entry.locator('.menu-entry-description')).toHaveCount(0);
+        } else {
+          await expect(entry.locator('.menu-entry-description')).toHaveText(/\S/);
+        }
       }
     }
     await expect(panel(page, 'Resources').locator('.menu-column-title')).toHaveText(['Run it', 'Build on it', 'Open source']);
@@ -125,22 +129,49 @@ test.describe('desktop panels', () => {
     const footer = page.getByRole('navigation', { name: 'Footer navigation' });
     expect(await hrefs('footer nav[aria-label="Footer navigation"] .footer-group a')).toEqual(await hrefs('.site-header details.menu-panel a'));
     await expect(footer.locator('.footer-panel-title')).toHaveText(['Product', 'Resources']);
-    expect(await footer.locator('.footer-group-title').allTextContents())
-      .toEqual(await page.locator('.site-header details.menu-panel :is(.menu-group-title, .menu-column-title)').allTextContents());
+    await expect(panel(page, 'Product').locator('.menu-group-title')).toHaveText(['For listening', 'For running it', 'For building on it']);
+    await expect(page.locator('.footer-bottom').getByRole('link', { name: 'Source', exact: true }))
+      .toHaveAttribute('href', 'https://github.com/baander-app/baander');
   });
 
-  test('a long panel stops after about six entries and scrolls within itself', async ({ page }) => {
+  test('every Product link fits without scrolling at desktop sizes', async ({ page }) => {
     await page.goto('/');
-    const productBody = (await openMenuPanel(page, 'Product')).locator('.menu-panel-body');
-    const product = await productBody.evaluate((element) => ({ client: element.clientHeight, scroll: element.scrollHeight }));
-    expect(product.client).toBeLessThanOrEqual(480);
-    expect(product.scroll).toBeGreaterThan(product.client);
-    const last = productBody.getByRole('link', { name: 'Developers', exact: true });
-    await last.scrollIntoViewIfNeeded();
-    await expect(last).toBeInViewport();
+    for (const viewport of [{ width: 1440, height: 900 }, { width: 1024, height: 768 }]) {
+      await page.setViewportSize(viewport);
+      const productBody = (await openMenuPanel(page, 'Product')).locator('.menu-panel-body');
+      const product = await productBody.evaluate((element) => ({ client: element.clientHeight, scroll: element.scrollHeight }));
+      expect(product.client).toBeLessThanOrEqual(400);
+      expect(product.scroll).toBe(product.client);
+      for (const link of await productBody.getByRole('link').all()) {
+        await expect(link).toBeInViewport({ ratio: 1 });
+      }
+      await noHorizontalScroll(page);
+    }
     const resourcesBody = (await openMenuPanel(page, 'Resources')).locator('.menu-panel-body');
     const resources = await resourcesBody.evaluate((element) => ({ client: element.clientHeight, scroll: element.scrollHeight }));
     expect(resources.scroll).toBe(resources.client);
+  });
+
+  test('footer aligns its desktop columns and stacks without overflow on phones', async ({ page }) => {
+    await page.goto('/');
+    const footer = page.locator('.site-footer');
+    const intro = (await footer.locator('.footer-intro').boundingBox())!;
+    const product = (await footer.locator('.footer-panel').first().boundingBox())!;
+    const resources = (await footer.locator('.footer-panel').last().boundingBox())!;
+    expect(product.y).toBe(intro.y);
+    expect(resources.y).toBe(product.y);
+    expect(product.x).toBeGreaterThanOrEqual(intro.x + intro.width);
+    expect(resources.x).toBeGreaterThanOrEqual(product.x + product.width);
+    for (const width of [390, 320]) {
+      await page.setViewportSize({ width, height: 844 });
+      const panels = await footer.locator('.footer-panel').evaluateAll((elements) => elements.map((element) => {
+        const { x, y, bottom } = element.getBoundingClientRect();
+        return { x, y, bottom };
+      }));
+      expect(panels[1].x).toBe(panels[0].x);
+      expect(panels[1].y).toBeGreaterThanOrEqual(panels[0].bottom);
+      await noHorizontalScroll(page);
+    }
   });
 
   test('at 760px the Resources panel opens inside the viewport with its columns stacked', async ({ page }) => {

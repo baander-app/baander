@@ -25,10 +25,17 @@ two share a name so only one is open, and both open and close without JavaScript
 small script closes an open panel on Escape, an outside click or focus leaving it,
 and moves focus to a panel's first entry when it opens. An open panel lies over the page inside a
 bordered surface, without a shadow, so opening it moves nothing, and it scrolls
-within itself when it is taller than the window. Every entry shows its title and a
-one-line description. At 860px and narrower the Resources columns stack; at 640px
-and narrower one Menu disclosure replaces the panels and the source link, holding
+within itself when it is taller than the window. Feature links show their titles
+in audience groups; the overview and other entries retain descriptions. On desktop,
+the feature groups sit side by side so Product fits without scrolling. At 860px and
+narrower the Resources columns stack; at 640px and narrower one Menu disclosure
+replaces the panels and the source link, holding
 both groups with the source link last.
+
+The footer places the brand beside Product and Resources link columns, with
+attribution and Source on a separate bottom row. On phones these sections stack;
+Product keeps two compact columns. Header and footer destinations come from the
+same menu data.
 
 Its page composition adapts to a public introduction and long-form manuals. Body
 copy may use 16px text, the homepage may use larger responsive headings, and section
