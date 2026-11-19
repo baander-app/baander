@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace App\Auth\Application\CommandHandler\OAuth;
 
 use App\Auth\Application\Command\OAuth\RevokeRegisteredClientCommand;
-use App\Auth\Application\Exception\ClientManagementException;
-use App\Auth\Application\Exception\ClientNotFoundException;
+use App\Auth\Application\Service\AdministeredClients;
 use App\Auth\Application\Service\ClientRevoker;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
+use App\Shared\Application\Exception\ConflictException;
+use App\Shared\Application\Exception\NotFoundException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
@@ -25,16 +26,11 @@ final readonly class RevokeRegisteredClientHandler
     ) {
     }
 
-    /** @throws ClientNotFoundException|ClientManagementException */
+    /** @throws NotFoundException|ConflictException with reason protected_client */
     #[AsMessageHandler]
     public function __invoke(RevokeRegisteredClientCommand $command): Client
     {
-        $client = $this->clientRepository->findClientByPublicId($command->clientId)
-            ?? throw ClientNotFoundException::forPublicId($command->clientId->toString());
-
-        if (!$client->getType()->isAdministered()) {
-            throw ClientManagementException::protectedClient();
-        }
+        $client = AdministeredClients::find($this->clientRepository, $command->clientId);
 
         $this->clientRevoker->revoke($client);
 

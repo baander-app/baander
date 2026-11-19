@@ -20,11 +20,17 @@ use Symfony\Component\Validator\Constraints as Assert;
             items: new OA\Items(type: 'string', format: 'uri'),
             example: ['https://player.baander.app/callback'],
         ),
+        new OA\Property(property: 'authMethod', description: 'How a confidential client authenticates; client_secret_post when omitted. Omit it for device and public clients.', type: 'string', enum: ['client_secret_post', 'private_key_jwt'], nullable: true),
+        new OA\Property(property: 'jwks', description: 'A private_key_jwt client\'s public keys as an inline JWK Set: at most 10 public asymmetric keys, each with its own `kid` when there are several, at most 64 KB. Give this or `jwksUri`.', type: 'object', nullable: true),
+        new OA\Property(property: 'jwksUri', description: 'An https URI on port 443 where a private_key_jwt client publishes its JWK Set. Give this or `jwks`.', type: 'string', format: 'uri', nullable: true, example: 'https://server.baander.app/jwks.json'),
     ],
 )]
 final readonly class AdminCreateOAuthClientRequest
 {
-    /** @param list<string> $redirectUris */
+    /**
+     * @param list<string> $redirectUris
+     * @param array<string, mixed>|null $jwks
+     */
     public function __construct(
         #[Assert\NotBlank(message: 'Name is required.', normalizer: 'trim')]
         #[Assert\Length(max: 100)]
@@ -37,6 +43,12 @@ final readonly class AdminCreateOAuthClientRequest
         #[Assert\Count(max: 10)]
         #[Assert\All([new Assert\Type('string'), new Assert\NotBlank(), new Assert\Length(max: 2000)])]
         public array $redirectUris = [],
+
+        public ?string $authMethod = null,
+
+        public ?array $jwks = null,
+
+        public ?string $jwksUri = null,
     ) {
     }
 }

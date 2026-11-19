@@ -2,8 +2,10 @@ import { useMutation } from '@tanstack/react-query'
 import { useAdminMutationTools } from './use-admin-mutation'
 import {
   type AdminCreateOAuthClientRequest,
+  type AdminReplaceOAuthClientKeysRequest,
   getGetAdminOauthClientsListQueryKey,
   postAdminOauthClientsCreate,
+  postAdminOauthClientsReplaceKeys,
   postAdminOauthClientsRevoke,
   postAdminOauthClientsRotateSecret,
   useGetAdminOauthClientsList,
@@ -34,6 +36,20 @@ export function useRotateOAuthClientSecret() {
   return useMutation({
     mutationFn: async (clientId: string) => live.run(async () => (await postAdminOauthClientsRotateSecret(clientId)).data),
     gcTime: 0,
+    onSettled: () => live.invalidate(getGetAdminOauthClientsListQueryKey()),
+  })
+}
+
+interface ReplaceKeysVariables {
+  clientId: string
+  keys: AdminReplaceOAuthClientKeysRequest
+}
+
+/** A key replacement carries no secret; the list is refetched as after any other change. */
+export function useReplaceOAuthClientKeys() {
+  const live = useAdminMutationTools(['admin-users'])
+  return useMutation({
+    mutationFn: async ({ clientId, keys }: ReplaceKeysVariables) => live.run(async () => (await postAdminOauthClientsReplaceKeys(clientId, keys)).data),
     onSettled: () => live.invalidate(getGetAdminOauthClientsListQueryKey()),
   })
 }

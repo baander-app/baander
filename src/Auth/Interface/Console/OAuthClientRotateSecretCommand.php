@@ -19,7 +19,7 @@ use Throwable;
 /** The CLI counterpart of POST /api/admin/oauth/clients/{clientId}/rotate-secret. */
 #[AsCommand(
     name: 'app:oauth:client:rotate-secret',
-    description: 'Give a confidential OAuth client a new secret.',
+    description: 'Give an OAuth client that authenticates with a secret a new one.',
 )]
 final class OAuthClientRotateSecretCommand extends Command
 {

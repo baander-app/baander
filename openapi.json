@@ -942,7 +942,7 @@
                     "Admin / OAuth clients"
                 ],
                 "summary": "Register an OAuth client",
-                "description": "Registers a device client (public, device authorization grant), a public client (authorization code with PKCE) or a confidential client (authorization code with a client secret). A confidential client's secret is in this response only.",
+                "description": "Registers a device client (public, device authorization grant), a public client (authorization code with PKCE) or a confidential client (authorization code with client authentication). A confidential client authenticates with a generated secret (client_secret_post, the default), which is in this response only, or with its own signing keys (private_key_jwt), given as exactly one of an inline JWK Set and a jwks_uri.",
                 "operationId": "post_admin_oauth_clients_create",
                 "requestBody": {
                     "required": true,
@@ -994,7 +994,7 @@
                         }
                     },
                     "422": {
-                        "description": "Invalid name, type or redirect URIs; `error.details.reason` is `invalid_registration` when the registration rules reject them",
+                        "description": "Invalid name, type, redirect URIs, authentication method or keys; `error.details.reason` is `invalid_registration` when the registration rules reject them",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1011,8 +1011,8 @@
                 "tags": [
                     "Admin / OAuth clients"
                 ],
-                "summary": "Rotate a confidential client's secret",
-                "description": "Confidential clients only. The old secret stops working at once; tokens already issued stay valid. The new secret is in this response only.",
+                "summary": "Rotate a client's secret",
+                "description": "Clients that authenticate with client_secret_post only. The old secret stops working at once; tokens already issued stay valid. The new secret is in this response only.",
                 "operationId": "post_admin_oauth_clients_rotate_secret",
                 "parameters": [
                     {
@@ -1080,6 +1080,107 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/oauth/clients/{clientId}/keys": {
+            "post": {
+                "tags": [
+                    "Admin / OAuth clients"
+                ],
+                "summary": "Replace a client's public keys",
+                "description": "Clients that authenticate with private_key_jwt only. Replaces the inline JWK Set or the jwks_uri; the new source may be of the other kind. Assertions signed with the old keys stop working at once; tokens already issued stay valid.",
+                "operationId": "post_admin_oauth_clients_replace_keys",
+                "parameters": [
+                    {
+                        "name": "clientId",
+                        "in": "path",
+                        "description": "The OAuth client_id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AdminReplaceOAuthClientKeysRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Keys replaced",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AdminOAuthClientResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not a super administrator",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown client",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The client is first-party (`error.details.reason` = `protected_client`), does not authenticate with keys (`no_keys`) or is revoked (`revoked`)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not exactly one key source, or keys the rules reject; `error.details.reason` is `invalid_keys`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
                                 }
                             }
                         }
@@ -24026,6 +24127,58 @@
                         ],
                         "default": [],
                         "maxItems": 10
+                    },
+                    "authMethod": {
+                        "description": "How a confidential client authenticates; client_secret_post when omitted. Omit it for device and public clients.",
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "client_secret_post",
+                            "private_key_jwt"
+                        ]
+                    },
+                    "jwks": {
+                        "description": "A private_key_jwt client's public keys as an inline JWK Set: at most 10 public asymmetric keys, each with its own `kid` when there are several, at most 64 KB. Give this or `jwksUri`.",
+                        "type": "object",
+                        "nullable": true
+                    },
+                    "jwksUri": {
+                        "description": "An https URI on port 443 where a private_key_jwt client publishes its JWK Set. Give this or `jwks`.",
+                        "type": "string",
+                        "format": "uri",
+                        "example": "https://server.baander.app/jwks.json",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "AdminReplaceOAuthClientKeysRequest": {
+                "description": "Exactly one of `jwks` and `jwksUri`. It may differ from the client's current key source.",
+                "properties": {
+                    "jwks": {
+                        "description": "The client's public keys as an inline JWK Set: at most 10 public asymmetric keys, each with its own `kid` when there are several, at most 64 KB",
+                        "type": "object",
+                        "example": {
+                            "keys": [
+                                {
+                                    "kty": "EC",
+                                    "crv": "P-256",
+                                    "kid": "signing-1",
+                                    "x": "WKn-ZIGevcwGIyyrzFoZNBdaq9_TsqzGl96oc0CWuis",
+                                    "y": "y77t-RvAHRKTsSGdIYUfweuOvwrvDD-Q3Hv5J0fSKbE"
+                                }
+                            ]
+                        },
+                        "nullable": true,
+                        "default": null
+                    },
+                    "jwksUri": {
+                        "description": "An https URI on port 443 where the client publishes its JWK Set",
+                        "type": "string",
+                        "format": "uri",
+                        "example": "https://server.baander.app/jwks.json",
+                        "nullable": true,
+                        "default": null
                     }
                 },
                 "type": "object"
@@ -26484,6 +26637,8 @@
                     "clientId",
                     "name",
                     "type",
+                    "authMethod",
+                    "jwksUri",
                     "redirectUris",
                     "revoked",
                     "createdAt",
@@ -26507,6 +26662,21 @@
                             "confidential",
                             "first_party"
                         ]
+                    },
+                    "authMethod": {
+                        "description": "How the client authenticates at the token and pushed-request endpoints: none for clients without credentials, client_secret_post with a secret, private_key_jwt with signed assertions",
+                        "type": "string",
+                        "enum": [
+                            "none",
+                            "client_secret_post",
+                            "private_key_jwt"
+                        ]
+                    },
+                    "jwksUri": {
+                        "description": "Where a private_key_jwt client publishes its keys; null for an inline key set and for other clients",
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true
                     },
                     "redirectUris": {
                         "type": "array",
@@ -26535,6 +26705,8 @@
                     "clientId",
                     "name",
                     "type",
+                    "authMethod",
+                    "jwksUri",
                     "redirectUris",
                     "revoked",
                     "createdAt",
@@ -26559,6 +26731,20 @@
                             "confidential"
                         ]
                     },
+                    "authMethod": {
+                        "type": "string",
+                        "enum": [
+                            "none",
+                            "client_secret_post",
+                            "private_key_jwt"
+                        ]
+                    },
+                    "jwksUri": {
+                        "description": "Where a private_key_jwt client publishes its keys; null otherwise",
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true
+                    },
                     "redirectUris": {
                         "type": "array",
                         "items": {
@@ -26578,7 +26764,7 @@
                         "format": "date-time"
                     },
                     "clientSecret": {
-                        "description": "The client_secret of a confidential client; null for device and public clients",
+                        "description": "The client_secret of a client_secret_post client; null for device, public and private_key_jwt clients",
                         "type": "string",
                         "nullable": true
                     }

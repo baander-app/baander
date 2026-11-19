@@ -28,6 +28,7 @@ The command prints a table with one row per client:
 | Client ID | The `client_id` the client sends |
 | Name | The name users see when they approve the client |
 | Type | `device`, `public`, `confidential` or `first_party` |
+| Authentication | `none`, `client_secret_post` or `private_key_jwt` |
 | Redirect URIs | One URI per line, or `-` for a device client |
 | Revoked | `yes` or `no` |
 | Created | Registration time in ISO 8601 format |

@@ -80,6 +80,24 @@ export const AdminCreateOAuthClientRequestType = {
   confidential: 'confidential',
 } as const;
 
+/**
+ * How a confidential client authenticates; client_secret_post when omitted. Omit it for device and public clients.
+ * @nullable
+ */
+export type AdminCreateOAuthClientRequestAuthMethod = typeof AdminCreateOAuthClientRequestAuthMethod[keyof typeof AdminCreateOAuthClientRequestAuthMethod] | null;
+
+
+export const AdminCreateOAuthClientRequestAuthMethod = {
+  client_secret_post: 'client_secret_post',
+  private_key_jwt: 'private_key_jwt',
+} as const;
+
+/**
+ * A private_key_jwt client's public keys as an inline JWK Set: at most 10 public asymmetric keys, each with its own `kid` when there are several, at most 64 KB. Give this or `jwksUri`.
+ * @nullable
+ */
+export type AdminCreateOAuthClientRequestJwks = { [key: string]: unknown } | null;
+
 export interface AdminCreateOAuthClientRequest {
   /** @maxLength 100 */
   name: string;
@@ -89,6 +107,43 @@ export interface AdminCreateOAuthClientRequest {
      * @maxItems 10
      */
   redirectUris?: string[];
+  /**
+     * How a confidential client authenticates; client_secret_post when omitted. Omit it for device and public clients.
+     * @nullable
+     */
+  authMethod?: AdminCreateOAuthClientRequestAuthMethod;
+  /**
+     * A private_key_jwt client's public keys as an inline JWK Set: at most 10 public asymmetric keys, each with its own `kid` when there are several, at most 64 KB. Give this or `jwksUri`.
+     * @nullable
+     */
+  jwks?: AdminCreateOAuthClientRequestJwks;
+  /**
+     * An https URI on port 443 where a private_key_jwt client publishes its JWK Set. Give this or `jwks`.
+     * @nullable
+     */
+  jwksUri?: string | null;
+}
+
+/**
+ * The client's public keys as an inline JWK Set: at most 10 public asymmetric keys, each with its own `kid` when there are several, at most 64 KB
+ * @nullable
+ */
+export type AdminReplaceOAuthClientKeysRequestJwks = { [key: string]: unknown } | null;
+
+/**
+ * Exactly one of `jwks` and `jwksUri`. It may differ from the client's current key source.
+ */
+export interface AdminReplaceOAuthClientKeysRequest {
+  /**
+     * The client's public keys as an inline JWK Set: at most 10 public asymmetric keys, each with its own `kid` when there are several, at most 64 KB
+     * @nullable
+     */
+  jwks?: AdminReplaceOAuthClientKeysRequestJwks;
+  /**
+     * An https URI on port 443 where the client publishes its JWK Set
+     * @nullable
+     */
+  jwksUri?: string | null;
 }
 
 export type AdminCreateUserRequestRolesItem = typeof AdminCreateUserRequestRolesItem[keyof typeof AdminCreateUserRequestRolesItem];
@@ -1416,11 +1471,30 @@ export const AdminOAuthClientResourceType = {
   first_party: 'first_party',
 } as const;
 
+/**
+ * How the client authenticates at the token and pushed-request endpoints: none for clients without credentials, client_secret_post with a secret, private_key_jwt with signed assertions
+ */
+export type AdminOAuthClientResourceAuthMethod = typeof AdminOAuthClientResourceAuthMethod[keyof typeof AdminOAuthClientResourceAuthMethod];
+
+
+export const AdminOAuthClientResourceAuthMethod = {
+  none: 'none',
+  client_secret_post: 'client_secret_post',
+  private_key_jwt: 'private_key_jwt',
+} as const;
+
 export interface AdminOAuthClientResource {
   /** The OAuth client_id (public ID) */
   clientId: string;
   name: string;
   type: AdminOAuthClientResourceType;
+  /** How the client authenticates at the token and pushed-request endpoints: none for clients without credentials, client_secret_post with a secret, private_key_jwt with signed assertions */
+  authMethod: AdminOAuthClientResourceAuthMethod;
+  /**
+     * Where a private_key_jwt client publishes its keys; null for an inline key set and for other clients
+     * @nullable
+     */
+  jwksUri: string | null;
   redirectUris: string[];
   revoked: boolean;
   createdAt: string;
@@ -1436,6 +1510,15 @@ export const AdminOAuthClientCredentialsResourceType = {
   confidential: 'confidential',
 } as const;
 
+export type AdminOAuthClientCredentialsResourceAuthMethod = typeof AdminOAuthClientCredentialsResourceAuthMethod[keyof typeof AdminOAuthClientCredentialsResourceAuthMethod];
+
+
+export const AdminOAuthClientCredentialsResourceAuthMethod = {
+  none: 'none',
+  client_secret_post: 'client_secret_post',
+  private_key_jwt: 'private_key_jwt',
+} as const;
+
 /**
  * A client right after registration or secret rotation. The secret is shown only in this response; Baander stores its SHA-256 digest.
  */
@@ -1444,12 +1527,18 @@ export interface AdminOAuthClientCredentialsResource {
   clientId: string;
   name: string;
   type: AdminOAuthClientCredentialsResourceType;
+  authMethod: AdminOAuthClientCredentialsResourceAuthMethod;
+  /**
+     * Where a private_key_jwt client publishes its keys; null otherwise
+     * @nullable
+     */
+  jwksUri: string | null;
   redirectUris: string[];
   revoked: boolean;
   createdAt: string;
   updatedAt: string;
   /**
-     * The client_secret of a confidential client; null for device and public clients
+     * The client_secret of a client_secret_post client; null for device, public and private_key_jwt clients
      * @nullable
      */
   clientSecret: string | null;
@@ -4542,6 +4631,10 @@ export type PostAdminOauthClientsCreate201 = {
 
 export type PostAdminOauthClientsRotateSecret200 = {
   data: AdminOAuthClientCredentialsResource;
+};
+
+export type PostAdminOauthClientsReplaceKeys200 = {
+  data: AdminOAuthClientResource;
 };
 
 export type PostAdminOauthClientsRevoke200 = {
@@ -10274,7 +10367,7 @@ export const getPostAdminOauthClientsCreateUrl = () => {
 }
 
 /**
- * Registers a device client (public, device authorization grant), a public client (authorization code with PKCE) or a confidential client (authorization code with a client secret). A confidential client's secret is in this response only.
+ * Registers a device client (public, device authorization grant), a public client (authorization code with PKCE) or a confidential client (authorization code with client authentication). A confidential client authenticates with a generated secret (client_secret_post, the default), which is in this response only, or with its own signing keys (private_key_jwt), given as exactly one of an inline JWK Set and a jwks_uri.
  * @summary Register an OAuth client
  */
 export const postAdminOauthClientsCreate = async (adminCreateOAuthClientRequest: AdminCreateOAuthClientRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostAdminOauthClientsCreate201> => {
@@ -10363,8 +10456,8 @@ export const getPostAdminOauthClientsRotateSecretUrl = (clientId: string,) => {
 }
 
 /**
- * Confidential clients only. The old secret stops working at once; tokens already issued stay valid. The new secret is in this response only.
- * @summary Rotate a confidential client's secret
+ * Clients that authenticate with client_secret_post only. The old secret stops working at once; tokens already issued stay valid. The new secret is in this response only.
+ * @summary Rotate a client's secret
  */
 export const postAdminOauthClientsRotateSecret = async (clientId: string, options?: Parameters<typeof customInstance>[1]): Promise<PostAdminOauthClientsRotateSecret200> => {
 
@@ -10416,7 +10509,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminOauthClientsRotateSecretMutationVariables = {clientId: string}
 
     /**
- * @summary Rotate a confidential client's secret
+ * @summary Rotate a client's secret
  */
 export const usePostAdminOauthClientsRotateSecret = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminOauthClientsRotateSecret>>, TError,PostAdminOauthClientsRotateSecretMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -10427,6 +10520,96 @@ export const usePostAdminOauthClientsRotateSecret = <TError = ErrorType<ApiError
         TContext
       > => {
       return useMutation(getPostAdminOauthClientsRotateSecretMutationOptions(options), queryClient);
+    }
+
+export const getPostAdminOauthClientsReplaceKeysUrl = (clientId: string,) => {
+
+
+
+
+  return `/api/admin/oauth/clients/${clientId}/keys`
+}
+
+/**
+ * Clients that authenticate with private_key_jwt only. Replaces the inline JWK Set or the jwks_uri; the new source may be of the other kind. Assertions signed with the old keys stop working at once; tokens already issued stay valid.
+ * @summary Replace a client's public keys
+ */
+export const postAdminOauthClientsReplaceKeys = async (clientId: string,
+    adminReplaceOAuthClientKeysRequest: AdminReplaceOAuthClientKeysRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostAdminOauthClientsReplaceKeys200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<PostAdminOauthClientsReplaceKeys200>(getPostAdminOauthClientsReplaceKeysUrl(clientId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminReplaceOAuthClientKeysRequest)
+  }
+);}
+
+
+
+
+
+export const getPostAdminOauthClientsReplaceKeysMutationKey = () => ['postAdminOauthClientsReplaceKeys'] as const;
+
+export const getPostAdminOauthClientsReplaceKeysMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminOauthClientsReplaceKeys>>, TError,PostAdminOauthClientsReplaceKeysMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAdminOauthClientsReplaceKeys>>, TError,PostAdminOauthClientsReplaceKeysMutationVariables, TContext> => {
+
+const mutationKey = getPostAdminOauthClientsReplaceKeysMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAdminOauthClientsReplaceKeys>>, PostAdminOauthClientsReplaceKeysMutationVariables> = (props) => {
+          const {clientId,data} = props ?? {};
+
+          return  postAdminOauthClientsReplaceKeys(clientId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostAdminOauthClientsReplaceKeysMutationResult = NonNullable<Awaited<ReturnType<typeof postAdminOauthClientsReplaceKeys>>>
+    export type PostAdminOauthClientsReplaceKeysMutationBody = BodyType<AdminReplaceOAuthClientKeysRequest>
+    export type PostAdminOauthClientsReplaceKeysMutationError = ErrorType<ApiError | ValidationError>
+    export type PostAdminOauthClientsReplaceKeysMutationVariables = {clientId: string;data: BodyType<AdminReplaceOAuthClientKeysRequest>}
+
+    /**
+ * @summary Replace a client's public keys
+ */
+export const usePostAdminOauthClientsReplaceKeys = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminOauthClientsReplaceKeys>>, TError,PostAdminOauthClientsReplaceKeysMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postAdminOauthClientsReplaceKeys>>,
+        TError,
+        PostAdminOauthClientsReplaceKeysMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostAdminOauthClientsReplaceKeysMutationOptions(options), queryClient);
     }
 
 export const getPostAdminOauthClientsRevokeUrl = (clientId: string,) => {

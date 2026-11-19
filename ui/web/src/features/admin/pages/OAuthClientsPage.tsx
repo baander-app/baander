@@ -9,13 +9,15 @@ import { StatusDot } from '@/shared/components/status-dot'
 import { useAdminCheck } from '@/features/auth/hooks/use-admin-check'
 import { type AdminOAuthClientResource } from '@/shared/api-client/gen/endpoints'
 import { useOAuthClients } from '../hooks/use-oauth-clients'
-import { CLIENT_TYPE_LABELS } from '../components/oauth-clients/client-type-labels'
+import { AUTH_METHOD_LABELS, CLIENT_TYPE_LABELS } from '../components/oauth-clients/client-type-labels'
 import { CreateOAuthClientDialog } from '../components/oauth-clients/CreateOAuthClientDialog'
+import { ReplaceKeysDialog } from '../components/oauth-clients/ReplaceKeysDialog'
 import { RevokeOAuthClientDialog } from '../components/oauth-clients/RevokeOAuthClientDialog'
 import { RotateSecretDialog } from '../components/oauth-clients/RotateSecretDialog'
 
 type ActiveDialog =
   | { type: 'rotate'; client: AdminOAuthClientResource }
+  | { type: 'keys'; client: AdminOAuthClientResource }
   | { type: 'revoke'; client: AdminOAuthClientResource }
   | null
 
@@ -82,6 +84,18 @@ const ClientId = styled.span`
   color: var(--color-muted-foreground);
 `
 
+const TypeCell = styled.div`
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.125rem;
+`
+
+const AuthMethod = styled.span`
+  ${textRole('caption', { dense: true })}
+  color: var(--color-muted-foreground);
+`
+
 const DateCell = styled.span`
   ${textRole('mono-sm', { dense: true })}
   color: var(--color-muted-foreground);
@@ -111,9 +125,16 @@ const EmptyState = styled.div`
   color: var(--color-muted-foreground);
 `
 
-/** The first-party client and revoked clients have no actions; only confidential ones rotate. */
+/**
+ * The first-party client and revoked clients have no actions. A client that authenticates with a
+ * secret can rotate it; one that authenticates with signing keys can replace them.
+ */
 function canRotate(client: AdminOAuthClientResource): boolean {
-  return client.type === 'confidential' && !client.revoked
+  return client.authMethod === 'client_secret_post' && !client.revoked
+}
+
+function canReplaceKeys(client: AdminOAuthClientResource): boolean {
+  return client.authMethod === 'private_key_jwt' && !client.revoked
 }
 
 function canRevoke(client: AdminOAuthClientResource): boolean {
@@ -141,7 +162,7 @@ export function OAuthClientsPage() {
         <Note>
           {isSuperAdmin
             ? 'Apps that sign users in through OAuth. A client secret is shown once, when it is created or rotated.'
-            : 'Apps that sign users in through OAuth. Only super admins can create, rotate, or revoke clients.'}
+            : 'Apps that sign users in through OAuth. Only super admins can create, rotate, or revoke clients, or replace their keys.'}
         </Note>
         {isSuperAdmin && (
           <Button size="sm" onClick={() => setShowCreate(true)}>
@@ -178,7 +199,10 @@ export function OAuthClientsPage() {
                 <NameLine textRole="body-sm" text={client.name} />
                 <ClientId title="Client ID">{client.clientId}</ClientId>
               </NameCell>
-              <span role="cell">{CLIENT_TYPE_LABELS[client.type]}</span>
+              <TypeCell role="cell">
+                <span>{CLIENT_TYPE_LABELS[client.type]}</span>
+                {client.type === 'confidential' && <AuthMethod>{AUTH_METHOD_LABELS[client.authMethod]}</AuthMethod>}
+              </TypeCell>
               <DateCell role="cell">{new Date(client.createdAt).toLocaleDateString()}</DateCell>
               <span role="cell">
                 <StatusDot color={client.revoked ? 'red' : 'green'} label={client.revoked ? 'Revoked' : 'Active'} />
@@ -188,6 +212,11 @@ export function OAuthClientsPage() {
                   {canRotate(client) && (
                     <Button size="xs" variant="outline" onClick={() => setActiveDialog({ type: 'rotate', client })}>
                       Rotate secret
+                    </Button>
+                  )}
+                  {canReplaceKeys(client) && (
+                    <Button size="xs" variant="outline" onClick={() => setActiveDialog({ type: 'keys', client })}>
+                      Replace keys
                     </Button>
                   )}
                   {canRevoke(client) && (
@@ -208,6 +237,11 @@ export function OAuthClientsPage() {
           <RotateSecretDialog
             client={activeDialog?.type === 'rotate' ? activeDialog.client : null}
             open={activeDialog?.type === 'rotate'}
+            onOpenChange={closeDialog}
+          />
+          <ReplaceKeysDialog
+            client={activeDialog?.type === 'keys' ? activeDialog.client : null}
+            open={activeDialog?.type === 'keys'}
             onOpenChange={closeDialog}
           />
           <RevokeOAuthClientDialog
