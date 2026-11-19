@@ -102,7 +102,7 @@ final class PasskeyAuthenticatorTest extends TestCase
         $outage = new PasskeyChallengeUnavailableException('Passkey challenge storage is unavailable.');
         $bus = $this->createStub(\Symfony\Component\Messenger\MessageBusInterface::class);
         $bus->method('dispatch')->willReturnCallback(static fn (object $command): never => throw new HandlerFailedException(new Envelope($command), [$outage]));
-        $verifier = new DpopTokenRequestVerifier(new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class)), new DpopNonceManager($redis));
+        $verifier = new DpopTokenRequestVerifier(new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class), publicUrl: 'https://baander.app'), new DpopNonceManager($redis));
         $authenticator = new PasskeyAuthenticator($bus, $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class), $this->createStub(LoggerInterface::class), new JsonEncoder(), $verifier, AuthenticationFailureMessages::create());
         $request = Request::create('https://baander.app/api/auth/login/passkey', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], '{"challengeKey":"key","response":{}}');
         $request->headers->set('DPoP', (new SignedDpopProof())->createWithNonce('POST', 'https://baander.app/api/auth/login/passkey', 'issued-nonce'));
