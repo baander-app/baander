@@ -139,7 +139,7 @@ The [Shared Kernel](shared-kernel.md) page describes each part.
 
 ## Anti-Corruption Layer
 
-Baander uses League OAuth2 Server only for its `ResourceServer`, which validates access tokens. Auth issues tokens itself, through the login and refresh endpoints and through its own authorization server at `/api/oauth/authorize`, `/api/oauth/token`, and `/api/oauth/device/authorize`; it runs no League authorization server. The resource server calls League's own repository interfaces internally (for example `League\OAuth2\Server\Repositories\AccessTokenRepositoryInterface`). Without an anti-corruption layer, the Auth domain would depend on those interfaces directly and tie its business logic to a third-party library.
+Baander uses League OAuth2 Server only for its `ResourceServer`, which validates access tokens. Auth issues tokens itself, through the login and refresh endpoints and through its own authorization server at `/api/oauth/par`, `/api/oauth/authorize`, `/api/oauth/token`, and `/api/oauth/device/authorize`; it runs no League authorization server. The resource server calls League's own repository interfaces internally (for example `League\OAuth2\Server\Repositories\AccessTokenRepositoryInterface`). Without an anti-corruption layer, the Auth domain would depend on those interfaces directly and tie its business logic to a third-party library.
 
 Instead, `config/services.yaml` aliases League's interfaces to internal adapter implementations:
 

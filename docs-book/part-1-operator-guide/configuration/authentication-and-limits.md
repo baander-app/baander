@@ -27,19 +27,32 @@ These are configured as parameters in `config/packages/auth.yaml` and can be ove
 | `auth.access_token.ttl` | `3600` (1 hour) | Access token lifetime in seconds. |
 | `auth.refresh_token.ttl` | `2592000` (30 days) | Refresh token lifetime in seconds. |
 | `auth.refresh.reuse_grace_seconds` | `60` | Lost-response grace, in seconds, measured on the database clock. For this long after a refresh token was consumed, presenting it again with a proof from the same DPoP key, while the pair it was exchanged for is still unused, issues a fresh pair and revokes that unused pair; a client whose refresh answer never arrived keeps its session. Any other reuse of a consumed token revokes its whole chain. At most `60`; `0` disables the grace. |
-| `auth.auth_code.ttl` | `600` (10 minutes) | Authorization code lifetime in seconds (authorization code grant with PKCE). |
+| `auth.auth_code.ttl` | `60` | Authorization code lifetime in seconds (authorization code grant with PKCE). The code is issued after the user's consent, so it only has to survive the redirect back to the client and the client's token request. |
+| `auth.par.request_uri_ttl` | `300` (5 minutes) | How long a pushed authorization request stays usable, in seconds: the time a user has to sign in, with TOTP or a passkey if needed, and approve or deny. One decision uses the request up. |
 | `auth.device_code.ttl` | `900` (15 minutes) | Device code lifetime in seconds (RFC 8628). |
 | `auth.device_code.interval` | `5` | Minimum seconds between a device's token polls. A faster poll is answered with `slow_down` and adds 5 seconds to that device code's interval. |
 
 ### Authorization server
 
-Clients other than Baander's own apps obtain tokens through the authorization code grant, the device authorization grant, and the refresh token grant. These parameters are also in `config/packages/auth.yaml`:
+Clients other than Baander's own apps obtain tokens through the authorization code grant, the device authorization grant, and the refresh token grant. Every authorization code request is pushed first to `POST /api/oauth/par` (RFC 9126); the consent page accepts only the `request_uri` a push returned, never request parameters in its address. These parameters are also in `config/packages/auth.yaml`:
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `auth.scopes.user_grants` | `profile`, `email`, `library`, `playlist` | Scopes a user token may carry, whichever path issues it: password or passkey login, the authorization code grant, or the device grant. Requested scopes outside this list are silently dropped. The metadata document at `/.well-known/oauth-authorization-server` lists them as `scopes_supported`. |
-| `auth.oauth.authorization_page_uri` | `%auth.oauth.issuer%/oauth/authorize` | Absolute URI of the web app's consent page. The metadata document advertises it as `authorization_endpoint`. The page checks the request with `GET /api/oauth/authorize`, sends the user's decision to `POST /api/oauth/authorize`, and then sends the browser to the redirect URI it gets back. |
+| `auth.oauth.authorization_page_uri` | `%auth.oauth.issuer%/oauth/authorize` | Absolute URI of the web app's consent page. The metadata document advertises it as `authorization_endpoint`. Clients send the browser there with only `client_id` and the `request_uri` from their push. The page looks the pushed request up with `GET /api/oauth/authorize`, sends the user's decision to `POST /api/oauth/authorize`, and then sends the browser to the redirect URI it gets back. |
 | `auth.device.verification_uri` | `%auth.oauth.issuer%/device` | Absolute URI of the web app page where a signed-in user enters the code a device shows. The device authorization response returns it as `verification_uri`, and the same URI with `?user_code=` appended as `verification_uri_complete`. |
+
+### Client assertions and key sets
+
+Confidential clients registered with `private_key_jwt` authenticate with a signed JWT instead of a secret. Its `aud` must be the issuer, `APP_URL`, exactly. These parameters in `config/packages/auth.yaml` bound the assertions and the key sets Baander fetches:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `auth.client_assertion.max_lifetime` | `300` (5 minutes) | Longest lifetime a client assertion may have, in seconds: its `exp` may lie at most this far ahead and at most this far after its `iat`. The clock skew allowance is `auth.dpop.clock_skew` (60 seconds). Each assertion is accepted once while it is valid. |
+| `auth.client_jwks.cache_ttl` | `3600` (1 hour) | How long a key set fetched from a client's `jwks_uri` is cached, in seconds. Replacing the client's keys makes the cached set unusable at once. |
+| `auth.client_jwks.refetch_interval` | `60` | Shortest time, in seconds, between two fetches of a client's cached key set when an assertion names a key the set lacks. A client can therefore rotate its own keys without an administrator, while an unknown key cannot make Baander fetch on every request. |
+
+Baander fetches a `jwks_uri` over `https` on port 443, only from a public address of that URI's host, without following redirects, within 3 seconds, and refuses a set larger than 64 KB. A request that needs a fetch gets `503` with `Retry-After` while the fetch fails or Redis is unavailable, and nothing is cached. While Redis is unavailable, every assertion gets `503`, because its `jti` cannot be recorded.
 
 The issuer is `APP_URL`. `app:auth:setup-clients` creates only the first-party client; administrators register device, public and confidential clients with the `app:oauth:client:*` commands or the admin API (see [OAuth Clients](../administration/user-management.md#oauth-clients)).
 
@@ -49,7 +62,7 @@ The issuer is `APP_URL`. `app:auth:setup-clients` creates only the first-party c
 ### Rate limiting
 
 Limits are set in `config/packages/auth.yaml`. They feed the Symfony policies in
-`config/packages/framework.yaml`; all 22 configured limiters consume state through
+`config/packages/framework.yaml`; all 24 configured limiters consume state through
 atomic Redis compare-and-set. Each limiter has its own namespace, so the admin
 **Rate Limits** tab and `app:rate-limiter:clear` reset its generation without
 changing other limiters. The catalog reports `storageNamespace`, not a cache pool.
@@ -82,6 +95,9 @@ See [Rate Limiter Monitor](../operations/health-and-metrics.md#rate-limiter-moni
 | `auth.rate_limit.oauth_token.max_attempts` | `120` | Max OAuth token endpoint requests per IP within the window. A polling device makes about 12 per minute at the default interval. |
 | `auth.rate_limit.oauth_token.window` | `60` (1 min) | Window in seconds for both token endpoint limits. |
 | `auth.rate_limit.oauth_token_client.max_attempts` | `600` | Max token endpoint requests per `client_id` within the `oauth_token` window, from all addresses together. |
+| `auth.rate_limit.oauth_par.max_attempts` | `120` | Max pushed authorization requests per IP within the window. Each one stores a request for up to `auth.par.request_uri_ttl` seconds. |
+| `auth.rate_limit.oauth_par.window` | `60` (1 min) | Window in seconds for both pushed authorization request limits. |
+| `auth.rate_limit.oauth_par_client.max_attempts` | `600` | Max pushed authorization requests per `client_id` within the `oauth_par` window, from all addresses together. |
 | `auth.rate_limit.oauth_authorize.max_attempts` | `30` | Max authorization endpoint requests per IP within the window. |
 | `auth.rate_limit.oauth_authorize.window` | `60` (1 min) | Window in seconds for the authorization endpoint. |
 | `auth.rate_limit.oauth_device_authorize.max_attempts` | `20` | Max device authorization requests per IP within the window. Each request stores a device code. |
@@ -106,6 +122,8 @@ Each limiter counts requests per key:
 | `auth_email_verification_user` | `POST /api/auth/me/email/verification` | User ID |
 | `oauth_token_ip` | `POST /api/oauth/token` | Client IP |
 | `oauth_token_client` | `POST /api/oauth/token` | `client_id` from the form or JSON body; skipped when the body has none |
+| `oauth_par_ip` | `POST /api/oauth/par` | Client IP |
+| `oauth_par_client` | `POST /api/oauth/par` | `client_id` from the form or JSON body; skipped when the body has none |
 | `oauth_authorize_ip` | `GET` and `POST /api/oauth/authorize` | Client IP |
 | `oauth_device_authorize_ip` | `POST /api/oauth/device/authorize` | Client IP |
 | `oauth_device_verify_ip` | `GET /api/oauth/device/verify`, `POST /api/oauth/device/approve` | Client IP |
@@ -186,7 +204,7 @@ Baander sends the email after the HTTP response has gone out, or at once when th
 
 ### Token binding
 
-Every access token is bound to the DPoP key that requested it; see
+Every access token is bound to the DPoP key that requested it, and every authorization code to the DPoP key its pushed request named; see
 [OAuth clients and cross-origin access](../maintenance/security.md#oauth-clients-and-cross-origin-access).
 A token can also be bound to a client fingerprint; no token is bound to IP addresses.
 When the request that issued a token sent the `X-Baander-Client-Fingerprint`
