@@ -9,15 +9,21 @@ use App\Shared\Infrastructure\Health\HealthCheckService;
 use App\Shared\Infrastructure\Health\HealthCheckResult;
 use App\Shared\Infrastructure\Health\HealthStatus;
 use OpenApi\Attributes as OA;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[OA\Tag(name: 'System', description: 'System utilities and background job monitoring')]
 final class HealthCheckController
 {
+    /** What a public probe shows in place of a failed check's error text. */
+    private const string UNAVAILABLE = 'unavailable';
+
     public function __construct(
         private readonly HealthCheckService $healthCheckService,
         private readonly ServerDrainStateInterface $drain,
+        private readonly LoggerInterface $logger = new NullLogger(),
     )
     {
     }
@@ -157,12 +163,30 @@ final class HealthCheckController
         return new JsonResponse(
             data: [
                 'status' => $healthy ? $okStatus : $failStatus,
-                'checks' => array_map(
-                    static fn($r) => $r->toArray(),
-                    $results,
-                ),
+                'checks' => array_map($this->publicCheck(...), $results),
             ],
             status: $healthy ? 200 : 503,
         );
+    }
+
+    /**
+     * A check as an unauthenticated probe shows it: an error's text, which can carry hosts,
+     * credentials or driver detail, is logged and replaced by a fixed string. The operator
+     * console's configuration check keeps the detail.
+     *
+     * @return array<string, mixed>
+     */
+    private function publicCheck(HealthCheckResult $result): array
+    {
+        $check = $result->toArray();
+        if (isset($check['details']['error'])) {
+            $this->logger->warning('Health probe check {component} failed: {error}', [
+                'component' => $result->component,
+                'error' => $check['details']['error'],
+            ]);
+            $check['details']['error'] = self::UNAVAILABLE;
+        }
+
+        return $check;
     }
 }

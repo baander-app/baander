@@ -16,6 +16,9 @@ use App\Shared\Interface\Controller\HealthCheckController;
 use App\Tests\Fixtures\Redis\ArrayRedis;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Result;
+use Monolog\Handler\TestHandler;
+use Monolog\Logger;
+use Monolog\LogRecord;
 use PHPUnit\Framework\TestCase;
 use Redis;
 use Symfony\Component\Clock\MockClock;
@@ -61,6 +64,24 @@ final class HealthCheckWorkerOutageTest extends TestCase
         $controller = new HealthCheckController($this->service($this->staleWorker()), $this->drain(false));
 
         self::assertSame(503, $controller->ready()->getStatusCode());
+    }
+
+    public function testPublicProbesReplaceDependencyErrorsWithAFixedStringAndLogThem(): void
+    {
+        $this->databaseUp = false;
+        $log = new TestHandler();
+        $controller = new HealthCheckController($this->service($this->staleWorker()), $this->drain(false), new Logger('health', [$log]));
+
+        foreach (['ready' => $controller->ready(), 'health' => $controller->health()] as $probe => $response) {
+            self::assertSame(503, $response->getStatusCode(), $probe);
+            self::assertStringNotContainsString('Connection refused', (string) $response->getContent(), $probe);
+            $body = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+            $postgres = array_values(array_filter($body['checks'], static fn (array $check): bool => $check['component'] === 'postgresql'));
+            self::assertSame(['error' => 'unavailable'], $postgres[0]['details'], $probe);
+        }
+        self::assertTrue($log->hasWarningThatContains('Health probe'));
+        $errors = array_map(static fn (LogRecord $record): mixed => $record->context['error'] ?? null, $log->getRecords());
+        self::assertContains('Connection refused', $errors);
     }
 
     public function testReadyAnswers503WithoutCheckingDependenciesWhileTheServerDrains(): void
