@@ -93,8 +93,8 @@ Tests do not use real JWT tokens or `loginUser()`. The `TestAuthenticator`, regi
 By default the request counts as a first-party token, the kind Baander's own apps hold, with the user's full roles. To test what a third-party client may do, `delegatedRequest()` adds the `X-Baander-Test-Client-Scopes` header with the token's scopes, separated by spaces. The request then counts as a [delegated token](../development/api-authentication.md#first-party-and-delegated-tokens): the user authenticates with `ROLE_USER` alone, and the scope check answers `403` `insufficient_scope` on every route those scopes do not cover. An empty value models a delegated token with no scopes.
 
 ```php
-// A token holding only the library scope cannot reach playlists
-$response = $this->delegatedRequest('GET', '/api/playlists/', $user, ['library']);
+// A token holding only the library scope cannot read the profile
+$response = $this->delegatedRequest('GET', '/api/auth/me', $this->createTestUser(), ['library']);
 $this->assertJsonResponse($response, 403);
 ```
 

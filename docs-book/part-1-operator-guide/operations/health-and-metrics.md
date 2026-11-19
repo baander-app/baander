@@ -209,7 +209,7 @@ dc exec -T app php bin/console app:rate-limiter:clear --all
 
 ### Rate-limit storage outages
 
-All 24 configured limiters use atomic Redis state while retaining their configured
+All 26 configured limiters use atomic Redis state while retaining their configured
 budgets and fixed-window, sliding-window or token-bucket policies. A protected request whose limiter state
 cannot be established receives a generic `503`, `Retry-After: 1` and
 `Cache-Control: no-store`; it does not receive a fresh budget from a cache miss.
