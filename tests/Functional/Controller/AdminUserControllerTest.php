@@ -260,6 +260,63 @@ final class AdminUserControllerTest extends TestCase
     }
 
     // ---------------------------------------------------------------
+    // POST /api/admin/users/{id}/reset-totp — Reset TOTP
+    // ---------------------------------------------------------------
+
+    public function testSuperAdminResetsAUsersTotpAndEndsTheirSessions(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $target = $this->createTestUser();
+        $target->enableTotp('ciphertext the configured key cannot open');
+        $this->userRepository->save($target);
+
+        $response = $this->authenticatedRequest('POST', '/api/admin/users/' . $target->getPublicId()->toString() . '/reset-totp', $superAdmin);
+
+        $data = $this->assertJsonResponse($response, 200, 'data');
+        $this->assertSame($target->getPublicId()->toString(), $data['data']['publicId']);
+        $this->entityManager->clear();
+        $this->assertFalse($this->userRepository->findByUuid($target->getId())?->hasTotp());
+    }
+
+    public function testResettingAUserWithoutTotpIsAConflict(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $target = $this->createTestUser();
+
+        $response = $this->authenticatedRequest('POST', '/api/admin/users/' . $target->getPublicId()->toString() . '/reset-totp', $superAdmin);
+
+        $error = $this->assertJsonResponse($response, 409, 'error');
+        $this->assertSame('totp_not_enabled', $error['error']['details']['reason'] ?? null);
+    }
+
+    public function testOnlyASuperAdminCanResetTotp(): void
+    {
+        $admin = $this->createAdminUser();
+        $target = $this->createTestUser();
+        $target->enableTotp('sealed-secret');
+        $this->userRepository->save($target);
+
+        $response = $this->authenticatedRequest('POST', '/api/admin/users/' . $target->getPublicId()->toString() . '/reset-totp', $admin);
+
+        $this->assertSame(403, $response->getStatusCode());
+        $this->entityManager->clear();
+        $this->assertTrue($this->userRepository->findByUuid($target->getId())?->hasTotp());
+    }
+
+    public function testAnAdministratorCannotResetTheirOwnTotpThroughTheAdminApi(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $superAdmin->enableTotp('sealed-secret');
+        $this->userRepository->save($superAdmin);
+
+        $response = $this->authenticatedRequest('POST', '/api/admin/users/' . $superAdmin->getPublicId()->toString() . '/reset-totp', $superAdmin);
+
+        $this->assertSame(403, $response->getStatusCode(), (string) $response->getContent());
+        $this->entityManager->clear();
+        $this->assertTrue($this->userRepository->findByUuid($superAdmin->getId())?->hasTotp());
+    }
+
+    // ---------------------------------------------------------------
     // POST /api/admin/users/{id}/disable — Disable user
     // ---------------------------------------------------------------
 

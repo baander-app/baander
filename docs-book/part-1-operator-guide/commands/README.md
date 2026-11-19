@@ -47,6 +47,7 @@ Application console commands run inside `app`. The control and execution worker 
 | [app:user:list](app-user-list.md) | List users, newest first |
 | [app:user:rename](app-user-rename.md) | Change a user's display name |
 | [app:user:reset-password](app-user-reset-password.md) | Set a new password for a user and sign them out everywhere |
+| [app:user:reset-totp](app-user-reset-totp.md) | Turn off a user's TOTP and sign them out everywhere |
 | [app:user:roles](app-user-roles.md) | Replace a user's roles |
 | [app:user:setting](app-user-setting.md) | Show, set or reset a user's setting, such as their email language |
 

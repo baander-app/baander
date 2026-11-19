@@ -4720,6 +4720,10 @@ export type PostAdminUsersResetPassword200 = {
   data?: PostAdminUsersResetPassword200Data;
 };
 
+export type PostAdminUsersResetTotp200 = {
+  data?: AdminUserResource;
+};
+
 export type PostAdminUsersDisable200 = {
   data?: AdminUserResource;
 };
@@ -11265,6 +11269,81 @@ export const usePostAdminUsersResetPassword = <TError = ErrorType<ApiError>,
         TContext
       > => {
       return useMutation(getPostAdminUsersResetPasswordMutationOptions(options), queryClient);
+    }
+
+export const getPostAdminUsersResetTotpUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/admin/users/${publicId}/reset-totp`
+}
+
+/**
+ * Removes the stored TOTP secret without reading it and signs the user out of every session, so they sign in with their password alone.
+ * @summary Turn off a user's TOTP
+ */
+export const postAdminUsersResetTotp = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<PostAdminUsersResetTotp200> => {
+
+  return customInstance<PostAdminUsersResetTotp200>(getPostAdminUsersResetTotpUrl(publicId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getPostAdminUsersResetTotpMutationKey = () => ['postAdminUsersResetTotp'] as const;
+
+export const getPostAdminUsersResetTotpMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersResetTotp>>, TError,PostAdminUsersResetTotpMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersResetTotp>>, TError,PostAdminUsersResetTotpMutationVariables, TContext> => {
+
+const mutationKey = getPostAdminUsersResetTotpMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAdminUsersResetTotp>>, PostAdminUsersResetTotpMutationVariables> = (props) => {
+          const {publicId} = props ?? {};
+
+          return  postAdminUsersResetTotp(publicId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostAdminUsersResetTotpMutationResult = NonNullable<Awaited<ReturnType<typeof postAdminUsersResetTotp>>>
+
+    export type PostAdminUsersResetTotpMutationError = ErrorType<ApiError>
+    export type PostAdminUsersResetTotpMutationVariables = {publicId: string}
+
+    /**
+ * @summary Turn off a user's TOTP
+ */
+export const usePostAdminUsersResetTotp = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersResetTotp>>, TError,PostAdminUsersResetTotpMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postAdminUsersResetTotp>>,
+        TError,
+        PostAdminUsersResetTotpMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostAdminUsersResetTotpMutationOptions(options), queryClient);
     }
 
 export const getPostAdminUsersDisableUrl = (publicId: string,) => {

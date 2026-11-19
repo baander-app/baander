@@ -1688,6 +1688,73 @@
                 }
             }
         },
+        "/api/admin/users/{publicId}/reset-totp": {
+            "post": {
+                "tags": [
+                    "Admin / Users"
+                ],
+                "summary": "Turn off a user's TOTP",
+                "description": "Removes the stored TOTP secret without reading it and signs the user out of every session, so they sign in with their password alone.",
+                "operationId": "post_admin_users_reset_totp",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "TOTP is off",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AdminUserResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The target is the signed-in administrator",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The user has no TOTP to reset",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/admin/users/{publicId}/disable": {
             "post": {
                 "tags": [

@@ -10,6 +10,7 @@ use App\Auth\Application\Command\User\DeleteUserCommand;
 use App\Auth\Application\Command\User\DisableUserCommand;
 use App\Auth\Application\Command\User\EnableUserCommand;
 use App\Auth\Application\Command\User\RenameUserCommand;
+use App\Auth\Application\Command\User\ResetUserTotpCommand;
 use App\Auth\Application\Command\User\SetUserPasswordCommand;
 use App\Auth\Application\Command\User\SetUserRolesCommand;
 use App\Auth\Application\DTO\UserPage;
@@ -51,7 +52,7 @@ final class AdminUserController
 {
     use ApiResponsesTrait;
 
-    private const string OWN_CREDENTIALS_REFUSAL = 'Change your own email address and password from your account settings.';
+    private const string OWN_CREDENTIALS_REFUSAL = 'Change your own email address, password and two-factor authentication from your account settings.';
 
     public function __construct(
         private readonly UserPortInterface $userService,
@@ -277,6 +278,35 @@ final class AdminUserController
     }
 
     #[OA\Post(
+        path: '/api/admin/users/{publicId}/reset-totp',
+        summary: 'Turn off a user\'s TOTP',
+        description: 'Removes the stored TOTP secret without reading it and signs the user out of every session, so they sign in with their password alone.',
+        responses: [
+            new OA\Response(response: '200', description: 'TOTP is off', content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'data', ref: new Model(type: AdminUserResource::class)),
+            ])),
+            new OA\Response(response: '403', description: 'The target is the signed-in administrator', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '409', description: 'The user has no TOTP to reset', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        ],
+    )]
+    #[Route('/{publicId}/reset-totp', name: 'reset_totp', methods: ['POST'])]
+    #[IsGranted('ROLE_SUPER_ADMIN')]
+    #[CliCounterpart('app:user:reset-totp')]
+    public function resetTotp(string $publicId): JsonResponse
+    {
+        $publicId = $this->publicIdentifier($publicId);
+        // An administrator's own TOTP goes off only with a current code, from the account settings.
+        if ($this->isSignedInUser($publicId)) {
+            return $this->forbidden(self::OWN_CREDENTIALS_REFUSAL);
+        }
+        // The same use case as `app:user:reset-totp`: it also signs the user out everywhere.
+        $user = $this->dispatch(new ResetUserTotpCommand($publicId));
+
+        return $this->successResponse(AdminUserResource::from($user));
+    }
+
+    #[OA\Post(
         path: '/api/admin/users/{publicId}/disable',
         summary: 'Disable a user',
         responses: [
@@ -338,8 +368,9 @@ final class AdminUserController
     }
 
     /**
-     * Whether the target is the signed-in administrator, who changes their own address and
-     * password from the account settings, with step-up. The console has no such limit.
+     * Whether the target is the signed-in administrator, who changes their own address,
+     * password and TOTP from the account settings, with step-up or a current code. The console
+     * has no such limit.
      */
     private function isSignedInUser(string $publicId): bool
     {

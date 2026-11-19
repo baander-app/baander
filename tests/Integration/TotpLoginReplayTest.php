@@ -20,6 +20,7 @@ use PHPUnit\Framework\TestCase;
 use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePoolContainer;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Process\Process;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -214,7 +215,46 @@ final class TotpLoginReplayTest extends TestCase
         self::assertSame(1, $this->sessions());
     }
 
-    // --- Enrolment ---
+    // --- Operator reset ---
+
+    /**
+     * `app:user:reset-totp` in a process of its own: stdout carries only the user, the sessions
+     * end, and the user signs in with the password alone. A second reset has nothing to do.
+     */
+    public function testAnOperatorResetEndsTheSessionsAndLetsThePasswordAloneSignIn(): void
+    {
+        $key = new SignedDpopProof();
+        $before = $this->login($this->code($this->enabledAt + 1), $key->createWithNonce('POST', self::ORIGIN . '/api/auth/login', $this->nonce()));
+        self::assertSame(200, $before->getStatusCode(), (string) $before->getContent());
+
+        $reset = $this->console('app:user:reset-totp', $this->user->getEmail(), '--json');
+
+        self::assertSame(0, $reset->getExitCode(), $reset->getErrorOutput());
+        $printed = json_decode($reset->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($this->user->getPublicId()->toString(), $printed['publicId']);
+        self::assertSame(0, (int) $this->connection->fetchOne(
+            'SELECT count(*) FROM oauth_access_tokens WHERE user_id = ? AND NOT revoked',
+            [$this->user->getId()->toString()],
+        ));
+        self::assertNull($this->connection->fetchOne('SELECT totp_secret_ciphertext FROM users WHERE id = ?', [$this->user->getId()->toString()]));
+        $after = $this->login(null, (new SignedDpopProof())->createWithNonce('POST', self::ORIGIN . '/api/auth/login', $this->nonce()));
+        self::assertSame(200, $after->getStatusCode(), (string) $after->getContent());
+
+        $again = $this->console('app:user:reset-totp', $this->user->getEmail(), '--json');
+        self::assertSame(1, $again->getExitCode());
+        self::assertSame('', $again->getOutput());
+        self::assertStringContainsString('TOTP is not on', $again->getErrorOutput());
+    }
+
+    private function console(string ...$arguments): Process
+    {
+        $process = new Process([PHP_BINARY, dirname(__DIR__, 2) . '/bin/console', ...$arguments], dirname(__DIR__, 2), timeout: 120);
+        $process->run();
+
+        return $process;
+    }
+
+    // --- Enrolment ---    // --- Enrolment ---
 
     /** Turns TOTP on through the API, as the settings page does. */
     private function enrol(): void
