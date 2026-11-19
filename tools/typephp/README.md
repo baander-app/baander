@@ -35,6 +35,7 @@ Both PDO patches change the derived source-cache identity and leave the download
 `phpx-cli-script-dispatch.patch` recognizes existing regular script files before applying the default application entry, preserving bare script calls made through `PHP_BINARY`. Exact first arguments `console` and `operator` select the application entry even when same-named files exist in the current directory; use `./console`, `./operator` or `-f` to execute those files as scripts. With no arguments, piped, socket or regular-file stdin selects interpreter input; terminal and `/dev/null` input retain the default application entry.
 `php-builder-qualification-bootstrap.patch` adds the qualification-only direct-evaluation bootstrap described below.
 `phpx-file-access.patch` restores fresh physical existence and permission checks with `open_basedir` enforcement while delegating embedded paths and custom stream wrappers to their existing handlers. TypePHP compiles `typephp_opcode_table.cc` as a project object, so this correction is picked up by package compilation without rebuilding the cached PHPX archive.
+`phpx-source-stream.patch` routes raw archived files through the existing memory-backed file wrapper so PHP's source scanners can read their bytes. Composer needs those bytes when scanning class declarations during optimized autoload generation. The previous synthetic handle returned empty source to `php_strip_whitespace`, even when `file_get_contents` returned the full archived file. Compilation still selects embedded opcodes first; the synthetic fallback remains for entries that have opcodes but no raw source. This patch also changes only the project object, not the cached PHPX archive.
 The original PHP and PECL source caches are unchanged.
 The host-installed compiler stays unpatched and serves setup/version inspection.
 `TYPEPHP_IMAGE` overrides the local image tag; use a distinct tag when changing the toolchain in concurrent worktrees.
@@ -173,7 +174,7 @@ The candidate removes the ordinary PHP binary after generating test metadata. Ba
 The paired worker drills create and remove their own Docker resources. They require the documented host resources and a controlled Docker endpoint; operator help alone does not qualify deployment behavior.
 The worker-command drill keeps its disposable checkout at the configured application root. With image checkout enabled, Docker populates its named volume from the image; host checkout mode disables that population and stages the selected files explicitly. Relocating the console to `/workspace` caused its physical Composer loader to redeclare the embedded initializer.
 
-Run the focused interpreter and filesystem regressions after building the qualification image:
+Run the focused interpreter, filesystem and source-stream regressions after building the qualification image:
 
 ```sh
 docker run --rm --network none --entrypoint php baander-typephp-qualification:local \
@@ -184,7 +185,20 @@ docker run --rm --network none --entrypoint php baander-typephp-qualification:lo
   tools/typephp/tests/filesystem.php
 docker run --rm --network none --entrypoint php baander-typephp-qualification:local \
   tools/typephp/tests/entrypoints.php /usr/local/lib/typephp/baander
+docker run --rm --network none --entrypoint php baander-typephp-qualification:local \
+  tools/typephp/tests/source-streams.php
 ```
+
+The source-stream fixture compares stripped PHP tokens and highlighted output with the archived bytes, checks physical files and a custom stream wrapper, and then loads the archived enum and console factory. Its mutation mode also replaces and removes the physical enum and console files to prove that scanning and execution still use the archive.
+Run that mode only in a fresh disposable container without bind mounts or shared application volumes:
+
+```sh
+docker run --rm --network none --user 0 --env BAANDER_TYPEPHP_DISPOSABLE=1 \
+  --entrypoint php baander-typephp-qualification:local \
+  tools/typephp/tests/source-streams.php --mutate-disposable
+```
+
+The fixture refuses mutation unless both `--mutate-disposable` and `BAANDER_TYPEPHP_DISPOSABLE=1` are set and a container marker is present. It uses external commands to alter the physical files because the archive streams are read-only; root access is needed for the vendor fixture. It attempts to restore the physical files in `finally`; the command above confines writes to the container's disposable layer.
 
 The PDO fixture requires an explicit disposable PostgreSQL connection through `TYPEPHP_TEST_PG_DSN`, `TYPEPHP_TEST_PG_USER` and `TYPEPHP_TEST_PG_PASSWORD`. It does not infer a connection from the application's database settings.
 
@@ -200,6 +214,8 @@ The remaining database lanes were stopped because that candidate had been supers
 The next full run executed 13,247 tests with 145,806 assertions and two failures. Both came from child-process retry fixtures leaving committed job-monitor rows behind; ordinary CI reproduced the same failures. Those fixtures now assign and clean up their own job IDs, with assertions that the child records the intended ID and status. Both affected controller files pass under the repaired candidate in transport-before-monitor order: 21 tests and 201 assertions. A further two-artifact run passed its ordinary and native lanes before the user requested one binary; it was stopped during database setup. Those results do not qualify the unified artifact.
 
 The unified build contains 13,218 files and 12,192 opcode blobs, with the same nine IDE-helper skips and no application PHP skipped. It passes all 106 entry-point assertions, the interpreter regressions, 11 bootstrap cases, 142 filesystem checks and the PostgreSQL/SQLite fixture. Both selectors continue to work after replacing the physical entry scripts with throwing markers in a disposable container, proving that they execute the embedded copies. Production cache warmup passes with the external test loader disabled. Full backend and runtime-drill qualification remain pending; the roadmap records the artifact identity and current evidence.
+
+The operator-derived image subsequently failed its unchanged `composer dump-autoload --dev --optimize --no-interaction --no-scripts --no-plugins` command because the source scanner received an empty stream. The rebuilt executable with `phpx-source-stream.patch` passes that command with and without the qualification prepend. It also passes 40 source-stream checks, expanded to 76 with physical copies changed and removed, and repeats the interpreter, 11 bootstrap, 142 filesystem and 106 entry-point checks successfully. The PostgreSQL/SQLite fixture above predates this source-only correction, which reuses the private runtime. A fresh full backend run is in progress; runtime drills remain pending.
 
 Application acceptance requires kernel/container boot, ZEngine source reflection and mutation, a database-backed HTTP request, worker message processing, coroutine isolation, drain/reload and the independent operator path.
 Then run the backend suites and runtime drills named in the [testing guide](../../docs-book/part-2-developer-guide/testing/README.md) against the candidate image.

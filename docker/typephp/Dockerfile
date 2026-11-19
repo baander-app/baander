@@ -16,6 +16,7 @@ COPY tools/typephp/php-builder-swoole-sources.patch /opt/typephp/
 COPY tools/typephp/php-builder-runtime-lock.patch tools/typephp/runtime-lock.json /opt/typephp/
 COPY tools/typephp/phpx-cli-script-dispatch.patch /opt/typephp/
 COPY tools/typephp/phpx-file-access.patch /opt/typephp/
+COPY tools/typephp/phpx-source-stream.patch /opt/typephp/
 COPY tools/typephp/php-builder-redis-lzf.patch /opt/typephp/
 COPY tools/typephp/php-builder-swoole-pdo-symbols.patch /opt/typephp/
 COPY tools/typephp/php-builder-swoole-copy-result.patch /opt/typephp/
@@ -32,6 +33,7 @@ RUN composer --working-dir=/opt/typephp install --no-dev --no-scripts --no-plugi
     && patch --directory=/opt/typephp/vendor/swoole/typephp --strip=1 < /opt/typephp/php-builder-qualification-bootstrap.patch \
     && patch --directory=/opt/typephp/vendor/swoole/phpx --strip=1 < /opt/typephp/phpx-cli-script-dispatch.patch \
     && patch --directory=/opt/typephp/vendor/swoole/phpx --strip=1 < /opt/typephp/phpx-file-access.patch \
+    && patch --directory=/opt/typephp/vendor/swoole/phpx --strip=1 < /opt/typephp/phpx-source-stream.patch \
     && php -r 'if (PHP_VERSION !== "8.5.12" || !PHP_ZTS || !extension_loaded("Zend OPcache")) { exit(1); }' \
     && php /opt/typephp/vendor/bin/tpc.php --version
 
