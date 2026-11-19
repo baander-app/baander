@@ -26,11 +26,26 @@ final readonly class LibraryReadScopeProvider implements LibraryReadScopeProvide
         if ($authority === null || $authority->disabled) {
             return LibraryReadScope::none();
         }
-        if ($authority->isAdministrator()) {
+        if ($authority->isAdministrator() && $this->requestCarriesAdministratorAuthority($userId)) {
             return LibraryReadScope::unrestricted();
         }
 
         return LibraryReadScope::restricted(array_map(Uuid::fromString(...), $this->access->getUserLibraryIds($userId)));
+    }
+
+    /**
+     * A request authenticated as this user carries their admin authority only when its token
+     * does: a token delegated to another client authenticates them with ROLE_USER alone.
+     * Work outside such a request, such as a signed media fetch, reads the stored roles.
+     */
+    private function requestCarriesAdministratorAuthority(Uuid $userId): bool
+    {
+        $user = $this->security->getUser();
+        if (!$user instanceof AuthenticatedUserIdentityInterface || $user->getId() !== $userId->toString()) {
+            return true;
+        }
+
+        return $this->security->isGranted('ROLE_ADMIN');
     }
 
     public function current(): LibraryReadScope

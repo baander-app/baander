@@ -578,8 +578,8 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         $claims = self::claims($tokens['access_token']);
         self::assertSame(['jkt' => $tv->thumbprint()], $claims['cnf']);
         self::assertSame($this->user->getPublicId()->toString(), $claims['sub']);
-        self::assertSame(200, $this->me($tokens['access_token'], $tv, $tvFingerprint)->getStatusCode());
-        self::assertSame(401, $this->me($tokens['access_token'], $tv)->getStatusCode(), 'The TV fingerprint binding applies.');
+        self::assertSame(200, $this->devices($tokens['access_token'], $tv, $tvFingerprint)->getStatusCode());
+        self::assertSame(401, $this->devices($tokens['access_token'], $tv)->getStatusCode(), 'The TV fingerprint binding applies.');
 
         // The code is spent; refresh at the token endpoint needs the TV key.
         [$again, $nonce] = $this->pollDevice($tv, $clientId, $codes['device_code'], $nonce, $tvFingerprint);
@@ -590,7 +590,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertSame(200, $refreshed['status'], json_encode($refreshed, JSON_THROW_ON_ERROR));
         self::assertTokenResponse($refreshed, 'library playlist');
         self::assertSame(['jkt' => $tv->thumbprint()], self::claims($refreshed['access_token'])['cnf']);
-        self::assertSame(200, $this->me($refreshed['access_token'], $tv, $tvFingerprint)->getStatusCode());
+        self::assertSame(200, $this->devices($refreshed['access_token'], $tv, $tvFingerprint)->getStatusCode());
     }
 
     /** A password change revokes the user's other tokens, including those the device grant issued. */
@@ -598,14 +598,14 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
     {
         $tv = new SignedDpopProof();
         $clientId = $this->deviceClient();
-        $codes = json_decode((string) $this->send('POST', '/api/oauth/device/authorize', form: ['client_id' => $clientId])->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        $codes = json_decode((string) $this->send('POST', '/api/oauth/device/authorize', form: ['client_id' => $clientId, 'scope' => 'library'])->getContent(), true, flags: JSON_THROW_ON_ERROR);
         $web = new SignedDpopProof();
         $login = $this->login($web);
         $approval = $this->asUser($login['accessToken'], $web, 'POST', '/api/oauth/device/approve', json: ['userCode' => $codes['user_code'], 'decision' => 'approve']);
         self::assertSame(200, $approval->getStatusCode(), (string) $approval->getContent());
         [$tokens, $nonce] = $this->pollDevice($tv, $clientId, $codes['device_code'], $this->nonce());
         self::assertSame(200, $tokens['status'], json_encode($tokens, JSON_THROW_ON_ERROR));
-        self::assertSame(200, $this->me($tokens['access_token'], $tv)->getStatusCode());
+        self::assertSame(200, $this->devices($tokens['access_token'], $tv)->getStatusCode());
 
         $change = $this->asUser($login['accessToken'], $web, 'PUT', '/api/auth/me/password', json: [
             'currentPassword' => self::PASSWORD,
@@ -613,7 +613,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         ]);
         self::assertSame(200, $change->getStatusCode(), (string) $change->getContent());
 
-        self::assertSame(401, $this->me($tokens['access_token'], $tv)->getStatusCode());
+        self::assertSame(401, $this->devices($tokens['access_token'], $tv)->getStatusCode());
         [$refresh] = $this->tokenRequest($tv, $nonce, ['grant_type' => 'refresh_token', 'client_id' => $clientId, 'refresh_token' => $tokens['refresh_token']]);
         self::assertSame('invalid_grant', $refresh['error']);
         self::assertSame(200, $this->me($login['accessToken'], $web)->getStatusCode(), 'The session that changed the password keeps its chain.');
@@ -688,7 +688,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertTokenResponse($tokens, 'library');
         self::assertSame(['jkt' => $app->thumbprint()], self::claims($tokens['access_token'])['cnf']);
         self::assertSame($app->thumbprint(), $this->storedBinding(self::claims($tokens['access_token'])['jti']));
-        self::assertSame(200, $this->me($tokens['access_token'], $app)->getStatusCode());
+        self::assertSame(200, $this->devices($tokens['access_token'], $app)->getStatusCode());
 
         [$replay] = $this->tokenRequest($app, $nonce, [...$exchange, 'code_verifier' => $verifier]);
         self::assertSame('invalid_grant', $replay['error'], 'A code is redeemed once.');
@@ -1020,15 +1020,26 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
 
     private function me(string $accessToken, SignedDpopProof $key, ?string $fingerprint = null): Response
     {
+        return $this->getWithToken('/api/auth/me', $accessToken, $key, $fingerprint);
+    }
+
+    /** A route a delegated `library` token reaches: the user's devices. */
+    private function devices(string $accessToken, SignedDpopProof $key, ?string $fingerprint = null): Response
+    {
+        return $this->getWithToken('/api/devices', $accessToken, $key, $fingerprint);
+    }
+
+    private function getWithToken(string $path, string $accessToken, SignedDpopProof $key, ?string $fingerprint): Response
+    {
         $headers = [
             'Authorization' => 'DPoP ' . $accessToken,
-            'DPoP' => $key->create('GET', self::ORIGIN . '/api/auth/me', $accessToken),
+            'DPoP' => $key->create('GET', self::ORIGIN . $path, $accessToken),
         ];
         if ($fingerprint !== null) {
             $headers[BaanderHeader::ClientFingerprint->value] = $fingerprint;
         }
 
-        return $this->send('GET', '/api/auth/me', headers: $headers);
+        return $this->send('GET', $path, headers: $headers);
     }
 
     private function registerPasskey(): WebAuthnTestCredential

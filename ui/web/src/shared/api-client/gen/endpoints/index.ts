@@ -1852,15 +1852,15 @@ export interface UserResource {
   publicId: string;
   /** Display name */
   name: string;
-  /** Email address */
+  /** Email address; absent for a delegated token without the email scope */
   email: string;
   /**
-     * When the email was verified
+     * When the email was verified; absent for a delegated token without the email scope
      * @nullable
      */
   emailVerifiedAt?: string | null;
   createdAt: string;
-  /** Assigned roles */
+  /** Assigned roles; absent for a delegated token */
   roles: string[];
 }
 

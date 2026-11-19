@@ -98,6 +98,24 @@ abstract class TestCase extends WebTestCase
         return $this->client->getResponse();
     }
 
+    /**
+     * Sends a request as the given user through a delegated token holding these scopes.
+     *
+     * @param list<string> $scopes
+     * @param array<string, mixed> $content
+     */
+    protected function delegatedRequest(string $method, string $uri, User $user, array $scopes, array $content = []): Response
+    {
+        $headers = [
+            'CONTENT_TYPE' => 'application/json',
+            BaanderHeader::TestUserId->serverKey() => $user->getId()->toString(),
+            BaanderHeader::TestClientScopes->serverKey() => implode(' ', $scopes),
+        ];
+        $this->client->request($method, $uri, [], [], $headers, $content === [] ? null : json_encode($content, JSON_THROW_ON_ERROR));
+
+        return $this->client->getResponse();
+    }
+
     /** @param array<string, mixed> $content */
     protected function anonymousRequest(string $method, string $uri, array $content = []): Response
     {

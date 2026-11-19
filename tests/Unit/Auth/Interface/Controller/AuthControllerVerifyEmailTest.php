@@ -95,7 +95,7 @@ final class AuthControllerVerifyEmailTest extends TestCase
     {
         $this->security->method('getUser')->willReturn($this->createStub(\Symfony\Component\Security\Core\User\UserInterface::class));
         $this->commandBus->expects($this->never())->method('dispatch');
-        $this->assertSame(Response::HTTP_NOT_FOUND, $this->controller->me()->getStatusCode());
+        $this->assertSame(Response::HTTP_NOT_FOUND, $this->controller->me(\Symfony\Component\HttpFoundation\Request::create('/api/auth/me'))->getStatusCode());
     }
 
     public function testVerifyEmailDispatchesCommandAndMarksVerified(): void

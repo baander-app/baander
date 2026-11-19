@@ -13,6 +13,7 @@ use App\Auth\Application\Command\User\RequestPasswordResetCommand;
 use App\Auth\Application\Command\User\ResendEmailVerificationCommand;
 use App\Auth\Application\Command\User\ResetPasswordCommand;
 use App\Auth\Application\Command\User\VerifyEmailCommand;
+use App\Auth\Application\Http\AccessTokenAttributes;
 use App\Auth\Application\Exception\CurrentPasswordMismatchException;
 use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use App\Auth\Application\Exception\EmailAddressInUseException;
@@ -162,7 +163,7 @@ final class AuthController
     {
         // OAuth2Authenticator copies the presenting token's identifier here. Its chain is
         // the session: logout revokes the whole chain and closes the sockets it opened.
-        $accessTokenId = $request->attributes->get('oauth_access_token_id');
+        $accessTokenId = $request->attributes->get(AccessTokenAttributes::TOKEN_ID);
         if (!is_string($accessTokenId) || $accessTokenId === '') {
             return $this->unauthorized();
         }
@@ -398,14 +399,18 @@ final class AuthController
         ],
     )]
     #[Route('/me', name: 'me', methods: ['GET'])]
-    public function me(): JsonResponse
+    public function me(Request $request): JsonResponse
     {
         $user = $this->getCurrentUser();
         if ($user === null) {
             return $this->notFound();
         }
 
-        return $this->successResponse(UserResource::from($user));
+        $attributes = $request->attributes;
+
+        return $this->successResponse(AccessTokenAttributes::isFirstParty($attributes->get(AccessTokenAttributes::FIRST_PARTY))
+            ? UserResource::from($user)
+            : UserResource::forDelegatedToken($user, AccessTokenAttributes::scopes($attributes->get(AccessTokenAttributes::SCOPES))));
     }
 
     #[OA\Put(
@@ -661,7 +666,7 @@ final class AuthController
         }
 
         // OAuth2Authenticator copies the presenting token's identifier here; its session stays signed in.
-        $currentAccessTokenId = $request->attributes->get('oauth_access_token_id');
+        $currentAccessTokenId = $request->attributes->get(AccessTokenAttributes::TOKEN_ID);
 
         try {
             $this->commandBus->dispatch(new ChangePasswordCommand(

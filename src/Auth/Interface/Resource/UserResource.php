@@ -13,10 +13,10 @@ use OpenApi\Attributes as OA;
     properties: [
         new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
         new OA\Property(property: 'name', type: 'string', description: 'Display name'),
-        new OA\Property(property: 'email', type: 'string', format: 'email', description: 'Email address'),
-        new OA\Property(property: 'emailVerifiedAt', type: 'string', format: 'date-time', nullable: true, description: 'When the email was verified'),
+        new OA\Property(property: 'email', type: 'string', format: 'email', description: 'Email address; absent for a delegated token without the email scope'),
+        new OA\Property(property: 'emailVerifiedAt', type: 'string', format: 'date-time', nullable: true, description: 'When the email was verified; absent for a delegated token without the email scope'),
         new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
-        new OA\Property(property: 'roles', type: 'array', items: new OA\Items(type: 'string'), description: 'Assigned roles'),
+        new OA\Property(property: 'roles', type: 'array', items: new OA\Items(type: 'string'), description: 'Assigned roles; absent for a delegated token'),
     ],
 )]
 final class UserResource extends AbstractResource
@@ -33,6 +33,25 @@ final class UserResource extends AbstractResource
             'createdAt' => $source->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'roles' => $source->getRoles(),
         ];
+    }
+
+    /**
+     * The profile a delegated token reads: the email fields only with the email scope, and
+     * never the roles, which a delegated token does not carry.
+     *
+     * @param list<string> $scopes
+     *
+     * @return array<string, mixed>
+     */
+    public static function forDelegatedToken(User $user, array $scopes): array
+    {
+        $profile = self::from($user);
+        unset($profile['roles']);
+        if (!in_array('email', $scopes, true)) {
+            unset($profile['email'], $profile['emailVerifiedAt']);
+        }
+
+        return $profile;
     }
 
     /**

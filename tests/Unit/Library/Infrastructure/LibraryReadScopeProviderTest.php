@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Library\Infrastructure;
 
 use App\Auth\Application\DTO\CurrentUserAuthority;
 use App\Auth\Application\Port\CurrentUserAuthorityReader;
+use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Infrastructure\LibraryReadScopeProvider;
 use App\Shared\Domain\Model\Uuid;
@@ -53,6 +54,36 @@ final class LibraryReadScopeProviderTest extends TestCase
     {
         yield ['ROLE_ADMIN'];
         yield ['ROLE_SUPER_ADMIN'];
+    }
+
+    /** @return iterable<string, array{bool, bool}> whether the request's token carries the admin role, unrestricted */
+    public static function administratorRequests(): iterable
+    {
+        yield 'a first-party token of the administrator' => [true, true];
+        yield 'a delegated token of the administrator' => [false, false];
+    }
+
+    /**
+     * An administrator acting through their own request reads with the authority its token
+     * carries, so a token they delegated to another client reaches only their granted libraries.
+     */
+    #[DataProvider('administratorRequests')]
+    public function testAnAdministratorsOwnRequestReadsWithItsTokensAuthority(bool $tokenIsAdmin, bool $unrestricted): void
+    {
+        $owner = new Uuid();
+        $library = new Uuid();
+        $reader = $this->createStub(CurrentUserAuthorityReader::class);
+        $reader->method('read')->willReturn(new CurrentUserAuthority(['ROLE_USER', 'ROLE_ADMIN'], false));
+        $access = $this->createStub(LibraryAccessPortInterface::class);
+        $access->method('getUserLibraryIds')->willReturn([$library->toString()]);
+        $security = $this->createStub(Security::class);
+        $security->method('getUser')->willReturn(new SecurityUser($owner->toString(), 'admin@baander.app', 'hashed-pw'));
+        $security->method('isGranted')->willReturn($tokenIsAdmin);
+
+        $scope = new LibraryReadScopeProvider($security, $access, $reader)->forUser($owner);
+
+        self::assertSame($unrestricted, $scope->isUnrestricted());
+        self::assertTrue($scope->allows($library));
     }
 
     public function testExplicitAccountMembershipIsReadAgainAfterRevocation(): void

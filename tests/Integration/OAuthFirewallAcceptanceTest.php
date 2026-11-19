@@ -92,11 +92,11 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         $users->save($this->user);
         $userEntity = $this->manager->find(UserEntity::class, $this->user->getId());
         self::assertInstanceOf(UserEntity::class, $userEntity);
-        $this->client = new ClientEntity(new PublicId(), 'Disposable OAuth client', json_encode(['https://baander.app/callback'], JSON_THROW_ON_ERROR));
+        // The web app's own client: its tokens are first-party and carry the user's roles.
+        $this->client = FirstPartyOAuthClient::entity($container, $this->manager);
         $this->proof = new SignedDpopProof();
         $this->token = new AccessTokenEntity((new Uuid())->toString(), $this->client, $userEntity, scopes: ['profile'], expiresAt: new \DateTimeImmutable('+1 hour'));
         $this->token->setDpopJkt($this->proof->thumbprint());
-        $this->manager->persist($this->client);
         $this->manager->persist($this->token);
         $this->manager->flush();
     }
@@ -106,7 +106,6 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         if (isset($this->manager, $this->user, $this->token, $this->client) && $this->manager->isOpen()) {
             $user = $this->manager->find(UserEntity::class, $this->user->getId());
             $this->manager->remove($this->token);
-            $this->manager->remove($this->client);
             if ($user !== null) {
                 $this->manager->remove($user);
             }

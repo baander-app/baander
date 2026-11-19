@@ -27473,12 +27473,12 @@
                         "type": "string"
                     },
                     "email": {
-                        "description": "Email address",
+                        "description": "Email address; absent for a delegated token without the email scope",
                         "type": "string",
                         "format": "email"
                     },
                     "emailVerifiedAt": {
-                        "description": "When the email was verified",
+                        "description": "When the email was verified; absent for a delegated token without the email scope",
                         "type": "string",
                         "format": "date-time",
                         "nullable": true
@@ -27488,7 +27488,7 @@
                         "format": "date-time"
                     },
                     "roles": {
-                        "description": "Assigned roles",
+                        "description": "Assigned roles; absent for a delegated token",
                         "type": "array",
                         "items": {
                             "type": "string"
