@@ -40,7 +40,7 @@ final class TotpControllerTest extends TestCase
 
     public function testSetupReturnsTotpProvisioningDataForAuthenticatedUser(): void
     {
-        $user = $this->createTestUser();
+        $user = $this->createTestUser(verified: true);
 
         $response = $this->authenticatedRequest('POST', '/api/auth/totp/setup', $user, ['currentPassword' => 'password123']);
 
@@ -64,7 +64,7 @@ final class TotpControllerTest extends TestCase
     /** TOTP is turned off first, which takes a current code. */
     public function testSetupIsRefusedWhileTotpIsOn(): void
     {
-        $user = $this->createTestUser();
+        $user = $this->createTestUser(verified: true);
         $secret = $this->startSetup($user);
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/auth/totp/enable', $user, ['code' => self::code($secret)]), 200);
 
@@ -75,7 +75,7 @@ final class TotpControllerTest extends TestCase
 
     public function testASecondSetupReplacesThePendingSecretAndEnableUsesTheNewest(): void
     {
-        $user = $this->createTestUser();
+        $user = $this->createTestUser(verified: true);
         $first = $this->startSetup($user);
         $second = $this->startSetup($user);
         $this->assertNotSame($first, $second);

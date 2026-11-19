@@ -9,6 +9,7 @@ use App\Auth\Application\Command\User\CreateUserCommand;
 use App\Auth\Application\Command\User\DeleteUserCommand;
 use App\Auth\Application\Command\User\DisableUserCommand;
 use App\Auth\Application\Command\User\EnableUserCommand;
+use App\Auth\Application\Command\User\MarkEmailVerifiedCommand;
 use App\Auth\Application\Command\User\RenameUserCommand;
 use App\Auth\Application\Command\User\ResetUserTotpCommand;
 use App\Auth\Application\Command\User\SetUserPasswordCommand;
@@ -159,7 +160,7 @@ final class AdminUserController
     #[OA\Patch(
         path: '/api/admin/users/{publicId}',
         summary: 'Update a user',
-        description: 'A new email address starts unverified and is sent a verification link. The CLI counterparts are app:user:rename and app:user:change-email.',
+        description: 'A new email address takes effect at once, counts as verified and replaces a change the user had pending; the previous address is told of the change. The CLI counterparts are app:user:rename and app:user:change-email.',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(ref: new Model(type: AdminUpdateUserRequest::class)),
@@ -185,8 +186,8 @@ final class AdminUserController
             return $this->forbidden(self::OWN_CREDENTIALS_REFUSAL);
         }
 
-        // The same use case as the user's own change and `app:user:change-email`: the new
-        // address starts unverified and is sent a verification link.
+        // The same use case as `app:user:change-email`: the new address takes effect at once
+        // and counts as verified.
         if ($request->email !== null) {
             $user = $this->dispatch(new ChangeEmailCommand($publicId, $request->email));
         }
@@ -302,6 +303,28 @@ final class AdminUserController
         }
         // The same use case as `app:user:reset-totp`: it also signs the user out everywhere.
         $user = $this->dispatch(new ResetUserTotpCommand($publicId));
+
+        return $this->successResponse(AdminUserResource::from($user));
+    }
+
+    #[OA\Post(
+        path: '/api/admin/users/{publicId}/verify-email',
+        summary: 'Mark a user\'s email address verified',
+        description: 'Marks the current address verified, as redeeming its verification link would; a verified address stays as it is. A pending email change is left alone. The CLI counterpart is app:user:mark-email-verified.',
+        responses: [
+            new OA\Response(response: '200', description: 'The address is verified', content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'data', ref: new Model(type: AdminUserResource::class)),
+            ])),
+            new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        ],
+    )]
+    #[Route('/{publicId}/verify-email', name: 'verify_email', methods: ['POST'])]
+    #[IsGranted('ROLE_SUPER_ADMIN')]
+    #[CliCounterpart('app:user:mark-email-verified')]
+    public function verifyEmail(string $publicId): JsonResponse
+    {
+        $publicId = $this->publicIdentifier($publicId);
+        $user = $this->dispatch(new MarkEmailVerifiedCommand($publicId));
 
         return $this->successResponse(AdminUserResource::from($user));
     }

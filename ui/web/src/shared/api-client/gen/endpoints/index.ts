@@ -1883,6 +1883,11 @@ export interface UserResource {
   roles: string[];
   /** Whether TOTP is on, so a sensitive change needs a code; absent for a delegated token */
   totpEnabled: boolean;
+  /**
+     * The address an email change waits to confirm through the link sent to it; absent for a delegated token
+     * @nullable
+     */
+  pendingEmail?: string | null;
 }
 
 export interface LoginRequest {
@@ -4724,6 +4729,10 @@ export type PostAdminUsersResetTotp200 = {
   data?: AdminUserResource;
 };
 
+export type PostAdminUsersVerifyEmail200 = {
+  data?: AdminUserResource;
+};
+
 export type PostAdminUsersDisable200 = {
   data?: AdminUserResource;
 };
@@ -5160,8 +5169,12 @@ export type PostAuthMeEmailVerification200 = {
   data?: PostAuthMeEmailVerification200Data;
 };
 
-export type PutAuthMeEmail200 = {
-  data?: UserResource;
+export type PutAuthMeEmail202Data = {
+  message?: string;
+};
+
+export type PutAuthMeEmail202 = {
+  data?: PutAuthMeEmail202Data;
 };
 
 export type PutAuthMePasswordBody = {
@@ -11011,7 +11024,7 @@ export const getPatchAdminUsersUpdateUrl = (publicId: string,) => {
 }
 
 /**
- * A new email address starts unverified and is sent a verification link. The CLI counterparts are app:user:rename and app:user:change-email.
+ * A new email address takes effect at once, counts as verified and replaces a change the user had pending; the previous address is told of the change. The CLI counterparts are app:user:rename and app:user:change-email.
  * @summary Update a user
  */
 export const patchAdminUsersUpdate = async (publicId: string,
@@ -11344,6 +11357,81 @@ export const usePostAdminUsersResetTotp = <TError = ErrorType<ApiError>,
         TContext
       > => {
       return useMutation(getPostAdminUsersResetTotpMutationOptions(options), queryClient);
+    }
+
+export const getPostAdminUsersVerifyEmailUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/admin/users/${publicId}/verify-email`
+}
+
+/**
+ * Marks the current address verified, as redeeming its verification link would; a verified address stays as it is. A pending email change is left alone. The CLI counterpart is app:user:mark-email-verified.
+ * @summary Mark a user's email address verified
+ */
+export const postAdminUsersVerifyEmail = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<PostAdminUsersVerifyEmail200> => {
+
+  return customInstance<PostAdminUsersVerifyEmail200>(getPostAdminUsersVerifyEmailUrl(publicId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getPostAdminUsersVerifyEmailMutationKey = () => ['postAdminUsersVerifyEmail'] as const;
+
+export const getPostAdminUsersVerifyEmailMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersVerifyEmail>>, TError,PostAdminUsersVerifyEmailMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersVerifyEmail>>, TError,PostAdminUsersVerifyEmailMutationVariables, TContext> => {
+
+const mutationKey = getPostAdminUsersVerifyEmailMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAdminUsersVerifyEmail>>, PostAdminUsersVerifyEmailMutationVariables> = (props) => {
+          const {publicId} = props ?? {};
+
+          return  postAdminUsersVerifyEmail(publicId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostAdminUsersVerifyEmailMutationResult = NonNullable<Awaited<ReturnType<typeof postAdminUsersVerifyEmail>>>
+
+    export type PostAdminUsersVerifyEmailMutationError = ErrorType<ApiError>
+    export type PostAdminUsersVerifyEmailMutationVariables = {publicId: string}
+
+    /**
+ * @summary Mark a user's email address verified
+ */
+export const usePostAdminUsersVerifyEmail = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersVerifyEmail>>, TError,PostAdminUsersVerifyEmailMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postAdminUsersVerifyEmail>>,
+        TError,
+        PostAdminUsersVerifyEmailMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostAdminUsersVerifyEmailMutationOptions(options), queryClient);
     }
 
 export const getPostAdminUsersDisableUrl = (publicId: string,) => {
@@ -12990,7 +13078,7 @@ export const getPostPasskeyOptionsUrl = () => {
 }
 
 /**
- * Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.
+ * Needs a verified email address, answered otherwise with 422 and `details.reason` `email_unverified`. Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.
  * @summary Get WebAuthn registration options
  */
 export const postPasskeyOptions = async (passkeyRegistrationOptionsRequest: PasskeyRegistrationOptionsRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPasskeyOptions200> => {
@@ -13507,7 +13595,7 @@ export const getPostTotpSetupUrl = () => {
 }
 
 /**
- * Refused while TOTP is on. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.
+ * Refused while TOTP is on, and for an unverified email address with 422 and `details.reason` `email_unverified`. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.
  * @summary Generate TOTP secret and provisioning URI
  */
 export const postTotpSetup = async (startTotpSetupRequest: StartTotpSetupRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostTotpSetup200> => {
@@ -14552,10 +14640,10 @@ export const getPutAuthMeEmailUrl = () => {
 }
 
 /**
- * Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The new address starts unverified and is sent a verification link; links sent to the old address stop working.
- * @summary Change the current user email
+ * Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The new address is held as `pendingEmail` and sent a verification link; the account keeps its address until that link is used. The answer is the same whether or not another account uses the new address: the link then fails. Asking for the current address drops a pending change.
+ * @summary Ask to change the current user email
  */
-export const putAuthMeEmail = async (changeEmailRequest: ChangeEmailRequest, options?: Parameters<typeof customInstance>[1]): Promise<PutAuthMeEmail200> => {
+export const putAuthMeEmail = async (changeEmailRequest: ChangeEmailRequest, options?: Parameters<typeof customInstance>[1]): Promise<PutAuthMeEmail202> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -14571,7 +14659,7 @@ export const putAuthMeEmail = async (changeEmailRequest: ChangeEmailRequest, opt
     }
     return headers;
   };
-return customInstance<PutAuthMeEmail200>(getPutAuthMeEmailUrl(),
+return customInstance<PutAuthMeEmail202>(getPutAuthMeEmailUrl(),
   {
     ...options,
     method: 'PUT',
@@ -14619,7 +14707,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PutAuthMeEmailMutationVariables = {data: BodyType<ChangeEmailRequest>}
 
     /**
- * @summary Change the current user email
+ * @summary Ask to change the current user email
  */
 export const usePutAuthMeEmail = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAuthMeEmail>>, TError,PutAuthMeEmailMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}

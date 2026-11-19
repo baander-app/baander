@@ -34,6 +34,11 @@ export interface User {
   emailVerifiedAt?: string | null
   /** Whether TOTP is on, so sensitive changes ask for a code. Absent until the profile is read. */
   totpEnabled?: boolean
+  /**
+   * The address an email change waits to confirm; the account keeps `email` until the link sent
+   * to it is opened. Null when no change is pending; absent until the profile is read.
+   */
+  pendingEmail?: string | null
 }
 
 interface AuthState {

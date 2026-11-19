@@ -6,9 +6,10 @@ namespace App\Auth\Infrastructure\Mail;
 
 use App\Auth\Application\Port\EmailVerificationDeliveryInterface;
 use App\Auth\Domain\Model\User;
+use App\Shared\Domain\Model\Email;
 
 /**
- * Emails the verification link, APP_URL/verify-email#token=…, to the user's current address
+ * Emails the verification link, APP_URL/verify-email#token=…, to the address it verifies
  * after the response has been sent (AfterResponseMailer). The fragment keeps the token out of
  * access logs and Referer headers.
  */
@@ -20,11 +21,11 @@ final readonly class MailerEmailVerificationDelivery implements EmailVerificatio
     ) {
     }
 
-    public function deliver(User $user, string $token, \DateTimeImmutable $expiresAt): void
+    public function deliver(User $user, Email $address, string $token, \DateTimeImmutable $expiresAt): void
     {
         $this->mailer->send(new CredentialEmail(
             userId: $user->getId()->toString(),
-            address: $user->getEmail(),
+            address: $address->toString(),
             name: $user->getName(),
             template: 'email/auth/email_verification',
             subjectKey: 'email_verification_email.subject',

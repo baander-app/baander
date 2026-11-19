@@ -39,9 +39,11 @@ final class UserRepository implements UserRepositoryInterface
             $this->passwordResetTokens->revokeForUser($user->getId());
         }
 
-        // A verification token vouches for the address it was sent to; a new address needs a
-        // new token, which the email change issues once the user is saved.
-        if ($this->entityManager->contains($entity) && $entity->getEmail() !== $user->getEmail()) {
+        // A verification token vouches for the address it was sent to: the current one, or the
+        // pending one a self-service change asked for. A change of either needs a new token,
+        // which the change issues once the user is saved.
+        if ($this->entityManager->contains($entity)
+            && ($entity->getEmail() !== $user->getEmail() || $entity->getPendingEmail() !== $user->getPendingEmail())) {
             $this->emailVerificationTokens->revokeForUser($user->getId());
         }
 
@@ -204,6 +206,7 @@ final class UserRepository implements UserRepositoryInterface
             emailVerifiedAt: $entity->getEmailVerifiedAt(),
             roles: $entity->getRoles(),
             disabled: $entity->isDisabled(),
+            pendingEmail: $entity->getPendingEmail(),
         ));
     }
 
@@ -211,6 +214,7 @@ final class UserRepository implements UserRepositoryInterface
     {
         $entity->setName($user->getName());
         $entity->setEmail($user->getEmail());
+        $entity->setPendingEmail($user->getPendingEmail());
         $entity->setPassword($user->getPassword());
         $entity->setTotpSecretCiphertext($user->getTotpSecretCiphertext());
         $entity->setRoles($user->getRoles());

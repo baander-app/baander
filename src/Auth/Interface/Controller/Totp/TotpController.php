@@ -7,6 +7,7 @@ namespace App\Auth\Interface\Controller\Totp;
 use App\Auth\Application\Command\Totp\DisableTotpCommand;
 use App\Auth\Application\Command\Totp\EnableTotpCommand;
 use App\Auth\Application\Command\Totp\StartTotpSetupCommand;
+use App\Auth\Application\Exception\EmailUnverifiedException;
 use App\Auth\Application\Exception\StepUpFailedException;
 use App\Auth\Application\Exception\StepUpRateLimitedException;
 use App\Auth\Application\Exception\TotpChangeRefusal;
@@ -48,7 +49,7 @@ final class TotpController
     #[OA\Post(
         path: '/api/auth/totp/setup',
         summary: 'Generate TOTP secret and provisioning URI',
-        description: 'Refused while TOTP is on. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.',
+        description: 'Refused while TOTP is on, and for an unverified email address with 422 and `details.reason` `email_unverified`. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(ref: new Model(type: StartTotpSetupRequest::class)),
@@ -69,7 +70,7 @@ final class TotpController
             ),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '409', description: 'TOTP is already on', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error, or the password is wrong', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '422', description: 'Validation error, an unverified email address, or the password is wrong', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
             new OA\Response(response: '429', description: 'Too many step-up attempts for this account', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
@@ -220,6 +221,7 @@ final class TotpController
         $cause = $exception instanceof HandlerFailedException ? ($exception->getPrevious() ?? $exception) : $exception;
         // Shared outcomes, answered by the exception subscribers: 422, 429 and 503.
         if ($cause instanceof StepUpFailedException
+            || $cause instanceof EmailUnverifiedException
             || $cause instanceof StepUpRateLimitedException
             || $cause instanceof RateLimiterUnavailableException) {
             throw $cause;

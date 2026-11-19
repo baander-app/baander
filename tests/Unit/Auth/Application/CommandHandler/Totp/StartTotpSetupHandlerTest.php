@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Auth\Application\CommandHandler;
 
 use App\Auth\Application\Command\Totp\StartTotpSetupCommand;
 use App\Auth\Application\CommandHandler\Totp\StartTotpSetupHandler;
+use App\Auth\Application\Exception\EmailUnverifiedException;
 use App\Auth\Application\Exception\StepUpFailedException;
 use App\Auth\Application\Exception\TotpChangeRefusal;
 use App\Auth\Application\Exception\TotpChangeRefusedException;
@@ -26,10 +27,28 @@ use Symfony\Component\Cache\Adapter\ArrayAdapter;
 final class StartTotpSetupHandlerTest extends TestCase
 {
     private User $user;
+    private int $stepUpAttempts = 0;
 
     protected function setUp(): void
     {
         $this->user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
+        $this->user->verifyEmail();
+    }
+
+    public function testAnUnverifiedAddressIsRefusedBeforeStepUpSpendsAnAttempt(): void
+    {
+        $user = User::register(new Email('unverified@baander.app'), 'hashed', 'Alice');
+        $this->user = $user;
+        $pending = new PendingTotpSecrets(new ArrayAdapter());
+
+        try {
+            $this->handler($pending, ['FIRSTSECRET'])(new StartTotpSetupCommand($user->getId()->toString(), 'current-password'));
+            self::fail('Setup must be refused for an unverified address.');
+        } catch (EmailUnverifiedException $exception) {
+            $this->assertSame(['reason' => 'email_unverified'], $exception->details);
+        }
+        $this->assertSame(0, $this->stepUpAttempts);
+        $this->assertNull($pending->find($user->getId()));
     }
 
     public function testEachSetupReplacesThePendingSecret(): void
@@ -93,7 +112,11 @@ final class StartTotpSetupHandlerTest extends TestCase
 
         $hasher = $this->createStub(PasswordHasherInterface::class);
         $hasher->method('verify')->willReturnCallback(static fn (string $plain): bool => $plain === 'current-password');
-        $stepUp = new StepUpVerifier($this->createStub(StepUpAttemptThrottleInterface::class), $hasher, $verifier, new NullLogger());
+        $throttle = $this->createStub(StepUpAttemptThrottleInterface::class);
+        $throttle->method('acquire')->willReturnCallback(function (): void {
+            ++$this->stepUpAttempts;
+        });
+        $stepUp = new StepUpVerifier($throttle, $hasher, $verifier, new NullLogger());
 
         return new StartTotpSetupHandler($users, $verifier, $pending, $stepUp);
     }

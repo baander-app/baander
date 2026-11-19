@@ -18,6 +18,7 @@ errors:
   password_reset_failed: "This password reset link is invalid or has expired."
   current_password_incorrect: "Current password is incorrect."
   step_up_failed: "The password or code is incorrect."
+  email_unverified: "Verify your email address first."
   invalid_credentials: "Invalid credentials."
   account_disabled: "This account has been disabled."
   totp_required: "TOTP code is required."
@@ -41,6 +42,7 @@ success:
   password_reset: "Your password has been reset."
   password_changed: "Password changed."
   registration_received: "Registration received. Check your email for the next step."
+  email_change_requested: "Check the new address for a link to confirm the change."
 
 password_reset_email:
   subject: "Reset your {app} password"
@@ -61,6 +63,13 @@ registration_attempt_email:
   action: "Choose a new password"
   fallback: "If the button does not work, copy this link into your browser:"
   ignore: "If it was not you, ignore this email. Your password stays the same."
+
+email_changed_email:
+  subject: "The email address of your {app} account changed"
+  heading: "Your email address changed"
+  greeting: "Hi {name},"
+  intro: "The email address of your {app} account was changed. Emails about the account, including password reset links, now go to the new address and no longer to this one."
+  unexpected: "If you did not make this change, contact your server administrator right away."
 
 email_verification_email:
   subject: "Verify your email address for {app}"

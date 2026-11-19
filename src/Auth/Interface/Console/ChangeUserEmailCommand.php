@@ -19,7 +19,7 @@ use Throwable;
 /** The CLI counterpart of changing a user's email in PATCH /api/admin/users/{id}. */
 #[AsCommand(
     name: 'app:user:change-email',
-    description: 'Change a user\'s email address and send a verification link to the new address.',
+    description: 'Change a user\'s email address; the new address counts as verified.',
 )]
 final class ChangeUserEmailCommand extends Command
 {
@@ -56,7 +56,7 @@ final class ChangeUserEmailCommand extends Command
             return AdminCommandSupport::json($io, $user);
         }
 
-        $io->success(sprintf('The email address of "%s" is now %s. It stays unverified until the user opens the link sent to it.', $identifier, $user['email']));
+        $io->success(sprintf('The email address of "%s" is now %s, and it counts as verified. The previous address was told of the change.', $identifier, $user['email']));
 
         return Command::SUCCESS;
     }

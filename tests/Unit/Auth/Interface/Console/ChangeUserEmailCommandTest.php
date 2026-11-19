@@ -41,7 +41,7 @@ final class ChangeUserEmailCommandTest extends TestCase
         self::assertCount(1, $this->dispatched);
         self::assertSame('alice@baander.app', $this->dispatched[0]->identifier);
         self::assertSame('Alice.New@baander.app', $this->dispatched[0]->email);
-        self::assertStringContainsString('unverified', preg_replace('/\s+/', ' ', $tester->getDisplay()) ?? '');
+        self::assertStringContainsString('counts as verified', preg_replace('/\s+/', ' ', $tester->getDisplay()) ?? '');
     }
 
     public function testPrintsTheChangedUserAsTheApiReturnsItWithJson(): void

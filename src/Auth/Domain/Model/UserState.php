@@ -30,6 +30,8 @@ final class UserState
         public ?DateTimeImmutable $emailVerifiedAt = null,
         public array $roles = ['ROLE_USER'],
         public bool $disabled = false,
+        /** An address the user asked to change to; it replaces the email only once its link is used. */
+        public ?string $pendingEmail = null,
     ) {
     }
 }

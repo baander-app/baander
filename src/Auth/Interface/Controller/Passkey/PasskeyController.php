@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Interface\Controller\Passkey;
 
 use App\Auth\Application\Command\Passkey\RegisterPasskeyCommand;
+use App\Auth\Application\Exception\EmailUnverifiedException;
 use App\Auth\Application\Exception\PasskeyChallengeUnavailableException;
 use App\Auth\Application\Port\UserPortInterface;
 use App\Auth\Application\Service\StepUpVerifier;
@@ -98,7 +99,7 @@ final class PasskeyController
     #[OA\Post(
         path: '/api/auth/passkey/options',
         summary: 'Get WebAuthn registration options',
-        description: 'Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.',
+        description: 'Needs a verified email address, answered otherwise with 422 and `details.reason` `email_unverified`. Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(ref: new Model(type: PasskeyRegistrationOptionsRequest::class)),
@@ -115,7 +116,7 @@ final class PasskeyController
                 ),
             ),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error, or the password or code is wrong', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '422', description: 'Validation error, an unverified email address, or the password or code is wrong', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
             new OA\Response(response: '429', description: 'Too many step-up attempts for this account', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(
                 response: '503',
@@ -138,6 +139,8 @@ final class PasskeyController
         if ($owner === null) {
             return $this->notFound();
         }
+        // Before step-up, so an unverified account spends none of its attempts.
+        EmailUnverifiedException::unlessVerified($owner);
         $this->stepUp->verify($owner, $payload->currentPassword, $payload->totpCode);
         $userId = $owner->getPublicId()->toString();
         $existingPasskeys = $this->passkeyRepository->forUser($userUuid);

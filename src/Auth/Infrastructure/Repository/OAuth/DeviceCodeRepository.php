@@ -256,6 +256,7 @@ final class DeviceCodeRepository implements DeviceCodeRepositoryInterface
             emailVerifiedAt: $entity->getEmailVerifiedAt(),
             roles: $entity->getRoles(),
             disabled: $entity->isDisabled(),
+            pendingEmail: $entity->getPendingEmail(),
         ));
     }
 

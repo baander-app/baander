@@ -76,14 +76,77 @@ final class User
         $this->state->updatedAt = new DateTimeImmutable();
     }
 
-    public function changeEmail(string $newEmail): void
+    /**
+     * Holds the address the user asked to change to. The account keeps its address, and that
+     * address's verification, until confirmPendingEmail(); asking for the current address drops
+     * the pending change.
+     */
+    public function requestEmailChange(Email $address): void
     {
-        if ($newEmail === $this->state->email) {
+        $pending = $address->equals(Email::fromString($this->state->email)) ? null : $address->toString();
+        if ($pending === $this->state->pendingEmail) {
             return;
         }
 
-        $this->state->email = $newEmail;
-        $this->state->emailVerifiedAt = null;
+        $this->state->pendingEmail = $pending;
+        $this->state->updatedAt = new DateTimeImmutable();
+    }
+
+    /**
+     * Makes the pending address the account's verified address; its owner has just used the
+     * link sent to it. The caller checks that no other account uses it.
+     *
+     * @throws \LogicException when no change is pending
+     */
+    public function confirmPendingEmail(): void
+    {
+        $pending = $this->state->pendingEmail ?? throw new \LogicException('No email change is pending.');
+
+        $now = new DateTimeImmutable();
+        $this->state->email = $pending;
+        $this->state->emailVerifiedAt = $now;
+        $this->state->pendingEmail = null;
+        $this->state->updatedAt = $now;
+    }
+
+    public function discardPendingEmail(): void
+    {
+        if ($this->state->pendingEmail === null) {
+            return;
+        }
+
+        $this->state->pendingEmail = null;
+        $this->state->updatedAt = new DateTimeImmutable();
+    }
+
+    /**
+     * An operator's email change: it takes effect at once, counts as verified and replaces any
+     * change the user had pending.
+     */
+    public function assignVerifiedEmail(Email $address): void
+    {
+        if ($address->equals(Email::fromString($this->state->email))) {
+            return;
+        }
+
+        $now = new DateTimeImmutable();
+        $this->state->email = $address->toString();
+        $this->state->emailVerifiedAt = $now;
+        $this->state->pendingEmail = null;
+        $this->state->updatedAt = $now;
+    }
+
+    /**
+     * A redeemed password reset proves control of the current address. On an address that was
+     * never verified, the account may have been registered by someone else under it, so the
+     * reset verifies the address, turns TOTP off and drops a pending email change; the caller
+     * removes the account's passkeys and sessions in the same transaction.
+     */
+    public function claimByPasswordReset(): void
+    {
+        $this->verifyEmail();
+        $this->state->totpSecretCiphertext = null;
+        $this->state->pendingEmail = null;
         $this->state->updatedAt = new DateTimeImmutable();
     }
 
@@ -120,6 +183,11 @@ final class User
     public function getPassword(): string
     {
         return $this->state->password;
+    }
+
+    public function getPendingEmail(): ?string
+    {
+        return $this->state->pendingEmail;
     }
 
     public function isEmailVerified(): bool

@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="{{ locale }}">
+<body style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background: #1f2937; color: #fff; padding: 20px; border-radius: 8px 8px 0 0;">
+        <h1 style="margin: 0;">{{ appName }}</h1>
+    </div>
+    <div style="background: #f9f9f9; padding: 20px; border: 1px solid #ddd; border-top: none;">
+        <h2>{{ 'email_changed_email.heading'|trans({}, 'auth', locale) }}</h2>
+        <p>{{ 'email_changed_email.greeting'|trans({name: name}, 'auth', locale) }}</p>
+        <p>{{ 'email_changed_email.intro'|trans({app: appName}, 'auth', locale) }}</p>
+        <p>{{ 'email_changed_email.unexpected'|trans({}, 'auth', locale) }}</p>
+    </div>
+</body>
+</html>

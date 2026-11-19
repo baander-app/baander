@@ -162,7 +162,7 @@ final class RegisterUserHandlerTest extends TestCase
             $this->issued[] = [$userId->toString(), $email->toString(), $token, $expiresAt, $this->active];
         });
         $delivery = $this->createStub(EmailVerificationDeliveryInterface::class);
-        $delivery->method('deliver')->willReturnCallback(function (User $user, string $token): void {
+        $delivery->method('deliver')->willReturnCallback(function (User $user, Email $address, string $token): void {
             $this->delivered[] = [$user, $token, $this->active];
         });
 

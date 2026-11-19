@@ -89,8 +89,21 @@ final class EmailVerificationTokenRepositoryTest extends TestCase
         $this->userRepository->save($user);
         $this->assertSame(1, $this->outstanding());
 
-        $user->changeEmail('changed-' . bin2hex(random_bytes(4)) . '@baander.app');
+        $user->assignVerifiedEmail(new Email('changed-' . bin2hex(random_bytes(4)) . '@baander.app'));
         $this->userRepository->save($user);
+        $this->assertSame(0, $this->outstanding());
+    }
+
+    public function testChangingThePendingAddressRemovesTheToken(): void
+    {
+        $user = $this->createTestUser();
+        $user->requestEmailChange(new Email('first-' . bin2hex(random_bytes(4)) . '@baander.app'));
+        $this->userRepository->save($user);
+        $this->tokens()->issue($user->getId(), new Email((string) $user->getPendingEmail()), 'pending-token', new \DateTimeImmutable('+1 hour'));
+
+        $user->requestEmailChange(new Email('second-' . bin2hex(random_bytes(4)) . '@baander.app'));
+        $this->userRepository->save($user);
+
         $this->assertSame(0, $this->outstanding());
     }
 

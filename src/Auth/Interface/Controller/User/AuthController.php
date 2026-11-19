@@ -16,7 +16,6 @@ use App\Auth\Application\Command\User\VerifyEmailCommand;
 use App\Auth\Application\Http\AccessTokenAttributes;
 use App\Auth\Application\Exception\CurrentPasswordMismatchException;
 use App\Auth\Application\Exception\DpopStoreUnavailableException;
-use App\Auth\Application\Exception\EmailAddressInUseException;
 use App\Auth\Application\Exception\EmailVerificationException;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Exception\PasswordPolicyException;
@@ -591,25 +590,26 @@ final class AuthController
 
     #[OA\Put(
         path: '/api/auth/me/email',
-        summary: 'Change the current user email',
-        description: 'Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The new address starts unverified and is sent a verification link; links sent to the old address stop working.',
+        summary: 'Ask to change the current user email',
+        description: 'Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The new address is held as `pendingEmail` and sent a verification link; the account keeps its address until that link is used. The answer is the same whether or not another account uses the new address: the link then fails. Asking for the current address drops a pending change.',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(ref: new Model(type: ChangeEmailRequest::class)),
         ),
         responses: [
             new OA\Response(
-                response: '200',
-                description: 'Email changed',
+                response: '202',
+                description: 'Change received; a verification link is on its way to the new address',
                 content: new OA\JsonContent(
                     properties: [
-                        new OA\Property(property: 'data', ref: new Model(type: UserResource::class)),
+                        new OA\Property(property: 'data', properties: [
+                            new OA\Property(property: 'message', type: 'string', example: 'Check the new address for a link to confirm the change.'),
+                        ], type: 'object'),
                     ],
                     type: 'object',
                 ),
             ),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '409', description: 'Email already taken', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Validation error, or the password or code is wrong', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
             new OA\Response(response: '429', description: 'Too many step-up attempts for this account', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
@@ -623,12 +623,12 @@ final class AuthController
         }
 
         try {
-            $changed = $this->commandBus->dispatch(new ChangeOwnEmailCommand(
+            $this->commandBus->dispatch(new ChangeOwnEmailCommand(
                 userId: $user->getId()->toString(),
                 email: $payload->email,
                 currentPassword: $payload->currentPassword,
                 totpCode: $payload->totpCode,
-            ))->last(HandledStamp::class)?->getResult();
+            ));
         } catch (\Throwable $e) {
             return $this->handleCommandException(
                 $e,
@@ -636,11 +636,10 @@ final class AuthController
                 Response::HTTP_INTERNAL_SERVER_ERROR,
             );
         }
-        if (!$changed instanceof User) {
-            throw new \LogicException('ChangeOwnEmailCommand did not return the user.');
-        }
 
-        return $this->successResponse(UserResource::from($changed));
+        return $this->successResponse([
+            'message' => $this->trans('success.email_change_requested', domain: 'auth'),
+        ], Response::HTTP_ACCEPTED);
     }
 
     #[OA\Put(
@@ -779,10 +778,6 @@ final class AuthController
                 $this->trans('errors.current_password_incorrect', domain: 'auth'),
                 Response::HTTP_UNPROCESSABLE_ENTITY,
             );
-        }
-
-        if ($previous instanceof EmailAddressInUseException) {
-            return $this->errorResponse($previous->getMessage(), Response::HTTP_CONFLICT);
         }
 
         if ($previous instanceof PasswordPolicyException) {

@@ -8,6 +8,7 @@ use App\Auth\Application\Command\User\VerifyEmailCommand;
 use App\Auth\Application\CommandHandler\User\VerifyEmailHandler;
 use App\Auth\Application\DTO\RedeemedEmailVerification;
 use App\Auth\Application\Exception\EmailVerificationException;
+use App\Auth\Application\Port\EmailChangeNoticeInterface;
 use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
 use App\Auth\Domain\Event\EmailVerified;
 use App\Auth\Domain\Model\User;
@@ -30,6 +31,10 @@ final class VerifyEmailHandlerTest extends TestCase
     /** @var list<object> */
     private array $events = [];
     private ?\Throwable $eventFailure = null;
+    /** @var list<string> addresses other accounts use */
+    private array $taken = [];
+    /** @var list<array{string, string, bool}> name, previous address, inside the transaction */
+    private array $notices = [];
 
     public function testVerifiesTheAddressTheTokenWasIssuedFor(): void
     {
@@ -91,6 +96,60 @@ final class VerifyEmailHandlerTest extends TestCase
         $this->assertSame($case === 'empty' ? [] : ['raw-token'], $this->redeemedTokens);
     }
 
+    public function testAPendingAddressBecomesTheVerifiedAddressAndTheOldOneIsTold(): void
+    {
+        $this->user = User::createByOperator(new Email('alice@baander.app'), 'hashed-pw', 'Alice', ['ROLE_USER']);
+        $this->user->requestEmailChange(new Email('alice.new@baander.app'));
+        $this->redeemed = new RedeemedEmailVerification($this->user->getId(), new Email('alice.new@baander.app'));
+
+        ($this->handler())(new VerifyEmailCommand('raw-token'));
+
+        $this->assertSame('alice.new@baander.app', $this->user->getEmail());
+        $this->assertTrue($this->user->isEmailVerified());
+        $this->assertNull($this->user->getPendingEmail());
+        $this->assertSame([true], $this->saves);
+        $this->assertCount(1, $this->events);
+        $this->assertSame([['Alice', 'alice@baander.app', false]], $this->notices, 'The old address hears of the change after the commit.');
+    }
+
+    public function testAPendingAddressAnotherAccountTookFailsAndKeepsTheAddress(): void
+    {
+        $this->user = User::register(new Email('alice@baander.app'), 'hashed-pw', 'Alice');
+        $this->user->requestEmailChange(new Email('bob@baander.app'));
+        $this->redeemed = new RedeemedEmailVerification($this->user->getId(), new Email('bob@baander.app'));
+        $this->taken[] = 'bob@baander.app';
+
+        try {
+            ($this->handler())(new VerifyEmailCommand('raw-token'));
+            $this->fail('A taken address must not be confirmed.');
+        } catch (EmailVerificationException $exception) {
+            $this->assertSame('Invalid or expired verification token.', $exception->getMessage());
+        }
+
+        $this->assertSame('alice@baander.app', $this->user->getEmail());
+        $this->assertNull($this->user->getPendingEmail(), 'The change is dropped.');
+        $this->assertSame([true], $this->saves);
+        $this->assertSame([], $this->events);
+        $this->assertSame([], $this->notices);
+    }
+
+    public function testATokenForAnAddressNoLongerPendingVerifiesNothing(): void
+    {
+        $this->user = User::register(new Email('alice@baander.app'), 'hashed-pw', 'Alice');
+        $this->user->requestEmailChange(new Email('alice.second@baander.app'));
+        $this->redeemed = new RedeemedEmailVerification($this->user->getId(), new Email('alice.first@baander.app'));
+
+        $this->expectException(EmailVerificationException::class);
+
+        try {
+            ($this->handler())(new VerifyEmailCommand('raw-token'));
+        } finally {
+            $this->assertSame('alice@baander.app', $this->user->getEmail());
+            $this->assertSame('alice.second@baander.app', $this->user->getPendingEmail());
+            $this->assertSame([], $this->saves);
+        }
+    }
+
     public function testAnEventFailureEscapesTheTransaction(): void
     {
         $this->user = User::register(new Email('alice@baander.app'), 'hashed-pw', 'Alice');
@@ -116,6 +175,7 @@ final class VerifyEmailHandlerTest extends TestCase
         $users->method('save')->willReturnCallback(function (): void {
             $this->saves[] = $this->active;
         });
+        $users->method('existsWithEmail')->willReturnCallback(fn (Email $email): bool => in_array($email->toString(), $this->taken, true));
         $dispatcher = $this->createStub(EventDispatcherInterface::class);
         $dispatcher->method('dispatch')->willReturnCallback(function (object $event): object {
             $this->assertTrue($this->active);
@@ -136,6 +196,11 @@ final class VerifyEmailHandlerTest extends TestCase
             }
         });
 
-        return new VerifyEmailHandler($tokens, $users, $dispatcher, $transaction);
+        $notice = $this->createStub(EmailChangeNoticeInterface::class);
+        $notice->method('deliver')->willReturnCallback(function (User $user, Email $previous): void {
+            $this->notices[] = [$user->getName(), $previous->toString(), $this->active];
+        });
+
+        return new VerifyEmailHandler($tokens, $users, $dispatcher, $transaction, $notice);
     }
 }

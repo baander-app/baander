@@ -342,7 +342,7 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         $response = $this->request($jwt, $proof);
         self::assertSame(200, $response->getStatusCode());
         $data = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame(['publicId', 'name', 'email', 'emailVerifiedAt', 'createdAt', 'roles', 'totpEnabled'], array_keys($data['data']));
+        self::assertSame(['publicId', 'name', 'email', 'emailVerifiedAt', 'createdAt', 'roles', 'totpEnabled', 'pendingEmail'], array_keys($data['data']));
         $failure = $this->request($jwt, $proof);
         self::assertSame(403, $failure->getStatusCode());
         foreach ([$response, $failure] as $result) {

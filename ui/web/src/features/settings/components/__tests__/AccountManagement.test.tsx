@@ -29,6 +29,7 @@ function profile(overrides: Partial<UserResource> = {}): UserResource {
     createdAt: '2026-10-01T09:00:00+00:00',
     roles: ['ROLE_USER'],
     totpEnabled: false,
+    pendingEmail: null,
     ...overrides,
   }
 }
@@ -125,11 +126,11 @@ describe('AccountManagement', () => {
 
   describe('account change failures', () => {
     it('shows the nested backend message after a failed email save', async () => {
-      answerEmailChange(() => Promise.reject(httpError(409, 'This email address is already in use.')))
+      answerEmailChange(() => Promise.reject(httpError(422, 'The request is invalid.')))
 
       await saveAccountChange('email')
 
-      expect(await screen.findByText('This email address is already in use.')).toBeInTheDocument()
+      expect(await screen.findByText('The request is invalid.')).toBeInTheDocument()
       expect(screen.getByRole('dialog', { name: 'Change email' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
       expect(mockRequest).toHaveBeenCalledWith('/api/auth/me/email', expect.objectContaining({
@@ -192,7 +193,7 @@ describe('AccountManagement', () => {
 
     it('submits the password and the code with the new address', async () => {
       signIn(profile({ totpEnabled: true }))
-      answerEmailChange(async () => ({ data: profile({ email: 'updated@baander.app', totpEnabled: true }) }))
+      answerEmailChange(async () => ({ data: { message: 'Check the new address for a link to confirm the change.' } }))
 
       await saveAccountChange('email')
 
@@ -285,15 +286,32 @@ describe('AccountManagement', () => {
       expect(screen.queryByRole('status')).not.toBeInTheDocument()
     })
 
-    it('shows the notice once a changed address comes back unverified', async () => {
-      answerEmailChange(async () => ({ data: profile({ email: 'updated@baander.app', emailVerifiedAt: null }) }))
+    it('shows the new address as pending once the change is received, and keeps the current one', async () => {
+      answerEmailChange(async () => {
+        signIn(profile({ pendingEmail: 'updated@baander.app' }))
+        answerEmailChange(async () => ({ data: { message: 'Check the new address for a link to confirm the change.' } }))
+
+        return { data: { message: 'Check the new address for a link to confirm the change.' } }
+      })
 
       await saveAccountChange('email')
 
       await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Change email' })).not.toBeInTheDocument())
-      expect(screen.getByText('updated@baander.app')).toBeInTheDocument()
-      expect(screen.getByText('Not verified')).toBeInTheDocument()
-      expect(useAuthStore.getState().user?.emailVerifiedAt).toBeNull()
+      expect(await screen.findByText('Waiting for confirmation')).toBeInTheDocument()
+      expect(screen.getByText('Open the link we sent to updated@baander.app to switch your account to that address.')).toBeInTheDocument()
+      expect(screen.getByText('member@baander.app')).toBeInTheDocument()
+      expect(useAuthStore.getState().user?.email).toBe('member@baander.app')
+      expect(useAuthStore.getState().user?.pendingEmail).toBe('updated@baander.app')
+    })
+
+    it('offers one resend action while a change is pending on an unverified address', async () => {
+      signIn(profile({ emailVerifiedAt: null, pendingEmail: 'updated@baander.app' }))
+      renderAccount()
+      await waitForProfileRefresh()
+
+      expect(await screen.findByText('Waiting for confirmation')).toBeInTheDocument()
+      expect(screen.queryByText('Not verified')).not.toBeInTheDocument()
+      expect(screen.getAllByRole('button', { name: 'Resend verification email' })).toHaveLength(1)
     })
 
     it('tells the user a verification link goes to the new address', async () => {
@@ -301,7 +319,7 @@ describe('AccountManagement', () => {
       const user = userEvent.setup()
       await user.click(screen.getAllByRole('button', { name: 'Change' })[0])
 
-      expect(screen.getByRole('dialog', { name: 'Change email' })).toHaveTextContent('We\'ll send a verification link to it')
+      expect(screen.getByRole('dialog', { name: 'Change email' })).toHaveTextContent('your account keeps its current address until you open that link')
     })
 
     it('picks up an address verified elsewhere from the profile', async () => {

@@ -69,7 +69,9 @@
       "resendSent": "If your email address still needs verification, a new link is on its way. Check your inbox and spam folder.",
       "notVerified": "Not verified",
       "notVerifiedHint": "Open the link in the verification email we sent to this address, or send a new one.",
-      "changeEmailDescription": "Enter your new email address. We'll send a verification link to it, and your address stays unverified until you open that link."
+      "changeEmailDescription": "Enter your new email address. We'll send a link to it, and your account keeps its current address until you open that link.",
+      "pendingChange": "Waiting for confirmation",
+      "pendingChangeHint": "Open the link we sent to {{email}} to switch your account to that address."
     },
     "scopes": {
       "intro": "It will be able to:",

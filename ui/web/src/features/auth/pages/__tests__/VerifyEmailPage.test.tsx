@@ -118,6 +118,7 @@ describe('VerifyEmailPage', () => {
       email: 'listener@baander.app',
       name: 'Listener',
       emailVerifiedAt: VERIFIED_AT,
+      pendingEmail: null,
     }))
   })
 

@@ -54,6 +54,26 @@ final class AdminUserCliParityTest extends TestCase
         self::assertFalse($this->stored($viaCli)->isDisabled());
     }
 
+    public function testMarkingAnAddressVerifiedLeavesTheSameStateAndSucceedsWhenRepeated(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $viaApi = $this->createTestUser();
+        $viaCli = $this->createTestUser();
+
+        foreach ([1, 2] as $attempt) {
+            $data = $this->assertJsonResponse($this->authenticatedRequest('POST', $this->userPath($viaApi) . '/verify-email', $superAdmin), 200, 'data')['data'];
+            self::assertNotNull($data['emailVerifiedAt'], 'API attempt ' . $attempt);
+            $mark = $this->command('app:user:mark-email-verified');
+            self::assertSame(Command::SUCCESS, $mark->execute(['identifier' => $viaCli->getEmail(), '--json' => true]), 'CLI attempt ' . $attempt . ': ' . $mark->getDisplay());
+            $printed = json_decode($mark->getDisplay(), true, 512, JSON_THROW_ON_ERROR);
+            self::assertIsArray($printed);
+            self::assertSame(array_keys($data), array_keys($printed), 'The CLI prints the API data.');
+            self::assertNotNull($printed['emailVerifiedAt'], 'CLI attempt ' . $attempt);
+        }
+        self::assertTrue($this->stored($viaApi)->isEmailVerified());
+        self::assertTrue($this->stored($viaCli)->isEmailVerified());
+    }
+
     public function testCreatingASuperAdminSeedsPreferencesAndAnnouncesTheUser(): void
     {
         $announced = [];

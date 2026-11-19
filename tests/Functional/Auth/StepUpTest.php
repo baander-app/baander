@@ -32,7 +32,7 @@ final class StepUpTest extends RateLimitTestCase
         self::assertSame($address, $this->userRepository->findByUuid($user->getId())?->getEmail());
     }
 
-    public function testTheRightPasswordAndCodeChangeTheEmail(): void
+    public function testTheRightPasswordAndCodeRecordAPendingEmailChange(): void
     {
         $user = $this->createTestUser();
         $this->enrolTotp($user);
@@ -40,9 +40,12 @@ final class StepUpTest extends RateLimitTestCase
 
         $response = $this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $address, 'currentPassword' => self::PASSWORD, 'totpCode' => self::currentTotpCode()]);
 
-        $data = $this->assertJsonResponse($response, 200, 'data');
-        self::assertSame($address, $data['data']['email']);
-        self::assertTrue($data['data']['totpEnabled']);
+        $this->assertJsonResponse($response, 202, 'data');
+        $this->entityManager->clear();
+        $stored = $this->userRepository->findByUuid($user->getId());
+        self::assertNotNull($stored);
+        self::assertSame($user->getEmail(), $stored->getEmail());
+        self::assertSame($address, $stored->getPendingEmail());
     }
 
     public function testACodeConfirmsOneChangeOnly(): void
@@ -51,7 +54,7 @@ final class StepUpTest extends RateLimitTestCase
         $this->enrolTotp($user);
         $code = self::currentTotpCode();
 
-        $this->assertJsonResponse($this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $this->uniqueEmail(), 'currentPassword' => self::PASSWORD, 'totpCode' => $code]), 200);
+        $this->assertJsonResponse($this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $this->uniqueEmail(), 'currentPassword' => self::PASSWORD, 'totpCode' => $code]), 202);
 
         $this->assertStepUpFailed($this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $this->uniqueEmail(), 'currentPassword' => self::PASSWORD, 'totpCode' => $code]));
     }
@@ -68,7 +71,7 @@ final class StepUpTest extends RateLimitTestCase
 
     public function testTotpSetupNeedsThePassword(): void
     {
-        $user = $this->createTestUser();
+        $user = $this->createTestUser(verified: true);
 
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/auth/totp/setup', $user), 422);
         $this->assertStepUpFailed($this->authenticatedRequest('POST', '/api/auth/totp/setup', $user, ['currentPassword' => 'not-the-password']));
@@ -78,7 +81,7 @@ final class StepUpTest extends RateLimitTestCase
 
     public function testPasskeyOptionsNeedThePasswordAndTheCode(): void
     {
-        $user = $this->createTestUser();
+        $user = $this->createTestUser(verified: true);
         $this->enrolTotp($user);
 
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/auth/passkey/options', $user), 422);
@@ -89,8 +92,8 @@ final class StepUpTest extends RateLimitTestCase
 
     public function testAChallengeIssuedToOneUserIsRefusedAtAnotherUsersRegistration(): void
     {
-        $owner = $this->createTestUser();
-        $other = $this->createTestUser();
+        $owner = $this->createTestUser(verified: true);
+        $other = $this->createTestUser(verified: true);
         $options = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/auth/passkey/options', $owner, ['currentPassword' => self::PASSWORD]), 200, 'data');
 
         $response = $this->authenticatedRequest('POST', '/api/auth/passkey/register', $other, [
@@ -100,6 +103,17 @@ final class StepUpTest extends RateLimitTestCase
         ]);
 
         $this->assertJsonResponse($response, 400, 'error');
+    }
+
+    public function testAnUnverifiedAddressCannotStartTotpSetupOrPasskeyRegistration(): void
+    {
+        $user = $this->createTestUser();
+
+        foreach (['/api/auth/totp/setup', '/api/auth/passkey/options'] as $path) {
+            $error = $this->assertJsonResponse($this->authenticatedRequest('POST', $path, $user, ['currentPassword' => self::PASSWORD]), 422, 'error');
+            self::assertSame('email_unverified', $error['error']['details']['reason'] ?? null, $path);
+            self::assertSame('Verify your email address first.', $error['error']['message'], $path);
+        }
     }
 
     public function testTheLimitCountsAttemptsPerAccountAcrossAddresses(): void

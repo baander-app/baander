@@ -39,12 +39,13 @@ Application console commands run inside `app`. The control and execution worker 
 | [app:oauth:client:rotate-secret](app-oauth-client-rotate-secret.md) | Give an OAuth client that authenticates with a secret a new one |
 | [app:oauth:generate-keys](app-oauth-generate-keys.md) | Generate OAuth2 private and public keys for JWT signing |
 | [app:oauth:purge-codes](app-oauth-purge-codes.md) | Delete authorization codes, device codes and pushed authorization requests that expired more than an hour ago |
-| [app:user:change-email](app-user-change-email.md) | Change a user's email address and send a verification link to it |
+| [app:user:change-email](app-user-change-email.md) | Change a user's email address; the new address counts as verified |
 | [app:user:create](app-user-create.md) | Create a new user account |
 | [app:user:delete](app-user-delete.md) | Delete a user account |
 | [app:user:disable](app-user-disable.md) | Disable a user account and end their sessions |
 | [app:user:enable](app-user-enable.md) | Enable a previously disabled user account |
 | [app:user:list](app-user-list.md) | List users, newest first |
+| [app:user:mark-email-verified](app-user-mark-email-verified.md) | Mark a user's email address verified |
 | [app:user:rename](app-user-rename.md) | Change a user's display name |
 | [app:user:reset-password](app-user-reset-password.md) | Set a new password for a user and sign them out everywhere |
 | [app:user:reset-totp](app-user-reset-totp.md) | Turn off a user's TOTP and sign them out everywhere |

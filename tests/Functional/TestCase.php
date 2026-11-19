@@ -38,7 +38,11 @@ abstract class TestCase extends WebTestCase
         parent::tearDown();
     }
 
-    protected function createTestUser(?string $email = null, string $name = 'Test User', string $password = 'password123'): User
+    /**
+     * A registered user, whose address starts unverified unless $verified: adding a passkey or
+     * turning TOTP on needs a verified address.
+     */
+    protected function createTestUser(?string $email = null, string $name = 'Test User', string $password = 'password123', bool $verified = false): User
     {
         $email ??= 'test-' . bin2hex(random_bytes(4)) . '@baander.app';
 
@@ -47,6 +51,9 @@ abstract class TestCase extends WebTestCase
             password_hash($password, PASSWORD_BCRYPT),
             $name,
         );
+        if ($verified) {
+            $user->verifyEmail();
+        }
 
         $this->userRepository->save($user);
 

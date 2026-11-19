@@ -56,14 +56,19 @@ final class PasswordResetTokenLifecycleTest extends TestCase
         $this->assertSame(0, $this->outstandingTokens());
     }
 
-    public function testChangingTheEmailRemovesTheToken(): void
+    public function testAPendingEmailChangeKeepsTheTokenAndAnOperatorChangeRemovesIt(): void
     {
         $user = $this->createTestUser($this->uniqueEmail());
         $this->requestReset($user->getEmail());
 
-        $response = $this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $this->uniqueEmail(), 'currentPassword' => 'password123']);
+        $pending = $this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $this->uniqueEmail(), 'currentPassword' => 'password123']);
 
-        $this->assertJsonResponse($response, 200);
+        $this->assertJsonResponse($pending, 202);
+        $this->assertSame(1, $this->outstandingTokens(), 'The account still has the address the reset went to.');
+
+        $changed = $this->authenticatedRequest('PATCH', '/api/admin/users/' . $user->getPublicId()->toString(), $this->createSuperAdminUser(), ['email' => $this->uniqueEmail()]);
+
+        $this->assertJsonResponse($changed, 200);
         $this->assertSame(0, $this->outstandingTokens());
     }
 

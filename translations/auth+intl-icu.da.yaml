@@ -18,6 +18,7 @@ errors:
   password_reset_failed: "Linket til nulstilling af adgangskode er ugyldigt eller udløbet."
   current_password_incorrect: "Den nuværende adgangskode er forkert."
   step_up_failed: "Adgangskoden eller koden er forkert."
+  email_unverified: "Bekræft din e-mailadresse først."
   invalid_credentials: "Ugyldige loginoplysninger."
   account_disabled: "Denne konto er deaktiveret."
   totp_required: "TOTP-kode er påkrævet."
@@ -41,6 +42,7 @@ success:
   password_reset: "Din adgangskode er blevet nulstillet."
   password_changed: "Adgangskoden er ændret."
   registration_received: "Tilmeldingen er modtaget. Tjek din e-mail for at se, hvad du skal gøre nu."
+  email_change_requested: "Tjek den nye adresse for et link, der bekræfter ændringen."
 
 password_reset_email:
   subject: "Nulstil din adgangskode til {app}"
@@ -61,6 +63,13 @@ registration_attempt_email:
   action: "Vælg en ny adgangskode"
   fallback: "Hvis knappen ikke virker, kan du kopiere dette link ind i din browser:"
   ignore: "Hvis det ikke var dig, kan du se bort fra denne e-mail. Din adgangskode forbliver uændret."
+
+email_changed_email:
+  subject: "E-mailadressen på din konto på {app} er ændret"
+  heading: "Din e-mailadresse er ændret"
+  greeting: "Hej {name}"
+  intro: "E-mailadressen på din konto på {app} er blevet ændret. E-mails om kontoen, også links til at nulstille adgangskoden, går nu til den nye adresse og ikke længere til denne."
+  unexpected: "Hvis det ikke var dig, der ændrede den, skal du straks kontakte administratoren af serveren."
 
 email_verification_email:
   subject: "Bekræft din e-mailadresse til {app}"

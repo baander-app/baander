@@ -19,9 +19,10 @@ final class DelegatedProfileTest extends TestCase
         self::assertSame(['publicId', 'name', 'createdAt'], array_keys($this->data($response)));
     }
 
-    public function testAnEmailTokenSeesTheEmailButNotTheRoles(): void
+    public function testAnEmailTokenSeesTheEmailButNotTheRolesOrAPendingChange(): void
     {
         $admin = $this->createAdminUser();
+        $this->assertSame(202, $this->authenticatedRequest('PUT', '/api/auth/me/email', $admin, ['email' => 'pending-' . bin2hex(random_bytes(4)) . '@baander.app', 'currentPassword' => 'password'])->getStatusCode());
 
         $response = $this->delegatedRequest('GET', '/api/auth/me', $admin, ['email']);
 
@@ -38,7 +39,7 @@ final class DelegatedProfileTest extends TestCase
         $response = $this->authenticatedRequest('GET', '/api/auth/me', $admin);
 
         self::assertSame(200, $response->getStatusCode());
-        self::assertSame(['publicId', 'name', 'email', 'emailVerifiedAt', 'createdAt', 'roles', 'totpEnabled'], array_keys($this->data($response)));
+        self::assertSame(['publicId', 'name', 'email', 'emailVerifiedAt', 'createdAt', 'roles', 'totpEnabled', 'pendingEmail'], array_keys($this->data($response)));
     }
 
     public function testATokenWithoutAProfileScopeCannotReadIt(): void

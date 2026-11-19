@@ -11,6 +11,7 @@ use App\Auth\Application\CommandHandler\User\ResendEmailVerificationHandler;
 use App\Auth\Application\DTO\IssuedEmailVerificationToken;
 use App\Auth\Application\Exception\EmailAddressInUseException;
 use App\Auth\Application\Exception\UserNotFoundException;
+use App\Auth\Application\Port\EmailChangeNoticeInterface;
 use App\Auth\Application\Port\EmailVerificationDeliveryInterface;
 use App\Auth\Application\Port\EmailVerificationResendThrottleInterface;
 use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
@@ -23,7 +24,10 @@ use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\TestCase;
 
-/** Email changes and resend requests issue a token for the current address and send it after the commit. */
+/**
+ * Operator email changes take effect verified and tell the old address after the commit; resend
+ * requests issue a token for the address that needs verifying and send it after the commit.
+ */
 final class EmailVerificationHandlersTest extends TestCase
 {
     private bool $active = false;
@@ -38,31 +42,23 @@ final class EmailVerificationHandlersTest extends TestCase
     /** @var list<array{string, string, bool}> recipient, token, inside the transaction */
     private array $delivered = [];
     private bool $throttleAllows = true;
+    /** @var list<array{string, bool}> previous address, inside the transaction */
+    private array $notices = [];
 
-    public function testAnEmailChangeSendsANewLinkToTheNewAddressAfterTheCommit(): void
+    public function testAnOperatorEmailChangeTakesEffectVerifiedAndTellsTheOldAddressAfterTheCommit(): void
     {
         $user = $this->user('alice@baander.app');
+        $user->requestEmailChange(new Email('alice.pending@baander.app'));
 
         $changed = ($this->changeHandler())(new ChangeEmailCommand($user->getPublicId()->toString(), 'Alice.New@baander.app'));
 
         $this->assertSame($user, $changed);
         $this->assertSame('alice.new@baander.app', $user->getEmail());
-        $this->assertFalse($user->isEmailVerified());
+        $this->assertTrue($user->isEmailVerified());
+        $this->assertNull($user->getPendingEmail());
         $this->assertSame([['alice.new@baander.app', true]], $this->saves);
-        $this->assertCount(1, $this->issued);
-        $this->assertSame('alice.new@baander.app', $this->issued[0][0]);
-        $this->assertSame([['alice.new@baander.app', $this->issued[0][1], false]], $this->delivered);
-    }
-
-    public function testAVerifiedUsersEmailChangeStartsUnverified(): void
-    {
-        $user = User::createByOperator(new Email('alice@baander.app'), 'hashed', 'Alice', ['ROLE_USER']);
-        $this->users[$user->getId()->toString()] = $user;
-
-        ($this->changeHandler())(new ChangeEmailCommand('alice@baander.app', 'alice.new@baander.app'));
-
-        $this->assertFalse($user->isEmailVerified());
-        $this->assertCount(1, $this->delivered);
+        $this->assertSame([], $this->issued, 'An operator change needs no verification link.');
+        $this->assertSame([['alice@baander.app', false]], $this->notices);
     }
 
     public function testAnUnchangedAddressChangesAndSendsNothing(): void
@@ -72,7 +68,7 @@ final class EmailVerificationHandlersTest extends TestCase
         ($this->changeHandler())(new ChangeEmailCommand($user->getPublicId()->toString(), 'ALICE@baander.app'));
 
         $this->assertSame([], $this->saves);
-        $this->assertSame([], $this->delivered);
+        $this->assertSame([], $this->notices);
     }
 
     public function testAnAddressInUseIsRejected(): void
@@ -86,7 +82,7 @@ final class EmailVerificationHandlersTest extends TestCase
             ($this->changeHandler())(new ChangeEmailCommand($user->getPublicId()->toString(), 'bob@baander.app'));
         } finally {
             $this->assertSame('alice@baander.app', $user->getEmail());
-            $this->assertSame([], $this->delivered);
+            $this->assertSame([], $this->notices);
         }
     }
 
@@ -105,6 +101,19 @@ final class EmailVerificationHandlersTest extends TestCase
 
         $this->assertCount(1, $this->issued);
         $this->assertSame([['alice@baander.app', $this->issued[0][1], false]], $this->delivered);
+    }
+
+    public function testResendSendsANewLinkToAPendingAddressOfAVerifiedUser(): void
+    {
+        $user = User::createByOperator(new Email('bob@baander.app'), 'hashed', 'Bob', ['ROLE_USER']);
+        $this->users[$user->getId()->toString()] = $user;
+        $user->requestEmailChange(new Email('bob.new@baander.app'));
+
+        ($this->resendHandler())(new ResendEmailVerificationCommand($user->getId()->toString()));
+
+        $this->assertCount(1, $this->issued);
+        $this->assertSame('bob.new@baander.app', $this->issued[0][0]);
+        $this->assertSame([['bob.new@baander.app', $this->issued[0][1], false]], $this->delivered);
     }
 
     public function testResendSendsNothingOverTheLimitOrForAVerifiedAddress(): void
@@ -137,7 +146,7 @@ final class EmailVerificationHandlersTest extends TestCase
     {
         $this->expectException(\LogicException::class);
 
-        serialize(new IssuedEmailVerificationToken('raw', new \DateTimeImmutable()));
+        serialize(new IssuedEmailVerificationToken('raw', new \DateTimeImmutable(), new Email('alice@baander.app')));
     }
 
     private function user(string $email): User
@@ -150,7 +159,12 @@ final class EmailVerificationHandlersTest extends TestCase
 
     private function changeHandler(): ChangeEmailHandler
     {
-        return new ChangeEmailHandler(new UserLookup($this->userRepository()), $this->userRepository(), $this->issuer(), $this->transaction());
+        $notice = $this->createStub(EmailChangeNoticeInterface::class);
+        $notice->method('deliver')->willReturnCallback(function (User $user, Email $previous): void {
+            $this->notices[] = [$previous->toString(), $this->active];
+        });
+
+        return new ChangeEmailHandler(new UserLookup($this->userRepository()), $this->userRepository(), $notice, $this->transaction());
     }
 
     private function resendHandler(): ResendEmailVerificationHandler
@@ -169,8 +183,8 @@ final class EmailVerificationHandlersTest extends TestCase
             $this->issued[] = [$email->toString(), $token];
         });
         $delivery = $this->createStub(EmailVerificationDeliveryInterface::class);
-        $delivery->method('deliver')->willReturnCallback(function (User $user, string $token): void {
-            $this->delivered[] = [$user->getEmail(), $token, $this->active];
+        $delivery->method('deliver')->willReturnCallback(function (User $user, Email $address, string $token): void {
+            $this->delivered[] = [$address->toString(), $token, $this->active];
         });
 
         return new EmailVerificationIssuer($tokens, $delivery, 86400);

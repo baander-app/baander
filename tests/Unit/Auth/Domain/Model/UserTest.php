@@ -186,6 +186,74 @@ final class UserTest extends TestCase
         $this->assertNull($user->getTotpSecretCiphertext());
     }
 
+    public function testARequestedEmailChangeStaysPendingAndLeavesTheAddressAlone(): void
+    {
+        $user = User::createByOperator(new Email('alice@baander.app'), 'hashed-pw', 'Alice', ['ROLE_USER']);
+
+        $user->requestEmailChange(new Email('Alice.New@baander.app'));
+
+        $this->assertSame('alice@baander.app', $user->getEmail());
+        $this->assertTrue($user->isEmailVerified());
+        $this->assertSame('alice.new@baander.app', $user->getPendingEmail());
+    }
+
+    public function testRequestingTheCurrentAddressDropsAPendingChange(): void
+    {
+        $user = User::register(new Email('alice@baander.app'), 'hashed-pw', 'Alice');
+        $user->requestEmailChange(new Email('alice.new@baander.app'));
+
+        $user->requestEmailChange(new Email('ALICE@baander.app'));
+
+        $this->assertNull($user->getPendingEmail());
+    }
+
+    public function testConfirmingThePendingAddressMakesItTheVerifiedAddress(): void
+    {
+        $user = User::register(new Email('alice@baander.app'), 'hashed-pw', 'Alice');
+        $user->requestEmailChange(new Email('alice.new@baander.app'));
+
+        $user->confirmPendingEmail();
+
+        $this->assertSame('alice.new@baander.app', $user->getEmail());
+        $this->assertTrue($user->isEmailVerified());
+        $this->assertNull($user->getPendingEmail());
+    }
+
+    public function testConfirmingWithoutAPendingAddressIsRefused(): void
+    {
+        $user = User::register(new Email('alice@baander.app'), 'hashed-pw', 'Alice');
+
+        $this->expectException(\LogicException::class);
+
+        $user->confirmPendingEmail();
+    }
+
+    public function testAnOperatorEmailChangeIsVerifiedAndDropsAPendingChange(): void
+    {
+        $user = User::register(new Email('alice@baander.app'), 'hashed-pw', 'Alice');
+        $user->requestEmailChange(new Email('alice.pending@baander.app'));
+
+        $user->assignVerifiedEmail(new Email('alice.new@baander.app'));
+
+        $this->assertSame('alice.new@baander.app', $user->getEmail());
+        $this->assertTrue($user->isEmailVerified());
+        $this->assertNull($user->getPendingEmail());
+    }
+
+    public function testAResetToANeverVerifiedAddressVerifiesItAndTurnsTotpOff(): void
+    {
+        $user = User::register(new Email('alice@baander.app'), 'hashed-pw', 'Alice');
+        $user->enableTotp('sealed-secret');
+        $user->requestEmailChange(new Email('alice.pending@baander.app'));
+
+        $user->claimByPasswordReset();
+
+        $this->assertTrue($user->isEmailVerified());
+        $this->assertFalse($user->hasTotp());
+        $this->assertNull($user->getPendingEmail());
+        $this->assertSame('alice@baander.app', $user->getEmail());
+    }
+
     public function testGettersReturnExpectedTypes(): void
     {
         $user = User::register(new Email('test@baander.app'), 'hashed-pw', 'Alice');

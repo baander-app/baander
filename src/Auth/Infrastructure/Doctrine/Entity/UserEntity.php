@@ -31,6 +31,10 @@ class UserEntity
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $emailVerifiedAt = null;
 
+    /** The address a self-service change asked for; it becomes the email when its link is used. */
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $pendingEmail = null;
+
     #[ORM\Column(type: 'text')]
     private string $password;
 
@@ -128,6 +132,16 @@ class UserEntity
 
         $this->emailVerifiedAt = $emailVerifiedAt;
         $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function getPendingEmail(): ?string
+    {
+        return $this->pendingEmail;
+    }
+
+    public function setPendingEmail(?string $pendingEmail): void
+    {
+        $this->pendingEmail = $pendingEmail;
     }
 
     public function getPassword(): string

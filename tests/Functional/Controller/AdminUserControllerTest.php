@@ -317,6 +317,51 @@ final class AdminUserControllerTest extends TestCase
     }
 
     // ---------------------------------------------------------------
+    // POST /api/admin/users/{id}/verify-email — Mark the address verified
+    // ---------------------------------------------------------------
+
+    public function testSuperAdminMarksAUsersAddressVerifiedAndRepeatingChangesNothing(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $target = $this->createTestUser();
+        $path = '/api/admin/users/' . $target->getPublicId()->toString() . '/verify-email';
+
+        $first = $this->assertJsonResponse($this->authenticatedRequest('POST', $path, $superAdmin), 200, 'data');
+        $second = $this->assertJsonResponse($this->authenticatedRequest('POST', $path, $superAdmin), 200, 'data');
+
+        $this->assertNotNull($first['data']['emailVerifiedAt']);
+        $this->assertSame($first['data']['emailVerifiedAt'], $second['data']['emailVerifiedAt']);
+        $this->entityManager->clear();
+        $this->assertTrue($this->userRepository->findByUuid($target->getId())?->isEmailVerified());
+    }
+
+    public function testOnlyASuperAdminCanMarkAnAddressVerified(): void
+    {
+        $target = $this->createTestUser();
+
+        $response = $this->authenticatedRequest('POST', '/api/admin/users/' . $target->getPublicId()->toString() . '/verify-email', $this->createAdminUser());
+
+        $this->assertSame(403, $response->getStatusCode());
+        $this->entityManager->clear();
+        $this->assertFalse($this->userRepository->findByUuid($target->getId())?->isEmailVerified());
+    }
+
+    public function testAnOperatorEmailChangeLeavesTheNewAddressVerified(): void
+    {
+        $target = $this->createTestUser();
+        $newEmail = 'operator-set-' . bin2hex(random_bytes(4)) . '@baander.app';
+
+        $response = $this->authenticatedRequest('PATCH', '/api/admin/users/' . $target->getPublicId()->toString(), $this->createSuperAdminUser(), ['email' => $newEmail]);
+
+        $this->assertJsonResponse($response, 200, 'data');
+        $this->entityManager->clear();
+        $stored = $this->userRepository->findByUuid($target->getId());
+        $this->assertNotNull($stored);
+        $this->assertSame($newEmail, $stored->getEmail());
+        $this->assertTrue($stored->isEmailVerified());
+    }
+
+    // ---------------------------------------------------------------
     // POST /api/admin/users/{id}/disable — Disable user
     // ---------------------------------------------------------------
 

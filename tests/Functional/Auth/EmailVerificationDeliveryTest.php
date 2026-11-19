@@ -137,15 +137,21 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
         $this->assertSame(['created_at', 'email', 'expires_at', 'token_hash', 'user_id'], $columns);
     }
 
-    public function testChangingTheEmailSendsANewLinkToTheNewAddressAndEndsTheOldOne(): void
+    public function testAnEmailChangeStaysPendingUntilItsLinkIsUsedAndThenTellsTheOldAddress(): void
     {
         $user = $this->registerThroughTheApi();
+        $oldAddress = $user->getEmail();
         [, $oldToken] = $this->linkFrom((string) $this->onlyEmail()->getTextBody());
         $newAddress = $this->uniqueEmail();
 
         $changed = $this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $newAddress, 'currentPassword' => 'registration-password-1']);
-        $this->assertJsonResponse($changed, 200, 'data');
+        $this->assertJsonResponse($changed, 202, 'data');
 
+        $this->assertSame(
+            ['email' => $oldAddress, 'pending_email' => $newAddress, 'email_verified_at' => null],
+            $this->connection()->fetchAssociative('SELECT email, pending_email, email_verified_at FROM users WHERE id = ?', [$user->getId()->toString()]),
+            'The account keeps its address until the new one is confirmed.',
+        );
         $messages = $this->getMailerMessages();
         $this->assertCount(2, $messages);
         $latest = $messages[1];
@@ -155,28 +161,97 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
 
         $this->assertJsonResponse($this->verify($oldToken), 400, 'error');
         $this->assertJsonResponse($this->verify($newToken), 200, 'data');
-        $this->assertSame($newAddress, $this->connection()->fetchOne('SELECT email FROM users WHERE id = ? AND email_verified_at IS NOT NULL', [$user->getId()->toString()]));
+        $this->assertSame(
+            ['email' => $newAddress, 'pending_email' => null, 'verified' => true],
+            $this->connection()->fetchAssociative('SELECT email, pending_email, email_verified_at IS NOT NULL AS verified FROM users WHERE id = ?', [$user->getId()->toString()]),
+        );
+        $messages = $this->getMailerMessages();
+        $this->assertCount(3, $messages);
+        $notice = $messages[2];
+        $this->assertInstanceOf(Email::class, $notice);
+        $this->assertSame([$oldAddress], array_map(static fn (Address $a): string => $a->getAddress(), $notice->getTo()));
+        $this->assertStringContainsString('email address of your', (string) $notice->getSubject());
+        $this->assertStringNotContainsString($newAddress, (string) $notice->getTextBody());
     }
 
-    public function testAnAdministratorEmailChangeSendsALinkToTheNewAddress(): void
+    public function testAChangeToATakenAddressAnswersTheSameAndItsLinkFails(): void
+    {
+        $user = $this->createTestUser($this->uniqueEmail(), verified: true);
+        $owner = $this->createTestUser($this->uniqueEmail());
+        $free = $this->authenticatedRequest('PUT', '/api/auth/me/email', $this->createTestUser($this->uniqueEmail()), ['email' => $this->uniqueEmail(), 'currentPassword' => 'password123']);
+
+        $taken = $this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $owner->getEmail(), 'currentPassword' => 'password123']);
+
+        $this->assertSame(202, $taken->getStatusCode(), (string) $taken->getContent());
+        $this->assertSame($free->getContent(), $taken->getContent());
+        $messages = $this->getMailerMessages();
+        $this->assertCount(2, $messages);
+        $this->assertInstanceOf(Email::class, $messages[1]);
+        [, $token] = $this->linkFrom((string) $messages[1]->getTextBody());
+
+        $this->assertJsonResponse($this->verify($token), 400, 'error');
+        $this->assertSame(
+            ['email' => $user->getEmail(), 'pending_email' => null, 'verified' => true],
+            $this->connection()->fetchAssociative('SELECT email, pending_email, email_verified_at IS NOT NULL AS verified FROM users WHERE id = ?', [$user->getId()->toString()]),
+            'The account keeps its address and its verification.',
+        );
+        $this->assertCount(2, $this->getMailerMessages(), 'Nobody is told of a change that did not happen.');
+    }
+
+    public function testAPendingChangeLeavesTheAddressFreeForItsOwnerToRegisterAndReset(): void
+    {
+        $user = $this->createTestUser($this->uniqueEmail(), verified: true);
+        $address = $this->uniqueEmail();
+        $this->assertJsonResponse($this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $address, 'currentPassword' => 'password123']), 202);
+
+        $registered = $this->requestFrom($this->ip(), 'POST', '/api/auth/register', content: [
+            'name' => 'Address Owner',
+            'email' => $address,
+            'password' => 'registration-password-1',
+        ]);
+
+        $this->assertJsonResponse($registered, 202, 'data');
+        $ownerId = $this->connection()->fetchOne('SELECT id FROM users WHERE email = ?', [$address]);
+        $this->assertIsString($ownerId, 'The address\'s owner registered an account with it.');
+        $this->assertNotSame($user->getId()->toString(), $ownerId);
+        $this->assertJsonResponse($this->anonymousRequest('POST', '/api/auth/password/reset-request', ['email' => $address]), 200);
+        $this->assertSame(1, (int) $this->connection()->fetchOne('SELECT count(*) FROM password_reset_tokens WHERE user_id = ?', [$ownerId]), 'The reset goes to the owner\'s account.');
+    }
+
+    public function testResendSendsANewLinkToAPendingAddress(): void
+    {
+        $user = $this->createTestUser($this->uniqueEmail(), verified: true);
+        $address = $this->uniqueEmail();
+        $this->assertJsonResponse($this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $address, 'currentPassword' => 'password123']), 202);
+
+        $this->resend($user);
+
+        $messages = $this->getMailerMessages();
+        $this->assertCount(2, $messages);
+        $this->assertInstanceOf(Email::class, $messages[1]);
+        $this->assertSame([$address], array_map(static fn (Address $a): string => $a->getAddress(), $messages[1]->getTo()));
+    }
+
+    public function testAnAdministratorEmailChangeTakesEffectVerifiedAndTellsTheOldAddress(): void
     {
         $user = $this->createTestUser($this->uniqueEmail());
+        $oldAddress = $user->getEmail();
         $newAddress = $this->uniqueEmail();
 
-        $response = $this->authenticatedRequest('PATCH', '/api/admin/users/' . $user->getPublicId()->toString(), $this->createSuperAdminUser(), ['email' => $newAddress, 'currentPassword' => 'registration-password-1']);
+        $response = $this->authenticatedRequest('PATCH', '/api/admin/users/' . $user->getPublicId()->toString(), $this->createSuperAdminUser(), ['email' => $newAddress]);
 
         $body = $this->assertJsonResponse($response, 200, 'data');
         $this->assertSame($newAddress, $body['data']['email']);
-        $this->assertNull($body['data']['emailVerifiedAt']);
+        $this->assertNotNull($body['data']['emailVerifiedAt']);
         $email = $this->onlyEmail();
-        $this->assertSame([$newAddress], array_map(static fn (Address $a): string => $a->getAddress(), $email->getTo()));
-        [, $token] = $this->linkFrom((string) $email->getTextBody());
-        $this->assertJsonResponse($this->verify($token), 200, 'data');
+        $this->assertSame([$oldAddress], array_map(static fn (Address $a): string => $a->getAddress(), $email->getTo()));
+        $this->assertSame(0, preg_match(self::LINK_PATTERN, (string) $email->getTextBody()), 'An operator change sends no verification link.');
     }
 
-    public function testTheCliEmailChangeSendsALinkToTheNewAddress(): void
+    public function testTheCliEmailChangeTakesEffectVerifiedAndTellsTheOldAddress(): void
     {
         $user = $this->createSuperAdminUser();
+        $oldAddress = $user->getEmail();
         $newAddress = $this->uniqueEmail();
         $kernel = static::$kernel;
         $this->assertNotNull($kernel);
@@ -185,18 +260,15 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
         $tester->execute(['identifier' => $user->getEmail(), 'email' => $newAddress]);
 
         $tester->assertCommandIsSuccessful();
-        $this->assertSame($newAddress, $this->connection()->fetchOne('SELECT email FROM users WHERE id = ? AND email_verified_at IS NULL', [$user->getId()->toString()]));
-        $email = $this->onlyEmail();
-        $this->assertSame([$newAddress], array_map(static fn (Address $a): string => $a->getAddress(), $email->getTo()));
-        [, $token] = $this->linkFrom((string) $email->getTextBody());
-        $this->assertJsonResponse($this->verify($token), 200, 'data');
+        $this->assertSame($newAddress, $this->connection()->fetchOne('SELECT email FROM users WHERE id = ? AND email_verified_at IS NOT NULL', [$user->getId()->toString()]));
+        $this->assertSame([$oldAddress], array_map(static fn (Address $a): string => $a->getAddress(), $this->onlyEmail()->getTo()));
     }
 
     public function testAnUnchangedEmailSendsNothing(): void
     {
         $user = $this->createTestUser($this->uniqueEmail());
 
-        $this->assertJsonResponse($this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $user->getEmail(), 'currentPassword' => 'password123']), 200, 'data');
+        $this->assertJsonResponse($this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $user->getEmail(), 'currentPassword' => 'password123']), 202, 'data');
 
         $this->assertEmailCount(0);
     }

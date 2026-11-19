@@ -1,6 +1,6 @@
 # app:user:change-email
 
-Change a user's email address. It does the same as changing the email in the admin panel (`PATCH /api/admin/users/{publicId}`) and as users changing their own address in **Settings**: the new address starts unverified and Baander emails it a verification link.
+Change a user's email address. It does the same as changing the email in the admin panel (`PATCH /api/admin/users/{publicId}`): the new address takes effect at once and counts as verified. A user who changes their own address in **Settings** keeps the old one until they open the link Baander sends to the new one; an operator's change needs no link.
 
 ## Quick start
 
@@ -34,11 +34,13 @@ make exec cmd="php bin/console app:user:change-email aB3dE5fG7hJ9kL1mN3pQr alice
 
 ## What it changes
 
-- The account's email address, which it then signs in with.
-- The address is marked unverified. Until the user opens the verification link, Baander sends them no notification email.
+- The account's email address, which it then signs in with. The new address counts as verified, so the user can add a passkey or turn on TOTP with it.
+- A change the user asked for in **Settings** and has not confirmed yet is dropped, and its link stops working.
 - Verification and password reset links sent to the old address stop working.
-- A verification link goes to the new address at once. If sending fails, the command still succeeds and the failure is logged; the user can ask for a new link from **Settings**.
+- Baander emails the old address that the account's address changed, without naming the new one. If sending fails, the command still succeeds and the failure is logged.
 - Giving the current address changes nothing and sends no email.
+
+Confirm that the new address belongs to the user before you run the command: it skips the verification link a self-service change needs.
 
 With `--json` the command prints only the user as the API's `data` object, the same user resource `PATCH /api/admin/users/{publicId}` returns: `publicId`, `name`, `email`, `emailVerifiedAt`, `roles`, `disabled`, `createdAt` and `updatedAt`.
 

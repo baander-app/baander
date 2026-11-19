@@ -198,9 +198,27 @@ final class PasskeyControllerTest extends TestCase
         self::assertSame(200, $response->getStatusCode());
     }
 
+    public function testRegistrationOptionsNeedAVerifiedAddressBeforeStepUp(): void
+    {
+        $owner = \App\Auth\Domain\Model\User::register(new \App\Shared\Domain\Model\Email('passkey@baander.app'), 'hash', 'Owner');
+        $this->security->method('getUser')->willReturn(new SecurityUser(id: $owner->getId()->toString(), email: $owner->getEmail(), password: 'hash'));
+        $users = $this->createStub(\App\Auth\Application\Port\UserPortInterface::class);
+        $users->method('findByUuid')->willReturn($owner);
+        $this->setPrivate($this->controller, 'users', $users);
+        $this->setPrivate($this->controller, 'stepUp', $this->stepUp());
+
+        try {
+            $this->controller->registrationOptions(new PasskeyRegistrationOptionsRequest('not-the-password'));
+            self::fail('Registration options must be refused for an unverified address.');
+        } catch (\App\Auth\Application\Exception\EmailUnverifiedException $exception) {
+            self::assertSame(['reason' => 'email_unverified'], $exception->details);
+        }
+    }
+
     public function testRegistrationOptionsEncodeThePublicUserHandle(): void
     {
         $owner = \App\Auth\Domain\Model\User::register(new \App\Shared\Domain\Model\Email('passkey@baander.app'), 'hash', 'Owner');
+        $owner->verifyEmail();
         $this->security->method('getUser')->willReturn(new SecurityUser(id: $owner->getId()->toString(), email: $owner->getEmail(), password: 'hash'));
         $users = $this->createStub(\App\Auth\Application\Port\UserPortInterface::class);
         $users->method('findByUuid')->willReturn($owner);
@@ -219,6 +237,7 @@ final class PasskeyControllerTest extends TestCase
     public function testARegistrationCeremonyCompletesForTheUserTheChallengeWasIssuedTo(): void
     {
         $owner = \App\Auth\Domain\Model\User::register(new \App\Shared\Domain\Model\Email('passkey@baander.app'), 'hash', 'Owner');
+        $owner->verifyEmail();
         $other = \App\Auth\Domain\Model\User::register(new \App\Shared\Domain\Model\Email('other@baander.app'), 'hash', 'Other');
         $signedIn = $owner;
         $this->security->method('getUser')->willReturnCallback(static function () use (&$signedIn): SecurityUser {

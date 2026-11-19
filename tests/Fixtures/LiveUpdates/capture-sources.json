@@ -1713,7 +1713,7 @@
       "mapping": "src/Auth/Infrastructure/Doctrine/Entity/UserEntity.php",
       "classification": "capture",
       "operations": ["INSERT", "UPDATE", "DELETE"],
-      "relevant_columns": ["id", "public_id", "name", "email", "email_verified_at", "created_at", "roles", "disabled"],
+      "relevant_columns": ["id", "public_id", "name", "email", "email_verified_at", "pending_email", "created_at", "roles", "disabled"],
       "excluded_columns": ["password", "totp_secret_ciphertext", "totp_last_used_step", "updated_at"],
       "families": ["account", "admin-users", "activity"],
       "scope_routes": ["self", "admin"],

@@ -20,9 +20,11 @@ use App\Auth\Application\Service\UserLookup;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\TokenId;
+use App\Auth\Domain\Model\Passkey\Passkey;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
+use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
@@ -39,6 +41,13 @@ final class PasswordHandlersTest extends TestCase
     /** @var list<string> */
     private array $keptSessions = [];
     private ?AccessToken $storedToken = null;
+    private bool $active = false;
+    /** @var list<Passkey> */
+    private array $passkeys = [];
+    /** @var list<bool> whether each passkey was removed inside the transaction */
+    private array $removedPasskeys = [];
+    /** @var list<bool> whether each TOTP step was cleared inside the transaction */
+    private array $totpStepsCleared = [];
 
     protected function setUp(): void
     {
@@ -48,7 +57,7 @@ final class PasswordHandlersTest extends TestCase
 
     public function testResetRedeemsTheTokenAndSignsOutEverySession(): void
     {
-        $handler = new ResetPasswordHandler($this->resetTokens($this->user->getId()), $this->userRepository(), $this->changer());
+        $handler = $this->resetHandler($this->user->getId());
 
         $handler(new ResetPasswordCommand('raw-token', 'new-password'));
 
@@ -58,7 +67,7 @@ final class PasswordHandlersTest extends TestCase
 
     public function testResetRejectsATokenThatRedeemsToNoUser(): void
     {
-        $handler = new ResetPasswordHandler($this->resetTokens(null), $this->userRepository(), $this->changer());
+        $handler = $this->resetHandler(null);
 
         $this->expectExceptionObject(PasswordResetException::invalidToken());
         $handler(new ResetPasswordCommand('raw-token', 'new-password'));
@@ -66,7 +75,7 @@ final class PasswordHandlersTest extends TestCase
 
     public function testResetRejectsATokenWhoseUserNoLongerExists(): void
     {
-        $handler = new ResetPasswordHandler($this->resetTokens(Uuid::generate()), $this->userRepository(), $this->changer());
+        $handler = $this->resetHandler(Uuid::generate());
 
         $this->expectExceptionObject(PasswordResetException::invalidToken());
         $handler(new ResetPasswordCommand('raw-token', 'new-password'));
@@ -75,7 +84,7 @@ final class PasswordHandlersTest extends TestCase
     public function testResetRejectsADisabledAccountWithTheSameError(): void
     {
         $this->user->disable();
-        $handler = new ResetPasswordHandler($this->resetTokens($this->user->getId()), $this->userRepository(), $this->changer());
+        $handler = $this->resetHandler($this->user->getId());
 
         try {
             $handler(new ResetPasswordCommand('raw-token', 'new-password'));
@@ -84,6 +93,38 @@ final class PasswordHandlersTest extends TestCase
             self::assertSame(PasswordResetException::invalidToken()->getMessage(), $e->getMessage());
         }
         self::assertSame('hashed:current-password', $this->user->getPassword());
+    }
+
+    public function testAResetToANeverVerifiedAddressClaimsTheAccountInTheResetTransaction(): void
+    {
+        $this->user->enableTotp('sealed-secret');
+        $this->user->requestEmailChange(new Email('elsewhere@baander.app'));
+        $this->passkeys = [$this->passkey(), $this->passkey()];
+
+        $this->resetHandler($this->user->getId())(new ResetPasswordCommand('raw-token', 'new-password'));
+
+        self::assertSame('hashed:new-password', $this->user->getPassword());
+        self::assertTrue($this->user->isEmailVerified());
+        self::assertFalse($this->user->hasTotp());
+        self::assertNull($this->user->getPendingEmail());
+        self::assertSame([true], $this->totpStepsCleared);
+        self::assertSame([true, true], $this->removedPasskeys);
+        self::assertSame(['none'], $this->keptSessions);
+    }
+
+    public function testAResetToAVerifiedAddressKeepsTheAuthenticatorsButDropsAPendingChange(): void
+    {
+        $this->user->verifyEmail();
+        $this->user->enableTotp('sealed-secret');
+        $this->user->requestEmailChange(new Email('elsewhere@baander.app'));
+        $this->passkeys = [$this->passkey()];
+
+        $this->resetHandler($this->user->getId())(new ResetPasswordCommand('raw-token', 'new-password'));
+
+        self::assertTrue($this->user->hasTotp());
+        self::assertNull($this->user->getPendingEmail());
+        self::assertSame([], $this->totpStepsCleared);
+        self::assertSame([], $this->removedPasskeys);
     }
 
     public function testOperatorResetFindsTheUserByEmailOrPublicIdAndSignsOutEverySession(): void
@@ -164,6 +205,32 @@ final class PasswordHandlersTest extends TestCase
         return new ChangePasswordHandler($this->userRepository(), $accessTokens, $this->hasher(), $this->changer());
     }
 
+    private function resetHandler(?Uuid $redeemsTo): ResetPasswordHandler
+    {
+        $users = $this->userRepository();
+        $passkeys = $this->createStub(PasskeyRepositoryInterface::class);
+        $passkeys->method('forUser')->willReturnCallback(fn (): array => $this->passkeys);
+        $passkeys->method('remove')->willReturnCallback(function (): void {
+            $this->removedPasskeys[] = $this->active;
+        });
+        $transaction = $this->createStub(TransactionPortInterface::class);
+        $transaction->method('run')->willReturnCallback(function (callable $operation): mixed {
+            $this->active = true;
+            try {
+                return $operation();
+            } finally {
+                $this->active = false;
+            }
+        });
+
+        return new ResetPasswordHandler($this->resetTokens($redeemsTo), $users, $this->changer(), $passkeys, $transaction);
+    }
+
+    private function passkey(): Passkey
+    {
+        return Passkey::create(new Uuid(), 'Key', bin2hex(random_bytes(16)), [], 0);
+    }
+
     private function resetTokens(?Uuid $redeemsTo): PasswordResetTokenRepositoryInterface
     {
         $tokens = $this->createMock(PasswordResetTokenRepositoryInterface::class);
@@ -185,6 +252,9 @@ final class PasswordHandlersTest extends TestCase
         $users->method('findByEmail')->willReturnCallback(
             fn (Email $email): ?User => $email->toString() === $this->user->getEmail() ? $this->user : null,
         );
+        $users->method('clearTotpStep')->willReturnCallback(function (): void {
+            $this->totpStepsCleared[] = $this->active;
+        });
 
         return $users;
     }

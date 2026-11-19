@@ -4,7 +4,7 @@ import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { useCurrentUserRefresh } from '@/features/auth/hooks/use-current-user-refresh'
 import { applyCurrentUser } from '@/features/auth/lib/current-user'
 import { parseApiError } from '@/features/auth/lib/parse-api-error'
-import { putAuthMeEmail } from '@/shared/api-client/gen/endpoints'
+import { getAuthMe, putAuthMeEmail } from '@/shared/api-client/gen/endpoints'
 import { useTranslation } from '@/shared/i18n'
 import { textRole } from '@/shared/theme'
 import { Button } from '@/shared/components/ui/button'
@@ -23,6 +23,7 @@ import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { EmailVerificationNotice } from './EmailVerificationNotice'
+import { PendingEmailNotice } from './PendingEmailNotice'
 import { StepUpDialog, type StepUpCredentials } from './StepUpDialog'
 
 const CardContentStyled = styled(CardContent)`
@@ -170,7 +171,10 @@ export function AccountManagement() {
             </ChangeEmailDialog>
           </Row>
 
-          {user?.emailVerifiedAt === null && <EmailVerificationNotice />}
+          {/* A resend goes to the pending address while a change waits, so only one notice offers it. */}
+          {user?.pendingEmail
+            ? <PendingEmailNotice email={user.pendingEmail} />
+            : user?.emailVerifiedAt === null && <EmailVerificationNotice />}
 
           {/* Password row */}
           <Row>
@@ -210,9 +214,10 @@ function ChangeEmailDialog({ open, onOpenChange, children }: { open: boolean; on
   const [email, setEmail] = useState(user?.email ?? '')
 
   const changeEmail = async (stepUp: StepUpCredentials) => {
-    const response = await putAuthMeEmail({ email, ...stepUp })
-    // The new address starts unverified, which brings up the verification notice.
-    if (response.data) applyCurrentUser(response.data)
+    await putAuthMeEmail({ email, ...stepUp })
+    // The change waits for the link sent to the new address; the profile now shows it as pending.
+    const profile = await getAuthMe()
+    if (profile.data) applyCurrentUser(profile.data)
 
     return true
   }

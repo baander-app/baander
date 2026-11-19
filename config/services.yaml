@@ -635,6 +635,9 @@ services:
         arguments:
             $appUrl: '%env(APP_URL)%'
 
+    App\Auth\Application\Port\EmailChangeNoticeInterface:
+        alias: App\Auth\Infrastructure\Mail\MailerEmailChangeNotice
+
     App\Auth\Infrastructure\Mail\AfterResponseMailer:
         arguments:
             $appName: '%app.name%'

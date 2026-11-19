@@ -48,7 +48,7 @@ final class MutationRouteInventoryTest extends TestCase
         'user and library-access administration' => [
             'admin_user_libraries_grant', 'admin_user_libraries_revoke',
             'admin_users_create', 'admin_users_update', 'admin_users_delete', 'admin_users_disable', 'admin_users_enable',
-            'admin_users_assign_roles', 'admin_users_reset_password', 'admin_users_reset_totp',
+            'admin_users_assign_roles', 'admin_users_reset_password', 'admin_users_reset_totp', 'admin_users_verify_email',
             'admin_user_settings_set', 'admin_user_settings_reset',
             'admin_login_blocks_delete', 'admin_login_blocks_delete_all',
             'admin_oauth_clients_create', 'admin_oauth_clients_replace_keys', 'admin_oauth_clients_revoke', 'admin_oauth_clients_rotate_secret',

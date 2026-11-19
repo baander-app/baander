@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Application\CommandHandler\Totp;
 
 use App\Auth\Application\Command\Totp\StartTotpSetupCommand;
+use App\Auth\Application\Exception\EmailUnverifiedException;
 use App\Auth\Application\Exception\TotpChangeRefusal;
 use App\Auth\Application\Exception\TotpChangeRefusedException;
 use App\Auth\Application\Exception\UserNotFoundException;
@@ -16,8 +17,8 @@ use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
- * Starts TOTP setup: refuses while TOTP is on, which only the current code can turn off,
- * confirms the current password, and holds a new secret for the user until enable confirms it.
+ * Starts TOTP setup: refuses while TOTP is on, which only the current code can turn off, and
+ * for an unverified email address, confirms the current password, and holds a new secret for the user until enable confirms it.
  */
 final readonly class StartTotpSetupHandler
 {
@@ -38,6 +39,8 @@ final readonly class StartTotpSetupHandler
         if ($user->hasTotp()) {
             throw new TotpChangeRefusedException(TotpChangeRefusal::AlreadyEnabled);
         }
+        // Before step-up, so an unverified account spends none of its attempts.
+        EmailUnverifiedException::unlessVerified($user);
         $this->stepUp->verify($user, $command->getCurrentPassword(), null);
 
         $secret = $this->totpVerifier->generateSecret();

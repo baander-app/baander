@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Auth\Application\Port;
 
 use App\Auth\Domain\Model\User;
+use App\Shared\Domain\Model\Email;
 
 /**
  * Sends a user the link that carries a newly issued email verification token, to the
- * user's current address.
+ * address the token verifies: the account's address, or the pending address of an email change.
  *
  * The raw token is a credential: implementations must not persist it, log it or put it in a
  * message transport. A delivery failure must not reach the caller, so it cannot fail the
@@ -17,5 +18,5 @@ use App\Auth\Domain\Model\User;
  */
 interface EmailVerificationDeliveryInterface
 {
-    public function deliver(User $user, string $token, \DateTimeImmutable $expiresAt): void;
+    public function deliver(User $user, Email $address, string $token, \DateTimeImmutable $expiresAt): void;
 }

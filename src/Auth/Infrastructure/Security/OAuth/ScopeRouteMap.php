@@ -50,7 +50,7 @@ final class ScopeRouteMap
         'admin_login_blocks_delete_all', 'admin_oauth_clients_list', 'admin_oauth_clients_create',
         'admin_oauth_clients_rotate_secret', 'admin_oauth_clients_replace_keys', 'admin_oauth_clients_revoke',
         'admin_users_list', 'admin_users_create', 'admin_users_update', 'admin_users_delete',
-        'admin_users_assign_roles', 'admin_users_reset_password', 'admin_users_reset_totp', 'admin_users_disable', 'admin_users_enable',
+        'admin_users_assign_roles', 'admin_users_reset_password', 'admin_users_reset_totp', 'admin_users_verify_email', 'admin_users_disable', 'admin_users_enable',
         'admin_user_settings_index', 'admin_user_settings_set', 'admin_user_settings_reset',
         'admin_album_delete_preview', 'admin_album_delete', 'admin_song_delete_preview', 'admin_song_delete',
         'admin_albums_duplicates', 'admin_metadata_match_reviews', 'admin_metadata_match_candidates',

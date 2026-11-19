@@ -1469,7 +1469,7 @@
                     "Admin / Users"
                 ],
                 "summary": "Update a user",
-                "description": "A new email address starts unverified and is sent a verification link. The CLI counterparts are app:user:rename and app:user:change-email.",
+                "description": "A new email address takes effect at once, counts as verified and replaces a change the user had pending; the previous address is told of the change. The CLI counterparts are app:user:rename and app:user:change-email.",
                 "operationId": "patch_admin_users_update",
                 "parameters": [
                     {
@@ -1744,6 +1744,53 @@
                     },
                     "409": {
                         "description": "The user has no TOTP to reset",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/users/{publicId}/verify-email": {
+            "post": {
+                "tags": [
+                    "Admin / Users"
+                ],
+                "summary": "Mark a user's email address verified",
+                "description": "Marks the current address verified, as redeeming its verification link would; a verified address stays as it is. A pending email change is left alone. The CLI counterpart is app:user:mark-email-verified.",
+                "operationId": "post_admin_users_verify_email",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The address is verified",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AdminUserResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3000,7 +3047,7 @@
                     "Auth"
                 ],
                 "summary": "Get WebAuthn registration options",
-                "description": "Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.",
+                "description": "Needs a verified email address, answered otherwise with 422 and `details.reason` `email_unverified`. Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.",
                 "operationId": "post_passkey_options",
                 "requestBody": {
                     "required": true,
@@ -3040,7 +3087,7 @@
                         }
                     },
                     "422": {
-                        "description": "Validation error, or the password or code is wrong",
+                        "description": "Validation error, an unverified email address, or the password or code is wrong",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3547,7 +3594,7 @@
                     "Auth"
                 ],
                 "summary": "Generate TOTP secret and provisioning URI",
-                "description": "Refused while TOTP is on. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.",
+                "description": "Refused while TOTP is on, and for an unverified email address with 422 and `details.reason` `email_unverified`. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.",
                 "operationId": "post_totp_setup",
                 "requestBody": {
                     "required": true,
@@ -3606,7 +3653,7 @@
                         }
                     },
                     "422": {
-                        "description": "Validation error, or the password is wrong",
+                        "description": "Validation error, an unverified email address, or the password is wrong",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4458,8 +4505,8 @@
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Change the current user email",
-                "description": "Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The new address starts unverified and is sent a verification link; links sent to the old address stop working.",
+                "summary": "Ask to change the current user email",
+                "description": "Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The new address is held as `pendingEmail` and sent a verification link; the account keeps its address until that link is used. The answer is the same whether or not another account uses the new address: the link then fails. Asking for the current address drops a pending change.",
                 "operationId": "put_auth_me_email",
                 "requestBody": {
                     "required": true,
@@ -4472,14 +4519,20 @@
                     }
                 },
                 "responses": {
-                    "200": {
-                        "description": "Email changed",
+                    "202": {
+                        "description": "Change received; a verification link is on its way to the new address",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/components/schemas/UserResource"
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string",
+                                                    "example": "Check the new address for a link to confirm the change."
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
@@ -4489,16 +4542,6 @@
                     },
                     "401": {
                         "description": "Not authenticated",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ApiError"
-                                }
-                            }
-                        }
-                    },
-                    "409": {
-                        "description": "Email already taken",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -27720,6 +27763,12 @@
                     "totpEnabled": {
                         "description": "Whether TOTP is on, so a sensitive change needs a code; absent for a delegated token",
                         "type": "boolean"
+                    },
+                    "pendingEmail": {
+                        "description": "The address an email change waits to confirm through the link sent to it; absent for a delegated token",
+                        "type": "string",
+                        "format": "email",
+                        "nullable": true
                     }
                 },
                 "type": "object"

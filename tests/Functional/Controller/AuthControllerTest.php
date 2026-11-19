@@ -204,7 +204,7 @@ final class AuthControllerTest extends TestCase
     // PUT /api/auth/me/email
     // ---------------------------------------------------------------
 
-    public function testChangingTheEmailClearsItsVerification(): void
+    public function testChangingTheEmailKeepsTheVerifiedAddressUntilTheNewOneIsConfirmed(): void
     {
         $user = $this->createAdminUser();
         $this->assertTrue($user->isEmailVerified(), 'Operator-created users start verified.');
@@ -212,23 +212,26 @@ final class AuthControllerTest extends TestCase
 
         $response = $this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $newEmail, 'currentPassword' => 'password']);
 
-        $this->assertJsonResponse($response, 200);
+        $this->assertJsonResponse($response, 202);
         $this->entityManager->clear();
         $stored = $this->userRepository->findByUuid($user->getId());
         $this->assertNotNull($stored);
-        $this->assertSame($newEmail, $stored->getEmail());
-        $this->assertFalse($stored->isEmailVerified(), 'A new address is unverified until its owner confirms it.');
+        $this->assertSame($user->getEmail(), $stored->getEmail());
+        $this->assertTrue($stored->isEmailVerified());
+        $this->assertSame($newEmail, $stored->getPendingEmail());
+        $me = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/auth/me', $user), 200, 'data');
+        $this->assertSame($newEmail, $me['data']['pendingEmail']);
     }
 
-    public function testChangingToAnAddressInUseIsAConflict(): void
+    public function testChangingToAnAddressInUseAnswersLikeAnyOtherChange(): void
     {
         $user = $this->createTestUser();
         $other = $this->createTestUser();
 
         $response = $this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $other->getEmail(), 'currentPassword' => 'password123']);
 
-        $data = $this->assertJsonResponse($response, 409, 'error');
-        $this->assertSame('This email address is already in use.', $data['error']['message']);
+        $data = $this->assertJsonResponse($response, 202, 'data');
+        $this->assertSame('Check the new address for a link to confirm the change.', $data['data']['message']);
     }
 
     // ---------------------------------------------------------------
