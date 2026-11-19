@@ -242,7 +242,7 @@ final class PasskeyControllerTest extends TestCase
         $credential = new \App\Tests\Fixtures\Auth\WebAuthnTestCredential($owner->getPublicId()->toString(), 'baander.app');
 
         $options = json_decode($this->controller->registrationOptions(new PasskeyRegistrationOptionsRequest('current-password'))->getContent(), true, 512, JSON_THROW_ON_ERROR)['data'];
-        $attestation = $credential->attest($options['options']['challenge'], 'https://baander.app');
+        $attestation = self::asTheWebClientSendsIt($credential->attest($options['options']['challenge'], 'https://baander.app'));
         $signedIn = $other;
         $borrowed = $this->controller->register(new \App\Auth\Interface\Request\Passkey\RegisterPasskeyRequest($options['challengeKey'], $attestation, 'Borrowed'));
         $signedIn = $owner;
@@ -348,6 +348,25 @@ final class PasskeyControllerTest extends TestCase
             supportedAlgorithmIds: [-7, -257],
             jsonEncoder: new \Symfony\Component\Serializer\Encoder\JsonEncoder(),
         );
+    }
+
+    /**
+     * The credential as the web client serializes it: the browser's base64url `id`, and the raw
+     * ID and response fields in standard, padded base64.
+     *
+     * @param array<string, mixed> $credential
+     *
+     * @return array<string, mixed>
+     */
+    private static function asTheWebClientSendsIt(array $credential): array
+    {
+        $standard = static fn (string $base64Url): string => base64_encode((string) base64_decode(strtr($base64Url, '-_', '+/'), true));
+
+        return [
+            ...$credential,
+            'rawId' => $standard($credential['rawId']),
+            'response' => array_map($standard, $credential['response']),
+        ];
     }
 
     /** A step-up check that the password always passes, for an account without TOTP. */

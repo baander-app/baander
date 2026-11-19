@@ -33,11 +33,11 @@ make exec cmd="php bin/console app:user:reset-totp aB3dE5fG7hJ9kL1mN3pQr"
 
 ## Details
 
-The reset removes the stored TOTP secret without reading it, so it also works for a secret the configured key cannot open. In the same transaction it revokes every access and refresh token of the user, so all of their devices must sign in again. The user can turn TOTP on again from their account settings.
+The reset removes the stored TOTP secret without reading it, so it also works for a secret the configured key cannot open. In the same transaction it revokes every access and refresh token of the user, so all of their devices must sign in again. The user can set up TOTP again afterwards (`POST /api/auth/totp/setup`).
 
 Confirm the request with the user through a channel you trust before you run the command: the reset removes their second factor.
 
-An administrator cannot reset their own TOTP through the admin API; they turn it off from their account settings with a current code. The console has no such limit.
+An administrator cannot reset their own TOTP through the admin API; they turn it off with a current code (`POST /api/auth/totp/disable`). The console has no such limit.
 
 With `--json` the command prints only the user as the API's `data` object, the same user resource `POST /api/admin/users/{publicId}/reset-totp` returns: `publicId`, `name`, `email`, `emailVerifiedAt`, `roles`, `disabled`, `createdAt` and `updatedAt`.
 

@@ -41,7 +41,7 @@ final class ResetUserTotpHandlerTest extends TestCase
         self::assertSame($this->user, $returned, 'The admin API renders the returned user.');
         self::assertFalse($this->user->hasTotp());
         self::assertNull($this->user->getTotpSecretCiphertext());
-        self::assertSame(['begin', '+save', '+revoke access tokens', '+revoke refresh tokens', 'commit'], $this->log);
+        self::assertSame(['begin', '+save', '+clear TOTP step', '+revoke access tokens', '+revoke refresh tokens', 'commit'], $this->log);
     }
 
     public function testAUserWithoutTotpIsAConflictAndNothingChanges(): void
@@ -73,6 +73,10 @@ final class ResetUserTotpHandlerTest extends TestCase
         $users->method('save')->willReturnCallback(function (User $user): void {
             self::assertSame($this->user, $user);
             $this->record('save');
+        });
+        $users->method('clearTotpStep')->willReturnCallback(function (Uuid $userId): void {
+            self::assertTrue($this->user->getId()->equals($userId));
+            $this->record('clear TOTP step');
         });
         $accessTokens = $this->createStub(AccessTokenRepositoryInterface::class);
         $accessTokens->method('revokeForUser')->willReturnCallback(function (Uuid $userId, ?AccessToken $keep): void {

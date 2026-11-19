@@ -182,6 +182,14 @@ final class UserRepository implements UserRepositoryInterface
         return $spent === 1;
     }
 
+    public function clearTotpStep(Uuid $id): void
+    {
+        $this->entityManager->getConnection()->executeStatement(
+            'UPDATE users SET totp_last_used_step = NULL WHERE id = :id',
+            ['id' => $id->toString()],
+        );
+    }
+
     private function toDomain(UserEntity $entity): User
     {
         return User::reconstitute(new UserState(

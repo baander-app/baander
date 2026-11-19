@@ -236,7 +236,10 @@ final class TotpLoginReplayTest extends TestCase
             'SELECT count(*) FROM oauth_access_tokens WHERE user_id = ? AND NOT revoked',
             [$this->user->getId()->toString()],
         ));
-        self::assertNull($this->connection->fetchOne('SELECT totp_secret_ciphertext FROM users WHERE id = ?', [$this->user->getId()->toString()]));
+        self::assertSame(
+            ['totp_secret_ciphertext' => null, 'totp_last_used_step' => null],
+            $this->connection->fetchAssociative('SELECT totp_secret_ciphertext, totp_last_used_step FROM users WHERE id = ?', [$this->user->getId()->toString()]),
+        );
         $after = $this->login(null, (new SignedDpopProof())->createWithNonce('POST', self::ORIGIN . '/api/auth/login', $this->nonce()));
         self::assertSame(200, $after->getStatusCode(), (string) $after->getContent());
 

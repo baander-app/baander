@@ -42,4 +42,10 @@ interface UserRepositoryInterface
      * one was already spent, so each code is accepted once, also by concurrent requests.
      */
     public function spendTotpStep(Uuid $id, int $step): bool;
+
+    /**
+     * Forgets the user's last spent TOTP time step, for an operator's TOTP reset: a secret
+     * enrolled afterwards starts with no step spent.
+     */
+    public function clearTotpStep(Uuid $id): void;
 }

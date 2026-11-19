@@ -52,7 +52,7 @@ final class AdminUserController
 {
     use ApiResponsesTrait;
 
-    private const string OWN_CREDENTIALS_REFUSAL = 'Change your own email address, password and two-factor authentication from your account settings.';
+    private const string OWN_CREDENTIALS_REFUSAL = 'An administrator cannot change their own email address, password or TOTP through the admin API.';
 
     public function __construct(
         private readonly UserPortInterface $userService,
@@ -296,7 +296,7 @@ final class AdminUserController
     public function resetTotp(string $publicId): JsonResponse
     {
         $publicId = $this->publicIdentifier($publicId);
-        // An administrator's own TOTP goes off only with a current code, from the account settings.
+        // An administrator's own TOTP goes off only with a current code, through POST /api/auth/totp/disable.
         if ($this->isSignedInUser($publicId)) {
             return $this->forbidden(self::OWN_CREDENTIALS_REFUSAL);
         }
@@ -368,9 +368,9 @@ final class AdminUserController
     }
 
     /**
-     * Whether the target is the signed-in administrator, who changes their own address,
-     * password and TOTP from the account settings, with step-up or a current code. The console
-     * has no such limit.
+     * Whether the target is the signed-in administrator, who changes their own address and
+     * password through the self-service routes, with step-up, and turns their own TOTP off
+     * with a current code. The console has no such limit.
      */
     private function isSignedInUser(string $publicId): bool
     {
