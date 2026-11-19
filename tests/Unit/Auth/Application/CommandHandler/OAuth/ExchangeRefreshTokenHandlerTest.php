@@ -8,7 +8,9 @@ use App\Auth\Application\Command\OAuth\ExchangeRefreshTokenCommand;
 use App\Auth\Application\CommandHandler\OAuth\ExchangeRefreshTokenHandler;
 use App\Auth\Application\Service\ChainConnectionCloser;
 use App\Auth\Application\CommandHandler\OAuth\RefreshTokenHandler;
+use App\Auth\Application\DTO\ClientCredentials;
 use App\Auth\Application\Exception\OAuthProtocolException;
+use App\Auth\Application\Port\ClientAssertionVerifierInterface;
 use App\Auth\Application\Port\JwtGeneratorInterface;
 use App\Auth\Application\Service\OAuthClientAuthenticator;
 use App\Auth\Domain\Model\OAuth\Client;
@@ -95,7 +97,7 @@ final class ExchangeRefreshTokenHandlerTest extends TestCase
         $accessTokens = $this->createStub(AccessTokenRepositoryInterface::class);
 
         return new ExchangeRefreshTokenHandler(
-            new OAuthClientAuthenticator($clients),
+            new OAuthClientAuthenticator($clients, $this->createStub(ClientAssertionVerifierInterface::class)),
             new RefreshTokenHandler(
                 $accessTokens,
                 $refreshTokens,
@@ -118,8 +120,7 @@ final class ExchangeRefreshTokenHandlerTest extends TestCase
     private function command(string $refreshToken): ExchangeRefreshTokenCommand
     {
         return new ExchangeRefreshTokenCommand(
-            clientId: $this->client->getPublicId()->toString(),
-            clientSecret: null,
+            credentials: new ClientCredentials($this->client->getPublicId()->toString()),
             refreshToken: $refreshToken,
             dpopJkt: 'exchange-test-proof-key-thumbprint',
         );

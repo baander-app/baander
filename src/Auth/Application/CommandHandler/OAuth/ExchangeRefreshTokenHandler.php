@@ -33,7 +33,7 @@ final readonly class ExchangeRefreshTokenHandler
     #[AsMessageHandler]
     public function __invoke(ExchangeRefreshTokenCommand $command): TokenResponseDTO
     {
-        $client = $this->clientAuthenticator->authenticate($command->clientId, $command->clientSecret);
+        $client = $this->clientAuthenticator->authenticate($command->credentials);
 
         if ($command->refreshToken === null || $command->refreshToken === '') {
             throw OAuthProtocolException::invalidRequest('The refresh_token parameter is required.');

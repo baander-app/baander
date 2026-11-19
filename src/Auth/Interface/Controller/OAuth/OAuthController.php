@@ -14,6 +14,7 @@ use App\Auth\Application\Command\OAuth\RequestDeviceAuthorizationCommand;
 use App\Auth\Application\Command\OAuth\RevokeTokenCommand;
 use App\Auth\Application\DTO\AuthorizationRequestDTO;
 use App\Auth\Application\DTO\AuthorizationResponseDTO;
+use App\Auth\Application\DTO\ClientCredentials;
 use App\Auth\Application\DTO\DeviceAuthorizationDTO;
 use App\Auth\Application\DTO\PendingDeviceAuthorizationDTO;
 use App\Auth\Application\DTO\TokenResponseDTO;
@@ -191,7 +192,7 @@ final class OAuthController
     /** @throws ServiceUnavailableHttpException for a server fault during the grant */
     #[OA\Post(
         path: '/api/oauth/token',
-        description: 'Requires a DPoP proof carrying a server-issued nonce. A missing or invalid proof is answered with `invalid_dpop_proof`, a proof without a fresh nonce with `use_dpop_nonce`; both carry a `DPoP-Nonce` header. Every answer carries the nonce for the next proof and `Cache-Control: no-store`. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded (RFC 6749) or JSON. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`.',
+        description: 'Requires a DPoP proof carrying a server-issued nonce. A missing or invalid proof is answered with `invalid_dpop_proof`, a proof without a fresh nonce with `use_dpop_nonce`; both carry a `DPoP-Nonce` header. Every answer carries the nonce for the next proof and `Cache-Control: no-store`. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded (RFC 6749) or JSON. Every request names its client in `client_id`. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`, or `client_assertion` with `client_assertion_type`, by the one method they were registered with. A client assertion (RFC 7523 as updated by RFC 10070) is a JWT signed with one of the client\'s registered keys: `iss` and `sub` are the `client_id`, `aud` is the issuer identifier as its sole value, `exp` and `jti` are required, it lives at most 300 seconds by default, and its `jti` is accepted once. Its `typ` header is `client-authentication+jwt` or absent.',
         summary: 'OAuth 2.0 token endpoint (RFC 6749 section 3.2)',
         security: [],
         requestBody: new OA\RequestBody(
@@ -201,7 +202,9 @@ final class OAuthController
                 properties: [
                     new OA\Property(property: 'grant_type', type: 'string', enum: ['authorization_code', 'refresh_token', 'urn:ietf:params:oauth:grant-type:device_code']),
                     new OA\Property(property: 'client_id', type: 'string'),
-                    new OA\Property(property: 'client_secret', description: 'Confidential clients only', type: 'string'),
+                    new OA\Property(property: 'client_secret', description: 'Confidential clients registered for client_secret_post only', type: 'string'),
+                    new OA\Property(property: 'client_assertion', description: 'Signed JWT client assertion; confidential clients registered for private_key_jwt only', type: 'string'),
+                    new OA\Property(property: 'client_assertion_type', description: 'Sent with client_assertion', type: 'string', enum: [ClientCredentials::JWT_BEARER_ASSERTION_TYPE]),
                     new OA\Property(property: 'code', description: 'Authorization code (authorization_code grant)', type: 'string'),
                     new OA\Property(property: 'redirect_uri', description: 'The redirect URI of the authorization request (authorization_code grant)', type: 'string', format: 'uri'),
                     new OA\Property(property: 'code_verifier', description: 'PKCE code verifier (authorization_code grant)', type: 'string'),
@@ -216,7 +219,7 @@ final class OAuthController
             new OA\Response(response: '401', description: 'Client authentication failed, or the client is revoked', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
             new OA\Response(
                 response: '503',
-                description: 'The server could not decide on the grant, for example while its database restarts or the DPoP nonce store is unavailable; the presented token may still be valid, so retry after the Retry-After delay. Carries no DPoP-Nonce header.',
+                description: 'The server could not decide on the grant, for example while its database restarts or the DPoP nonce store or client assertion jti store is unavailable; the presented token may still be valid, so retry after the Retry-After delay, with a newly signed client assertion. Carries no DPoP-Nonce header.',
                 headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 5))],
                 content: new OA\JsonContent(ref: new Model(type: ApiError::class)),
             ),
@@ -459,15 +462,19 @@ final class OAuthController
             throw OAuthProtocolException::invalidClient('The client_id parameter is required.');
         }
 
-        $clientSecret = self::stringOrNull($parameters['client_secret'] ?? null);
+        $credentials = new ClientCredentials(
+            clientId: $clientId,
+            secret: self::stringOrNull($parameters['client_secret'] ?? null),
+            assertion: self::stringOrNull($parameters['client_assertion'] ?? null),
+            assertionType: self::stringOrNull($parameters['client_assertion_type'] ?? null),
+        );
         $ipAddress = $request->getClientIp();
         $userAgent = $request->headers->get('User-Agent');
         $fingerprint = $request->headers->get(BaanderHeader::ClientFingerprint->value);
 
         return match ($grantType) {
             'authorization_code' => new ExchangeAuthorizationCodeCommand(
-                clientId: $clientId,
-                clientSecret: $clientSecret,
+                credentials: $credentials,
                 code: self::stringOrNull($parameters['code'] ?? null),
                 redirectUri: self::stringOrNull($parameters['redirect_uri'] ?? null),
                 codeVerifier: self::stringOrNull($parameters['code_verifier'] ?? null),
@@ -477,8 +484,7 @@ final class OAuthController
                 clientFingerprint: $fingerprint,
             ),
             'urn:ietf:params:oauth:grant-type:device_code' => new ExchangeDeviceCodeCommand(
-                clientId: $clientId,
-                clientSecret: $clientSecret,
+                credentials: $credentials,
                 deviceCode: self::stringOrNull($parameters['device_code'] ?? null),
                 dpopJkt: $proof->jkt,
                 ipAddress: $ipAddress,
@@ -486,8 +492,7 @@ final class OAuthController
                 clientFingerprint: $fingerprint,
             ),
             'refresh_token' => new ExchangeRefreshTokenCommand(
-                clientId: $clientId,
-                clientSecret: $clientSecret,
+                credentials: $credentials,
                 refreshToken: self::stringOrNull($parameters['refresh_token'] ?? null),
                 dpopJkt: $proof->jkt,
                 ipAddress: $ipAddress,

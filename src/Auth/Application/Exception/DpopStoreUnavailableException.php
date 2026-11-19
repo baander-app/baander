@@ -8,7 +8,8 @@ use RuntimeException;
 use Throwable;
 
 /**
- * The DPoP nonce or jti store did not answer, so no proof can be judged.
+ * The DPoP nonce or jti store, or the client assertion jti store, did not answer, so no
+ * proof or assertion can be judged.
  *
  * Only a failure to reach the store raises it: a refused or dropped connection, a read
  * that timed out, or an exhausted connection pool. A nonce that is missing and a jti
@@ -32,5 +33,10 @@ final class DpopStoreUnavailableException extends RuntimeException
     public static function jtiStore(Throwable $cause): self
     {
         return new self('The DPoP jti store is unavailable.', previous: $cause);
+    }
+
+    public static function assertionJtiStore(Throwable $cause): self
+    {
+        return new self('The client assertion jti store is unavailable.', previous: $cause);
     }
 }

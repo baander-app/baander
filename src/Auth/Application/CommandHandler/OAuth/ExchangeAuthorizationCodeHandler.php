@@ -36,7 +36,7 @@ final readonly class ExchangeAuthorizationCodeHandler
     #[AsMessageHandler]
     public function __invoke(ExchangeAuthorizationCodeCommand $command): TokenResponseDTO
     {
-        $client = $this->clientAuthenticator->authenticate($command->clientId, $command->clientSecret);
+        $client = $this->clientAuthenticator->authenticate($command->credentials);
 
         if ($command->code === null || $command->code === '') {
             throw OAuthProtocolException::invalidRequest('The code parameter is required.');

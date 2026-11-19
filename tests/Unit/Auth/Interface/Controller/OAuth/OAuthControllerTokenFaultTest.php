@@ -6,7 +6,9 @@ namespace App\Tests\Unit\Auth\Interface\Controller\OAuth;
 
 use App\Auth\Application\Command\OAuth\ExchangeRefreshTokenCommand;
 use App\Auth\Application\Command\OAuth\RevokeTokenCommand;
+use App\Auth\Application\DTO\ClientCredentials;
 use App\Auth\Application\DTO\VerifiedDpopProof;
+use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Interface\Controller\OAuth\OAuthController;
@@ -49,6 +51,34 @@ final class OAuthControllerTokenFaultTest extends TestCase
             self::assertSame(503, $exception->getStatusCode());
             self::assertEqualsCanonicalizing(['retry-after' => '5', 'cache-control' => 'no-store'], array_change_key_case(array_map(strval(...), $exception->getHeaders()), CASE_LOWER));
             self::assertSame($fault, $exception->getPrevious());
+        }
+    }
+
+    /** The assertion parameters reach the grant; an assertion jti store outage is answered like any server fault. */
+    public function testAClientAssertionIsPassedOnAndItsStoreOutageIsAnsweredWith503(): void
+    {
+        $outage = DpopStoreUnavailableException::assertionJtiStore(new \RedisException('Connection refused'));
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects($this->once())->method('dispatch')->willReturnCallback(
+            static function (object $command) use ($outage): never {
+                self::assertInstanceOf(ExchangeRefreshTokenCommand::class, $command);
+                self::assertEquals(new ClientCredentials('player', null, 'signed.client.assertion', ClientCredentials::JWT_BEARER_ASSERTION_TYPE), $command->credentials);
+
+                throw new HandlerFailedException(new Envelope($command), [$outage]);
+            },
+        );
+        $request = $this->tokenRequest([
+            'client_assertion' => 'signed.client.assertion',
+            'client_assertion_type' => ClientCredentials::JWT_BEARER_ASSERTION_TYPE,
+        ]);
+
+        try {
+            $this->controller($bus)->token($request);
+            self::fail('A replay verdict is never guessed.');
+        } catch (ServiceUnavailableHttpException $exception) {
+            self::assertSame(503, $exception->getStatusCode());
+            self::assertSame('5', (string) $exception->getHeaders()['Retry-After']);
+            self::assertSame($outage, $exception->getPrevious());
         }
     }
 
@@ -147,12 +177,14 @@ final class OAuthControllerTokenFaultTest extends TestCase
         return $controller;
     }
 
-    private function tokenRequest(): Request
+    /** @param array<string, string> $authentication */
+    private function tokenRequest(array $authentication = []): Request
     {
         $request = Request::create('https://baander.app/api/oauth/token', 'POST', [
             'grant_type' => 'refresh_token',
             'client_id' => 'player',
             'refresh_token' => str_repeat('r', 80),
+            ...$authentication,
         ], server: ['REMOTE_ADDR' => '10.0.0.7']);
         $request->attributes->set(VerifiedDpopProof::class, new VerifiedDpopProof('thumbprint', 'next-nonce'));
 

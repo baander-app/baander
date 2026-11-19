@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace App\Auth\Application\Service;
 
+use App\Auth\Application\DTO\ClientCredentials;
+use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use App\Auth\Application\Exception\OAuthProtocolException;
+use App\Auth\Application\Port\ClientAssertionVerifierInterface;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\ClientAuthMethod;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Shared\Domain\Model\PublicId;
 use InvalidArgumentException;
@@ -13,28 +17,47 @@ use InvalidArgumentException;
 /**
  * Identifies and authenticates the client of an OAuth request by its public ID.
  *
- * Public clients authenticate with their ID alone (`none`); confidential clients
- * must also send their secret (`client_secret_post`). Unknown, malformed and
- * revoked clients fail alike, so the response does not reveal which it was.
+ * Each client authenticates by the one method it was registered with: public clients
+ * with their ID alone (`none`), confidential clients with their secret
+ * (`client_secret_post`) or with a JWT assertion signed by one of their keys
+ * (`private_key_jwt`). A request that presents any other method, or more than one,
+ * fails (RFC 6749 section 2.3). Unknown, malformed and revoked clients fail alike, so
+ * the response does not reveal which it was.
  */
 final readonly class OAuthClientAuthenticator
 {
     public function __construct(
         private ClientRepositoryInterface $clientRepository,
+        private ClientAssertionVerifierInterface $assertionVerifier,
     ) {
     }
 
-    /** @throws OAuthProtocolException invalid_client */
-    public function authenticate(string $clientId, ?string $clientSecret = null): Client
+    /**
+     * @throws OAuthProtocolException invalid_client
+     * @throws DpopStoreUnavailableException when an assertion's single use cannot be checked
+     */
+    public function authenticate(ClientCredentials $credentials): Client
     {
-        $client = $this->identify($clientId);
+        $client = $this->identify($credentials->clientId);
 
-        // The stored digest is compared in constant time (ClientSecret::matches).
-        if ($client->isConfidential() && !$client->authenticatesWith($clientSecret)) {
+        $authenticated = match ($client->getAuthMethod()) {
+            ClientAuthMethod::None => !$credentials->presentsSecret() && !$credentials->presentsAssertion(),
+            // The stored digest is compared in constant time (ClientSecret::matches).
+            ClientAuthMethod::ClientSecretPost => !$credentials->presentsAssertion() && $client->authenticatesWith($credentials->secret),
+            ClientAuthMethod::PrivateKeyJwt => !$credentials->presentsSecret() && $this->verifiesAssertion($credentials, $client),
+        };
+        if (!$authenticated) {
             throw OAuthProtocolException::invalidClient();
         }
 
         return $client;
+    }
+
+    private function verifiesAssertion(ClientCredentials $credentials, Client $client): bool
+    {
+        $assertion = $credentials->jwtBearerAssertion();
+
+        return $assertion !== null && $this->assertionVerifier->verify($assertion, $client);
     }
 
     /**

@@ -10,8 +10,10 @@ use App\Auth\Application\Command\OAuth\RotateClientSecretCommand;
 use App\Auth\Application\CommandHandler\OAuth\RegisterClientHandler;
 use App\Auth\Application\CommandHandler\OAuth\RevokeRegisteredClientHandler;
 use App\Auth\Application\CommandHandler\OAuth\RotateClientSecretHandler;
+use App\Auth\Application\DTO\ClientCredentials;
 use App\Auth\Application\Exception\ClientManagementException;
 use App\Auth\Application\Exception\ClientNotFoundException;
+use App\Auth\Application\Port\ClientAssertionVerifierInterface;
 use App\Auth\Application\Service\ClientRevoker;
 use App\Auth\Application\Service\OAuthClientAuthenticator;
 use App\Auth\Domain\Model\OAuth\Client;
@@ -42,7 +44,8 @@ final class ClientManagementHandlersTest extends TestCase
         self::assertSame(ClientType::Confidential, $registered->client->getType());
         self::assertSame(hash('sha256', $registered->secret), $registered->client->getSecretHash());
         self::assertSame($registered->client, $this->saved[$registered->client->getPublicId()->toString()]);
-        $authenticated = (new OAuthClientAuthenticator($this->repository()))->authenticate($registered->client->getPublicId()->toString(), $registered->secret);
+        $authenticated = (new OAuthClientAuthenticator($this->repository(), $this->createStub(ClientAssertionVerifierInterface::class)))
+            ->authenticate(new ClientCredentials($registered->client->getPublicId()->toString(), $registered->secret));
         self::assertSame($registered->client, $authenticated);
     }
 

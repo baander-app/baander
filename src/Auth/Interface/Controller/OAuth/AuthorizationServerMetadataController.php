@@ -21,6 +21,9 @@ final class AuthorizationServerMetadataController
     /** The proof algorithms DpopProofValidator accepts; a unit test keeps the two lists equal. */
     public const array DPOP_SIGNING_ALGORITHMS = ['EdDSA', 'ES256', 'ES384', 'ES512', 'RS256', 'RS384', 'RS512'];
 
+    /** The client assertion algorithms ClientAssertionVerifier accepts; a unit test keeps the two lists equal. */
+    public const array CLIENT_ASSERTION_SIGNING_ALGORITHMS = ['EdDSA', 'ES256', 'ES384', 'ES512', 'RS256', 'RS384', 'RS512'];
+
     public function __construct(
         private readonly UrlGeneratorInterface $urlGenerator,
         private readonly string $issuer,
@@ -51,6 +54,7 @@ final class AuthorizationServerMetadataController
                         new OA\Property(property: 'response_types_supported', type: 'array', items: new OA\Items(type: 'string')),
                         new OA\Property(property: 'grant_types_supported', type: 'array', items: new OA\Items(type: 'string')),
                         new OA\Property(property: 'token_endpoint_auth_methods_supported', type: 'array', items: new OA\Items(type: 'string')),
+                        new OA\Property(property: 'token_endpoint_auth_signing_alg_values_supported', description: 'Algorithms a private_key_jwt client assertion may be signed with', type: 'array', items: new OA\Items(type: 'string')),
                         new OA\Property(property: 'code_challenge_methods_supported', type: 'array', items: new OA\Items(type: 'string')),
                         new OA\Property(property: 'scopes_supported', type: 'array', items: new OA\Items(type: 'string')),
                         new OA\Property(property: 'dpop_signing_alg_values_supported', type: 'array', items: new OA\Items(type: 'string')),
@@ -86,7 +90,8 @@ final class AuthorizationServerMetadataController
                 'urn:ietf:params:oauth:grant-type:device_code',
             ],
             'scopes_supported'                      => $this->scopes,
-            'token_endpoint_auth_methods_supported' => ['none', 'client_secret_post'],
+            'token_endpoint_auth_methods_supported' => ['none', 'client_secret_post', 'private_key_jwt'],
+            'token_endpoint_auth_signing_alg_values_supported' => self::CLIENT_ASSERTION_SIGNING_ALGORITHMS,
             'code_challenge_methods_supported'      => ['S256'],
             'dpop_signing_alg_values_supported'     => self::DPOP_SIGNING_ALGORITHMS,
             'authorization_response_iss_parameter_supported' => true,

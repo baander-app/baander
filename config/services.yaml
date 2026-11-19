@@ -427,6 +427,26 @@ services:
 
     App\Auth\Infrastructure\Security\OAuth\DpopBindingListener: ~
 
+    # --- Client assertions (private_key_jwt) ---
+    App\Auth\Application\Port\ClientAssertionVerifierInterface:
+        alias: App\Auth\Infrastructure\Security\OAuth\ClientAssertionVerifier
+
+    App\Auth\Application\Port\ClientAssertionJtiStoreInterface:
+        alias: App\Auth\Infrastructure\Cache\RedisClientAssertionJtiStore
+
+    App\Auth\Application\Port\ClientKeySetProviderInterface:
+        alias: App\Auth\Infrastructure\Security\OAuth\ClientKeySetProvider
+
+    App\Auth\Infrastructure\Cache\RedisClientAssertionJtiStore:
+        arguments:
+            $redisClientFactory: '@App\Shared\Infrastructure\Redis\RedisClientFactory'
+
+    App\Auth\Infrastructure\Security\OAuth\ClientAssertionVerifier:
+        arguments:
+            $issuer: '%auth.oauth.issuer%'
+            $maxLifetimeSeconds: '%auth.client_assertion.max_lifetime%'
+            $clockSkewSeconds: '%auth.dpop.clock_skew%'
+
     App\Auth\Application\CommandHandler\Totp\EnableTotpHandler:
         arguments:
             $cache: '@cache.tags'

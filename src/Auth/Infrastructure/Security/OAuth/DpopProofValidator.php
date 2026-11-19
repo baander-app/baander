@@ -8,17 +8,7 @@ use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use App\Auth\Application\Port\DpopJtiCacheInterface;
 use App\Auth\Domain\Model\OAuth\ValueObject\DpopValidationResult;
 use DateTimeImmutable;
-use InvalidArgumentException;
 use Lcobucci\JWT\Encoding\JoseEncoder;
-use Lcobucci\JWT\Signer;
-use Lcobucci\JWT\Signer\Ecdsa\Sha256 as ES256;
-use Lcobucci\JWT\Signer\Ecdsa\Sha384 as ES384;
-use Lcobucci\JWT\Signer\Ecdsa\Sha512 as ES512;
-use Lcobucci\JWT\Signer\Eddsa;
-use Lcobucci\JWT\Signer\Key\InMemory;
-use Lcobucci\JWT\Signer\Rsa\Sha256 as RS256;
-use Lcobucci\JWT\Signer\Rsa\Sha384 as RS384;
-use Lcobucci\JWT\Signer\Rsa\Sha512 as RS512;
 use Lcobucci\JWT\Token\Parser;
 use Lcobucci\JWT\Token\Plain;
 use Psr\Log\LoggerInterface;
@@ -28,22 +18,10 @@ use Throwable;
 
 final class DpopProofValidator
 {
-    private const SUPPORTED_ALGORITHMS = [
-        'EdDSA',
-        'ES256',
-        'ES384',
-        'ES512',
-        'RS256',
-        'RS384',
-        'RS512',
-    ];
-
-    private const PRIVATE_KEY_MEMBERS = ['d', 'p', 'q', 'dp', 'dq', 'qi'];
+    /** One list with client assertions; the metadata test pins the advertised copy to it. */
+    private const array SUPPORTED_ALGORITHMS = JwkPublicKeyConverter::SIGNING_ALGORITHMS;
 
     private Parser $parser;
-
-    /** @var array<string, Signer> */
-    private array $signers;
 
     /**
      * @param int $jtiTtlSeconds The proof acceptance window a jti is refused for: the larger
@@ -57,16 +35,6 @@ final class DpopProofValidator
     )
     {
         $this->parser = new Parser(new JoseEncoder());
-
-        $this->signers = [
-            'EdDSA' => new Eddsa(),
-            'ES256' => new ES256(),
-            'ES384' => new ES384(),
-            'ES512' => new ES512(),
-            'RS256' => new RS256(),
-            'RS384' => new RS384(),
-            'RS512' => new RS512(),
-        ];
     }
 
     /**
@@ -141,7 +109,7 @@ final class DpopProofValidator
         }
 
         // 5. No private key in jwk
-        foreach (self::PRIVATE_KEY_MEMBERS as $member) {
+        foreach (JwkPublicKeyConverter::PRIVATE_KEY_MEMBERS as $member) {
             if (array_key_exists($member, $jwk)) {
                 return DpopValidationResult::invalid('invalid_dpop_proof', 'DPoP proof jwk must not contain private key material.');
             }
@@ -199,14 +167,8 @@ final class DpopProofValidator
         }
 
         // 11. Signature verification
-        $signer = $this->signers[$alg] ?? null;
-        if ($signer === null) {
-            return DpopValidationResult::invalid('invalid_dpop_proof', sprintf('No signer available for algorithm "%s".', $alg));
-        }
-
         try {
-            $verificationKey = $this->jwkToVerificationKey($jwk, $alg);
-            $verified = $signer->verify($this->base64urlDecode($token->signature()->toString()), $token->payload(), $verificationKey);
+            $verified = JwkPublicKeyConverter::verify($jwk, $alg, $token->payload(), $token->signature()->toString());
         } catch (Throwable $e) {
             $this->logger->debug('DPoP proof verification key is invalid', ['exception' => $e]);
 
@@ -268,130 +230,6 @@ final class DpopProofValidator
     {
         // Bind to the actual URI, excluding query and fragment per RFC 9449 §4.3.
         return $request->getSchemeAndHttpHost() . $request->getPathInfo();
-    }
-
-    /**
-     * Converts a JWK public key to a key suitable for lcobucci/jwt verification.
-     *
-     * @param array<string, mixed> $jwk
-     */
-    private function jwkToVerificationKey(array $jwk, string $alg): InMemory
-    {
-        $kty = $jwk['kty'] ?? '';
-
-        if ($kty === 'OKP') {
-            return $this->jwkOkpToKey($jwk);
-        }
-
-        if ($kty === 'EC') {
-            return $this->jwkEcToPem($jwk);
-        }
-
-        if ($kty === 'RSA') {
-            return $this->jwkRsaToPem($jwk);
-        }
-
-        throw new InvalidArgumentException(sprintf('Unsupported JWK key type: "%s".', $kty));
-    }
-
-    /** @param array<string, mixed> $jwk */
-    private function jwkOkpToKey(array $jwk): InMemory
-    {
-        // EdDSA with Ed25519: sodium expects raw 32-byte public key
-        $x = $jwk['x'] ?? '';
-        if ($x === '') {
-            throw new InvalidArgumentException('OKP JWK missing "x" parameter.');
-        }
-
-        // Decode base64url to raw bytes
-        $keyBytes = $this->base64urlDecode($x);
-
-        return InMemory::plainText($keyBytes);
-    }
-
-    private function base64urlDecode(string $input): string
-    {
-        $padded = strtr($input, '-_', '+/');
-        $remainder = strlen($padded) % 4;
-        if ($remainder > 0) {
-            $padded .= str_repeat('=', 4 - $remainder);
-        }
-
-        return base64_decode($padded);
-    }
-
-    /** @param array<string, mixed> $jwk */
-    private function jwkEcToPem(array $jwk): InMemory
-    {
-        $crv = $jwk['crv'] ?? '';
-        $x = $this->base64urlDecode($jwk['x'] ?? '');
-        $y = $this->base64urlDecode($jwk['y'] ?? '');
-
-        $curveOid = match ($crv) {
-            'P-256' => "\x06\x08\x2a\x86\x48\xce\x3d\x03\x01\x07",
-            'P-384' => "\x06\x05\x2b\x81\x04\x00\x22",
-            'P-521' => "\x06\x05\x2b\x81\x04\x00\x23",
-            default => throw new InvalidArgumentException(sprintf('Unsupported EC curve: "%s".', $crv)),
-        };
-
-        // ecPublicKey OID: 1.2.840.10045.2.1
-        $ecPublicKeyOid = "\x06\x07\x2a\x86\x48\xce\x3d\x02\x01";
-
-        // AlgorithmIdentifier = SEQUENCE { ecPublicKey OID, curve OID }
-        $algoId = $ecPublicKeyOid . $curveOid;
-        $algoIdSeq = "\x30" . $this->encodeLength(strlen($algoId)) . $algoId;
-
-        // BIT STRING with uncompressed point (0x04 prefix + x + y)
-        $pointData = "\x04" . $x . $y;
-        $bitString = "\x03" . $this->encodeLength(strlen($pointData) + 1) . "\x00" . $pointData;
-
-        // SubjectPublicKeyInfo = SEQUENCE { AlgorithmIdentifier, BIT STRING }
-        $spki = $algoIdSeq . $bitString;
-        $der = "\x30" . $this->encodeLength(strlen($spki)) . $spki;
-
-        $pem = "-----BEGIN PUBLIC KEY-----\n";
-        $pem .= chunk_split(base64_encode($der), 64, "\n");
-        $pem .= "-----END PUBLIC KEY-----\n";
-
-        return InMemory::plainText($pem);
-    }
-
-    /** @param array<string, mixed> $jwk */
-    private function jwkRsaToPem(array $jwk): InMemory
-    {
-        $n = $this->base64urlDecode($jwk['n'] ?? '');
-        $e = $this->base64urlDecode($jwk['e'] ?? '');
-
-        // RSA public key DER: SEQUENCE { SEQUENCE { OID rsaEncryption, NULL }, BIT STRING { SEQUENCE { n, e } } }
-        $rsaEncryptionOid = "\x30\x0d\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x01\x01\x05\x00";
-
-        $nInt = "\x02" . $this->encodeLength(strlen($n)) . $n;
-        $eInt = "\x02" . $this->encodeLength(strlen($e)) . $e;
-        $rsaSeq = "\x30" . $this->encodeLength(strlen($nInt) + strlen($eInt)) . $nInt . $eInt;
-        $bitString = "\x03" . $this->encodeLength(strlen($rsaSeq) + 1) . "\x00" . $rsaSeq;
-        $outerSeq = "\x30" . $this->encodeLength(strlen($rsaEncryptionOid) + strlen($bitString)) . $rsaEncryptionOid . $bitString;
-
-        $pem = "-----BEGIN PUBLIC KEY-----\n";
-        $pem .= chunk_split(base64_encode($outerSeq), 64, "\n");
-        $pem .= "-----END PUBLIC KEY-----\n";
-
-        return InMemory::plainText($pem);
-    }
-
-    private function encodeLength(int $length): string
-    {
-        if ($length < 128) {
-            return chr($length);
-        }
-
-        $bytes = [];
-        $temp = $length;
-        while ($temp > 0) {
-            array_unshift($bytes, $temp & 0xff);
-            $temp >>= 8;
-        }
-
-        return chr(0x80 | count($bytes)) . implode('', array_map('chr', $bytes));
     }
 
     private function hashAccessToken(string $accessToken): string

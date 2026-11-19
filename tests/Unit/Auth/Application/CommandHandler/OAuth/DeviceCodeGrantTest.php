@@ -9,6 +9,7 @@ use App\Auth\Application\Command\OAuth\RequestDeviceAuthorizationCommand;
 use App\Auth\Application\CommandHandler\OAuth\ExchangeDeviceCodeHandler;
 use App\Auth\Application\CommandHandler\OAuth\RequestDeviceAuthorizationHandler;
 use App\Auth\Application\DTO\DeviceAuthorizationDTO;
+use App\Auth\Application\DTO\ClientCredentials;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\ScopeAllowlist;
 use App\Auth\Domain\Model\OAuth\Client;
@@ -163,8 +164,7 @@ final class DeviceCodeGrantTest extends TestCase
         $handler = new ExchangeDeviceCodeHandler($this->clientAuthenticator(), $this->deviceCodes(), $this->tokenPairIssuer());
 
         return $handler(new ExchangeDeviceCodeCommand(
-            clientId: $clientId ?? $this->tv->getPublicId()->toString(),
-            clientSecret: null,
+            credentials: new ClientCredentials($clientId ?? $this->tv->getPublicId()->toString()),
             deviceCode: $deviceCode,
             dpopJkt: self::JKT,
             clientFingerprint: 'fp-tv',

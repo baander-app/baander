@@ -6,6 +6,7 @@ namespace App\Tests\Functional\Auth;
 
 use App\Auth\Application\Command\OAuth\ExchangeRefreshTokenCommand;
 use App\Auth\Application\Command\OAuth\IssueTokenCommand;
+use App\Auth\Application\DTO\ClientCredentials;
 use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Domain\Model\OAuth\Client;
@@ -236,7 +237,7 @@ final class LogoutTest extends TestCase
     private function refresh(Client $client, ?string $refreshToken): TokenResponseDTO
     {
         $result = $this->bus()
-            ->dispatch(new ExchangeRefreshTokenCommand($client->getPublicId()->toString(), null, $refreshToken, self::DPOP_JKT))
+            ->dispatch(new ExchangeRefreshTokenCommand(new ClientCredentials($client->getPublicId()->toString()), $refreshToken, self::DPOP_JKT))
             ->last(HandledStamp::class)?->getResult();
         self::assertInstanceOf(TokenResponseDTO::class, $result);
 

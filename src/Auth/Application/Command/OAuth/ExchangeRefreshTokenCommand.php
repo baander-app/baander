@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Auth\Application\Command\OAuth;
 
+use App\Auth\Application\DTO\ClientCredentials;
+
 /**
  * A client refreshes its token pair at the token endpoint (RFC 6749 section 6).
  *
@@ -12,8 +14,7 @@ namespace App\Auth\Application\Command\OAuth;
 final readonly class ExchangeRefreshTokenCommand
 {
     public function __construct(
-        public string $clientId,
-        public ?string $clientSecret,
+        public ClientCredentials $credentials,
         public ?string $refreshToken,
         public string $dpopJkt,
         public ?string $ipAddress = null,

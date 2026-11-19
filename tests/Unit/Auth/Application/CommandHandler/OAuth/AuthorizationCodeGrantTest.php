@@ -10,6 +10,7 @@ use App\Auth\Application\CommandHandler\OAuth\CreateAuthorizationCodeHandler;
 use App\Auth\Application\CommandHandler\OAuth\ExchangeAuthorizationCodeHandler;
 use App\Auth\Application\DTO\AuthorizationRequestDTO;
 use App\Auth\Application\DTO\AuthorizationResponseDTO;
+use App\Auth\Application\DTO\ClientCredentials;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Query\OAuth\GetAuthorizationRequestQuery;
 use App\Auth\Application\QueryHandler\OAuth\GetAuthorizationRequestHandler;
@@ -106,8 +107,7 @@ final class AuthorizationCodeGrantTest extends TestCase
         $code = (string) $this->authorize()->code;
 
         $tokens = ($this->exchanger())(new ExchangeAuthorizationCodeCommand(
-            clientId: $this->client->getPublicId()->toString(),
-            clientSecret: null,
+            credentials: new ClientCredentials($this->client->getPublicId()->toString()),
             code: $code,
             redirectUri: self::REDIRECT,
             codeVerifier: self::VERIFIER,
@@ -158,7 +158,7 @@ final class AuthorizationCodeGrantTest extends TestCase
         $other = $this->register(Client::create('Other app', [self::REDIRECT]));
 
         $this->assertProtocolError('invalid_grant', fn () => ($this->exchanger())(new ExchangeAuthorizationCodeCommand(
-            $other->getPublicId()->toString(), null, $code, self::REDIRECT, self::VERIFIER, self::JKT,
+            new ClientCredentials($other->getPublicId()->toString()), $code, self::REDIRECT, self::VERIFIER, self::JKT,
         )));
     }
 
@@ -186,11 +186,11 @@ final class AuthorizationCodeGrantTest extends TestCase
         $code = (string) $this->authorize(clientId: $confidential->getPublicId()->toString())->code;
 
         $this->assertProtocolError('invalid_client', fn () => ($this->exchanger())(new ExchangeAuthorizationCodeCommand(
-            $confidential->getPublicId()->toString(), 'wrong', $code, self::REDIRECT, self::VERIFIER, self::JKT,
+            new ClientCredentials($confidential->getPublicId()->toString(), 'wrong'), $code, self::REDIRECT, self::VERIFIER, self::JKT,
         )), 401);
 
         $tokens = ($this->exchanger())(new ExchangeAuthorizationCodeCommand(
-            $confidential->getPublicId()->toString(), 'shared-secret', $code, self::REDIRECT, self::VERIFIER, self::JKT,
+            new ClientCredentials($confidential->getPublicId()->toString(), 'shared-secret'), $code, self::REDIRECT, self::VERIFIER, self::JKT,
         ));
         self::assertNotSame('', $tokens->getAccessToken());
     }
@@ -317,7 +317,7 @@ final class AuthorizationCodeGrantTest extends TestCase
 
     private function exchange(string $code, ?string $redirectUri = self::REDIRECT, ?string $verifier = self::VERIFIER): ExchangeAuthorizationCodeCommand
     {
-        return new ExchangeAuthorizationCodeCommand($this->client->getPublicId()->toString(), null, $code, $redirectUri, $verifier, self::JKT);
+        return new ExchangeAuthorizationCodeCommand(new ClientCredentials($this->client->getPublicId()->toString()), $code, $redirectUri, $verifier, self::JKT);
     }
 
     private function authCodes(): AuthCodeRepositoryInterface

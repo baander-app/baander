@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Application\CommandHandler\OAuth;
 
+use App\Auth\Application\Port\ClientAssertionVerifierInterface;
 use App\Auth\Application\Port\JwtGeneratorInterface;
 use App\Auth\Application\ScopeAllowlist;
 use App\Auth\Application\Service\OAuthClientAuthenticator;
@@ -88,7 +89,7 @@ trait IssuesTokenPairs
             fn (PublicId $publicId): ?Client => $this->clients[$publicId->toString()] ?? null,
         );
 
-        return new OAuthClientAuthenticator($repository);
+        return new OAuthClientAuthenticator($repository, $this->createStub(ClientAssertionVerifierInterface::class));
     }
 
     private function register(Client $client): Client

@@ -11,6 +11,7 @@ use App\Auth\Application\Command\OAuth\IssueTokenCommand;
 use App\Auth\Application\Command\User\DisableUserCommand;
 use App\Auth\Application\Command\User\EnableUserCommand;
 use App\Auth\Application\DTO\AuthorizationResponseDTO;
+use App\Auth\Application\DTO\ClientCredentials;
 use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Service\WebSocketOriginPolicy;
@@ -126,7 +127,7 @@ final class DisabledUserAccessTest extends TestCase
         $this->entityManager->clear();
 
         try {
-            $this->bus()->dispatch(new ExchangeAuthorizationCodeCommand($clientId, null, $authorization->code, $redirectUri, $verifier, self::DPOP_JKT));
+            $this->bus()->dispatch(new ExchangeAuthorizationCodeCommand(new ClientCredentials($clientId), $authorization->code, $redirectUri, $verifier, self::DPOP_JKT));
             self::fail('The authorization code of a disabled user must not be exchangeable.');
         } catch (HandlerFailedException $exception) {
             $cause = $exception->getPrevious();
@@ -186,7 +187,7 @@ final class DisabledUserAccessTest extends TestCase
     private function refresh(string $clientPublicId, ?string $refreshToken): TokenResponseDTO
     {
         $result = $this->bus()
-            ->dispatch(new ExchangeRefreshTokenCommand($clientPublicId, null, $refreshToken, self::DPOP_JKT))
+            ->dispatch(new ExchangeRefreshTokenCommand(new ClientCredentials($clientPublicId), $refreshToken, self::DPOP_JKT))
             ->last(HandledStamp::class)?->getResult();
         self::assertInstanceOf(TokenResponseDTO::class, $result);
 

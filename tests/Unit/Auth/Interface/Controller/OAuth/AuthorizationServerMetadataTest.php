@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Interface\Controller\OAuth;
 
+use App\Auth\Infrastructure\Security\OAuth\ClientAssertionVerifier;
 use App\Auth\Infrastructure\Security\OAuth\DpopProofValidator;
 use App\Auth\Interface\Controller\OAuth\AuthorizationServerMetadataController;
 use PHPUnit\Framework\TestCase;
@@ -18,6 +19,11 @@ final class AuthorizationServerMetadataTest extends TestCase
         $accepted = (new ReflectionClassConstant(DpopProofValidator::class, 'SUPPORTED_ALGORITHMS'))->getValue();
 
         self::assertSame($accepted, AuthorizationServerMetadataController::DPOP_SIGNING_ALGORITHMS);
+    }
+
+    public function testAdvertisedClientAssertionAlgorithmsAreThoseTheVerifierAccepts(): void
+    {
+        self::assertSame(ClientAssertionVerifier::SUPPORTED_ALGORITHMS, AuthorizationServerMetadataController::CLIENT_ASSERTION_SIGNING_ALGORITHMS);
     }
 
     public function testEndpointsAreRootedAtTheIssuer(): void
@@ -41,6 +47,8 @@ final class AuthorizationServerMetadataTest extends TestCase
         self::assertSame(['S256'], $metadata['code_challenge_methods_supported']);
         self::assertSame(['authorization_code', 'refresh_token', 'urn:ietf:params:oauth:grant-type:device_code'], $metadata['grant_types_supported']);
         self::assertSame(['profile', 'library'], $metadata['scopes_supported']);
+        self::assertSame(['none', 'client_secret_post', 'private_key_jwt'], $metadata['token_endpoint_auth_methods_supported']);
+        self::assertSame(AuthorizationServerMetadataController::CLIENT_ASSERTION_SIGNING_ALGORITHMS, $metadata['token_endpoint_auth_signing_alg_values_supported']);
         self::assertArrayNotHasKey('introspection_endpoint', $metadata);
     }
 }

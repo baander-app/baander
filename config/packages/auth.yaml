@@ -132,6 +132,13 @@ parameters:
     # DPoP nonce TTL in seconds. Default: 5 minutes.
     auth.dpop.nonce_ttl: 300
 
+    # --- Client Assertions (private_key_jwt, RFC 7523 and RFC 10070) ---
+
+    # Longest lifetime a client assertion may have: its exp may lie at most this far
+    # ahead, and at most this far after its iat. The clock skew is auth.dpop.clock_skew.
+    # Each assertion's jti is accepted once while the assertion is valid. Default: 5 minutes.
+    auth.client_assertion.max_lifetime: 300
+
     # --- Rate Limiting (Brute-Force Protection) ---
 
     # Maximum login attempts per IP within the window. Default: 20 per 5 minutes.

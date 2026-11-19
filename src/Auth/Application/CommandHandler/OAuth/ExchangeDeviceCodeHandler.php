@@ -36,7 +36,7 @@ final readonly class ExchangeDeviceCodeHandler
     #[AsMessageHandler]
     public function __invoke(ExchangeDeviceCodeCommand $command): TokenResponseDTO
     {
-        $client = $this->clientAuthenticator->authenticate($command->clientId, $command->clientSecret);
+        $client = $this->clientAuthenticator->authenticate($command->credentials);
         if (!$client->isDeviceClient()) {
             throw OAuthProtocolException::unauthorizedClient('The client is not registered for the device authorization grant.');
         }
