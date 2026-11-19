@@ -17,6 +17,7 @@
     "ext-posix": "*",
     "ext-redis": "*",
     "ext-sockets": "*",
+    "ext-sodium": "*",
     "ext-swoole": "*",
     "cweagans/composer-patches": "^2.0",
     "defuse/php-encryption": "^2.4",
