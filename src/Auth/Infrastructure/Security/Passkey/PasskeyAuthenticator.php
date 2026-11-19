@@ -7,6 +7,7 @@ namespace App\Auth\Infrastructure\Security\Passkey;
 use App\Auth\Application\Command\Passkey\AuthenticatePasskeyCommand;
 use App\Auth\Application\DTO\VerifiedPasskeyLogin;
 use App\Auth\Application\Exception\DpopStoreUnavailableException;
+use App\Auth\Application\Exception\PasskeyChallengeUnavailableException;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Security\OAuth\DpopTokenRequestVerifier;
 use App\Auth\Infrastructure\Security\AuthenticationFailureMessage;
@@ -21,6 +22,7 @@ use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Application\Exception\HandlerFailure;
 use Symfony\Component\Security\Core\Exception\AuthenticationException;
 use Symfony\Component\Security\Core\Exception\BadCredentialsException;
 use Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException;
@@ -124,6 +126,16 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
             }
             $uuid = Uuid::fromString($userId);
         } catch (\Throwable $e) {
+            $cause = HandlerFailure::cause($e);
+            if ($cause instanceof PasskeyChallengeUnavailableException) {
+                // Not a failed ceremony: the challenge store could not answer.
+                throw new ServiceUnavailableHttpException(
+                    PasskeyChallengeUnavailableException::RETRY_AFTER_SECONDS,
+                    'The passkey challenge store is unavailable.',
+                    $cause,
+                    headers: ['Cache-Control' => 'no-store'],
+                );
+            }
             $this->logger->debug('Passkey authentication failed.', ['exception' => $e]);
             throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS, 0, $e);
         }

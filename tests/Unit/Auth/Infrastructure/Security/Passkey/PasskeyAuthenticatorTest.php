@@ -10,6 +10,7 @@ use App\Auth\Domain\Repository\LoginBlockRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Security\User\PasswordAuthenticator;
 use App\Auth\Application\Exception\DpopStoreUnavailableException;
+use App\Auth\Application\Exception\PasskeyChallengeUnavailableException;
 use App\Auth\Application\Port\DpopJtiCacheInterface;
 use App\Auth\Infrastructure\Security\OAuth\DpopNonceManager;
 use App\Auth\Infrastructure\Security\OAuth\DpopProofValidator;
@@ -28,6 +29,8 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class PasskeyAuthenticatorTest extends TestCase
@@ -88,6 +91,28 @@ final class PasskeyAuthenticatorTest extends TestCase
             self::assertSame(503, $exception->getStatusCode());
             self::assertEqualsCanonicalizing(['retry-after' => '5', 'cache-control' => 'no-store'], array_change_key_case(array_map(strval(...), $exception->getHeaders()), CASE_LOWER));
             self::assertInstanceOf(DpopStoreUnavailableException::class, $exception->getPrevious());
+        }
+    }
+
+    /** The challenge store not answering is not a failed ceremony either. */
+    public function testAChallengeStoreOutageIsAnsweredWith503(): void
+    {
+        $redis = $this->createStub(RedisClientFactory::class);
+        $redis->method('borrow')->willReturn(true);
+        $outage = new PasskeyChallengeUnavailableException('Passkey challenge storage is unavailable.');
+        $bus = $this->createStub(\Symfony\Component\Messenger\MessageBusInterface::class);
+        $bus->method('dispatch')->willReturnCallback(static fn (object $command): never => throw new HandlerFailedException(new Envelope($command), [$outage]));
+        $verifier = new DpopTokenRequestVerifier(new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class)), new DpopNonceManager($redis));
+        $authenticator = new PasskeyAuthenticator($bus, $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class), $this->createStub(LoggerInterface::class), new JsonEncoder(), $verifier, AuthenticationFailureMessages::create());
+        $request = Request::create('https://baander.app/api/auth/login/passkey', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], '{"challengeKey":"key","response":{}}');
+        $request->headers->set('DPoP', (new SignedDpopProof())->createWithNonce('POST', 'https://baander.app/api/auth/login/passkey', 'issued-nonce'));
+
+        try {
+            $authenticator->authenticate($request);
+            self::fail('The outage must not be reported as an authentication failure.');
+        } catch (ServiceUnavailableHttpException $exception) {
+            self::assertEqualsCanonicalizing(['retry-after' => '1', 'cache-control' => 'no-store'], array_change_key_case(array_map(strval(...), $exception->getHeaders()), CASE_LOWER));
+            self::assertSame($outage, $exception->getPrevious());
         }
     }
 

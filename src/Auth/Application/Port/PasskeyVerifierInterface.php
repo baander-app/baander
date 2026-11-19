@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Auth\Application\Port;
 
+use App\Auth\Application\Exception\PasskeyChallengeUnavailableException;
 use Webauthn\CredentialRecord;
-use Webauthn\PublicKeyCredentialCreationOptions;
 use Webauthn\PublicKeyCredentialRequestOptions;
 
 /**
@@ -16,11 +16,12 @@ use Webauthn\PublicKeyCredentialRequestOptions;
 interface PasskeyVerifierInterface
 {
     /**
-     * Retrieve stored challenge options by key.
+     * The login challenge stored under this key, spent by this call.
      *
-     * @throws \RuntimeException If the challenge key is not found or expired
+     * @throws \RuntimeException If the challenge key is not found, expired or already used
+     * @throws PasskeyChallengeUnavailableException
      */
-    public function getChallenge(string $key): PublicKeyCredentialCreationOptions|PublicKeyCredentialRequestOptions;
+    public function consumeLoginChallenge(string $challengeKey): PublicKeyCredentialRequestOptions;
 
     /**
      * Verify a WebAuthn authentication (assertion) response.
@@ -28,6 +29,7 @@ interface PasskeyVerifierInterface
      * @param array<string, mixed>               $response          The JSON from navigator.credentials.get()
      * @param PublicKeyCredentialRequestOptions  $expectedOptions   The stored request options
      * @param CredentialRecord                    $storedCredential  The stored credential record
+     * @param bool $requireUserVerification Refuse an assertion whose authenticator did not verify the user
      *
      * @throws \RuntimeException
      * @throws \Webauthn\Exception\AuthenticatorResponseVerificationException
@@ -36,6 +38,7 @@ interface PasskeyVerifierInterface
         array $response,
         PublicKeyCredentialRequestOptions $expectedOptions,
         CredentialRecord $storedCredential,
+        bool $requireUserVerification,
     ): CredentialRecord;
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Interface\Controller\Passkey;
 
 use App\Auth\Application\Command\Passkey\RegisterPasskeyCommand;
+use App\Auth\Application\Exception\PasskeyChallengeUnavailableException;
 use App\Auth\Application\Port\UserPortInterface;
 use App\Auth\Domain\Model\Passkey\Passkey;
 use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
@@ -107,6 +108,12 @@ final class PasskeyController
                 ),
             ),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '503',
+                description: 'The passkey challenge store is unavailable; retry after the Retry-After delay.',
+                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 1))],
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ),
         ],
     )]
     #[Route('/options', name: 'options', methods: ['POST'])]
@@ -129,11 +136,15 @@ final class PasskeyController
             $existingPasskeys,
         );
 
-        $result = $this->passkeyService->createRegistrationOptions(
-            userId: $userId,
-            username: $user->getEmail(),
-            existingCredentialIds: $existingCredentialIds,
-        );
+        try {
+            $result = $this->passkeyService->createRegistrationOptions(
+                userId: $userId,
+                username: $user->getEmail(),
+                existingCredentialIds: $existingCredentialIds,
+            );
+        } catch (PasskeyChallengeUnavailableException) {
+            return $this->challengeStoreUnavailable();
+        }
 
         return $this->successResponse($result);
     }
@@ -166,6 +177,12 @@ final class PasskeyController
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '400', description: 'Invalid challenge or verification failed', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '503',
+                description: 'The passkey challenge store is unavailable; retry after the Retry-After delay.',
+                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 1))],
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ),
         ],
     )]
     #[Route('/register', name: 'register', methods: ['POST'])]
@@ -176,8 +193,18 @@ final class PasskeyController
             return $this->unauthorized();
         }
 
+        $owner = $this->users->findByUuid(Uuid::fromString($user->getId()));
+        if ($owner === null) {
+            return $this->notFound();
+        }
+
         try {
-            $expectedOptions = $this->passkeyService->getChallenge($passkeyRequest->challengeKey);
+            $expectedOptions = $this->passkeyService->consumeRegistrationChallenge(
+                $owner->getPublicId()->toString(),
+                $passkeyRequest->challengeKey,
+            );
+        } catch (PasskeyChallengeUnavailableException) {
+            return $this->challengeStoreUnavailable();
         } catch (\Throwable) {
             return $this->errorResponse($this->trans('errors.invalid_challenge', domain: 'auth'));
         }
@@ -234,6 +261,12 @@ final class PasskeyController
                 ),
             ),
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '503',
+                description: 'The passkey challenge store is unavailable; retry after the Retry-After delay.',
+                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 1))],
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ),
         ],
     )]
     #[Route('/authenticate/options', name: 'authenticate_options', methods: ['POST'])]
@@ -253,7 +286,11 @@ final class PasskeyController
             }
         }
 
-        $result = $this->passkeyService->createAuthenticationOptions($allowedCredentialIds);
+        try {
+            $result = $this->passkeyService->createAuthenticationOptions($allowedCredentialIds);
+        } catch (PasskeyChallengeUnavailableException) {
+            return $this->challengeStoreUnavailable();
+        }
 
         return $this->successResponse($result);
     }
@@ -288,13 +325,21 @@ final class PasskeyController
             new OA\Response(response: '400', description: 'Invalid challenge or verification failed', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '401', description: 'No passkey found for credential ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '503',
+                description: 'The passkey challenge store is unavailable; retry after the Retry-After delay.',
+                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 1))],
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ),
         ],
     )]
     #[Route('/authenticate', name: 'authenticate', methods: ['POST'])]
     public function authenticate(#[MapRequestPayload] VerifyPasskeyChallengeRequest $payload): JsonResponse
     {
         try {
-            $expectedOptions = $this->passkeyService->getChallenge($payload->challengeKey);
+            $expectedOptions = $this->passkeyService->consumeLoginChallenge($payload->challengeKey);
+        } catch (PasskeyChallengeUnavailableException) {
+            return $this->challengeStoreUnavailable();
         } catch (\Throwable) {
             return $this->errorResponse($this->trans('errors.invalid_challenge', domain: 'auth'));
         }
@@ -336,6 +381,7 @@ final class PasskeyController
                 $payload->response,
                 $expectedOptions,
                 $storedCredential,
+                $owner->hasTotpEnabled(),
             );
         } catch (\Throwable $e) {
             return $this->errorResponse($this->trans('errors.passkey_auth_failed', ['{details}' => $e->getMessage()], 'auth'), Response::HTTP_UNAUTHORIZED);
@@ -435,6 +481,18 @@ final class PasskeyController
             'message' => $this->trans('success.passkey_deleted', domain: 'auth'),
             'signal' => $signalData,
         ]);
+    }
+
+    private function challengeStoreUnavailable(): JsonResponse
+    {
+        $response = $this->errorResponse(
+            $this->trans('errors.passkey_unavailable', domain: 'auth'),
+            Response::HTTP_SERVICE_UNAVAILABLE,
+        );
+        $response->headers->set('Retry-After', (string) PasskeyChallengeUnavailableException::RETRY_AFTER_SECONDS);
+        $response->headers->set('Cache-Control', 'no-store');
+
+        return $response;
     }
 
     private function getCurrentSecurityUser(): ?SecurityUser

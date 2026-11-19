@@ -214,6 +214,24 @@ final class DpopStoreOutageTest extends TestCase
         self::assertIsString($recovered->headers->get('DPoP-Nonce'));
     }
 
+    /**
+     * Passkey challenges live in Redis only: during the outage no challenge is issued or
+     * spent, and a challenge issued before it is still good, once, when Redis answers.
+     */
+    public function testPasskeyChallengesDuringTheOutageAnswer503AndStaySingleUse(): void
+    {
+        $assertion = $this->passkeyAssertion($this->registerPasskey());
+        $refused = $this->refusedKernel();
+
+        self::assertStoreUnavailable($this->send('POST', '/api/auth/passkey/authenticate/options', json: ['userId' => $this->user->getPublicId()->toString()], kernel: $refused), '1');
+        self::assertStoreUnavailable($this->send('POST', '/api/auth/passkey/authenticate', json: $assertion, kernel: $refused), '1');
+
+        $verified = $this->send('POST', '/api/auth/passkey/authenticate', json: $assertion);
+        self::assertSame(200, $verified->getStatusCode(), (string) $verified->getContent());
+        $replayed = $this->send('POST', '/api/auth/passkey/authenticate', json: $assertion);
+        self::assertSame(400, $replayed->getStatusCode(), (string) $replayed->getContent());
+    }
+
     public function testTheTokenEndpointDuringTheOutageAnswers503WithRetryAfter(): void
     {
         $key = new SignedDpopProof();

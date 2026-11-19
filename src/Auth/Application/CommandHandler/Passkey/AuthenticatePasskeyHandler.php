@@ -40,8 +40,8 @@ final class AuthenticatePasskeyHandler
             throw new RuntimeException('No passkey found for the given credential ID.');
         }
 
-        // Retrieve the stored challenge options
-        $expectedOptions = $this->passkeyVerifier->getChallenge($command->getChallengeKey());
+        // Spend the challenge first: whatever happens below, it cannot be tried again.
+        $expectedOptions = $this->passkeyVerifier->consumeLoginChallenge($command->getChallengeKey());
 
         // Reconstruct the credential source from stored passkey data
         $storedCredential = $this->passkeyVerifier->credentialRecordFromArray(
@@ -49,27 +49,38 @@ final class AuthenticatePasskeyHandler
             $passkey->getCounter(),
         );
 
-        // Verify the authentication response (challenge, origin, signature, user handle)
-        $updatedCredential = $this->passkeyVerifier->verifyAuthenticationResponse(
-            $response,
-            $expectedOptions,
-            $storedCredential,
-        );
-
-        // Check and update the counter for cloned authenticator detection.
-        // A counter less than or equal to the stored value indicates a cloned authenticator.
-        if ($updatedCredential->counter <= $passkey->getCounter()) {
-            throw new RuntimeException('Possible cloned authenticator detected: signature counter did not increase.');
-        }
-
         $userId = $this->passkeyRepository->userIdForCredentialId($credentialId);
         if ($userId === null) {
             throw new RuntimeException('Unable to resolve user for the given credential ID.');
         }
         $owner = $this->users->findByUuid($userId);
-        if ($owner === null || !hash_equals($owner->getPublicId()->toString(), $storedCredential->userHandle)) {
+        if ($owner === null) {
             throw new RuntimeException('Credential owner does not match its registered user handle.');
         }
+
+        // Verify the authentication response (challenge, origin, signature, user handle).
+        // A passkey stands in for both factors only when the authenticator verified the
+        // user, so an account with TOTP on refuses an assertion without that flag.
+        $updatedCredential = $this->passkeyVerifier->verifyAuthenticationResponse(
+            $response,
+            $expectedOptions,
+            $storedCredential,
+            $owner->hasTotpEnabled(),
+        );
+
+        if (!hash_equals($owner->getPublicId()->toString(), $storedCredential->userHandle)) {
+            throw new RuntimeException('Credential owner does not match its registered user handle.');
+        }
+
+        // Cloned authenticator detection, as WebAuthn defines it: a counter that does not
+        // increase is suspect, unless both counters are 0, which an authenticator without
+        // a counter reports on every use.
+        $newCounter = $updatedCredential->counter;
+        $storedCounter = $passkey->getCounter();
+        if (($newCounter !== 0 || $storedCounter !== 0) && $newCounter <= $storedCounter) {
+            throw new RuntimeException('Possible cloned authenticator detected: signature counter did not increase.');
+        }
+
         $claimedUserId = $command->getUserId();
         if ($claimedUserId !== null) {
             try {
@@ -83,7 +94,7 @@ final class AuthenticatePasskeyHandler
         }
 
         // Rejected owner hints never update or persist the credential's counter.
-        $passkey->updateCounter($updatedCredential->counter);
+        $passkey->updateCounter($newCounter);
         $this->passkeyRepository->markUsed($passkey);
 
         return $userId->toString();

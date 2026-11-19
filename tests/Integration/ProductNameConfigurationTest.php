@@ -8,6 +8,7 @@ use App\Auth\Domain\Model\User;
 use App\Auth\Infrastructure\Mail\AfterResponseMailer;
 use App\Auth\Infrastructure\Mail\MailerPasswordResetDelivery;
 use App\Auth\Infrastructure\Security\Passkey\PasskeyService;
+use App\Tests\Fixtures\Auth\InMemoryPasskeyChallengeStore;
 use App\Auth\Infrastructure\Security\Totp\TotpService;
 use App\Kernel;
 use App\Notification\Application\DTO\SendEmailCommand;
@@ -20,7 +21,6 @@ use App\UserPreference\Application\Port\UserSettingsContractInterface;
 use OTPHP\TOTP;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Reference;
@@ -191,7 +191,7 @@ final class ProductNameConfigurationKernel extends Kernel
         ] as $id => $class) {
             $container->register($id, $class)->setSynthetic(true)->setPublic(true);
         }
-        $container->register('branding.cache', ArrayAdapter::class);
+        $container->register('branding.challenges', InMemoryPasskeyChallengeStore::class);
         $container->setAlias('branding.dispatcher', 'event_dispatcher')->setPublic(true);
         foreach ([
             'branding.password_reset' => MailerPasswordResetDelivery::class,
@@ -212,7 +212,7 @@ final class ProductNameConfigurationKernel extends Kernel
                     ->setArgument('$preferenceRepository', new Reference('branding.preferences'))
                     ->setArgument('$userSettings', new Reference('branding.settings'));
                 $container->getDefinition(PasskeyService::class)
-                    ->setArgument('$cache', new Reference('branding.cache'));
+                    ->setArgument('$challenges', new Reference('branding.challenges'));
             }
         });
     }

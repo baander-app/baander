@@ -13085,7 +13085,7 @@ return customInstance<PostPasskeyAuthenticateOptions200>(getPostPasskeyAuthentic
 
 export const getPostPasskeyAuthenticateOptionsMutationKey = () => ['postPasskeyAuthenticateOptions'] as const;
 
-export const getPostPasskeyAuthenticateOptionsMutationOptions = <TError = ErrorType<ValidationError>,
+export const getPostPasskeyAuthenticateOptionsMutationOptions = <TError = ErrorType<ValidationError | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>, TError,PostPasskeyAuthenticateOptionsMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>, TError,PostPasskeyAuthenticateOptionsMutationVariables, TContext> => {
 
@@ -13114,13 +13114,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostPasskeyAuthenticateOptionsMutationResult = NonNullable<Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>>
     export type PostPasskeyAuthenticateOptionsMutationBody = BodyType<PostPasskeyAuthenticateOptionsBody>
-    export type PostPasskeyAuthenticateOptionsMutationError = ErrorType<ValidationError>
+    export type PostPasskeyAuthenticateOptionsMutationError = ErrorType<ValidationError | ApiError>
     export type PostPasskeyAuthenticateOptionsMutationVariables = {data: BodyType<PostPasskeyAuthenticateOptionsBody>}
 
     /**
  * @summary Get WebAuthn authentication options
  */
-export const usePostPasskeyAuthenticateOptions = <TError = ErrorType<ValidationError>,
+export const usePostPasskeyAuthenticateOptions = <TError = ErrorType<ValidationError | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>, TError,PostPasskeyAuthenticateOptionsMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>,

@@ -15,7 +15,7 @@ use App\Shared\Application\Http\AcceptLanguageMatcher;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Psr\Cache\CacheItemPoolInterface;
+use App\Tests\Fixtures\Auth\InMemoryPasskeyChallengeStore;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -60,7 +60,7 @@ final class AuthControllerLogoutFaultTest extends TestCase
             counterChecker: $this->createStub(CounterChecker::class),
             eventDispatcher: $this->createStub(EventDispatcherInterface::class),
             logger: $this->createStub(LoggerInterface::class),
-            cache: $this->createStub(CacheItemPoolInterface::class),
+            challenges: new InMemoryPasskeyChallengeStore(),
             supportedAlgorithmIds: [-7],
             jsonEncoder: $jsonEncoder,
         );

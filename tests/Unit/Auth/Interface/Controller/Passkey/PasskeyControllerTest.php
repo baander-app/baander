@@ -264,7 +264,7 @@ final class PasskeyControllerTest extends TestCase
             counterChecker: $this->createStub(\Webauthn\Counter\CounterChecker::class),
             eventDispatcher: $this->createStub(\Psr\EventDispatcher\EventDispatcherInterface::class),
             logger: new \Psr\Log\NullLogger(),
-            cache: new \Symfony\Component\Cache\Adapter\ArrayAdapter(),
+            challenges: new \App\Tests\Fixtures\Auth\InMemoryPasskeyChallengeStore(),
             supportedAlgorithmIds: [-7, -257],
             jsonEncoder: new \Symfony\Component\Serializer\Encoder\JsonEncoder(),
         );

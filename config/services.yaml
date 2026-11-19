@@ -296,12 +296,14 @@ services:
             $userVerification: '%auth.passkey.user_verification%'
             $residentKey: '%auth.passkey.resident_key%'
             $attestation: '%auth.passkey.attestation%'
-            $cache: '@cache.tags'
             $supportedAlgorithmIds: '%auth.passkey.algorithms%'
             $jsonEncoder: '@json_encoder'
 
     App\Auth\Application\Port\PasskeyVerifierInterface:
         alias: App\Auth\Infrastructure\Security\Passkey\PasskeyService
+
+    App\Auth\Application\Port\PasskeyChallengeStoreInterface:
+        alias: App\Auth\Infrastructure\Cache\RedisPasskeyChallengeStore
 
     # --- Health Check ---
     App\Shared\Infrastructure\Health\HealthCheckService:

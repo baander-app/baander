@@ -12,12 +12,12 @@ use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Security\Passkey\PasskeyService;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
+use App\Tests\Fixtures\Auth\InMemoryPasskeyChallengeStore;
 use App\Tests\Fixtures\Auth\WebAuthnTestCredential;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\NullLogger;
-use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Webauthn\Counter\CounterChecker;
 
@@ -49,7 +49,7 @@ final class PublicPasskeyAuthenticationTest extends TestCase
             authenticatorAttachment: '', userVerification: 'preferred', residentKey: 'preferred', attestation: 'none',
             counterChecker: $this->createStub(CounterChecker::class),
             eventDispatcher: $this->createStub(EventDispatcherInterface::class),
-            logger: new NullLogger(), cache: new ArrayAdapter(), supportedAlgorithmIds: [-7], jsonEncoder: new JsonEncoder(),
+            logger: new NullLogger(), challenges: new InMemoryPasskeyChallengeStore(), supportedAlgorithmIds: [-7], jsonEncoder: new JsonEncoder(),
         );
         $options = $service->createAuthenticationOptions();
         $assertion = $credential->assert($options['options']['challenge'], 'https://baander.app');

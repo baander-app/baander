@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Infrastructure\Security;
 
+use App\Auth\Application\Exception\PasskeyChallengeUnavailableException;
+use App\Auth\Application\Port\PasskeyChallengeStoreInterface;
 use App\Auth\Infrastructure\Security\Passkey\PasskeyService;
+use App\Tests\Fixtures\Auth\InMemoryPasskeyChallengeStore;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
-use Psr\Cache\CacheItemInterface;
-use Psr\Cache\CacheItemPoolInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Webauthn\Counter\CounterChecker;
 use Webauthn\CredentialRecord;
-use Webauthn\PublicKeyCredentialCreationOptions;
 use Webauthn\PublicKeyCredentialRequestOptions;
 
 final class PasskeyServiceTest extends TestCase
@@ -23,7 +23,7 @@ final class PasskeyServiceTest extends TestCase
     private LoggerInterface&Stub $logger;
     private CounterChecker $counterChecker;
     private EventDispatcherInterface&Stub $eventDispatcher;
-    private CacheItemPoolInterface&Stub $cache;
+    private PasskeyChallengeStoreInterface $challenges;
     private PasskeyService $service;
 
     protected function setUp(): void
@@ -31,7 +31,7 @@ final class PasskeyServiceTest extends TestCase
         $this->logger = $this->createStub(LoggerInterface::class);
         $this->counterChecker = $this->createStub(CounterChecker::class);
         $this->eventDispatcher = $this->createStub(EventDispatcherInterface::class);
-        $this->cache = $this->createStub(CacheItemPoolInterface::class);
+        $this->challenges = new InMemoryPasskeyChallengeStore();
 
         $this->service = $this->createService();
     }
@@ -49,296 +49,83 @@ final class PasskeyServiceTest extends TestCase
             counterChecker: $this->counterChecker,
             eventDispatcher: $this->eventDispatcher,
             logger: $this->logger,
-            cache: $this->cache,
+            challenges: $this->challenges,
             supportedAlgorithmIds: [-7, -257],
             jsonEncoder: new JsonEncoder(),
         );
     }
 
-    // --- Challenge storage (Redis-backed) ---
+    // --- Challenge storage ---
 
-    public function testStoreChallengeWritesToCache(): void
+    private const string USER_A = 'aaaaaaaaaaaaaaaaaaaaa';
+    private const string USER_B = 'bbbbbbbbbbbbbbbbbbbbb';
+
+    public function testARegistrationChallengeIssuedForOneUserIsRefusedForAnother(): void
     {
-        $this->cache = $this->createMock(CacheItemPoolInterface::class);
-        $this->service = $this->createService();
+        $issued = $this->service->createRegistrationOptions(self::USER_A, 'a@baander.app');
 
-        $creationOptions = PublicKeyCredentialCreationOptions::create(
-            rp: \Webauthn\PublicKeyCredentialRpEntity::create(name: 'Bånder', id: 'localhost'),
-            user: \Webauthn\PublicKeyCredentialUserEntity::create(name: 'user@baander.app', id: 'user-1', displayName: 'User'),
-            challenge: random_bytes(32),
-        );
+        try {
+            $this->service->consumeRegistrationChallenge(self::USER_B, $issued['challengeKey']);
+            self::fail('Another user cannot spend the challenge.');
+        } catch (RuntimeException $error) {
+            self::assertSame('Challenge not found or has expired.', $error->getMessage());
+        }
 
-        $cacheItem = $this->createStub(CacheItemInterface::class);
-        $cacheItem->method('set')->willReturnSelf();
-        $cacheItem->method('expiresAfter')->willReturnSelf();
-
-        $this->cache->expects($this->once())
-            ->method('getItem')
-            ->with($this->stringStartsWith('webauthn_challenge_'))
-            ->willReturn($cacheItem);
-
-        $this->cache->expects($this->once())
-            ->method('save')
-            ->with($cacheItem);
-
-        $key = $this->service->storeChallenge($creationOptions);
-        $this->assertNotEmpty($key);
+        $options = $this->service->consumeRegistrationChallenge(self::USER_A, $issued['challengeKey']);
+        self::assertSame(self::USER_A, $options->user->id);
     }
 
-    public function testStoreAndRetrieveChallengeFromCache(): void
+    public function testARegistrationChallengeIsSpentOnceFromAnyServiceInstance(): void
     {
-        $creationOptions = PublicKeyCredentialCreationOptions::create(
-            rp: \Webauthn\PublicKeyCredentialRpEntity::create(name: 'Bånder', id: 'localhost'),
-            user: \Webauthn\PublicKeyCredentialUserEntity::create(name: 'user@baander.app', id: 'user-1', displayName: 'User'),
-            challenge: random_bytes(32),
-        );
+        $issued = $this->service->createRegistrationOptions(self::USER_A, 'a@baander.app');
+        $otherWorker = $this->createService();
 
-        // Capture the serialized JSON that storeChallenge writes to cache
-        $capturedJson = null;
-        $storeItem = $this->createStub(CacheItemInterface::class);
-        $self = $storeItem;
-        $storeItem->method('set')->willReturnCallback(function (string $value) use (&$capturedJson, $self): CacheItemInterface {
-            $capturedJson = $value;
+        $otherWorker->consumeRegistrationChallenge(self::USER_A, $issued['challengeKey']);
 
-            return $self;
-        });
-        $storeItem->method('expiresAfter')->willReturnSelf();
-        $this->cache->method('getItem')->willReturn($storeItem);
-        $this->cache->method('save')->willReturn(true);
-
-        $key = $this->service->storeChallenge($creationOptions);
-        $this->assertNotEmpty($key);
-        $this->assertNotNull($capturedJson);
-
-        // Now replace cache mock for getChallenge to return the captured value
-        $retrieveItem = $this->createStub(CacheItemInterface::class);
-        $retrieveItem->method('isHit')->willReturn(true);
-        $retrieveItem->method('get')->willReturn($capturedJson);
-
-        $newCache = $this->createMock(CacheItemPoolInterface::class);
-        $newCache->method('getItem')->willReturn($retrieveItem);
-        $newCache->expects($this->once())->method('deleteItem');
-
-        $service = new PasskeyService(
-            appDomain: 'localhost',
-            appName: 'Bånder',
-            timeout: 60000,
-            authenticatorAttachment: '',
-            userVerification: 'preferred',
-            residentKey: 'preferred',
-            attestation: 'none',
-            counterChecker: $this->counterChecker,
-            eventDispatcher: $this->eventDispatcher,
-            logger: $this->logger,
-            cache: $newCache,
-            supportedAlgorithmIds: [-7, -257],
-            jsonEncoder: new JsonEncoder(),
-        );
-
-        $retrieved = $service->getChallenge($key);
-
-        $this->assertInstanceOf(PublicKeyCredentialCreationOptions::class, $retrieved);
+        $this->expectExceptionObject(new RuntimeException('Challenge not found or has expired.'));
+        $this->service->consumeRegistrationChallenge(self::USER_A, $issued['challengeKey']);
     }
 
-    public function testGetChallengeFallsBackToInMemoryWhenCacheFails(): void
+    public function testAChallengeServesOnlyTheCeremonyItWasIssuedFor(): void
     {
-        $this->logger = $this->createMock(LoggerInterface::class);
-        $this->cache = $this->createMock(CacheItemPoolInterface::class);
-        $this->service = $this->createService();
+        $registration = $this->service->createRegistrationOptions(self::USER_A, 'a@baander.app');
+        $login = $this->service->createAuthenticationOptions();
 
-        $creationOptions = PublicKeyCredentialCreationOptions::create(
-            rp: \Webauthn\PublicKeyCredentialRpEntity::create(name: 'Bånder', id: 'localhost'),
-            user: \Webauthn\PublicKeyCredentialUserEntity::create(name: 'user@baander.app', id: 'user-1', displayName: 'User'),
-            challenge: random_bytes(32),
-        );
+        foreach ([
+            fn () => $this->service->consumeLoginChallenge($registration['challengeKey']),
+            fn () => $this->service->consumeRegistrationChallenge(self::USER_A, $login['challengeKey']),
+        ] as $crossed) {
+            try {
+                $crossed();
+                self::fail('A challenge cannot cross ceremonies.');
+            } catch (RuntimeException $error) {
+                self::assertSame('Challenge not found or has expired.', $error->getMessage());
+            }
+        }
 
-        $key = $this->service->storeChallenge($creationOptions);
-
-        // Cache getItem throws
-        $this->cache->expects($this->once())
-            ->method('getItem')
-            ->willThrowException(new \RuntimeException('Redis connection refused'));
-
-        $this->logger->expects($this->once())
-            ->method('warning')
-            ->with($this->stringContains('Failed to retrieve'));
-
-        // Should fall back to in-memory and return the options
-        $retrieved = $this->service->getChallenge($key);
-        $this->assertInstanceOf(PublicKeyCredentialCreationOptions::class, $retrieved);
+        self::assertInstanceOf(PublicKeyCredentialRequestOptions::class, $this->service->consumeLoginChallenge($login['challengeKey']));
     }
 
-    public function testGetChallengeRemovesFromCache(): void
+    public function testAnUnavailableStoreFailsOptionsAndConsumptionAlike(): void
     {
-        $options = PublicKeyCredentialRequestOptions::create(
-            challenge: random_bytes(32),
-            rpId: 'localhost',
-        );
+        $this->challenges = $this->createStub(PasskeyChallengeStoreInterface::class);
+        $this->challenges->method('put')->willThrowException(new PasskeyChallengeUnavailableException('Passkey challenge storage is unavailable.'));
+        $this->challenges->method('take')->willThrowException(new PasskeyChallengeUnavailableException('Passkey challenge storage is unavailable.'));
+        $service = $this->createService();
 
-        $key = $this->service->storeChallenge($options);
-
-        // First retrieval via cache hit should remove from in-memory too
-        $hitItem = $this->createStub(CacheItemInterface::class);
-        $hitItem->method('isHit')->willReturn(true);
-        $hitItem->method('get')->willReturnCallback(function () use ($options) {
-            $challenge = rtrim(strtr(base64_encode($options->challenge), '+/', '-_'), '=');
-            return json_encode([
-                'challenge' => $challenge,
-                'rpId' => $options->rpId,
-                'userVerification' => $options->userVerification,
-                'timeout' => $options->timeout,
-                'allowCredentials' => [],
-                'extensions' => [],
-            ], JSON_THROW_ON_ERROR);
-        });
-
-        // Use a fresh service so we can control the cache behavior precisely
-        $freshCache = $this->createMock(CacheItemPoolInterface::class);
-        $freshCache->expects($this->exactly(2))
-            ->method('getItem')
-            ->willReturnOnConsecutiveCalls($hitItem, $this->createConfiguredStub(CacheItemInterface::class, ['isHit' => false]));
-        $freshCache->expects($this->once())
-            ->method('deleteItem');
-
-        $freshService = new PasskeyService(
-            appDomain: 'localhost',
-            appName: 'Bånder',
-            timeout: 60000,
-            authenticatorAttachment: '',
-            userVerification: 'preferred',
-            residentKey: 'preferred',
-            attestation: 'none',
-            counterChecker: $this->counterChecker,
-            eventDispatcher: $this->eventDispatcher,
-            logger: $this->logger,
-            cache: $freshCache,
-            supportedAlgorithmIds: [-7, -257],
-            jsonEncoder: new JsonEncoder(),
-        );
-
-        // First retrieval succeeds (cache hit)
-        $freshService->getChallenge($key);
-
-        // Second retrieval should throw because in-memory was cleaned up and cache returns miss
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Challenge not found or has expired');
-
-        $freshService->getChallenge($key);
-    }
-
-    public function testGetChallengeThrowsOnUnknownKey(): void
-    {
-        $this->cache = $this->createMock(CacheItemPoolInterface::class);
-        $this->service = $this->createService();
-
-        $missItem = $this->createStub(CacheItemInterface::class);
-        $missItem->method('isHit')->willReturn(false);
-
-        $this->cache->expects($this->once())
-            ->method('getItem')
-            ->willReturn($missItem);
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Challenge not found or has expired');
-
-        $this->service->getChallenge('non-existent-key');
-    }
-
-    public function testExpiredChallengeReturnsNullFromCacheAndThrows(): void
-    {
-        // Use a fresh service with empty in-memory store to simulate a restart
-        $freshCache = $this->createStub(CacheItemPoolInterface::class);
-        $missItem = $this->createStub(CacheItemInterface::class);
-        $missItem->method('isHit')->willReturn(false);
-
-        $freshCache->method('getItem')->willReturn($missItem);
-
-        $freshService = new PasskeyService(
-            appDomain: 'localhost',
-            appName: 'Bånder',
-            timeout: 60000,
-            authenticatorAttachment: '',
-            userVerification: 'preferred',
-            residentKey: 'preferred',
-            attestation: 'none',
-            counterChecker: $this->counterChecker,
-            eventDispatcher: $this->eventDispatcher,
-            logger: $this->logger,
-            cache: $freshCache,
-            supportedAlgorithmIds: [-7, -257],
-            jsonEncoder: new JsonEncoder(),
-        );
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Challenge not found or has expired');
-
-        // Simulate retrieving a challenge whose cache TTL has expired after service restart
-        $freshService->getChallenge('some-stale-challenge-key');
-    }
-
-    public function testStoreChallengeFallsBackToInMemoryOnCacheFailure(): void
-    {
-        $this->logger = $this->createMock(LoggerInterface::class);
-        $this->service = $this->createService();
-
-        $creationOptions = PublicKeyCredentialCreationOptions::create(
-            rp: \Webauthn\PublicKeyCredentialRpEntity::create(name: 'Bånder', id: 'localhost'),
-            user: \Webauthn\PublicKeyCredentialUserEntity::create(name: 'user@baander.app', id: 'user-1', displayName: 'User'),
-            challenge: random_bytes(32),
-        );
-
-        $this->cache->method('getItem')
-            ->willThrowException(new \RuntimeException('Redis down'));
-
-        $this->logger->expects($this->exactly(2))
-            ->method('warning');
-
-        // Still returns a key; stored in-memory
-        $key = $this->service->storeChallenge($creationOptions);
-        $this->assertNotEmpty($key);
-
-        // Can retrieve via in-memory fallback
-        $retrieved = $this->service->getChallenge($key);
-        $this->assertSame($creationOptions, $retrieved);
-    }
-
-    public function testGetChallengeDeserializesRequestOptions(): void
-    {
-        $this->cache = $this->createMock(CacheItemPoolInterface::class);
-        $this->service = $this->createService();
-
-        $options = PublicKeyCredentialRequestOptions::create(
-            challenge: random_bytes(32),
-            rpId: 'localhost',
-            userVerification: 'preferred',
-            timeout: 60000,
-        );
-
-        $key = $this->service->storeChallenge($options);
-
-        $cacheItem = $this->createStub(CacheItemInterface::class);
-        $cacheItem->method('isHit')->willReturn(true);
-        $cacheItem->method('get')->willReturnCallback(function () use ($options) {
-            $challenge = rtrim(strtr(base64_encode($options->challenge), '+/', '-_'), '=');
-            return json_encode([
-                'challenge' => $challenge,
-                'rpId' => $options->rpId,
-                'userVerification' => $options->userVerification,
-                'timeout' => $options->timeout,
-                'allowCredentials' => [],
-                'extensions' => [],
-            ], JSON_THROW_ON_ERROR);
-        });
-
-        $this->cache->expects($this->once())
-            ->method('getItem')
-            ->willReturn($cacheItem);
-
-        $this->cache->expects($this->once())
-            ->method('deleteItem');
-
-        $retrieved = $this->service->getChallenge($key);
-        $this->assertInstanceOf(PublicKeyCredentialRequestOptions::class, $retrieved);
+        foreach ([
+            fn () => $service->createRegistrationOptions(self::USER_A, 'a@baander.app'),
+            fn () => $service->createAuthenticationOptions(),
+            fn () => $service->consumeRegistrationChallenge(self::USER_A, 'challenge-key'),
+            fn () => $service->consumeLoginChallenge('challenge-key'),
+        ] as $operation) {
+            try {
+                $operation();
+                self::fail('No challenge is issued or spent without the store.');
+            } catch (PasskeyChallengeUnavailableException) {
+                $this->addToAssertionCount(1);
+            }
+        }
     }
 
     // --- Registration / Authentication options ---

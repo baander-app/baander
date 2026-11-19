@@ -8,7 +8,13 @@ use App\Auth\Domain\Model\Passkey\Passkey;
 use App\Shared\Domain\Model\Uuid;
 use RuntimeException;
 
-/** ES256 platform authenticator that produces real WebAuthn assertions for one registered credential. */
+/**
+ * ES256 platform authenticator that produces real WebAuthn assertions for one registered credential.
+ *
+ * By default it verifies the user and increments its signature counter on every assertion. An
+ * authenticator without user verification, such as a security key with no PIN, sets only the
+ * user-present flag; one without a counter reports 0 every time.
+ */
 final class WebAuthnTestCredential
 {
     private string $privateKey;
@@ -17,8 +23,12 @@ final class WebAuthnTestCredential
     private string $credentialId;
     private int $counter = 0;
 
-    public function __construct(private readonly string $userId, private readonly string $rpId)
-    {
+    public function __construct(
+        private readonly string $userId,
+        private readonly string $rpId,
+        private readonly bool $verifiesUser = true,
+        private readonly bool $counts = true,
+    ) {
         $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
         if ($key === false || !openssl_pkey_export($key, $privateKey)) {
             throw new RuntimeException('Unable to create the WebAuthn test key.');
@@ -54,10 +64,14 @@ final class WebAuthnTestCredential
      */
     public function assert(string $challenge, string $origin): array
     {
-        ++$this->counter;
+        if ($this->counts) {
+            ++$this->counter;
+        }
         $clientData = json_encode(['type' => 'webauthn.get', 'challenge' => $challenge, 'origin' => $origin, 'crossOrigin' => false], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
-        // User present and user verified, followed by the big-endian signature counter.
-        $authenticatorData = hash('sha256', $this->rpId, true) . "\x05" . pack('N', $this->counter);
+        // User present (0x01), and user verified (0x04) when the authenticator verifies the
+        // user, followed by the big-endian signature counter.
+        $flags = $this->verifiesUser ? "\x05" : "\x01";
+        $authenticatorData = hash('sha256', $this->rpId, true) . $flags . pack('N', $this->counter);
         if (!openssl_sign($authenticatorData . hash('sha256', $clientData, true), $signature, $this->privateKey, OPENSSL_ALGO_SHA256)) {
             throw new RuntimeException('Unable to sign the WebAuthn assertion.');
         }

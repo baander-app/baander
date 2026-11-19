@@ -2938,6 +2938,25 @@
                                 }
                             }
                         }
+                    },
+                    "503": {
+                        "description": "The passkey challenge store is unavailable; retry after the Retry-After delay.",
+                        "headers": {
+                            "Retry-After": {
+                                "description": "Seconds to wait before retrying",
+                                "schema": {
+                                    "type": "integer",
+                                    "example": 1
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": []
@@ -3032,6 +3051,25 @@
                                 }
                             }
                         }
+                    },
+                    "503": {
+                        "description": "The passkey challenge store is unavailable; retry after the Retry-After delay.",
+                        "headers": {
+                            "Retry-After": {
+                                "description": "Seconds to wait before retrying",
+                                "schema": {
+                                    "type": "integer",
+                                    "example": 1
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -3082,6 +3120,25 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The passkey challenge store is unavailable; retry after the Retry-After delay.",
+                        "headers": {
+                            "Retry-After": {
+                                "description": "Seconds to wait before retrying",
+                                "schema": {
+                                    "type": "integer",
+                                    "example": 1
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -3181,6 +3238,25 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The passkey challenge store is unavailable; retry after the Retry-After delay.",
+                        "headers": {
+                            "Retry-After": {
+                                "description": "Seconds to wait before retrying",
+                                "schema": {
+                                    "type": "integer",
+                                    "example": 1
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -3324,7 +3400,7 @@
                         }
                     },
                     "503": {
-                        "description": "The DPoP nonce store is unavailable, so the proof could not be checked; retry after the Retry-After delay. Carries no DPoP-Nonce header.",
+                        "description": "The DPoP nonce store or the passkey challenge store is unavailable; retry after the Retry-After delay. When the nonce store is down, the proof could not be checked and the answer carries no DPoP-Nonce header.",
                         "headers": {
                             "Retry-After": {
                                 "description": "Seconds to wait before retrying",

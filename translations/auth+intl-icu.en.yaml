@@ -4,6 +4,7 @@ errors:
   invalid_challenge: "Invalid or expired challenge."
   passkey_registration_failed: "Passkey registration verification failed: {details}"
   passkey_auth_failed: "Passkey authentication failed: {details}"
+  passkey_unavailable: "Passkeys are temporarily unavailable. Try again in a moment."
   no_passkey_found: "No passkey found for the given credential ID."
   cannot_resolve_user: "Unable to resolve user for the given credential ID."
   failed_delete_passkey: "Failed to delete passkey."

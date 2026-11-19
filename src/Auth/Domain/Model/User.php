@@ -147,6 +147,12 @@ final class User
         return $this->state->totpSecret;
     }
 
+    /** Whether sign-in asks for a TOTP code: a secret is stored and it is not empty. */
+    public function hasTotpEnabled(): bool
+    {
+        return ($this->state->totpSecret ?? '') !== '';
+    }
+
     public function setTotpSecret(?string $totp_secret): void
     {
         $this->state->totpSecret = $totp_secret;

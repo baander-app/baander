@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Auth\Infrastructure\Security\Passkey;
 
+use App\Auth\Application\Exception\PasskeyChallengeUnavailableException;
+use App\Auth\Application\Port\PasskeyChallengeStoreInterface;
 use App\Auth\Application\Port\PasskeyVerifierInterface;
 use App\Shared\Domain\Model\PublicId;
 use Cose\Algorithm\Manager;
@@ -26,7 +28,6 @@ use Symfony\Component\Serializer\Normalizer\AbstractObjectNormalizer;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Uid\Uuid as SymfonyUuid;
-use Psr\Cache\CacheItemPoolInterface;
 use Webauthn\AttestationStatement\AndroidKeyAttestationStatementSupport;
 use Webauthn\AttestationStatement\AppleAttestationStatementSupport;
 use Webauthn\AttestationStatement\AttestationStatementSupportManager;
@@ -62,11 +63,15 @@ use Webauthn\TrustPath\EmptyTrustPath;
  * Provides challenge generation, registration verification, and authentication
  * verification for passkey (WebAuthn) flows. Uses CeremonyStepManagerFactory
  * from webauthn-lib v5 for proper cryptographic verification.
+ *
+ * Each challenge is stored for one ceremony: a registration for the user who asked
+ * for it, or an anonymous login whose challenge key is its only identity. It can be
+ * consumed once, from any worker, and only by the ceremony it was issued for.
  */
 final class PasskeyService implements PasskeyVerifierInterface
 {
-    /** @var array<string, PublicKeyCredentialCreationOptions|PublicKeyCredentialRequestOptions> */
-    private array $challenges = [];
+    private const int CHALLENGE_TTL_SECONDS = 300;
+    private const string LOGIN_CEREMONY = 'login';
 
     private readonly SerializerInterface $serializer;
     private readonly AuthenticatorAttestationResponseValidator $attestationValidator;
@@ -89,7 +94,7 @@ final class PasskeyService implements PasskeyVerifierInterface
         private readonly CounterChecker $counterChecker,
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly LoggerInterface $logger,
-        private readonly CacheItemPoolInterface $cache,
+        private readonly PasskeyChallengeStoreInterface $challenges,
         array $supportedAlgorithmIds,
         private readonly JsonEncoder $jsonEncoder,
     ) {
@@ -153,88 +158,66 @@ final class PasskeyService implements PasskeyVerifierInterface
         return $manager;
     }
 
-    public function storeChallenge(PublicKeyCredentialCreationOptions|PublicKeyCredentialRequestOptions $options): string
-    {
-        $key = SymfonyUuid::v4()->toRfc4122();
-        $cacheKey = "webauthn_challenge_{$key}";
-
-        try {
-            $optionsJson = $this->serializer->serialize(
-                $options,
-                'json',
-                [AbstractObjectNormalizer::SKIP_NULL_VALUES => true],
-            );
-
-            $item = $this->cache->getItem($cacheKey);
-            $item->set($optionsJson);
-            $item->expiresAfter(300);
-            $this->cache->save($item);
-        } catch (\Throwable $e) {
-            $this->logger->warning('Failed to store WebAuthn challenge in cache, falling back to in-memory.', [
-                'exception' => $e->getMessage(),
-            ]);
-        }
-
-        $this->challenges[$key] = $options;
-
-        return $key;
-    }
-
     /**
-     * @throws RuntimeException If the challenge key is not found or expired
-     */
-    public function getChallenge(string $key): PublicKeyCredentialCreationOptions|PublicKeyCredentialRequestOptions
-    {
-        // Try cache first
-        $cacheKey = "webauthn_challenge_{$key}";
-        $cached = null;
-
-        try {
-            $item = $this->cache->getItem($cacheKey);
-            if ($item->isHit()) {
-                $cached = $item->get();
-                $this->cache->deleteItem($cacheKey);
-            }
-        } catch (\Throwable $e) {
-            $this->logger->warning('Failed to retrieve WebAuthn challenge from cache.', [
-                'exception' => $e->getMessage(),
-            ]);
-            $cached = null;
-        }
-
-        if ($cached !== null) {
-            unset($this->challenges[$key]);
-
-            return $this->deserializeChallengeOptions($cached);
-        }
-
-        // Fall back to in-memory
-        $options = $this->challenges[$key] ?? null;
-
-        if ($options === null) {
-            throw new RuntimeException('Challenge not found or has expired.');
-        }
-
-        unset($this->challenges[$key]);
-
-        return $options;
-    }
-
-    /**
-     * Deserialize WebAuthn options from cached JSON.
+     * The registration challenge issued to this user, spent by this call.
      *
-     * @throws RuntimeException If deserialization fails or type cannot be determined
+     * @param string $userId User public ID the options were created for
+     *
+     * @throws RuntimeException If no such challenge is stored for this user
+     * @throws PasskeyChallengeUnavailableException
      */
-    private function deserializeChallengeOptions(string $json): PublicKeyCredentialCreationOptions|PublicKeyCredentialRequestOptions
+    public function consumeRegistrationChallenge(string $userId, string $challengeKey): PublicKeyCredentialCreationOptions
     {
-        $data = $this->jsonEncoder->decode($json, 'json');
+        return $this->serializer->deserialize(
+            $this->takeChallenge(self::registrationCeremony($userId), $challengeKey),
+            PublicKeyCredentialCreationOptions::class,
+            'json',
+        );
+    }
 
-        // PublicKeyCredentialRequestOptions has rpId, while CreationOptions has rp
-        if (isset($data['rpId'])) {
-            return $this->serializer->deserialize($json, PublicKeyCredentialRequestOptions::class, 'json');
-        }
+    public function consumeLoginChallenge(string $challengeKey): PublicKeyCredentialRequestOptions
+    {
+        return $this->serializer->deserialize(
+            $this->takeChallenge(self::LOGIN_CEREMONY, $challengeKey),
+            PublicKeyCredentialRequestOptions::class,
+            'json',
+        );
+    }
 
-        return $this->serializer->deserialize($json, PublicKeyCredentialCreationOptions::class, 'json');
+    /**
+     * Stores the options under a fresh challenge key and returns them for the client.
+     *
+     * @return array{challengeKey: string, options: array<string, mixed>}
+     *
+     * @throws PasskeyChallengeUnavailableException
+     */
+    private function issueChallenge(
+        string $ceremony,
+        PublicKeyCredentialCreationOptions|PublicKeyCredentialRequestOptions $options,
+    ): array {
+        $challengeKey = SymfonyUuid::v4()->toRfc4122();
+        $optionsJson = $this->serializer->serialize(
+            $options,
+            'json',
+            [AbstractObjectNormalizer::SKIP_NULL_VALUES => true],
+        );
+        $this->challenges->put($ceremony, $challengeKey, $optionsJson, self::CHALLENGE_TTL_SECONDS);
+
+        return [
+            'challengeKey' => $challengeKey,
+            'options' => $this->jsonEncoder->decode($optionsJson, 'json'),
+        ];
+    }
+
+    private function takeChallenge(string $ceremony, string $challengeKey): string
+    {
+        return $this->challenges->take($ceremony, $challengeKey)
+            ?? throw new RuntimeException('Challenge not found or has expired.');
+    }
+
+    private static function registrationCeremony(string $userId): string
+    {
+        return 'registration:' . PublicId::fromString($userId)->toString();
     }
 
     /**
@@ -249,6 +232,7 @@ final class PasskeyService implements PasskeyVerifierInterface
      * @throws RandomException
      * @throws SerializerExceptionInterface
      * @throws JsonException
+     * @throws PasskeyChallengeUnavailableException
      */
     public function createRegistrationOptions(string $userId, string $username, array $existingCredentialIds = []): array
     {
@@ -290,18 +274,7 @@ final class PasskeyService implements PasskeyVerifierInterface
             timeout: $this->timeout,
         );
 
-        $challengeKey = $this->storeChallenge($options);
-
-        $optionsJson = $this->serializer->serialize(
-            $options,
-            'json',
-            [AbstractObjectNormalizer::SKIP_NULL_VALUES => true],
-        );
-
-        return [
-            'challengeKey' => $challengeKey,
-            'options' => $this->jsonEncoder->decode($optionsJson, 'json'),
-        ];
+        return $this->issueChallenge(self::registrationCeremony($userId), $options);
     }
 
     /**
@@ -347,6 +320,7 @@ final class PasskeyService implements PasskeyVerifierInterface
      * @throws RandomException
      * @throws SerializerExceptionInterface
      * @throws JsonException
+     * @throws PasskeyChallengeUnavailableException
      */
     public function createAuthenticationOptions(array $allowedCredentialIds = []): array
     {
@@ -366,18 +340,7 @@ final class PasskeyService implements PasskeyVerifierInterface
             timeout: $this->timeout,
         );
 
-        $challengeKey = $this->storeChallenge($options);
-
-        $optionsJson = $this->serializer->serialize(
-            $options,
-            'json',
-            [AbstractObjectNormalizer::SKIP_NULL_VALUES => true],
-        );
-
-        return [
-            'challengeKey' => $challengeKey,
-            'options' => $this->jsonEncoder->decode($optionsJson, 'json'),
-        ];
+        return $this->issueChallenge(self::LOGIN_CEREMONY, $options);
     }
 
     /**
@@ -395,6 +358,7 @@ final class PasskeyService implements PasskeyVerifierInterface
         array $response,
         PublicKeyCredentialRequestOptions $expectedOptions,
         CredentialRecord $storedCredential,
+        bool $requireUserVerification,
     ): CredentialRecord {
         PublicId::fromString($storedCredential->userHandle);
         $publicKeyCredential = $this->serializer->deserialize(
@@ -411,13 +375,21 @@ final class PasskeyService implements PasskeyVerifierInterface
 
         $userHandle = $assertionResponse->userHandle;
 
-        return $this->assertionValidator->check(
+        $verified = $this->assertionValidator->check(
             $storedCredential,
             $assertionResponse,
             $expectedOptions,
             $this->appDomain,
             $userHandle !== '' ? $userHandle : null,
         );
+
+        // Checked only once the signature holds, so a failed check tells nobody
+        // whether the account has TOTP on.
+        if ($requireUserVerification && !$assertionResponse->authenticatorData->isUserVerified()) {
+            throw new RuntimeException('This account requires user verification on the passkey.');
+        }
+
+        return $verified;
     }
 
     /**

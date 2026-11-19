@@ -18,7 +18,7 @@ use App\Tests\Fixtures\Auth\SignedDpopProof;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
-use Psr\Cache\CacheItemPoolInterface;
+use App\Tests\Fixtures\Auth\InMemoryPasskeyChallengeStore;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Redis;
@@ -76,7 +76,7 @@ final class AuthControllerRefreshOutageTest extends TestCase
             counterChecker: $this->createStub(CounterChecker::class),
             eventDispatcher: $this->createStub(EventDispatcherInterface::class),
             logger: $this->createStub(LoggerInterface::class),
-            cache: $this->createStub(CacheItemPoolInterface::class),
+            challenges: new InMemoryPasskeyChallengeStore(),
             supportedAlgorithmIds: [-7],
             jsonEncoder: $jsonEncoder,
         );
