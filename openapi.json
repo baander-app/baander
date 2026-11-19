@@ -31791,7 +31791,7 @@
                 "description": "OAuth 2.0 authorization code flow with mandatory S256 PKCE. Token requests need a nonce-bearing DPoP proof, and the issued tokens are DPoP-bound.",
                 "flows": {
                     "authorizationCode": {
-                        "authorizationUrl": "/api/oauth/authorize",
+                        "authorizationUrl": "/oauth/authorize",
                         "tokenUrl": "/api/oauth/token",
                         "refreshUrl": "/api/oauth/token",
                         "scopes": {
