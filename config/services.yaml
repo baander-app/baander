@@ -417,6 +417,8 @@ services:
     # iat is within the clock skew (either side) or while the nonce it carries lives.
     App\Auth\Infrastructure\Security\OAuth\DpopProofValidator:
         arguments:
+            $publicUrl: '%env(APP_URL)%'
+            $extraOrigins: '%auth.dpop.extra_origins%'
             $clockSkewSeconds: '%auth.dpop.clock_skew%'
             $jtiTtlSeconds: '@=max(parameter("auth.dpop.nonce_ttl"), 2 * parameter("auth.dpop.clock_skew"))'
 

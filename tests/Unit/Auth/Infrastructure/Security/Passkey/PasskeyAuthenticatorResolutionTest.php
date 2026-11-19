@@ -200,7 +200,7 @@ final class PasskeyAuthenticatorResolutionTest extends TestCase
         $redis->method('borrow')->willReturn(true);
 
         return new DpopTokenRequestVerifier(
-            new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class)),
+            new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class), publicUrl: 'https://baander.app'),
             new DpopNonceManager($redis),
         );
     }

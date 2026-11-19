@@ -86,7 +86,7 @@ final class AuthControllerRefreshOutageTest extends TestCase
             $this->commandBus,
             $this->createStub(UserPortInterface::class),
             $passkeyService,
-            new DpopProofValidator($jtiCache),
+            new DpopProofValidator($jtiCache, publicUrl: 'https://baander.app'),
             new DpopNonceManager($factory),
             $jsonEncoder,
             $this->logger,

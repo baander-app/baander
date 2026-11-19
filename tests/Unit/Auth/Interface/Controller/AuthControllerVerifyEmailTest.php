@@ -68,6 +68,7 @@ final class AuthControllerVerifyEmailTest extends TestCase
 
         $dpopProofValidator = new DpopProofValidator(
             jtiCache: $this->createStub(DpopJtiCacheInterface::class),
+            publicUrl: 'https://baander.app',
         );
 
         $redisClientFactory = new RedisClientFactory('redis://localhost:6379');

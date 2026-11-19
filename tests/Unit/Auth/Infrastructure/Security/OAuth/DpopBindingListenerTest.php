@@ -41,7 +41,7 @@ final class DpopBindingListenerTest extends TestCase
         $storage->setToken(new UsernamePasswordToken(new SecurityUser('user', 'user@baander.app', ''), 'api', ['ROLE_USER']));
         $listener = new DpopBindingListener(
             $storage,
-            new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class)),
+            new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class), publicUrl: 'https://baander.app'),
             $this->logger(),
         );
         $request = Request::create($path, $method);
@@ -163,7 +163,7 @@ final class DpopBindingListenerTest extends TestCase
         $storage = new TokenStorage();
         $storage->setToken(new UsernamePasswordToken(new SecurityUser(self::USER_ID, 'listener@baander.app', ''), 'api', ['ROLE_USER']));
 
-        return new DpopBindingListener($storage, new DpopProofValidator($jtiCache), $this->logger());
+        return new DpopBindingListener($storage, new DpopProofValidator($jtiCache, publicUrl: 'https://baander.app'), $this->logger());
     }
 
     /**

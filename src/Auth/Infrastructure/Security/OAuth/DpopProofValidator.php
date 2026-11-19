@@ -8,6 +8,7 @@ use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use App\Auth\Application\Port\DpopJtiCacheInterface;
 use App\Auth\Domain\Model\OAuth\ValueObject\DpopValidationResult;
 use DateTimeImmutable;
+use InvalidArgumentException;
 use Lcobucci\JWT\Encoding\JoseEncoder;
 use Lcobucci\JWT\Token\Parser;
 use Lcobucci\JWT\Token\Plain;
@@ -23,18 +24,37 @@ final class DpopProofValidator
 
     private Parser $parser;
 
+    /** @var list<string> The origins a proof's `htu` may name, normalized and without duplicates */
+    private array $publicOrigins;
+
     /**
+     * A proof's `htu` names one of the deployment's public origins and the request path. The
+     * request's own scheme and Host never count: behind a TLS-terminating proxy the request
+     * reaches the application as plain HTTP, and the Host header is the client's to choose.
+     *
+     * @param string $publicUrl The URL users reach Baander at (APP_URL); its origin is always allowed
+     * @param list<string> $extraOrigins Further origins the deployment answers on, such as a LAN address
      * @param int $jtiTtlSeconds The proof acceptance window a jti is refused for: the larger
      *     of the nonce TTL and twice the clock skew (wired in config/services.yaml).
+     *
+     * @throws InvalidArgumentException when an origin is not an absolute http or https URL
      */
     public function __construct(
         private readonly DpopJtiCacheInterface $jtiCache,
+        string $publicUrl,
+        array $extraOrigins = [],
         private readonly int $clockSkewSeconds = 60,
         private readonly int $jtiTtlSeconds = 300,
         private readonly LoggerInterface $logger = new NullLogger(),
     )
     {
         $this->parser = new Parser(new JoseEncoder());
+        $this->publicOrigins = [$publicUrl, ...$extraOrigins]
+            |> (static fn (array $urls): array => array_map(trim(...), $urls))
+            |> (static fn (array $urls): array => array_filter($urls, static fn (string $url): bool => $url !== ''))
+            |> (static fn (array $urls): array => array_map(self::origin(...), $urls))
+            |> array_unique(...)
+            |> array_values(...);
     }
 
     /**
@@ -153,13 +173,10 @@ final class DpopProofValidator
             return DpopValidationResult::invalid('invalid_dpop_proof', 'DPoP proof "htu" must be a string.');
         }
 
-        $expectedHtu = $this->buildHtu($request);
-        if ($htu !== $expectedHtu) {
+        if (!in_array($htu, $this->acceptedHtus($request), true)) {
             $this->logger->debug('DPoP HTU mismatch', [
                 'provided' => $htu,
-                'expected' => $expectedHtu,
-                'request_uri' => $request->getUri(),
-                'scheme_and_http_host' => $request->getSchemeAndHttpHost(),
+                'public_origins' => $this->publicOrigins,
                 'path_info' => $request->getPathInfo(),
             ]);
 
@@ -226,10 +243,31 @@ final class DpopProofValidator
         return DpopValidationResult::valid($jkt, replayUnchecked: $replayUnchecked);
     }
 
-    private function buildHtu(Request $request): string
+    /**
+     * Each public origin plus the request path, without query and fragment (RFC 9449 section 4.3).
+     *
+     * @return list<string>
+     */
+    private function acceptedHtus(Request $request): array
     {
-        // Bind to the actual URI, excluding query and fragment per RFC 9449 §4.3.
-        return $request->getSchemeAndHttpHost() . $request->getPathInfo();
+        $path = $request->getPathInfo();
+
+        return array_map(static fn (string $origin): string => $origin . $path, $this->publicOrigins);
+    }
+
+    /** The URL's origin, with the scheme and host in lowercase and the default port left out. */
+    private static function origin(string $url): string
+    {
+        $parts = parse_url($url);
+        $scheme = strtolower(is_array($parts) ? $parts['scheme'] ?? '' : '');
+        $host = strtolower(is_array($parts) ? $parts['host'] ?? '' : '');
+        if (!in_array($scheme, ['http', 'https'], true) || $host === '') {
+            throw new InvalidArgumentException(sprintf('The DPoP origin "%s" is not an absolute http or https URL.', $url));
+        }
+        $port = $parts['port'] ?? null;
+        $defaultPort = $scheme === 'https' ? 443 : 80;
+
+        return sprintf('%s://%s%s', $scheme, $host, $port === null || $port === $defaultPort ? '' : ':' . $port);
     }
 
     private function hashAccessToken(string $accessToken): string

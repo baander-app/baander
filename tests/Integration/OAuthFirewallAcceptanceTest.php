@@ -167,7 +167,7 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         yield 'different proof key' => ['wrong-key', 403];
         yield 'wrong audience' => ['audience', 401];
         yield 'revoked token' => ['revoked', 401];
-        yield 'HTTPS proof on HTTP request' => ['scheme', 403];
+        yield 'proof for an origin the deployment does not answer on' => ['origin', 403];
     }
 
     #[DataProvider('invalidPresentations')]
@@ -179,8 +179,9 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         }
         $jwt = $this->accessJwt($kind === 'audience' ? 'https://other.baander.app' : 'https://baander.app');
         $proof = $kind === 'wrong-key' ? new SignedDpopProof() : $this->proof;
-        $header = $kind === 'missing' ? null : $proof->create('GET', 'https://baander.app/api/auth/me', $jwt);
-        $response = $this->request($jwt, $header, $kind === 'scheme' ? 'http://baander.app/api/auth/me' : 'https://baander.app/api/auth/me');
+        $proofUri = $kind === 'origin' ? 'https://foreign.baander.app/api/auth/me' : 'https://baander.app/api/auth/me';
+        $header = $kind === 'missing' ? null : $proof->create('GET', $proofUri, $jwt);
+        $response = $this->request($jwt, $header, $kind === 'origin' ? $proofUri : 'https://baander.app/api/auth/me');
 
         self::assertSame($status, $response->getStatusCode(), $response->getContent());
     }

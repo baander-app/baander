@@ -70,7 +70,7 @@ final class AuthControllerLogoutFaultTest extends TestCase
             $this->commandBus,
             $this->createStub(UserPortInterface::class),
             $passkeyService,
-            new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class)),
+            new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class), publicUrl: 'https://baander.app'),
             new DpopNonceManager($this->createStub(RedisClientFactory::class)),
             $jsonEncoder,
             $this->logger,

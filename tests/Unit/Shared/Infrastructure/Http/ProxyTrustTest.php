@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Http;
 
-use App\Auth\Application\Port\DpopJtiCacheInterface;
 use App\Auth\Infrastructure\Security\ApiRateLimitListener;
-use App\Auth\Infrastructure\Security\OAuth\DpopProofValidator;
-use App\Tests\Fixtures\Auth\SignedDpopProof;
 use Assert\Assertion;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -120,7 +117,7 @@ final class ProxyTrustTest extends TestCase
     }
 
     #[DataProvider('trustedUrlCases')]
-    public function testSignedProofUsesUrlFromTrustedPeerOnly(bool $trusted, string $forwardedHost, ?string $forwardedPort, string $externalOrigin): void
+    public function testForwardedUrlComesFromTrustedPeerOnly(bool $trusted, string $forwardedHost, ?string $forwardedPort, string $externalOrigin): void
     {
         (new SetRequestRuntimeConfiguration())->boot(['trustedProxies' => $trusted ? ['192.0.2.10'] : []]);
         $server = [
@@ -132,16 +129,7 @@ final class ProxyTrustTest extends TestCase
             $server['HTTP_X_FORWARDED_PORT'] = $forwardedPort;
         }
         $request = Request::create('http://internal.baander.app/api/auth/me?ignored=yes', server: $server);
-        $proof = new SignedDpopProof();
-        $cache = $this->createMock(DpopJtiCacheInterface::class);
-        $cache->expects($trusted ? $this->once() : $this->never())->method('isReplay')->willReturn(false);
-        $result = (new DpopProofValidator($cache))->validate(
-            $proof->create('GET', $externalOrigin . '/api/auth/me', 'disposable-access-token'),
-            $request,
-            'disposable-access-token',
-            $proof->thumbprint(),
-        );
-        self::assertSame($trusted, $result->isValid());
+
         self::assertSame($trusted ? $externalOrigin : 'http://internal.baander.app', $request->getSchemeAndHttpHost());
     }
 

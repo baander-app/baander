@@ -40,7 +40,7 @@ final class PasskeyAuthenticatorTest extends TestCase
         $logger = $this->createStub(LoggerInterface::class);
         $redis = $this->createStub(RedisClientFactory::class);
         $redis->method('borrow')->willReturn(true);
-        $verifier = new DpopTokenRequestVerifier(new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class)), new DpopNonceManager($redis));
+        $verifier = new DpopTokenRequestVerifier(new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class), publicUrl: 'https://baander.app'), new DpopNonceManager($redis));
         $this->authenticator = new PasskeyAuthenticator($bus, $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class), $logger, new JsonEncoder(), $verifier, AuthenticationFailureMessages::create());
     }
 
@@ -76,7 +76,7 @@ final class PasskeyAuthenticatorTest extends TestCase
         $redis->method('borrow')->willThrowException(new \RedisException('Connection refused'));
         $bus = $this->createMock(\Symfony\Component\Messenger\MessageBusInterface::class);
         $bus->expects($this->never())->method('dispatch');
-        $verifier = new DpopTokenRequestVerifier(new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class)), new DpopNonceManager($redis));
+        $verifier = new DpopTokenRequestVerifier(new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class), publicUrl: 'https://baander.app'), new DpopNonceManager($redis));
         $authenticator = new PasskeyAuthenticator($bus, $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class), $this->createStub(LoggerInterface::class), new JsonEncoder(), $verifier, AuthenticationFailureMessages::create());
         $request = Request::create('https://baander.app/api/auth/login/passkey', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], '{"challengeKey":"key","response":{}}');
         $request->headers->set('DPoP', (new SignedDpopProof())->createWithNonce('POST', 'https://baander.app/api/auth/login/passkey', 'issued-nonce'));

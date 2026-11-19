@@ -380,6 +380,19 @@ final class NginxTemplateTest extends TestCase
     }
 
     /**
+     * Behind the external TLS proxy this server listens on plain HTTP, so it passes on the
+     * scheme the proxy reported and falls back to its own only when none was sent.
+     */
+    public function testProdConfigForwardsTheUpstreamScheme(): void
+    {
+        $config = $this->readProdConfig();
+
+        $this->assertMatchesRegularExpression('/map \$http_x_forwarded_proto \$forwarded_proto \{\s*default\s+\$http_x_forwarded_proto;\s*\'\'\s+\$scheme;\s*\}/', $config);
+        $this->assertStringNotContainsString('X-Forwarded-Proto $scheme', $config);
+        $this->assertStringContainsString('proxy_set_header X-Forwarded-Proto $forwarded_proto;', $config);
+    }
+
+    /**
      * Production config has all the same streaming location blocks as dev.
      */
     public function testProdConfigHasStreamingLocations(): void

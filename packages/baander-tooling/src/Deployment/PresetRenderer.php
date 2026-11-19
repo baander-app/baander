@@ -146,6 +146,10 @@ map $http_upgrade $connection_upgrade {
     default upgrade;
     '' close;
 }
+map $http_x_forwarded_proto $forwarded_proto {
+    default $http_x_forwarded_proto;
+    '' $scheme;
+}
 log_format preset '$remote_addr $request_method $uri $status $body_bytes_sent';
 server {
     listen 80;
@@ -158,7 +162,7 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Host $http_host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto $forwarded_proto;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;
         proxy_buffering off;

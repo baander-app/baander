@@ -481,7 +481,11 @@ final class PresetDeploymentTest extends TestCase
         $compose = PresetRenderer::render($configuration, $images, $layout, $profile, 'max_connections = 36', 'owner');
         self::assertSame(['postgres', '-c', 'config_file=/etc/baander/postgresql.conf'], $compose['services']['postgres']['command']);
         self::assertSame('secret$$literal', $compose['services']['postgres']['environment']['POSTGRES_PASSWORD']);
-        self::assertStringContainsString('$http_upgrade', PresetRenderer::configurationFiles($configuration, 'max_connections = 36')['gateway_configuration']['content']);
+        $gateway = PresetRenderer::configurationFiles($configuration, 'max_connections = 36')['gateway_configuration']['content'];
+        self::assertStringContainsString('$http_upgrade', $gateway);
+        // The gateway listens on plain HTTP behind the operator's TLS proxy: it passes on the scheme that proxy reported.
+        self::assertMatchesRegularExpression('/map \$http_x_forwarded_proto \$forwarded_proto \{\s*default\s+\$http_x_forwarded_proto;\s*\'\'\s+\$scheme;\s*\}/', $gateway);
+        self::assertStringContainsString('proxy_set_header X-Forwarded-Proto $forwarded_proto;', $gateway);
         self::assertStringContainsString('noeviction', $compose['services']['redis']['command'][2]);
         self::assertSame('memory_limit=256M', $compose['services']['web']['command'][1]);
         self::assertSame($profile->fingerprint(), $compose['services']['web']['labels']['org.baander.deployment.fingerprint']);

@@ -134,6 +134,11 @@ parameters:
     # DPoP nonce TTL in seconds. Default: 5 minutes.
     auth.dpop.nonce_ttl: 300
 
+    # A DPoP proof's htu names APP_URL's origin or one of these comma-separated
+    # origins, never the scheme and Host the request arrived with. Default: none.
+    env(AUTH_DPOP_EXTRA_ORIGINS): ''
+    auth.dpop.extra_origins: '%env(csv:AUTH_DPOP_EXTRA_ORIGINS)%'
+
     # --- Client Assertions (private_key_jwt, RFC 7523 and RFC 10070) ---
 
     # Longest lifetime a client assertion may have: its exp may lie at most this far

@@ -70,7 +70,7 @@ final class LoginControllerOutageTest extends TestCase
             $this->bus,
             $clients,
             $users,
-            new DpopProofValidator($jtiCache),
+            new DpopProofValidator($jtiCache, publicUrl: 'https://baander.app'),
             new DpopNonceManager($factory),
             $spaClientId,
         );

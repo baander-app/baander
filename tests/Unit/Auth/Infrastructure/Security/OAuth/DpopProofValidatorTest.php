@@ -15,6 +15,7 @@ use Symfony\Component\HttpFoundation\Request;
 
 final class DpopProofValidatorTest extends TestCase
 {
+    private const string ORIGIN = 'https://baander.app';
     private const string LOGOUT_URI = 'https://baander.app/api/auth/logout';
     private const string ACCESS_TOKEN = 'disposable-access-token';
 
@@ -23,7 +24,7 @@ final class DpopProofValidatorTest extends TestCase
         $proof = new SignedDpopProof(LeadingZeroDpopKey::PEM);
         $cache = $this->createMock(DpopJtiCacheInterface::class);
         $cache->expects($this->once())->method('isReplay')->willReturn(false);
-        $validator = new DpopProofValidator($cache);
+        $validator = new DpopProofValidator($cache, publicUrl: self::ORIGIN);
         $token = 'disposable-access-token';
         $uri = 'https://baander.app/api/auth/me';
         $result = $validator->validate($proof->create('GET', $uri, $token), Request::create($uri), $token, $proof->thumbprint());
@@ -36,7 +37,7 @@ final class DpopProofValidatorTest extends TestCase
         $proof = new SignedDpopProof();
         $cache = $this->createMock(DpopJtiCacheInterface::class);
         $cache->expects($this->once())->method('isReplay')->with(self::isString(), 420)->willReturn(false);
-        $validator = new DpopProofValidator($cache, jtiTtlSeconds: 420);
+        $validator = new DpopProofValidator($cache, publicUrl: self::ORIGIN, jtiTtlSeconds: 420);
         $token = 'disposable-access-token';
         $uri = 'https://baander.app/api/auth/me';
         $result = $validator->validate($proof->create('GET', $uri, $token), Request::create($uri), $token, $proof->thumbprint());
@@ -51,7 +52,7 @@ final class DpopProofValidatorTest extends TestCase
         $outage = DpopStoreUnavailableException::jtiStore(new \RedisException('Connection refused'));
         $cache = $this->createStub(DpopJtiCacheInterface::class);
         $cache->method('isReplay')->willThrowException($outage);
-        $validator = new DpopProofValidator($cache);
+        $validator = new DpopProofValidator($cache, publicUrl: self::ORIGIN);
         $token = 'disposable-access-token';
         $uri = 'https://baander.app/api/auth/me';
 
@@ -63,7 +64,7 @@ final class DpopProofValidatorTest extends TestCase
     public function testAStoreOutageIsToleratedWhenTheCallerAllowsSkippingTheReplayCheck(): void
     {
         $proof = new SignedDpopProof();
-        $validator = new DpopProofValidator($this->refusedStore());
+        $validator = new DpopProofValidator($this->refusedStore(), publicUrl: self::ORIGIN);
 
         $result = $validator->validate(
             $proof->create('POST', self::LOGOUT_URI, self::ACCESS_TOKEN),
@@ -114,7 +115,7 @@ final class DpopProofValidatorTest extends TestCase
     {
         $key = new SignedDpopProof();
         [$proof, $request, $accessToken, $expectedJkt] = $arrange($key);
-        $validator = new DpopProofValidator($this->refusedStore());
+        $validator = new DpopProofValidator($this->refusedStore(), publicUrl: self::ORIGIN);
 
         $result = $validator->validate($proof, $request, $accessToken, $expectedJkt, skipReplayCheckOnStoreFailure: true);
 
@@ -126,7 +127,7 @@ final class DpopProofValidatorTest extends TestCase
     public function testADegradedProofWithoutAthIsRefusedWhileAnAccessTokenIsPresented(): void
     {
         $proof = new SignedDpopProof();
-        $validator = new DpopProofValidator($this->refusedStore());
+        $validator = new DpopProofValidator($this->refusedStore(), publicUrl: self::ORIGIN);
 
         $result = $validator->validate(
             $proof->createWithNonce('POST', self::LOGOUT_URI, 'server-nonce'),
@@ -146,7 +147,7 @@ final class DpopProofValidatorTest extends TestCase
         $proof = new SignedDpopProof();
         $cache = $this->createStub(DpopJtiCacheInterface::class);
         $cache->method('isReplay')->willReturn(true);
-        $validator = new DpopProofValidator($cache);
+        $validator = new DpopProofValidator($cache, publicUrl: self::ORIGIN);
 
         $result = $validator->validate(
             $proof->create('POST', self::LOGOUT_URI, self::ACCESS_TOKEN),
@@ -166,7 +167,7 @@ final class DpopProofValidatorTest extends TestCase
         $proof = new SignedDpopProof();
         $cache = $this->createMock(DpopJtiCacheInterface::class);
         $cache->expects($this->once())->method('isReplay')->willReturn(false);
-        $validator = new DpopProofValidator($cache);
+        $validator = new DpopProofValidator($cache, publicUrl: self::ORIGIN);
 
         $result = $validator->validate(
             $proof->create('POST', self::LOGOUT_URI, self::ACCESS_TOKEN),
@@ -185,7 +186,7 @@ final class DpopProofValidatorTest extends TestCase
         $proof = new SignedDpopProof();
         $cache = $this->createMock(DpopJtiCacheInterface::class);
         $cache->expects($this->never())->method('isReplay');
-        $validator = new DpopProofValidator($cache);
+        $validator = new DpopProofValidator($cache, publicUrl: self::ORIGIN);
         $token = 'disposable-access-token';
         $uri = 'https://baander.app/api/auth/me';
         $jwk = ['kty' => 'EC', 'crv' => 'P-256', 'x' => SignedDpopProof::encode(str_repeat("\x01", 32)), 'y' => SignedDpopProof::encode(str_repeat("\x02", 32)), 'd' => SignedDpopProof::encode(str_repeat("\x03", 32))];
@@ -200,7 +201,7 @@ final class DpopProofValidatorTest extends TestCase
         $proof = new SignedDpopProof();
         $cache = $this->createMock(DpopJtiCacheInterface::class);
         $cache->expects($this->never())->method('isReplay');
-        $validator = new DpopProofValidator($cache);
+        $validator = new DpopProofValidator($cache, publicUrl: self::ORIGIN);
         $token = 'disposable-access-token';
         $uri = 'https://baander.app/api/auth/me';
         $jwk = ['kty' => 'EC', 'crv' => 'P-256', 'x' => SignedDpopProof::encode("\x01"), 'y' => SignedDpopProof::encode("\x02")];
@@ -210,26 +211,32 @@ final class DpopProofValidatorTest extends TestCase
         self::assertSame('invalid_dpop_proof', $result->getError());
     }
 
-    /** @return iterable<string, array{string, string, bool}> */
+    /**
+     * The proof's `htu` names one of the deployment's public origins and the request path,
+     * whatever scheme and host the request reached the application with.
+     *
+     * @return iterable<string, array{string, string, bool}>
+     */
     public static function requestUris(): iterable
     {
         yield 'matching HTTPS' => ['https://baander.app/api/auth/me', 'https://baander.app/api/auth/me', true];
-        yield 'matching HTTP' => ['http://baander.app/api/auth/me', 'http://baander.app/api/auth/me', true];
-        yield 'HTTPS proof on HTTP request' => ['http://baander.app/api/auth/me', 'https://baander.app/api/auth/me', false];
-        yield 'HTTP proof on HTTPS request' => ['https://baander.app/api/auth/me', 'http://baander.app/api/auth/me', false];
+        yield 'HTTPS proof on a request the proxy forwarded as HTTP' => ['http://baander.app/api/auth/me', 'https://baander.app/api/auth/me', true];
+        yield 'HTTPS proof on a request to an internal host' => ['http://web:9501/api/auth/me', 'https://baander.app/api/auth/me', true];
+        yield 'HTTP proof for an HTTPS origin' => ['http://baander.app/api/auth/me', 'http://baander.app/api/auth/me', false];
+        yield 'origin from the Host header alone' => ['https://evil.baander.app/api/auth/me', 'https://evil.baander.app/api/auth/me', false];
+        yield 'extra origin' => ['http://web:9501/api/auth/me', 'https://lan.baander.app:8443/api/auth/me', true];
         yield 'request query ignored' => ['https://baander.app/api/auth/me?page=2', 'https://baander.app/api/auth/me', true];
         yield 'request fragment ignored' => ['https://baander.app/api/auth/me#profile', 'https://baander.app/api/auth/me', true];
-        yield 'different host' => ['https://api.baander.app/api/auth/me', 'https://baander.app/api/auth/me', false];
         yield 'different path' => ['https://baander.app/api/auth/me', 'https://baander.app/api/favorites/', false];
     }
 
     #[DataProvider('requestUris')]
-    public function testSignedProofBindsToActualRequestUri(string $requestUri, string $proofUri, bool $accepted): void
+    public function testSignedProofBindsToAPublicOriginAndTheRequestPath(string $requestUri, string $proofUri, bool $accepted): void
     {
         $proof = new SignedDpopProof();
         $cache = $this->createMock(DpopJtiCacheInterface::class);
         $cache->expects($accepted ? $this->once() : $this->never())->method('isReplay')->willReturn(false);
-        $validator = new DpopProofValidator($cache);
+        $validator = new DpopProofValidator($cache, publicUrl: 'https://baander.app', extraOrigins: ['https://lan.baander.app:8443']);
         $accessToken = 'disposable-access-token';
         $result = $validator->validate(
             $proof->create('GET', $proofUri, $accessToken),
