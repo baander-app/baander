@@ -9,6 +9,31 @@ override cmd := $(value cmd)
 export cmd
 INSIDE_DOCKER_CONTAINER ?= 0
 ERROR_ONLY_FOR_HOST = @echo "Run this command on the host."
+TYPEPHP_IMAGE ?= baander-typephp-toolchain:local
+TYPEPHP_JOBS ?= 2
+
+.PHONY: typephp-setup typephp-version typephp-toolchain
+typephp-setup: ## Install the locked, isolated TypePHP compiler
+	composer --working-dir=tools/typephp install --no-dev --no-scripts --no-plugins --prefer-dist --no-interaction
+
+typephp-version: ## Print the installed TypePHP compiler version
+	php tools/typephp/vendor/bin/tpc.php --version
+
+typephp-toolchain: ## Build the optional PHP 8.5.12 ZTS packaging toolchain
+	docker build --file docker/typephp/Dockerfile --tag "$(TYPEPHP_IMAGE)" --build-arg BUILDER_UID="$$(id -u)" --build-arg BUILDER_GID="$$(id -g)" .
+
+.PHONY: typephp-check-dependencies typephp-build typephp-build-operator
+typephp-check-dependencies:
+	@test -f vendor/autoload_runtime.php || { echo 'Install application dependencies with composer install --no-dev --no-scripts first.' >&2; exit 1; }
+	@php -r '$$packages = json_decode(file_get_contents("vendor/composer/installed.json"), true, flags: JSON_THROW_ON_ERROR); if ($$packages["dev"] ?? true) { fwrite(STDERR, "TypePHP packaging requires a production vendor tree (composer install --no-dev --no-scripts).\n"); exit(1); }'
+
+typephp-build: typephp-check-dependencies ## Package the console used by web and worker processes
+	mkdir -p var/typephp/cache
+	docker run --rm --volume "$(CURDIR):/app:ro,z" --volume "$(CURDIR)/var/typephp:/app/var/typephp:z" --volume "$(CURDIR)/var/typephp/cache:/home/typephp/.typephp:z" "$(TYPEPHP_IMAGE)" tools/typephp/console.yml --no-progress --no-color --job "$(TYPEPHP_JOBS)"
+
+typephp-build-operator: typephp-check-dependencies ## Package the separate worker deployment operator
+	mkdir -p var/typephp/cache
+	docker run --rm --volume "$(CURDIR):/app:ro,z" --volume "$(CURDIR)/var/typephp:/app/var/typephp:z" --volume "$(CURDIR)/var/typephp/cache:/home/typephp/.typephp:z" "$(TYPEPHP_IMAGE)" tools/typephp/operator.yml --no-progress --no-color --job "$(TYPEPHP_JOBS)"
 
 help: ## List available commands
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "%-25s %s\n", $$1, $$2}' Makefile

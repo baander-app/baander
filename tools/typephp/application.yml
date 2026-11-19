@@ -1,0 +1,46 @@
+mode: bin
+sapi: cli
+php-version: '8.5'
+optimize: 2
+php-builder:
+  zts: on
+  debug: off
+  extensions:
+    - curl
+    - dom
+    - exif
+    - ffi
+    - filter
+    - gettext
+    - igbinary
+    - intl
+    - mbstring
+    - msgpack
+    - pdo_pgsql
+    - phar
+    - session
+    - shmop
+    - simplexml
+    - sodium
+    - sysvmsg
+    - tokenizer
+    - xml
+    - xmlreader
+    - xmlwriter
+    - zip
+    - zlib
+embedded-files:
+  - ../../bin/console
+  - ../../src
+  - ../../vendor
+  - ../../packages/swoole-bundle/src
+  - ../../packages/tsduck-php-ffi/src
+  - ../../composer.json
+  - ../../config/bundles.php
+  - ../../config/packages
+  - ../../config/routes
+  - ../../config/routes.yaml
+  - ../../config/services.yaml
+  - ../../config/services_baander_navigator.yaml
+  - ../../templates
+  - ../../translations

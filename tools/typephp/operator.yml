@@ -1,0 +1,7 @@
+include: application.yml
+name: baander-operator
+entry: ../../bin/worker-deployment.php
+sources:
+  - ../../bin/worker-deployment.php
+build-dir: ../../var/typephp/operator
+output: ../../var/typephp/baander-operator
