@@ -56,7 +56,7 @@ transport settings. See [Shared media paths](../getting-started/storage-and-data
   ownership and mode requirements in the [worker deployment reference](../workers/worker-deployment.md#ipc-and-media-volumes).
 - A real environment variable set in the container runtime, such as Docker Compose
   or Kubernetes, overrides the same variable in `.env`.
-- For each deployment, generate a unique `APP_SECRET` with `php -r 'echo bin2hex(random_bytes(32));'`.
+- For each deployment, generate a unique `APP_SECRET` and `STREAM_URL_HMAC_SECRET` with `php -r 'echo bin2hex(random_bytes(32));'`, and an `AUTH_TOTP_ENCRYPTION_KEY` with `openssl rand -base64 32`. In `prod`, every process refuses to boot while one of the three is unset, a committed default, a `replace-with-` placeholder or shorter than 32 bytes.
 - OAuth keys should be at least 2048-bit RSA. Generate with `openssl genrsa -out private.key 2048` and `openssl rsa -in private.key -pubout > public.key`.
 - Rate limiting requires Redis. While its state is unavailable, protected work stops
   with `503`; logout and revocation keep the narrow exceptions described in
