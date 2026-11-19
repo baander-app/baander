@@ -361,7 +361,7 @@ stateDiagram-v2
 - **Approach:**
   1. Refuse a push or device authorization whose grantable scopes are empty with `invalid_scope`; ungrantable scopes mixed with grantable ones are dropped, and consent shows only what will be granted.
   2. Drop `access-api` from `KNOWN_SCOPES` and the copy.
-  3. Use these consent lines: `profile` "See your name and profile picture"; `email` "See your email address"; `library` "Browse and play your library, and control playback on your devices"; `playlist` "See, create and change your playlists".
+  3. Use these consent lines: `profile` "See your name and profile"; `email` "See your email address"; `library` "Browse and play your library, and control playback on your devices"; `playlist` "See, create and change your playlists".
   4. An `invalid_scope` or expired request on the consent page uses the existing rejected view with copy telling the user to start again from the app.
 - **Patterns to follow:** existing `ScopeAllowlist::filter` use in the validator.
 - **Test scenarios:**

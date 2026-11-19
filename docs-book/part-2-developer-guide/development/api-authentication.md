@@ -260,7 +260,7 @@ DPoP: <proof>
 }
 ```
 
-`scopes` are the scopes an approval grants: the pushed scopes Baander allows. The consent page describes each to the user: "See your name and profile picture" (`profile`), "See your email address" (`email`), "Browse and play your library, and control playback on your devices" (`library`), and "See, create and change your playlists" (`playlist`). `client_type` is `public`, `confidential`, `first_party`, or `personal_access`. `consent_required` is false only for clients with the first-party flag: the first-party client and the user's own personal access clients. The page may approve those without asking. A personal access client's tokens are still delegated and limited to their scopes. Another user's personal access client gets `unauthorized_client`.
+`scopes` are the scopes an approval grants: the pushed scopes Baander allows. The consent page describes each to the user: "See your name and profile" (`profile`), "See your email address" (`email`), "Browse and play your library, and control playback on your devices" (`library`), and "See, create and change your playlists" (`playlist`). `client_type` is `public`, `confidential`, `first_party`, or `personal_access`. `consent_required` is false only for clients with the first-party flag: the first-party client and the user's own personal access clients. The page may approve those without asking. A personal access client's tokens are still delegated and limited to their scopes. Another user's personal access client gets `unauthorized_client`.
 
 Then `POST /api/oauth/authorize` records the user's decision on the same pushed request. The body may be JSON or form-encoded:
 

@@ -75,7 +75,7 @@
     },
     "scopes": {
       "intro": "It will be able to:",
-      "profile": "See your name and profile picture",
+      "profile": "See your name and profile",
       "email": "See your email address",
       "library": "Browse and play your library, and control playback on your devices",
       "playlist": "See, create and change your playlists"

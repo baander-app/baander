@@ -19,8 +19,9 @@ use Symfony\Component\Serializer\Exception\NotEncodableValueException;
  *
  * Protects against brute-force attacks by applying per-IP rate limiting
  * to sensitive auth endpoints, including passkey sign-in. For login, an
- * additional per-IP+email compound limit prevents distributed brute-force
- * attempts on a single account.
+ * additional per-IP+email compound limit slows guessing against one account
+ * from one address; failed logins are also limited per account across all
+ * addresses, which the password authenticator charges.
  *
  * Returns 429 Too Many Requests with a Retry-After header when limits are exceeded.
  *

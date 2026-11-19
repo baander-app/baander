@@ -21,7 +21,7 @@ describe('ScopeList', () => {
     mount(['profile', 'email', 'library', 'playlist'])
 
     expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
-      'See your name and profile picture',
+      'See your name and profile',
       'See your email address',
       'Browse and play your library, and control playback on your devices',
       'See, create and change your playlists',
