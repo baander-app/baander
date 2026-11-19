@@ -85,11 +85,12 @@ final class GenerationDeliveryTest extends TestCase
 
     public function testManifestsPinGenerationBeforeSigningAndUsePublishedEncoder(): void
     {
-        $master = $this->service->getMasterManifest($this->job->getVideoId(), [['jobId' => $this->job->getPublicId()->toString(), 'generation' => 3]], 2000000000);
+        $expiresAt = time() + 3600;
+        $master = $this->service->getMasterManifest($this->job->getVideoId(), [['jobId' => $this->job->getPublicId()->toString(), 'generation' => 3]], $expiresAt);
         self::assertStringContainsString('CODECS="avc1.64001f,mp4a.40.2"', $master);
         self::assertStringNotContainsString('hvc1.', $master);
         self::assertStringContainsString('generation=3', $master);
-        $media = $this->service->getMediaManifest($this->job->getPublicId(), MediaTrack::Video, 3, 2000000000);
+        $media = $this->service->getMediaManifest($this->job->getPublicId(), MediaTrack::Video, 3, $expiresAt);
         preg_match_all('~(/api/transcode/[^"\s]+)~', $media, $matches);
         self::assertCount(3, $matches[1]);
         $auth = new HmacStreamAuthAdapter('generation-secret');

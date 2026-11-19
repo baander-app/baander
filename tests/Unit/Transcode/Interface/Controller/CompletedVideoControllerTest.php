@@ -22,7 +22,6 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 final class CompletedVideoControllerTest extends TestCase
 {
     private const string JOB = '0123456789abcdefghijk';
-    private const int EXPIRY = 2000000000;
 
     #[DataProvider('invalidSignatures')]
     public function testInvalidSignatureNeverReachesDelivery(string $method, string $kind): void
@@ -51,9 +50,9 @@ final class CompletedVideoControllerTest extends TestCase
         $delivery = $this->createMock(CompletedVideoDeliveryPort::class);
         $expected = $delivery->expects(self::once())->method($operation);
         if ($operation === 'master') {
-            $expected->with(PublicId::fromString(self::JOB), 7, self::EXPIRY);
+            $expected->with(PublicId::fromString(self::JOB), 7, self::expiry());
         } else {
-            $expected->with(PublicId::fromString(self::JOB), 7, MediaTrack::Audio, self::EXPIRY);
+            $expected->with(PublicId::fromString(self::JOB), 7, MediaTrack::Audio, self::expiry());
         }
         $expected->willReturn("#EXTM3U\n#EXT-X-ENDLIST\n");
         $response = $this->invoke($this->controller($delivery), $method, $this->request($method));
@@ -95,7 +94,7 @@ final class CompletedVideoControllerTest extends TestCase
         try {
             $delivery = $this->createMock(CompletedVideoDeliveryPort::class);
             $delivery->expects(self::once())->method('path')
-                ->with(PublicId::fromString(self::JOB), 7, $track, $index, self::EXPIRY)
+                ->with(PublicId::fromString(self::JOB), 7, $track, $index, self::expiry())
                 ->willReturn($path);
             $request = $this->signedRequest(str_replace(
                 ['/audio/', 'index=0'],
@@ -185,7 +184,7 @@ final class CompletedVideoControllerTest extends TestCase
 
     private function signedRequest(string $path): Request
     {
-        $url = (new HmacStreamAuthAdapter('test-secret'))->signUrlUntil($path, self::EXPIRY)['url'];
+        $url = (new HmacStreamAuthAdapter('test-secret'))->signUrlUntil($path, self::expiry())['url'];
         return Request::create('https://baander.app'.$url);
     }
 
@@ -205,5 +204,13 @@ final class CompletedVideoControllerTest extends TestCase
         return $method === 'master'
             ? $controller->master(self::JOB, 7, $request)
             : $controller->$method(self::JOB, 7, $track, $request);
+    }
+
+    /** An expiry an hour ahead, the same for the whole run; signed URLs may reach at most a day ahead. */
+    private static function expiry(): int
+    {
+        static $expiry = null;
+
+        return $expiry ??= time() + 3600;
     }
 }

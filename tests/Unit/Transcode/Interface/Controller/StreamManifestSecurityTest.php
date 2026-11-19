@@ -118,9 +118,10 @@ final class StreamManifestSecurityTest extends TestCase
         $jobId = (new PublicId())->toString();
         $renditions = [['jobId' => $jobId, 'generation' => 3]];
         $signer = new HmacStreamAuthAdapter('test-secret');
+        $expiresAt = time() + 3600;
         $state = new class { public bool $advanced = false; };
         $streaming = $this->createMock(TranscodeStreamingPortInterface::class);
-        $streaming->expects(self::exactly(2))->method('getDashManifest')->with($video->getId(), $renditions, 2000000000)
+        $streaming->expects(self::exactly(2))->method('getDashManifest')->with($video->getId(), $renditions, $expiresAt)
             ->willReturnCallback(static function () use ($state, $retired): string {
                 if (!$state->advanced) {
                     return '<MPD type="dynamic"><Representation id="before"/></MPD>';
@@ -134,7 +135,7 @@ final class StreamManifestSecurityTest extends TestCase
         $videos->method('videoId')->willReturn($video->getId());
         $controller = new StreamManifestController($streaming, new SignedStreamRequest($signer), $this->createStub(PlaybackPortInterface::class), $videos, $sleeper);
 
-        $response = $controller->dashManifest($video->getPublicId()->toString(), Request::create($signer->signUrlUntil('/api/transcode/'.$video->getPublicId().'/manifest.mpd?set='.$jobId.'.3', 2000000000)['url']));
+        $response = $controller->dashManifest($video->getPublicId()->toString(), Request::create($signer->signUrlUntil('/api/transcode/'.$video->getPublicId().'/manifest.mpd?set='.$jobId.'.3', $expiresAt)['url']));
 
         self::assertSame($retired ? 503 : 200, $response->getStatusCode());
         ob_start();
