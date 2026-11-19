@@ -357,6 +357,18 @@ The base file also binds the web service on host loopback port 9501. Review ever
 publication and host firewall rule for your deployment;
 [Getting started](../getting-started/installation.md) describes the source-install topology.
 
+### Browser protections
+
+Every response carries `X-Content-Type-Options: nosniff` and `X-Frame-Options: DENY`,
+static files included. The web app's HTML page also carries a Content-Security-Policy.
+Scripts run only from the installation's own origin or with a nonce issued for that
+page view, framing is refused (`frame-ancestors 'none'`), and plugins and `<base>`
+are blocked. Images and media may come from any HTTP(S) host, because radio streams
+and station logos live on the stations' own servers. A request that reaches Baander
+as HTTPS, directly or through a proxy listed in `TRUSTED_PROXIES` that sets
+`X-Forwarded-Proto: https`, also gets `Strict-Transport-Security: max-age=31536000`.
+With an untrusted proxy, Baander sees plain HTTP and sends no HSTS.
+
 ### Outbound provider requests
 
 Metadata lookups, Spotify token acquisition, IPRD catalog downloads and browser-push

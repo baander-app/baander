@@ -151,6 +151,9 @@ final class AdvancedStaticFilesServer implements RequestHandler, Bootable
                 && str_starts_with($resolved, $root)
                 && (isset($this->cachedMimeTypes[$path]) || $this->checkPath($path))) {
                 $response->header('Content-Type', $this->cachedMimeTypes[$path]);
+                // Static files bypass the kernel's response listeners, so they set these here.
+                $response->header('X-Content-Type-Options', 'nosniff');
+                $response->header('X-Frame-Options', 'DENY');
                 if (str_starts_with($resolved, $root . self::FINGERPRINTED_DIRECTORY . DIRECTORY_SEPARATOR)) {
                     $response->header('Cache-Control', self::IMMUTABLE_CACHE_CONTROL);
                 }

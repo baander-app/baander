@@ -43,7 +43,7 @@ final class AdvancedStaticFilesServerTest extends TestCase
         $this->server($this->neverReached())->handle(self::get(self::FONT), $response);
 
         self::assertSame(
-            ['Content-Type' => 'font/woff2', 'Cache-Control' => 'public, max-age=31536000, immutable'],
+            ['Content-Type' => 'font/woff2', 'X-Content-Type-Options' => 'nosniff', 'X-Frame-Options' => 'DENY', 'Cache-Control' => 'public, max-age=31536000, immutable'],
             $headers->getArrayCopy(),
         );
     }
@@ -62,12 +62,12 @@ final class AdvancedStaticFilesServerTest extends TestCase
         $server->handle(self::get(self::FONT), $response);
 
         self::assertSame(
-            ['Content-Type' => 'font/woff2', 'Cache-Control' => 'public, max-age=31536000, immutable'],
+            ['Content-Type' => 'font/woff2', 'X-Content-Type-Options' => 'nosniff', 'X-Frame-Options' => 'DENY', 'Cache-Control' => 'public, max-age=31536000, immutable'],
             $headers->getArrayCopy(),
         );
     }
 
-    public function testOtherStaticFilesKeepTheirHeaders(): void
+    public function testOtherStaticFilesAreNotSniffedOrFramed(): void
     {
         $response = $this->createMock(Response::class);
         $headers = $this->recordHeaders($response);
@@ -75,7 +75,7 @@ final class AdvancedStaticFilesServerTest extends TestCase
 
         $this->server($this->neverReached())->handle(self::get('/favicon.svg'), $response);
 
-        self::assertSame(['Content-Type' => 'image/svg+xml'], $headers->getArrayCopy());
+        self::assertSame(['Content-Type' => 'image/svg+xml', 'X-Content-Type-Options' => 'nosniff', 'X-Frame-Options' => 'DENY'], $headers->getArrayCopy());
     }
 
     public function testAnAssetPathThatResolvesOutsideThePublicDirectoryIsRefused(): void

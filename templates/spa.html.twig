@@ -8,7 +8,7 @@
     <title>Bånder</title>
     {{ vite_entry_link_tags('app') }}
     {{ vite_entry_script_tags('app', {dependency: 'react'}) }}
-    <script>
+    <script nonce="{{ app.request.attributes.get('_csp_nonce') }}">
         window.__BAANDER_API_URL__ = {{ api_url|json_encode|raw }};
     </script>
 </head>
