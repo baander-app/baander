@@ -25,9 +25,8 @@ final class AuthControllerTest extends TestCase
             'password' => 'securepassword123',
         ]);
 
-        $data = $this->assertJsonResponse($response, 201, 'data');
-        $this->assertSame($email, $data['data']['email']);
-        $this->assertSame('New User', $data['data']['name']);
+        $data = $this->assertJsonResponse($response, 202, 'data');
+        $this->assertSame(['message' => 'Registration received. Check your email for the next step.'], $data['data']);
     }
 
     public function testRegisterPersistsUser(): void
@@ -47,18 +46,46 @@ final class AuthControllerTest extends TestCase
         $this->assertSame('Persisted User', $user->getName());
     }
 
-    public function testRegisterWithDuplicateEmailFails(): void
+    /** A taken address gets the answer a new one gets; only its owner learns of the attempt. */
+    public function testRegisteringATakenAddressAnswersLikeANewOneAndEmailsTheOwner(): void
     {
         $email = 'dup-' . bin2hex(random_bytes(4)) . '@baander.app';
-        $this->createTestUser($email);
+        $owner = $this->createTestUser($email, name: 'Original Owner');
+        $fresh = 'fresh-' . bin2hex(random_bytes(4)) . '@baander.app';
 
-        $response = $this->anonymousRequest('POST', '/api/auth/register', [
-            'email' => $email,
+        $new = $this->anonymousRequest('POST', '/api/auth/register', [
+            'email' => $fresh,
+            'name' => 'Another User',
+            'password' => 'securepassword123',
+        ]);
+        $taken = $this->anonymousRequest('POST', '/api/auth/register', [
+            'email' => strtoupper($email),
             'name' => 'Another User',
             'password' => 'securepassword123',
         ]);
 
-        $this->assertJsonResponse($response, 400);
+        $this->assertSame(202, $taken->getStatusCode(), (string) $taken->getContent());
+        $this->assertSame($new->getStatusCode(), $taken->getStatusCode());
+        $this->assertSame($new->getContent(), $taken->getContent());
+
+        $toOwner = array_values(array_filter(
+            $this->getMailerMessages(),
+            static fn (object $message): bool => $message instanceof \Symfony\Component\Mime\Email
+                && array_map(static fn (\Symfony\Component\Mime\Address $a): string => $a->getAddress(), $message->getTo()) === [$email],
+        ));
+        $this->assertCount(1, $toOwner, 'The owner gets one notice.');
+        $notice = $toOwner[0];
+        $this->assertInstanceOf(\Symfony\Component\Mime\Email::class, $notice);
+        $this->assertStringContainsString('Someone tried to sign up', (string) $notice->getSubject());
+        $this->assertStringContainsString('Hi Original Owner,', (string) $notice->getTextBody());
+        $this->assertStringContainsString('/forgot-password', (string) $notice->getTextBody());
+
+        $this->entityManager->clear();
+        $stored = $this->userRepository->findByEmail(new Email($email));
+        $this->assertNotNull($stored);
+        $this->assertTrue($stored->getId()->equals($owner->getId()));
+        $this->assertSame('Original Owner', $stored->getName(), 'The existing account is left as it was.');
+        $this->assertSame($owner->getPassword(), $stored->getPassword());
     }
 
     public function testRegisterWithInvalidDataFails(): void

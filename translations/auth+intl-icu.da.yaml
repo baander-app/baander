@@ -39,6 +39,7 @@ success:
   passkey_deleted: "passkey slettet."
   password_reset: "Din adgangskode er blevet nulstillet."
   password_changed: "Adgangskoden er ændret."
+  registration_received: "Tilmeldingen er modtaget. Tjek din e-mail for at se, hvad du skal gøre nu."
 
 password_reset_email:
   subject: "Nulstil din adgangskode til {app}"
@@ -49,6 +50,16 @@ password_reset_email:
   fallback: "Hvis knappen ikke virker, kan du kopiere dette link ind i din browser:"
   expiry: "Linket kan bruges én gang og udløber om {minutes, plural, one {# minut} other {# minutter}}."
   ignore: "Hvis du ikke har bedt om dette, kan du se bort fra denne e-mail. Din adgangskode forbliver uændret."
+
+registration_attempt_email:
+  subject: "Nogen har prøvet at oprette en konto på {app} med din e-mailadresse"
+  heading: "Nogen har prøvet at oprette en konto med din adresse"
+  greeting: "Hej {name}"
+  intro: "Nogen har prøvet at oprette en ny konto på {app} med denne e-mailadresse. Du har allerede en konto, så der blev ikke oprettet en ny, og intet ved din konto er ændret."
+  forgot: "Hvis det var dig, og du har glemt din adgangskode, kan du vælge en ny her:"
+  action: "Vælg en ny adgangskode"
+  fallback: "Hvis knappen ikke virker, kan du kopiere dette link ind i din browser:"
+  ignore: "Hvis det ikke var dig, kan du se bort fra denne e-mail. Din adgangskode forbliver uændret."
 
 email_verification_email:
   subject: "Bekræft din e-mailadresse til {app}"

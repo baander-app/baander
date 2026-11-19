@@ -39,14 +39,15 @@ final class RegistrationLanguageTest extends TestCase
             $server['HTTP_ACCEPT_LANGUAGE'] = $acceptLanguage;
         }
 
+        $email = 'new-' . bin2hex(random_bytes(4)) . '@baander.app';
         $this->client->request('POST', '/api/auth/register', [], [], $server, json_encode([
-            'email' => 'new-' . bin2hex(random_bytes(4)) . '@baander.app',
+            'email' => $email,
             'name' => 'New Listener',
             'password' => 'Test-password-42',
         ], JSON_THROW_ON_ERROR));
-        $body = $this->assertJsonResponse($this->client->getResponse(), 201, 'data');
+        $this->assertJsonResponse($this->client->getResponse(), 202, 'data');
 
-        $userId = $this->userRepository->findByPublicId(\App\Shared\Domain\Model\PublicId::fromString($body['data']['publicId']))->getId();
+        $userId = $this->userRepository->findByEmail(new \App\Shared\Domain\Model\Email($email))->getId();
         $this->assertSame($stored, static::getContainer()->get(UserSettingStoreInterface::class)->find($userId, 'language'));
     }
 }

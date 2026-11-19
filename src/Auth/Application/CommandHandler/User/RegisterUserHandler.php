@@ -6,6 +6,7 @@ namespace App\Auth\Application\CommandHandler\User;
 
 use App\Auth\Application\Command\User\RegisterUserCommand;
 use App\Auth\Application\Port\PasswordHasherInterface;
+use App\Auth\Application\Port\RegistrationAttemptNoticeInterface;
 use App\Auth\Application\Service\EmailVerificationIssuer;
 use App\Auth\Domain\Event\UserRegistered;
 use App\Auth\Domain\Model\User;
@@ -18,6 +19,12 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
 
+/**
+ * Registers an account, or, when the address is taken, tells its owner instead.
+ *
+ * The caller cannot tell the two apart: both hash the password and both send their email
+ * after the response, so registration does not reveal which addresses have accounts.
+ */
 final class RegisterUserHandler
 {
     public function __construct(
@@ -28,17 +35,22 @@ final class RegisterUserHandler
         private readonly EmailVerificationIssuer $emailVerification,
         private readonly TransactionPortInterface $transaction,
         private readonly UserSettingsContractInterface $settings,
+        private readonly RegistrationAttemptNoticeInterface $registrationAttemptNotice,
     ) {
     }
 
     #[AsMessageHandler]
-    public function __invoke(RegisterUserCommand $command): User
+    public function __invoke(RegisterUserCommand $command): void
     {
-        if ($this->userRepository->existsWithEmail($command->getEmail())) {
-            throw new \RuntimeException('A user with this email already exists.');
+        $hashedPassword = $this->passwordHasher->hash($command->getPlainPassword());
+
+        $owner = $this->userRepository->findByEmail($command->getEmail());
+        if ($owner !== null) {
+            $this->registrationAttemptNotice->deliver($owner);
+
+            return;
         }
 
-        $hashedPassword = $this->passwordHasher->hash($command->getPlainPassword());
         $user = User::register($command->getEmail(), $hashedPassword, $command->getName());
 
         $issued = $this->transaction->run(function () use ($user, $command) {
@@ -70,7 +82,5 @@ final class RegisterUserHandler
         // After the commit, so a rolled-back registration never emails a link. A delivery
         // failure is logged by the delivery and does not fail the registration.
         $this->emailVerification->deliver($user, $issued);
-
-        return $user;
     }
 }

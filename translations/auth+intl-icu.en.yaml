@@ -39,6 +39,7 @@ success:
   passkey_deleted: "Passkey deleted successfully."
   password_reset: "Your password has been reset."
   password_changed: "Password changed."
+  registration_received: "Registration received. Check your email for the next step."
 
 password_reset_email:
   subject: "Reset your {app} password"
@@ -49,6 +50,16 @@ password_reset_email:
   fallback: "If the button does not work, copy this link into your browser:"
   expiry: "The link works once and expires in {minutes, plural, one {# minute} other {# minutes}}."
   ignore: "If you did not ask for this, ignore this email. Your password stays the same."
+
+registration_attempt_email:
+  subject: "Someone tried to sign up for {app} with your email address"
+  heading: "Someone tried to sign up with your address"
+  greeting: "Hi {name},"
+  intro: "Someone tried to create a new {app} account with this email address. You already have an account, so no new account was created and nothing about your account changed."
+  forgot: "If it was you and you have forgotten your password, you can choose a new one here:"
+  action: "Choose a new password"
+  fallback: "If the button does not work, copy this link into your browser:"
+  ignore: "If it was not you, ignore this email. Your password stays the same."
 
 email_verification_email:
   subject: "Verify your email address for {app}"

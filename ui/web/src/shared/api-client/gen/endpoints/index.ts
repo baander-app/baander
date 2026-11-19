@@ -5036,8 +5036,12 @@ export type PostAuthRegisterBody = {
   password: string;
 };
 
-export type PostAuthRegister201 = {
-  data?: UserResource;
+export type PostAuthRegister202Data = {
+  message?: string;
+};
+
+export type PostAuthRegister202 = {
+  data?: PostAuthRegister202Data;
 };
 
 export type PostAuthLogout200Data = {
@@ -13645,7 +13649,7 @@ export const getPostAuthRegisterUrl = () => {
 /**
  * @summary Register a new user
  */
-export const postAuthRegister = async (postAuthRegisterBody: PostAuthRegisterBody, options?: Parameters<typeof customInstance>[1]): Promise<PostAuthRegister201> => {
+export const postAuthRegister = async (postAuthRegisterBody: PostAuthRegisterBody, options?: Parameters<typeof customInstance>[1]): Promise<PostAuthRegister202> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -13661,7 +13665,7 @@ export const postAuthRegister = async (postAuthRegisterBody: PostAuthRegisterBod
     }
     return headers;
   };
-return customInstance<PostAuthRegister201>(getPostAuthRegisterUrl(),
+return customInstance<PostAuthRegister202>(getPostAuthRegisterUrl(),
   {
     ...options,
     method: 'POST',

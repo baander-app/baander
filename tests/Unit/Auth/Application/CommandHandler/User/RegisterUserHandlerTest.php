@@ -9,6 +9,7 @@ use App\Auth\Application\CommandHandler\User\RegisterUserHandler;
 use App\Auth\Application\Port\EmailVerificationDeliveryInterface;
 use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
 use App\Auth\Application\Port\PasswordHasherInterface;
+use App\Auth\Application\Port\RegistrationAttemptNoticeInterface;
 use App\Auth\Application\Service\EmailVerificationIssuer;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
@@ -18,7 +19,6 @@ use App\Shared\Domain\Model\Uuid;
 use App\UserPreference\Application\Port\UserSettingsContractInterface;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -37,13 +37,26 @@ final class RegisterUserHandlerTest extends TestCase
     private array $delivered = [];
     /** @var list<array{string, string, bool}> userId, language, inside the transaction */
     private array $seeded = [];
+    /** @var list<User> */
+    private array $saved = [];
+    /** @var list<User> owners told about a registration attempt */
+    private array $noticed = [];
+    /** @var list<string> passwords hashed */
+    private array $hashed = [];
 
     protected function setUp(): void
     {
         $this->userRepository = $this->createStub(UserRepositoryInterface::class);
-        $this->userRepository->method('existsWithEmail')->willReturn(false);
+        $this->userRepository->method('findByEmail')->willReturn(null);
+        $this->userRepository->method('save')->willReturnCallback(function (User $user): void {
+            $this->saved[] = $user;
+        });
         $this->passwordHasher = $this->createStub(PasswordHasherInterface::class);
-        $this->passwordHasher->method('hash')->willReturn('hashed-pw');
+        $this->passwordHasher->method('hash')->willReturnCallback(function (string $password): string {
+            $this->hashed[] = $password;
+
+            return 'hashed-pw';
+        });
         $this->eventDispatcher = $this->createStub(EventDispatcherInterface::class);
         $this->eventDispatcher->method('dispatch')->willReturnArgument(0);
         $this->bus = $this->createStub(MessageBusInterface::class);
@@ -61,27 +74,41 @@ final class RegisterUserHandlerTest extends TestCase
 
     public function testRegistersAnUnverifiedUser(): void
     {
-        $user = ($this->handler())(new RegisterUserCommand(new Email('test@baander.app'), 'Alice', 'password123'));
+        ($this->handler())(new RegisterUserCommand(new Email('test@baander.app'), 'Alice', 'password123'));
+        $user = $this->registered();
 
         $this->assertSame('Alice', $user->getName());
         $this->assertSame('test@baander.app', $user->getEmail());
         $this->assertFalse($user->isEmailVerified());
     }
 
-    public function testThrowsOnDuplicateEmail(): void
+    /** A taken address costs the same hash, creates nothing and tells the existing owner. */
+    public function testATakenAddressNotifiesItsOwnerAndCreatesNothing(): void
     {
+        $owner = User::register(new Email('test@baander.app'), 'owner-hash', 'Owner');
         $this->userRepository = $this->createStub(UserRepositoryInterface::class);
-        $this->userRepository->method('existsWithEmail')->willReturn(true);
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('already exists');
+        $this->userRepository->method('findByEmail')->willReturn($owner);
+        $this->userRepository->method('save')->willReturnCallback(static fn (): never => self::fail('A taken address must not create an account.'));
 
         ($this->handler())(new RegisterUserCommand(new Email('test@baander.app'), 'Alice', 'password123'));
+
+        $this->assertSame(['password123'], $this->hashed, 'The password is hashed as for a new account.');
+        $this->assertSame([$owner], $this->noticed);
+        $this->assertSame([], $this->issued);
+        $this->assertSame([], $this->delivered);
+    }
+
+    public function testANewAddressNotifiesNobody(): void
+    {
+        ($this->handler())(new RegisterUserCommand(new Email('test@baander.app'), 'Alice', 'password123'));
+
+        $this->assertSame([], $this->noticed);
     }
 
     public function testIssuesATokenInTheTransactionAndDeliversItAfterTheCommit(): void
     {
-        $user = ($this->handler())(new RegisterUserCommand(new Email('test@baander.app'), 'Alice', 'password123'));
+        ($this->handler())(new RegisterUserCommand(new Email('test@baander.app'), 'Alice', 'password123'));
+        $user = $this->registered();
 
         $this->assertCount(1, $this->issued);
         [$userId, $email, $token, $expiresAt, $inside] = $this->issued[0];
@@ -99,7 +126,8 @@ final class RegisterUserHandlerTest extends TestCase
 
     public function testTheBrowserLanguageIsSeededInsideTheRegistrationTransaction(): void
     {
-        $user = ($this->handler())(new RegisterUserCommand(new Email('alice@baander.app'), 'Alice', 'password123', 'da'));
+        ($this->handler())(new RegisterUserCommand(new Email('alice@baander.app'), 'Alice', 'password123', 'da'));
+        $user = $this->registered();
 
         $this->assertSame([[$user->getId()->toString(), 'da', true]], $this->seeded);
     }
@@ -138,6 +166,11 @@ final class RegisterUserHandlerTest extends TestCase
             $this->delivered[] = [$user, $token, $this->active];
         });
 
+        $notice = $this->createStub(RegistrationAttemptNoticeInterface::class);
+        $notice->method('deliver')->willReturnCallback(function (User $owner): void {
+            $this->noticed[] = $owner;
+        });
+
         return new RegisterUserHandler(
             $this->userRepository,
             $this->passwordHasher,
@@ -146,7 +179,15 @@ final class RegisterUserHandlerTest extends TestCase
             new EmailVerificationIssuer($tokens, $delivery, 86400),
             $this->transaction,
             $this->settings(),
+            $notice,
         );
+    }
+
+    private function registered(): User
+    {
+        $this->assertCount(1, $this->saved);
+
+        return $this->saved[0];
     }
 
     private function settings(): UserSettingsContractInterface

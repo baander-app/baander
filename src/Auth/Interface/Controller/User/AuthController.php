@@ -99,11 +99,13 @@ final class AuthController
         ),
         responses: [
             new OA\Response(
-                response: '201',
-                description: 'User created',
+                response: '202',
+                description: 'Registration received. The answer is the same whether or not an account uses the address: a new account is created and emailed a verification link, while the owner of an existing account is emailed that someone tried to register with it.',
                 content: new OA\JsonContent(
                     properties: [
-                        new OA\Property(property: 'data', ref: new Model(type: UserResource::class)),
+                        new OA\Property(property: 'data', properties: [
+                            new OA\Property(property: 'message', type: 'string', example: 'Registration received. Check your email for the next step.'),
+                        ], type: 'object'),
                     ],
                     type: 'object',
                 ),
@@ -123,9 +125,7 @@ final class AuthController
         );
 
         try {
-            $envelope = $this->commandBus->dispatch($command);
-            $stamp = $envelope->last(HandledStamp::class);
-            $user = $stamp?->getResult();
+            $this->commandBus->dispatch($command);
         } catch (\Throwable $e) {
             return $this->handleCommandException(
                 $e,
@@ -134,7 +134,9 @@ final class AuthController
             );
         }
 
-        return $this->successResponse(UserResource::from($user), Response::HTTP_CREATED);
+        return $this->successResponse([
+            'message' => $this->trans('success.registration_received', domain: 'auth'),
+        ], Response::HTTP_ACCEPTED);
     }
 
     #[OA\Post(

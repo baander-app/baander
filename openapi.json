@@ -3691,14 +3691,20 @@
                     }
                 },
                 "responses": {
-                    "201": {
-                        "description": "User created",
+                    "202": {
+                        "description": "Registration received. The answer is the same whether or not an account uses the address: a new account is created and emailed a verification link, while the owner of an existing account is emailed that someone tried to register with it.",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/components/schemas/UserResource"
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string",
+                                                    "example": "Registration received. Check your email for the next step."
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"

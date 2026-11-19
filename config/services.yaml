@@ -619,6 +619,13 @@ services:
         arguments:
             $appUrl: '%env(APP_URL)%'
 
+    App\Auth\Application\Port\RegistrationAttemptNoticeInterface:
+        alias: App\Auth\Infrastructure\Mail\MailerRegistrationAttemptNotice
+
+    App\Auth\Infrastructure\Mail\MailerRegistrationAttemptNotice:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+
     App\Auth\Infrastructure\Mail\AfterResponseMailer:
         arguments:
             $appName: '%app.name%'

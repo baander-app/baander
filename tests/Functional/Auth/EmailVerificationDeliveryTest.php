@@ -47,8 +47,7 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
             'email' => $address,
             'password' => 'registration-password-1',
         ]);
-        $body = $this->assertJsonResponse($registered, 201, 'data');
-        $this->assertNull($body['data']['emailVerifiedAt']);
+        $this->assertJsonResponse($registered, 202, 'data');
 
         $this->assertEmailCount(1);
         $email = $this->onlyEmail();
@@ -69,6 +68,8 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
             $this->connection()->fetchOne('SELECT token_hash FROM email_verification_tokens WHERE user_id = ?', [$userId]),
             'Only the SHA-256 hash of the token is stored.',
         );
+
+        $this->assertNull($this->connection()->fetchOne('SELECT email_verified_at FROM users WHERE id = ?', [$userId]), 'A new account starts unverified.');
 
         $this->assertJsonResponse($this->verify($token), 200, 'data');
         $this->assertNotNull($this->connection()->fetchOne('SELECT email_verified_at FROM users WHERE id = ?', [$userId]));
@@ -114,7 +115,7 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
             'password' => 'registration-password-1',
         ]);
 
-        $this->assertJsonResponse($response, 201, 'data');
+        $this->assertJsonResponse($response, 202, 'data');
         $this->assertNotNull($transport->attemptedText, 'Delivery was attempted after the response.');
         [, $token] = $this->linkFrom($transport->attemptedText);
         $this->assertTrue($logs->hasErrorThatContains('Verification email could not be sent.'));
@@ -317,7 +318,7 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
             'email' => $address,
             'password' => 'registration-password-1',
         ]);
-        $this->assertJsonResponse($response, 201, 'data');
+        $this->assertJsonResponse($response, 202, 'data');
         $this->entityManager->clear();
         $user = $this->userRepository->findByEmail(new \App\Shared\Domain\Model\Email($address));
         $this->assertInstanceOf(User::class, $user);
