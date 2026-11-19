@@ -10,11 +10,15 @@ use App\Transcode\Application\Port\StreamAuthPortInterface;
  * HMAC-SHA256 signed URL adapter for stream segment delivery.
  *
  * Generates and validates time-limited signed URLs using HMAC-SHA256.
- * Signature payload: "{path}:{expiresAt}[:{clientIp}]".
+ * Signature payload: "{path}:{expiresAt}[:{clientIp}]". A URL whose expiry lies more
+ * than 24 hours ahead is refused.
  * Supports optional IP binding for enhanced security.
  */
 final readonly class HmacStreamAuthAdapter implements StreamAuthPortInterface
 {
+    /** The longest a signed URL stays valid: 24 hours. */
+    public const int MAX_LIFETIME_SECONDS = 86400;
+
     public function __construct(
         private string $hmacSecret,
         private string $appDomain = '',
@@ -47,8 +51,10 @@ final readonly class HmacStreamAuthAdapter implements StreamAuthPortInterface
 
     public function validateUrl(string $path, string $signature, int $expiresAt, ?string $clientIp = null): bool
     {
-        // Check expiry first (cheapest check)
-        if ($expiresAt < time()) {
+        // Check expiry first (cheapest check). A URL may be valid for at most the longest
+        // lifetime the signing endpoint issues, so a leaked secret cannot mint long-lived URLs.
+        $now = time();
+        if ($expiresAt < $now || $expiresAt > $now + self::MAX_LIFETIME_SECONDS) {
             return false;
         }
 

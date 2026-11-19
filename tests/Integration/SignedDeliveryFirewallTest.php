@@ -253,7 +253,7 @@ final class SignedDeliveryFirewallTest extends TestCase
     public function testManifestControllersReceiveTheVerifiedCapabilityExpiryThroughTheFirewall(): void
     {
         $this->bus->expects($this->never())->method('dispatch');
-        $expiresAt = 2000000000;
+        $expiresAt = time() + 3600;
         $methods = [
             'stream_master_manifest' => 'getMasterManifest',
             'stream_dash_manifest' => 'getDashManifest',
@@ -283,7 +283,7 @@ final class SignedDeliveryFirewallTest extends TestCase
         foreach (self::STREAMING_METHODS as $method) {
             $this->streaming->expects($this->never())->method($method);
         }
-        $expiresAt = 2000000000;
+        $expiresAt = time() + 3600;
         $this->completed->expects($this->once())->method('master')->with($this->jobId, 3, $expiresAt);
         $this->completed->expects($this->once())->method('playlist')->with($this->jobId, 3, MediaTrack::Video, $expiresAt);
         $indices = [];
