@@ -30,6 +30,7 @@ The OAuth models AccessToken, AuthCode, Client, DeviceCode, PushedAuthorizationR
 | `PasswordResetDeliveryInterface` | Emails the reset link after the response is sent; never persists or logs the token |
 | `EmailVerificationTokenRepositoryInterface` | Each user's single outstanding email verification token (hashed, bound to the address, single use) |
 | `EmailVerificationDeliveryInterface` | Emails the verification link after the response is sent; never persists or logs the token |
+| `EmailChangeNoticeInterface` | Tells an account's previous address that its email changed, after the response is sent |
 | `EmailVerificationResendThrottleInterface` | Per-user limit on verification resend requests |
 | `AuthenticatedUserIdentityInterface` | Identity of the user a login authenticator verified |
 | `OAuthSecretBundleInterface` | Key bundle preparation and validation for secret rotation |
