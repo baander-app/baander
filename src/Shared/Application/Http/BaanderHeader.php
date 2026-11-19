@@ -11,6 +11,7 @@ enum BaanderHeader: string
     case ClientFingerprint = 'X-Baander-Client-Fingerprint';
     case CorrelationId = 'X-Baander-Correlation-ID';
     case DeviceId = 'X-Baander-Device-Id';
+    case TestClientScopes = 'X-Baander-Test-Client-Scopes';
     case TestUserId = 'X-Baander-Test-User-Id';
     case WebhookSignature = 'X-Baander-Webhook-Signature';
     case WebhookSignatureVersion = 'X-Baander-Webhook-Signature-Version';

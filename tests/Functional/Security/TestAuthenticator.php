@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Security;
 
+use App\Auth\Application\Http\AccessTokenAttributes;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Security\SecurityUser;
@@ -21,6 +22,10 @@ use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPasspor
 
 /**
  * Test authenticator that accepts X-Baander-Test-User-Id header.
+ *
+ * The request counts as a first-party token by default. X-Baander-Test-Client-Scopes
+ * models a delegated token instead: its space-separated value is the token's scopes,
+ * and the user authenticates with ROLE_USER alone, as the API authenticator does.
  *
  * Only active in test environment via security_test.yaml override.
  */
@@ -44,9 +49,13 @@ final class TestAuthenticator extends AbstractAuthenticator
             throw new UserNotFoundException(BaanderHeader::TestUserId->value . ' header is empty.');
         }
 
+        $firstParty = !$request->headers->has(BaanderHeader::TestClientScopes->value);
+        $request->attributes->set(AccessTokenAttributes::FIRST_PARTY, $firstParty);
+        $request->attributes->set(AccessTokenAttributes::SCOPES, $firstParty ? [] : self::delegatedScopes($request));
+
         $badge = new UserBadge(
             $userId,
-            function (string $uuid): SecurityUser {
+            function (string $uuid) use ($firstParty): SecurityUser {
                 $user = $this->userRepository->findByUuid(Uuid::fromString($uuid));
 
                 if ($user === null) {
@@ -57,12 +66,20 @@ final class TestAuthenticator extends AbstractAuthenticator
                     $user->getId()->toString(),
                     $user->getEmail(),
                     $user->getPassword(),
-                    $user->getRoles(),
+                    $firstParty ? $user->getRoles() : ['ROLE_USER'],
                 );
             },
         );
 
         return new SelfValidatingPassport($badge);
+    }
+
+    /** @return list<string> */
+    private static function delegatedScopes(Request $request): array
+    {
+        $value = (string) $request->headers->get(BaanderHeader::TestClientScopes->value, '');
+
+        return array_values(array_filter(explode(' ', $value), static fn (string $scope): bool => $scope !== ''));
     }
 
     public function onAuthenticationSuccess(Request $request, TokenInterface $token, string $firewallName): ?Response

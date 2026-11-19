@@ -7,7 +7,6 @@ namespace App\Tests\Integration;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
-use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\GenreEntity;
@@ -29,6 +28,7 @@ use App\Media\Infrastructure\Doctrine\Entity\ImageEntity;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
 use App\Tests\Fixtures\Auth\OAuthAccessTokenJwt;
 use App\Tests\Fixtures\Auth\CatalogOAuthKernel;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
@@ -669,7 +669,7 @@ final class CatalogReadFirewallTest extends TestCase
         $this->actorId = $user->getId();
         $entity = $this->manager->find(UserEntity::class, $user->getId());
         self::assertInstanceOf(UserEntity::class, $entity);
-        $client = new ClientEntity(new PublicId(), 'Catalog acceptance client', json_encode(['https://baander.app/callback'], JSON_THROW_ON_ERROR));
+        $client = FirstPartyOAuthClient::entity($this->kernel->getContainer(), $this->manager);
         $this->proof = new SignedDpopProof();
         $token = new AccessTokenEntity((new Uuid())->toString(), $client, $entity, scopes: ['library'], expiresAt: new \DateTimeImmutable('+1 hour'));
         $token->setDpopJkt($this->proof->thumbprint());
@@ -677,7 +677,6 @@ final class CatalogReadFirewallTest extends TestCase
             $this->manager->persist(new UserLibraryAccessEntity($entity->getId(), $this->catalog['allowed']['library'], new \DateTimeImmutable()));
         }
         $this->persistFixture($entity, $entity->getId());
-        $this->persistFixture($client, $client->getId());
         $this->persistFixture($token, $token->getId());
         $this->manager->flush();
         $this->jwt = OAuthAccessTokenJwt::sign(self::$privateKey, $token);

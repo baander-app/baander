@@ -103,9 +103,9 @@ final class AccessTokenTest extends TestCase
 
     public function testGetScopeIdentifiers(): void
     {
-        $token = AccessToken::issue($this->client, scopes: [new Scope('access-api')]);
+        $token = AccessToken::issue($this->client, scopes: [new Scope('library')]);
 
-        $this->assertSame(['access-api'], $token->getScopeIdentifiers());
+        $this->assertSame(['library'], $token->getScopeIdentifiers());
     }
 
     public function testReconstitute(): void

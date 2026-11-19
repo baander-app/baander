@@ -103,7 +103,7 @@ final class AuthorizationCodeGrantTest extends TestCase
         self::assertTrue($details->consentRequired);
         self::assertSame([], $this->codes);
         self::assertFalse($this->pushed[$request->getRequestId()->toString()]->isConsumed(), 'Looking a request up does not use it up.');
-        self::assertSame(['access-api'], $this->describe($this->pushRequest(scopes: []))->scopes, 'No allowed scope means the default scopes.');
+        self::assertSame([], $this->describe($this->pushRequest(scopes: []))->scopes, 'No allowed scope grants no scope.');
     }
 
     public function testLookingARequestUpTwiceThenApprovingIssuesOneCode(): void

@@ -12,9 +12,9 @@ final class ScopeTest extends TestCase
 {
     public function testValidScope(): void
     {
-        $scope = new Scope('access-api');
+        $scope = new Scope('library');
 
-        $this->assertSame('access-api', $scope->toString());
+        $this->assertSame('library', $scope->toString());
     }
 
     public function testSingleCharScope(): void
@@ -73,17 +73,8 @@ final class ScopeTest extends TestCase
         $this->assertSame('admin', $scope->toString());
     }
 
-    public function testDefaultScopes(): void
-    {
-        $defaults = Scope::defaultScopes();
-
-        $this->assertCount(1, $defaults);
-        $this->assertSame('access-api', $defaults[0]->toString());
-    }
-
     public function testStaticFactories(): void
     {
-        $this->assertSame('access-api', Scope::accessApi()->toString());
         $this->assertSame('profile', Scope::profile()->toString());
         $this->assertSame('admin', Scope::admin()->toString());
     }

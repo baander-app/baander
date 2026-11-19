@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Controller;
 
+use App\Auth\Application\Http\AccessTokenAttributes;
 use App\Auth\Application\Exception\WebSocketOriginRejectedException;
 use App\Auth\Application\Exception\WebSocketTicketRejectedException;
 use App\Auth\Application\Exception\WebSocketTicketUnavailableException;
@@ -40,7 +41,7 @@ final readonly class WebSocketTicketController
     public function issue(Request $request): JsonResponse
     {
         $user = $this->security->getUser();
-        $tokenId = $request->attributes->get('oauth_access_token_id');
+        $tokenId = $request->attributes->get(AccessTokenAttributes::TOKEN_ID);
         if (!$user instanceof AuthenticatedUserIdentityInterface || !is_string($tokenId) || $tokenId === '') {
             $response = $this->unauthorized();
         } else {

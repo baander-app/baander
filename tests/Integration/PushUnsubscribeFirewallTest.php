@@ -8,10 +8,10 @@ use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
+use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Notification\Infrastructure\Doctrine\Entity\PushSubscriptionEntity;
 use App\Shared\Domain\Model\Email;
-use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Auth\OAuthAccessTokenJwt;
 use App\Tests\Fixtures\Auth\ProductionOAuthKernel;
@@ -125,12 +125,10 @@ final class PushUnsubscribeFirewallTest extends TestCase
         $proof = new SignedDpopProof();
         if ($actor !== 'anonymous') {
             $user = $actor === 'owner' ? $owner : $this->createUser($actor);
-            $client = new ClientEntity(new PublicId(), 'Push acceptance', json_encode(['https://baander.app/callback'], JSON_THROW_ON_ERROR));
+            $client = FirstPartyOAuthClient::entity($this->kernel->getContainer(), $this->manager);
             $token = new AccessTokenEntity((new Uuid())->toString(), $client, $user, scopes: ['library'], expiresAt: new \DateTimeImmutable('+1 hour'));
             $token->setDpopJkt($proof->thumbprint());
-            $this->manager->persist($client);
             $this->manager->persist($token);
-            $this->entities[] = $client;
             $this->entities[] = $token;
             $this->manager->flush();
             $jwt = OAuthAccessTokenJwt::sign(self::$privateKey, $token);
@@ -197,12 +195,10 @@ final class PushUnsubscribeFirewallTest extends TestCase
         $jwt = null;
         if ($actor !== 'anonymous') {
             $user = $actor === 'owner' ? $owner : $this->createUser($actor);
-            $client = new ClientEntity(new PublicId(), 'Push registration', json_encode(['https://baander.app/callback'], JSON_THROW_ON_ERROR));
+            $client = FirstPartyOAuthClient::entity($this->kernel->getContainer(), $this->manager);
             $token = new AccessTokenEntity((new Uuid())->toString(), $client, $user, scopes: ['library'], expiresAt: new \DateTimeImmutable('+1 hour'));
             $token->setDpopJkt($proof->thumbprint());
-            $this->manager->persist($client);
             $this->manager->persist($token);
-            $this->entities[] = $client;
             $this->entities[] = $token;
             $this->manager->flush();
             $jwt = OAuthAccessTokenJwt::sign(self::$privateKey, $token);

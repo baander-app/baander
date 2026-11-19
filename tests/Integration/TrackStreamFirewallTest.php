@@ -21,6 +21,7 @@ use App\Media\Infrastructure\Service\StreamService;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
 use App\Tests\Fixtures\Auth\OAuthAccessTokenJwt;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
 use App\Tests\Fixtures\Auth\TrackStreamOAuthKernel;
@@ -316,11 +317,7 @@ final class TrackStreamFirewallTest extends TestCase
             return;
         }
         $entity = $actor === 'member' ? $this->member : $this->createUser($actor);
-        $client = new ClientEntity(
-            new PublicId(),
-            'Track acceptance client',
-            json_encode(['https://baander.app/callback'], JSON_THROW_ON_ERROR),
-        );
+        $client = FirstPartyOAuthClient::entity($this->kernel->getContainer(), $this->manager);
         $this->proof = new SignedDpopProof();
         $this->token = new AccessTokenEntity(
             (new Uuid())->toString(),
@@ -330,9 +327,7 @@ final class TrackStreamFirewallTest extends TestCase
             expiresAt: new \DateTimeImmutable('+1 hour'),
         );
         $this->token->setDpopJkt($this->proof->thumbprint());
-        $this->manager->persist($client);
         $this->manager->persist($this->token);
-        $this->entities[] = $client;
         $this->entities[] = $this->token;
         $this->manager->flush();
         $this->jwt = OAuthAccessTokenJwt::sign(self::$privateKey, $this->token);

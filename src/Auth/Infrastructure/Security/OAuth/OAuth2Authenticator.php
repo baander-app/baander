@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Auth\Infrastructure\Security\OAuth;
 
+use App\Auth\Application\Http\AccessTokenAttributes;
+use App\Auth\Domain\Model\OAuth\ClientType;
 use App\Auth\Domain\Model\OAuth\TokenId;
+use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Security\AuthenticationFailureMessage;
@@ -14,6 +17,7 @@ use App\Shared\Domain\Model\PublicId;
 use League\OAuth2\Server\ResourceServer;
 use League\OAuth2\Server\Exception\OAuthServerException;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Bridge\PsrHttpMessage\HttpMessageFactoryInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -36,6 +40,12 @@ use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPasspor
  * A DPoP-bound token is accepted under the DPoP scheme only (RFC 9449 section 7.1);
  * presented as a Bearer token it is refused like any other invalid token. The
  * proof itself is verified later by the DPoP binding listener.
+ *
+ * The token's client, whether it is first-party and its scopes are set as request
+ * attributes (AccessTokenAttributes). A token is first-party only when its client is
+ * the first-party client registered as `auth.spa_client_id`; any other token is
+ * delegated, reaches only what its scopes cover, and authenticates its user with
+ * ROLE_USER alone, so no admin authority travels with it.
  */
 final class OAuth2Authenticator extends AbstractAuthenticator
 {
@@ -46,6 +56,9 @@ final class OAuth2Authenticator extends AbstractAuthenticator
         private readonly LoggerInterface $logger,
         private readonly TokenMetadataRepositoryInterface $tokenMetadataRepository,
         private readonly AuthenticationFailureMessage $failureMessage,
+        private readonly ClientRepositoryInterface $clientRepository,
+        #[Autowire(param: 'auth.spa_client_id')]
+        private readonly string $spaClientId,
     ) {
     }
 
@@ -117,18 +130,21 @@ final class OAuth2Authenticator extends AbstractAuthenticator
             );
         }
 
-        // Copy the access token ID to the Symfony request attributes so that
-        // TokenBindingListener can read it to verify token-to-client bindings.
         if ($accessTokenId !== null) {
-            $request->attributes->set('oauth_access_token_id', $accessTokenId);
+            $request->attributes->set(AccessTokenAttributes::TOKEN_ID, $accessTokenId);
         }
 
         // Enforce the client fingerprint binding of tokens issued with a fingerprint.
         $this->verifyTokenBinding($accessTokenId, $request);
 
+        $firstParty = $this->isFirstPartyClient($clientId);
+        $request->attributes->set(AccessTokenAttributes::CLIENT_ID, $clientId);
+        $request->attributes->set(AccessTokenAttributes::FIRST_PARTY, $firstParty);
+        $request->attributes->set(AccessTokenAttributes::SCOPES, $firstParty ? [] : AccessTokenAttributes::scopes($scopes));
+
         $badge = new UserBadge(
             $userIdentifier,
-            function (string $publicId): SecurityUser {
+            function (string $publicId) use ($firstParty): SecurityUser {
                 $user = $this->userRepository->findByPublicId(PublicId::fromString($publicId));
 
                 if ($user === null) {
@@ -153,13 +169,9 @@ final class OAuth2Authenticator extends AbstractAuthenticator
                     $user->getId()->toString(),
                     $user->getEmail(),
                     $user->getPassword(),
-                    $user->getRoles(),
+                    $firstParty ? $user->getRoles() : ['ROLE_USER'],
                 );
             },
-            [
-                'oauth_client_id' => $clientId,
-                'oauth_scopes' => $scopes,
-            ],
         );
 
         return new SelfValidatingPassport($badge);
@@ -168,6 +180,16 @@ final class OAuth2Authenticator extends AbstractAuthenticator
     public function onAuthenticationSuccess(Request $request, TokenInterface $token, string $firewallName): ?Response
     {
         return null;
+    }
+
+    /** Only the client registered as Baander's own, under its configured public ID, is first-party. */
+    private function isFirstPartyClient(string $clientId): bool
+    {
+        if (!hash_equals($this->spaClientId, $clientId)) {
+            return false;
+        }
+
+        return $this->clientRepository->findClientByPublicId(PublicId::fromString($clientId))?->getType() === ClientType::FirstParty;
     }
 
     /**

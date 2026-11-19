@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Infrastructure\Security;
 
+use App\Auth\Application\Http\AccessTokenAttributes;
+use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\TokenId;
+use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Domain\Model\OAuth\TokenMetadata;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
@@ -27,6 +30,8 @@ use Nyholm\Psr7\ServerRequest as Psr7Request;
 
 final class OAuth2AuthenticatorTest extends TestCase
 {
+    private const string SPA_CLIENT_ID = 'baander_web_spa_00001';
+
     private OAuth2Authenticator $authenticator;
     private ResourceServer&Stub $resourceServer;
     private HttpMessageFactoryInterface&Stub $psrFactory;
@@ -44,6 +49,8 @@ final class OAuth2AuthenticatorTest extends TestCase
             $logger,
             $tokenMetadataRepository,
             AuthenticationFailureMessages::create(),
+            $this->createStub(ClientRepositoryInterface::class),
+            self::SPA_CLIENT_ID,
         );
     }
 
@@ -257,6 +264,77 @@ final class OAuth2AuthenticatorTest extends TestCase
         self::assertSame($user->getId()->toString(), $securityUser->getId());
     }
 
+    public function testATokenOfTheFirstPartyClientCarriesTheFirstPartyMarkerNoScopesAndTheUsersRoles(): void
+    {
+        $admin = $this->admin();
+        $client = Client::create('Baander', [], firstParty: true, passwordClient: true, publicId: \App\Shared\Domain\Model\PublicId::fromString(self::SPA_CLIENT_ID));
+        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), $admin->getPublicId()->toString(), 'jkt', self::SPA_CLIENT_ID, []);
+
+        $request = $this->dpopRequest();
+        $user = $this->createAuthenticator($this->createStub(TokenMetadataRepositoryInterface::class), $admin, client: $client)->authenticate($request)->getUser();
+
+        self::assertTrue($request->attributes->get(AccessTokenAttributes::FIRST_PARTY));
+        self::assertSame([], $request->attributes->get(AccessTokenAttributes::SCOPES));
+        self::assertSame(self::SPA_CLIENT_ID, $request->attributes->get(AccessTokenAttributes::CLIENT_ID));
+        self::assertSame(['ROLE_USER', 'ROLE_ADMIN'], $user->getRoles());
+    }
+
+    public function testAPersonalAccessTokenOfAnAdminIsDelegatedWithItsScopesAndNoAdminRole(): void
+    {
+        $admin = $this->admin();
+        $client = Client::createPersonalAccess('Scripts', $admin->getId());
+        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), $admin->getPublicId()->toString(), 'jkt', $client->getPublicId()->toString(), ['library', 'playlist']);
+
+        $request = $this->dpopRequest();
+        $user = $this->createAuthenticator($this->createStub(TokenMetadataRepositoryInterface::class), $admin, client: $client)->authenticate($request)->getUser();
+
+        self::assertFalse($request->attributes->get(AccessTokenAttributes::FIRST_PARTY));
+        self::assertSame(['library', 'playlist'], $request->attributes->get(AccessTokenAttributes::SCOPES));
+        self::assertSame($client->getPublicId()->toString(), $request->attributes->get(AccessTokenAttributes::CLIENT_ID));
+        self::assertSame(['ROLE_USER'], $user->getRoles());
+    }
+
+    public function testAFirstPartyTypedClientUnderAnotherPublicIdIsDelegated(): void
+    {
+        $admin = $this->admin();
+        $client = Client::create('Look-alike', [], firstParty: true, passwordClient: true);
+        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), $admin->getPublicId()->toString(), 'jkt', $client->getPublicId()->toString(), []);
+
+        $request = $this->dpopRequest();
+        $user = $this->createAuthenticator($this->createStub(TokenMetadataRepositoryInterface::class), $admin, client: $client)->authenticate($request)->getUser();
+
+        self::assertFalse($request->attributes->get(AccessTokenAttributes::FIRST_PARTY));
+        self::assertSame([], $request->attributes->get(AccessTokenAttributes::SCOPES));
+        self::assertSame(['ROLE_USER'], $user->getRoles());
+    }
+
+    public function testTheSpaPublicIdOnAClientThatIsNotFirstPartyIsDelegated(): void
+    {
+        $admin = $this->admin();
+        $client = Client::create('Impostor', [], publicId: \App\Shared\Domain\Model\PublicId::fromString(self::SPA_CLIENT_ID));
+        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), $admin->getPublicId()->toString(), 'jkt', self::SPA_CLIENT_ID, ['library']);
+
+        $request = $this->dpopRequest();
+        $user = $this->createAuthenticator($this->createStub(TokenMetadataRepositoryInterface::class), $admin, client: $client)->authenticate($request)->getUser();
+
+        self::assertFalse($request->attributes->get(AccessTokenAttributes::FIRST_PARTY));
+        self::assertSame(['library'], $request->attributes->get(AccessTokenAttributes::SCOPES));
+        self::assertSame(['ROLE_USER'], $user->getRoles());
+    }
+
+    private function admin(): \App\Auth\Domain\Model\User
+    {
+        return \App\Auth\Domain\Model\User::createByOperator(new \App\Shared\Domain\Model\Email('admin-' . bin2hex(random_bytes(4)) . '@baander.app'), 'hashed-pw', 'Admin', ['ROLE_USER', 'ROLE_ADMIN']);
+    }
+
+    private function dpopRequest(): Request
+    {
+        $request = Request::create('/api/auth/me');
+        $request->headers->set('Authorization', 'DPoP token123');
+
+        return $request;
+    }
+
     private function user(string $email): \App\Auth\Domain\Model\User
     {
         return \App\Auth\Domain\Model\User::register(new \App\Shared\Domain\Model\Email($email), 'hashed-pw', 'Test User');
@@ -277,14 +355,20 @@ final class OAuth2AuthenticatorTest extends TestCase
         $this->createAuthenticator($this->createStub(TokenMetadataRepositoryInterface::class), userRepository: $users)->authenticate($request);
     }
 
-    private function setupSuccessfulResourceServerValidation(string $accessTokenId, string $userId, ?string $dpopJkt = null): void
-    {
+    /** @param list<string> $scopes */
+    private function setupSuccessfulResourceServerValidation(
+        string $accessTokenId,
+        string $userId,
+        ?string $dpopJkt = null,
+        string $clientId = 'V1StGXR8_Z5jdHi6B-myT',
+        array $scopes = ['profile'],
+    ): void {
         $psrRequest = new Psr7Request('GET', '/');
         $psrRequest = $psrRequest
             ->withAttribute('oauth_access_token_id', $accessTokenId)
             ->withAttribute('oauth_user_id', $userId)
-            ->withAttribute('oauth_client_id', 'V1StGXR8_Z5jdHi6B-myT')
-            ->withAttribute('oauth_scopes', ['profile']);
+            ->withAttribute('oauth_client_id', $clientId)
+            ->withAttribute('oauth_scopes', $scopes);
         if ($dpopJkt !== null) {
             $psrRequest = $psrRequest->withAttribute('oauth_dpop_jkt', $dpopJkt);
         }
@@ -297,11 +381,14 @@ final class OAuth2AuthenticatorTest extends TestCase
         TokenMetadataRepositoryInterface $tokenMetadataRepository,
         ?\App\Auth\Domain\Model\User $user = null,
         ?\App\Auth\Domain\Repository\UserRepositoryInterface $userRepository = null,
+        ?Client $client = null,
     ): OAuth2Authenticator {
         if ($userRepository === null) {
             $userRepository = $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class);
             $userRepository->method('findByPublicId')->willReturn($user ?? $this->user('test@baander.app'));
         }
+        $clients = $this->createStub(ClientRepositoryInterface::class);
+        $clients->method('findClientByPublicId')->willReturn($client);
 
         return new OAuth2Authenticator(
             $this->resourceServer,
@@ -310,6 +397,8 @@ final class OAuth2AuthenticatorTest extends TestCase
             $this->createStub(LoggerInterface::class),
             $tokenMetadataRepository,
             AuthenticationFailureMessages::create(),
+            $clients,
+            self::SPA_CLIENT_ID,
         );
     }
 }

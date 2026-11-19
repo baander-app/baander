@@ -12,6 +12,8 @@ use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
+use App\Tests\Fixtures\Auth\OAuthAccessTokenJwt;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
 use App\Tests\Fixtures\Auth\LeadingZeroDpopKey;
 use App\Tests\Fixtures\Auth\ProductionOAuthKernel;
@@ -267,6 +269,55 @@ final class OAuthFirewallAcceptanceTest extends TestCase
             $uri = 'https://baander.app' . $path;
             $response = $this->request($jwt, $this->proof->create($method, $uri, $jwt), $uri, $method);
             self::assertSame(403, $response->getStatusCode(), (string) $response->getContent());
+        }
+    }
+
+    /** @return iterable<string, array{'first-party'|'personal-access'|'third-party', int}> */
+    public static function adminTokenClients(): iterable
+    {
+        yield 'first-party client' => ['first-party', 200];
+        yield 'personal access client' => ['personal-access', 403];
+        yield 'third-party client' => ['third-party', 403];
+    }
+
+    /**
+     * Only a token of Baander's own client carries its user's admin role; a token the same
+     * administrator granted any other client authenticates them as a plain user.
+     *
+     * @param 'first-party'|'personal-access'|'third-party' $kind
+     */
+    #[DataProvider('adminTokenClients')]
+    public function testOnlyAFirstPartyTokenCarriesTheAdministratorsRole(string $kind, int $status): void
+    {
+        $users = $this->kernel->getContainer()->get('oauth.acceptance.users');
+        self::assertInstanceOf(UserRepositoryInterface::class, $users);
+        $admin = User::createByOperator(new Email('oauth-admin-' . bin2hex(random_bytes(8)) . '@baander.app'), 'test-only-password', 'OAuth administrator', ['ROLE_USER', 'ROLE_ADMIN']);
+        $users->save($admin);
+        $adminEntity = $this->manager->find(UserEntity::class, $admin->getId());
+        self::assertInstanceOf(UserEntity::class, $adminEntity);
+        $client = match ($kind) {
+            'first-party' => FirstPartyOAuthClient::entity($this->kernel->getContainer(), $this->manager),
+            'personal-access' => new ClientEntity(new PublicId(), 'Administrator scripts', '[]', personalAccessClient: true, firstParty: true),
+            'third-party' => new ClientEntity(new PublicId(), 'Third-party player', json_encode(['https://baander.app/callback'], JSON_THROW_ON_ERROR)),
+        };
+        $token = new AccessTokenEntity((new Uuid())->toString(), $client, $adminEntity, scopes: $kind === 'first-party' ? [] : ['library', 'playlist'], expiresAt: new \DateTimeImmutable('+1 hour'));
+        $token->setDpopJkt($this->proof->thumbprint());
+        $this->manager->persist($client);
+        $this->manager->persist($token);
+        $this->manager->flush();
+        try {
+            $jwt = OAuthAccessTokenJwt::sign($this->privateKey, $token);
+            $uri = 'https://baander.app/api/admin/users';
+            $response = $this->request($jwt, $this->proof->create('GET', $uri, $jwt), $uri);
+
+            self::assertSame($status, $response->getStatusCode(), (string) $response->getContent());
+        } finally {
+            $this->manager->remove($token);
+            if ($kind !== 'first-party') {
+                $this->manager->remove($client);
+            }
+            $this->manager->remove($adminEntity);
+            $this->manager->flush();
         }
     }
 

@@ -7,10 +7,9 @@ namespace App\Tests\Integration\LiveUpdates;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
-use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
+use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Email;
-use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Auth\OAuthAccessTokenJwt;
 use App\Tests\Fixtures\Auth\ProductionOAuthKernel;
@@ -28,7 +27,6 @@ final class LiveRecoveryTest extends TestCase
     private ProductionOAuthKernel $kernel;
     private EntityManagerInterface $manager;
     private User $user;
-    private ClientEntity $client;
     private SignedDpopProof $proof;
     private string $jwt;
 
@@ -62,10 +60,9 @@ final class LiveRecoveryTest extends TestCase
         $entity = $manager->find(UserEntity::class, $this->user->getId());
         self::assertInstanceOf(UserEntity::class, $entity);
         $this->proof = new SignedDpopProof();
-        $this->client = new ClientEntity(new PublicId(), 'Live recovery test', '["https://baander.app/callback"]');
-        $token = new AccessTokenEntity((new Uuid())->toString(), $this->client, $entity, scopes: ['library'], expiresAt: new \DateTimeImmutable('+1 hour'));
+        $client = FirstPartyOAuthClient::entity($container, $manager);
+        $token = new AccessTokenEntity((new Uuid())->toString(), $client, $entity, scopes: ['library'], expiresAt: new \DateTimeImmutable('+1 hour'));
         $token->setDpopJkt($this->proof->thumbprint());
-        $manager->persist($this->client);
         $manager->persist($token);
         $manager->flush();
         $this->jwt = OAuthAccessTokenJwt::sign($privateKey, $token);
@@ -77,9 +74,6 @@ final class LiveRecoveryTest extends TestCase
             $connection = $this->manager->getConnection();
             if (isset($this->user)) {
                 $connection->executeStatement('DELETE FROM users WHERE id = ?', [$this->user->getId()->toString()]);
-            }
-            if (isset($this->client)) {
-                $connection->executeStatement('DELETE FROM oauth_clients WHERE id = ?', [$this->client->getId()->toString()]);
             }
             $this->manager->close();
         }

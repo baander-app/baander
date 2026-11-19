@@ -28,8 +28,6 @@ final readonly class ValidatedAuthorizationRequest
      */
     public function effectiveScopes(): array
     {
-        $scopes = $this->pushedRequest->getScopes();
-
-        return array_map(static fn (Scope $scope): string => $scope->toString(), $scopes === [] ? Scope::defaultScopes() : $scopes);
+        return array_map(static fn (Scope $scope): string => $scope->toString(), $this->pushedRequest->getScopes());
     }
 }

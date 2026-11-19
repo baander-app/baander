@@ -169,6 +169,13 @@ final class TokenPairIssuerTest extends TestCase
         self::assertNotContains('access token saved', $this->events);
     }
 
+    public function testATokenRequestedWithoutScopesCarriesNone(): void
+    {
+        $response = $this->issuer->issue($this->client(), $this->user(), [], self::JKT);
+
+        self::assertSame([], $response->getScopes());
+    }
+
     private function client(): Client
     {
         return Client::create('Browser', ['https://baander.app/callback'], firstParty: true);

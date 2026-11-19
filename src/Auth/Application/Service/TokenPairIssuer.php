@@ -66,7 +66,7 @@ final class TokenPairIssuer
     }
 
     /**
-     * @param string[] $requestedScopes Filtered against the allowlist; none requested yields the default scopes
+     * @param string[] $requestedScopes Filtered against the allowlist; none requested yields a token without scopes
      * @param (callable(ChainId): void)|null $persistWithTokens Further writes that commit or roll back with the tokens;
      *                                                     it receives the chain the pair starts
      *
@@ -131,17 +131,13 @@ final class TokenPairIssuer
     }
 
     /**
-     * Requested scopes outside the allowlist are dropped; no request yields the default scopes.
+     * Requested scopes outside the allowlist are dropped.
      *
      * @param string[] $requestedScopes
      * @return Scope[]
      */
     private function resolveScopes(array $requestedScopes): array
     {
-        if ($requestedScopes === []) {
-            return Scope::defaultScopes();
-        }
-
         return array_map(
             static fn (string $scope): Scope => new Scope($scope),
             array_values(array_unique($this->scopeAllowlist->filter($requestedScopes))),

@@ -22,6 +22,7 @@ use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistSongEntity;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
 use App\Tests\Fixtures\Auth\OAuthAccessTokenJwt;
 use App\Tests\Fixtures\Auth\PlaylistOAuthKernel;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
@@ -330,13 +331,11 @@ final class PlaylistReadFirewallTest extends TestCase
     {
         $entity = $actor === 'owner' ? $this->owner : $this->createUser($actor);
         $this->actor = $entity;
-        $client = new ClientEntity(new PublicId(), 'Playlist acceptance client', json_encode(['https://baander.app/callback'], JSON_THROW_ON_ERROR));
+        $client = FirstPartyOAuthClient::entity($this->kernel->getContainer(), $this->manager);
         $this->proof = new SignedDpopProof();
         $token = new AccessTokenEntity((new Uuid())->toString(), $client, $entity, scopes: ['library'], expiresAt: new \DateTimeImmutable('+1 hour'));
         $token->setDpopJkt($this->proof->thumbprint());
-        $this->manager->persist($client);
         $this->manager->persist($token);
-        $this->entities[] = $client;
         $this->entities[] = $token;
         if ($actor === 'collaborator') {
             // A collaborator of every seeded playlist who reads only the library the owner cannot.

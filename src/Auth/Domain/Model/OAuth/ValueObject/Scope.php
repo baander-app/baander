@@ -51,23 +51,6 @@ final readonly class Scope implements Stringable
         return new self($scope);
     }
 
-    /**
-     * Returns the commonly used built-in scopes.
-     *
-     * @return self[]
-     */
-    public static function defaultScopes(): array
-    {
-        return [
-            self::accessApi(),
-        ];
-    }
-
-    public static function accessApi(): self
-    {
-        return new self('access-api');
-    }
-
     public static function profile(): self
     {
         return new self('profile');

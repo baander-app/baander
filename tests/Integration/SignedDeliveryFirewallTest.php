@@ -7,7 +7,6 @@ namespace App\Tests\Integration;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
-use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
@@ -18,6 +17,7 @@ use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
 use App\Tests\Fixtures\Auth\OAuthAccessTokenJwt;
 use App\Tests\Fixtures\Auth\ProductionOAuthKernel;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
@@ -739,11 +739,10 @@ final class SignedDeliveryFirewallTest extends TestCase
         self::assertInstanceOf(UserEntity::class, $entity);
         $this->actor = $entity;
         $this->entities[] = $entity;
-        $client = new ClientEntity(new PublicId(), 'Disposable client', json_encode(['https://baander.app/callback'], JSON_THROW_ON_ERROR));
+        $client = FirstPartyOAuthClient::entity($this->kernel->getContainer(), $this->manager);
         $token = new AccessTokenEntity((new Uuid())->toString(), $client, $entity, scopes: ['library'], expiresAt: $expiresAt ?? new \DateTimeImmutable('+1 hour'));
         $token->setDpopJkt($this->proof->thumbprint());
         $this->accessToken = $token;
-        $this->persist($client);
         $this->persist($token);
         $this->manager->flush();
         if ($fingerprint !== null) {

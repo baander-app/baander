@@ -20,14 +20,14 @@ final class DTOTest extends TestCase
             tokenType: 'Bearer',
             expiresIn: 3600,
             refreshToken: 'ref-456',
-            scopes: ['access-api', 'admin'],
+            scopes: ['library', 'admin'],
         );
 
         $this->assertSame('tok-123', $dto->getAccessToken());
         $this->assertSame('Bearer', $dto->getTokenType());
         $this->assertSame(3600, $dto->getExpiresIn());
         $this->assertSame('ref-456', $dto->getRefreshToken());
-        $this->assertSame(['access-api', 'admin'], $dto->getScopes());
+        $this->assertSame(['library', 'admin'], $dto->getScopes());
     }
 
     public function testTokenResponseDTOToArrayMinimal(): void
