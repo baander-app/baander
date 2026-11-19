@@ -186,6 +186,13 @@ parameters:
     # whether the account exists. Default: 10 per 15 minutes.
     auth.rate_limit.password_reset_per_email.max_attempts: 10
 
+    # Maximum step-up attempts per account within the window: the current password,
+    # plus a TOTP code when TOTP is on, that a user's own email change, TOTP setup
+    # and passkey registration ask for. Every attempt counts, from any address. Over
+    # the limit the request answers 429 with Retry-After. Default: 10 per 15 minutes.
+    auth.rate_limit.step_up.max_attempts: 10
+    auth.rate_limit.step_up.window: 900
+
     # Maximum first-party token refresh requests per presented refresh token within the
     # window, counted under the token's SHA-256. Default: 60 per minute.
     auth.rate_limit.refresh.max_attempts: 60

@@ -32,6 +32,8 @@ export interface User {
    * known, as for a mock login, until the profile is read from /api/auth/me.
    */
   emailVerifiedAt?: string | null
+  /** Whether TOTP is on, so sensitive changes ask for a code. Absent until the profile is read. */
+  totpEnabled?: boolean
 }
 
 interface AuthState {

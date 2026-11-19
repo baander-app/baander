@@ -23,6 +23,7 @@ import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { EmailVerificationNotice } from './EmailVerificationNotice'
+import { StepUpDialog, type StepUpCredentials } from './StepUpDialog'
 
 const CardContentStyled = styled(CardContent)`
   display: flex;
@@ -207,66 +208,41 @@ function ChangeEmailDialog({ open, onOpenChange, children }: { open: boolean; on
   const { t } = useTranslation()
   const user = useAuthStore((s) => s.user)
   const [email, setEmail] = useState(user?.email ?? '')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setLoading(true)
+  const changeEmail = async (stepUp: StepUpCredentials) => {
+    const response = await putAuthMeEmail({ email, ...stepUp })
+    // The new address starts unverified, which brings up the verification notice.
+    if (response.data) applyCurrentUser(response.data)
 
-    try {
-      const response = await putAuthMeEmail({ email })
-      // The new address starts unverified, which brings up the verification notice.
-      if (response.data) applyCurrentUser(response.data)
-      onOpenChange(false)
-    } catch (err: unknown) {
-      setError(parseApiError(err, 'Failed to change email.').message)
-    } finally {
-      setLoading(false)
-    }
+    return true
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Change email</DialogTitle>
-          <DialogDescription>
-            {t('auth.emailVerification.changeEmailDescription')}
-          </DialogDescription>
-        </DialogHeader>
-        <Form onSubmit={handleSubmit}>
-          {error && (
-            <ErrorBox>{error}</ErrorBox>
-          )}
-          <div>
-            <FieldLabel htmlFor="new-email">
-              New email
-            </FieldLabel>
-            <Input
-              id="new-email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-              autoFocus
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? <SpinningIconWithMargin size={14} /> : null}
-              Save
-            </Button>
-          </DialogFooter>
-        </Form>
-      </DialogContent>
-    </Dialog>
+    <StepUpDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      trigger={children}
+      title="Change email"
+      description={t('auth.emailVerification.changeEmailDescription')}
+      submitLabel="Save"
+      fallbackError="Failed to change email."
+      onConfirm={changeEmail}
+    >
+      <div>
+        <FieldLabel htmlFor="new-email">
+          New email
+        </FieldLabel>
+        <Input
+          id="new-email"
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
+          autoFocus
+        />
+      </div>
+    </StepUpDialog>
   )
 }
 

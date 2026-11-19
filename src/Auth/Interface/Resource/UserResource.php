@@ -17,6 +17,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'emailVerifiedAt', type: 'string', format: 'date-time', nullable: true, description: 'When the email was verified; absent for a delegated token without the email scope'),
         new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
         new OA\Property(property: 'roles', type: 'array', items: new OA\Items(type: 'string'), description: 'Assigned roles; absent for a delegated token'),
+        new OA\Property(property: 'totpEnabled', type: 'boolean', description: 'Whether TOTP is on, so a sensitive change needs a code; absent for a delegated token'),
     ],
 )]
 final class UserResource extends AbstractResource
@@ -32,12 +33,13 @@ final class UserResource extends AbstractResource
             'emailVerifiedAt' => $source->getEmailVerifiedAt()?->format(\DateTimeInterface::ATOM),
             'createdAt' => $source->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'roles' => $source->getRoles(),
+            'totpEnabled' => $source->hasTotp(),
         ];
     }
 
     /**
      * The profile a delegated token reads: the email fields only with the email scope, and
-     * never the roles, which a delegated token does not carry.
+     * never the roles, which a delegated token does not carry, or the account's TOTP state.
      *
      * @param list<string> $scopes
      *
@@ -46,7 +48,7 @@ final class UserResource extends AbstractResource
     public static function forDelegatedToken(User $user, array $scopes): array
     {
         $profile = self::from($user);
-        unset($profile['roles']);
+        unset($profile['roles'], $profile['totpEnabled']);
         if (!in_array('email', $scopes, true)) {
             unset($profile['email'], $profile['emailVerifiedAt']);
         }
@@ -57,7 +59,7 @@ final class UserResource extends AbstractResource
     /**
      * @deprecated Use from() instead. Kept for backward compatibility during migration.
      */
-    /** @return array{publicId: string, name: string, email: string, emailVerifiedAt: string|null, createdAt: string, roles: array<array-key, string>} */
+    /** @return array{publicId: string, name: string, email: string, emailVerifiedAt: string|null, createdAt: string, roles: array<array-key, string>, totpEnabled: bool} */
     public static function fromDomain(User $user): array
     {
         return self::from($user);

@@ -38,7 +38,7 @@ final class DelegatedProfileTest extends TestCase
         $response = $this->authenticatedRequest('GET', '/api/auth/me', $admin);
 
         self::assertSame(200, $response->getStatusCode());
-        self::assertSame(['publicId', 'name', 'email', 'emailVerifiedAt', 'createdAt', 'roles'], array_keys($this->data($response)));
+        self::assertSame(['publicId', 'name', 'email', 'emailVerifiedAt', 'createdAt', 'roles', 'totpEnabled'], array_keys($this->data($response)));
     }
 
     public function testATokenWithoutAProfileScopeCannotReadIt(): void

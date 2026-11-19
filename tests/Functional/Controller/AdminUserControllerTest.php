@@ -161,6 +161,33 @@ final class AdminUserControllerTest extends TestCase
         $this->assertSame(404, $response->getStatusCode());
     }
 
+    public function testAnAdministratorCannotChangeTheirOwnEmailThroughTheAdminApi(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $path = '/api/admin/users/' . $superAdmin->getPublicId()->toString();
+
+        $refused = $this->authenticatedRequest('PATCH', $path, $superAdmin, ['name' => 'Renamed Admin', 'email' => 'own-change@baander.app']);
+        $renamed = $this->authenticatedRequest('PATCH', $path, $superAdmin, ['name' => 'Renamed Admin', 'email' => $superAdmin->getEmail()]);
+
+        $this->assertSame(403, $refused->getStatusCode(), (string) $refused->getContent());
+        $data = $this->assertJsonResponse($renamed, 200, 'data');
+        $this->assertSame('Renamed Admin', $data['data']['name'], 'The edit dialog sends the unchanged address with a new name.');
+        $this->entityManager->clear();
+        $this->assertSame($superAdmin->getEmail(), $this->userRepository->findByUuid($superAdmin->getId())?->getEmail());
+    }
+
+    public function testTheConsoleCanStillChangeAnAdministratorsEmail(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $application = new \Symfony\Bundle\FrameworkBundle\Console\Application(static::$kernel);
+        $command = new \Symfony\Component\Console\Tester\CommandTester($application->find('app:user:change-email'));
+
+        $this->assertSame(0, $command->execute(['identifier' => $superAdmin->getEmail(), 'email' => 'console-change@baander.app'], ['interactive' => false]), $command->getDisplay());
+
+        $this->entityManager->clear();
+        $this->assertSame('console-change@baander.app', $this->userRepository->findByUuid($superAdmin->getId())?->getEmail());
+    }
+
     // ---------------------------------------------------------------
     // POST /api/admin/users/{id}/roles — Assign roles
     // ---------------------------------------------------------------
@@ -213,6 +240,23 @@ final class AdminUserControllerTest extends TestCase
         );
 
         $this->assertSame(200, $response->getStatusCode());
+    }
+
+    public function testAnAdministratorCannotResetTheirOwnPasswordThroughTheAdminApi(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $hash = $superAdmin->getPassword();
+
+        $response = $this->authenticatedRequest(
+            'POST',
+            '/api/admin/users/' . $superAdmin->getPublicId()->toString() . '/reset-password',
+            $superAdmin,
+            ['password' => 'brandNewPassword999'],
+        );
+
+        $this->assertSame(403, $response->getStatusCode(), (string) $response->getContent());
+        $this->entityManager->clear();
+        $this->assertSame($hash, $this->userRepository->findByUuid($superAdmin->getId())?->getPassword());
     }
 
     // ---------------------------------------------------------------

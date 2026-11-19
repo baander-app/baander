@@ -7,11 +7,15 @@ namespace App\Auth\Interface\Controller\Totp;
 use App\Auth\Application\Command\Totp\DisableTotpCommand;
 use App\Auth\Application\Command\Totp\EnableTotpCommand;
 use App\Auth\Application\Command\Totp\StartTotpSetupCommand;
+use App\Auth\Application\Exception\StepUpFailedException;
+use App\Auth\Application\Exception\StepUpRateLimitedException;
 use App\Auth\Application\Exception\TotpChangeRefusal;
 use App\Auth\Application\Exception\TotpChangeRefusedException;
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Auth\Interface\Request\Totp\DisableTotpRequest;
 use App\Auth\Interface\Request\Totp\EnableTotpRequest;
+use App\Auth\Interface\Request\Totp\StartTotpSetupRequest;
+use App\Shared\Application\Exception\RateLimiterUnavailableException;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -44,7 +48,11 @@ final class TotpController
     #[OA\Post(
         path: '/api/auth/totp/setup',
         summary: 'Generate TOTP secret and provisioning URI',
-        description: 'Refused while TOTP is on. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.',
+        description: 'Refused while TOTP is on. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(ref: new Model(type: StartTotpSetupRequest::class)),
+        ),
         responses: [
             new OA\Response(
                 response: '200',
@@ -61,10 +69,12 @@ final class TotpController
             ),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '409', description: 'TOTP is already on', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'Validation error, or the password is wrong', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '429', description: 'Too many step-up attempts for this account', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/setup', name: 'setup', methods: ['POST'])]
-    public function setup(): JsonResponse
+    public function setup(#[MapRequestPayload(mapWhenEmpty: true)] StartTotpSetupRequest $payload): JsonResponse
     {
         $user = $this->getCurrentSecurityUser();
         if ($user === null) {
@@ -72,7 +82,8 @@ final class TotpController
         }
 
         try {
-            $secret = $this->commandBus->dispatch(new StartTotpSetupCommand($user->getId()))->last(HandledStamp::class)?->getResult();
+            $secret = $this->commandBus->dispatch(new StartTotpSetupCommand($user->getId(), $payload->currentPassword))
+                ->last(HandledStamp::class)?->getResult();
         } catch (\Throwable $exception) {
             return $this->refusal($exception);
         }
@@ -207,6 +218,12 @@ final class TotpController
     private function refusal(\Throwable $exception): JsonResponse
     {
         $cause = $exception instanceof HandlerFailedException ? ($exception->getPrevious() ?? $exception) : $exception;
+        // Shared outcomes, answered by the exception subscribers: 422, 429 and 503.
+        if ($cause instanceof StepUpFailedException
+            || $cause instanceof StepUpRateLimitedException
+            || $cause instanceof RateLimiterUnavailableException) {
+            throw $cause;
+        }
         if (!$cause instanceof TotpChangeRefusedException) {
             $this->logger->error('TOTP command failed.', ['exception' => $cause]);
 

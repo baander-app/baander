@@ -1517,6 +1517,16 @@
                             }
                         }
                     },
+                    "403": {
+                        "description": "The request changes the signed-in administrator's own email address",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "409": {
                         "description": "Email already taken",
                         "content": {
@@ -1651,6 +1661,16 @@
                                         }
                                     },
                                     "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The target is the signed-in administrator",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -2913,7 +2933,18 @@
                     "Auth"
                 ],
                 "summary": "Get WebAuthn registration options",
+                "description": "Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.",
                 "operationId": "post_passkey_options",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PasskeyRegistrationOptionsRequest"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
                         "description": "Registration options",
@@ -2941,6 +2972,26 @@
                             }
                         }
                     },
+                    "422": {
+                        "description": "Validation error, or the password or code is wrong",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many step-up attempts for this account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "503": {
                         "description": "The passkey challenge store is unavailable; retry after the Retry-After delay.",
                         "headers": {
@@ -2960,8 +3011,7 @@
                             }
                         }
                     }
-                },
-                "security": []
+                }
             }
         },
         "/api/auth/passkey/register": {
@@ -3430,8 +3480,18 @@
                     "Auth"
                 ],
                 "summary": "Generate TOTP secret and provisioning URI",
-                "description": "Refused while TOTP is on. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.",
+                "description": "Refused while TOTP is on. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.",
                 "operationId": "post_totp_setup",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StartTotpSetupRequest"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
                         "description": "TOTP provisioning data",
@@ -3470,6 +3530,26 @@
                     },
                     "409": {
                         "description": "TOTP is already on",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error, or the password is wrong",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many step-up attempts for this account",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4312,24 +4392,14 @@
                     "Auth"
                 ],
                 "summary": "Change the current user email",
-                "description": "The new address starts unverified and is sent a verification link; links sent to the old address stop working.",
+                "description": "Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The new address starts unverified and is sent a verification link; links sent to the old address stop working.",
                 "operationId": "put_auth_me_email",
                 "requestBody": {
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
-                                "required": [
-                                    "email"
-                                ],
-                                "properties": {
-                                    "email": {
-                                        "type": "string",
-                                        "format": "email",
-                                        "example": "alice@example.com"
-                                    }
-                                },
-                                "type": "object"
+                                "$ref": "#/components/schemas/ChangeEmailRequest"
                             }
                         }
                     }
@@ -4371,11 +4441,21 @@
                         }
                     },
                     "422": {
-                        "description": "Validation error",
+                        "description": "Validation error, or the password or code is wrong",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many step-up attempts for this account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -24501,6 +24581,26 @@
                 },
                 "type": "object"
             },
+            "PasskeyRegistrationOptionsRequest": {
+                "required": [
+                    "currentPassword"
+                ],
+                "properties": {
+                    "currentPassword": {
+                        "type": "string",
+                        "example": "********",
+                        "default": ""
+                    },
+                    "totpCode": {
+                        "description": "A current TOTP code; needed when TOTP is on",
+                        "type": "string",
+                        "example": "123456",
+                        "nullable": true,
+                        "default": null
+                    }
+                },
+                "type": "object"
+            },
             "RegisterPasskeyRequest": {
                 "required": [
                     "challengeKey",
@@ -24561,6 +24661,19 @@
                         "nullable": true,
                         "default": "",
                         "maxLength": 255
+                    }
+                },
+                "type": "object"
+            },
+            "StartTotpSetupRequest": {
+                "required": [
+                    "currentPassword"
+                ],
+                "properties": {
+                    "currentPassword": {
+                        "type": "string",
+                        "example": "********",
+                        "default": ""
                     }
                 },
                 "type": "object"
@@ -24705,7 +24818,8 @@
             },
             "ChangeEmailRequest": {
                 "required": [
-                    "email"
+                    "email",
+                    "currentPassword"
                 ],
                 "properties": {
                     "email": {
@@ -24713,6 +24827,18 @@
                         "format": "email",
                         "example": "alice@example.com",
                         "default": ""
+                    },
+                    "currentPassword": {
+                        "type": "string",
+                        "example": "********",
+                        "default": ""
+                    },
+                    "totpCode": {
+                        "description": "A current TOTP code; needed when TOTP is on",
+                        "type": "string",
+                        "example": "123456",
+                        "nullable": true,
+                        "default": null
                     }
                 },
                 "type": "object"
@@ -27487,7 +27613,8 @@
                     "name",
                     "email",
                     "createdAt",
-                    "roles"
+                    "roles",
+                    "totpEnabled"
                 ],
                 "properties": {
                     "publicId": {
@@ -27522,6 +27649,10 @@
                         "items": {
                             "type": "string"
                         }
+                    },
+                    "totpEnabled": {
+                        "description": "Whether TOTP is on, so a sensitive change needs a code; absent for a delegated token",
+                        "type": "boolean"
                     }
                 },
                 "type": "object"

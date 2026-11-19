@@ -10,13 +10,14 @@ use App\Auth\Application\Exception\TotpChangeRefusedException;
 use App\Auth\Application\Exception\UserNotFoundException;
 use App\Auth\Application\Port\TotpVerifierInterface;
 use App\Auth\Application\Service\PendingTotpSecrets;
+use App\Auth\Application\Service\StepUpVerifier;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
  * Starts TOTP setup: refuses while TOTP is on, which only the current code can turn off,
- * and holds a new secret for the user until enable confirms it.
+ * confirms the current password, and holds a new secret for the user until enable confirms it.
  */
 final readonly class StartTotpSetupHandler
 {
@@ -24,6 +25,7 @@ final readonly class StartTotpSetupHandler
         private UserRepositoryInterface $userRepository,
         private TotpVerifierInterface $totpVerifier,
         private PendingTotpSecrets $pendingSecrets,
+        private StepUpVerifier $stepUp,
     ) {
     }
 
@@ -36,6 +38,7 @@ final readonly class StartTotpSetupHandler
         if ($user->hasTotp()) {
             throw new TotpChangeRefusedException(TotpChangeRefusal::AlreadyEnabled);
         }
+        $this->stepUp->verify($user, $command->getCurrentPassword(), null);
 
         $secret = $this->totpVerifier->generateSecret();
         $this->pendingSecrets->hold($userId, $secret);

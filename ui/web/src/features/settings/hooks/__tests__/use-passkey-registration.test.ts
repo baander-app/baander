@@ -58,6 +58,8 @@ function createMockCredential() {
   } as unknown as PublicKeyCredential;
 }
 
+const STEP_UP = { currentPassword: 'current-password', totpCode: '123456' };
+
 describe('usePasskeyRegistration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -70,28 +72,28 @@ describe('usePasskeyRegistration', () => {
     });
   });
 
-  it('starts with no loading, error, or success state', () => {
+  it('starts with no loading or success state', () => {
     const { result } = renderHook(() => usePasskeyRegistration(), { wrapper: createWrapper() });
     expect(result.current.loading).toBe(false);
-    expect(result.current.error).toBeNull();
     expect(result.current.success).toBe(false);
   });
 
-  it('registers a passkey successfully', async () => {
+  it('confirms the step-up with the options and registers the whole credential', async () => {
     mockPostPasskeyOptions.mockResolvedValue(VALID_OPTIONS_RESPONSE as never);
     mockPostPasskeyRegister.mockResolvedValue({} as never);
     vi.mocked(navigator.credentials.create).mockResolvedValue(createMockCredential());
 
     const { result } = renderHook(() => usePasskeyRegistration(), { wrapper: createWrapper() });
 
+    let registered: boolean | undefined;
     await act(async () => {
-      await result.current.register();
+      registered = await result.current.register('Passkey', STEP_UP);
     });
 
+    expect(registered).toBe(true);
     expect(result.current.loading).toBe(false);
     expect(result.current.success).toBe(true);
-    expect(result.current.error).toBeNull();
-    expect(mockPostPasskeyOptions).toHaveBeenCalledWith({ method: 'POST' });
+    expect(mockPostPasskeyOptions).toHaveBeenCalledWith(STEP_UP);
     const creationOptions = vi.mocked(navigator.credentials.create).mock.calls[0][0]?.publicKey;
     expect(Array.from(new Uint8Array(creationOptions!.user.id as ArrayBuffer))).toEqual(
       Array.from(USER_PUBLIC_ID, (character) => character.charCodeAt(0)),
@@ -101,14 +103,18 @@ describe('usePasskeyRegistration', () => {
         challengeKey: 'test-challenge-key',
         name: 'Passkey',
         response: expect.objectContaining({
-          attestationObject: btoa('\0'.repeat(8)),
-          clientDataJSON: btoa('\0'.repeat(8)),
+          id: 'mock-credential-id',
+          type: 'public-key',
+          response: expect.objectContaining({
+            attestationObject: btoa('\0'.repeat(8)),
+            clientDataJSON: btoa('\0'.repeat(8)),
+          }),
         }),
       }),
     );
   });
 
-  it('handles user cancellation (NotAllowedError)', async () => {
+  it('resolves false when the user cancels the browser prompt (NotAllowedError)', async () => {
     mockPostPasskeyOptions.mockResolvedValue(VALID_OPTIONS_RESPONSE as never);
     vi.mocked(navigator.credentials.create).mockRejectedValue(
       new DOMException('User cancelled', 'NotAllowedError'),
@@ -116,69 +122,59 @@ describe('usePasskeyRegistration', () => {
 
     const { result } = renderHook(() => usePasskeyRegistration(), { wrapper: createWrapper() });
 
+    let registered: boolean | undefined;
     await act(async () => {
-      await result.current.register();
+      registered = await result.current.register('Passkey', STEP_UP);
     });
 
+    expect(registered).toBe(false);
     expect(result.current.loading).toBe(false);
-    expect(result.current.error).toBeNull();
     expect(result.current.success).toBe(false);
   });
 
-  it('handles null credential from WebAuthn', async () => {
+  it('resolves false when WebAuthn returns no credential', async () => {
     mockPostPasskeyOptions.mockResolvedValue(VALID_OPTIONS_RESPONSE as never);
     vi.mocked(navigator.credentials.create).mockResolvedValue(null);
 
     const { result } = renderHook(() => usePasskeyRegistration(), { wrapper: createWrapper() });
 
+    let registered: boolean | undefined;
     await act(async () => {
-      await result.current.register();
+      registered = await result.current.register('Passkey', STEP_UP);
     });
 
+    expect(registered).toBe(false);
     expect(result.current.loading).toBe(false);
-    expect(result.current.error).toBe('Passkey creation was cancelled. Please try again.');
     expect(mockPostPasskeyRegister).not.toHaveBeenCalled();
   });
 
-  it('handles API error during options fetch', async () => {
-    mockPostPasskeyOptions.mockRejectedValue(new Error('Network error'));
+  it('rejects with the refused step-up and asks the browser for nothing', async () => {
+    const refusal = new Error('step_up_failed');
+    mockPostPasskeyOptions.mockRejectedValue(refusal);
 
     const { result } = renderHook(() => usePasskeyRegistration(), { wrapper: createWrapper() });
 
     await act(async () => {
-      await result.current.register();
+      await expect(result.current.register('Passkey', STEP_UP)).rejects.toBe(refusal);
     });
 
     expect(result.current.loading).toBe(false);
-    expect(result.current.error).toBe('Network error');
+    expect(navigator.credentials.create).not.toHaveBeenCalled();
   });
 
-  it('handles API error during registration', async () => {
+  it('rejects when the registration is refused, such as for an expired challenge', async () => {
     mockPostPasskeyOptions.mockResolvedValue(VALID_OPTIONS_RESPONSE as never);
     vi.mocked(navigator.credentials.create).mockResolvedValue(createMockCredential());
-    mockPostPasskeyRegister.mockRejectedValue(new Error('Registration failed'));
+    mockPostPasskeyRegister.mockRejectedValue(new Error('Invalid or expired challenge.'));
 
     const { result } = renderHook(() => usePasskeyRegistration(), { wrapper: createWrapper() });
 
     await act(async () => {
-      await result.current.register();
+      await expect(result.current.register('Passkey', STEP_UP)).rejects.toThrow('Invalid or expired challenge.');
     });
 
     expect(result.current.loading).toBe(false);
-    expect(result.current.error).toBe('Registration failed');
     expect(result.current.success).toBe(false);
-  });
-
-  it('handles non-Error thrown values', async () => {
-    mockPostPasskeyOptions.mockRejectedValue('string error' as never);
-
-    const { result } = renderHook(() => usePasskeyRegistration(), { wrapper: createWrapper() });
-
-    await act(async () => {
-      await result.current.register();
-    });
-
-    expect(result.current.error).toBe('Failed to register passkey');
   });
 });
 
@@ -211,8 +207,8 @@ describe('passkey registration attempt ownership', () => {
       if (stage === 'credential') vi.mocked(navigator.credentials.create).mockReturnValueOnce(pending.promise as Promise<Credential | null>);
       if (stage === 'registration') mockPostPasskeyRegister.mockReturnValueOnce(pending.promise as never);
       const { result } = renderHook(() => usePasskeyRegistration(), { wrapper: createWrapper() });
-      let attempt!: Promise<void>;
-      await act(async () => { attempt = result.current.register(); });
+      let attempt!: Promise<boolean>;
+      await act(async () => { attempt = result.current.register('Passkey', STEP_UP); });
       expect(result.current.loading).toBe(true);
 
       await act(async () => {
@@ -222,11 +218,10 @@ describe('passkey registration attempt ownership', () => {
       });
 
       expect(result.current.loading).toBe(false);
-      expect(result.current.error).toBeNull();
       expect(result.current.success).toBe(false);
       expect(mockPostPasskeyRegister).toHaveBeenCalledTimes(stage === 'registration' ? 1 : 0);
       if (stage === 'options') expect(navigator.credentials.create).not.toHaveBeenCalled();
-      await act(async () => { await result.current.register(); });
+      await act(async () => { await result.current.register('Passkey', STEP_UP); });
       expect(result.current.success).toBe(true);
     },
   );
@@ -238,14 +233,14 @@ describe('passkey registration attempt ownership', () => {
       if (stage === 'credential') vi.mocked(navigator.credentials.create).mockReturnValueOnce(pending.promise as Promise<Credential | null>);
       if (stage === 'registration') mockPostPasskeyRegister.mockReturnValueOnce(pending.promise as never);
       const { result } = renderHook(() => usePasskeyRegistration(), { wrapper: createWrapper() });
-      let attempt!: Promise<void>;
-      await act(async () => { attempt = result.current.register(); });
+      let attempt!: Promise<boolean>;
+      await act(async () => { attempt = result.current.register('Passkey', STEP_UP); });
       await act(async () => {
         advanceAuthorization();
         pending.reject(new Error('Obsolete registration failure'));
         await attempt;
       });
-      expect(result.current).toMatchObject({ loading: false, error: null, success: false });
+      expect(result.current).toMatchObject({ loading: false, success: false });
     },
   );
 
@@ -254,17 +249,17 @@ describe('passkey registration attempt ownership', () => {
     const second = deferred<unknown>();
     mockPostPasskeyOptions.mockReturnValueOnce(first.promise as never).mockReturnValueOnce(second.promise as never);
     const { result } = renderHook(() => usePasskeyRegistration(), { wrapper: createWrapper() });
-    let firstAttempt!: Promise<void>;
-    let secondAttempt!: Promise<void>;
+    let firstAttempt!: Promise<boolean>;
+    let secondAttempt!: Promise<boolean>;
     await act(async () => {
-      firstAttempt = result.current.register('First');
-      secondAttempt = result.current.register('Second');
+      firstAttempt = result.current.register('First', STEP_UP);
+      secondAttempt = result.current.register('Second', STEP_UP);
     });
     await act(async () => { first.resolve(VALID_OPTIONS_RESPONSE); await firstAttempt; });
-    expect(result.current).toMatchObject({ loading: true, error: null, success: false });
+    expect(result.current).toMatchObject({ loading: true, success: false });
     expect(navigator.credentials.create).not.toHaveBeenCalled();
     await act(async () => { second.resolve(VALID_OPTIONS_RESPONSE); await secondAttempt; });
-    expect(result.current).toMatchObject({ loading: false, error: null, success: true });
+    expect(result.current).toMatchObject({ loading: false, success: true });
     expect(mockPostPasskeyRegister).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ name: 'Second' }));
   });
 
@@ -276,8 +271,8 @@ describe('passkey registration attempt ownership', () => {
       if (stage === 'credential') vi.mocked(navigator.credentials.create).mockReturnValueOnce(pending.promise as Promise<Credential | null>);
       if (stage === 'registration') mockPostPasskeyRegister.mockReturnValueOnce(pending.promise as never);
       const { result, unmount } = renderHook(() => usePasskeyRegistration(), { wrapper: createWrapper() });
-      let attempt!: Promise<void>;
-      await act(async () => { attempt = result.current.register(); });
+      let attempt!: Promise<boolean>;
+      await act(async () => { attempt = result.current.register('Passkey', STEP_UP); });
       unmount();
       await act(async () => {
         pending.resolve(stage === 'options' ? VALID_OPTIONS_RESPONSE : stage === 'credential' ? createMockCredential() : {});

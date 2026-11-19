@@ -224,7 +224,7 @@ final class TotpLoginReplayTest extends TestCase
         self::assertSame(200, $login->getStatusCode(), (string) $login->getContent());
         $accessToken = $this->json($login)['data']['accessToken'];
 
-        $setup = $this->authorized('/api/auth/totp/setup', $accessToken, $key, []);
+        $setup = $this->authorized('/api/auth/totp/setup', $accessToken, $key, ['currentPassword' => self::PASSWORD]);
         self::assertSame(200, $setup->getStatusCode(), (string) $setup->getContent());
         $this->secret = $this->json($setup)['data']['secret'];
 

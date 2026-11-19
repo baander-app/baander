@@ -32,6 +32,11 @@
     "name": "Name",
     "passwordMismatch": "The passwords do not match.",
     "forgotPassword": "Forgot password?",
+    "stepUp": {
+      "currentPassword": "Current password",
+      "failed": "Password or code is incorrect",
+      "limited": "Too many attempts. Try again later."
+    },
     "passwordReset": {
       "requestTitle": "Reset your password",
       "requestIntro": "Enter the email address you log in with. If it belongs to an account, you'll get an email with a link to choose a new password.",

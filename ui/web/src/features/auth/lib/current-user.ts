@@ -15,5 +15,6 @@ export function applyCurrentUser(resource: UserResource): void {
     email: resource.email,
     name: resource.name,
     emailVerifiedAt: resource.emailVerifiedAt ?? null,
+    totpEnabled: resource.totpEnabled,
   })
 }

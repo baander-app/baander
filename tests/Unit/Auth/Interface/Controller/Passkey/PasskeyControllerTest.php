@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Interface\Controller\Passkey;
 
+use App\Auth\Application\Port\PasswordHasherInterface;
+use App\Auth\Application\Port\StepUpAttemptThrottleInterface;
+use App\Auth\Application\Port\TotpVerifierInterface;
+use App\Auth\Application\Service\StepUpVerifier;
 use App\Auth\Domain\Model\Passkey\Passkey;
 use App\Auth\Domain\Model\Passkey\PasskeyState;
 use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Auth\Interface\Controller\Passkey\PasskeyController;
+use App\Auth\Interface\Request\Passkey\PasskeyRegistrationOptionsRequest;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -202,12 +207,52 @@ final class PasskeyControllerTest extends TestCase
         $this->passkeyRepository->method('forUser')->willReturn([]);
         $this->setPrivate($this->controller, 'users', $users);
         $this->setPrivate($this->controller, 'passkeyService', $this->authenticationOptionsService());
+        $this->setPrivate($this->controller, 'stepUp', $this->stepUp());
 
-        $response = $this->controller->registrationOptions();
+        $response = $this->controller->registrationOptions(new PasskeyRegistrationOptionsRequest('current-password'));
         self::assertSame(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame($owner->getPublicId()->toString(), base64_decode(strtr($data['data']['options']['user']['id'], '-_', '+/'), true));
         self::assertStringNotContainsString($owner->getId()->toString(), $response->getContent());
+    }
+
+    public function testARegistrationCeremonyCompletesForTheUserTheChallengeWasIssuedTo(): void
+    {
+        $owner = \App\Auth\Domain\Model\User::register(new \App\Shared\Domain\Model\Email('passkey@baander.app'), 'hash', 'Owner');
+        $other = \App\Auth\Domain\Model\User::register(new \App\Shared\Domain\Model\Email('other@baander.app'), 'hash', 'Other');
+        $signedIn = $owner;
+        $this->security->method('getUser')->willReturnCallback(static function () use (&$signedIn): SecurityUser {
+            return new SecurityUser(id: $signedIn->getId()->toString(), email: $signedIn->getEmail(), password: 'hash');
+        });
+        $users = $this->createStub(\App\Auth\Application\Port\UserPortInterface::class);
+        $users->method('findByUuid')->willReturnCallback(static fn (Uuid $id): \App\Auth\Domain\Model\User => $id->equals($owner->getId()) ? $owner : $other);
+        $this->passkeyRepository->method('forUser')->willReturn([]);
+        $registered = [];
+        $bus = $this->createStub(\Symfony\Component\Messenger\MessageBusInterface::class);
+        $bus->method('dispatch')->willReturnCallback(static function (object $message) use (&$registered): \Symfony\Component\Messenger\Envelope {
+            $registered[] = $message;
+
+            return new \Symfony\Component\Messenger\Envelope($message);
+        });
+        $this->controller->setTranslator(new \Symfony\Component\Translation\Translator('en'));
+        $this->setPrivate($this->controller, 'users', $users);
+        $this->setPrivate($this->controller, 'passkeyService', $this->authenticationOptionsService());
+        $this->setPrivate($this->controller, 'stepUp', $this->stepUp());
+        $this->setPrivate($this->controller, 'commandBus', $bus);
+        $credential = new \App\Tests\Fixtures\Auth\WebAuthnTestCredential($owner->getPublicId()->toString(), 'baander.app');
+
+        $options = json_decode($this->controller->registrationOptions(new PasskeyRegistrationOptionsRequest('current-password'))->getContent(), true, 512, JSON_THROW_ON_ERROR)['data'];
+        $attestation = $credential->attest($options['options']['challenge'], 'https://baander.app');
+        $signedIn = $other;
+        $borrowed = $this->controller->register(new \App\Auth\Interface\Request\Passkey\RegisterPasskeyRequest($options['challengeKey'], $attestation, 'Borrowed'));
+        $signedIn = $owner;
+        $completed = $this->controller->register(new \App\Auth\Interface\Request\Passkey\RegisterPasskeyRequest($options['challengeKey'], $attestation, 'Laptop'));
+
+        self::assertSame(400, $borrowed->getStatusCode(), (string) $borrowed->getContent());
+        self::assertSame(201, $completed->getStatusCode(), (string) $completed->getContent());
+        self::assertCount(1, $registered);
+        self::assertInstanceOf(\App\Auth\Application\Command\Passkey\RegisterPasskeyCommand::class, $registered[0]);
+        self::assertSame($owner->getId()->toString(), $registered[0]->getUserId());
     }
 
     /** @return iterable<string, array{string, int}> */
@@ -302,6 +347,20 @@ final class PasskeyControllerTest extends TestCase
             challenges: new \App\Tests\Fixtures\Auth\InMemoryPasskeyChallengeStore(),
             supportedAlgorithmIds: [-7, -257],
             jsonEncoder: new \Symfony\Component\Serializer\Encoder\JsonEncoder(),
+        );
+    }
+
+    /** A step-up check that the password always passes, for an account without TOTP. */
+    private function stepUp(): StepUpVerifier
+    {
+        $hasher = $this->createStub(PasswordHasherInterface::class);
+        $hasher->method('verify')->willReturn(true);
+
+        return new StepUpVerifier(
+            $this->createStub(StepUpAttemptThrottleInterface::class),
+            $hasher,
+            $this->createStub(TotpVerifierInterface::class),
+            new \Psr\Log\NullLogger(),
         );
     }
 

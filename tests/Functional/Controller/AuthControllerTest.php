@@ -210,7 +210,7 @@ final class AuthControllerTest extends TestCase
         $this->assertTrue($user->isEmailVerified(), 'Operator-created users start verified.');
         $newEmail = 'changed-' . bin2hex(random_bytes(4)) . '@baander.app';
 
-        $response = $this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $newEmail]);
+        $response = $this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $newEmail, 'currentPassword' => 'password']);
 
         $this->assertJsonResponse($response, 200);
         $this->entityManager->clear();
@@ -225,7 +225,7 @@ final class AuthControllerTest extends TestCase
         $user = $this->createTestUser();
         $other = $this->createTestUser();
 
-        $response = $this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $other->getEmail()]);
+        $response = $this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $other->getEmail(), 'currentPassword' => 'password123']);
 
         $data = $this->assertJsonResponse($response, 409, 'error');
         $this->assertSame('This email address is already in use.', $data['error']['message']);

@@ -17,6 +17,7 @@ errors:
   internal: "Intern serverfejl."
   password_reset_failed: "Linket til nulstilling af adgangskode er ugyldigt eller udløbet."
   current_password_incorrect: "Den nuværende adgangskode er forkert."
+  step_up_failed: "Adgangskoden eller koden er forkert."
   invalid_credentials: "Ugyldige loginoplysninger."
   account_disabled: "Denne konto er deaktiveret."
   totp_required: "TOTP-kode er påkrævet."

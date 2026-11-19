@@ -7,10 +7,12 @@ namespace App\Auth\Interface\Controller\Passkey;
 use App\Auth\Application\Command\Passkey\RegisterPasskeyCommand;
 use App\Auth\Application\Exception\PasskeyChallengeUnavailableException;
 use App\Auth\Application\Port\UserPortInterface;
+use App\Auth\Application\Service\StepUpVerifier;
 use App\Auth\Domain\Model\Passkey\Passkey;
 use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
 use App\Auth\Infrastructure\Security\Passkey\PasskeyService;
 use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Auth\Interface\Request\Passkey\PasskeyRegistrationOptionsRequest;
 use App\Auth\Interface\Request\Passkey\RegisterPasskeyRequest;
 use App\Auth\Interface\Request\Passkey\VerifyPasskeyChallengeRequest;
 use App\Auth\Interface\Request\Passkey\WebAuthnOptionsRequest;
@@ -43,6 +45,7 @@ final class PasskeyController
         private readonly PasskeyRepositoryInterface $passkeyRepository,
         private readonly JsonEncoder $jsonEncoder,
         private readonly UserPortInterface $users,
+        private readonly StepUpVerifier $stepUp,
     ) {
     }
 
@@ -95,7 +98,11 @@ final class PasskeyController
     #[OA\Post(
         path: '/api/auth/passkey/options',
         summary: 'Get WebAuthn registration options',
-        security: [],
+        description: 'Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(ref: new Model(type: PasskeyRegistrationOptionsRequest::class)),
+        ),
         responses: [
             new OA\Response(
                 response: '200',
@@ -108,6 +115,8 @@ final class PasskeyController
                 ),
             ),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'Validation error, or the password or code is wrong', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '429', description: 'Too many step-up attempts for this account', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(
                 response: '503',
                 description: 'The passkey challenge store is unavailable; retry after the Retry-After delay.',
@@ -117,7 +126,7 @@ final class PasskeyController
         ],
     )]
     #[Route('/options', name: 'options', methods: ['POST'])]
-    public function registrationOptions(): JsonResponse
+    public function registrationOptions(#[MapRequestPayload(mapWhenEmpty: true)] PasskeyRegistrationOptionsRequest $payload): JsonResponse
     {
         $user = $this->getCurrentSecurityUser();
         if ($user === null) {
@@ -129,6 +138,7 @@ final class PasskeyController
         if ($owner === null) {
             return $this->notFound();
         }
+        $this->stepUp->verify($owner, $payload->currentPassword, $payload->totpCode);
         $userId = $owner->getPublicId()->toString();
         $existingPasskeys = $this->passkeyRepository->forUser($userUuid);
         $existingCredentialIds = array_map(

@@ -29,6 +29,7 @@ final class ResourcesTest extends TestCase
         $this->assertSame('test@baander.app', $result['email']);
         $this->assertNull($result['emailVerifiedAt']);
         $this->assertArrayHasKey('createdAt', $result);
+        $this->assertFalse($result['totpEnabled']);
     }
 
     public function testUserResourceFromDomainBackwardCompat(): void

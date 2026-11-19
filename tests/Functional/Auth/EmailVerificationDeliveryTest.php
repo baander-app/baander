@@ -143,7 +143,7 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
         [, $oldToken] = $this->linkFrom((string) $this->onlyEmail()->getTextBody());
         $newAddress = $this->uniqueEmail();
 
-        $changed = $this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $newAddress]);
+        $changed = $this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $newAddress, 'currentPassword' => 'registration-password-1']);
         $this->assertJsonResponse($changed, 200, 'data');
 
         $messages = $this->getMailerMessages();
@@ -163,7 +163,7 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
         $user = $this->createTestUser($this->uniqueEmail());
         $newAddress = $this->uniqueEmail();
 
-        $response = $this->authenticatedRequest('PATCH', '/api/admin/users/' . $user->getPublicId()->toString(), $this->createSuperAdminUser(), ['email' => $newAddress]);
+        $response = $this->authenticatedRequest('PATCH', '/api/admin/users/' . $user->getPublicId()->toString(), $this->createSuperAdminUser(), ['email' => $newAddress, 'currentPassword' => 'registration-password-1']);
 
         $body = $this->assertJsonResponse($response, 200, 'data');
         $this->assertSame($newAddress, $body['data']['email']);
@@ -196,7 +196,7 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
     {
         $user = $this->createTestUser($this->uniqueEmail());
 
-        $this->assertJsonResponse($this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $user->getEmail()]), 200, 'data');
+        $this->assertJsonResponse($this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $user->getEmail(), 'currentPassword' => 'password123']), 200, 'data');
 
         $this->assertEmailCount(0);
     }

@@ -1,4 +1,4 @@
-import { cleanup, screen, waitFor } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AxiosError, AxiosHeaders } from 'axios'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -28,6 +28,7 @@ function profile(overrides: Partial<UserResource> = {}): UserResource {
     emailVerifiedAt: VERIFIED_AT,
     createdAt: '2026-10-01T09:00:00+00:00',
     roles: ['ROLE_USER'],
+    totpEnabled: false,
     ...overrides,
   }
 }
@@ -53,10 +54,10 @@ function signIn(user: UserResource) {
   })
 }
 
-function httpError(status: number, message: string, headers: Record<string, string> = {}) {
+function httpError(status: number, message: string, headers: Record<string, string> = {}, details?: Record<string, unknown>) {
   const config = { headers: new AxiosHeaders() }
   return new AxiosError(`Request failed with status code ${status}`, 'ERR_BAD_REQUEST', config, undefined, {
-    data: { error: { code: status, message } },
+    data: { error: { code: status, message, ...(details ? { details } : {}) } },
     status,
     statusText: 'Error',
     headers,
@@ -89,6 +90,8 @@ async function saveAccountChange(kind: 'email' | 'password') {
   if (kind === 'email') {
     await user.clear(screen.getByLabelText('New email'))
     await user.type(screen.getByLabelText('New email'), 'updated@baander.app')
+    await user.type(screen.getByLabelText('Current password'), 'current-password')
+    if (useAuthStore.getState().user?.totpEnabled) await user.type(screen.getByLabelText('Authentication code'), '123456')
   } else {
     await user.type(screen.getByLabelText('Current password'), 'current-password')
     await user.type(screen.getByLabelText('New password'), 'new-password')
@@ -131,7 +134,7 @@ describe('AccountManagement', () => {
       expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
       expect(mockRequest).toHaveBeenCalledWith('/api/auth/me/email', expect.objectContaining({
         method: 'PUT',
-        body: JSON.stringify({ email: 'updated@baander.app' }),
+        body: JSON.stringify({ email: 'updated@baander.app', currentPassword: 'current-password' }),
       }))
       expect(screen.queryByText('Failed to change email.')).not.toBeInTheDocument()
     })
@@ -166,6 +169,71 @@ describe('AccountManagement', () => {
       expect(await screen.findByText('Failed to change password.')).toBeInTheDocument()
       expect(screen.getByRole('dialog', { name: 'Change password' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    })
+  })
+
+  describe('step-up for an email change', () => {
+    it('asks for a code only when TOTP is on', async () => {
+      const user = userEvent.setup()
+      renderAccount()
+      await waitForProfileRefresh()
+      await user.click(screen.getAllByRole('button', { name: 'Change' })[0])
+
+      expect(screen.getByLabelText('Current password')).toHaveAttribute('autocomplete', 'current-password')
+      expect(screen.queryByLabelText('Authentication code')).not.toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+      signIn(profile({ totpEnabled: true }))
+      renderAccount()
+      await user.click(screen.getAllByRole('button', { name: 'Change' })[0])
+
+      expect(screen.getByLabelText('Authentication code')).toHaveAttribute('autocomplete', 'one-time-code')
+    })
+
+    it('submits the password and the code with the new address', async () => {
+      signIn(profile({ totpEnabled: true }))
+      answerEmailChange(async () => ({ data: profile({ email: 'updated@baander.app', totpEnabled: true }) }))
+
+      await saveAccountChange('email')
+
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Change email' })).not.toBeInTheDocument())
+      expect(mockRequest).toHaveBeenCalledWith('/api/auth/me/email', expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({ email: 'updated@baander.app', currentPassword: 'current-password', totpCode: '123456' }),
+      }))
+    })
+
+    it('keeps the dialog open and clears the fields when the password or code is wrong', async () => {
+      signIn(profile({ totpEnabled: true }))
+      answerEmailChange(() => Promise.reject(httpError(422, 'The password or code is incorrect.', {}, { reason: 'step_up_failed' })))
+
+      await saveAccountChange('email')
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Password or code is incorrect')
+      expect(screen.getByRole('dialog', { name: 'Change email' })).toBeInTheDocument()
+      expect(screen.getByLabelText('Current password')).toHaveValue('')
+      expect(screen.getByLabelText('Authentication code')).toHaveValue('')
+      expect(screen.getByLabelText('New email')).toHaveValue('updated@baander.app')
+      expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    })
+
+    it('stops further attempts after too many', async () => {
+      answerEmailChange(() => Promise.reject(httpError(429, 'Too many attempts. Try again later.', { 'retry-after': '600' })))
+
+      await saveAccountChange('email')
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Too many attempts. Try again later.')
+      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    })
+
+    it('offers the verification email in place of the prompt for an unverified address', async () => {
+      answerEmailChange(() => Promise.reject(httpError(422, 'Verify your email address first.', {}, { reason: 'email_unverified' })))
+
+      await saveAccountChange('email')
+
+      const dialog = await screen.findByRole('dialog', { name: 'Change email' })
+      expect(within(dialog).getByRole('button', { name: 'Resend verification email' })).toBeInTheDocument()
+      expect(within(dialog).queryByLabelText('Current password')).not.toBeInTheDocument()
     })
   })
 

@@ -14,6 +14,7 @@ import { Trash2, Loader2 } from 'lucide-react';
 import { textRole } from '@/shared/theme';
 import { ContentText } from '@/shared/typography';
 import { usePasskeyRegistration } from '../hooks/use-passkey-registration';
+import { StepUpDialog, type StepUpCredentials } from './StepUpDialog';
 import { usePasskeyList, useDeletePasskey } from '../hooks/use-passkey-list';
 
 const Container = styled.div`
@@ -39,11 +40,6 @@ const Heading = styled.p`
 const Subheading = styled.p`
   ${textRole('caption')}
   color: var(--color-muted-foreground);
-`
-
-const ErrorText = styled.p`
-  ${textRole('caption')}
-  color: var(--color-destructive);
 `
 
 const SuccessText = styled.p`
@@ -134,7 +130,7 @@ const SpinningWithMargin = styled(Loader2)`
 `
 
 export function PasskeyManagement() {
-  const { register, loading: registering, error: regError, success } = usePasskeyRegistration();
+  const { register, loading: registering, success } = usePasskeyRegistration();
   const { data: passkeys, isPending: loadingList } = usePasskeyList();
   const deletePasskey = useDeletePasskey();
   const [deleteTarget, setDeleteTarget] = useState<{ publicId: string; name: string } | null>(null);
@@ -144,11 +140,11 @@ export function PasskeyManagement() {
   const items = passkeys ?? [];
   const isLastPasskey = items.length === 1;
 
-  function handleRegister() {
-    const name = passkeyName.trim() || 'Passkey';
-    register(name);
-    setShowRegister(false);
-    setPasskeyName('');
+  async function handleRegister(stepUp: StepUpCredentials) {
+    const registered = await register(passkeyName.trim() || 'Passkey', stepUp);
+    if (registered) setPasskeyName('');
+
+    return registered;
   }
 
   function handleDeleteConfirm() {
@@ -172,9 +168,6 @@ export function PasskeyManagement() {
         </Button>
       </HeaderRow>
 
-      {regError && (
-        <ErrorText>{regError}</ErrorText>
-      )}
       {success && (
         <SuccessText>Passkey registered successfully.</SuccessText>
       )}
@@ -217,39 +210,24 @@ export function PasskeyManagement() {
         </PasskeyList>
       )}
 
-      {/* Register dialog */}
-      <Dialog open={showRegister} onOpenChange={setShowRegister}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Register new passkey</DialogTitle>
-            <DialogDescription>
-              Name this passkey so you can identify it later.
-            </DialogDescription>
-          </DialogHeader>
-          <Input
-            placeholder="e.g. YubiKey, iPhone"
-            value={passkeyName}
-            onChange={(e) => setPasskeyName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleRegister()}
-            autoFocus
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRegister(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleRegister} disabled={registering}>
-              {registering ? (
-                <>
-                  <SpinningWithMargin size={14} />
-                  Registering...
-                </>
-              ) : (
-                'Register'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Register dialog: step-up first, then the browser's passkey prompt */}
+      <StepUpDialog
+        open={showRegister}
+        onOpenChange={setShowRegister}
+        title="Register new passkey"
+        description="Name this passkey so you can identify it later, and confirm it's you."
+        submitLabel={registering ? 'Registering...' : 'Register'}
+        fallbackError="Failed to register passkey."
+        onConfirm={handleRegister}
+      >
+        <Input
+          aria-label="Passkey name"
+          placeholder="e.g. YubiKey, iPhone"
+          value={passkeyName}
+          onChange={(e) => setPasskeyName(e.target.value)}
+          autoFocus
+        />
+      </StepUpDialog>
 
       {/* Delete confirmation */}
       <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>

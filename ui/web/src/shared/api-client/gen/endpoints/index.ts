@@ -234,6 +234,15 @@ export interface DeviceApproveRequest {
   decision: DeviceApproveRequestDecision;
 }
 
+export interface PasskeyRegistrationOptionsRequest {
+  currentPassword: string;
+  /**
+     * A current TOTP code; needed when TOTP is on
+     * @nullable
+     */
+  totpCode?: string | null;
+}
+
 /**
  * WebAuthn authenticator response (base64-encoded attestation object)
  * @nullable
@@ -276,6 +285,10 @@ export interface VerifyPasskeyChallengeRequest {
      * @nullable
      */
   userId?: string | null;
+}
+
+export interface StartTotpSetupRequest {
+  currentPassword: string;
 }
 
 export interface EnableTotpRequest {
@@ -344,6 +357,12 @@ export interface VerifyEmailRequest {
 
 export interface ChangeEmailRequest {
   email: string;
+  currentPassword: string;
+  /**
+     * A current TOTP code; needed when TOTP is on
+     * @nullable
+     */
+  totpCode?: string | null;
 }
 
 export interface ChangePasswordRequest {
@@ -1862,6 +1881,8 @@ export interface UserResource {
   createdAt: string;
   /** Assigned roles; absent for a delegated token */
   roles: string[];
+  /** Whether TOTP is on, so a sensitive change needs a code; absent for a delegated token */
+  totpEnabled: boolean;
 }
 
 export interface LoginRequest {
@@ -5133,10 +5154,6 @@ export type PostAuthMeEmailVerification200Data = {
 
 export type PostAuthMeEmailVerification200 = {
   data?: PostAuthMeEmailVerification200Data;
-};
-
-export type PutAuthMeEmailBody = {
-  email: string;
 };
 
 export type PutAuthMeEmail200 = {
@@ -12894,16 +12911,31 @@ export const getPostPasskeyOptionsUrl = () => {
 }
 
 /**
+ * Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.
  * @summary Get WebAuthn registration options
  */
-export const postPasskeyOptions = async ( options?: Parameters<typeof customInstance>[1]): Promise<PostPasskeyOptions200> => {
+export const postPasskeyOptions = async (passkeyRegistrationOptionsRequest: PasskeyRegistrationOptionsRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPasskeyOptions200> => {
 
-  return customInstance<PostPasskeyOptions200>(getPostPasskeyOptionsUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<PostPasskeyOptions200>(getPostPasskeyOptionsUrl(),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(passkeyRegistrationOptionsRequest)
   }
 );}
 
@@ -12913,9 +12945,9 @@ export const postPasskeyOptions = async ( options?: Parameters<typeof customInst
 
 export const getPostPasskeyOptionsMutationKey = () => ['postPasskeyOptions'] as const;
 
-export const getPostPasskeyOptionsMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPasskeyOptions>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postPasskeyOptions>>, TError,void, TContext> => {
+export const getPostPasskeyOptionsMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPasskeyOptions>>, TError,PostPasskeyOptionsMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postPasskeyOptions>>, TError,PostPasskeyOptionsMutationVariables, TContext> => {
 
 const mutationKey = getPostPasskeyOptionsMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -12927,10 +12959,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPasskeyOptions>>, void> = () => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPasskeyOptions>>, PostPasskeyOptionsMutationVariables> = (props) => {
+          const {data} = props ?? {};
 
-
-          return  postPasskeyOptions(requestOptions)
+          return  postPasskeyOptions(data,requestOptions)
         }
 
 
@@ -12941,19 +12973,19 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PostPasskeyOptionsMutationResult = NonNullable<Awaited<ReturnType<typeof postPasskeyOptions>>>
-
-    export type PostPasskeyOptionsMutationError = ErrorType<ApiError>
-
+    export type PostPasskeyOptionsMutationBody = BodyType<PasskeyRegistrationOptionsRequest>
+    export type PostPasskeyOptionsMutationError = ErrorType<ApiError | ValidationError>
+    export type PostPasskeyOptionsMutationVariables = {data: BodyType<PasskeyRegistrationOptionsRequest>}
 
     /**
  * @summary Get WebAuthn registration options
  */
-export const usePostPasskeyOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPasskeyOptions>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+export const usePostPasskeyOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPasskeyOptions>>, TError,PostPasskeyOptionsMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postPasskeyOptions>>,
         TError,
-        void,
+        PostPasskeyOptionsMutationVariables,
         TContext
       > => {
       return useMutation(getPostPasskeyOptionsMutationOptions(options), queryClient);
@@ -13396,17 +13428,31 @@ export const getPostTotpSetupUrl = () => {
 }
 
 /**
- * Refused while TOTP is on. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.
+ * Refused while TOTP is on. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.
  * @summary Generate TOTP secret and provisioning URI
  */
-export const postTotpSetup = async ( options?: Parameters<typeof customInstance>[1]): Promise<PostTotpSetup200> => {
+export const postTotpSetup = async (startTotpSetupRequest: StartTotpSetupRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostTotpSetup200> => {
 
-  return customInstance<PostTotpSetup200>(getPostTotpSetupUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<PostTotpSetup200>(getPostTotpSetupUrl(),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(startTotpSetupRequest)
   }
 );}
 
@@ -13416,9 +13462,9 @@ export const postTotpSetup = async ( options?: Parameters<typeof customInstance>
 
 export const getPostTotpSetupMutationKey = () => ['postTotpSetup'] as const;
 
-export const getPostTotpSetupMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTotpSetup>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postTotpSetup>>, TError,void, TContext> => {
+export const getPostTotpSetupMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTotpSetup>>, TError,PostTotpSetupMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postTotpSetup>>, TError,PostTotpSetupMutationVariables, TContext> => {
 
 const mutationKey = getPostTotpSetupMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -13430,10 +13476,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postTotpSetup>>, void> = () => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postTotpSetup>>, PostTotpSetupMutationVariables> = (props) => {
+          const {data} = props ?? {};
 
-
-          return  postTotpSetup(requestOptions)
+          return  postTotpSetup(data,requestOptions)
         }
 
 
@@ -13444,19 +13490,19 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PostTotpSetupMutationResult = NonNullable<Awaited<ReturnType<typeof postTotpSetup>>>
-
-    export type PostTotpSetupMutationError = ErrorType<ApiError>
-
+    export type PostTotpSetupMutationBody = BodyType<StartTotpSetupRequest>
+    export type PostTotpSetupMutationError = ErrorType<ApiError | ValidationError>
+    export type PostTotpSetupMutationVariables = {data: BodyType<StartTotpSetupRequest>}
 
     /**
  * @summary Generate TOTP secret and provisioning URI
  */
-export const usePostTotpSetup = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTotpSetup>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+export const usePostTotpSetup = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTotpSetup>>, TError,PostTotpSetupMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postTotpSetup>>,
         TError,
-        void,
+        PostTotpSetupMutationVariables,
         TContext
       > => {
       return useMutation(getPostTotpSetupMutationOptions(options), queryClient);
@@ -14427,10 +14473,10 @@ export const getPutAuthMeEmailUrl = () => {
 }
 
 /**
- * The new address starts unverified and is sent a verification link; links sent to the old address stop working.
+ * Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The new address starts unverified and is sent a verification link; links sent to the old address stop working.
  * @summary Change the current user email
  */
-export const putAuthMeEmail = async (putAuthMeEmailBody: PutAuthMeEmailBody, options?: Parameters<typeof customInstance>[1]): Promise<PutAuthMeEmail200> => {
+export const putAuthMeEmail = async (changeEmailRequest: ChangeEmailRequest, options?: Parameters<typeof customInstance>[1]): Promise<PutAuthMeEmail200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -14451,7 +14497,7 @@ return customInstance<PutAuthMeEmail200>(getPutAuthMeEmailUrl(),
     ...options,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(putAuthMeEmailBody)
+    body: JSON.stringify(changeEmailRequest)
   }
 );}
 
@@ -14489,9 +14535,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PutAuthMeEmailMutationResult = NonNullable<Awaited<ReturnType<typeof putAuthMeEmail>>>
-    export type PutAuthMeEmailMutationBody = BodyType<PutAuthMeEmailBody>
+    export type PutAuthMeEmailMutationBody = BodyType<ChangeEmailRequest>
     export type PutAuthMeEmailMutationError = ErrorType<ApiError | ValidationError>
-    export type PutAuthMeEmailMutationVariables = {data: BodyType<PutAuthMeEmailBody>}
+    export type PutAuthMeEmailMutationVariables = {data: BodyType<ChangeEmailRequest>}
 
     /**
  * @summary Change the current user email

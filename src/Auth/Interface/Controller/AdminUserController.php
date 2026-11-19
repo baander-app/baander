@@ -13,6 +13,7 @@ use App\Auth\Application\Command\User\RenameUserCommand;
 use App\Auth\Application\Command\User\SetUserPasswordCommand;
 use App\Auth\Application\Command\User\SetUserRolesCommand;
 use App\Auth\Application\DTO\UserPage;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Application\Port\UserPortInterface;
 use App\Auth\Application\Query\User\ListUsersQuery;
 use App\Auth\Application\Service\UserLookup;
@@ -49,6 +50,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class AdminUserController
 {
     use ApiResponsesTrait;
+
+    private const string OWN_CREDENTIALS_REFUSAL = 'Change your own email address and password from your account settings.';
 
     public function __construct(
         private readonly UserPortInterface $userService,
@@ -165,6 +168,7 @@ final class AdminUserController
                 new OA\Property(property: 'data', ref: new Model(type: AdminUserResource::class)),
             ])),
             new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '403', description: 'The request changes the signed-in administrator\'s own email address', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '409', description: 'Email already taken', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
@@ -176,6 +180,9 @@ final class AdminUserController
     {
         $publicId = $this->publicIdentifier($publicId);
         $user = null;
+        if ($request->email !== null && $this->changesOwnEmail($publicId, $request->email)) {
+            return $this->forbidden(self::OWN_CREDENTIALS_REFUSAL);
+        }
 
         // The same use case as the user's own change and `app:user:change-email`: the new
         // address starts unverified and is sent a verification link.
@@ -250,6 +257,7 @@ final class AdminUserController
                     new OA\Property(property: 'message', type: 'string'),
                 ], type: 'object'),
             ])),
+            new OA\Response(response: '403', description: 'The target is the signed-in administrator', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
@@ -259,6 +267,9 @@ final class AdminUserController
     public function resetPassword(string $publicId, #[MapRequestPayload] AdminResetPasswordRequest $request): JsonResponse
     {
         $publicId = $this->publicIdentifier($publicId);
+        if ($this->isSignedInUser($publicId)) {
+            return $this->forbidden(self::OWN_CREDENTIALS_REFUSAL);
+        }
         // The same use case as `app:user:reset-password`: it also signs the user out everywhere.
         $this->dispatch(new SetUserPasswordCommand($publicId, $request->password));
 
@@ -307,6 +318,35 @@ final class AdminUserController
         $user = $this->dispatch(new EnableUserCommand($publicId));
 
         return $this->successResponse(AdminUserResource::from($user));
+    }
+
+    /**
+     * Whether the request changes the signed-in administrator's own address. The edit dialog
+     * sends the address with every save, so an unchanged one is a rename, not a change.
+     */
+    private function changesOwnEmail(string $publicId, string $email): bool
+    {
+        if (!$this->isSignedInUser($publicId)) {
+            return false;
+        }
+
+        try {
+            return Email::fromString($email)->toString() !== $this->userLookup->byIdentifier($publicId)->getEmail();
+        } catch (\InvalidArgumentException) {
+            return true;
+        }
+    }
+
+    /**
+     * Whether the target is the signed-in administrator, who changes their own address and
+     * password from the account settings, with step-up. The console has no such limit.
+     */
+    private function isSignedInUser(string $publicId): bool
+    {
+        $signedIn = $this->security->getUser();
+
+        return $signedIn instanceof AuthenticatedUserIdentityInterface
+            && $this->userLookup->byIdentifier($publicId)->getId()->toString() === $signedIn->getId();
     }
 
     private function publicIdentifier(string $value): string

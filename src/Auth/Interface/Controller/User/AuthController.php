@@ -6,7 +6,7 @@ namespace App\Auth\Interface\Controller\User;
 
 use App\Auth\Application\Command\OAuth\RefreshTokenCommand;
 use App\Auth\Application\Command\OAuth\RevokeTokenCommand;
-use App\Auth\Application\Command\User\ChangeEmailCommand;
+use App\Auth\Application\Command\User\ChangeOwnEmailCommand;
 use App\Auth\Application\Command\User\ChangePasswordCommand;
 use App\Auth\Application\Command\User\RegisterUserCommand;
 use App\Auth\Application\Command\User\RequestPasswordResetCommand;
@@ -22,6 +22,8 @@ use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Exception\PasswordPolicyException;
 use App\Auth\Application\Exception\PasswordResetException;
 use App\Auth\Application\Exception\RefreshTokenRejectedException;
+use App\Auth\Application\Exception\StepUpFailedException;
+use App\Auth\Application\Exception\StepUpRateLimitedException;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Application\Port\UserPortInterface;
 use App\Auth\Domain\Model\User;
@@ -590,12 +592,10 @@ final class AuthController
     #[OA\Put(
         path: '/api/auth/me/email',
         summary: 'Change the current user email',
-        description: 'The new address starts unverified and is sent a verification link; links sent to the old address stop working.',
+        description: 'Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The new address starts unverified and is sent a verification link; links sent to the old address stop working.',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(required: ['email'], properties: [
-                        new OA\Property(property: 'email', type: 'string', format: 'email', example: 'alice@example.com'),
-                    ]),
+            content: new OA\JsonContent(ref: new Model(type: ChangeEmailRequest::class)),
         ),
         responses: [
             new OA\Response(
@@ -610,7 +610,8 @@ final class AuthController
             ),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '409', description: 'Email already taken', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '422', description: 'Validation error, or the password or code is wrong', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '429', description: 'Too many step-up attempts for this account', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/me/email', name: 'me_email', methods: ['PUT'])]
@@ -622,8 +623,12 @@ final class AuthController
         }
 
         try {
-            $changed = $this->commandBus->dispatch(new ChangeEmailCommand($user->getPublicId()->toString(), $payload->email))
-                ->last(HandledStamp::class)?->getResult();
+            $changed = $this->commandBus->dispatch(new ChangeOwnEmailCommand(
+                userId: $user->getId()->toString(),
+                email: $payload->email,
+                currentPassword: $payload->currentPassword,
+                totpCode: $payload->totpCode,
+            ))->last(HandledStamp::class)?->getResult();
         } catch (\Throwable $e) {
             return $this->handleCommandException(
                 $e,
@@ -632,7 +637,7 @@ final class AuthController
             );
         }
         if (!$changed instanceof User) {
-            throw new \LogicException('ChangeEmailCommand did not return the user.');
+            throw new \LogicException('ChangeOwnEmailCommand did not return the user.');
         }
 
         return $this->successResponse(UserResource::from($changed));
@@ -754,6 +759,13 @@ final class AuthController
         $previous = $exception instanceof HandlerFailedException
             ? $exception->getPrevious()
             : $exception;
+
+        // Shared outcomes, answered by the exception subscribers: 422, 429 and 503.
+        if ($previous instanceof StepUpFailedException
+            || $previous instanceof StepUpRateLimitedException
+            || $previous instanceof RateLimiterUnavailableException) {
+            throw $previous;
+        }
 
         if ($previous instanceof PasswordResetException) {
             return $this->errorResponse(

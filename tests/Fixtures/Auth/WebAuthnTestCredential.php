@@ -90,6 +90,45 @@ final class WebAuthnTestCredential
         ];
     }
 
+    /**
+     * The credential a registration ceremony creates for the base64url challenge from the
+     * registration options, with a `none` attestation.
+     *
+     * @return array<string, mixed>
+     */
+    public function attest(string $challenge, string $origin): array
+    {
+        $clientData = json_encode(['type' => 'webauthn.create', 'challenge' => $challenge, 'origin' => $origin, 'crossOrigin' => false], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+        // User present and verified, with attested credential data (0x45): a zero AAGUID, the
+        // credential ID with its big-endian length, and the public key.
+        $authenticatorData = hash('sha256', $this->rpId, true) . "\x45" . pack('N', $this->counter)
+            . str_repeat("\0", 16) . pack('n', strlen($this->credentialId)) . $this->credentialId . $this->coseKey();
+        // CBOR map {fmt: "none", attStmt: {}, authData: bytes}.
+        $attestationObject = "\xA3" . "\x63fmt" . "\x64none" . "\x67attStmt" . "\xA0" . "\x68authData" . self::cborBytes($authenticatorData);
+        $id = self::encode($this->credentialId);
+
+        return [
+            'id' => $id,
+            'rawId' => $id,
+            'type' => 'public-key',
+            'response' => [
+                'clientDataJSON' => self::encode($clientData),
+                'attestationObject' => self::encode($attestationObject),
+            ],
+        ];
+    }
+
+    private static function cborBytes(string $value): string
+    {
+        $length = strlen($value);
+
+        return match (true) {
+            $length < 24 => chr(0x40 + $length),
+            $length < 256 => "\x58" . chr($length),
+            default => "\x59" . pack('n', $length),
+        } . $value;
+    }
+
     /** CBOR map {kty: EC2, alg: ES256, crv: P-256, x, y} (RFC 9053 §7.1.1). */
     private function coseKey(): string
     {

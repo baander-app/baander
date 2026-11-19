@@ -532,6 +532,13 @@ services:
             $oauthParClientLimiter: '@limiter.oauth_par_client'
             $environment: '%kernel.environment%'
 
+    App\Auth\Application\Port\StepUpAttemptThrottleInterface:
+        alias: App\Auth\Infrastructure\Security\RateLimiterStepUpAttemptThrottle
+
+    App\Auth\Infrastructure\Security\RateLimiterStepUpAttemptThrottle:
+        arguments:
+            $authStepUpUserLimiter: '@limiter.auth_step_up_user'
+
     # --- Admin Rate Limiting ---
     App\Catalog\Infrastructure\EventListener\AdminRateLimitListener:
         arguments:

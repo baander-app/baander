@@ -17,7 +17,7 @@ final class TotpControllerTest extends TestCase
 
     public function testSetupReturns401ForUnauthenticatedRequest(): void
     {
-        $response = $this->anonymousRequest('POST', '/api/auth/totp/setup');
+        $response = $this->anonymousRequest('POST', '/api/auth/totp/setup', ['currentPassword' => 'password123']);
 
         // /api/auth/ has PUBLIC_ACCESS at the firewall level, so the request
         // reaches the controller which returns 401 when no user is found.
@@ -26,7 +26,7 @@ final class TotpControllerTest extends TestCase
 
     public function testSetupReturns401WithoutTestUserHeader(): void
     {
-        $response = $this->anonymousRequest('POST', '/api/auth/totp/setup');
+        $response = $this->anonymousRequest('POST', '/api/auth/totp/setup', ['currentPassword' => 'password123']);
 
         $data = $this->assertJsonResponse($response, 401);
         $this->assertArrayHasKey('error', $data);
@@ -42,7 +42,7 @@ final class TotpControllerTest extends TestCase
     {
         $user = $this->createTestUser();
 
-        $response = $this->authenticatedRequest('POST', '/api/auth/totp/setup', $user);
+        $response = $this->authenticatedRequest('POST', '/api/auth/totp/setup', $user, ['currentPassword' => 'password123']);
 
         $data = $this->assertJsonResponse($response, 200, 'data');
         $this->assertArrayHasKey('secret', $data['data']);
@@ -68,7 +68,7 @@ final class TotpControllerTest extends TestCase
         $secret = $this->startSetup($user);
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/auth/totp/enable', $user, ['code' => self::code($secret)]), 200);
 
-        $data = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/auth/totp/setup', $user), 409);
+        $data = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/auth/totp/setup', $user, ['currentPassword' => 'password123']), 409);
 
         $this->assertSame('Two-factor authentication is already on. Turn it off before setting it up again.', $data['error']['message']);
     }
@@ -149,7 +149,7 @@ final class TotpControllerTest extends TestCase
 
     private function startSetup(User $user): string
     {
-        $data = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/auth/totp/setup', $user), 200, 'data');
+        $data = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/auth/totp/setup', $user, ['currentPassword' => 'password123']), 200, 'data');
 
         return $data['data']['secret'];
     }
