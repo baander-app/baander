@@ -54,6 +54,7 @@ class Bootstrap
                 'DB_PASSWORD' => bin2hex(random_bytes(32)),
                 'REDIS_PASSWORD' => bin2hex(random_bytes(32)),
                 'STREAM_URL_HMAC_SECRET' => bin2hex(random_bytes(32)),
+                'AUTH_TOTP_ENCRYPTION_KEY' => base64_encode(random_bytes(32)),
                 'AUTH_SPA_CLIENT_ID' => 'baander_dev_spa_00001',
             ], $environment ?? [], $this->vapid());
             $values['DATABASE_URL'] = 'postgresql://' . rawurlencode($values['DB_USERNAME'])

@@ -34,7 +34,7 @@ final readonly class DeploymentRuntimeEnvironment implements JsonSerializable
         // The media worker qualifies the encoder this names; without it the worker keeps the
         // value baked into the image's .env.
         'VIDEO_ENCODER',
-        'VAPID_PRIVATE_KEY', 'VAPID_PUBLIC_KEY', 'STREAM_URL_HMAC_SECRET',
+        'VAPID_PRIVATE_KEY', 'VAPID_PUBLIC_KEY', 'STREAM_URL_HMAC_SECRET', 'AUTH_TOTP_ENCRYPTION_KEY',
         'APP_URL', 'DEFAULT_URI',
         // The managed preset turns OpenTelemetry export off unless the operator sets a collector.
         'OTEL_ENABLED', 'OTEL_EXPORTER_OTLP_ENDPOINT',

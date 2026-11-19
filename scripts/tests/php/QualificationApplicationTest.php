@@ -154,7 +154,7 @@ final class QualificationApplicationTest extends TestCase
             'size' => ['webWorkers' => 2, 'databaseSlots' => 4, 'ordinaryConsumers' => 1, 'sharedBuffersMiB' => 128, 'workMemMiB' => 4, 'copySlots' => 2],
             'origin' => 'https://baander.app', 'listen' => ['address' => '127.0.0.1', 'port' => 8080],
             'images' => array_fill_keys(['application', 'worker', 'operator', 'postgres', 'gateway', 'redis'], 'baander/fixture:local'),
-            'environment' => ['APP_SECRET' => 'private-app-secret', 'STREAM_URL_HMAC_SECRET' => 'private-stream-secret', 'DB_USERNAME' => 'baander', 'DB_PASSWORD' => 'private-database-secret', 'DB_DATABASE' => 'baander', 'REDIS_PASSWORD' => 'private-redis-secret'],
+            'environment' => ['APP_SECRET' => 'private-app-secret', 'STREAM_URL_HMAC_SECRET' => 'private-stream-secret', 'AUTH_TOTP_ENCRYPTION_KEY' => 'cHJpdmF0ZS10b3RwLWVuY3J5cHRpb24ta2V5LTMyYiE=', 'DB_USERNAME' => 'baander', 'DB_PASSWORD' => 'private-database-secret', 'DB_DATABASE' => 'baander', 'REDIS_PASSWORD' => 'private-redis-secret'],
         ];
         $configuration['volumes'] = ['media' => 'fixture-media'];
         $state = ['version' => 1, 'phase' => 'running', 'owner' => 'fixture-owner', 'configuration' => $configuration, 'layout' => ['version' => 1, 'root' => '/srv/baander'], 'composeFile' => '/tmp/fixture-compose.json', 'target' => $docker->target->toArray(), 'images' => ['application' => ['id' => 'sha256:' . str_repeat('a', 64)], 'postgres' => ['id' => 'sha256:' . str_repeat('b', 64)]]];

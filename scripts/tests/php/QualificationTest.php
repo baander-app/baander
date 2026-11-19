@@ -740,7 +740,7 @@ final class QualificationTest extends TestCase
             'version' => 2, 'name' => 'baander-qualification', 'capability' => 'remux', 'size' => self::SIZE, 'origin' => 'http://baander.app:8080',
             'listen' => ['address' => '127.0.0.1', 'port' => 8080],
             'images' => array_fill_keys(['application', 'worker', 'operator', 'postgres', 'gateway', 'redis'], 'baander/fixture:local'),
-            'environment' => ['APP_SECRET' => 'private-app', 'STREAM_URL_HMAC_SECRET' => 'private-stream', 'DB_USERNAME' => 'baander', 'DB_PASSWORD' => 'private-db', 'DB_DATABASE' => 'baander', 'REDIS_PASSWORD' => 'private-redis'],
+            'environment' => ['APP_SECRET' => 'private-app', 'STREAM_URL_HMAC_SECRET' => 'private-stream', 'AUTH_TOTP_ENCRYPTION_KEY' => 'cHJpdmF0ZS10b3RwLWVuY3J5cHRpb24ta2V5LTMyYiE=', 'DB_USERNAME' => 'baander', 'DB_PASSWORD' => 'private-db', 'DB_DATABASE' => 'baander', 'REDIS_PASSWORD' => 'private-redis'],
         ], 'datasetRun' => 'repeatable-media',
             'host' => ['constraintBytes' => 12 * 1024 ** 3, 'storage' => 'disposable VM disk', 'description' => 'four CPU twelve GiB VM']];
     }

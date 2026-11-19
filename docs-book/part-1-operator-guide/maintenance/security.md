@@ -221,7 +221,7 @@ is a configuration review, not proof that an attacker has been removed.
 
 ### Hardening checklist
 
-- [ ] **Unique `APP_SECRET`** — never use the default `change_me_in_production`
+- [ ] **Private secrets** — set `APP_SECRET`, `STREAM_URL_HMAC_SECRET` and `AUTH_TOTP_ENCRYPTION_KEY` to private random values. With `APP_ENV=prod`, every web, worker and console process refuses to boot while one of them is unset, still the value committed in `.env`, a `replace-with-` placeholder or shorter than 32 bytes. For `AUTH_TOTP_ENCRYPTION_KEY`, the 32 bytes are counted after base64 decoding. The error names the variable.
 - [ ] **Strong Redis password** — not the default `baander`
 - [ ] **Strong database password** — not the default `baander`
 - [ ] **`APP_ENV=prod`** in production — disables debug mode, verbose errors, and the profiler
@@ -256,6 +256,7 @@ VAPID_PUBLIC_KEY=<from app:generate-vapid-keys>
 VAPID_PRIVATE_KEY=<from app:generate-vapid-keys>
 
 STREAM_URL_HMAC_SECRET=<generate with: php -r 'echo bin2hex(random_bytes(32));'>
+AUTH_TOTP_ENCRYPTION_KEY=<generate with: openssl rand -base64 32>
 ```
 
 The supplied Compose stack initializes PostgreSQL and writes the connection pooler's

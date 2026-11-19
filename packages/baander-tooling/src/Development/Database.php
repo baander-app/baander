@@ -399,7 +399,7 @@ SQL;
             . ':' . rawurlencode($env['DB_PASSWORD'])
             . '@database:5432/' . rawurlencode($env['DB_DATABASE'])
             . '?serverVersion=18&charset=utf8';
-        $commandEnvironment = array_replace($this->connections->environment(), array_intersect_key($env, array_flip(['DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE', 'APP_SECRET'])), [
+        $commandEnvironment = array_replace($this->connections->environment(), array_intersect_key($env, array_flip(['DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE', 'APP_SECRET', 'STREAM_URL_HMAC_SECRET', 'AUTH_TOTP_ENCRYPTION_KEY'])), [
             'POSTGRES_PASSWORD' => $env['DB_PASSWORD'], 'POSTGRES_USER' => $env['DB_USERNAME'],
             'POSTGRES_DB' => $env['DB_DATABASE'], 'DATABASE_URL' => $url,
         ]);
@@ -458,7 +458,7 @@ SQL;
                     '--env',
                     'APP_DEBUG=0',
                 ];
-                foreach (['DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE', 'APP_SECRET'] as $key) {
+                foreach (['DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE', 'APP_SECRET', 'STREAM_URL_HMAC_SECRET', 'AUTH_TOTP_ENCRYPTION_KEY'] as $key) {
                     array_push($arguments, '--env', $key);
                 }
                 array_push(

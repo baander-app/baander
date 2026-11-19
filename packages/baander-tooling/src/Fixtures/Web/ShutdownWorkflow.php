@@ -6,7 +6,7 @@ namespace Baander\Tooling\Fixtures\Web;
 
 use Baander\Tooling\Docker\Client as DockerClient;
 use Baander\Tooling\Resources\{ResourceLedger, ResourceKind};
-use Baander\Tooling\Fixtures\Runtime;
+use Baander\Tooling\Fixtures\{FixtureSecrets, Runtime};
 use Baander\Tooling\Process\ProcessResult;
 use Throwable;
 
@@ -50,10 +50,7 @@ final class ShutdownWorkflow
             'XDEBUG_MODE=off',
             '-e',
             'OTEL_ENABLED=false',
-            '-e',
-            'APP_SECRET=web-shutdown-test-only-secret',
-            '-e',
-            'STREAM_URL_HMAC_SECRET=web-shutdown-test-only-hmac',
+            ...FixtureSecrets::dockerFlags(),
             '-e',
             'APP_URL=https://baander.app',
             '-e',

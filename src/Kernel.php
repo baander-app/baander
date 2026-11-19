@@ -6,6 +6,7 @@ use App\Shared\Domain\Event\Outbox\OutboxSubscriberPass;
 use App\Shared\Infrastructure\Doctrine\Type\CustomTypesRegistrar;
 use App\Shared\Infrastructure\Logging\BoundedContextLoggerPass;
 use App\Shared\Infrastructure\Logging\MonologHandlerResetterPass;
+use App\Shared\Infrastructure\Security\ProductionSecrets;
 use App\Shared\Infrastructure\RateLimiter\RateLimiterCatalogPass;
 use App\Shared\Infrastructure\Swoole\DBAL\DBALAliveKeeperCompilerPass;
 use App\Shared\Infrastructure\Swoole\ServeCommandPass;
@@ -29,10 +30,17 @@ class Kernel extends BaseKernel
      * proxifying the DBAL connection, so the `dbal.types` config block is
      * never applied. {@see CustomTypesRegistrar} restores them in a way that
      * covers both HTTP workers and console commands.
+     *
+     * A production process refuses to boot while a required secret is unset, a committed
+     * default, a placeholder or too short ({@see ProductionSecrets}).
      */
     public function boot(): void
     {
         CustomTypesRegistrar::register();
+
+        if (!$this->booted && $this->environment === 'prod') {
+            new ProductionSecrets()->assertConfigured(ProductionSecrets::environmentValue(...));
+        }
 
         parent::boot();
     }

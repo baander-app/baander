@@ -36,7 +36,7 @@ final class PresetDeploymentTest extends TestCase
             'origin' => 'http://baander.app:8080',
             'listen' => ['address' => '127.0.0.1', 'port' => 8080],
             'images' => array_fill_keys(['application', 'worker', 'operator', 'postgres', 'gateway', 'redis'], 'baander/fixture:local'),
-            'environment' => ['APP_SECRET' => 'private-app-secret', 'STREAM_URL_HMAC_SECRET' => 'private-stream-secret', 'DB_USERNAME' => 'baander', 'DB_PASSWORD' => 'private-database-secret', 'DB_DATABASE' => 'baander', 'REDIS_PASSWORD' => 'private-redis-secret'],
+            'environment' => ['APP_SECRET' => 'private-app-secret', 'STREAM_URL_HMAC_SECRET' => 'private-stream-secret', 'AUTH_TOTP_ENCRYPTION_KEY' => 'cHJpdmF0ZS10b3RwLWVuY3J5cHRpb24ta2V5LTMyYiE=', 'DB_USERNAME' => 'baander', 'DB_PASSWORD' => 'private-database-secret', 'DB_DATABASE' => 'baander', 'REDIS_PASSWORD' => 'private-redis-secret'],
         ];
     }
 
@@ -165,6 +165,43 @@ final class PresetDeploymentTest extends TestCase
         } finally {
             Collector::remove($directory);
         }
+    }
+
+    public function testPlaceholderSecretsAreRefusedBeforeAnyDockerCommand(): void
+    {
+        $data = self::configuration();
+        $data['environment']['STREAM_URL_HMAC_SECRET'] = 'replace-with-a-separate-private-random-value';
+        $configuration = PresetConfiguration::fromArray($data);
+        $directory = sys_get_temp_dir() . '/baander.app-preset-' . bin2hex(random_bytes(8));
+        $commands = [];
+        $executor = $this->createStub(CommandExecutor::class);
+        $executor->method('run')->willReturnCallback(static function (ProcessSpec $command) use (&$commands): ProcessResult {
+            $commands[] = $command->argv;
+            return new ProcessResult(0, null, false, false, '', '', 0);
+        });
+        $target = new Target('/usr/bin/docker', 'unix:///run/baander.app-docker.sock', 'owned-daemon', null, null);
+        $preset = new Preset(new PresetStateStore($directory), new Client($executor, $target, []), $executor, []);
+        try {
+            foreach (['render', 'start'] as $action) {
+                try {
+                    $preset->{$action}($configuration);
+                    self::fail($action . ' accepted a placeholder secret.');
+                } catch (\InvalidArgumentException $error) {
+                    self::assertSame('Replace the placeholder value of STREAM_URL_HMAC_SECRET before deploying.', $error->getMessage());
+                }
+            }
+            self::assertSame([], $commands);
+        } finally {
+            Collector::remove($directory);
+        }
+    }
+
+    public function testPresetRequiresTheTotpEncryptionKey(): void
+    {
+        $data = self::configuration();
+        unset($data['environment']['AUTH_TOTP_ENCRYPTION_KEY']);
+        $this->expectExceptionMessage('Missing or invalid AUTH_TOTP_ENCRYPTION_KEY.');
+        PresetConfiguration::fromArray($data);
     }
 
     public function testPoolsAndConnectionsAreDerivedFromTheDeploymentSize(): void

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Baander\Tooling\Fixtures\Worker;
 
 use Baander\Tooling\Deployment\Pooler;
-use Baander\Tooling\Fixtures\{Failure, Runtime as FixtureRuntime};
+use Baander\Tooling\Fixtures\{Failure, FixtureSecrets, Runtime as FixtureRuntime};
 use Throwable;
 
 final readonly class OperatorProvisioning
@@ -31,8 +31,6 @@ final readonly class OperatorProvisioning
             ...$this->serviceLimits(['--pids-limit', '128', '--memory', '2g', '--memory-swap', '2g']),
             '--env-file',
             $this->qualification->work('runtime.env'),
-            '-e',
-            'STREAM_URL_HMAC_SECRET=two-command-drill-only',
             '-e',
             'OTEL_ENABLED=false',
             '-e',
@@ -498,7 +496,7 @@ final readonly class OperatorProvisioning
             'BAANDER_DEPLOYMENT_PROFILE' => $deployment->json(),
             'APP_ENV' => 'prod',
             'APP_DEBUG' => '0',
-            'APP_SECRET' => 'operator-test-only',
+            ...FixtureSecrets::ENVIRONMENT,
             ...($this->load() ? Pooler::urls('baander', 'test-only', 'worker_operator_test') : ['DATABASE_URL' => $direct, 'DATABASE_CONTROL_URL' => $direct]),
             'REDIS_URL' => 'redis://default:test-only@redis:6379',
             'REDIS_PASSWORD' => 'test-only',

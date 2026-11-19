@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Worker;
 
+use App\Shared\Infrastructure\Security\ProductionSecrets;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
@@ -70,6 +71,8 @@ CHILD;
             ], cwd: $root, env: [
                 'APP_ENV' => 'prod',
                 'APP_DEBUG' => '0',
+                // The test environment's private secrets, which a production kernel accepts.
+                ...array_combine(ProductionSecrets::VARIABLES, array_map(ProductionSecrets::environmentValue(...), ProductionSecrets::VARIABLES)),
                 'REDIS_URL' => $dsn,
                 'SYMFONY_DOTENV_VARS' => false,
                 'MESSENGER_TRANSPORT_DSN' => 'redis://redis.baander.app:6379/messages/baander',

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Fixtures\Worker;
 
-use Baander\Tooling\Fixtures\Runtime;
+use Baander\Tooling\Fixtures\{FixtureSecrets, Runtime};
 
 final class LegacyRuntime
 {
@@ -103,6 +103,7 @@ final class LegacyRuntime
                 'APP_DEBUG=0',
                 '-e',
                 'XDEBUG_MODE=off',
+                ...FixtureSecrets::dockerFlags(),
                 '-e',
                 'REDIS_PASSWORD=test-only',
                 '-e',

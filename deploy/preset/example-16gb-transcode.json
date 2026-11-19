@@ -27,6 +27,7 @@
     "environment": {
         "APP_SECRET": "replace-with-a-private-random-value",
         "STREAM_URL_HMAC_SECRET": "replace-with-a-separate-private-random-value",
+        "AUTH_TOTP_ENCRYPTION_KEY": "replace-with-32-random-bytes-base64-encoded",
         "DB_USERNAME": "baander",
         "DB_PASSWORD": "replace-with-a-private-database-password",
         "DB_DATABASE": "baander",

@@ -67,6 +67,7 @@ final readonly class Preset
     /** @return array<string,mixed> */
     public function render(PresetConfiguration $configuration): array
     {
+        $configuration->assertDeployable();
         $previous = $this->store->load();
         if ($previous !== null && !in_array($previous['phase'] ?? null, ['prepared', 'stopped'], true)) {
             throw new \RuntimeException('Stop the saved deployment before rendering its replacement.');
@@ -133,6 +134,7 @@ final readonly class Preset
     /** @return array<string,mixed> */
     public function start(PresetConfiguration $configuration): array
     {
+        $configuration->assertDeployable();
         $previous = $this->store->load();
         if ($previous !== null) {
             self::assertSameDeployment($previous, $configuration);

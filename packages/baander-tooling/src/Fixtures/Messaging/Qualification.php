@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Fixtures\Messaging;
 
-use Baander\Tooling\Fixtures\Runtime;
+use Baander\Tooling\Fixtures\{FixtureSecrets, Runtime};
 use Baander\Tooling\Docker\Client;
 use Baander\Tooling\Resources\ResourceKind;
 
@@ -152,6 +152,7 @@ final class Qualification
                     'APP_ENV=prod',
                     'APP_DEBUG=0',
                     'XDEBUG_MODE=off',
+                    ...FixtureSecrets::assignments(),
                     'REDIS_PASSWORD=test-only',
                     'REDIS_URL=redis://default:test-only@redis:6379',
                     'MESSENGER_TRANSPORT_DSN=redis://default:test-only@redis:6379/messages',

@@ -24,6 +24,8 @@ final readonly class PresetConfiguration
     /** PostgreSQL memory bounds in MiB, as [minimum, maximum]. */
     public const array POSTGRES_BOUNDS = ['sharedBuffersMiB' => [32, 16384], 'workMemMiB' => [1, 1024]];
     public const array HARDWARE_KEYS = ['accelerator', 'device', 'group'];
+    /** The prefix of the example configurations' placeholder values. */
+    public const string PLACEHOLDER_PREFIX = 'replace-with-';
     /** @param array<string,ImageSelection> $images
      * @param array<string,string> $environment
      * @param array<string,int> $resources
@@ -92,7 +94,7 @@ final readonly class PresetConfiguration
                 throw new \InvalidArgumentException('Environment must map variable names to strings.');
             }
         }
-        foreach (['APP_SECRET', 'STREAM_URL_HMAC_SECRET', 'DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE', 'REDIS_PASSWORD'] as $key) {
+        foreach (['APP_SECRET', 'STREAM_URL_HMAC_SECRET', 'AUTH_TOTP_ENCRYPTION_KEY', 'DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE', 'REDIS_PASSWORD'] as $key) {
             self::string($environment, $key);
         }
         foreach (['BAANDER_DEPLOYMENT_PROFILE', 'APP_ENV', 'APP_DEBUG', 'DATABASE_URL', 'DATABASE_CONTROL_URL', 'REDIS_URL', 'MESSENGER_TRANSPORT_DSN', 'APP_URL', 'DEFAULT_URI', 'APP_DOMAIN', 'MEDIA_STORAGE_PATH', 'CONVERT_STORAGE_PATH', 'APP_HOME', 'OAUTH_PRIVATE_KEY_PATH', 'OAUTH_PUBLIC_KEY_PATH'] as $key) {
@@ -126,6 +128,19 @@ final readonly class PresetConfiguration
             throw new \InvalidArgumentException('Persistent volume roles must have distinct names.');
         }
         return new self($name, $capability, rtrim($origin, '/'), $address, $listen['port'], $selections, $environment, $resources, $volumes, $size, $hardware);
+    }
+
+    /**
+     * Refuses a configuration that still carries an example's `replace-with-` placeholder, so
+     * a copied example cannot be deployed. The shipped examples parse; they do not deploy.
+     */
+    public function assertDeployable(): void
+    {
+        foreach ($this->environment as $key => $value) {
+            if (str_starts_with($value, self::PLACEHOLDER_PREFIX)) {
+                throw new \InvalidArgumentException('Replace the placeholder value of ' . $key . ' before deploying.');
+            }
+        }
     }
 
     /**

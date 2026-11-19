@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Fixtures\Worker;
 
-use Baander\Tooling\Fixtures\Runtime;
+use Baander\Tooling\Fixtures\{FixtureSecrets, Runtime};
 use Baander\Tooling\Process\ProcessResult;
 
 final class Command
@@ -148,6 +148,7 @@ final class Command
             'APP_DEBUG=0',
             '-e',
             'XDEBUG_MODE=off',
+            ...FixtureSecrets::dockerFlags(),
             '-e',
             'CONVERT_STORAGE_PATH=/workspace/storage/conversions',
             '-e',

@@ -96,6 +96,7 @@ class Workers
                 'VAPID_PRIVATE_KEY',
                 'VAPID_PUBLIC_KEY',
                 'STREAM_URL_HMAC_SECRET',
+                'AUTH_TOTP_ENCRYPTION_KEY',
             ];
             $environment = array_replace(array_intersect_key($environment, array_flip($allowed)), [
                 'APP_ENV' => 'prod', 'APP_DEBUG' => '0',

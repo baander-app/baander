@@ -6,7 +6,7 @@ namespace Baander\Tooling\Fixtures\Web;
 
 use Baander\Tooling\Docker\Client as DockerClient;
 use Baander\Tooling\Resources\{ResourceLedger, ResourceKind};
-use Baander\Tooling\Fixtures\Runtime;
+use Baander\Tooling\Fixtures\{FixtureSecrets, Runtime};
 use Baander\Tooling\Process\ProcessResult;
 use Throwable;
 
@@ -252,14 +252,12 @@ final class RuntimeWorkflow
 
     private function startApp(): void
     {
-        $kind = $this->security ? 'security' : 'web';
         $environment = [
             'APP_ENV=prod',
             'APP_DEBUG=0',
             'XDEBUG_MODE=off',
             'OTEL_ENABLED=false',
-            "APP_SECRET={$kind}-runtime-test-only-secret",
-            "STREAM_URL_HMAC_SECRET={$kind}-runtime-test-only-hmac",
+            ...FixtureSecrets::assignments(),
             'APP_URL=https://baander.app',
             'DEFAULT_URI=https://baander.app',
             'APP_DOMAIN=http://127.0.0.1:9501',

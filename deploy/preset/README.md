@@ -41,7 +41,10 @@ application code.
 Copy the example for the nearest starting point and capability, such as
 `example-4gb-remux.json` or `example-16gb-transcode.json`, to a private file, adjust
 its `size` if needed, replace every secret and set the origin and
-listening address for your installation. The gateway serves HTTP. For an HTTPS
+listening address for your installation. Rendering and starting refuse any value that
+still begins with `replace-with-`. `APP_SECRET`, `STREAM_URL_HMAC_SECRET` and
+`AUTH_TOTP_ENCRYPTION_KEY` must each be at least 32 bytes, or the containers refuse to
+boot; generate the TOTP key with `openssl rand -base64 32`. The gateway serves HTTP. For an HTTPS
 origin, configure an external TLS reverse proxy and the application's trusted proxy
 settings for that proxy. The default listener is reachable only from the local host.
 Keep the configuration file and state directory accessible only to the operator.
