@@ -4769,6 +4769,7 @@ export type PostOauthParBody = {
   redirect_uri?: string;
   /** Space-separated scopes */
   scope?: string;
+  /** At most 1024 bytes */
   state?: string;
   /** BASE64URL(SHA256(code_verifier)) */
   code_challenge: string;
@@ -4824,8 +4825,24 @@ export type PostOauthRevokeBody = {
   tokenTypeHint?: string;
 };
 
+/**
+ * Sent with client_assertion
+ */
+export type PostOauthDeviceAuthorizeBodyClientAssertionType = typeof PostOauthDeviceAuthorizeBodyClientAssertionType[keyof typeof PostOauthDeviceAuthorizeBodyClientAssertionType];
+
+
+export const PostOauthDeviceAuthorizeBodyClientAssertionType = {
+  'urn:ietf:params:oauth:client-assertion-type:jwt-bearer': 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+} as const;
+
 export type PostOauthDeviceAuthorizeBody = {
   client_id: string;
+  /** Confidential clients registered for client_secret_post only */
+  client_secret?: string;
+  /** Signed JWT client assertion; confidential clients registered for private_key_jwt only */
+  client_assertion?: string;
+  /** Sent with client_assertion */
+  client_assertion_type?: PostOauthDeviceAuthorizeBodyClientAssertionType;
   /** Space-separated scopes */
   scope?: string;
 };
@@ -12485,7 +12502,7 @@ export const getPostOauthDeviceAuthorizeUrl = () => {
 }
 
 /**
- * Only clients registered as device clients may start the device flow. Parameters may be form-encoded (RFC 8628) or JSON. Show the user code and `verification_uri` (or encode `verification_uri_complete` in a QR code), then poll the token endpoint with the device code no faster than `interval` seconds.
+ * Only clients registered as device clients may start the device flow. A confidential client authenticates as at the token endpoint. Parameters may be form-encoded (RFC 8628) or JSON. Show the user code and `verification_uri` (or encode `verification_uri_complete` in a QR code), then poll the token endpoint with the device code no faster than `interval` seconds.
  * @summary Device authorization request (RFC 8628 section 3.1)
  */
 export const postOauthDeviceAuthorize = async (postOauthDeviceAuthorizeBody: PostOauthDeviceAuthorizeBody, options?: Parameters<typeof customInstance>[1]): Promise<DeviceAuthorizationResource> => {

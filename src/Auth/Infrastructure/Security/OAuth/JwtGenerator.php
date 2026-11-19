@@ -11,26 +11,37 @@ use Lcobucci\JWT\Configuration;
 use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Signer\Rsa\Sha256;
 use League\OAuth2\Server\CryptKey;
+use RuntimeException;
 
 /**
- * Generates RS256-signed JWTs compatible with league/oauth2-server's BearerTokenValidator.
+ * Generates RS256-signed JWT access tokens (RFC 9068) compatible with league/oauth2-server's BearerTokenValidator.
  *
- * The JWT claims mirror League's AccessTokenTrait::convertToJWT() so that the
- * ResourceServer can validate tokens issued by our custom IssueTokenHandler.
+ * The claims mirror League's AccessTokenTrait::convertToJWT() so that the ResourceServer
+ * can validate them. The header carries the `at+jwt` type and the key's RFC 7638
+ * thumbprint as `kid`, which the JWKS publishes too. Baander is both the issuer and
+ * the audience of its tokens, so `iss` and `aud` are the same identifier.
  */
 final class JwtGenerator implements JwtGeneratorInterface
 {
-    private Configuration $jwtConfiguration;
+    private const string ACCESS_TOKEN_TYPE = 'at+jwt';
 
+    private Configuration $jwtConfiguration;
+    private string $keyId;
+
+    /** @param string $resourceServerUri The issuer identifier, which is also the audience */
     public function __construct(string $privateKeyPath, private readonly string $resourceServerUri)
     {
         $cryptKey = new CryptKey($privateKeyPath);
+        $passPhrase = $cryptKey->getPassPhrase() ?? '';
 
         $this->jwtConfiguration = Configuration::forAsymmetricSigner(
             new Sha256(),
-            InMemory::plainText($cryptKey->getKeyContents(), $cryptKey->getPassPhrase() ?? ''),
+            InMemory::plainText($cryptKey->getKeyContents(), $passPhrase),
             InMemory::plainText('empty', 'empty'),
         );
+        $privateKey = openssl_pkey_get_private($cryptKey->getKeyContents(), $passPhrase)
+            ?: throw new RuntimeException('Failed to parse the access token signing key.');
+        $this->keyId = AccessTokenSigningKey::jwkOf($privateKey)['kid'];
     }
 
     public function generate(AccessToken $accessToken, ?string $dpopJkt = null): string
@@ -44,6 +55,9 @@ final class JwtGenerator implements JwtGeneratorInterface
             : $client->getPublicId()->toString();
 
         $builder = $this->jwtConfiguration->builder()
+            ->withHeader('typ', self::ACCESS_TOKEN_TYPE)
+            ->withHeader('kid', $this->keyId)
+            ->issuedBy($this->resourceServerUri)
             ->permittedFor($this->resourceServerUri)
             ->identifiedBy($accessToken->getTokenId()->toString())
             ->issuedAt(new DateTimeImmutable())

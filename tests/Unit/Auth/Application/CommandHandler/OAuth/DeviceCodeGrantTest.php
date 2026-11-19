@@ -14,6 +14,7 @@ use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\ScopeAllowlist;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\DeviceCode;
+use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
 use App\Auth\Domain\Model\OAuth\DeviceCodeState;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\User;
@@ -60,6 +61,19 @@ final class DeviceCodeGrantTest extends TestCase
 
         $this->assertProtocolError('unauthorized_client', fn () => $this->authorize($web->getPublicId()->toString()));
         $this->assertProtocolError('invalid_client', fn () => $this->authorize('unknown_client_000001'), 401);
+    }
+
+    public function testAConfidentialDeviceClientAuthenticatesWithItsSecret(): void
+    {
+        $box = $this->register(Client::create('Set-top box', [], secret: ClientSecret::fromString('box-secret'), confidential: true, deviceClient: true));
+        $boxId = $box->getPublicId()->toString();
+
+        $this->assertProtocolError('invalid_client', fn () => $this->authorize($boxId), 401);
+        $this->assertProtocolError('invalid_client', fn () => $this->authorize($boxId, 'wrong-secret'), 401);
+        self::assertSame([], $this->codes);
+
+        $this->authorize($boxId, 'box-secret');
+        self::assertCount(1, $this->codes);
     }
 
     public function testPendingPollsAnswerAuthorizationPendingThenSlowDown(): void
@@ -145,7 +159,7 @@ final class DeviceCodeGrantTest extends TestCase
         $this->assertProtocolError('invalid_request', fn () => $this->poll(null));
     }
 
-    private function authorize(?string $clientId = null): DeviceAuthorizationDTO
+    private function authorize(?string $clientId = null, ?string $clientSecret = null): DeviceAuthorizationDTO
     {
         $handler = new RequestDeviceAuthorizationHandler(
             $this->clientAuthenticator(),
@@ -156,7 +170,10 @@ final class DeviceCodeGrantTest extends TestCase
             5,
         );
 
-        return $handler(new RequestDeviceAuthorizationCommand($clientId ?? $this->tv->getPublicId()->toString(), ['library', 'admin']));
+        return $handler(new RequestDeviceAuthorizationCommand(
+            new ClientCredentials($clientId ?? $this->tv->getPublicId()->toString(), $clientSecret),
+            ['library', 'admin'],
+        ));
     }
 
     private function poll(?string $deviceCode, ?string $clientId = null): \App\Auth\Application\DTO\TokenResponseDTO

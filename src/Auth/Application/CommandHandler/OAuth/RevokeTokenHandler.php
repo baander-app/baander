@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Application\CommandHandler\OAuth;
 
 use App\Auth\Application\Command\OAuth\RevokeTokenCommand;
+use App\Auth\Application\Port\AccessTokenSigningKeyInterface;
 use App\Auth\Application\Service\TokenChainRevoker;
 use App\Auth\Domain\Event\OAuth\TokenRevoked;
 use App\Auth\Domain\Model\OAuth\AccessToken;
@@ -25,6 +26,10 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * Closing them earlier would let a reconnect pass on a token the commit has not yet
  * revoked. A token without a chain is revoked on its own.
  *
+ * The token is an access token JWT signed by Baander's key, which is found by its
+ * `jti`, a refresh token, or the id of an access token, as logout passes it. A JWT
+ * signed by any other key is an unknown token.
+ *
  * Per RFC 7009, the server responds with 200 OK even if the token does not exist
  * or is already revoked; a token the command's owner does not hold is treated the
  * same way, so the revocation endpoint is no liveness oracle for foreign tokens.
@@ -37,16 +42,24 @@ final class RevokeTokenHandler
         private readonly EntityManagerInterface $entityManager,
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly TokenChainRevoker $chainRevoker,
+        private readonly AccessTokenSigningKeyInterface $signingKey,
     ) {
     }
 
     #[AsMessageHandler]
     public function __invoke(RevokeTokenCommand $command): void
     {
-        $tokenId = TokenId::fromString($command->getTokenId());
-
-        $refreshToken = $this->refreshTokenRepository->findByTokenId($tokenId);
-        $accessToken = $refreshToken === null ? $this->accessTokenRepository->findByTokenId($tokenId) : null;
+        // An access token is presented as the JWT itself and stored under its jti.
+        $accessTokenId = $this->signingKey->tokenIdOf($command->getTokenId());
+        if ($accessTokenId !== null) {
+            $tokenId = TokenId::fromString($accessTokenId);
+            $refreshToken = null;
+            $accessToken = $this->accessTokenRepository->findByTokenId($tokenId);
+        } else {
+            $tokenId = TokenId::fromString($command->getTokenId());
+            $refreshToken = $this->refreshTokenRepository->findByTokenId($tokenId);
+            $accessToken = $refreshToken === null ? $this->accessTokenRepository->findByTokenId($tokenId) : null;
+        }
         $token = $refreshToken ?? $accessToken;
 
         // RFC 7009: an unknown token, and a token of another user, are answered alike.

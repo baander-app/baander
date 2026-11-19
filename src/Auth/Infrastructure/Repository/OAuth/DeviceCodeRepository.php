@@ -174,6 +174,36 @@ final class DeviceCodeRepository implements DeviceCodeRepositoryInterface
         }
     }
 
+    public function approve(DeviceCode $deviceCode): bool
+    {
+        $user = $deviceCode->getUser() ?? throw new \LogicException('An approved device code names its user.');
+
+        // One conditional UPDATE decides between concurrent approvals of the same code, so
+        // the device receives tokens for exactly the user whose approval was confirmed.
+        $approved = $this->entityManager->getConnection()->executeStatement(
+            <<<'SQL'
+                UPDATE oauth_device_codes
+                SET approved = TRUE, user_id = :user_id, updated_at = NOW()
+                WHERE id = :id
+                  AND approved = FALSE
+                  AND denied = FALSE
+                  AND user_id IS NULL
+                  AND (expires_at IS NULL OR expires_at > clock_timestamp())
+                SQL,
+            ['id' => $deviceCode->getId()->toString(), 'user_id' => $user->getId()->toString()],
+        );
+        if ($approved !== 1) {
+            return false;
+        }
+
+        $entity = $this->entityManager->getRepository(DeviceCodeEntity::class)->find($deviceCode->getId());
+        if ($entity !== null) {
+            $this->entityManager->refresh($entity);
+        }
+
+        return true;
+    }
+
     public function redeem(DeviceCode $deviceCode): bool
     {
         // One conditional UPDATE decides between concurrent polls of the same approved code.

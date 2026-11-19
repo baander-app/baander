@@ -118,6 +118,38 @@ final class LogoutTest extends TestCase
         self::assertSame(Response::HTTP_UNAUTHORIZED, $this->accessTokenStatus($tokens->getAccessToken()));
     }
 
+    public function testRevokingWithTheAccessTokenItselfEndsItsChain(): void
+    {
+        $user = $this->createTestUser();
+        $client = $this->createSpaClient();
+        $tokens = $this->issueTokens($user, $client);
+        $chainId = $this->chainIdOf($tokens);
+
+        $response = $this->authenticatedRequest('POST', '/api/oauth/revoke', $user, [
+            'token' => $tokens->getAccessToken(),
+            'tokenTypeHint' => 'access_token',
+        ]);
+
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode(), $response->getContent());
+        self::assertSame(['access' => 0, 'refresh' => 0], $this->liveTokenCounts($chainId));
+        self::assertSame(Response::HTTP_UNAUTHORIZED, $this->accessTokenStatus($tokens->getAccessToken()));
+    }
+
+    public function testAJwtSignedByAnotherKeyRevokesNothing(): void
+    {
+        $user = $this->createTestUser();
+        $client = $this->createSpaClient();
+        $tokens = $this->issueTokens($user, $client);
+        $chainId = $this->chainIdOf($tokens);
+        [$header, $claims] = explode('.', $tokens->getAccessToken());
+        $forged = $header . '.' . $claims . '.' . rtrim(strtr(base64_encode(random_bytes(256)), '+/', '-_'), '=');
+
+        $response = $this->authenticatedRequest('POST', '/api/oauth/revoke', $user, ['token' => $forged]);
+
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode(), $response->getContent());
+        self::assertSame(['access' => 1, 'refresh' => 1], $this->liveTokenCounts($chainId), 'An unsigned copy of the claims is an unknown token.');
+    }
+
     /**
      * Sends the logout with the attribute the production authenticator sets for the
      * presenting token. The listener is removed again, so no later request carries it.

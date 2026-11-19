@@ -20,6 +20,14 @@ interface DeviceCodeRepositoryInterface
     public function findByUserCode(string $userCode): ?DeviceCode;
 
     /**
+     * Atomically records the approval the device code holds, for the user it names.
+     *
+     * Returns false when the code was already approved or denied, or has expired,
+     * so exactly one of several concurrent approvals succeeds.
+     */
+    public function approve(DeviceCode $deviceCode): bool;
+
+    /**
      * Atomically consumes an approved, unexpired, unconsumed device code.
      *
      * Returns false when another poll already redeemed it, so exactly one

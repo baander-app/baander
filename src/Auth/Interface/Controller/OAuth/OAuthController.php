@@ -371,7 +371,7 @@ final class OAuthController
 
     #[OA\Post(
         path: '/api/oauth/device/authorize',
-        description: 'Only clients registered as device clients may start the device flow. Parameters may be form-encoded (RFC 8628) or JSON. Show the user code and `verification_uri` (or encode `verification_uri_complete` in a QR code), then poll the token endpoint with the device code no faster than `interval` seconds.',
+        description: 'Only clients registered as device clients may start the device flow. A confidential client authenticates as at the token endpoint. Parameters may be form-encoded (RFC 8628) or JSON. Show the user code and `verification_uri` (or encode `verification_uri_complete` in a QR code), then poll the token endpoint with the device code no faster than `interval` seconds.',
         summary: 'Device authorization request (RFC 8628 section 3.1)',
         security: [],
         requestBody: new OA\RequestBody(
@@ -380,6 +380,9 @@ final class OAuthController
                 required: ['client_id'],
                 properties: [
                     new OA\Property(property: 'client_id', type: 'string'),
+                    new OA\Property(property: 'client_secret', description: 'Confidential clients registered for client_secret_post only', type: 'string'),
+                    new OA\Property(property: 'client_assertion', description: 'Signed JWT client assertion; confidential clients registered for private_key_jwt only', type: 'string'),
+                    new OA\Property(property: 'client_assertion_type', description: 'Sent with client_assertion', type: 'string', enum: [ClientCredentials::JWT_BEARER_ASSERTION_TYPE]),
                     new OA\Property(property: 'scope', description: 'Space-separated scopes', type: 'string'),
                 ],
             ),
@@ -387,7 +390,7 @@ final class OAuthController
         responses: [
             new OA\Response(response: '200', description: 'Device code issued (RFC 8628 section 3.2)', content: new OA\JsonContent(ref: new Model(type: DeviceAuthorizationResource::class))),
             new OA\Response(response: '400', description: 'Missing client_id, or the client may not use the device flow', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
-            new OA\Response(response: '401', description: 'Unknown or revoked client', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
+            new OA\Response(response: '401', description: 'Unknown or revoked client, or client authentication failed', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
         ],
     )]
     #[Route('/device/authorize', name: 'device_authorize', methods: ['POST'])]
@@ -400,7 +403,7 @@ final class OAuthController
                 throw OAuthProtocolException::invalidRequest('The client_id parameter is required.');
             }
             $authorization = $this->dispatch(new RequestDeviceAuthorizationCommand(
-                clientId: $clientId,
+                credentials: self::credentials($clientId, $parameters),
                 scopes: self::scopes($parameters['scope'] ?? null),
             ));
         } catch (OAuthProtocolException $exception) {

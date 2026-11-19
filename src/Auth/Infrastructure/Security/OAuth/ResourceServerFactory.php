@@ -19,6 +19,7 @@ final class ResourceServerFactory
     public function __construct(
         private readonly AccessTokenRepositoryInterface $accessTokenRepository,
         private readonly string $publicKeyPath,
+        private readonly string $issuer,
         private readonly ?string $resourceServerUri = null,
     ) {
     }
@@ -29,6 +30,7 @@ final class ResourceServerFactory
             $this->accessTokenRepository,
             null,
             $this->resourceServerUri,
+            $this->issuer,
         );
 
         return new ResourceServer(

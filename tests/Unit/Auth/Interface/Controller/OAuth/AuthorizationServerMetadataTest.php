@@ -53,5 +53,6 @@ final class AuthorizationServerMetadataTest extends TestCase
         self::assertSame(['none', 'client_secret_basic', 'client_secret_post', 'private_key_jwt'], $metadata['token_endpoint_auth_methods_supported']);
         self::assertSame(AuthorizationServerMetadataController::CLIENT_ASSERTION_SIGNING_ALGORITHMS, $metadata['token_endpoint_auth_signing_alg_values_supported']);
         self::assertArrayNotHasKey('introspection_endpoint', $metadata);
+        self::assertArrayNotHasKey('revocation_endpoint', $metadata, 'The revocation route authenticates the user, not the client (RFC 7009 section 2.1).');
     }
 }

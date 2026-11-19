@@ -4,18 +4,25 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
+use App\Auth\Application\Port\PasswordResetTokenRepositoryInterface;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\ClientAuthMethod;
+use App\Auth\Domain\Model\OAuth\DeviceCode;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientKeySource;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
+use App\Auth\Domain\Model\User;
+use App\Auth\Infrastructure\Doctrine\UserRepository;
 use App\Auth\Infrastructure\Repository\OAuth\AccessTokenRepository;
 use App\Auth\Infrastructure\Repository\OAuth\AuthCodeRepository;
 use App\Auth\Infrastructure\Repository\OAuth\ClientRepository;
 use App\Auth\Infrastructure\Repository\OAuth\DeviceCodeRepository;
 use App\Auth\Infrastructure\Repository\OAuth\RefreshTokenRepository;
+use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Doctrine\Type\CustomTypesRegistrar;
+use DateInterval;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
@@ -210,5 +217,41 @@ final class OAuthClientPersistenceTest extends TestCase
             ['kty' => 'EC', 'crv' => 'P-256', 'kid' => 'signing-1', 'x' => 'f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU', 'y' => 'x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0'],
             ['kty' => 'RSA', 'kid' => 'signing-2', 'e' => 'AQAB', 'n' => str_repeat('u1SU1LfVLPHCozMxH2Mo', 17)],
         ]];
+    }
+
+    /** Two users who both saw the code pending approve it: one approval is recorded, for its user alone. */
+    public function testOfTwoApprovalsOfOnePendingDeviceCodeOnlyTheFirstIsRecorded(): void
+    {
+        $users = new UserRepository(
+            $this->manager,
+            $this->createStub(PasswordResetTokenRepositoryInterface::class),
+            $this->createStub(EmailVerificationTokenRepositoryInterface::class),
+        );
+        $first = User::register(new Email('first-' . bin2hex(random_bytes(4)) . '@baander.app'), 'hashed', 'First');
+        $second = User::register(new Email('second-' . bin2hex(random_bytes(4)) . '@baander.app'), 'hashed', 'Second');
+        $users->save($first);
+        $users->save($second);
+        $client = Client::create('Living room TV', [], deviceClient: true);
+        new ClientRepository($this->manager, new JsonEncoder())->saveClient($client);
+        $codes = new DeviceCodeRepository($this->manager, new JsonEncoder());
+        $code = DeviceCode::create($client, 'BCDF-GHJK', 'https://baander.app/device', ttl: new DateInterval('PT15M'));
+        $codes->save($code);
+        $this->manager->clear();
+
+        // Both approvals read the code as pending before either writes.
+        $seenByFirst = $codes->findByUserCode('BCDF-GHJK');
+        $seenBySecond = $codes->findByUserCode('BCDF-GHJK');
+        self::assertNotNull($seenByFirst);
+        self::assertNotNull($seenBySecond);
+        self::assertTrue($seenByFirst->isPending() && $seenBySecond->isPending());
+        $seenByFirst->approve($first);
+        $seenBySecond->approve($second);
+
+        self::assertTrue($codes->approve($seenByFirst));
+        self::assertFalse($codes->approve($seenBySecond));
+        self::assertSame(
+            ['approved' => true, 'user_id' => $first->getId()->toString()],
+            $this->observer->fetchAssociative('SELECT approved, user_id FROM oauth_device_codes WHERE id = ?', [$code->getId()->toString()]),
+        );
     }
 }

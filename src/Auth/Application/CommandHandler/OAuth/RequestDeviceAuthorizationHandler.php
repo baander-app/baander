@@ -39,7 +39,8 @@ final readonly class RequestDeviceAuthorizationHandler
     #[AsMessageHandler]
     public function __invoke(RequestDeviceAuthorizationCommand $command): DeviceAuthorizationDTO
     {
-        $client = $this->clientAuthenticator->identify($command->clientId);
+        // RFC 8628 section 3.1: a confidential client authenticates as at the token endpoint.
+        $client = $this->clientAuthenticator->authenticate($command->credentials);
         if (!$client->isDeviceClient()) {
             throw OAuthProtocolException::unauthorizedClient('The client is not registered for the device authorization grant.');
         }

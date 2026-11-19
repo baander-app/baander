@@ -460,6 +460,7 @@ final class OAuthFirewallAcceptanceTest extends TestCase
     private function accessJwt(string $audience = 'https://baander.app', ?string $subject = null): string
     {
         $claims = [
+            'iss' => 'https://baander.app',
             'jti' => $this->token->getTokenId(),
             'sub' => $subject ?? $this->user->getPublicId()->toString(),
             'aud' => $audience,

@@ -486,6 +486,22 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertContains('urn:ietf:params:oauth:grant-type:device_code', $metadata['grant_types_supported']);
     }
 
+    /** RFC 9068: an access token names its issuer and type, and its key ID is the one the JWKS publishes. */
+    public function testAnAccessTokenNamesItsIssuerTypeAndTheKeyTheJwksPublishes(): void
+    {
+        $login = $this->login(new SignedDpopProof());
+        [$encodedHeader] = explode('.', $login['accessToken']);
+        $header = json_decode((string) base64_decode(strtr($encodedHeader, '-_', '+/'), true), true, flags: JSON_THROW_ON_ERROR);
+
+        $jwks = $this->send('GET', '/.well-known/jwks.json');
+        self::assertSame(200, $jwks->getStatusCode(), (string) $jwks->getContent());
+        $keys = json_decode((string) $jwks->getContent(), true, flags: JSON_THROW_ON_ERROR)['keys'];
+
+        self::assertSame('at+jwt', $header['typ']);
+        self::assertSame([$header['kid']], array_column($keys, 'kid'));
+        self::assertSame('https://baander.app', self::claims($login['accessToken'])['iss']);
+    }
+
     public function testTokenEndpointRequiresANonceBearingProof(): void
     {
         $device = $this->deviceClient();

@@ -9,6 +9,7 @@ use League\OAuth2\Server\Exception\OAuthServerException;
 use League\OAuth2\Server\Repositories\AccessTokenRepositoryInterface;
 use Nyholm\Psr7\ServerRequest;
 use League\OAuth2\Server\CryptKey;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class DpopAwareBearerTokenValidatorTest extends TestCase
@@ -71,11 +72,39 @@ final class DpopAwareBearerTokenValidatorTest extends TestCase
         self::assertNull($validator->validateAuthorization($request)->getAttribute('oauth_dpop_jkt'));
     }
 
+    public function testATokenFromTheConfiguredIssuerIsAccepted(): void
+    {
+        [$request, $publicKey] = $this->signedRequest('https://baander.app', issuer: 'https://baander.app');
+        $validator = new DpopAwareBearerTokenValidator($this->accessTokenRepository, null, 'https://baander.app', 'https://baander.app');
+        $validator->setPublicKey($publicKey);
+
+        self::assertSame('client-uuid', $validator->validateAuthorization($request)->getAttribute('oauth_client_id'));
+    }
+
+    /** @return iterable<string, array{?string}> */
+    public static function wrongIssuers(): iterable
+    {
+        yield 'no issuer' => [null];
+        yield 'another issuer' => ['https://other.baander.app'];
+    }
+
+    #[DataProvider('wrongIssuers')]
+    public function testATokenWithoutTheConfiguredIssuerIsRefused(?string $issuer): void
+    {
+        [$request, $publicKey] = $this->signedRequest('https://baander.app', issuer: $issuer);
+        $validator = new DpopAwareBearerTokenValidator($this->accessTokenRepository, null, 'https://baander.app', 'https://baander.app');
+        $validator->setPublicKey($publicKey);
+
+        $this->expectException(OAuthServerException::class);
+        $validator->validateAuthorization($request);
+    }
+
     /**
      * @param string|null $jkt The DPoP key thumbprint the token is bound to; unbound when null.
+     * @param string|null $issuer The iss claim; absent when null.
      * @return array{ServerRequest, CryptKey}
      */
-    private function signedRequest(string $audience, ?string $jkt = null): array
+    private function signedRequest(string $audience, ?string $jkt = null, ?string $issuer = null): array
     {
         $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
         self::assertNotFalse($key);
@@ -89,6 +118,9 @@ final class DpopAwareBearerTokenValidatorTest extends TestCase
         ];
         if ($jkt !== null) {
             $claims['cnf'] = ['jkt' => $jkt];
+        }
+        if ($issuer !== null) {
+            $claims['iss'] = $issuer;
         }
         $body = $encode(json_encode(['alg' => 'RS256', 'typ' => 'JWT'], JSON_THROW_ON_ERROR)) . '.'
             . $encode(json_encode($claims, JSON_THROW_ON_ERROR));

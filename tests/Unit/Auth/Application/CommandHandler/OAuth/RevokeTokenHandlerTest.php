@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Auth\Application\CommandHandler;
 
 use App\Auth\Application\Command\OAuth\RevokeTokenCommand;
+use App\Auth\Application\Port\AccessTokenSigningKeyInterface;
 use App\Auth\Application\CommandHandler\OAuth\RevokeTokenHandler;
 use App\Auth\Application\Service\ChainConnectionCloser;
 use App\Auth\Application\Service\TokenChainRevoker;
@@ -39,6 +40,8 @@ final class RevokeTokenHandlerTest extends TestCase
     private Connection&MockObject $connection;
     private EventDispatcherInterface&Stub $eventDispatcher;
     private LiveConnectionsPortInterface&Stub $liveConnections;
+    /** @var array<string, string> The jti of each JWT the signing key signed */
+    private array $signedJwts = [];
     private RevokeTokenHandler $handler;
 
     protected function setUp(): void
@@ -88,7 +91,16 @@ final class RevokeTokenHandlerTest extends TestCase
                 },
                 new ChainConnectionCloser($this->liveConnections, $logger ?? new NullLogger()),
             ),
+            $this->signingKey(),
         );
+    }
+
+    private function signingKey(): AccessTokenSigningKeyInterface
+    {
+        $signingKey = $this->createStub(AccessTokenSigningKeyInterface::class);
+        $signingKey->method('tokenIdOf')->willReturnCallback(fn (string $jwt): ?string => $this->signedJwts[$jwt] ?? null);
+
+        return $signingKey;
     }
 
     // --- Chain revocation ---
@@ -154,6 +166,36 @@ final class RevokeTokenHandlerTest extends TestCase
         ($this->handler)(new RevokeTokenCommand($tokenId, revokeChain: true));
 
         $this->assertSame(['refresh', 'list', 'access', 'close'], $order, 'Refresh rows lock before the access tokens are listed and revoked; sockets close after the commit.');
+    }
+
+    public function testAnAccessTokenJwtIsFoundByItsJtiAndRevokesItsChain(): void
+    {
+        $this->accessTokenRepository = $this->createMock(AccessTokenRepositoryInterface::class);
+        $this->refreshTokenRepository = $this->createMock(RefreshTokenRepositoryInterface::class);
+        $chainId = ChainId::generate();
+        $accessToken = $this->createAccessToken($chainId);
+        $jti = $accessToken->getTokenId()->toString();
+        $this->signedJwts['header.claims.signature'] = $jti;
+        $this->handler = $this->createRevokeTokenHandlerFixture();
+
+        $this->refreshTokenRepository->expects($this->never())->method('findByTokenId');
+        $this->accessTokenRepository
+            ->expects($this->once())
+            ->method('findByTokenId')
+            ->with($this->callback(fn (TokenId $id): bool => $id->toString() === $jti))
+            ->willReturn($accessToken);
+        $this->accessTokenRepository->method('findTokenIdsByChainId')->willReturn([$jti]);
+        $this->refreshTokenRepository
+            ->expects($this->once())
+            ->method('revokeByChainId')
+            ->with($this->callback(fn (ChainId $c): bool => $c->equals($chainId)));
+        $this->accessTokenRepository
+            ->expects($this->once())
+            ->method('revokeByChainId')
+            ->with($this->callback(fn (ChainId $c): bool => $c->equals($chainId)));
+        $this->connection->expects($this->once())->method('transactional');
+
+        ($this->handler)(new RevokeTokenCommand('header.claims.signature', revokeChain: true));
     }
 
     public function testChainRevocationViaAccessToken(): void

@@ -22,8 +22,6 @@ use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 use DateInterval;
-use Doctrine\DBAL\Connection;
-use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -37,6 +35,10 @@ final class ApproveDeviceCodeHandlerTest extends TestCase
     private array $codes = [];
     /** @var list<DeviceCode> */
     private array $saved = [];
+    /** @var list<DeviceCode> */
+    private array $approved = [];
+    /** Whether the conditional approval finds the code still undecided. */
+    private bool $stillPending = true;
     /** @var list<object> */
     private array $events = [];
     private ?User $user;
@@ -54,10 +56,19 @@ final class ApproveDeviceCodeHandlerTest extends TestCase
 
         self::assertTrue($code->isApproved());
         self::assertSame($this->user, $code->getUser());
-        self::assertSame([$code], $this->saved);
+        self::assertSame([$code], $this->approved);
         self::assertCount(1, $this->events);
         self::assertInstanceOf(DeviceCodeApproved::class, $this->events[0]);
         self::assertSame($code->getId()->toString(), $this->events[0]->getDeviceCodeId());
+    }
+
+    public function testAnApprovalThatLosesToAnotherDecisionIsAnsweredAsAlreadyProcessedWithoutNotifying(): void
+    {
+        $this->pending();
+        $this->stillPending = false;
+
+        $this->assertReason(DeviceUserCodeException::ALREADY_PROCESSED, fn () => ($this->approveHandler())(new ApproveDeviceCodeCommand(self::USER_CODE, $this->user()->getId())));
+        self::assertSame([], $this->events);
     }
 
     public function testDenialMarksTheRequestDenied(): void
@@ -136,6 +147,13 @@ final class ApproveDeviceCodeHandlerTest extends TestCase
         $repository->method('save')->willReturnCallback(function (DeviceCode $code): void {
             $this->saved[] = $code;
         });
+        $repository->method('approve')->willReturnCallback(function (DeviceCode $code): bool {
+            if ($this->stillPending) {
+                $this->approved[] = $code;
+            }
+
+            return $this->stillPending;
+        });
 
         return $repository;
     }
@@ -145,10 +163,6 @@ final class ApproveDeviceCodeHandlerTest extends TestCase
         $repository = $this->repository();
         $users = $this->createStub(UserRepositoryInterface::class);
         $users->method('findByUuid')->willReturnCallback(fn (): ?User => $this->user);
-        $connection = $this->createStub(Connection::class);
-        $connection->method('transactional')->willReturnCallback(static fn (callable $callback) => $callback());
-        $entityManager = $this->createStub(EntityManagerInterface::class);
-        $entityManager->method('getConnection')->willReturn($connection);
         $dispatcher = $this->createStub(EventDispatcherInterface::class);
         $dispatcher->method('dispatch')->willReturnCallback(function (object $event): object {
             $this->events[] = $event;
@@ -156,7 +170,7 @@ final class ApproveDeviceCodeHandlerTest extends TestCase
             return $event;
         });
 
-        return new ApproveDeviceCodeHandler($repository, new PendingDeviceCodeFinder($repository), $users, $entityManager, $dispatcher);
+        return new ApproveDeviceCodeHandler($repository, new PendingDeviceCodeFinder($repository), $users, $dispatcher);
     }
 
     private function denyHandler(): DenyDeviceCodeHandler

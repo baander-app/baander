@@ -465,7 +465,10 @@ services:
             $cache: '@cache.tags'
             $appName: '%app.name%'
 
-    App\Auth\Interface\Controller\OAuth\JwksController:
+    App\Auth\Application\Port\AccessTokenSigningKeyInterface:
+        alias: App\Auth\Infrastructure\Security\OAuth\AccessTokenSigningKey
+
+    App\Auth\Infrastructure\Security\OAuth\AccessTokenSigningKey:
         arguments:
             $publicKeyPath: '%auth.public_key_path%'
 
@@ -522,6 +525,7 @@ services:
     App\Auth\Infrastructure\Security\OAuth\ResourceServerFactory:
         arguments:
             $publicKeyPath: '%auth.public_key_path%'
+            $issuer: '%auth.oauth.issuer%'
             $resourceServerUri: '%auth.oauth.issuer%'
 
     App\Auth\Application\Port\OAuthSecretBundleInterface:

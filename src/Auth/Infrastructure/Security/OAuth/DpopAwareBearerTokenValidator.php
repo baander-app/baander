@@ -12,7 +12,8 @@ use Psr\Http\Message\ServerRequestInterface;
 
 /**
  * Extends BearerTokenValidator to read client_id from a dedicated JWT claim,
- * validate the aud claim against the configured resource server identifier and
+ * validate the aud claim against the configured resource server identifier,
+ * require the iss claim to name the configured issuer (RFC 9068 section 4) and
  * expose the DPoP key binding of a bound token.
  */
 final class DpopAwareBearerTokenValidator extends BearerTokenValidator
@@ -27,6 +28,7 @@ final class DpopAwareBearerTokenValidator extends BearerTokenValidator
         AccessTokenRepositoryInterface $accessTokenRepository,
         ?DateInterval $jwtValidAtDateLeeway = null,
         private readonly ?string $resourceServerUri = null,
+        private readonly ?string $issuer = null,
     ) {
         parent::__construct($accessTokenRepository, $jwtValidAtDateLeeway);
     }
@@ -48,6 +50,10 @@ final class DpopAwareBearerTokenValidator extends BearerTokenValidator
                 || !in_array($this->resourceServerUri, $audiences, true)) {
                 throw OAuthServerException::accessDenied('Access token audience does not match resource server identifier');
             }
+        }
+
+        if ($this->issuer !== null && ($claims['iss'] ?? null) !== $this->issuer) {
+            throw OAuthServerException::accessDenied('Access token issuer does not match the authorization server');
         }
 
         $validatedRequest = parent::validateAuthorization($request);

@@ -2335,6 +2335,7 @@
                                         "type": "string"
                                     },
                                     "state": {
+                                        "description": "At most 1024 bytes",
                                         "type": "string"
                                     },
                                     "code_challenge": {
@@ -2380,6 +2381,16 @@
                     },
                     "401": {
                         "description": "Client authentication failed, or the client is revoked",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OAuthError"
+                                }
+                            }
+                        }
+                    },
+                    "413": {
+                        "description": "The request body is larger than 64 KiB (`invalid_request`)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2613,7 +2624,7 @@
                     "Auth"
                 ],
                 "summary": "Device authorization request (RFC 8628 section 3.1)",
-                "description": "Only clients registered as device clients may start the device flow. Parameters may be form-encoded (RFC 8628) or JSON. Show the user code and `verification_uri` (or encode `verification_uri_complete` in a QR code), then poll the token endpoint with the device code no faster than `interval` seconds.",
+                "description": "Only clients registered as device clients may start the device flow. A confidential client authenticates as at the token endpoint. Parameters may be form-encoded (RFC 8628) or JSON. Show the user code and `verification_uri` (or encode `verification_uri_complete` in a QR code), then poll the token endpoint with the device code no faster than `interval` seconds.",
                 "operationId": "post_oauth_device_authorize",
                 "requestBody": {
                     "required": true,
@@ -2626,6 +2637,21 @@
                                 "properties": {
                                     "client_id": {
                                         "type": "string"
+                                    },
+                                    "client_secret": {
+                                        "description": "Confidential clients registered for client_secret_post only",
+                                        "type": "string"
+                                    },
+                                    "client_assertion": {
+                                        "description": "Signed JWT client assertion; confidential clients registered for private_key_jwt only",
+                                        "type": "string"
+                                    },
+                                    "client_assertion_type": {
+                                        "description": "Sent with client_assertion",
+                                        "type": "string",
+                                        "enum": [
+                                            "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+                                        ]
                                     },
                                     "scope": {
                                         "description": "Space-separated scopes",
@@ -2659,7 +2685,7 @@
                         }
                     },
                     "401": {
-                        "description": "Unknown or revoked client",
+                        "description": "Unknown or revoked client, or client authentication failed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -24132,6 +24158,7 @@
                         "description": "How a confidential client authenticates; client_secret_post when omitted. Omit it for device and public clients.",
                         "type": "string",
                         "nullable": true,
+                        "default": null,
                         "enum": [
                             "client_secret_post",
                             "private_key_jwt"
@@ -24140,14 +24167,16 @@
                     "jwks": {
                         "description": "A private_key_jwt client's public keys as an inline JWK Set: at most 10 public asymmetric keys, each with its own `kid` when there are several, at most 64 KB. Give this or `jwksUri`.",
                         "type": "object",
-                        "nullable": true
+                        "nullable": true,
+                        "default": null
                     },
                     "jwksUri": {
                         "description": "An https URI on port 443 where a private_key_jwt client publishes its JWK Set. Give this or `jwks`.",
                         "type": "string",
                         "format": "uri",
                         "example": "https://server.baander.app/jwks.json",
-                        "nullable": true
+                        "nullable": true,
+                        "default": null
                     }
                 },
                 "type": "object"

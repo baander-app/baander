@@ -29,6 +29,7 @@ final class OAuthAccessTokenJwt
         }
 
         $claims = array_filter([
+            'iss' => 'https://baander.app',
             'jti' => $token->getTokenId(),
             'sub' => $subject,
             'aud' => $audience,
