@@ -376,7 +376,7 @@ final class AdminOAuthClientTest extends TestCase
         self::assertNotNull($client);
         $bus = static::getContainer()->get(MessageBusInterface::class);
         self::assertInstanceOf(MessageBusInterface::class, $bus);
-        $result = $bus->dispatch(new IssueTokenCommand($client->getId(), $user->getId(), 'admin-client-test-jkt'))
+        $result = $bus->dispatch(new IssueTokenCommand($client->getId(), $user->getId(), 'admin-client-test-jkt', 0))
             ->last(HandledStamp::class)?->getResult();
         self::assertInstanceOf(TokenResponseDTO::class, $result);
 
@@ -389,7 +389,7 @@ final class AdminOAuthClientTest extends TestCase
         $connection = $this->entityManager->getConnection();
         $refresh = $connection->fetchAssociative(
             'SELECT r.revoked AS refresh_revoked, a.revoked AS access_revoked FROM oauth_refresh_tokens r JOIN oauth_access_tokens a ON a.id = r.access_token_id WHERE r.token_id = ?',
-            [$tokens->getRefreshToken()],
+            [hash('sha256', $tokens->getRefreshToken())],
         );
         self::assertIsArray($refresh);
 

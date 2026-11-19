@@ -56,6 +56,14 @@ class AccessTokenEntity implements AccessTokenEntityInterface
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $dpopJkt = null;
 
+    /**
+     * The user's credential epoch the token was issued under. Written on insert and by the
+     * password change that keeps this session (AccessTokenRepository::restampCredentialEpoch()),
+     * so saving the aggregate never moves it back.
+     */
+    #[ORM\Column(type: 'integer', updatable: false)]
+    private int $credentialEpoch;
+
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $expiresAt = null;
 
@@ -83,9 +91,11 @@ class AccessTokenEntity implements AccessTokenEntityInterface
         ?\DateTimeImmutable $expiresAt = null,
         ?Uuid $chainId = null,
         ?Uuid $id = null,
+        int $credentialEpoch = 0,
     ) {
         $this->id = $id ?? new Uuid();
         $this->tokenId = $tokenId;
+        $this->credentialEpoch = $credentialEpoch;
         $this->client = $client;
         $this->user = $user;
         $this->name = $name;
@@ -273,6 +283,11 @@ class AccessTokenEntity implements AccessTokenEntityInterface
     public function isRevoked(): bool
     {
         return $this->revoked;
+    }
+
+    public function getCredentialEpoch(): int
+    {
+        return $this->credentialEpoch;
     }
 
     public function getDpopJkt(): ?string

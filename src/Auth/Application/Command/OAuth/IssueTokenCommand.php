@@ -17,6 +17,8 @@ final readonly class IssueTokenCommand
     /**
      * @param string[] $scopes
      * @param string $dpopJkt Thumbprint of the DPoP key the tokens are bound to (RFC 9449)
+     * @param int $credentialEpoch The user's credential epoch read with the credential the login verified;
+     *                             issuance refuses when a password change moved it since
      * @param string|null $clientFingerprint Device fingerprint the access token is bound to, when the client sent one
      * @param int|null $totpStep TOTP time step the login's code matched; spent in the transaction that stores the tokens
      */
@@ -24,6 +26,7 @@ final readonly class IssueTokenCommand
         private Uuid $clientId,
         private Uuid $userId,
         private string $dpopJkt,
+        private int $credentialEpoch,
         private array $scopes = [],
         private ?string $tokenName = null,
         private ?string $ipAddress = null,
@@ -46,6 +49,11 @@ final readonly class IssueTokenCommand
     public function getDpopJkt(): string
     {
         return $this->dpopJkt;
+    }
+
+    public function getCredentialEpoch(): int
+    {
+        return $this->credentialEpoch;
     }
 
     /**

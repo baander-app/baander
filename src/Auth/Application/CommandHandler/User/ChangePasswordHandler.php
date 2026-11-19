@@ -46,6 +46,6 @@ final readonly class ChangePasswordHandler
             $current = null;
         }
 
-        $this->passwordChanger->change($user, $command->newPassword, $current);
+        $this->passwordChanger->change($user, $this->passwordChanger->hash($command->newPassword), $current);
     }
 }

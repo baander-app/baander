@@ -9,8 +9,9 @@ use Doctrine\ORM\EntityManagerInterface;
 /**
  * Bounds the lock waits of a token-issuing transaction.
  *
- * Issuance and refresh lock the client row, the presented refresh row, its successors
- * and the access rows in one order, so they never deadlock; what remains is a lock a
+ * Issuance and refresh lock the client row, the user row, the presented refresh row, its
+ * successors and the access rows in one order, and a password change locks the user row
+ * before any token row, so they never deadlock; what remains is a lock a
  * stuck transaction holds. Past this bound the issuing transaction fails as a server
  * fault, which the token endpoints answer with 503 and Retry-After inside the client's
  * attempt timeout, instead of holding the request until the client gives up.

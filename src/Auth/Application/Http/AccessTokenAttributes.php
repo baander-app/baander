@@ -25,9 +25,21 @@ final class AccessTokenAttributes
     /** The scopes a delegated token was granted; empty for a first-party token. */
     public const string SCOPES = 'oauth_scopes';
 
+    /**
+     * The user's credential epoch the token was issued under, which the authenticator found
+     * current. An approval made with the token carries it, so a password change voids it.
+     */
+    public const string CREDENTIAL_EPOCH = 'oauth_credential_epoch';
+
     public static function isFirstParty(mixed $attribute): bool
     {
         return $attribute === true;
+    }
+
+    /** Null when the request carries no epoch, which a caller must treat as unauthenticated. */
+    public static function credentialEpoch(mixed $attribute): ?int
+    {
+        return is_int($attribute) ? $attribute : null;
     }
 
     /** @return list<string> */

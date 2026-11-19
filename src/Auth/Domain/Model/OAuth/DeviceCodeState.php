@@ -39,6 +39,8 @@ final class DeviceCodeState
         public bool $approved = false,
         public bool $denied = false,
         public ?DateTimeImmutable $consumedAt = null,
+        /** The credential epoch of the token that approved the code; null until it is approved. */
+        public ?int $credentialEpoch = null,
     ) {
         $this->scopes = $scopes;
     }

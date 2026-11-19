@@ -174,7 +174,7 @@ final class DpopStoreOutageTest extends TestCase
 
         self::assertStoreUnavailable($response);
         self::assertLessThan(5.0, $elapsed, sprintf('A refused connection is answered without waiting out a read timeout, not after %.1f s.', $elapsed));
-        self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM oauth_refresh_tokens WHERE token_id = ? AND used_at IS NULL AND revoked = FALSE', [$login['refreshToken']]), 'The token was neither consumed nor revoked.');
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM oauth_refresh_tokens WHERE token_id = ? AND used_at IS NULL AND revoked = FALSE', [hash('sha256', $login['refreshToken'])]), 'The token was neither consumed nor revoked.');
 
         // The nonce from the login was never read by the refused kernel, so it is still good.
         $retry = $this->refresh($login['refreshToken'], $key, $login['nonce']);
@@ -399,7 +399,7 @@ final class DpopStoreOutageTest extends TestCase
         self::assertFalse($second->headers->has('DPoP-Nonce'));
         $secondData = json_decode((string) $second->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
         self::assertNotSame($firstData['refreshToken'], $secondData['refreshToken']);
-        self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM oauth_refresh_tokens WHERE token_id = ? AND used_at IS NOT NULL', [$firstData['refreshToken']]), 'The presented token was consumed.');
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM oauth_refresh_tokens WHERE token_id = ? AND used_at IS NOT NULL', [hash('sha256', $firstData['refreshToken'])]), 'The presented token was consumed.');
 
         // Without a nonce the next refresh gets one challenge, then succeeds with the challenged nonce.
         $challenge = $this->send('POST', '/api/auth/refresh', json: ['refreshToken' => $secondData['refreshToken']], headers: [
@@ -611,7 +611,7 @@ final class DpopStoreOutageTest extends TestCase
     /** @return array{id: string, chain_id: string, revoked: bool} */
     private function refreshRow(string $refreshToken): array
     {
-        $row = $this->connection->fetchAssociative('SELECT id, chain_id, revoked FROM oauth_refresh_tokens WHERE token_id = ?', [$refreshToken]);
+        $row = $this->connection->fetchAssociative('SELECT id, chain_id, revoked FROM oauth_refresh_tokens WHERE token_id = ?', [hash('sha256', $refreshToken)]);
         self::assertIsArray($row, 'The refresh token must be persisted.');
 
         /** @var array{id: string, chain_id: string, revoked: bool} $row */

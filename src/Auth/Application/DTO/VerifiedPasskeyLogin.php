@@ -17,11 +17,13 @@ final readonly class VerifiedPasskeyLogin
     /**
      * @param string $dpopJkt Thumbprint of the proof key the tokens are bound to
      * @param string $nextNonce Server-issued nonce for the client's next DPoP proof
+     * @param int $credentialEpoch The user's credential epoch, read before the passkey the assertion used
      */
     public function __construct(
         public Uuid $userId,
         public string $dpopJkt,
         public string $nextNonce,
+        public int $credentialEpoch,
     ) {
     }
 }

@@ -53,6 +53,7 @@ final class CommandsTest extends TestCase
             clientId: $clientId,
             userId: $userId,
             dpopJkt: 'thumbprint',
+            credentialEpoch: 3,
             ipAddress: '127.0.0.1',
             userAgent: 'PHPUnit',
             clientFingerprint: 'fingerprint',
@@ -61,6 +62,7 @@ final class CommandsTest extends TestCase
         $this->assertSame($clientId, $cmd->getClientId());
         $this->assertSame($userId, $cmd->getUserId());
         $this->assertSame('thumbprint', $cmd->getDpopJkt());
+        $this->assertSame(3, $cmd->getCredentialEpoch());
         $this->assertSame('127.0.0.1', $cmd->getIpAddress());
         $this->assertSame('PHPUnit', $cmd->getUserAgent());
         $this->assertSame('fingerprint', $cmd->getClientFingerprint());
@@ -68,7 +70,7 @@ final class CommandsTest extends TestCase
 
     public function testIssueTokenCommandDefaults(): void
     {
-        $cmd = new IssueTokenCommand(Uuid::v4(), Uuid::v4(), 'thumbprint');
+        $cmd = new IssueTokenCommand(Uuid::v4(), Uuid::v4(), 'thumbprint', 0);
 
         $this->assertEmpty($cmd->getScopes());
         $this->assertNull($cmd->getTokenName());
@@ -114,10 +116,11 @@ final class CommandsTest extends TestCase
     public function testApproveDeviceCodeCommandGetters(): void
     {
         $userId = Uuid::v4();
-        $cmd = new ApproveDeviceCodeCommand('ABCD', $userId);
+        $cmd = new ApproveDeviceCodeCommand('ABCD', $userId, 2);
 
         $this->assertSame('ABCD', $cmd->getUserCode());
         $this->assertSame($userId, $cmd->getUserId());
+        $this->assertSame(2, $cmd->getCredentialEpoch());
     }
 
     public function testRequestPasswordResetCommandGetters(): void

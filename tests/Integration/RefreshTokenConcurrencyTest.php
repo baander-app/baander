@@ -361,7 +361,7 @@ final class RefreshTokenConcurrencyTest extends TestCase
     {
         $login = $this->login();
         $this->observer()->beginTransaction();
-        $this->observer()->executeQuery('SELECT id FROM oauth_refresh_tokens WHERE token_id = ? FOR UPDATE', [$login['refreshToken']])->free();
+        $this->observer()->executeQuery('SELECT id FROM oauth_refresh_tokens WHERE token_id = ? FOR UPDATE', [hash('sha256', $login['refreshToken'])])->free();
 
         $started = microtime(true);
         $stuck = $this->refresh($login['refreshToken']);
@@ -452,7 +452,7 @@ final class RefreshTokenConcurrencyTest extends TestCase
     {
         $row = $this->observer()->fetchAssociative(
             'SELECT id, chain_id, previous_refresh_token_id, revoked, used_at FROM oauth_refresh_tokens WHERE token_id = ?',
-            [$refreshToken],
+            [hash('sha256', $refreshToken)],
         );
         self::assertIsArray($row, 'The refresh token must be persisted.');
 

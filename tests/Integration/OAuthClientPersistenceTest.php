@@ -198,14 +198,14 @@ final class OAuthClientPersistenceTest extends TestCase
         $this->writer->insert('oauth_auth_codes', ['id' => Uuid::generate()->toString(), 'code_id' => $tokens['auth code'],
             'client_id' => $client->toString(), 'user_id' => $user, 'redirect_uri' => 'https://server.baander.app/callback',
             'code_challenge' => 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM', 'code_challenge_method' => 'S256',
-            'dpop_jkt' => '0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I', ...$times]);
+            'dpop_jkt' => '0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I', 'credential_epoch' => 0, ...$times]);
         $this->writer->insert('oauth_device_codes', ['id' => $deviceCode, 'device_code' => bin2hex(random_bytes(16)),
             'user_code' => strtoupper(bin2hex(random_bytes(6))), 'client_id' => $client->toString(),
             'verification_uri' => 'https://app.baander.app/device', 'expires_at' => '2026-11-19 12:15:00+00', ...$times]);
         $this->writer->insert('oauth_access_tokens', ['id' => $access, 'token_id' => $tokens['access token'],
-            'client_id' => $client->toString(), 'user_id' => $user, ...$times]);
-        $this->writer->insert('oauth_refresh_tokens', ['id' => Uuid::generate()->toString(), 'token_id' => $tokens['refresh token'],
-            'access_token_id' => $access, ...$times]);
+            'client_id' => $client->toString(), 'user_id' => $user, 'credential_epoch' => 0, ...$times]);
+        $this->writer->insert('oauth_refresh_tokens', ['id' => Uuid::generate()->toString(), 'token_id' => hash('sha256', $tokens['refresh token']),
+            'access_token_id' => $access, 'credential_epoch' => 0, 'chain_expires_at' => '2027-01-01 00:00:00+00', ...$times]);
 
         return [...$tokens, 'device code' => $deviceCode];
     }
@@ -244,8 +244,8 @@ final class OAuthClientPersistenceTest extends TestCase
         self::assertNotNull($seenByFirst);
         self::assertNotNull($seenBySecond);
         self::assertTrue($seenByFirst->isPending() && $seenBySecond->isPending());
-        $seenByFirst->approve($first);
-        $seenBySecond->approve($second);
+        $seenByFirst->approve($first, 0);
+        $seenBySecond->approve($second, 0);
 
         self::assertTrue($codes->approve($seenByFirst));
         self::assertFalse($codes->approve($seenBySecond));

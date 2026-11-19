@@ -29,6 +29,7 @@ class RefreshTokenEntity implements RefreshTokenEntityInterface
     #[ORM\JoinColumn(name: 'previous_refresh_token_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
     private ?RefreshTokenEntity $previousRefreshToken = null;
 
+    /** The hex SHA-256 digest of the refresh token; the token itself is never stored. */
     #[ORM\Column(type: 'text')]
     private string $tokenId;
 
@@ -45,6 +46,17 @@ class RefreshTokenEntity implements RefreshTokenEntityInterface
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $usedAt = null;
 
+    /** When the chain ends, however recently its tokens rotated: set when the chain starts, copied by each rotation. */
+    #[ORM\Column(type: 'datetime_immutable', updatable: false)]
+    private \DateTimeImmutable $chainExpiresAt;
+
+    /**
+     * The user's credential epoch the chain was issued under. Written on insert and by the
+     * password change that keeps this chain (RefreshTokenRepository::restampCredentialEpoch()).
+     */
+    #[ORM\Column(type: 'integer', updatable: false)]
+    private int $credentialEpoch;
+
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
@@ -58,8 +70,12 @@ class RefreshTokenEntity implements RefreshTokenEntityInterface
         ?Uuid $chainId = null,
         ?RefreshTokenEntity $previousRefreshToken = null,
         ?Uuid $id = null,
+        ?\DateTimeImmutable $chainExpiresAt = null,
+        int $credentialEpoch = 0,
     ) {
         $this->id = $id ?? new Uuid();
+        $this->chainExpiresAt = $chainExpiresAt ?? throw new \InvalidArgumentException('A refresh token needs the expiry of its chain.');
+        $this->credentialEpoch = $credentialEpoch;
         $this->tokenId = $tokenId;
         $this->accessToken = $accessToken;
         $this->expiresAt = $expiresAt;
@@ -151,6 +167,16 @@ class RefreshTokenEntity implements RefreshTokenEntityInterface
     public function getUsedAt(): ?\DateTimeImmutable
     {
         return $this->usedAt;
+    }
+
+    public function getChainExpiresAt(): \DateTimeImmutable
+    {
+        return $this->chainExpiresAt;
+    }
+
+    public function getCredentialEpoch(): int
+    {
+        return $this->credentialEpoch;
     }
 
     public function markUsed(): void

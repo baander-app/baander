@@ -49,6 +49,14 @@ class UserEntity
     #[ORM\Column(type: 'bigint', nullable: true, insertable: false, updatable: false)]
     private ?int $totpLastUsedStep = null;
 
+    /**
+     * Incremented by every password change; tokens and codes record the value they were issued
+     * under. Only UserRepository::advanceCredentialEpoch() writes it, so saving an aggregate never
+     * moves it back.
+     */
+    #[ORM\Column(type: 'integer', options: ['default' => 0], insertable: false, updatable: false)]
+    private int $credentialEpoch = 0;
+
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
@@ -174,6 +182,11 @@ class UserEntity
     public function getTotpSecretCiphertext(): ?string
     {
         return $this->totpSecretCiphertext;
+    }
+
+    public function getCredentialEpoch(): int
+    {
+        return $this->credentialEpoch;
     }
 
     public function setTotpSecretCiphertext(?string $totpSecretCiphertext): void

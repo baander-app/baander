@@ -25,8 +25,10 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * account may have been registered by someone else under it: the reset then verifies the
  * address and removes the account's passkeys and TOTP as well.
  *
- * Everything runs in one transaction, the token's redemption included, so a password the
- * policy refuses leaves the token redeemable and nothing half-claimed.
+ * The new password is checked against the policy and hashed before the transaction opens,
+ * so a password the policy refuses leaves the token redeemable; redemption and the change
+ * then run in one transaction, so nothing is half-claimed. Redemptions are limited per IP,
+ * which bounds the hashing an invalid token costs.
  */
 final readonly class ResetPasswordHandler
 {
@@ -46,9 +48,11 @@ final readonly class ResetPasswordHandler
     #[AsMessageHandler]
     public function __invoke(ResetPasswordCommand $command): void
     {
-        $reset = $this->transaction->run(function () use ($command): bool {
-            // Redeem first, so an invalid token costs no password hashing. An unusable token is
-            // still deleted: the transaction commits and the caller is told only that it is invalid.
+        $password = $this->passwordChanger->hash($command->password);
+
+        $reset = $this->transaction->run(function () use ($command, $password): bool {
+            // An unusable token is still deleted: the transaction commits and the caller is told
+            // only that it is invalid.
             $userId = $this->passwordResetTokenRepository->redeem($command->token, new \DateTimeImmutable());
             $user = $userId === null ? null : $this->userRepository->findByUuid($userId);
 
@@ -56,7 +60,7 @@ final readonly class ResetPasswordHandler
                 return false;
             }
 
-            $this->passwordChanger->change($user, $command->password);
+            $this->passwordChanger->change($user, $password);
             $user->isEmailVerified() ? $this->dropPendingEmail($user) : $this->claim($user);
 
             return true;

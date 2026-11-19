@@ -400,6 +400,58 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
         self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM oauth_pushed_authorization_requests'));
     }
 
+    /**
+     * The credential epoch upgrade ends stored sessions and authorization codes, which carry
+     * no epoch and raw refresh tokens, and keeps accounts, clients and device codes: users
+     * start at epoch 0, and an approval recorded before has no epoch, so it issues nothing.
+     */
+    public function testCredentialEpochUpgradeEndsStoredSessionsAndCodesAndKeepsAccounts(): void
+    {
+        self::assertSame(0, $this->migrate($this->factory(), 'DoctrineMigrations\\Version20261120100000'));
+        [$user, $client, $access, $refresh, $device] = [Uuid::generate()->toString(), Uuid::generate()->toString(), Uuid::generate()->toString(), Uuid::generate()->toString(), Uuid::generate()->toString()];
+        $times = ['created_at' => '2026-11-20 12:00:00+00', 'updated_at' => '2026-11-20 12:00:00+00'];
+        $this->connection->executeStatement(
+            "INSERT INTO users (id, public_id, name, email, password, created_at, updated_at) VALUES (?, ?, 'Epoch upgrade', 'epoch-upgrade@baander.app', 'hash', clock_timestamp(), clock_timestamp())",
+            [$user, (new PublicId())->toString()],
+        );
+        $this->connection->insert('oauth_clients', ['id' => $client, 'public_id' => (new PublicId())->toString(), 'name' => 'Epoch upgrade', 'redirect' => '["https://app.baander.app/callback"]', ...$times]);
+        $this->connection->insert('oauth_access_tokens', ['id' => $access, 'token_id' => bin2hex(random_bytes(40)), 'client_id' => $client, 'user_id' => $user, ...$times]);
+        $this->connection->insert('oauth_refresh_tokens', ['id' => $refresh, 'token_id' => bin2hex(random_bytes(40)), 'access_token_id' => $access, ...$times]);
+        $this->connection->insert('oauth_token_metadata', ['id' => Uuid::generate()->toString(), 'token_id' => $access, ...$times]);
+        $this->connection->insert('oauth_auth_codes', [
+            'id' => Uuid::generate()->toString(), 'code_id' => bin2hex(random_bytes(16)), 'client_id' => $client, 'user_id' => $user,
+            'redirect_uri' => 'https://app.baander.app/callback', 'code_challenge' => 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+            'code_challenge_method' => 'S256', 'dpop_jkt' => 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs', 'expires_at' => '2026-11-20 12:01:00+00', ...$times,
+        ]);
+        $this->connection->insert('oauth_device_codes', [
+            'id' => $device, 'device_code' => bin2hex(random_bytes(16)), 'user_code' => 'BCDFGHJK', 'user_id' => $user, 'client_id' => $client,
+            'verification_uri' => 'https://app.baander.app/device', 'approved' => 'true', ...$times,
+        ]);
+
+        self::assertSame(0, $this->migrate($this->factory()));
+
+        foreach (['oauth_access_tokens', 'oauth_refresh_tokens', 'oauth_token_metadata', 'oauth_auth_codes'] as $table) {
+            self::assertSame(0, (int) $this->connection->fetchOne(sprintf('SELECT count(*) FROM %s', $table)), $table);
+        }
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT credential_epoch FROM users WHERE id = ?', [$user]));
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT count(*) FROM oauth_clients WHERE id = ?', [$client]));
+        self::assertNull($this->connection->fetchOne('SELECT credential_epoch FROM oauth_device_codes WHERE id = ?', [$device]));
+        self::assertSame(
+            [
+                ['table_name' => 'oauth_access_tokens', 'column_name' => 'credential_epoch', 'is_nullable' => 'NO', 'column_default' => null],
+                ['table_name' => 'oauth_auth_codes', 'column_name' => 'credential_epoch', 'is_nullable' => 'NO', 'column_default' => null],
+                ['table_name' => 'oauth_device_codes', 'column_name' => 'credential_epoch', 'is_nullable' => 'YES', 'column_default' => null],
+                ['table_name' => 'oauth_refresh_tokens', 'column_name' => 'chain_expires_at', 'is_nullable' => 'NO', 'column_default' => null],
+                ['table_name' => 'oauth_refresh_tokens', 'column_name' => 'credential_epoch', 'is_nullable' => 'NO', 'column_default' => null],
+                ['table_name' => 'users', 'column_name' => 'credential_epoch', 'is_nullable' => 'NO', 'column_default' => '0'],
+            ],
+            $this->connection->fetchAllAssociative(
+                "SELECT table_name, column_name, is_nullable, column_default FROM information_schema.columns
+                  WHERE table_schema = 'public' AND column_name IN ('credential_epoch', 'chain_expires_at') ORDER BY table_name, column_name",
+            ),
+        );
+    }
+
     public function testFreshDatabaseInitializesWithoutPreprovisionedExtensions(): void
     {
         self::assertSame(0, $this->migrate($this->factory()));

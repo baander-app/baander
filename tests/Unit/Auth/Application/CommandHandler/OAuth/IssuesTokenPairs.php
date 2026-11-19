@@ -22,6 +22,7 @@ use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
+use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Tests\Fixtures\Catalog\PassThroughTransaction;
 use App\Shared\Application\Port\LiveConnectionsPortInterface;
 use App\Shared\Domain\Model\PublicId;
@@ -51,6 +52,8 @@ trait IssuesTokenPairs
     private array $revokedChains = [];
     /** @var list<array{string, string, ?string}> Per-client charges: endpoint, client public ID, caller address */
     private array $clientCharges = [];
+    /** The users' credential epoch as issuance finds it under the row lock. */
+    private int $lockedCredentialEpoch = 0;
     /** When set, every per-client charge is refused with this Retry-After. */
     private ?int $clientAllowanceSpentFor = null;
 
@@ -91,8 +94,10 @@ trait IssuesTokenPairs
         });
 
         $transaction = new PassThroughTransaction();
+        $users = $this->createStub(UserRepositoryInterface::class);
+        $users->method('lockCredentialEpoch')->willReturnCallback(fn (): int => $this->lockedCredentialEpoch);
 
-        return new TokenPairIssuer($accessTokens, $refreshTokens, new ScopeAllowlist(['profile', 'email', 'library', 'playlist']), $entityManager, $jwt, $metadata, $clients, $transaction, 3600, 2592000);
+        return new TokenPairIssuer($accessTokens, $refreshTokens, new ScopeAllowlist(['profile', 'email', 'library', 'playlist']), $entityManager, $jwt, $metadata, $clients, $transaction, $users, 3600, 2592000, 7776000);
     }
 
     /** Records each revoked chain; no web server runs, so no socket closes. */

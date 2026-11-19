@@ -18,7 +18,9 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  *
  * The Symfony authenticators verify the user's credentials; this handler mints a
  * DPoP-bound access token and a refresh token that starts a new rotation chain, and
- * spends the TOTP step a password login matched in the same transaction.
+ * spends the TOTP step a password login matched in the same transaction. The
+ * credential epoch the login captured must still be the user's when the tokens are
+ * stored (CredentialsChangedException otherwise).
  * The authorization code and device code grants issue through the same
  * TokenPairIssuer in their own handlers.
  */
@@ -52,6 +54,7 @@ final readonly class IssueTokenHandler
             user: $user,
             requestedScopes: $command->getScopes(),
             dpopJkt: $command->getDpopJkt(),
+            credentialEpoch: $command->getCredentialEpoch(),
             tokenName: $command->getTokenName(),
             clientFingerprint: $command->getClientFingerprint(),
             userAgent: $command->getUserAgent(),

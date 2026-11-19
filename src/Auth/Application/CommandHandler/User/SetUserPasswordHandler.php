@@ -24,6 +24,7 @@ final readonly class SetUserPasswordHandler
     #[AsMessageHandler]
     public function __invoke(SetUserPasswordCommand $command): void
     {
-        $this->passwordChanger->change($this->users->byIdentifier($command->identifier), $command->password);
+        $user = $this->users->byIdentifier($command->identifier);
+        $this->passwordChanger->change($user, $this->passwordChanger->hash($command->password));
     }
 }

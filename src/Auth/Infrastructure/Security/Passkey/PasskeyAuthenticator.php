@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Infrastructure\Security\Passkey;
 
 use App\Auth\Application\Command\Passkey\AuthenticatePasskeyCommand;
+use App\Auth\Application\DTO\AuthenticatedPasskeyOwner;
 use App\Auth\Application\DTO\VerifiedPasskeyLogin;
 use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use App\Auth\Application\Exception\PasskeyChallengeUnavailableException;
@@ -20,7 +21,6 @@ use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
-use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Application\Exception\HandlerFailure;
 use Symfony\Component\Security\Core\Exception\AuthenticationException;
@@ -120,11 +120,11 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
         );
 
         try {
-            $userId = $this->commandBus->dispatch($command)->last(HandledStamp::class)?->getResult();
-            if (!is_string($userId)) {
+            $owner = $this->commandBus->dispatch($command)->last(HandledStamp::class)?->getResult();
+            if (!$owner instanceof AuthenticatedPasskeyOwner) {
                 throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
             }
-            $uuid = Uuid::fromString($userId);
+            $uuid = $owner->userId;
         } catch (\Throwable $e) {
             $cause = HandlerFailure::cause($e);
             if ($cause instanceof PasskeyChallengeUnavailableException) {
@@ -144,12 +144,13 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
             $uuid,
             $proofKey,
             $nextNonce,
+            $owner->credentialEpoch,
         ));
 
         // The handler returns a user ID UUID string; use a custom loader that resolves
         // via UUID instead of going through UserProvider (which expects an email).
         return new SelfValidatingPassport(
-            new UserBadge((string) $userId, function () use ($uuid): SecurityUser {
+            new UserBadge($uuid->toString(), function () use ($uuid): SecurityUser {
                 $user = $this->userRepository->findByUuid($uuid);
                 if ($user === null) {
                     throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);

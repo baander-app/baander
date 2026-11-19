@@ -10,13 +10,13 @@ use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\ClientState;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\User;
-use App\Auth\Domain\Model\UserState;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
 use App\Auth\Domain\Repository\OAuth\AuthCodeRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AuthCodeEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Auth\Infrastructure\Doctrine\UserEntityMapping;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
@@ -83,6 +83,7 @@ final class AuthCodeRepository implements AuthCodeRepositoryInterface
             $authCode->getScopes() !== [] ? $authCode->getScopeIdentifiers() : null,
             $authCode->getExpiresAt(),
             id: $authCode->getId(),
+            credentialEpoch: $authCode->getCredentialEpoch(),
         );
     }
 
@@ -106,6 +107,7 @@ final class AuthCodeRepository implements AuthCodeRepositoryInterface
             dpopJkt: $entity->getDpopJkt(),
             revoked: $entity->isRevoked(),
             issuedChainId: $entity->getChainId() !== null ? ChainId::fromUuid($entity->getChainId()) : null,
+            credentialEpoch: $entity->getCredentialEpoch(),
         ));
     }
 
@@ -156,20 +158,7 @@ final class AuthCodeRepository implements AuthCodeRepositoryInterface
 
     private function userEntityToDomain(UserEntity $entity): User
     {
-        return User::reconstitute(new UserState(
-            id: $entity->getId(),
-            publicId: $entity->getPublicId(),
-            name: $entity->getName(),
-            email: $entity->getEmail(),
-            password: $entity->getPassword(),
-            totpSecretCiphertext: $entity->getTotpSecretCiphertext(),
-            createdAt: $entity->getCreatedAt(),
-            updatedAt: $entity->getUpdatedAt(),
-            emailVerifiedAt: $entity->getEmailVerifiedAt(),
-            roles: $entity->getRoles(),
-            disabled: $entity->isDisabled(),
-            pendingEmail: $entity->getPendingEmail(),
-        ));
+        return UserEntityMapping::toDomain($entity);
     }
 
     private function clientEntityToDomain(ClientEntity $entity): Client

@@ -110,6 +110,7 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
             updatedAt: new \DateTimeImmutable(),
             revoked: false,
             dpopJkt: $entity->getDpopJkt(),
+            credentialEpoch: $userDomain?->getCredentialEpoch() ?? 0,
         ));
 
         $this->domainRepository->save($domain);

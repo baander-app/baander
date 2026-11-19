@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Auth\Application\CommandHandler;
 
 use App\Auth\Application\Command\OAuth\IssueTokenCommand;
 use App\Auth\Application\CommandHandler\OAuth\IssueTokenHandler;
+use App\Auth\Application\Exception\CredentialsChangedException;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Port\JwtGeneratorInterface;
 use App\Auth\Application\ScopeAllowlist;
@@ -45,6 +46,8 @@ final class IssueTokenHandlerTest extends TestCase
     private array $jwtBindings = [];
     /** What the issuing transaction finds when it locks the client's row. */
     private bool $clientActiveAtIssuance = true;
+    /** What the issuing transaction finds when it locks the user's row. */
+    private int $lockedCredentialEpoch = 2;
     private IssueTokenHandler $handler;
 
     protected function setUp(): void
@@ -60,6 +63,7 @@ final class IssueTokenHandlerTest extends TestCase
         $this->clientRepository = $this->createStub(ClientRepositoryInterface::class);
         $this->clientRepository->method('lockActiveClientForIssuance')->willReturnCallback(fn (): bool => $this->clientActiveAtIssuance);
         $this->userRepository = $this->createStub(UserRepositoryInterface::class);
+        $this->userRepository->method('lockCredentialEpoch')->willReturnCallback(fn (): int => $this->lockedCredentialEpoch);
 
         // The issuing transaction bounds its lock waits on the manager's connection.
         $entityManager = $this->createStub(EntityManagerInterface::class);
@@ -90,8 +94,10 @@ final class IssueTokenHandlerTest extends TestCase
                 $tokenMetadataRepository,
                 $this->clientRepository,
                 $transaction,
+                $this->userRepository,
                 accessTokenTtl: 3600,
                 refreshTokenTtl: 2592000,
+                maxChainLifetime: 7776000,
             ),
         );
     }
@@ -100,7 +106,7 @@ final class IssueTokenHandlerTest extends TestCase
     {
         [$client, $user] = $this->registered();
 
-        $result = ($this->handler)(new IssueTokenCommand(clientId: $client->getId(), userId: $user->getId(), dpopJkt: self::JKT));
+        $result = ($this->handler)(new IssueTokenCommand(clientId: $client->getId(), userId: $user->getId(), dpopJkt: self::JKT, credentialEpoch: 2));
 
         self::assertNotEmpty($result->getAccessToken());
         self::assertSame($this->savedRefreshTokens[0]->getTokenId()->toString(), $result->getRefreshToken());
@@ -110,6 +116,26 @@ final class IssueTokenHandlerTest extends TestCase
         self::assertNotNull($chain);
         self::assertSame($chain, $this->savedRefreshTokens[0]->getChainId()?->toString());
         self::assertSame($user->getId()->toString(), $this->savedAccessTokens[0]->getUser()?->getId()->toString());
+        self::assertSame(2, $this->savedAccessTokens[0]->getCredentialEpoch(), 'The pair carries the epoch the login captured.');
+        self::assertSame(2, $this->savedRefreshTokens[0]->getCredentialEpoch());
+        $lifetime = $this->savedRefreshTokens[0]->getChainExpiresAt()?->getTimestamp() - $this->savedRefreshTokens[0]->getCreatedAt()->getTimestamp();
+        self::assertSame(7776000, $lifetime, 'The chain starts with its absolute lifetime.');
+    }
+
+    /** A password change committed after the login read the credential: nothing is issued. */
+    public function testALoginWhoseCredentialEpochMovedIsRefusedBeforeAnythingIsWritten(): void
+    {
+        [$client, $user] = $this->registered();
+        $this->lockedCredentialEpoch = 3;
+
+        try {
+            ($this->handler)(new IssueTokenCommand(clientId: $client->getId(), userId: $user->getId(), dpopJkt: self::JKT, credentialEpoch: 2));
+            self::fail('Issuance must refuse a login captured under an earlier epoch.');
+        } catch (CredentialsChangedException) {
+        }
+        self::assertSame([], $this->savedAccessTokens);
+        self::assertSame([], $this->savedRefreshTokens);
+        self::assertSame([], $this->savedMetadata);
     }
 
     public function testDropsScopesOutsideTheAllowlist(): void
@@ -119,7 +145,7 @@ final class IssueTokenHandlerTest extends TestCase
         $result = ($this->handler)(new IssueTokenCommand(
             clientId: $client->getId(),
             userId: $user->getId(),
-            dpopJkt: self::JKT,
+            dpopJkt: self::JKT, credentialEpoch: 2,
             scopes: ['profile', 'admin', 'library'],
         ));
 
@@ -133,7 +159,7 @@ final class IssueTokenHandlerTest extends TestCase
         ($this->handler)(new IssueTokenCommand(
             clientId: $client->getId(),
             userId: $user->getId(),
-            dpopJkt: self::JKT,
+            dpopJkt: self::JKT, credentialEpoch: 2,
             ipAddress: '127.0.0.1',
             userAgent: 'PHPUnit/13',
             clientFingerprint: 'fp-123',
@@ -150,7 +176,7 @@ final class IssueTokenHandlerTest extends TestCase
     {
         [$client, $user] = $this->registered();
 
-        ($this->handler)(new IssueTokenCommand(clientId: $client->getId(), userId: $user->getId(), dpopJkt: self::JKT, clientFingerprint: ''));
+        ($this->handler)(new IssueTokenCommand(clientId: $client->getId(), userId: $user->getId(), dpopJkt: self::JKT, credentialEpoch: 2, clientFingerprint: ''));
 
         self::assertNull($this->savedMetadata[0]->getClientFingerprint());
     }
@@ -162,7 +188,7 @@ final class IssueTokenHandlerTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Client not found');
 
-        ($this->handler)(new IssueTokenCommand(clientId: Uuid::generate(), userId: Uuid::generate(), dpopJkt: self::JKT));
+        ($this->handler)(new IssueTokenCommand(clientId: Uuid::generate(), userId: Uuid::generate(), dpopJkt: self::JKT, credentialEpoch: 2));
     }
 
     public function testRevokedClientThrows(): void
@@ -173,7 +199,7 @@ final class IssueTokenHandlerTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Client has been revoked');
 
-        ($this->handler)(new IssueTokenCommand(clientId: $client->getId(), userId: $user->getId(), dpopJkt: self::JKT));
+        ($this->handler)(new IssueTokenCommand(clientId: $client->getId(), userId: $user->getId(), dpopJkt: self::JKT, credentialEpoch: 2));
     }
 
     public function testAClientRevokedBeforeTheTokensAreStoredFailsWithInvalidClient(): void
@@ -182,7 +208,7 @@ final class IssueTokenHandlerTest extends TestCase
         $this->clientActiveAtIssuance = false;
 
         try {
-            ($this->handler)(new IssueTokenCommand(clientId: $client->getId(), userId: $user->getId(), dpopJkt: self::JKT));
+            ($this->handler)(new IssueTokenCommand(clientId: $client->getId(), userId: $user->getId(), dpopJkt: self::JKT, credentialEpoch: 2));
             self::fail('Issuance must fail once the locked client row is revoked.');
         } catch (OAuthProtocolException $exception) {
             self::assertSame('invalid_client', $exception->error);
@@ -202,7 +228,7 @@ final class IssueTokenHandlerTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('User not found');
 
-        ($this->handler)(new IssueTokenCommand(clientId: $client->getId(), userId: Uuid::generate(), dpopJkt: self::JKT));
+        ($this->handler)(new IssueTokenCommand(clientId: $client->getId(), userId: Uuid::generate(), dpopJkt: self::JKT, credentialEpoch: 2));
     }
 
     /** @return array{Client, User} */

@@ -23,7 +23,8 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * Either decision uses the request up, so it is decided once. Approval issues a
  * single-use authorization code bound to the pushed PKCE challenge, redirect URI and
  * DPoP key thumbprint, in the transaction that uses the request up; of two concurrent
- * approvals one issues a code. Denial answers access_denied at the pushed redirect URI.
+ * approvals one issues a code. The code carries the credential epoch of the token the
+ * approval was sent with, so a password change before the exchange voids it. Denial answers access_denied at the pushed redirect URI.
  * Both run the same user checks first; a check that fails for the user leaves the
  * request unused.
  */
@@ -56,7 +57,7 @@ final readonly class CreateAuthorizationCodeHandler
             return AuthorizationResponseDTO::denied($pushedRequest->getRedirectUri(), $pushedRequest->getState());
         }
 
-        $code = $this->transaction->run(function () use ($request, $pushedRequest): AuthCode {
+        $code = $this->transaction->run(function () use ($request, $pushedRequest, $command): AuthCode {
             $this->useUp($pushedRequest, $request->client);
             $code = AuthCode::create(
                 $request->user,
@@ -67,6 +68,7 @@ final readonly class CreateAuthorizationCodeHandler
                 $pushedRequest->getDpopJkt(),
                 $pushedRequest->getScopes(),
                 $this->authCodeTtl,
+                $command->credentialEpoch,
             );
             $this->authCodeRepository->save($code);
 

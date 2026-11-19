@@ -25,9 +25,9 @@ final class RefreshTokenDpopMappingTest extends TestCase
         $client = new ClientEntity(new PublicId(), 'Mapping client', '["https://baander.app/callback"]');
         $access = new AccessTokenEntity(bin2hex(random_bytes(40)), $client);
         $access->setDpopJkt($jkt);
-        $refresh = new RefreshTokenEntity(bin2hex(random_bytes(40)), $access);
+        $refresh = new RefreshTokenEntity(bin2hex(random_bytes(40)), $access, chainExpiresAt: new \DateTimeImmutable("+1 day"));
         $refreshEntities = $this->createMock(EntityRepository::class);
-        $refreshEntities->expects(self::once())->method('findOneBy')->with(['tokenId' => $refresh->getTokenId()])->willReturn($refresh);
+        $refreshEntities->expects(self::once())->method('findOneBy')->with(['tokenId' => hash('sha256', $refresh->getTokenId())])->willReturn($refresh);
         $accessEntities = $this->createMock(EntityRepository::class);
         $accessEntities->expects(self::once())->method('find')->with($access->getId())->willReturn($access);
         $manager = $this->createMock(EntityManagerInterface::class);
@@ -52,12 +52,12 @@ final class RefreshTokenDpopMappingTest extends TestCase
         $client = new ClientEntity(new PublicId(), 'Mapping client', '["https://baander.app/callback"]');
         $previousAccess = new AccessTokenEntity(bin2hex(random_bytes(40)), $client);
         $previousAccess->setDpopJkt(str_repeat('b', 43));
-        $previous = new RefreshTokenEntity(bin2hex(random_bytes(40)), $previousAccess);
+        $previous = new RefreshTokenEntity(bin2hex(random_bytes(40)), $previousAccess, chainExpiresAt: new \DateTimeImmutable("+1 day"));
         $access = new AccessTokenEntity(bin2hex(random_bytes(40)), $client);
         $access->setDpopJkt(str_repeat('a', 43));
-        $refresh = new RefreshTokenEntity(bin2hex(random_bytes(40)), $access, previousRefreshToken: $previous);
+        $refresh = new RefreshTokenEntity(bin2hex(random_bytes(40)), $access, previousRefreshToken: $previous, chainExpiresAt: new \DateTimeImmutable("+1 day"));
         $entities = $this->createMock(EntityRepository::class);
-        $entities->expects(self::once())->method('findOneBy')->with(['tokenId' => $refresh->getTokenId()])->willReturn($refresh);
+        $entities->expects(self::once())->method('findOneBy')->with(['tokenId' => hash('sha256', $refresh->getTokenId())])->willReturn($refresh);
         $entities->expects(self::once())->method('find')->with($previous->getId())->willReturn($previous);
         $manager = $this->createMock(EntityManagerInterface::class);
         $manager->expects(self::exactly(2))->method('getRepository')->with(RefreshTokenEntity::class)->willReturn($entities);

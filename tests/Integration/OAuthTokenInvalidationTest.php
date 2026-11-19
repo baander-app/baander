@@ -199,14 +199,14 @@ final class OAuthTokenInvalidationTest extends TestCase
             'redirect' => '["https://baander.app/callback"]', ...$times]);
         $this->writer->insert('oauth_scopes', ['id' => 'profile', 'description' => 'Profile', ...$times]);
         $this->writer->insert('oauth_access_tokens', ['id' => $access, 'token_id' => 'rotation-access-token',
-            'client_id' => $client, 'user_id' => $user, ...$times]);
+            'client_id' => $client, 'user_id' => $user, 'credential_epoch' => 0, ...$times]);
         $this->writer->insert('oauth_refresh_tokens', ['id' => $refresh, 'token_id' => 'rotation-refresh-token',
-            'access_token_id' => $access, ...$times]);
+            'access_token_id' => $access, 'credential_epoch' => 0, 'chain_expires_at' => '2027-01-01 00:00:00+00', ...$times]);
         $this->writer->insert('oauth_refresh_tokens', ['id' => Uuid::generate()->toString(), 'token_id' => 'rotation-refresh-successor',
-            'access_token_id' => $access, 'previous_refresh_token_id' => $refresh, ...$times]);
+            'access_token_id' => $access, 'previous_refresh_token_id' => $refresh, 'credential_epoch' => 0, 'chain_expires_at' => '2027-01-01 00:00:00+00', ...$times]);
         $this->writer->insert('oauth_auth_codes', ['id' => Uuid::generate()->toString(), 'code_id' => 'rotation-auth-code',
             'client_id' => $client, 'user_id' => $user, 'code_challenge' => str_repeat('a', 43),
-            'code_challenge_method' => 'S256', 'dpop_jkt' => 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs', 'redirect_uri' => 'https://baander.app/callback', ...$times]);
+            'code_challenge_method' => 'S256', 'dpop_jkt' => 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs', 'redirect_uri' => 'https://baander.app/callback', 'credential_epoch' => 0, ...$times]);
         foreach (['pending', 'approved'] as $phase) {
             $this->writer->insert('oauth_device_codes', ['id' => Uuid::generate()->toString(), 'device_code' => 'rotation-device-' . $phase,
                 'user_code' => 'rotation-user-' . $phase, 'client_id' => $client, 'user_id' => $user,

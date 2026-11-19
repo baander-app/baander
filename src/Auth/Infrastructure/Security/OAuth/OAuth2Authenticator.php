@@ -7,6 +7,7 @@ namespace App\Auth\Infrastructure\Security\OAuth;
 use App\Auth\Application\Http\AccessTokenAttributes;
 use App\Auth\Domain\Model\OAuth\ClientType;
 use App\Auth\Domain\Model\OAuth\TokenId;
+use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
@@ -37,6 +38,10 @@ use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPasspor
  * the league/oauth2-server ResourceServer, and creates a Passport with
  * the user loaded from the database by public ID. A disabled account does not authenticate.
  *
+ * A token issued before the user's latest password change does not authenticate: its
+ * credential epoch, read from storage with the user's, must not be behind. The epoch is
+ * set as a request attribute, so approvals made with the token carry it.
+ *
  * A DPoP-bound token is accepted under the DPoP scheme only (RFC 9449 section 7.1);
  * presented as a Bearer token it is refused like any other invalid token. The
  * proof itself is verified later by the DPoP binding listener.
@@ -57,6 +62,7 @@ final class OAuth2Authenticator extends AbstractAuthenticator
         private readonly TokenMetadataRepositoryInterface $tokenMetadataRepository,
         private readonly AuthenticationFailureMessage $failureMessage,
         private readonly ClientRepositoryInterface $clientRepository,
+        private readonly AccessTokenRepositoryInterface $accessTokenRepository,
         #[Autowire(param: 'auth.spa_client_id')]
         private readonly string $spaClientId,
     ) {
@@ -130,9 +136,14 @@ final class OAuth2Authenticator extends AbstractAuthenticator
             );
         }
 
-        if ($accessTokenId !== null) {
-            $request->attributes->set(AccessTokenAttributes::TOKEN_ID, $accessTokenId);
+        if (!is_string($accessTokenId) || $accessTokenId === '') {
+            throw new CustomUserMessageAuthenticationException(
+                AuthenticationFailureMessage::INVALID_TOKEN,
+                ['error_code' => 'AUTH_INVALID_TOKEN'],
+            );
         }
+        $request->attributes->set(AccessTokenAttributes::TOKEN_ID, $accessTokenId);
+        $request->attributes->set(AccessTokenAttributes::CREDENTIAL_EPOCH, $this->currentCredentialEpoch($accessTokenId));
 
         // Enforce the client fingerprint binding of tokens issued with a fingerprint.
         $this->verifyTokenBinding($accessTokenId, $request);
@@ -180,6 +191,28 @@ final class OAuth2Authenticator extends AbstractAuthenticator
     public function onAuthenticationSuccess(Request $request, TokenInterface $token, string $firewallName): ?Response
     {
         return null;
+    }
+
+    /**
+     * The token's credential epoch, when the user's credentials have not changed since it was
+     * issued; otherwise the token is refused.
+     */
+    private function currentCredentialEpoch(string $accessTokenId): int
+    {
+        try {
+            $epoch = $this->accessTokenRepository->currentCredentialEpoch(TokenId::fromString($accessTokenId));
+        } catch (\InvalidArgumentException) {
+            $epoch = null;
+        }
+        if ($epoch === null) {
+            $this->logger->info('OAuth2 token issued before a password change refused.', ['access_token_id' => $accessTokenId]);
+            throw new CustomUserMessageAuthenticationException(
+                AuthenticationFailureMessage::INVALID_TOKEN,
+                ['error_code' => 'AUTH_INVALID_TOKEN'],
+            );
+        }
+
+        return $epoch;
     }
 
     /** Only the client registered as Baander's own, under its configured public ID, is first-party. */

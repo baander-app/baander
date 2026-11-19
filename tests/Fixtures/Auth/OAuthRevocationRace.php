@@ -14,10 +14,13 @@ use App\Auth\Application\Service\TokenPairIssuer;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Model\UserState;
+use App\Auth\Infrastructure\Doctrine\UserRepository;
+use App\Auth\Infrastructure\Repository\EmailVerificationTokenRepository;
 use App\Auth\Infrastructure\Repository\OAuth\AccessTokenRepository;
 use App\Auth\Infrastructure\Repository\OAuth\ClientRepository;
 use App\Auth\Infrastructure\Repository\OAuth\RefreshTokenRepository;
 use App\Auth\Infrastructure\Repository\OAuth\TokenMetadataRepository;
+use App\Auth\Infrastructure\Repository\PasswordResetTokenRepository;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
@@ -96,11 +99,13 @@ final class OAuthRevocationRace
             new TokenMetadataRepository($manager),
             $clients,
             self::transaction($manager),
+            new UserRepository($manager, new PasswordResetTokenRepository($manager->getConnection()), new EmailVerificationTokenRepository($manager->getConnection())),
             3600,
             86400,
+            7776000,
         );
 
-        return $issuer->issue($client, $user, ['profile'], 'race-proof-key-thumbprint', persistWithTokens: $whileLocked);
+        return $issuer->issue($client, $user, ['profile'], 'race-proof-key-thumbprint', $user->getCredentialEpoch(), persistWithTokens: $whileLocked);
     }
 
     /**

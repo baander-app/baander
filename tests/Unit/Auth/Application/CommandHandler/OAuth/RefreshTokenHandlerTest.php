@@ -72,6 +72,10 @@ final class RefreshTokenHandlerTest extends TestCase
     private array $savedMetadata = [];
     /** What the rotation transaction finds when it locks the client's row. */
     private bool $clientActiveAtIssuance = true;
+    /** The user's credential epoch as the rotation finds it under the row lock. */
+    private int $lockedCredentialEpoch = 0;
+    /** Whether the database finds the presented token's chain past its absolute expiry. */
+    private bool $chainExpired = false;
     /** @var array<string, true> IDs of the users the user repository reports as disabled */
     private array $disabledUserIds = [];
     /** @var array<string, true> IDs of the users the user repository no longer finds */
@@ -130,6 +134,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
             return false;
         });
+        $this->refreshTokenRepository->method('chainExpired')->willReturnCallback(fn (): bool => $this->chainExpired);
         $this->refreshTokenRepository->method('chainHoldsLiveToken')->willReturnCallback(fn (): bool => $this->chainHoldsLiveToken);
         $this->refreshTokenRepository->method('revokeByIds')->willReturnCallback(function (array $ids): int {
             $this->events[] = 'revoke replacements';
@@ -317,6 +322,71 @@ final class RefreshTokenHandlerTest extends TestCase
     // --- Lost-response grace ---
 
     /** The retry of a lost response gets a fresh pair; the unused replacement is superseded. */
+    /**
+     * The user's row is locked before the presented token is consumed, and a chain issued
+     * under an earlier credential epoch is refused without issuing or revoking anything.
+     */
+    public function testAChainIssuedBeforeAPasswordChangeIsRefusedUnderTheUserLock(): void
+    {
+        $chainId = ChainId::generate();
+        $presented = $this->store(RefreshToken::issue(
+            AccessToken::issue($this->createConfidentialClient(), User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User'), [], null, new \DateInterval('PT3600S'), $chainId, self::JKT, credentialEpoch: 1),
+            $chainId,
+            new \DateInterval('PT2592000S'),
+        ));
+        $this->lockedCredentialEpoch = 2;
+
+        try {
+            ($this->handler)(new RefreshTokenCommand(refreshTokenId: $presented->getTokenId()->toString(), dpopJkt: self::JKT));
+            self::fail('A chain behind the user\'s credential epoch must not rotate.');
+        } catch (RefreshTokenRejectedException $rejection) {
+            self::assertSame(RefreshTokenRejectedException::credentialsChanged()->getMessage(), $rejection->getMessage());
+            self::assertNull($rejection->chainToRevoke);
+        }
+        self::assertSame(['begin', 'lock user', 'rolled back'], $this->events);
+        self::assertSame([], $this->savedAccessTokens);
+        self::assertSame([], $this->savedRefreshTokens);
+    }
+
+    /** The replacement pair carries the epoch locked for the rotation and the chain's absolute expiry. */
+    public function testTheReplacementCarriesTheLockedEpochAndTheChainExpiry(): void
+    {
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
+        $chainId = ChainId::generate();
+        $presented = $this->store(RefreshToken::issue(
+            AccessToken::issue($this->createConfidentialClient(), $user, [], null, new \DateInterval('PT3600S'), $chainId, self::JKT, credentialEpoch: 3),
+            $chainId,
+            new \DateInterval('PT2592000S'),
+            maxChainLifetime: new \DateInterval('PT7776000S'),
+        ));
+        $this->lockedCredentialEpoch = 3;
+
+        ($this->handler)(new RefreshTokenCommand(refreshTokenId: $presented->getTokenId()->toString(), dpopJkt: self::JKT));
+
+        self::assertSame(3, $this->savedAccessTokens[0]->getCredentialEpoch());
+        self::assertSame(3, $this->savedRefreshTokens[0]->getCredentialEpoch());
+        self::assertEquals($presented->getChainExpiresAt(), $this->savedRefreshTokens[0]->getChainExpiresAt());
+    }
+
+    /** A lost-response grace issues a pair of the same chain, so it stops at the chain's absolute expiry. */
+    public function testAGraceOfAChainPastItsAbsoluteExpiryIsRefusedWithoutRevoking(): void
+    {
+        $chainId = ChainId::generate();
+        $r1 = $this->usedRefreshToken($chainId, new \DateTimeImmutable('-5 seconds'));
+        $this->replacementOf($r1);
+        $this->chainExpired = true;
+
+        try {
+            ($this->handler)(new RefreshTokenCommand(refreshTokenId: $r1->getTokenId()->toString(), dpopJkt: self::JKT));
+            self::fail('A chain past its absolute expiry must not be graced.');
+        } catch (RefreshTokenRejectedException $rejection) {
+            self::assertSame(RefreshTokenRejectedException::expired()->getMessage(), $rejection->getMessage());
+            self::assertNull($rejection->chainToRevoke);
+        }
+        self::assertSame([], $this->revokedRefreshIds);
+        self::assertSame([], $this->savedRefreshTokens);
+    }
+
     public function testAUsedTokenPresentedAgainWithinTheWindowGetsAFreshPairAndSupersedesTheUnusedReplacement(): void
     {
         $chainId = ChainId::generate();
@@ -350,7 +420,7 @@ final class RefreshTokenHandlerTest extends TestCase
         self::assertSame('bound-fingerprint', $this->savedMetadata[0]->getClientFingerprint());
         self::assertSame('10.0.0.7', $this->savedMetadata[0]->getIpAddress());
         self::assertSame(
-            ['begin', 'lock presented', 'lock successors', 'window check', 'revoke replacements', 'revoke replacement access tokens', 'save access', 'save refresh', 'committed'],
+            ['begin', 'lock user', 'lock presented', 'lock successors', 'window check', 'revoke replacements', 'revoke replacement access tokens', 'save access', 'save refresh', 'committed'],
             $this->events,
             'Revocations by id run before any persist, inside the issuing transaction.',
         );
@@ -386,7 +456,7 @@ final class RefreshTokenHandlerTest extends TestCase
         $this->assertRejected(
             $r1,
             'Refresh token reuse detected: a replacement was already used.',
-            ['begin', 'lock presented', 'lock successors', 'window check', 'rolled back', 'begin', 'revoke chain refresh tokens ' . $chainId->toString(), 'list chain access tokens ' . $chainId->toString(), 'revoke chain access tokens ' . $chainId->toString(), 'committed', 'close sockets'],
+            ['begin', 'lock user', 'lock presented', 'lock successors', 'window check', 'rolled back', 'begin', 'revoke chain refresh tokens ' . $chainId->toString(), 'list chain access tokens ' . $chainId->toString(), 'revoke chain access tokens ' . $chainId->toString(), 'committed', 'close sockets'],
         );
         self::assertSame([], $this->savedRefreshTokens);
         $this->assertLogged('warning', 'replacement used', $chainId, [$r1, $r2]);
@@ -403,7 +473,7 @@ final class RefreshTokenHandlerTest extends TestCase
         $this->assertRejected(
             $r1,
             'Refresh token reuse detected: a replacement was already used.',
-            ['begin', 'lock presented', 'lock successors', 'window check', 'rolled back', 'begin', 'revoke chain refresh tokens ' . $chainId->toString(), 'list chain access tokens ' . $chainId->toString(), 'revoke chain access tokens ' . $chainId->toString(), 'committed', 'close sockets'],
+            ['begin', 'lock user', 'lock presented', 'lock successors', 'window check', 'rolled back', 'begin', 'revoke chain refresh tokens ' . $chainId->toString(), 'list chain access tokens ' . $chainId->toString(), 'revoke chain access tokens ' . $chainId->toString(), 'committed', 'close sockets'],
         );
         self::assertSame(
             [[$r1->getAccessToken()->getTokenId()->toString(), $r2->getAccessToken()->getTokenId()->toString()]],
@@ -424,7 +494,7 @@ final class RefreshTokenHandlerTest extends TestCase
         $this->assertRejected(
             $r1,
             'Refresh token reuse detected: a replacement was already used.',
-            ['begin', 'lock presented', 'lock successors', 'window check', 'rolled back', 'begin', 'revoke chain refresh tokens ' . $chainId->toString(), 'list chain access tokens ' . $chainId->toString(), 'revoke chain access tokens ' . $chainId->toString(), 'committed', 'close sockets'],
+            ['begin', 'lock user', 'lock presented', 'lock successors', 'window check', 'rolled back', 'begin', 'revoke chain refresh tokens ' . $chainId->toString(), 'list chain access tokens ' . $chainId->toString(), 'revoke chain access tokens ' . $chainId->toString(), 'committed', 'close sockets'],
         );
         $errors = array_values(array_filter($this->logs, static fn (array $record): bool => $record['level'] === 'error'));
         self::assertCount(1, $errors);
@@ -442,7 +512,7 @@ final class RefreshTokenHandlerTest extends TestCase
         $this->assertRejected(
             $r1,
             'Refresh token reuse detected: presented again outside the grace window.',
-            ['begin', 'lock presented', 'lock successors', 'window check', 'rolled back', 'begin', 'revoke chain refresh tokens ' . $chainId->toString(), 'list chain access tokens ' . $chainId->toString(), 'revoke chain access tokens ' . $chainId->toString(), 'committed', 'close sockets'],
+            ['begin', 'lock user', 'lock presented', 'lock successors', 'window check', 'rolled back', 'begin', 'revoke chain refresh tokens ' . $chainId->toString(), 'list chain access tokens ' . $chainId->toString(), 'revoke chain access tokens ' . $chainId->toString(), 'committed', 'close sockets'],
         );
         self::assertSame([], $this->revokedRefreshIds, 'No replacement is superseded on a reuse verdict.');
         $this->assertLogged('warning', 'outside window', $chainId, [$r1, $r2]);
@@ -458,7 +528,7 @@ final class RefreshTokenHandlerTest extends TestCase
         $this->assertRejected(
             $r1,
             'Refresh token reuse detected: presented again outside the grace window.',
-            ['begin', 'lock presented', 'lock successors', 'rolled back', 'begin', 'revoke chain refresh tokens ' . $chainId->toString(), 'list chain access tokens ' . $chainId->toString(), 'revoke chain access tokens ' . $chainId->toString(), 'committed', 'close sockets'],
+            ['begin', 'lock user', 'lock presented', 'lock successors', 'rolled back', 'begin', 'revoke chain refresh tokens ' . $chainId->toString(), 'list chain access tokens ' . $chainId->toString(), 'revoke chain access tokens ' . $chainId->toString(), 'committed', 'close sockets'],
         );
     }
 
@@ -507,7 +577,7 @@ final class RefreshTokenHandlerTest extends TestCase
         $this->assertRejected(
             $r2,
             'Refresh token reuse detected: a superseded token was presented.',
-            ['begin', 'lock presented', 'lock successors', 'rolled back', 'begin', 'revoke chain refresh tokens ' . $chainId->toString(), 'list chain access tokens ' . $chainId->toString(), 'revoke chain access tokens ' . $chainId->toString(), 'committed', 'close sockets'],
+            ['begin', 'lock user', 'lock presented', 'lock successors', 'rolled back', 'begin', 'revoke chain refresh tokens ' . $chainId->toString(), 'list chain access tokens ' . $chainId->toString(), 'revoke chain access tokens ' . $chainId->toString(), 'committed', 'close sockets'],
         );
         $this->assertLogged('warning', 'superseded token presented', $chainId, [$r1, $r2]);
     }
@@ -538,7 +608,7 @@ final class RefreshTokenHandlerTest extends TestCase
         $r2->revoke();
         $this->chainHoldsLiveToken = false;
 
-        $this->assertRejected($r2, 'Refresh token has been revoked.', ['begin', 'lock presented', 'lock successors', 'rolled back']);
+        $this->assertRejected($r2, 'Refresh token has been revoked.', ['begin', 'lock user', 'lock presented', 'lock successors', 'rolled back']);
     }
 
     public function testARevokedUsedTokenIsRefusedAsRevokedWithoutLocking(): void
@@ -560,7 +630,7 @@ final class RefreshTokenHandlerTest extends TestCase
         $this->assertRejected(
             $r1,
             'Refresh token was consumed by a concurrent request.',
-            ['begin', 'lock presented', 'lock successors', 'window check', 'rolled back'],
+            ['begin', 'lock user', 'lock presented', 'lock successors', 'window check', 'rolled back'],
         );
         self::assertSame([], $this->revokedRefreshIds);
         $this->assertLogged('info', 'concurrent loser', $chainId, [$r1, $r2]);
@@ -1227,6 +1297,11 @@ final class RefreshTokenHandlerTest extends TestCase
             updatedAt: new \DateTimeImmutable(),
             disabled: isset($this->disabledUserIds[$id->toString()]),
         )));
+        $users->method('lockCredentialEpoch')->willReturnCallback(function (Uuid $id): ?int {
+            $this->events[] = 'lock user';
+
+            return isset($this->deletedUserIds[$id->toString()]) ? null : $this->lockedCredentialEpoch;
+        });
 
         return $users;
     }

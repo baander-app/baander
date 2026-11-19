@@ -37,6 +37,8 @@ final class AccessTokenState
         public DateTimeImmutable $updatedAt,
         public bool $revoked = false,
         public readonly ?string $dpopJkt = null,
+        /** The user's credential epoch the token was issued under. */
+        public readonly int $credentialEpoch = 0,
     ) {
         $this->scopes = $scopes;
     }

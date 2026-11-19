@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Auth\Infrastructure\Security;
 use App\Auth\Application\Http\AccessTokenAttributes;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\TokenId;
+use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Domain\Model\OAuth\TokenMetadata;
@@ -50,6 +51,7 @@ final class OAuth2AuthenticatorTest extends TestCase
             $tokenMetadataRepository,
             AuthenticationFailureMessages::create(),
             $this->createStub(ClientRepositoryInterface::class),
+            $this->createStub(AccessTokenRepositoryInterface::class),
             self::SPA_CLIENT_ID,
         );
     }
@@ -185,6 +187,31 @@ final class OAuth2AuthenticatorTest extends TestCase
 
         $this->expectException(CustomUserMessageAuthenticationException::class);
         $this->createAuthenticator($tokenMetadataRepository)->authenticate($request);
+    }
+
+    /** The approval endpoints read the epoch the token was issued under from the request. */
+    public function testACurrentTokenSetsItsCredentialEpochOnTheRequest(): void
+    {
+        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), (new \App\Shared\Domain\Model\PublicId())->toString());
+        $request = Request::create('/');
+        $request->headers->set('Authorization', 'Bearer token123');
+
+        $this->createAuthenticator($this->createStub(TokenMetadataRepositoryInterface::class), credentialEpoch: 5)->authenticate($request);
+
+        self::assertSame(5, $request->attributes->get(AccessTokenAttributes::CREDENTIAL_EPOCH));
+    }
+
+    /** A token issued before the user's latest password change is refused, even when nothing revoked it. */
+    public function testATokenBehindTheUsersCredentialEpochDoesNotAuthenticate(): void
+    {
+        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), (new \App\Shared\Domain\Model\PublicId())->toString());
+        $request = Request::create('/');
+        $request->headers->set('Authorization', 'Bearer token123');
+
+        $this->expectException(CustomUserMessageAuthenticationException::class);
+        $this->expectExceptionMessage('Invalid or expired token.');
+
+        $this->createAuthenticator($this->createStub(TokenMetadataRepositoryInterface::class), credentialEpoch: null)->authenticate($request);
     }
 
     public function testATokenOfADisabledAccountDoesNotAuthenticate(): void
@@ -382,6 +409,7 @@ final class OAuth2AuthenticatorTest extends TestCase
         ?\App\Auth\Domain\Model\User $user = null,
         ?\App\Auth\Domain\Repository\UserRepositoryInterface $userRepository = null,
         ?Client $client = null,
+        ?int $credentialEpoch = 5,
     ): OAuth2Authenticator {
         if ($userRepository === null) {
             $userRepository = $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class);
@@ -389,6 +417,9 @@ final class OAuth2AuthenticatorTest extends TestCase
         }
         $clients = $this->createStub(ClientRepositoryInterface::class);
         $clients->method('findClientByPublicId')->willReturn($client);
+        // Null stands for a token whose user changed the password after it was issued.
+        $accessTokens = $this->createStub(AccessTokenRepositoryInterface::class);
+        $accessTokens->method('currentCredentialEpoch')->willReturn($credentialEpoch);
 
         return new OAuth2Authenticator(
             $this->resourceServer,
@@ -398,6 +429,7 @@ final class OAuth2AuthenticatorTest extends TestCase
             $tokenMetadataRepository,
             AuthenticationFailureMessages::create(),
             $clients,
+            $accessTokens,
             self::SPA_CLIENT_ID,
         );
     }

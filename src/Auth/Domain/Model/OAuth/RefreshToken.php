@@ -24,21 +24,24 @@ final class RefreshToken
     }
 
     /**
-     * Issue a new refresh token.
+     * Issue a new refresh token under its access token's credential epoch.
      *
      * When issued as part of a token rotation, pass the previous refresh token
-     * to maintain chain continuity. For initial issuance, pass null.
+     * to maintain chain continuity; the chain keeps the absolute expiry it got when
+     * it started. For initial issuance, pass null and the chain's maximum lifetime.
      */
     public static function issue(
         AccessToken $accessToken,
         ?ChainId $chainId = null,
         ?DateInterval $ttl = null,
         ?self $previousRefreshToken = null,
+        ?DateInterval $maxChainLifetime = null,
     ): self {
-        $expiresAt = null;
-        if ($ttl !== null) {
-            $expiresAt = (new DateTimeImmutable())->add($ttl);
-        }
+        $now = new DateTimeImmutable();
+        $expiresAt = $ttl === null ? null : $now->add($ttl);
+        $chainExpiresAt = $previousRefreshToken === null
+            ? ($maxChainLifetime === null ? null : $now->add($maxChainLifetime))
+            : $previousRefreshToken->getChainExpiresAt();
 
         return new self(new RefreshTokenState(
             id: new Uuid(),
@@ -48,8 +51,10 @@ final class RefreshToken
             previousRefreshToken: $previousRefreshToken,
             expiresAt: $expiresAt,
             usedAt: null,
-            createdAt: new DateTimeImmutable(),
-            updatedAt: new DateTimeImmutable(),
+            createdAt: $now,
+            updatedAt: $now,
+            chainExpiresAt: $chainExpiresAt,
+            credentialEpoch: $accessToken->getCredentialEpoch(),
         ));
     }
 
@@ -104,9 +109,24 @@ final class RefreshToken
         return $this->state->id;
     }
 
+    /**
+     * The token to hand to the client. Only the request that issued the token knows it; a
+     * token read back from storage has only its hash.
+     */
     public function getTokenId(): TokenId
     {
-        return $this->state->tokenId;
+        return $this->state->tokenId
+            ?? throw new \LogicException('A stored refresh token keeps only its hash.');
+    }
+
+    public function getChainExpiresAt(): ?DateTimeImmutable
+    {
+        return $this->state->chainExpiresAt;
+    }
+
+    public function getCredentialEpoch(): int
+    {
+        return $this->state->credentialEpoch;
     }
 
     public function getAccessToken(): AccessToken

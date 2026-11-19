@@ -65,6 +65,10 @@ class AuthCodeEntity implements AuthCodeEntityInterface
     #[ORM\Column(type: 'text')]
     private string $dpopJkt;
 
+    /** The user's credential epoch when the code was approved; the exchange refuses a later one. */
+    #[ORM\Column(type: 'integer', updatable: false)]
+    private int $credentialEpoch;
+
     /** The token chain the code's exchange started; presenting the code again revokes it. */
     #[ORM\Column(type: 'uuid', nullable: true)]
     private ?Uuid $chainId = null;
@@ -81,9 +85,11 @@ class AuthCodeEntity implements AuthCodeEntityInterface
         ?array $scopes = null,
         ?\DateTimeImmutable $expiresAt = null,
         ?Uuid $id = null,
+        int $credentialEpoch = 0,
     ) {
         $this->id = $id ?? new Uuid();
         $this->codeId = $codeId;
+        $this->credentialEpoch = $credentialEpoch;
         $this->user = $user;
         $this->client = $client;
         $this->redirectUri = $redirectUri;
@@ -282,5 +288,10 @@ class AuthCodeEntity implements AuthCodeEntityInterface
     {
         $this->codeChallengeMethod = $codeChallengeMethod;
         $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function getCredentialEpoch(): int
+    {
+        return $this->credentialEpoch;
     }
 }

@@ -24,6 +24,7 @@ use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Domain\Service\TokenChainValidator;
 use App\Shared\Application\Port\TransactionPortInterface;
+use App\Shared\Domain\Model\Uuid;
 use DateInterval;
 use Doctrine\ORM\EntityManagerInterface;
 use InvalidArgumentException;
@@ -60,6 +61,14 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * proof from a different key is refused without revoking anything. The loser of two
  * simultaneous presentations, whose conditional consume changed no row, runs the same
  * locked evaluation, so two presentations leave exactly one usable pair.
+ *
+ * Credential fence: after the client's row, the transaction locks the user's row and
+ * reads the credential epoch. The presented token, read again under that lock, must
+ * carry the same epoch; a chain issued before a password change is refused, and the
+ * replacement pair carries the locked epoch. A password change locks the user's row
+ * before it revokes tokens, so a rotation either commits first and is revoked with the
+ * rest, or waits and is refused. A chain past its absolute expiry (chain_expires_at,
+ * on the database clock) is refused like an expired token, without revoking anything.
  */
 final class RefreshTokenHandler
 {
@@ -182,14 +191,16 @@ final class RefreshTokenHandler
         }
 
         try {
-            return $this->transaction->run(function () use ($refreshTokenId, $command, $tokenClient, $lockedEvaluation): TokenResponseDTO {
+            return $this->transaction->run(function () use ($refreshTokenId, $command, $tokenClient, $tokenUser, $lockedEvaluation): TokenResponseDTO {
                 IssuanceLockTimeout::apply($this->entityManager);
                 if (!$this->clientRepository->lockActiveClientForIssuance($tokenClient->getId())) {
                     throw self::clientRevoked();
                 }
+                // Locked before any token row, in the order a password change takes them.
+                $credentialEpoch = $tokenUser === null ? null : $this->lockCredentialEpoch($tokenUser->getId());
 
                 if ($lockedEvaluation) {
-                    return $this->evaluateUnderLock($refreshTokenId, $command);
+                    return $this->evaluateUnderLock($refreshTokenId, $command, $credentialEpoch);
                 }
 
                 // Atomically consume the refresh token. If another request already used
@@ -197,8 +208,9 @@ final class RefreshTokenHandler
                 // race gets the same locked verdict as a token presented again.
                 $consumedToken = $this->refreshTokenRepository->consumeByTokenId($refreshTokenId);
                 if ($consumedToken === null) {
-                    return $this->evaluateUnderLock($refreshTokenId, $command);
+                    return $this->evaluateUnderLock($refreshTokenId, $command, $credentialEpoch);
                 }
+                self::assertCredentialEpoch($consumedToken, $credentialEpoch);
 
                 // The conditional UPDATE already stamped used_at on the database clock, which
                 // the grace window is measured on; saving the token again would restamp it
@@ -209,7 +221,7 @@ final class RefreshTokenHandler
                 $oldAccessToken->revoke();
                 $this->accessTokenRepository->save($oldAccessToken, false);
 
-                return $this->issuePair($consumedToken, $command);
+                return $this->issuePair($consumedToken, $command, $credentialEpoch);
             });
         } catch (RefreshTokenRejectedException $rejection) {
             // The issuing transaction rolled back; a reuse verdict now ends the chain.
@@ -225,12 +237,13 @@ final class RefreshTokenHandler
      * successors as they are under the row lock. Returns the fresh pair of a
      * grace; every other outcome is a rejection, which rolls the transaction back.
      */
-    private function evaluateUnderLock(TokenId $refreshTokenId, RefreshTokenCommand $command): TokenResponseDTO
+    private function evaluateUnderLock(TokenId $refreshTokenId, RefreshTokenCommand $command, ?int $credentialEpoch): TokenResponseDTO
     {
         $presented = $this->refreshTokenRepository->lockByTokenId($refreshTokenId);
         if ($presented === null) {
             throw RefreshTokenRejectedException::notFound();
         }
+        self::assertCredentialEpoch($presented, $credentialEpoch);
         $chainId = $presented->getChainId();
         if ($chainId === null) {
             // Outside the rotation model there is no chain to grace into.
@@ -261,6 +274,11 @@ final class RefreshTokenHandler
             if ($successor->hasBeenUsed()) {
                 throw RefreshTokenRejectedException::replacementUsed($chainId);
             }
+        }
+
+        // A grace issues a pair of the same chain, so the chain's absolute expiry applies.
+        if ($this->refreshTokenRepository->chainExpired($presented->getId())) {
+            throw RefreshTokenRejectedException::expired();
         }
 
         $live = array_values(array_filter($successors, static fn (RefreshToken $successor): bool => !$successor->isRevoked()));
@@ -294,7 +312,7 @@ final class RefreshTokenHandler
             throw new LogicException(sprintf('The grace revoked %d of %d replacement access tokens.', $revokedAccessTokens, count($accessTokenIds)));
         }
 
-        $response = $this->issuePair($presented, $command);
+        $response = $this->issuePair($presented, $command, $credentialEpoch);
         $this->logger->info('Refresh token grace: a consumed token presented again within the window got a fresh pair.', [
             'chain_id' => $chainId->toString(),
             'reason' => 'grace',
@@ -305,10 +323,12 @@ final class RefreshTokenHandler
     }
 
     /**
-     * Issues the next pair of the chain from the presented token's access token, writes
-     * it, carries the client fingerprint binding over and signs inside the transaction.
+     * Issues the next pair of the chain from the presented token's access token, under the
+     * credential epoch locked for this rotation, writes it, carries the client fingerprint
+     * binding over and signs inside the transaction. The refresh token keeps the chain's
+     * absolute expiry.
      */
-    private function issuePair(RefreshToken $predecessor, RefreshTokenCommand $command): TokenResponseDTO
+    private function issuePair(RefreshToken $predecessor, RefreshTokenCommand $command, ?int $credentialEpoch): TokenResponseDTO
     {
         $template = $predecessor->getAccessToken();
         $chainId = $predecessor->getChainId();
@@ -321,6 +341,7 @@ final class RefreshTokenHandler
             $this->accessTokenTtl,
             $chainId,
             $template->getDpopJkt(),
+            $credentialEpoch ?? $predecessor->getCredentialEpoch(),
         );
 
         $newRefreshToken = RefreshToken::issue(
@@ -373,6 +394,24 @@ final class RefreshTokenHandler
             'reason' => $reason,
         ]);
         $this->connectionCloser->close($accessTokenIds, $chainId);
+    }
+
+    /**
+     * The user's credential epoch under the row lock; a user deleted since the token was
+     * read is refused like a disabled one.
+     */
+    private function lockCredentialEpoch(Uuid $userId): int
+    {
+        return $this->userRepository->lockCredentialEpoch($userId)
+            ?? throw RefreshTokenRejectedException::accountDisabled();
+    }
+
+    /** The token, as read under the user's row lock, must carry the user's current epoch. */
+    private static function assertCredentialEpoch(RefreshToken $token, ?int $credentialEpoch): void
+    {
+        if ($credentialEpoch !== null && $token->getCredentialEpoch() !== $credentialEpoch) {
+            throw RefreshTokenRejectedException::credentialsChanged();
+        }
     }
 
     private static function clientRevoked(): OAuthProtocolException

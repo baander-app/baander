@@ -63,6 +63,12 @@ final class RefreshTokenRejectedException extends RuntimeException
         return new self('Refresh token belongs to a disabled or deleted account.');
     }
 
+    /** A password change since the chain was issued ended it; the change already revoked it. */
+    public static function credentialsChanged(): self
+    {
+        return new self('Refresh token was issued before the account\'s credentials changed.');
+    }
+
     public static function proofBindingMismatch(): self
     {
         return new self('Refresh token proof binding does not match.');

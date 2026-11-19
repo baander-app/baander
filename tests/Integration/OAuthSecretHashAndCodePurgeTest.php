@@ -202,6 +202,7 @@ final class OAuthSecretHashAndCodePurgeTest extends TestCase
             'code_challenge' => 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
             'code_challenge_method' => 'S256',
             'dpop_jkt' => 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs',
+            'credential_epoch' => 0,
             'revoked' => $revoked ? 'true' : 'false',
             'expires_at' => $expiresAt,
             'created_at' => '2026-10-06 12:00:00+00',

@@ -31,11 +31,13 @@ final class PasswordChangerTest extends TestCase
     {
         $user = User::register(new Email('owner@baander.app'), 'old-hash', 'Owner');
 
-        $this->changer()->change($user, 'new-password');
+        $changer = $this->changer();
+        $changer->change($user, $changer->hash('new-password'));
 
         self::assertSame('hashed:new-password', $user->getPassword());
         self::assertSame([
             'hash',
+            'advance epoch of ' . $user->getId()->toString(),
             'save:hashed:new-password',
             'revoke access for ' . $user->getId()->toString() . ' keeping none',
             'revoke refresh for ' . $user->getId()->toString() . ' keeping none',
@@ -48,11 +50,15 @@ final class PasswordChangerTest extends TestCase
         $user = User::register(new Email('owner@baander.app'), 'old-hash', 'Owner');
         $keep = AccessToken::issue(Client::create('SPA', ['https://baander.app']), $user);
 
-        $this->changer()->change($user, 'new-password', $keep);
+        $changer = $this->changer();
+        $changer->change($user, $changer->hash('new-password'), $keep);
 
         $kept = ' keeping ' . $keep->getTokenId()->toString();
         self::assertContains('revoke access for ' . $user->getId()->toString() . $kept, $this->calls);
         self::assertContains('revoke refresh for ' . $user->getId()->toString() . $kept, $this->calls);
+        // The kept session moves to the new epoch, so it still authenticates and refreshes.
+        self::assertContains('restamp access ' . $keep->getTokenId()->toString() . ' to 8', $this->calls);
+        self::assertContains('restamp refresh ' . $keep->getTokenId()->toString() . ' to 8', $this->calls);
     }
 
     /** @return iterable<string, array{string}> */
@@ -68,7 +74,7 @@ final class PasswordChangerTest extends TestCase
         $user = User::register(new Email('owner@baander.app'), 'old-hash', 'Owner');
 
         try {
-            $this->changer()->change($user, $password);
+            $this->changer()->hash($password);
             self::fail('The policy must reject the password.');
         } catch (PasswordPolicyException) {
         }
@@ -81,8 +87,9 @@ final class PasswordChangerTest extends TestCase
     {
         $user = User::register(new Email('owner@baander.app'), 'old-hash', 'Owner');
 
-        $this->changer()->change($user, str_repeat('æ', 8));
-        $this->changer()->change($user, str_repeat('æ', 255));
+        $changer = $this->changer();
+        $changer->change($user, $changer->hash(str_repeat('æ', 8)));
+        $changer->change($user, $changer->hash(str_repeat('æ', 255)));
 
         self::assertSame('hashed:' . str_repeat('æ', 255), $user->getPassword());
     }
@@ -97,6 +104,12 @@ final class PasswordChangerTest extends TestCase
             return 'hashed:' . $plain;
         });
         $users = $this->createStub(UserRepositoryInterface::class);
+        $users->method('advanceCredentialEpoch')->willReturnCallback(function (Uuid $userId): int {
+            $this->assertTransaction();
+            $this->calls[] = 'advance epoch of ' . $userId->toString();
+
+            return 8;
+        });
         $users->method('save')->willReturnCallback(function (User $user): void {
             $this->assertTransaction();
             $this->calls[] = 'save:' . $user->getPassword();
@@ -106,7 +119,15 @@ final class PasswordChangerTest extends TestCase
             $this->assertTransaction();
             $this->calls[] = 'revoke access for ' . $userId->toString() . ' keeping ' . ($keep?->getTokenId()->toString() ?? 'none');
         });
+        $accessTokens->method('restampCredentialEpoch')->willReturnCallback(function (AccessToken $keep, int $epoch): void {
+            $this->assertTransaction();
+            $this->calls[] = 'restamp access ' . $keep->getTokenId()->toString() . ' to ' . $epoch;
+        });
         $refreshTokens = $this->createStub(RefreshTokenRepositoryInterface::class);
+        $refreshTokens->method('restampCredentialEpoch')->willReturnCallback(function (AccessToken $keep, int $epoch): void {
+            $this->assertTransaction();
+            $this->calls[] = 'restamp refresh ' . $keep->getTokenId()->toString() . ' to ' . $epoch;
+        });
         $refreshTokens->method('revokeForUser')->willReturnCallback(function (Uuid $userId, ?AccessToken $keep): void {
             $this->assertTransaction();
             $this->calls[] = 'revoke refresh for ' . $userId->toString() . ' keeping ' . ($keep?->getTokenId()->toString() ?? 'none');

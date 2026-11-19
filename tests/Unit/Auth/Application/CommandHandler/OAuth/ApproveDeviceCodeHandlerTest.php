@@ -52,10 +52,11 @@ final class ApproveDeviceCodeHandlerTest extends TestCase
     {
         $code = $this->pending();
 
-        ($this->approveHandler())(new ApproveDeviceCodeCommand('bcdf ghjk', $this->user()->getId()));
+        ($this->approveHandler())(new ApproveDeviceCodeCommand('bcdf ghjk', $this->user()->getId(), 4));
 
         self::assertTrue($code->isApproved());
         self::assertSame($this->user, $code->getUser());
+        self::assertSame(4, $code->getCredentialEpoch(), 'The code carries the approving token\'s credential epoch.');
         self::assertSame([$code], $this->approved);
         self::assertCount(1, $this->events);
         self::assertInstanceOf(DeviceCodeApproved::class, $this->events[0]);
@@ -67,7 +68,7 @@ final class ApproveDeviceCodeHandlerTest extends TestCase
         $this->pending();
         $this->stillPending = false;
 
-        $this->assertReason(DeviceUserCodeException::ALREADY_PROCESSED, fn () => ($this->approveHandler())(new ApproveDeviceCodeCommand(self::USER_CODE, $this->user()->getId())));
+        $this->assertReason(DeviceUserCodeException::ALREADY_PROCESSED, fn () => ($this->approveHandler())(new ApproveDeviceCodeCommand(self::USER_CODE, $this->user()->getId(), 0)));
         self::assertSame([], $this->events);
     }
 
@@ -99,7 +100,7 @@ final class ApproveDeviceCodeHandlerTest extends TestCase
         usleep(1000);
 
         foreach (['ZZZZ-ZZZZ', 'not a code', self::USER_CODE] as $input) {
-            $this->assertReason(DeviceUserCodeException::INVALID, fn () => ($this->approveHandler())(new ApproveDeviceCodeCommand($input, $this->user()->getId())));
+            $this->assertReason(DeviceUserCodeException::INVALID, fn () => ($this->approveHandler())(new ApproveDeviceCodeCommand($input, $this->user()->getId(), 0)));
             $this->assertReason(DeviceUserCodeException::INVALID, fn () => ($this->denyHandler())(new DenyDeviceCodeCommand($input, $this->user()->getId())));
             $this->assertReason(DeviceUserCodeException::INVALID, fn () => ($this->lookupHandler())(new GetDeviceAuthorizationQuery($input)));
         }
@@ -111,7 +112,7 @@ final class ApproveDeviceCodeHandlerTest extends TestCase
         $code = $this->pending();
         $code->deny();
 
-        $this->assertReason(DeviceUserCodeException::ALREADY_PROCESSED, fn () => ($this->approveHandler())(new ApproveDeviceCodeCommand(self::USER_CODE, $this->user()->getId())));
+        $this->assertReason(DeviceUserCodeException::ALREADY_PROCESSED, fn () => ($this->approveHandler())(new ApproveDeviceCodeCommand(self::USER_CODE, $this->user()->getId(), 0)));
         $this->assertReason(DeviceUserCodeException::ALREADY_PROCESSED, fn () => ($this->lookupHandler())(new GetDeviceAuthorizationQuery(self::USER_CODE)));
         self::assertFalse($code->isApproved());
     }
@@ -125,7 +126,7 @@ final class ApproveDeviceCodeHandlerTest extends TestCase
         $this->expectExceptionMessage('User not found');
 
         try {
-            ($this->approveHandler())(new ApproveDeviceCodeCommand(self::USER_CODE, Uuid::v4()));
+            ($this->approveHandler())(new ApproveDeviceCodeCommand(self::USER_CODE, Uuid::v4(), 0));
         } finally {
             self::assertTrue($code->isPending());
         }

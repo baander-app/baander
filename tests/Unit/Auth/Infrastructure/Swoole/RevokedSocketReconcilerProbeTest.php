@@ -45,6 +45,8 @@ final class TickRepository implements App\Auth\Domain\Repository\OAuth\AccessTok
     public function revokeByIds(array $ids): int { return 0; }
     public function revokeForUser(App\Shared\Domain\Model\Uuid $userId, ?App\Auth\Domain\Model\OAuth\AccessToken $keep = null): void {}
     public function revokeByClientId(App\Shared\Domain\Model\Uuid $clientId): void {}
+    public function currentCredentialEpoch(App\Auth\Domain\Model\OAuth\TokenId $tokenId): ?int { return 0; }
+    public function restampCredentialEpoch(App\Auth\Domain\Model\OAuth\AccessToken $keep, int $credentialEpoch): void {}
 }
 final class CountingConnections implements App\Shared\Application\Port\LiveConnectionsPortInterface {
     /** @var list<list<string>> */

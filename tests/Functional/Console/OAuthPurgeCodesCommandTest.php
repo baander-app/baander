@@ -63,6 +63,7 @@ final class OAuthPurgeCodesCommandTest extends TestCase
             'code_challenge' => 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
             'code_challenge_method' => 'S256',
             'dpop_jkt' => 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs',
+            'credential_epoch' => 0,
             'expires_at' => (new \DateTimeImmutable($expiresIn))->format('Y-m-d H:i:s.uP'),
             'created_at' => '2026-10-07 12:00:00+00',
             'updated_at' => '2026-10-07 12:00:00+00',

@@ -23,6 +23,9 @@ use League\OAuth2\Server\Repositories\RefreshTokenRepositoryInterface;
  */
 final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
 {
+    /** The default of auth.refresh.max_chain_lifetime; a token this adapter persists starts a chain. */
+    private const int CHAIN_LIFETIME_SECONDS = 7776000;
+
     public function __construct(
         private readonly DomainRepository $domainRepository,
         private readonly AccessTokenRepositoryInterface $accessTokenRepository,
@@ -34,6 +37,7 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
         return new RefreshTokenEntity(
             bin2hex(random_bytes(40)),
             $this->createStubAccessTokenEntity(),
+            chainExpiresAt: new \DateTimeImmutable(sprintf('+%d seconds', self::CHAIN_LIFETIME_SECONDS)),
         );
     }
 
@@ -65,6 +69,8 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
             createdAt: new \DateTimeImmutable(),
             updatedAt: new \DateTimeImmutable(),
             revoked: false,
+            chainExpiresAt: $entity->getChainExpiresAt(),
+            credentialEpoch: $accessTokenDomain->getCredentialEpoch(),
         ));
 
         $this->domainRepository->save($domain);

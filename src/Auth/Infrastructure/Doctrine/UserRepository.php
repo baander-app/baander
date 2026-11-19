@@ -7,7 +7,6 @@ namespace App\Auth\Infrastructure\Doctrine;
 use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
 use App\Auth\Application\Port\PasswordResetTokenRepositoryInterface;
 use App\Auth\Domain\Model\User;
-use App\Auth\Domain\Model\UserState;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Email;
@@ -192,22 +191,44 @@ final class UserRepository implements UserRepositoryInterface
         );
     }
 
+    public function lockCredentialEpoch(Uuid $id): ?int
+    {
+        $connection = $this->entityManager->getConnection();
+        if (!$connection->isTransactionActive()) {
+            // Outside a transaction the lock would end with its own statement and fence nothing.
+            throw new \LogicException('The credential epoch is locked inside the issuing transaction.');
+        }
+
+        // FOR NO KEY UPDATE, not FOR SHARE: password login spends its TOTP step with an UPDATE of
+        // this row in the same transaction, and two logins each holding a share lock would
+        // deadlock upgrading it. FOR UPDATE would also block every insert whose foreign key
+        // references the user; this mode leaves those inserts (FOR KEY SHARE) alone. A row lock
+        // that waited for a committed update returns the updated row, so the epoch read here is
+        // the one the waited-for password change wrote.
+        $epoch = $connection->fetchOne(
+            'SELECT credential_epoch FROM users WHERE id = :id FOR NO KEY UPDATE',
+            ['id' => $id->toString()],
+        );
+
+        return $epoch === false ? null : (int) $epoch;
+    }
+
+    public function advanceCredentialEpoch(Uuid $id): int
+    {
+        $epoch = $this->entityManager->getConnection()->fetchOne(
+            'UPDATE users SET credential_epoch = credential_epoch + 1 WHERE id = :id RETURNING credential_epoch',
+            ['id' => $id->toString()],
+        );
+        if ($epoch === false) {
+            throw new \LogicException(sprintf('User %s vanished while its password changed.', $id->toString()));
+        }
+
+        return (int) $epoch;
+    }
+
     private function toDomain(UserEntity $entity): User
     {
-        return User::reconstitute(new UserState(
-            id: $entity->getId(),
-            publicId: $entity->getPublicId(),
-            name: $entity->getName(),
-            email: $entity->getEmail(),
-            password: $entity->getPassword(),
-            totpSecretCiphertext: $entity->getTotpSecretCiphertext(),
-            createdAt: $entity->getCreatedAt(),
-            updatedAt: $entity->getUpdatedAt(),
-            emailVerifiedAt: $entity->getEmailVerifiedAt(),
-            roles: $entity->getRoles(),
-            disabled: $entity->isDisabled(),
-            pendingEmail: $entity->getPendingEmail(),
-        ));
+        return UserEntityMapping::toDomain($entity);
     }
 
     private function syncToEntity(User $user, UserEntity $entity): void

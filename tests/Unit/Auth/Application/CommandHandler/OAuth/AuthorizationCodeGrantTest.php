@@ -394,6 +394,7 @@ final class AuthorizationCodeGrantTest extends TestCase
             userId: $this->user->getId(),
             clientId: $clientId ?? $this->client->getPublicId()->toString(),
             requestUri: $request->requestUri(),
+            credentialEpoch: $this->lockedCredentialEpoch,
             approved: $approved,
         ));
     }

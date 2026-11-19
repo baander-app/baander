@@ -8,6 +8,7 @@ use App\Auth\Application\Command\Passkey\AuthenticatePasskeyCommand;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Model\UserState;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
+use App\Auth\Application\DTO\AuthenticatedPasskeyOwner;
 use App\Auth\Application\DTO\VerifiedPasskeyLogin;
 use App\Auth\Application\Port\DpopJtiCacheInterface;
 use App\Auth\Infrastructure\Security\OAuth\DpopNonceManager;
@@ -58,7 +59,7 @@ final class PasskeyAuthenticatorResolutionTest extends TestCase
         $bus->expects($this->once())->method('dispatch')->willReturnCallback(
             static function (object $message): Envelope {
                 self::assertInstanceOf(AuthenticatePasskeyCommand::class, $message);
-                return new Envelope($message, [new HandledStamp(self::OWNER, 'handler')]);
+                return new Envelope($message, [new HandledStamp(new AuthenticatedPasskeyOwner(Uuid::fromString(self::OWNER), 0), 'handler')]);
             },
         );
         $authenticator = new PasskeyAuthenticator($bus, $repository, new NullLogger(), new JsonEncoder(), $this->verifier(), AuthenticationFailureMessages::create());
@@ -82,7 +83,7 @@ final class PasskeyAuthenticatorResolutionTest extends TestCase
         $repository->expects($this->once())->method('findByUuid')->willReturn(null);
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($this->once())->method('dispatch')->willReturnCallback(static fn (object $message): Envelope =>
-            new Envelope($message, [new HandledStamp(self::OWNER, 'handler')]));
+            new Envelope($message, [new HandledStamp(new AuthenticatedPasskeyOwner(Uuid::fromString(self::OWNER), 0), 'handler')]));
         $authenticator = new PasskeyAuthenticator($bus, $repository, new NullLogger(), new JsonEncoder(), $this->verifier(), AuthenticationFailureMessages::create());
         $this->expectException(BadCredentialsException::class);
         $authenticator->authenticate($this->request())->getUser();
@@ -90,7 +91,7 @@ final class PasskeyAuthenticatorResolutionTest extends TestCase
 
     public function testInvalidHandlerResultsBecomeGenericAuthenticationFailures(): void
     {
-        foreach ([null, 17, 'not-a-uuid'] as $result) {
+        foreach ([null, 17, self::OWNER] as $result) {
             $repository = $this->createMock(UserRepositoryInterface::class);
             $repository->expects($this->never())->method('findByUuid');
             $bus = $this->createMock(MessageBusInterface::class);
@@ -137,7 +138,7 @@ final class PasskeyAuthenticatorResolutionTest extends TestCase
         $repository->expects($this->once())->method('findByUuid')->willReturn($user);
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($this->once())->method('dispatch')->willReturnCallback(static fn (object $message): Envelope =>
-            new Envelope($message, [new HandledStamp(self::OWNER, 'handler')]));
+            new Envelope($message, [new HandledStamp(new AuthenticatedPasskeyOwner(Uuid::fromString(self::OWNER), 0), 'handler')]));
         $authenticator = new PasskeyAuthenticator($bus, $repository, new NullLogger(), new JsonEncoder(), $this->verifier(), AuthenticationFailureMessages::create());
 
         $this->expectException(CustomUserMessageAuthenticationException::class);

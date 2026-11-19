@@ -12,6 +12,7 @@ use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\User;
+use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
@@ -180,6 +181,7 @@ final class LogoutTest extends TestCase
             $this->service(TokenMetadataRepositoryInterface::class),
             AuthenticationFailureMessages::create(),
             $this->service(ClientRepositoryInterface::class),
+            $this->service(AccessTokenRepositoryInterface::class),
             (string) static::getContainer()->getParameter('auth.spa_client_id'),
         );
 
@@ -261,7 +263,7 @@ final class LogoutTest extends TestCase
     private function issueTokens(User $user, Client $client): TokenResponseDTO
     {
         $result = $this->bus()
-            ->dispatch(new IssueTokenCommand($client->getId(), $user->getId(), self::DPOP_JKT))
+            ->dispatch(new IssueTokenCommand($client->getId(), $user->getId(), self::DPOP_JKT, 0))
             ->last(HandledStamp::class)?->getResult();
         self::assertInstanceOf(TokenResponseDTO::class, $result);
 

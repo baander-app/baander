@@ -10,6 +10,10 @@ use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Shared\Domain\Model\Uuid;
 
+/**
+ * Refresh tokens are looked up by the token the client presents; the store keeps only a hash
+ * of it, so the methods taking a TokenId hash it themselves.
+ */
 interface RefreshTokenRepositoryInterface
 {
     public function save(RefreshToken $refreshToken, bool $flush = true): void;
@@ -20,7 +24,8 @@ interface RefreshTokenRepositoryInterface
      * Atomically consume a refresh token by its token ID.
      *
      * Returns the token only if the row was updated (was unused and valid).
-     * Returns null if the token is unknown, already used, revoked, or expired.
+     * Returns null if the token is unknown, already used, revoked, or expired, or its chain
+     * is past its absolute expiry; both expiries are compared on the database clock.
      */
     public function consumeByTokenId(TokenId $tokenId): ?RefreshToken;
 
@@ -43,6 +48,9 @@ interface RefreshTokenRepositoryInterface
      * database clock; false for a token that was never consumed.
      */
     public function consumedWithin(Uuid $refreshTokenId, int $seconds): bool;
+
+    /** Whether the token's chain is past its absolute expiry, on the database clock. */
+    public function chainExpired(Uuid $refreshTokenId): bool;
 
     /** Whether the chain still holds a refresh token that is not revoked. */
     public function chainHoldsLiveToken(ChainId $chainId): bool;
@@ -73,6 +81,12 @@ interface RefreshTokenRepositoryInterface
      * given, refresh tokens issued with it or in its refresh chain stay valid.
      */
     public function revokeForUser(Uuid $userId, ?AccessToken $keep = null): void;
+
+    /**
+     * Stamps the refresh tokens issued with $keep or in its chain with the credential epoch a
+     * password change moved the user to, so the session that changed it keeps refreshing.
+     */
+    public function restampCredentialEpoch(AccessToken $keep, int $credentialEpoch): void;
 
     /** Revoke every active refresh token whose access token was issued to the client. */
     public function revokeByClientId(Uuid $clientId): void;

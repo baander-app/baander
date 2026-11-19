@@ -118,7 +118,7 @@ final class OAuthClientRevocationRaceTest extends TestCase
         self::assertSame(0, $this->rowCount('oauth_refresh_tokens', 'NOT revoked'));
         self::assertTrue((bool) $this->observer->fetchOne(
             'SELECT revoked FROM oauth_refresh_tokens WHERE token_id = ?',
-            [$tokens->getRefreshToken()],
+            [hash('sha256', $tokens->getRefreshToken())],
         ), 'The token pair issued while the revocation waited is revoked with the client.');
     }
 

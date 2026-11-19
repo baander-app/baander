@@ -195,7 +195,7 @@ final class CommittedCaptureTest extends TestCase
             $this->clearInbox();
             $this->writer->insert('oauth_access_tokens', [
                 'id' => $access, 'token_id' => 'opaque-access-' . bin2hex(random_bytes(24)),
-                'user_id' => $user, 'client_id' => $client,
+                'user_id' => $user, 'client_id' => $client, 'credential_epoch' => 0,
                 'created_at' => '2026-10-30 12:00:00+00', 'updated_at' => '2026-10-30 12:00:00+00',
             ]);
             $this->assertTokenScopes($user);
@@ -214,6 +214,7 @@ final class CommittedCaptureTest extends TestCase
             $this->clearInbox();
             $this->writer->insert('oauth_refresh_tokens', [
                 'id' => $refresh, 'token_id' => 'opaque-refresh-' . bin2hex(random_bytes(24)), 'access_token_id' => $access,
+                'credential_epoch' => 0, 'chain_expires_at' => '2027-01-30 12:00:00+00',
                 'created_at' => '2026-10-30 12:00:00+00', 'updated_at' => '2026-10-30 12:00:00+00',
             ]);
             $this->assertTokenScopes($user);
@@ -242,7 +243,7 @@ final class CommittedCaptureTest extends TestCase
         }
         $this->clearInbox();
         $this->writer->insert('oauth_access_tokens', [
-            'id' => $access = $this->id(), 'token_id' => 'opaque-client-credentials-' . bin2hex(random_bytes(24)), 'client_id' => $client,
+            'id' => $access = $this->id(), 'token_id' => 'opaque-client-credentials-' . bin2hex(random_bytes(24)), 'client_id' => $client, 'credential_epoch' => 0,
             'created_at' => '2026-10-30 12:00:00+00', 'updated_at' => '2026-10-30 12:00:00+00',
         ]);
         $adminScope = [['family' => 'admin-security', 'scope_kind' => 'admin', 'scope_id' => '*']];

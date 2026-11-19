@@ -32,6 +32,11 @@ final class UserState
         public bool $disabled = false,
         /** An address the user asked to change to; it replaces the email only once its link is used. */
         public ?string $pendingEmail = null,
+        /**
+         * Incremented by every password change; a token, chain or code issued under an earlier
+         * value no longer counts. Only the repository moves it.
+         */
+        public readonly int $credentialEpoch = 0,
     ) {
     }
 }

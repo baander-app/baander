@@ -6,6 +6,7 @@ namespace App\Auth\Interface\Controller\Passkey;
 
 use App\Auth\Application\Command\OAuth\IssueTokenCommand;
 use App\Auth\Application\DTO\VerifiedPasskeyLogin;
+use App\Auth\Application\Exception\CredentialsChangedException;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Interface\Resource\TokenResource;
@@ -18,6 +19,7 @@ use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
@@ -86,14 +88,23 @@ final class PasskeyLoginController
             return $this->unauthorized();
         }
 
-        $envelope = $this->bus->dispatch(new IssueTokenCommand(
-            clientId: $client->getId(),
-            userId: $user->getId(),
-            ipAddress: $request->getClientIp(),
-            userAgent: $request->headers->get('User-Agent'),
-            clientFingerprint: $request->headers->get(BaanderHeader::ClientFingerprint->value),
-            dpopJkt: $login->dpopJkt,
-        ));
+        try {
+            $envelope = $this->bus->dispatch(new IssueTokenCommand(
+                clientId: $client->getId(),
+                userId: $user->getId(),
+                ipAddress: $request->getClientIp(),
+                userAgent: $request->headers->get('User-Agent'),
+                clientFingerprint: $request->headers->get(BaanderHeader::ClientFingerprint->value),
+                dpopJkt: $login->dpopJkt,
+                credentialEpoch: $login->credentialEpoch,
+            ));
+        } catch (HandlerFailedException $exception) {
+            if ($exception->getPrevious() instanceof CredentialsChangedException) {
+                // A password reset since the assertion was checked ended what it proved.
+                return $this->unauthorized();
+            }
+            throw $exception;
+        }
 
         $tokenResponse = $envelope->last(HandledStamp::class)?->getResult();
 

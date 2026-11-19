@@ -25,6 +25,7 @@ use App\Auth\Application\Exception\DeviceUserCodeException;
 use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use App\Auth\Application\Exception\OAuthClientRateLimitedException;
 use App\Auth\Application\Exception\OAuthProtocolException;
+use App\Auth\Application\Http\AccessTokenAttributes;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Application\Query\OAuth\GetAuthorizationRequestQuery;
 use App\Auth\Application\Query\OAuth\GetDeviceAuthorizationQuery;
@@ -146,7 +147,8 @@ final class OAuthController
     public function authorizeDecision(Request $request): JsonResponse
     {
         $user = $this->security->getUser();
-        if (!$user instanceof AuthenticatedUserIdentityInterface) {
+        $credentialEpoch = AccessTokenAttributes::credentialEpoch($request->attributes->get(AccessTokenAttributes::CREDENTIAL_EPOCH));
+        if (!$user instanceof AuthenticatedUserIdentityInterface || $credentialEpoch === null) {
             return $this->unauthorized();
         }
 
@@ -157,7 +159,7 @@ final class OAuthController
             if ($decision !== 'approve' && $decision !== 'deny') {
                 throw OAuthProtocolException::invalidRequest('The decision must be "approve" or "deny".');
             }
-            $answer = $this->dispatch(new CreateAuthorizationCodeCommand(Uuid::fromString($user->getId()), $clientId, $requestUri, $decision === 'approve'));
+            $answer = $this->dispatch(new CreateAuthorizationCodeCommand(Uuid::fromString($user->getId()), $clientId, $requestUri, $credentialEpoch, $decision === 'approve'));
         } catch (OAuthProtocolException $exception) {
             return $this->authorizationError($exception);
         }
@@ -474,17 +476,18 @@ final class OAuthController
         ],
     )]
     #[Route('/device/approve', name: 'device_approve', methods: ['POST'])]
-    public function deviceApprove(#[MapRequestPayload] DeviceApproveRequest $payload): JsonResponse
+    public function deviceApprove(#[MapRequestPayload] DeviceApproveRequest $payload, Request $request): JsonResponse
     {
         $user = $this->security->getUser();
-        if (!$user instanceof AuthenticatedUserIdentityInterface) {
+        $credentialEpoch = AccessTokenAttributes::credentialEpoch($request->attributes->get(AccessTokenAttributes::CREDENTIAL_EPOCH));
+        if (!$user instanceof AuthenticatedUserIdentityInterface || $credentialEpoch === null) {
             return $this->unauthorized();
         }
         $userId = Uuid::fromString($user->getId());
 
         try {
             if ($payload->decision === 'approve') {
-                $this->dispatch(new ApproveDeviceCodeCommand($payload->userCode, $userId));
+                $this->dispatch(new ApproveDeviceCodeCommand($payload->userCode, $userId, $credentialEpoch));
                 $decision = 'approved';
                 $message = $this->trans('success.device_approved', domain: 'auth');
             } else {

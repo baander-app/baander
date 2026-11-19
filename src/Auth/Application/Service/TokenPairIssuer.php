@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Application\Service;
 
 use App\Auth\Application\DTO\TokenResponseDTO;
+use App\Auth\Application\Exception\CredentialsChangedException;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Port\JwtGeneratorInterface;
 use App\Auth\Application\ScopeAllowlist;
@@ -19,9 +20,11 @@ use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
+use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use DateInterval;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Mints the DPoP-bound token pair that starts a new refresh rotation chain.
@@ -37,6 +40,14 @@ use Doctrine\ORM\EntityManagerInterface;
  * written, so a client revoked concurrently either rejects the issuance or has
  * the new tokens revoked with the rest (ClientRepositoryInterface::lockActiveClientForIssuance).
  *
+ * The user's row is locked next, and the credential epoch captured where the
+ * credential was proved (the login's user read, or the code's approving token)
+ * must equal the epoch under that lock. A password change bumps the epoch first
+ * in its own transaction, so issuance either finishes before the change, whose
+ * revocation then catches the new tokens, or waits for it and refuses. Both
+ * tokens carry the captured epoch, and the chain gets its absolute expiry from
+ * `auth.refresh.max_chain_lifetime`.
+ *
  * The pair, its metadata and the signature are one transaction, in the order
  * flush, metadata, sign, commit, as the refresh rotation is: a signing failure
  * leaves no committed pair without its binding. The transaction runs through the
@@ -48,6 +59,7 @@ final class TokenPairIssuer
 {
     private readonly DateInterval $accessTokenTtl;
     private readonly DateInterval $refreshTokenTtl;
+    private readonly DateInterval $maxChainLifetime;
 
     public function __construct(
         private readonly AccessTokenRepositoryInterface $accessTokenRepository,
@@ -58,25 +70,32 @@ final class TokenPairIssuer
         private readonly TokenMetadataRepositoryInterface $tokenMetadataRepository,
         private readonly ClientRepositoryInterface $clientRepository,
         private readonly TransactionPortInterface $transaction,
+        private readonly UserRepositoryInterface $userRepository,
         int $accessTokenTtl,
         int $refreshTokenTtl,
+        #[Autowire(param: 'auth.refresh.max_chain_lifetime')]
+        int $maxChainLifetime,
     ) {
         $this->accessTokenTtl = new DateInterval(sprintf('PT%dS', $accessTokenTtl));
         $this->refreshTokenTtl = new DateInterval(sprintf('PT%dS', $refreshTokenTtl));
+        $this->maxChainLifetime = new DateInterval(sprintf('PT%dS', $maxChainLifetime));
     }
 
     /**
      * @param string[] $requestedScopes Filtered against the allowlist; none requested yields a token without scopes
+     * @param int $credentialEpoch The user's credential epoch captured where the credential was proved
      * @param (callable(ChainId): void)|null $persistWithTokens Further writes that commit or roll back with the tokens;
      *                                                     it receives the chain the pair starts
      *
      * @throws OAuthProtocolException invalid_client when the client was revoked before the tokens were stored
+     * @throws CredentialsChangedException when the user's credential epoch moved past $credentialEpoch
      */
     public function issue(
         Client $client,
         User $user,
         array $requestedScopes,
         string $dpopJkt,
+        int $credentialEpoch,
         ?string $tokenName = null,
         ?string $clientFingerprint = null,
         ?string $userAgent = null,
@@ -94,18 +113,23 @@ final class TokenPairIssuer
             $this->accessTokenTtl,
             $chainId,
             $dpopJkt,
+            $credentialEpoch,
         );
 
         $refreshToken = RefreshToken::issue(
             $accessToken,
             $chainId,
             $this->refreshTokenTtl,
+            maxChainLifetime: $this->maxChainLifetime,
         );
 
-        return $this->transaction->run(function () use ($client, $chainId, $accessToken, $refreshToken, $persistWithTokens, $dpopJkt, $clientFingerprint, $userAgent, $ipAddress): TokenResponseDTO {
+        return $this->transaction->run(function () use ($client, $user, $credentialEpoch, $chainId, $accessToken, $refreshToken, $persistWithTokens, $dpopJkt, $clientFingerprint, $userAgent, $ipAddress): TokenResponseDTO {
             IssuanceLockTimeout::apply($this->entityManager);
             if (!$this->clientRepository->lockActiveClientForIssuance($client->getId())) {
                 throw OAuthProtocolException::invalidClient('The client has been revoked.');
+            }
+            if ($this->userRepository->lockCredentialEpoch($user->getId()) !== $credentialEpoch) {
+                throw new CredentialsChangedException();
             }
             if ($persistWithTokens !== null) {
                 $persistWithTokens($chainId);

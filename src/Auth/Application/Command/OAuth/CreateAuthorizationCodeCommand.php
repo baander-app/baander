@@ -17,12 +17,15 @@ final readonly class CreateAuthorizationCodeCommand
     /**
      * @param string $clientId   The client_id the browser carried, which must be the client that pushed the request
      * @param string $requestUri The request URI the pushed authorization request endpoint returned
+     * @param int    $credentialEpoch The credential epoch of the access token the decision was sent with;
+     *                                an approval stores it on the code
      * @param bool   $approved   The user's decision
      */
     public function __construct(
         public Uuid $userId,
         public string $clientId,
         public string $requestUri,
+        public int $credentialEpoch,
         public bool $approved = true,
     ) {
     }

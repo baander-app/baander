@@ -136,11 +136,14 @@ final class PasswordAuthenticator extends AbstractAuthenticator
             throw $failure;
         }
 
+        // The epoch comes from the same read as the password hash just checked, so a password
+        // change committed after that read makes issuance refuse the login.
         $request->attributes->set(VerifiedPasswordLogin::class, new VerifiedPasswordLogin(
             $user->getId(),
             $proofKey,
             $nextNonce,
             $totpStep,
+            $user->getCredentialEpoch(),
         ));
 
         return new SelfValidatingPassport(

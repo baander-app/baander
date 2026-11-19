@@ -55,12 +55,14 @@ final class TestAuthenticator extends AbstractAuthenticator
 
         $badge = new UserBadge(
             $userId,
-            function (string $uuid) use ($firstParty): SecurityUser {
+            function (string $uuid) use ($firstParty, $request): SecurityUser {
                 $user = $this->userRepository->findByUuid(Uuid::fromString($uuid));
 
                 if ($user === null) {
                     throw new UserNotFoundException(sprintf('User with UUID "%s" not found.', $uuid));
                 }
+                // A test request stands for a token issued under the user's current credentials.
+                $request->attributes->set(AccessTokenAttributes::CREDENTIAL_EPOCH, $user->getCredentialEpoch());
 
                 return new SecurityUser(
                     $user->getId()->toString(),

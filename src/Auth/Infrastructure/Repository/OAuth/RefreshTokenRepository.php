@@ -11,15 +11,13 @@ use App\Auth\Domain\Model\OAuth\ClientState;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
 use App\Auth\Domain\Model\OAuth\RefreshTokenState;
 use App\Auth\Domain\Model\OAuth\TokenId;
-use App\Auth\Domain\Model\User;
-use App\Auth\Domain\Model\UserState;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\RefreshTokenEntity;
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Auth\Infrastructure\Doctrine\UserEntityMapping;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\ParameterType;
@@ -28,6 +26,9 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 /**
  * Pure domain repository for refresh tokens.
+ *
+ * Callers pass the refresh token itself; only its SHA-256 hash is written or looked up, so a
+ * copy of the table cannot be replayed.
  */
 final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
 {
@@ -52,7 +53,7 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
     {
         $entity = $this->entityManager
             ->getRepository(RefreshTokenEntity::class)
-            ->findOneBy(['tokenId' => $tokenId->toString()]);
+            ->findOneBy(['tokenId' => self::hash($tokenId)]);
 
         return $entity !== null ? $this->toDomain($entity) : null;
     }
@@ -64,12 +65,13 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
             <<<'SQL'
                 UPDATE oauth_refresh_tokens
                 SET used_at = NOW(), updated_at = NOW()
-                WHERE token_id = :tokenId
+                WHERE token_id = :tokenHash
                   AND used_at IS NULL
                   AND revoked = FALSE
                   AND (expires_at IS NULL OR expires_at > NOW())
+                  AND chain_expires_at > NOW()
                 SQL,
-            ['tokenId' => $tokenId->toString()],
+            ['tokenHash' => self::hash($tokenId)],
         );
 
         if ($rowsAffected === 0) {
@@ -78,13 +80,16 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
 
         $entity = $this->entityManager
             ->getRepository(RefreshTokenEntity::class)
-            ->findOneBy(['tokenId' => $tokenId->toString()]);
+            ->findOneBy(['tokenId' => self::hash($tokenId)]);
 
         if ($entity === null) {
             return null;
         }
 
+        // The row and its access token as they are now: the access token's epoch may have
+        // been restamped since it was first read.
         $this->entityManager->refresh($entity);
+        $this->entityManager->refresh($entity->getAccessToken());
 
         return $this->toDomain($entity);
     }
@@ -92,8 +97,8 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
     public function lockByTokenId(TokenId $tokenId): ?RefreshToken
     {
         $id = $this->entityManager->getConnection()->fetchOne(
-            'SELECT id FROM oauth_refresh_tokens WHERE token_id = :tokenId FOR UPDATE',
-            ['tokenId' => $tokenId->toString()],
+            'SELECT id FROM oauth_refresh_tokens WHERE token_id = :tokenHash FOR UPDATE',
+            ['tokenHash' => self::hash($tokenId)],
         );
         if (!is_string($id)) {
             return null;
@@ -125,6 +130,17 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
             'SELECT (used_at >= NOW() - make_interval(secs => :seconds))::int FROM oauth_refresh_tokens WHERE id = :id',
             ['id' => $refreshTokenId->toString(), 'seconds' => $seconds],
             ['seconds' => ParameterType::INTEGER],
+        );
+
+        return (int) $answer === 1;
+    }
+
+    public function chainExpired(Uuid $refreshTokenId): bool
+    {
+        // The chain's absolute lifetime, on the database clock as the consume predicate is.
+        $answer = $this->entityManager->getConnection()->fetchOne(
+            'SELECT (chain_expires_at <= NOW())::int FROM oauth_refresh_tokens WHERE id = :id',
+            ['id' => $refreshTokenId->toString()],
         );
 
         return (int) $answer === 1;
@@ -204,6 +220,18 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
         $this->entityManager->clear();
     }
 
+    public function restampCredentialEpoch(AccessToken $keep, int $credentialEpoch): void
+    {
+        $sql = 'UPDATE oauth_refresh_tokens SET credential_epoch = :epoch, updated_at = NOW() WHERE access_token_id = :keepId';
+        $params = ['epoch' => $credentialEpoch, 'keepId' => $keep->getId()->toString()];
+        if ($keep->getChainId() !== null) {
+            $sql .= ' OR chain_id = :keepChainId';
+            $params['keepChainId'] = $keep->getChainId()->toString();
+        }
+
+        $this->entityManager->getConnection()->executeStatement($sql, $params, ['epoch' => ParameterType::INTEGER]);
+    }
+
     public function revokeByClientId(Uuid $clientId): void
     {
         $conn = $this->entityManager->getConnection();
@@ -272,12 +300,14 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
         }
 
         return new RefreshTokenEntity(
-            $refreshToken->getTokenId()->toString(),
+            self::hash($refreshToken->getTokenId()),
             $accessTokenEntity,
             $refreshToken->getExpiresAt(),
             $refreshToken->getChainId()?->getUuid(),
             $previousEntity,
             id: $refreshToken->getId(),
+            chainExpiresAt: $refreshToken->getChainExpiresAt(),
+            credentialEpoch: $refreshToken->getCredentialEpoch(),
         );
     }
 
@@ -293,7 +323,7 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
 
         return RefreshToken::reconstitute(new RefreshTokenState(
             id: $entity->getId(),
-            tokenId: TokenId::fromString($entity->getTokenId()),
+            tokenId: null,
             accessToken: $accessToken,
             chainId: $chainId,
             previousRefreshToken: $previousRefreshToken,
@@ -302,6 +332,8 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
             createdAt: $entity->getCreatedAt(),
             updatedAt: $entity->getUpdatedAt(),
             revoked: $entity->isRevoked(),
+            chainExpiresAt: $entity->getChainExpiresAt(),
+            credentialEpoch: $entity->getCredentialEpoch(),
         ));
     }
 
@@ -337,7 +369,7 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
 
         return RefreshToken::reconstitute(new RefreshTokenState(
             id: $fresh->getId(),
-            tokenId: TokenId::fromString($fresh->getTokenId()),
+            tokenId: null,
             accessToken: $previousAccessToken,
             chainId: $previousChainId,
             previousRefreshToken: null, // Do NOT recurse -- stop at one level
@@ -346,6 +378,8 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
             createdAt: $fresh->getCreatedAt(),
             updatedAt: $fresh->getUpdatedAt(),
             revoked: $fresh->isRevoked(),
+            chainExpiresAt: $fresh->getChainExpiresAt(),
+            credentialEpoch: $fresh->getCredentialEpoch(),
         ));
     }
 
@@ -362,22 +396,7 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
 
     private function accessTokenEntityToDomain(AccessTokenEntity $entity): AccessToken
     {
-        $user = $entity->getUser() !== null
-            ? User::reconstitute(new UserState(
-                id: $entity->getUser()->getId(),
-                publicId: $entity->getUser()->getPublicId(),
-                name: $entity->getUser()->getName(),
-                email: $entity->getUser()->getEmail(),
-                password: $entity->getUser()->getPassword(),
-                totpSecretCiphertext: $entity->getUser()->getTotpSecretCiphertext(),
-                createdAt: $entity->getUser()->getCreatedAt(),
-                updatedAt: $entity->getUser()->getUpdatedAt(),
-                emailVerifiedAt: $entity->getUser()->getEmailVerifiedAt(),
-                roles: $entity->getUser()->getRoles(),
-                disabled: $entity->getUser()->isDisabled(),
-                pendingEmail: $entity->getUser()->getPendingEmail(),
-            ))
-            : null;
+        $user = $entity->getUser() !== null ? UserEntityMapping::toDomain($entity->getUser()) : null;
 
         $client = Client::reconstitute(new ClientState(
             id: $entity->getClient()->getId(),
@@ -421,6 +440,7 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
             updatedAt: $entity->getUpdatedAt(),
             revoked: $entity->isRevoked(),
             dpopJkt: $entity->getDpopJkt(),
+            credentialEpoch: $entity->getCredentialEpoch(),
         ));
     }
 
@@ -436,5 +456,14 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
         }
 
         return array_filter(array_map('trim', explode(',', $redirect)));
+    }
+
+    /**
+     * Refresh tokens are stored as the hex SHA-256 digest of the token. A token is 80 random
+     * characters, so an unsalted fast hash cannot be reversed or brute-forced.
+     */
+    private static function hash(TokenId $tokenId): string
+    {
+        return hash('sha256', $tokenId->toString());
     }
 }

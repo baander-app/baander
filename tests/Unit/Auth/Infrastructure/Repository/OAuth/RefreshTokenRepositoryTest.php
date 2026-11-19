@@ -90,7 +90,7 @@ final class RefreshTokenRepositoryTest extends TestCase
 
         // Invoke toDomain via findByTokenId
         $refreshTokenRepo->expects($this->once())->method('findOneBy')
-            ->with(['tokenId' => self::$entityId->toString()])
+            ->with(['tokenId' => hash('sha256', self::$entityId->toString())])
             ->willReturn($currentEntity);
 
         $result = $this->repository->findByTokenId(TokenId::fromString(self::$entityId->toString()));
@@ -121,7 +121,7 @@ final class RefreshTokenRepositoryTest extends TestCase
 
         $refreshTokenRepo = $this->createMock(EntityRepository::class);
         $refreshTokenRepo->expects($this->once())->method('findOneBy')
-            ->with(['tokenId' => self::$entityId->toString()])
+            ->with(['tokenId' => hash('sha256', self::$entityId->toString())])
             ->willReturn($currentEntity);
 
         $this->entityManager->expects($this->atLeastOnce())->method('getRepository')
@@ -158,7 +158,7 @@ final class RefreshTokenRepositoryTest extends TestCase
         // Simulate the predecessor entity being deleted from DB after association.
         $refreshTokenRepo = $this->createMock(EntityRepository::class);
         $refreshTokenRepo->expects($this->once())->method('findOneBy')
-            ->with(['tokenId' => self::$entityId->toString()])
+            ->with(['tokenId' => hash('sha256', self::$entityId->toString())])
             ->willReturn($currentEntity);
         $refreshTokenRepo->expects($this->once())->method('find')
             ->with($parentId)
@@ -193,7 +193,7 @@ final class RefreshTokenRepositoryTest extends TestCase
 
         $refreshTokenRepo = $this->createMock(EntityRepository::class);
         $refreshTokenRepo->expects($this->once())->method('findOneBy')
-            ->with(['tokenId' => self::$entityId->toString()])
+            ->with(['tokenId' => hash('sha256', self::$entityId->toString())])
             ->willReturn($entity);
 
         $this->entityManager->expects($this->atLeastOnce())->method('getRepository')
@@ -223,7 +223,7 @@ final class RefreshTokenRepositoryTest extends TestCase
 
         $refreshTokenRepo = $this->createMock(EntityRepository::class);
         $refreshTokenRepo->expects($this->once())->method('findOneBy')
-            ->with(['tokenId' => self::$entityId->toString()])
+            ->with(['tokenId' => hash('sha256', self::$entityId->toString())])
             ->willReturn($entity);
 
         $this->entityManager->expects($this->atLeastOnce())->method('getRepository')
@@ -330,7 +330,7 @@ final class RefreshTokenRepositoryTest extends TestCase
         );
         $this->connection->expects($this->once())
             ->method('fetchOne')
-            ->with('SELECT id FROM oauth_refresh_tokens WHERE token_id = :tokenId FOR UPDATE', ['tokenId' => self::$entityId->toString()])
+            ->with('SELECT id FROM oauth_refresh_tokens WHERE token_id = :tokenHash FOR UPDATE', ['tokenHash' => hash('sha256', self::$entityId->toString())])
             ->willReturn(self::$entityId->toString());
         $refreshTokenRepo = $this->createMock(EntityRepository::class);
         $refreshTokenRepo->expects($this->once())->method('find')->with(self::$entityId)->willReturn($entity);
@@ -517,6 +517,7 @@ final class RefreshTokenRepositoryTest extends TestCase
             null,
             $chainId?->getUuid(),
             $previousRefreshToken,
+            chainExpiresAt: new \DateTimeImmutable('+90 days'),
         );
 
         // Use reflection to set the ID since the constructor generates a random one

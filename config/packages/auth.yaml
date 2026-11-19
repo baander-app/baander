@@ -34,6 +34,12 @@ parameters:
     # The web client's refresh budget stays below it. Default and maximum: 60.
     auth.refresh.reuse_grace_seconds: 60
 
+    # Absolute lifetime of a refresh chain, from the login or grant that started it.
+    # Rotation keeps the chain's expiry, so a chain ends after this long however often
+    # it refreshes; the user then signs in again. Compared on the database clock.
+    # Default: 90 days.
+    auth.refresh.max_chain_lifetime: 7776000
+
     # Authorization code time-to-live (authorization code grant with PKCE). The code is
     # issued after consent, so it only has to survive the redirect and the token request.
     # Default: 60 seconds.

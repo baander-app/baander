@@ -234,7 +234,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         $login = $this->login($key);
         self::assertSame(1, $this->connection->executeStatement(
             'UPDATE oauth_refresh_tokens SET revoked = TRUE WHERE token_id = ?',
-            [$login['refreshToken']],
+            [hash('sha256', $login['refreshToken'])],
         ));
 
         $response = $this->refresh($login['refreshToken'], $key, $login['nonce']);
@@ -269,7 +269,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
             case 'expired':
                 $this->connection->executeStatement(
                     "UPDATE oauth_refresh_tokens SET expires_at = now() - interval '1 hour' WHERE token_id = ?",
-                    [$refreshToken],
+                    [hash('sha256', $refreshToken)],
                 );
                 break;
             case 'disabled':
@@ -620,6 +620,94 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertSame(200, $this->me($login['accessToken'], $web)->getStatusCode(), 'The session that changed the password keeps its chain.');
     }
 
+    /**
+     * A device code approved by a session that a password change then ended issues no tokens:
+     * the code carries the credential epoch of the approving token.
+     */
+    public function testADeviceCodeApprovedBeforeAPasswordChangeIsRefusedAfterIt(): void
+    {
+        $tv = new SignedDpopProof();
+        $clientId = $this->deviceClient();
+        $codes = json_decode((string) $this->send('POST', '/api/oauth/device/authorize', form: ['client_id' => $clientId, 'scope' => 'library'])->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        $web = new SignedDpopProof();
+        $login = $this->login($web);
+        $approval = $this->asUser($login['accessToken'], $web, 'POST', '/api/oauth/device/approve', json: ['userCode' => $codes['user_code'], 'decision' => 'approve']);
+        self::assertSame(200, $approval->getStatusCode(), (string) $approval->getContent());
+
+        $this->changePassword($login['accessToken'], $web);
+
+        [$poll] = $this->pollDevice($tv, $clientId, $codes['device_code'], $this->nonce());
+        self::assertSame(['invalid_grant', 400], [$poll['error'], $poll['status']], json_encode($poll, JSON_THROW_ON_ERROR));
+        self::assertSame(0, $this->issuedTo($clientId), 'The device received no tokens.');
+    }
+
+    /** An authorization code created before a password change is refused after it. */
+    public function testAnAuthorizationCodeCreatedBeforeAPasswordChangeIsRefusedAfterIt(): void
+    {
+        $clientId = $this->publicClient();
+        [$verifier, $challenge] = self::pkcePair();
+        $app = new SignedDpopProof();
+        $web = new SignedDpopProof();
+        $login = $this->login($web);
+        $redirect = $this->decide($login['accessToken'], $web, ['client_id' => $clientId, 'request_uri' => $this->push($clientId, $challenge, proof: $app), 'decision' => 'approve']);
+        self::assertArrayHasKey('code', $redirect);
+
+        $this->changePassword($login['accessToken'], $web);
+
+        [$exchange] = $this->tokenRequest($app, $this->nonce(), [
+            'grant_type' => 'authorization_code', 'client_id' => $clientId, 'code' => $redirect['code'],
+            'redirect_uri' => self::REDIRECT, 'code_verifier' => $verifier,
+        ]);
+        self::assertSame(['invalid_grant', 400], [$exchange['error'], $exchange['status']], json_encode($exchange, JSON_THROW_ON_ERROR));
+        self::assertSame(0, $this->issuedTo($clientId), 'The client received no tokens.');
+    }
+
+    /**
+     * A refresh chain ends at its absolute lifetime even while its latest token is inside
+     * its own sliding lifetime; the token endpoint answers invalid_grant.
+     */
+    public function testAChainPastItsAbsoluteLifetimeFailsToRefreshWithinItsSlidingWindow(): void
+    {
+        [$tv, $clientId, $tokens, $nonce] = $this->deviceTokens();
+        $hash = hash('sha256', $tokens['refresh_token']);
+        $this->connection->executeStatement(
+            "UPDATE oauth_refresh_tokens SET chain_expires_at = now() - interval '1 second' WHERE token_id = ?",
+            [$hash],
+        );
+        self::assertTrue((bool) $this->connection->fetchOne('SELECT expires_at > now() FROM oauth_refresh_tokens WHERE token_id = ?', [$hash]), 'The token is inside its sliding window.');
+
+        [$refresh] = $this->tokenRequest($tv, $nonce, ['grant_type' => 'refresh_token', 'client_id' => $clientId, 'refresh_token' => $tokens['refresh_token']]);
+
+        self::assertSame(['invalid_grant', 400], [$refresh['error'], $refresh['status']], json_encode($refresh, JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * Each chain gets the configured absolute lifetime when it starts, and a rotation copies
+     * it unchanged. The table holds no value equal to an issued refresh token.
+     */
+    public function testRefreshTokensAreStoredAsHashesAndRotationKeepsTheChainExpiry(): void
+    {
+        [$tv, $clientId, $tokens, $nonce] = $this->deviceTokens();
+        $first = $this->connection->fetchAssociative(
+            "SELECT chain_id, chain_expires_at, extract(epoch FROM chain_expires_at - created_at) AS lifetime FROM oauth_refresh_tokens WHERE token_id = ?",
+            [hash('sha256', $tokens['refresh_token'])],
+        );
+        self::assertIsArray($first, 'The refresh token is stored under its SHA-256 hash.');
+        self::assertEqualsWithDelta(7776000, (float) $first['lifetime'], 5);
+
+        [$refreshed] = $this->tokenRequest($tv, $nonce, ['grant_type' => 'refresh_token', 'client_id' => $clientId, 'refresh_token' => $tokens['refresh_token']]);
+        self::assertSame(200, $refreshed['status'], json_encode($refreshed, JSON_THROW_ON_ERROR));
+
+        self::assertSame(
+            [$first['chain_expires_at']],
+            $this->connection->fetchFirstColumn('SELECT DISTINCT chain_expires_at FROM oauth_refresh_tokens WHERE chain_id = ?', [$first['chain_id']]),
+        );
+        self::assertSame(0, (int) $this->connection->fetchOne(
+            'SELECT count(*) FROM oauth_refresh_tokens WHERE token_id IN (?, ?)',
+            [$tokens['refresh_token'], $refreshed['refresh_token']],
+        ), 'No stored value equals an issued refresh token.');
+    }
+
     public function testDeniedDeviceRequestAnswersAccessDenied(): void
     {
         $tv = new SignedDpopProof();
@@ -913,6 +1001,44 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertSame(3600, $tokens['expires_in']);
         self::assertIsString($tokens['refresh_token']);
         self::assertSame($scope, $tokens['scope']);
+    }
+
+    /**
+     * Tokens the device grant issued to a fresh device client for the signed-in user.
+     *
+     * @return array{SignedDpopProof, string, array<string, mixed>, string}
+     */
+    private function deviceTokens(): array
+    {
+        $tv = new SignedDpopProof();
+        $clientId = $this->deviceClient();
+        $codes = json_decode((string) $this->send('POST', '/api/oauth/device/authorize', form: ['client_id' => $clientId, 'scope' => 'library'])->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        $web = new SignedDpopProof();
+        $login = $this->login($web);
+        $approval = $this->asUser($login['accessToken'], $web, 'POST', '/api/oauth/device/approve', json: ['userCode' => $codes['user_code'], 'decision' => 'approve']);
+        self::assertSame(200, $approval->getStatusCode(), (string) $approval->getContent());
+        [$tokens, $nonce] = $this->pollDevice($tv, $clientId, $codes['device_code'], $this->nonce());
+        self::assertSame(200, $tokens['status'], json_encode($tokens, JSON_THROW_ON_ERROR));
+
+        return [$tv, $clientId, $tokens, $nonce];
+    }
+
+    private function changePassword(string $accessToken, SignedDpopProof $key): void
+    {
+        $change = $this->asUser($accessToken, $key, 'PUT', '/api/auth/me/password', json: [
+            'currentPassword' => self::PASSWORD,
+            'newPassword' => 'grant-path-changed-password',
+        ]);
+        self::assertSame(200, $change->getStatusCode(), (string) $change->getContent());
+    }
+
+    /** Access tokens issued to the client with the given public ID. */
+    private function issuedTo(string $clientId): int
+    {
+        return (int) $this->connection->fetchOne(
+            'SELECT count(*) FROM oauth_access_tokens a JOIN oauth_clients c ON c.id = a.client_id WHERE c.public_id = ?',
+            [$clientId],
+        );
     }
 
     private function deviceClient(): string

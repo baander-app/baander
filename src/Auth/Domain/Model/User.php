@@ -190,6 +190,15 @@ final class User
         return $this->state->pendingEmail;
     }
 
+    /**
+     * The credential epoch as it was when this user was loaded. A login captures it from the
+     * read that checked its credential; issuance compares it with the epoch under the row lock.
+     */
+    public function getCredentialEpoch(): int
+    {
+        return $this->state->credentialEpoch;
+    }
+
     public function isEmailVerified(): bool
     {
         return $this->state->emailVerifiedAt !== null;

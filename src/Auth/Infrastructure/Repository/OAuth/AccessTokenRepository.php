@@ -10,15 +10,16 @@ use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\ClientState;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\User;
-use App\Auth\Domain\Model\UserState;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Auth\Infrastructure\Doctrine\UserEntityMapping;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\ArrayParameterType;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
@@ -136,6 +137,36 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
         $this->entityManager->clear();
     }
 
+    public function currentCredentialEpoch(TokenId $tokenId): ?int
+    {
+        // One indexed read per authenticated request. A token without a user has no epoch to
+        // fall behind.
+        $epoch = $this->entityManager->getConnection()->fetchOne(
+            <<<'SQL'
+                SELECT a.credential_epoch
+                  FROM oauth_access_tokens a
+                  LEFT JOIN users u ON u.id = a.user_id
+                 WHERE a.token_id = :tokenId
+                   AND (u.id IS NULL OR a.credential_epoch >= u.credential_epoch)
+                SQL,
+            ['tokenId' => $tokenId->toString()],
+        );
+
+        return $epoch === false ? null : (int) $epoch;
+    }
+
+    public function restampCredentialEpoch(AccessToken $keep, int $credentialEpoch): void
+    {
+        $sql = 'UPDATE oauth_access_tokens SET credential_epoch = :epoch, updated_at = NOW() WHERE id = :keepId';
+        $params = ['epoch' => $credentialEpoch, 'keepId' => $keep->getId()->toString()];
+        if ($keep->getChainId() !== null) {
+            $sql .= ' OR chain_id = :keepChainId';
+            $params['keepChainId'] = $keep->getChainId()->toString();
+        }
+
+        $this->entityManager->getConnection()->executeStatement($sql, $params, ['epoch' => ParameterType::INTEGER]);
+    }
+
     public function revokeByClientId(Uuid $clientId): void
     {
         $conn = $this->entityManager->getConnection();
@@ -175,6 +206,7 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
             $accessToken->getExpiresAt(),
             $accessToken->getChainId()?->getUuid(),
             id: $accessToken->getId(),
+            credentialEpoch: $accessToken->getCredentialEpoch(),
         );
     }
 
@@ -198,6 +230,7 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
             updatedAt: $entity->getUpdatedAt(),
             revoked: $entity->isRevoked(),
             dpopJkt: $entity->getDpopJkt(),
+            credentialEpoch: $entity->getCredentialEpoch(),
         ));
     }
 
@@ -220,20 +253,7 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
 
     private function userEntityToDomain(UserEntity $entity): User
     {
-        return User::reconstitute(new UserState(
-            id: $entity->getId(),
-            publicId: $entity->getPublicId(),
-            name: $entity->getName(),
-            email: $entity->getEmail(),
-            password: $entity->getPassword(),
-            totpSecretCiphertext: $entity->getTotpSecretCiphertext(),
-            createdAt: $entity->getCreatedAt(),
-            updatedAt: $entity->getUpdatedAt(),
-            emailVerifiedAt: $entity->getEmailVerifiedAt(),
-            roles: $entity->getRoles(),
-            disabled: $entity->isDisabled(),
-            pendingEmail: $entity->getPendingEmail(),
-        ));
+        return UserEntityMapping::toDomain($entity);
     }
 
     private function clientEntityToDomain(ClientEntity $entity): Client

@@ -18,6 +18,7 @@ use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
+use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
 use Doctrine\DBAL\Connection;
@@ -89,6 +90,13 @@ final class TokenPairIssuerTest extends TestCase
             $this->events[] = 'metadata saved';
         });
 
+        $users = $this->createStub(UserRepositoryInterface::class);
+        $users->method('lockCredentialEpoch')->willReturnCallback(function (): int {
+            $this->events[] = 'user locked';
+
+            return 0;
+        });
+
         $transaction = $this->createStub(TransactionPortInterface::class);
         $transaction->method('run')->willReturnCallback(function (callable $operation): mixed {
             $this->events[] = 'begin';
@@ -113,14 +121,16 @@ final class TokenPairIssuerTest extends TestCase
             tokenMetadataRepository: $metadata,
             clientRepository: $clients,
             transaction: $transaction,
+            userRepository: $users,
             accessTokenTtl: 3600,
             refreshTokenTtl: 2592000,
+            maxChainLifetime: 7776000,
         );
     }
 
     public function testTheMetadataAndTheSignatureAreWrittenInsideTheTransactionAfterTheFlush(): void
     {
-        $response = $this->issuer->issue($this->client(), $this->user(), ['profile'], self::JKT, persistWithTokens: function (): void {
+        $response = $this->issuer->issue($this->client(), $this->user(), ['profile'], self::JKT, 0, persistWithTokens: function (): void {
             $this->events[] = 'grant consumed';
         });
 
@@ -129,6 +139,7 @@ final class TokenPairIssuerTest extends TestCase
             'begin',
             sprintf("SET LOCAL lock_timeout = '%dms'", IssuanceLockTimeout::MILLISECONDS),
             'client locked',
+            'user locked',
             'grant consumed',
             'access token saved',
             'refresh token saved',
@@ -144,7 +155,7 @@ final class TokenPairIssuerTest extends TestCase
         $this->signingFails = true;
 
         try {
-            $this->issuer->issue($this->client(), $this->user(), ['profile'], self::JKT);
+            $this->issuer->issue($this->client(), $this->user(), ['profile'], self::JKT, 0);
             self::fail('The signing failure must propagate.');
         } catch (RuntimeException $failure) {
             self::assertSame('injected signing failure', $failure->getMessage());
@@ -159,7 +170,7 @@ final class TokenPairIssuerTest extends TestCase
         $this->clientActiveAtIssuance = false;
 
         try {
-            $this->issuer->issue($this->client(), $this->user(), ['profile'], self::JKT);
+            $this->issuer->issue($this->client(), $this->user(), ['profile'], self::JKT, 0);
             self::fail('A revoked client cannot be issued to.');
         } catch (OAuthProtocolException $refusal) {
             self::assertSame('invalid_client', $refusal->error);
@@ -171,7 +182,7 @@ final class TokenPairIssuerTest extends TestCase
 
     public function testATokenRequestedWithoutScopesCarriesNone(): void
     {
-        $response = $this->issuer->issue($this->client(), $this->user(), [], self::JKT);
+        $response = $this->issuer->issue($this->client(), $this->user(), [], self::JKT, 0);
 
         self::assertSame([], $response->getScopes());
     }

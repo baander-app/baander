@@ -19,12 +19,14 @@ final readonly class VerifiedPasswordLogin
      * @param string $dpopJkt Thumbprint of the proof key the tokens are bound to
      * @param string $nextNonce Server-issued nonce for the client's next DPoP proof
      * @param int|null $totpStep The TOTP time step the code matched; null for an account without TOTP
+     * @param int $credentialEpoch The user's credential epoch, read with the password hash the login checked
      */
     public function __construct(
         public Uuid $userId,
         public string $dpopJkt,
         public string $nextNonce,
         public ?int $totpStep,
+        public int $credentialEpoch,
     ) {
     }
 }

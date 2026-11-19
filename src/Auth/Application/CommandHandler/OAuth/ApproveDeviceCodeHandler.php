@@ -19,7 +19,9 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  *
  * The device's next poll then receives a token pair for this user. Of two users
  * approving the same code at once, one approval is recorded and the other is told
- * the code was already decided. The approval raises DeviceCodeApproved, which
+ * the code was already decided. The approval records the credential epoch of the
+ * token it was sent with, so a password change before the device polls voids it.
+ * The approval raises DeviceCodeApproved, which
  * notifies the user as a security event.
  */
 final readonly class ApproveDeviceCodeHandler
@@ -42,7 +44,7 @@ final readonly class ApproveDeviceCodeHandler
             throw new RuntimeException('User not found.');
         }
 
-        $deviceCode->approve($user);
+        $deviceCode->approve($user, $command->getCredentialEpoch());
         if (!$this->deviceCodeRepository->approve($deviceCode)) {
             // Another decision, or the expiry, came between the lookup and this approval.
             throw DeviceUserCodeException::alreadyProcessed();

@@ -11,10 +11,19 @@ use App\Shared\Domain\Model\Uuid;
  */
 final readonly class ApproveDeviceCodeCommand
 {
+    /**
+     * @param int $credentialEpoch The credential epoch of the access token the approval was sent with
+     */
     public function __construct(
         private string $userCode,
         private Uuid $userId,
+        private int $credentialEpoch,
     ) {
+    }
+
+    public function getCredentialEpoch(): int
+    {
+        return $this->credentialEpoch;
     }
 
     public function getUserCode(): string

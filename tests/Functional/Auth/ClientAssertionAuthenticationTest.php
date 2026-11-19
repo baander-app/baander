@@ -76,7 +76,7 @@ final class ClientAssertionAuthenticationTest extends TestCase
         $this->service(ClientRepositoryInterface::class)->saveClient($client);
 
         $tokens = $this->service(MessageBusInterface::class)
-            ->dispatch(new IssueTokenCommand($client->getId(), $this->createTestUser()->getId(), $this->proofKey->thumbprint()))
+            ->dispatch(new IssueTokenCommand($client->getId(), $this->createTestUser()->getId(), $this->proofKey->thumbprint(), 0))
             ->last(HandledStamp::class)?->getResult();
         self::assertInstanceOf(TokenResponseDTO::class, $tokens);
         $this->refreshToken = (string) $tokens->getRefreshToken();

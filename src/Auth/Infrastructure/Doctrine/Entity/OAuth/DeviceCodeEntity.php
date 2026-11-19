@@ -68,6 +68,13 @@ class DeviceCodeEntity implements DeviceCodeEntityInterface
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     private ?DateTimeImmutable $consumedAt = null;
 
+    /**
+     * The approving token's credential epoch; null until a user approves the code. Only the
+     * conditional approval in DeviceCodeRepository::approve() writes it.
+     */
+    #[ORM\Column(type: 'integer', nullable: true, insertable: false, updatable: false)]
+    private ?int $credentialEpoch = null;
+
     #[ORM\Column(type: 'datetime_immutable')]
     private DateTimeImmutable $createdAt;
 
@@ -327,5 +334,10 @@ class DeviceCodeEntity implements DeviceCodeEntityInterface
     {
         $this->approved = $userApproved;
         $this->updatedAt = new DateTimeImmutable();
+    }
+
+    public function getCredentialEpoch(): ?int
+    {
+        return $this->credentialEpoch;
     }
 }

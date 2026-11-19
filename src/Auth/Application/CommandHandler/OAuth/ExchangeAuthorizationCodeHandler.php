@@ -6,6 +6,7 @@ namespace App\Auth\Application\CommandHandler\OAuth;
 
 use App\Auth\Application\Command\OAuth\ExchangeAuthorizationCodeCommand;
 use App\Auth\Application\DTO\TokenResponseDTO;
+use App\Auth\Application\Exception\CredentialsChangedException;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Port\OAuthClientThrottleInterface;
 use App\Auth\Application\Service\OAuthClientAuthenticator;
@@ -66,20 +67,26 @@ final readonly class ExchangeAuthorizationCodeHandler
             throw OAuthProtocolException::invalidGrant('The user account is unavailable.');
         }
 
-        return $this->tokenPairIssuer->issue(
-            client: $client,
-            user: $user,
-            requestedScopes: $authCode->getScopeIdentifiers(),
-            dpopJkt: $command->dpopJkt,
-            clientFingerprint: $command->clientFingerprint,
-            userAgent: $command->userAgent,
-            ipAddress: $command->ipAddress,
-            persistWithTokens: function (ChainId $chainId) use ($authCode): void {
-                if (!$this->authCodeRepository->redeem($authCode, $chainId)) {
-                    throw OAuthProtocolException::invalidGrant('The authorization code was already used or has expired.');
-                }
-            },
-        );
+        try {
+            return $this->tokenPairIssuer->issue(
+                client: $client,
+                user: $user,
+                requestedScopes: $authCode->getScopeIdentifiers(),
+                dpopJkt: $command->dpopJkt,
+                credentialEpoch: $authCode->getCredentialEpoch(),
+                clientFingerprint: $command->clientFingerprint,
+                userAgent: $command->userAgent,
+                ipAddress: $command->ipAddress,
+                persistWithTokens: function (ChainId $chainId) use ($authCode): void {
+                    if (!$this->authCodeRepository->redeem($authCode, $chainId)) {
+                        throw OAuthProtocolException::invalidGrant('The authorization code was already used or has expired.');
+                    }
+                },
+            );
+        } catch (CredentialsChangedException) {
+            // The password changed after the approval the code carries.
+            throw self::unusableCode();
+        }
     }
 
     private function findRedeemableCode(string $code, Client $client): AuthCode

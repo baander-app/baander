@@ -10,14 +10,15 @@ use App\Auth\Domain\Model\OAuth\DeviceCode;
 use App\Auth\Domain\Model\OAuth\DeviceCodeState;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\User;
-use App\Auth\Domain\Model\UserState;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
 use App\Auth\Domain\Repository\OAuth\DeviceCodeRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\DeviceCodeEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Auth\Infrastructure\Doctrine\UserEntityMapping;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
@@ -137,6 +138,7 @@ final class DeviceCodeRepository implements DeviceCodeRepositoryInterface
             approved: $entity->isApproved(),
             denied: $entity->isDenied(),
             consumedAt: $entity->getConsumedAt(),
+            credentialEpoch: $entity->getCredentialEpoch(),
         ));
     }
 
@@ -177,20 +179,22 @@ final class DeviceCodeRepository implements DeviceCodeRepositoryInterface
     public function approve(DeviceCode $deviceCode): bool
     {
         $user = $deviceCode->getUser() ?? throw new \LogicException('An approved device code names its user.');
+        $epoch = $deviceCode->getCredentialEpoch() ?? throw new \LogicException('An approved device code carries the approving credential epoch.');
 
         // One conditional UPDATE decides between concurrent approvals of the same code, so
         // the device receives tokens for exactly the user whose approval was confirmed.
         $approved = $this->entityManager->getConnection()->executeStatement(
             <<<'SQL'
                 UPDATE oauth_device_codes
-                SET approved = TRUE, user_id = :user_id, updated_at = NOW()
+                SET approved = TRUE, user_id = :user_id, credential_epoch = :epoch, updated_at = NOW()
                 WHERE id = :id
                   AND approved = FALSE
                   AND denied = FALSE
                   AND user_id IS NULL
                   AND (expires_at IS NULL OR expires_at > clock_timestamp())
                 SQL,
-            ['id' => $deviceCode->getId()->toString(), 'user_id' => $user->getId()->toString()],
+            ['id' => $deviceCode->getId()->toString(), 'user_id' => $user->getId()->toString(), 'epoch' => $epoch],
+            ['epoch' => ParameterType::INTEGER],
         );
         if ($approved !== 1) {
             return false;
@@ -244,20 +248,7 @@ final class DeviceCodeRepository implements DeviceCodeRepositoryInterface
 
     private function userEntityToDomain(UserEntity $entity): User
     {
-        return User::reconstitute(new UserState(
-            id: $entity->getId(),
-            publicId: $entity->getPublicId(),
-            name: $entity->getName(),
-            email: $entity->getEmail(),
-            password: $entity->getPassword(),
-            totpSecretCiphertext: $entity->getTotpSecretCiphertext(),
-            createdAt: $entity->getCreatedAt(),
-            updatedAt: $entity->getUpdatedAt(),
-            emailVerifiedAt: $entity->getEmailVerifiedAt(),
-            roles: $entity->getRoles(),
-            disabled: $entity->isDisabled(),
-            pendingEmail: $entity->getPendingEmail(),
-        ));
+        return UserEntityMapping::toDomain($entity);
     }
 
     private function clientEntityToDomain(ClientEntity $entity): Client

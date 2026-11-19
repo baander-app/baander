@@ -36,6 +36,7 @@ final class AuthCode
      *
      * @param string  $dpopJkt The JWK SHA-256 thumbprint of the DPoP key the code is bound to
      * @param Scope[] $scopes
+     * @param int     $credentialEpoch The credential epoch of the token that approved the code
      */
     public static function create(
         User $user,
@@ -46,6 +47,7 @@ final class AuthCode
         string $dpopJkt,
         array $scopes = [],
         ?DateInterval $ttl = null,
+        int $credentialEpoch = 0,
     ): self {
         if ($codeChallengeMethod !== self::CODE_CHALLENGE_METHOD) {
             throw new InvalidArgumentException('Authorization codes require the S256 code challenge method.');
@@ -80,6 +82,7 @@ final class AuthCode
             codeChallenge: $codeChallenge,
             codeChallengeMethod: $codeChallengeMethod,
             dpopJkt: $dpopJkt,
+            credentialEpoch: $credentialEpoch,
         ));
     }
 
@@ -116,6 +119,11 @@ final class AuthCode
     }
 
     /** The token chain the code's exchange started, or null while it is unredeemed. */
+    public function getCredentialEpoch(): int
+    {
+        return $this->state->credentialEpoch;
+    }
+
     public function getIssuedChainId(): ?ChainId
     {
         return $this->state->issuedChainId;

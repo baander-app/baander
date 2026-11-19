@@ -238,6 +238,7 @@ final class RefreshTokenHandlerConcurrencyTest extends TestCase
     {
         $users = $this->createStub(UserRepositoryInterface::class);
         $users->method('findByUuid')->willReturn(User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User'));
+        $users->method('lockCredentialEpoch')->willReturn(0);
 
         return $users;
     }

@@ -191,11 +191,11 @@ final class RefreshTokenGraceTest extends TestCase
         $chainId = $this->refreshRow($login['refreshToken'])['chain_id'];
 
         $this->observer()->beginTransaction();
-        $this->observer()->executeQuery('SELECT id FROM oauth_refresh_tokens WHERE token_id = ? FOR UPDATE', [$login['refreshToken']])->free();
+        $this->observer()->executeQuery('SELECT id FROM oauth_refresh_tokens WHERE token_id = ? FOR UPDATE', [hash('sha256', $login['refreshToken'])])->free();
         $child = $this->startChild($login['refreshToken']);
         $this->awaitLockWait($child);
         // Another session rotates the replacement before the presentation gets the lock.
-        self::assertSame(1, $this->observer()->executeStatement('UPDATE oauth_refresh_tokens SET used_at = NOW() WHERE token_id = ?', [$second['refreshToken']]));
+        self::assertSame(1, $this->observer()->executeStatement('UPDATE oauth_refresh_tokens SET used_at = NOW() WHERE token_id = ?', [hash('sha256', $second['refreshToken'])]));
         $this->observer()->commit();
 
         self::assertSame(401, $this->finish($child)['status']);
@@ -210,7 +210,7 @@ final class RefreshTokenGraceTest extends TestCase
         $chainId = $this->refreshRow($login['refreshToken'])['chain_id'];
         self::assertSame(1, $this->connection->executeStatement(
             "UPDATE oauth_refresh_tokens SET used_at = NOW() - interval '61 seconds' WHERE token_id = ?",
-            [$login['refreshToken']],
+            [hash('sha256', $login['refreshToken'])],
         ));
 
         $late = $this->refresh($login['refreshToken']);
@@ -316,7 +316,7 @@ final class RefreshTokenGraceTest extends TestCase
         $login = $this->login();
         $second = $this->refreshOk($login['refreshToken']);
         $chainId = $this->refreshRow($login['refreshToken'])['chain_id'];
-        self::assertSame(1, $this->connection->executeStatement('UPDATE oauth_refresh_tokens SET revoked = TRUE WHERE token_id = ?', [$second['refreshToken']]));
+        self::assertSame(1, $this->connection->executeStatement('UPDATE oauth_refresh_tokens SET revoked = TRUE WHERE token_id = ?', [hash('sha256', $second['refreshToken'])]));
 
         $retry = $this->refresh($login['refreshToken']);
 
@@ -338,7 +338,7 @@ final class RefreshTokenGraceTest extends TestCase
         $chainId = $this->refreshRow($login['refreshToken'])['chain_id'];
 
         $this->observer()->beginTransaction();
-        $this->observer()->executeQuery('SELECT id FROM oauth_refresh_tokens WHERE token_id = ? FOR UPDATE', [$login['refreshToken']])->free();
+        $this->observer()->executeQuery('SELECT id FROM oauth_refresh_tokens WHERE token_id = ? FOR UPDATE', [hash('sha256', $login['refreshToken'])])->free();
         $first = $this->startChild($login['refreshToken']);
         $second = $this->startChild($login['refreshToken']);
         $this->awaitLockWait($first);
@@ -524,7 +524,7 @@ final class RefreshTokenGraceTest extends TestCase
     {
         $row = $this->connection->fetchAssociative(
             'SELECT id, chain_id, previous_refresh_token_id, revoked, used_at FROM oauth_refresh_tokens WHERE token_id = ?',
-            [$refreshToken],
+            [hash('sha256', $refreshToken)],
         );
         self::assertIsArray($row, 'The refresh token must be persisted.');
 

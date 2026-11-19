@@ -31,6 +31,8 @@ final class AccessToken
      *
      * @param Scope[] $scopes
      * @param string|null $dpopJkt Thumbprint of the DPoP key the token is bound to (RFC 9449)
+     * @param int $credentialEpoch The user's credential epoch the token is issued under; a token
+     *                             behind the user's current epoch does not authenticate
      */
     public static function issue(
         Client $client,
@@ -40,6 +42,7 @@ final class AccessToken
         ?DateInterval $ttl = null,
         ?ChainId $chainId = null,
         ?string $dpopJkt = null,
+        int $credentialEpoch = 0,
     ): self {
         $expiresAt = null;
         if ($ttl !== null) {
@@ -59,6 +62,7 @@ final class AccessToken
             createdAt: new DateTimeImmutable(),
             updatedAt: new DateTimeImmutable(),
             dpopJkt: $dpopJkt,
+            credentialEpoch: $credentialEpoch,
         ));
     }
 
@@ -105,6 +109,11 @@ final class AccessToken
     public function getTokenId(): TokenId
     {
         return $this->state->tokenId;
+    }
+
+    public function getCredentialEpoch(): int
+    {
+        return $this->state->credentialEpoch;
     }
 
     public function getUser(): ?User

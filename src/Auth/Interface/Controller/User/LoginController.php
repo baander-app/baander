@@ -6,6 +6,7 @@ namespace App\Auth\Interface\Controller\User;
 
 use App\Auth\Application\Command\OAuth\IssueTokenCommand;
 use App\Auth\Application\DTO\VerifiedPasswordLogin;
+use App\Auth\Application\Exception\CredentialsChangedException;
 use App\Auth\Application\Exception\TotpStepAlreadySpentException;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
@@ -92,11 +93,16 @@ final class LoginController
                 userAgent: $request->headers->get('User-Agent'),
                 clientFingerprint: $request->headers->get(BaanderHeader::ClientFingerprint->value),
                 dpopJkt: $login->dpopJkt,
+                credentialEpoch: $login->credentialEpoch,
                 totpStep: $login->totpStep,
             ));
         } catch (HandlerFailedException $exception) {
             if ($exception->getPrevious() instanceof TotpStepAlreadySpentException) {
                 // Another request spent the code first; the tokens were rolled back with the step.
+                return $this->invalidCredentials();
+            }
+            if ($exception->getPrevious() instanceof CredentialsChangedException) {
+                // The password changed after this login checked it; the password it used is gone.
                 return $this->invalidCredentials();
             }
             throw $exception;

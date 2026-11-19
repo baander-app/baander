@@ -48,4 +48,17 @@ interface UserRepositoryInterface
      * enrolled afterwards starts with no step spent.
      */
     public function clearTotpStep(Uuid $id): void;
+
+    /**
+     * Locks the user's row FOR NO KEY UPDATE and returns the credential epoch as of the lock,
+     * so a password change that committed while the lock waited is seen. Null when the user does not exist. Requires an open transaction; the
+     * lock holds until it ends.
+     */
+    public function lockCredentialEpoch(Uuid $id): ?int;
+
+    /**
+     * Increments the user's credential epoch in one statement and returns the new value. The
+     * row stays locked until the transaction ends, so issuance waiting on it sees the change.
+     */
+    public function advanceCredentialEpoch(Uuid $id): int;
 }

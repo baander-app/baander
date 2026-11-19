@@ -42,6 +42,8 @@ final class PasswordHandlersTest extends TestCase
     private array $keptSessions = [];
     private ?AccessToken $storedToken = null;
     private bool $active = false;
+    /** @var list<bool> Whether each password hash ran inside the reset transaction. */
+    private array $hashedInTransaction = [];
     /** @var list<Passkey> */
     private array $passkeys = [];
     /** @var list<bool> whether each passkey was removed inside the transaction */
@@ -63,6 +65,7 @@ final class PasswordHandlersTest extends TestCase
 
         self::assertSame('hashed:new-password', $this->user->getPassword());
         self::assertSame(['none'], $this->keptSessions);
+        self::assertSame([false], $this->hashedInTransaction, 'The new password is hashed before the reset transaction opens.');
     }
 
     public function testResetRejectsATokenThatRedeemsToNoUser(): void
@@ -262,7 +265,11 @@ final class PasswordHandlersTest extends TestCase
     private function hasher(): PasswordHasherInterface
     {
         $hasher = $this->createStub(PasswordHasherInterface::class);
-        $hasher->method('hash')->willReturnCallback(static fn (string $plain): string => 'hashed:' . $plain);
+        $hasher->method('hash')->willReturnCallback(function (string $plain): string {
+            $this->hashedInTransaction[] = $this->active;
+
+            return 'hashed:' . $plain;
+        });
         $hasher->method('verify')->willReturnCallback(static fn (string $plain, string $hash): bool => 'hashed:' . $plain === $hash);
 
         return $hasher;

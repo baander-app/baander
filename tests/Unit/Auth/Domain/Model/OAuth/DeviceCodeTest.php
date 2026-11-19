@@ -61,7 +61,7 @@ final class DeviceCodeTest extends TestCase
     {
         $code = DeviceCode::create($this->client, 'ABCD', '/verify');
 
-        $code->approve($this->user);
+        $code->approve($this->user, 0);
 
         $this->assertTrue($code->isApproved());
         $this->assertFalse($code->isPending());
@@ -71,10 +71,10 @@ final class DeviceCodeTest extends TestCase
     public function testApproveIdempotent(): void
     {
         $code = DeviceCode::create($this->client, 'ABCD', '/verify');
-        $code->approve($this->user);
+        $code->approve($this->user, 0);
         $before = $code->getUpdatedAt();
 
-        $code->approve($this->user);
+        $code->approve($this->user, 0);
 
         $this->assertEquals($before, $code->getUpdatedAt());
     }
@@ -87,7 +87,7 @@ final class DeviceCodeTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('already been denied');
 
-        $code->approve($this->user);
+        $code->approve($this->user, 0);
     }
 
     public function testDeny(): void
@@ -114,7 +114,7 @@ final class DeviceCodeTest extends TestCase
     public function testDenyApprovedThrows(): void
     {
         $code = DeviceCode::create($this->client, 'ABCD', '/verify');
-        $code->approve($this->user);
+        $code->approve($this->user, 0);
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('already been approved');
@@ -170,7 +170,7 @@ final class DeviceCodeTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('expired');
 
-        $code->approve($this->user);
+        $code->approve($this->user, 0);
     }
 
     public function testReconstitute(): void
@@ -230,7 +230,7 @@ final class DeviceCodeTest extends TestCase
     public function testConsumeApproved(): void
     {
         $code = DeviceCode::create($this->client, 'ABCD', '/verify');
-        $code->approve($this->user);
+        $code->approve($this->user, 0);
 
         $before = new \DateTimeImmutable();
         $code->consume();
@@ -245,7 +245,7 @@ final class DeviceCodeTest extends TestCase
     public function testConsumeAlreadyConsumedThrows(): void
     {
         $code = DeviceCode::create($this->client, 'ABCD', '/verify');
-        $code->approve($this->user);
+        $code->approve($this->user, 0);
         $code->consume();
 
         $this->expectException(RuntimeException::class);

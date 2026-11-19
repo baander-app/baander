@@ -70,6 +70,7 @@ final class AuthCodePkceMigrationTest extends TestCase
             'code_challenge' => self::CHALLENGE,
             'code_challenge_method' => 'S256',
             'dpop_jkt' => self::THUMBPRINT,
+            'credential_epoch' => 0,
             'created_at' => '2026-10-07 12:00:00+00',
             'updated_at' => '2026-10-07 12:00:00+00',
             ...$overrides,

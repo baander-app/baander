@@ -107,7 +107,7 @@ final class DeviceCodeGrantTest extends TestCase
     public function testApprovedCodeIssuesOneProofBoundTokenPairForTheApprovingUser(): void
     {
         $deviceCode = $this->authorize()->deviceCode;
-        $this->codes[$deviceCode]->approve($this->user);
+        $this->codes[$deviceCode]->approve($this->user, 0);
 
         $tokens = $this->poll($deviceCode);
 
@@ -127,7 +127,7 @@ final class DeviceCodeGrantTest extends TestCase
     public function testAConcurrentPollThatLosesTheRedemptionIssuesNothing(): void
     {
         $deviceCode = $this->authorize()->deviceCode;
-        $this->codes[$deviceCode]->approve($this->user);
+        $this->codes[$deviceCode]->approve($this->user, 0);
         $this->redeemed[$deviceCode] = true;
 
         $this->assertProtocolError('invalid_grant', fn () => $this->poll($deviceCode));
@@ -168,7 +168,7 @@ final class DeviceCodeGrantTest extends TestCase
     public function testAnotherClientCannotRedeemTheCode(): void
     {
         $deviceCode = $this->authorize()->deviceCode;
-        $this->codes[$deviceCode]->approve($this->user);
+        $this->codes[$deviceCode]->approve($this->user, 0);
         $otherTv = $this->register(Client::create('Bedroom TV', [], deviceClient: true));
 
         $this->assertProtocolError('invalid_grant', fn () => $this->poll($deviceCode, $otherTv->getPublicId()->toString()));

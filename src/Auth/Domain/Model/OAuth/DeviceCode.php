@@ -79,9 +79,10 @@ final class DeviceCode
     }
 
     /**
-     * Approve the device code request and bind it to a user.
+     * Approve the device code request and bind it to a user, under the credential epoch of
+     * the token the user approved it with.
      */
-    public function approve(User $user): void
+    public function approve(User $user, int $credentialEpoch): void
     {
         if ($this->state->approved) {
             return;
@@ -96,6 +97,7 @@ final class DeviceCode
         }
 
         $this->state->user = $user;
+        $this->state->credentialEpoch = $credentialEpoch;
         $this->state->approved = true;
         $this->state->updatedAt = new DateTimeImmutable();
     }
@@ -227,6 +229,11 @@ final class DeviceCode
     public function getUserCode(): string
     {
         return $this->state->userCode;
+    }
+
+    public function getCredentialEpoch(): ?int
+    {
+        return $this->state->credentialEpoch;
     }
 
     public function getUser(): ?User

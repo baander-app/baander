@@ -102,6 +102,16 @@ final readonly class CachedAccessTokenRepository implements AccessTokenRepositor
         );
     }
 
+    public function currentCredentialEpoch(TokenId $tokenId): ?int
+    {
+        return $this->inner->currentCredentialEpoch($tokenId);
+    }
+
+    public function restampCredentialEpoch(AccessToken $keep, int $credentialEpoch): void
+    {
+        $this->inner->restampCredentialEpoch($keep, $credentialEpoch);
+    }
+
     public function revokeByClientId(Uuid $clientId): void
     {
         $this->inner->revokeByClientId($clientId);

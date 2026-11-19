@@ -21,6 +21,7 @@ use App\Auth\Application\Port\WebSocketTicketIssuerInterface;
 use App\Auth\Application\Port\WebSocketTicketRedeemerInterface;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\User;
+use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Infrastructure\Security\OAuth\OAuth2Authenticator;
@@ -125,7 +126,7 @@ final class DisabledUserAccessTest extends TestCase
             ->last(HandledStamp::class)?->getResult();
         self::assertInstanceOf(PushedAuthorizationRequestDTO::class, $pushed);
         $authorization = $this->bus()
-            ->dispatch(new CreateAuthorizationCodeCommand($user->getId(), $clientId, $pushed->requestUri))
+            ->dispatch(new CreateAuthorizationCodeCommand($user->getId(), $clientId, $pushed->requestUri, 0))
             ->last(HandledStamp::class)?->getResult();
         self::assertInstanceOf(AuthorizationResponseDTO::class, $authorization);
         self::assertIsString($authorization->code);
@@ -157,6 +158,7 @@ final class DisabledUserAccessTest extends TestCase
             $this->service(TokenMetadataRepositoryInterface::class),
             AuthenticationFailureMessages::create(),
             $this->service(ClientRepositoryInterface::class),
+            $this->service(AccessTokenRepositoryInterface::class),
             $spaClientId,
         );
 
@@ -255,7 +257,7 @@ final class DisabledUserAccessTest extends TestCase
     private function issueTokens(User $user, string $clientPublicId): TokenResponseDTO
     {
         $result = $this->bus()
-            ->dispatch(new IssueTokenCommand(Uuid::fromString($this->clientUuids[$clientPublicId]), $user->getId(), self::DPOP_JKT))
+            ->dispatch(new IssueTokenCommand(Uuid::fromString($this->clientUuids[$clientPublicId]), $user->getId(), self::DPOP_JKT, 0))
             ->last(HandledStamp::class)?->getResult();
         self::assertInstanceOf(TokenResponseDTO::class, $result);
 

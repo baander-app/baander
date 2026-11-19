@@ -38,6 +38,8 @@ final class AuthCodeState
         public readonly string $dpopJkt,
         public bool $revoked = false,
         public ?ChainId $issuedChainId = null,
+        /** The credential epoch of the token that approved the code; the exchange refuses a later one. */
+        public readonly int $credentialEpoch = 0,
     ) {
         $this->scopes = $scopes;
     }

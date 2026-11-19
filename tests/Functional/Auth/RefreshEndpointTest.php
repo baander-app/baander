@@ -72,7 +72,7 @@ final class RefreshEndpointTest extends TestCase
         $bus = static::getContainer()->get(MessageBusInterface::class);
         self::assertInstanceOf(MessageBusInterface::class, $bus);
         $tokens = $bus
-            ->dispatch(new IssueTokenCommand($clientId, $userId ?? $this->createTestUser()->getId(), $this->key->thumbprint()))
+            ->dispatch(new IssueTokenCommand($clientId, $userId ?? $this->createTestUser()->getId(), $this->key->thumbprint(), 0))
             ->last(HandledStamp::class)?->getResult();
         self::assertInstanceOf(TokenResponseDTO::class, $tokens);
 

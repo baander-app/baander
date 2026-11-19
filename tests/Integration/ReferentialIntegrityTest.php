@@ -51,7 +51,7 @@ final class ReferentialIntegrityTest extends TestCase
         'oauth_auth_codes.code_id' => 'the code\'s own OAuth identifier',
         'oauth_pushed_authorization_requests.request_id' => 'the pushed request\'s own OAuth identifier, carried in its request URI',
         'oauth_refresh_tokens.chain_id' => 'token chain identifier with no chain table',
-        'oauth_refresh_tokens.token_id' => 'the token\'s own OAuth identifier',
+        'oauth_refresh_tokens.token_id' => 'the SHA-256 hash of the token\'s own OAuth identifier',
         'oauth_token_metadata.session_id' => 'client-reported session identifier',
         'pairing_sessions.server_public_id' => 'copy of server_instances.public_id; server_id carries the foreign key',
         'party_members.audio_profile_id' => 'identifier within the video\'s probe data',
@@ -443,9 +443,10 @@ final class ReferentialIntegrityTest extends TestCase
             'token_id' => bin2hex(random_bytes(16)),
             'client_id' => $client->toString(),
             'user_id' => $user->toString(),
+            'credential_epoch' => '0',
             ...$times,
         ]);
-        $this->insert('oauth_refresh_tokens', ['token_id' => bin2hex(random_bytes(16)), 'access_token_id' => $token->toString(), ...$times]);
+        $this->insert('oauth_refresh_tokens', ['token_id' => bin2hex(random_bytes(16)), 'access_token_id' => $token->toString(), 'credential_epoch' => '0', 'chain_expires_at' => '2027-01-01 00:00:00+00', ...$times]);
         $this->insert('oauth_token_metadata', ['token_id' => $token->toString(), ...$times]);
 
         return $token;
@@ -461,6 +462,7 @@ final class ReferentialIntegrityTest extends TestCase
             'code_challenge' => 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
             'code_challenge_method' => 'S256',
             'dpop_jkt' => 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs',
+            'credential_epoch' => '0',
             'created_at' => '2026-10-07 12:00:00+00',
             'updated_at' => '2026-10-07 12:00:00+00',
         ]);

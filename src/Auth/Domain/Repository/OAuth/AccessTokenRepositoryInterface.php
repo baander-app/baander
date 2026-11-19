@@ -53,5 +53,18 @@ interface AccessTokenRepositoryInterface
     public function revokeForUser(Uuid $userId, ?AccessToken $keep = null): void;
 
     /** Revoke every active access token issued to the client. */
+    /**
+     * The credential epoch the token was issued under, read from storage; null when the token
+     * is unknown or its user's credentials changed after it was issued (the user's epoch moved
+     * past the token's).
+     */
+    public function currentCredentialEpoch(TokenId $tokenId): ?int;
+
+    /**
+     * Stamps $keep and the access tokens of its chain with the credential epoch a password
+     * change moved the user to, so the session that changed it stays signed in.
+     */
+    public function restampCredentialEpoch(AccessToken $keep, int $credentialEpoch): void;
+
     public function revokeByClientId(Uuid $clientId): void;
 }

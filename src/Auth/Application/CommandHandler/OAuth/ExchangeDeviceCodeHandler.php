@@ -6,6 +6,7 @@ namespace App\Auth\Application\CommandHandler\OAuth;
 
 use App\Auth\Application\Command\OAuth\ExchangeDeviceCodeCommand;
 use App\Auth\Application\DTO\TokenResponseDTO;
+use App\Auth\Application\Exception\CredentialsChangedException;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Port\OAuthClientThrottleInterface;
 use App\Auth\Application\Service\OAuthClientAuthenticator;
@@ -75,21 +76,35 @@ final readonly class ExchangeDeviceCodeHandler
         if ($user === null || $user->isDisabled()) {
             throw OAuthProtocolException::invalidGrant('The approving user account is unavailable.');
         }
+        // An approval recorded before approvals carried the approving token's epoch issues nothing.
+        $credentialEpoch = $deviceCode->getCredentialEpoch()
+            ?? throw self::credentialsChanged();
 
-        return $this->tokenPairIssuer->issue(
-            client: $client,
-            user: $user,
-            requestedScopes: $deviceCode->getScopeIdentifiers(),
-            dpopJkt: $command->dpopJkt,
-            clientFingerprint: $command->clientFingerprint,
-            userAgent: $command->userAgent,
-            ipAddress: $command->ipAddress,
-            persistWithTokens: function () use ($deviceCode): void {
-                if (!$this->deviceCodeRepository->redeem($deviceCode)) {
-                    throw OAuthProtocolException::invalidGrant('The device code was already used or has expired.');
-                }
-            },
-        );
+        try {
+            return $this->tokenPairIssuer->issue(
+                client: $client,
+                user: $user,
+                requestedScopes: $deviceCode->getScopeIdentifiers(),
+                dpopJkt: $command->dpopJkt,
+                credentialEpoch: $credentialEpoch,
+                clientFingerprint: $command->clientFingerprint,
+                userAgent: $command->userAgent,
+                ipAddress: $command->ipAddress,
+                persistWithTokens: function () use ($deviceCode): void {
+                    if (!$this->deviceCodeRepository->redeem($deviceCode)) {
+                        throw OAuthProtocolException::invalidGrant('The device code was already used or has expired.');
+                    }
+                },
+            );
+        } catch (CredentialsChangedException) {
+            throw self::credentialsChanged();
+        }
+    }
+
+    /** The password changed after the user approved the code. */
+    private static function credentialsChanged(): OAuthProtocolException
+    {
+        return OAuthProtocolException::invalidGrant('The approval is no longer valid.');
     }
 
     private function find(string $deviceCode): ?DeviceCode

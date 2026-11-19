@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Application\CommandHandler\Passkey;
 
 use App\Auth\Application\Command\Passkey\AuthenticatePasskeyCommand;
+use App\Auth\Application\DTO\AuthenticatedPasskeyOwner;
 use App\Auth\Application\Port\PasskeyVerifierInterface;
 use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
@@ -22,18 +23,29 @@ final class AuthenticatePasskeyHandler
     }
 
     /**
-     * Verifies a WebAuthn authentication ceremony and returns the authenticated user ID.
-     *
-     * @return string The UUID string of the authenticated user
+     * Verifies a WebAuthn authentication ceremony and returns the authenticated user with the
+     * credential epoch issuance must still find.
      *
      * @throws RuntimeException If the challenge is invalid, credential is not found, or verification fails
      */
     #[AsMessageHandler]
-    public function __invoke(AuthenticatePasskeyCommand $command): string
+    public function __invoke(AuthenticatePasskeyCommand $command): AuthenticatedPasskeyOwner
     {
         $response = $command->getResponse();
 
         $credentialId = self::credentialId($response);
+
+        // The owner, and with it the credential epoch, is read before the passkey: a reset that
+        // removes the passkey and moves the epoch then either hides the passkey from the read
+        // below or leaves this login holding an epoch issuance refuses.
+        $userId = $this->passkeyRepository->userIdForCredentialId($credentialId);
+        if ($userId === null) {
+            throw new RuntimeException('No passkey found for the given credential ID.');
+        }
+        $owner = $this->users->findByUuid($userId);
+        if ($owner === null) {
+            throw new RuntimeException('Credential owner does not match its registered user handle.');
+        }
 
         $passkey = $this->passkeyRepository->ofCredentialId($credentialId);
         if ($passkey === null) {
@@ -48,15 +60,6 @@ final class AuthenticatePasskeyHandler
             $passkey->getData(),
             $passkey->getCounter(),
         );
-
-        $userId = $this->passkeyRepository->userIdForCredentialId($credentialId);
-        if ($userId === null) {
-            throw new RuntimeException('Unable to resolve user for the given credential ID.');
-        }
-        $owner = $this->users->findByUuid($userId);
-        if ($owner === null) {
-            throw new RuntimeException('Credential owner does not match its registered user handle.');
-        }
 
         // Verify the authentication response (challenge, origin, signature, user handle).
         // A passkey stands in for both factors only when the authenticator verified the
@@ -97,7 +100,7 @@ final class AuthenticatePasskeyHandler
         $passkey->updateCounter($newCounter);
         $this->passkeyRepository->markUsed($passkey);
 
-        return $userId->toString();
+        return new AuthenticatedPasskeyOwner($userId, $owner->getCredentialEpoch());
     }
 
     /** @param array<string,mixed> $response */
