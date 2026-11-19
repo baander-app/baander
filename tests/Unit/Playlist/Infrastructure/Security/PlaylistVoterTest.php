@@ -11,6 +11,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use PHPUnit\Framework\Attributes\DataProvider;
+use App\Tests\Support\Security\RoleHierarchyDecisions;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\VoterInterface;
@@ -32,6 +33,7 @@ final class PlaylistVoterTest extends TestCase
             'collaborator' => ['VIEW', 'EDIT_SONGS', 'LEAVE'],
             'collaborator flag off' => ['VIEW', 'LEAVE'],
             'admin' => ['VIEW'],
+            'super admin' => ['VIEW'],
             'unrelated' => [],
         ];
         foreach ($granted as $actor => $grants) {
@@ -54,7 +56,11 @@ final class PlaylistVoterTest extends TestCase
             'collaborator', 'collaborator flag off' => $collaboratorId,
             default => Uuid::generate(),
         };
-        $roles = $actor === 'admin' ? ['ROLE_ADMIN'] : ['ROLE_USER'];
+        $roles = match ($actor) {
+            'admin' => ['ROLE_ADMIN'],
+            'super admin' => ['ROLE_SUPER_ADMIN'],
+            default => ['ROLE_USER'],
+        };
 
         self::assertSame($expected, $this->voter()->vote($this->token($userId, $roles), $playlist, [$attribute]));
     }
@@ -121,7 +127,7 @@ final class PlaylistVoterTest extends TestCase
 
     private function voter(): PlaylistVoter
     {
-        return new PlaylistVoter();
+        return new PlaylistVoter(RoleHierarchyDecisions::manager());
     }
 
     /** @param list<Uuid> $collaboratorIds */

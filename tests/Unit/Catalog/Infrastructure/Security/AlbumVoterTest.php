@@ -12,6 +12,7 @@ use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\Attributes\DataProvider;
+use App\Tests\Support\Security\RoleHierarchyDecisions;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\VoterInterface;
@@ -23,9 +24,9 @@ final class AlbumVoterTest extends TestCase
     public static function resourceVotes(): iterable
     {
         foreach (['domain', 'orm', 'string'] as $kind) {
-            foreach (['user', 'admin'] as $actor) {
+            foreach (['user', 'admin', 'super admin'] as $actor) {
                 foreach (['VIEW', 'EDIT', 'DELETE'] as $attribute) {
-                    $expected = ($actor === 'admin') ? VoterInterface::ACCESS_GRANTED : VoterInterface::ACCESS_DENIED;
+                    $expected = ($actor !== 'user') ? VoterInterface::ACCESS_GRANTED : VoterInterface::ACCESS_DENIED;
                     yield "$kind $actor $attribute" => [$kind, $actor, $attribute, $expected];
                 }
             }
@@ -36,7 +37,11 @@ final class AlbumVoterTest extends TestCase
     public function testRealResourceAndExplicitStringPolicy(string $kind, string $actor, string $attribute, int $expected): void
     {
         $userId = Uuid::generate();
-        $roles = $actor === 'admin' ? ['ROLE_ADMIN'] : ['ROLE_USER'];
+        $roles = match ($actor) {
+            'admin' => ['ROLE_ADMIN'],
+            'super admin' => ['ROLE_SUPER_ADMIN'],
+            default => ['ROLE_USER'],
+        };
 
         self::assertSame($expected, $this->voter()->vote($this->token($userId, $roles), $this->subject($kind), [$attribute]));
     }
@@ -91,7 +96,7 @@ final class AlbumVoterTest extends TestCase
 
     private function voter(): AlbumVoter
     {
-        return new AlbumVoter();
+        return new AlbumVoter(RoleHierarchyDecisions::manager());
     }
 
     private function subject(string $kind): object|string

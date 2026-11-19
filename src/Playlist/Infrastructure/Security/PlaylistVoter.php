@@ -8,6 +8,7 @@ use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Playlist\Domain\Model\Playlist;
 use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
+use Symfony\Component\Security\Core\Authorization\AccessDecisionManagerInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\Vote;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
@@ -41,6 +42,11 @@ final class PlaylistVoter extends Voter
         self::LEAVE,
     ];
 
+    public function __construct(
+        private readonly AccessDecisionManagerInterface $accessDecisionManager,
+    ) {
+    }
+
     protected function supports(string $attribute, mixed $subject): bool
     {
         return in_array($attribute, self::ATTRIBUTES, true) && $subject instanceof Playlist;
@@ -56,7 +62,7 @@ final class PlaylistVoter extends Voter
         $userId = Uuid::fromString($user->getId());
         $isOwner = $subject->getUserId()->equals($userId);
         $isCollaborator = $subject->isCollaborator($userId);
-        $isAdmin = in_array('ROLE_ADMIN', $token->getRoleNames(), true);
+        $isAdmin = $this->accessDecisionManager->decide($token, ['ROLE_ADMIN']);
 
         return match ($attribute) {
             self::VIEW => $isOwner || $isCollaborator || $isAdmin,

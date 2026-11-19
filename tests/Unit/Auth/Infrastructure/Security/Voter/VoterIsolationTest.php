@@ -22,6 +22,7 @@ use App\Playlist\Domain\Model\Playlist;
 use App\Playlist\Infrastructure\Security\PlaylistVoter;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\FilesystemType;
+use App\Tests\Support\Security\RoleHierarchyDecisions;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
@@ -140,12 +141,14 @@ final class VoterIsolationTest extends TestCase
 
     private function manager(): AccessDecisionManager
     {
+        $roles = RoleHierarchyDecisions::manager();
+
         return new AccessDecisionManager([
             new NotificationVoter(),
-            new LibraryVoter(),
-            new PlaylistVoter(),
-            new AlbumVoter(),
-            new SongVoter(),
+            new LibraryVoter($roles),
+            new PlaylistVoter($roles),
+            new AlbumVoter($roles),
+            new SongVoter($roles),
             new AdminVoter(),
         ]);
     }

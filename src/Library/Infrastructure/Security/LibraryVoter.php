@@ -8,6 +8,7 @@ use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Library\Domain\Model\Library;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
+use Symfony\Component\Security\Core\Authorization\AccessDecisionManagerInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\Vote;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
@@ -23,6 +24,11 @@ final class LibraryVoter extends Voter
     public const string EDIT = 'EDIT';
     public const string DELETE = 'DELETE';
 
+    public function __construct(
+        private readonly AccessDecisionManagerInterface $accessDecisionManager,
+    ) {
+    }
+
     protected function supports(string $attribute, mixed $subject): bool
     {
         return in_array($attribute, [self::VIEW, self::EDIT, self::DELETE], true)
@@ -36,7 +42,7 @@ final class LibraryVoter extends Voter
             return false;
         }
 
-        if (in_array('ROLE_ADMIN', $token->getRoleNames(), true)) {
+        if ($this->accessDecisionManager->decide($token, ['ROLE_ADMIN'])) {
             return true;
         }
 
