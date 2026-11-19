@@ -60,7 +60,7 @@ final class MutationRouteInventoryTest extends TestCase
             'auth_password_reset', 'auth_password_reset_request', 'auth_passkey_login_passkey',
             'passkey_options', 'passkey_register', 'passkey_authenticate', 'passkey_authenticate_options', 'passkey_delete',
             'totp_setup', 'totp_enable', 'totp_disable',
-            'oauth_token', 'oauth_revoke', 'oauth_authorize_decision', 'oauth_clients_create', 'oauth_clients_revoke',
+            'oauth_token', 'oauth_par', 'oauth_revoke', 'oauth_authorize_decision', 'oauth_clients_create', 'oauth_clients_revoke',
             'oauth_device_authorize', 'oauth_device_approve',
         ],
         'playback sessions and devices' => [

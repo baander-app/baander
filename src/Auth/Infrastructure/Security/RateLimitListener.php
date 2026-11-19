@@ -51,6 +51,8 @@ final class RateLimitListener
         RateLimiterFactoryInterface $authEmailVerificationIpLimiter,
         RateLimiterFactoryInterface $oauthTokenIpLimiter,
         RateLimiterFactoryInterface $oauthTokenClientLimiter,
+        RateLimiterFactoryInterface $oauthParIpLimiter,
+        RateLimiterFactoryInterface $oauthParClientLimiter,
         RateLimiterFactoryInterface $oauthAuthorizeIpLimiter,
         RateLimiterFactoryInterface $oauthDeviceAuthorizeIpLimiter,
         RateLimiterFactoryInterface $oauthDeviceVerifyIpLimiter,
@@ -129,6 +131,19 @@ final class RateLimitListener
                 'key_resolver' => fn (Request $r): string => $this->oauthClientId($r),
                 'skip_empty_key' => true,
             ],
+            // Pushed authorization requests: per IP, and per client across all addresses;
+            // each request stores a row, so a public client cannot fill the table.
+            [
+                'pattern' => '#^/api/oauth/par$#',
+                'limiter' => $oauthParIpLimiter,
+                'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
+            ],
+            [
+                'pattern' => '#^/api/oauth/par$#',
+                'limiter' => $oauthParClientLimiter,
+                'key_resolver' => fn (Request $r): string => $this->oauthClientId($r),
+                'skip_empty_key' => true,
+            ],
             // Authorization endpoint: per IP, for both methods it accepts.
             [
                 'pattern' => '#^/api/oauth/authorize$#',
@@ -165,7 +180,7 @@ final class RateLimitListener
         return is_string($value) ? $value : '';
     }
 
-    /** The client_id of a form-encoded or JSON token request, or an empty string. */
+    /** The client_id of a form-encoded or JSON token or pushed authorization request, or an empty string. */
     private function oauthClientId(Request $request): string
     {
         $clientId = $request->request->all()['client_id'] ?? null;

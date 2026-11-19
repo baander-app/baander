@@ -13,7 +13,12 @@ use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
- * Requires a nonce-bearing DPoP proof (RFC 9449) on every OAuth token endpoint request.
+ * Requires a nonce-bearing DPoP proof (RFC 9449) on every OAuth token endpoint request,
+ * and checks the same way a proof sent to the pushed authorization request endpoint.
+ *
+ * A pushed authorization request may bind its key through the dpop_jkt parameter
+ * instead (RFC 9449 section 10.1), so one without a DPoP header passes on without a
+ * VerifiedDpopProof; one with the header gets every check below.
  *
  * A missing, stale or invalid proof is answered here, before any grant runs, with
  * an OAuth error: `use_dpop_nonce` when the proof lacks a fresh server nonce,
@@ -31,7 +36,8 @@ use Symfony\Component\HttpKernel\KernelEvents;
  */
 final readonly class TokenEndpointDpopListener
 {
-    public const string ROUTE = 'oauth_token';
+    public const string TOKEN_ROUTE = 'oauth_token';
+    public const string PAR_ROUTE = 'oauth_par';
 
     public function __construct(
         private DpopTokenRequestVerifier $verifier,
@@ -42,7 +48,11 @@ final readonly class TokenEndpointDpopListener
     public function onKernelRequest(RequestEvent $event): void
     {
         $request = $event->getRequest();
-        if (!$event->isMainRequest() || $request->attributes->get('_route') !== self::ROUTE) {
+        $route = $request->attributes->get('_route');
+        if (!$event->isMainRequest() || !in_array($route, [self::TOKEN_ROUTE, self::PAR_ROUTE], true)) {
+            return;
+        }
+        if ($route === self::PAR_ROUTE && !$request->headers->has('DPoP')) {
             return;
         }
 

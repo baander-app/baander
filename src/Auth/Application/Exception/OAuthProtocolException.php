@@ -17,20 +17,22 @@ final class OAuthProtocolException extends RuntimeException
     /**
      * @param string|null $redirectUri Set once the authorization endpoint has validated the client's
      *                                 redirect URI; the error is then sent there (RFC 6749 section 4.1.2.1)
+     * @param string|null $state       The client's state, returned with an error sent to the redirect URI
      */
     private function __construct(
         public readonly string $error,
         string $description,
         public readonly int $statusCode = 400,
         public readonly ?string $redirectUri = null,
+        public readonly ?string $state = null,
     ) {
         parent::__construct($description);
     }
 
-    /** The same error, delivered to the client's validated redirect URI. */
-    public function redirectTo(string $redirectUri): self
+    /** The same error, delivered to the client's validated redirect URI with the client's state. */
+    public function redirectTo(string $redirectUri, ?string $state = null): self
     {
-        return new self($this->error, $this->getMessage(), $this->statusCode, $redirectUri);
+        return new self($this->error, $this->getMessage(), $this->statusCode, $redirectUri, $state);
     }
 
     public static function invalidRequest(string $description): self
@@ -42,6 +44,24 @@ final class OAuthProtocolException extends RuntimeException
     public static function invalidClient(string $description = 'Client authentication failed.'): self
     {
         return new self('invalid_client', $description, 401);
+    }
+
+    /** RFC 9126 section 2.2: a request URI that is unknown, expired, used up or another client's. */
+    public static function invalidRequestUri(string $description): self
+    {
+        return new self('invalid_request_uri', $description);
+    }
+
+    /** RFC 9126 section 2.3: Baander accepts no request objects (RFC 9101). */
+    public static function requestNotSupported(): self
+    {
+        return new self('request_not_supported', 'Request objects are not supported; push the parameters themselves.');
+    }
+
+    /** RFC 9449 section 10.1: the DPoP proof and the dpop_jkt parameter name different keys. */
+    public static function invalidDpopProof(string $description): self
+    {
+        return new self('invalid_dpop_proof', $description);
     }
 
     public static function invalidGrant(string $description): self

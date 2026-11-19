@@ -71,9 +71,11 @@ parameters:
     # --- Web App Authorization Pages ---
 
     # Absolute URI of the web app's consent page. RFC 8414 metadata advertises it as
-    # the authorization_endpoint; the page reads the request from its query string,
-    # checks it with GET /api/oauth/authorize and sends the user's decision to
-    # POST /api/oauth/authorize, then navigates to the redirect URI it gets back.
+    # the authorization_endpoint. A client first pushes its request to
+    # POST /api/oauth/par and sends the browser here with only client_id and
+    # request_uri; the page looks the pushed request up with GET /api/oauth/authorize,
+    # sends the user's decision to POST /api/oauth/authorize, then navigates to the
+    # redirect URI it gets back.
     auth.oauth.authorization_page_uri: '%auth.oauth.issuer%/oauth/authorize'
 
     # --- Device Authorization (RFC 8628) ---
@@ -182,6 +184,15 @@ parameters:
     # Maximum OAuth token endpoint requests per client_id within the oauth_token
     # window, from all addresses together. Default: 600 per minute.
     auth.rate_limit.oauth_token_client.max_attempts: 600
+
+    # Maximum pushed authorization requests per IP within the window. Each one stores a
+    # request for up to auth.par.request_uri_ttl seconds. Default: 120 per minute.
+    auth.rate_limit.oauth_par.max_attempts: 120
+    auth.rate_limit.oauth_par.window: 60
+
+    # Maximum pushed authorization requests per client_id within the oauth_par window,
+    # from all addresses together. Default: 600 per minute.
+    auth.rate_limit.oauth_par_client.max_attempts: 600
 
     # Maximum authorization endpoint requests per IP within the window. Default: 30 per minute.
     auth.rate_limit.oauth_authorize.max_attempts: 30

@@ -1632,14 +1632,13 @@ export type AuthorizationErrorResourceError = typeof AuthorizationErrorResourceE
 export const AuthorizationErrorResourceError = {
   invalid_request: 'invalid_request',
   invalid_client: 'invalid_client',
+  invalid_request_uri: 'invalid_request_uri',
   unauthorized_client: 'unauthorized_client',
-  unsupported_response_type: 'unsupported_response_type',
-  invalid_scope: 'invalid_scope',
   access_denied: 'access_denied',
 } as const;
 
 /**
- * An OAuth error (RFC 6749 section 4.1.2.1). Without redirect_uri the client or redirect URI is invalid and the user must see the error; never redirect. With redirect_uri, navigate there.
+ * An OAuth error (RFC 6749 section 4.1.2.1). Without redirect_uri the client or the pushed request is invalid and the user must see the error; never redirect. `invalid_request_uri` means the pushed request is unknown, expired, already used, or was pushed by another client. With redirect_uri, navigate there.
  */
 export interface AuthorizationErrorResource {
   error: AuthorizationErrorResourceError;
@@ -1656,33 +1655,14 @@ export const AuthorizationDecisionRequestDecision = {
   deny: 'deny',
 } as const;
 
-export type AuthorizationDecisionRequestResponseType = typeof AuthorizationDecisionRequestResponseType[keyof typeof AuthorizationDecisionRequestResponseType];
-
-
-export const AuthorizationDecisionRequestResponseType = {
-  code: 'code',
-} as const;
-
-export type AuthorizationDecisionRequestCodeChallengeMethod = typeof AuthorizationDecisionRequestCodeChallengeMethod[keyof typeof AuthorizationDecisionRequestCodeChallengeMethod];
-
-
-export const AuthorizationDecisionRequestCodeChallengeMethod = {
-  S256: 'S256',
-} as const;
-
 /**
- * The parameters of the authorization request the consent page showed, unchanged, with the user's decision. JSON or form-encoded.
+ * The pushed request the consent page showed, named by its client_id and request_uri, with the user's decision. JSON or form-encoded; any other parameter is ignored.
  */
 export interface AuthorizationDecisionRequest {
   decision: AuthorizationDecisionRequestDecision;
-  response_type: AuthorizationDecisionRequestResponseType;
   client_id: string;
-  redirect_uri: string;
-  /** Space-separated scopes */
-  scope: string;
-  state: string;
-  code_challenge: string;
-  code_challenge_method: AuthorizationDecisionRequestCodeChallengeMethod;
+  /** The request URI the client received from the pushed authorization request endpoint */
+  request_uri: string;
 }
 
 /**
@@ -1691,6 +1671,26 @@ export interface AuthorizationDecisionRequest {
 export interface AuthorizationRedirectResource {
   /** The client's redirect URI with code, state and iss on approval, or error=access_denied, error_description, state and iss on denial */
   redirect_uri: string;
+}
+
+/**
+ * A pushed authorization request (RFC 9126 section 2.2). Send the browser to the authorization endpoint with `client_id` and this `request_uri`.
+ */
+export interface PushedAuthorizationRequestResource {
+  /** Single-use reference to the pushed request */
+  request_uri: string;
+  /** Seconds the request URI stays usable */
+  expires_in: number;
+}
+
+/**
+ * OAuth2 error response
+ */
+export interface OAuthError {
+  error: string;
+  error_description: string;
+  /** @nullable */
+  error_uri?: string | null;
 }
 
 export type OAuthTokenResourceTokenType = typeof OAuthTokenResourceTokenType[keyof typeof OAuthTokenResourceTokenType];
@@ -1711,16 +1711,6 @@ export interface OAuthTokenResource {
   refresh_token: string;
   /** Space-separated scopes the access token carries */
   scope: string;
-}
-
-/**
- * OAuth2 error response
- */
-export interface OAuthError {
-  error: string;
-  error_description: string;
-  /** @nullable */
-  error_uri?: string | null;
 }
 
 /**
@@ -4657,8 +4647,30 @@ export type DeleteOauthClientsRevoke200 = {
 };
 
 export type GetOauthAuthorizeParams = {
-  response_type: GetOauthAuthorizeResponseType;
   client_id: string;
+  /** The request URI the pushed authorization request endpoint returned */
+  request_uri: string;
+};
+
+export type PostOauthParBodyResponseType = typeof PostOauthParBodyResponseType[keyof typeof PostOauthParBodyResponseType];
+
+
+export const PostOauthParBodyResponseType = {
+  code: 'code',
+} as const;
+
+export type PostOauthParBodyCodeChallengeMethod = typeof PostOauthParBodyCodeChallengeMethod[keyof typeof PostOauthParBodyCodeChallengeMethod];
+
+
+export const PostOauthParBodyCodeChallengeMethod = {
+  S256: 'S256',
+} as const;
+
+export type PostOauthParBody = {
+  response_type: PostOauthParBodyResponseType;
+  client_id: string;
+  /** Confidential clients only */
+  client_secret?: string;
   /** Required unless the client registered exactly one redirect URI */
   redirect_uri?: string;
   /** Space-separated scopes */
@@ -4666,22 +4678,10 @@ export type GetOauthAuthorizeParams = {
   state?: string;
   /** BASE64URL(SHA256(code_verifier)) */
   code_challenge: string;
-  code_challenge_method: GetOauthAuthorizeCodeChallengeMethod;
+  code_challenge_method: PostOauthParBodyCodeChallengeMethod;
+  /** JWK SHA-256 thumbprint of the DPoP key (RFC 7638); required without a DPoP proof header */
+  dpop_jkt?: string;
 };
-
-export type GetOauthAuthorizeResponseType = typeof GetOauthAuthorizeResponseType[keyof typeof GetOauthAuthorizeResponseType];
-
-
-export const GetOauthAuthorizeResponseType = {
-  code: 'code',
-} as const;
-
-export type GetOauthAuthorizeCodeChallengeMethod = typeof GetOauthAuthorizeCodeChallengeMethod[keyof typeof GetOauthAuthorizeCodeChallengeMethod];
-
-
-export const GetOauthAuthorizeCodeChallengeMethod = {
-  S256: 'S256',
-} as const;
 
 export type PostOauthTokenBodyGrantType = typeof PostOauthTokenBodyGrantType[keyof typeof PostOauthTokenBodyGrantType];
 
@@ -4692,11 +4692,25 @@ export const PostOauthTokenBodyGrantType = {
   'urn:ietf:params:oauth:grant-type:device_code': 'urn:ietf:params:oauth:grant-type:device_code',
 } as const;
 
+/**
+ * Sent with client_assertion
+ */
+export type PostOauthTokenBodyClientAssertionType = typeof PostOauthTokenBodyClientAssertionType[keyof typeof PostOauthTokenBodyClientAssertionType];
+
+
+export const PostOauthTokenBodyClientAssertionType = {
+  'urn:ietf:params:oauth:client-assertion-type:jwt-bearer': 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+} as const;
+
 export type PostOauthTokenBody = {
   grant_type: PostOauthTokenBodyGrantType;
   client_id: string;
-  /** Confidential clients only */
+  /** Confidential clients registered for client_secret_post only */
   client_secret?: string;
+  /** Signed JWT client assertion; confidential clients registered for private_key_jwt only */
+  client_assertion?: string;
+  /** Sent with client_assertion */
+  client_assertion_type?: PostOauthTokenBodyClientAssertionType;
   /** Authorization code (authorization_code grant) */
   code?: string;
   /** The redirect URI of the authorization request (authorization_code grant) */
@@ -11829,8 +11843,8 @@ export const getGetOauthAuthorizeUrl = (params: GetOauthAuthorizeParams,) => {
 }
 
 /**
- * Backs the consent page at `APP_URL/oauth/authorize`, which RFC 8414 metadata advertises as the authorization endpoint. The page passes on the query parameters it received; this endpoint checks them for the signed-in user and describes the request. It never redirects. When the client or redirect URI is invalid, the error has no `redirect_uri`: show it to the user. Any other error carries `redirect_uri`, the client's redirect URI with `error`, `error_description`, `state` and `iss` (RFC 6749 section 4.1.2.1, RFC 9207); navigate there.
- * @summary Check an authorization request (RFC 6749 section 4.1.1)
+ * Backs the consent page at `APP_URL/oauth/authorize`, which RFC 8414 metadata advertises as the authorization endpoint. The client pushed its request to the pushed authorization request endpoint first; the page passes on only `client_id` and `request_uri`, and this endpoint describes the pushed request for the signed-in user. Looking it up does not use it up. It never redirects. When the client is invalid, or the pushed request is unknown, expired, already used or another client's (`invalid_request_uri`), the error has no `redirect_uri`: show it to the user. Any other error carries `redirect_uri`, the pushed redirect URI with `error`, `error_description`, the pushed `state` and `iss` (RFC 6749 section 4.1.2.1, RFC 9207); navigate there.
+ * @summary Look up a pushed authorization request (RFC 9126 section 4)
  */
 export const getOauthAuthorize = async (params: GetOauthAuthorizeParams, options?: Parameters<typeof customInstance>[1]): Promise<AuthorizationRequestResource> => {
 
@@ -11901,7 +11915,7 @@ export function useGetOauthAuthorize<TData = Awaited<ReturnType<typeof getOauthA
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Check an authorization request (RFC 6749 section 4.1.1)
+ * @summary Look up a pushed authorization request (RFC 9126 section 4)
  */
 
 export function useGetOauthAuthorize<TData = Awaited<ReturnType<typeof getOauthAuthorize>>, TError = ErrorType<AuthorizationErrorResource | ApiError>>(
@@ -11931,8 +11945,8 @@ export const getPostOauthAuthorizeDecisionUrl = () => {
 }
 
 /**
- * Records the signed-in user's decision on the request the consent page showed, sent with the same parameters. Approval answers with the client's redirect URI carrying `code`, `state` and `iss` (RFC 9207); denial with `error=access_denied`, `state` and `iss`. The page navigates to `redirect_uri`. Errors follow GET.
- * @summary Approve or deny an authorization request (RFC 6749 section 4.1.2)
+ * Records the signed-in user's decision on the pushed request the consent page showed, named by the same `client_id` and `request_uri`. Either decision uses the request up. Approval answers with the pushed redirect URI carrying `code`, the pushed `state` and `iss` (RFC 9207); denial with `error=access_denied`, the pushed `state` and `iss`. The page navigates to `redirect_uri`. Errors follow GET; a request another decision already used answers `invalid_request_uri`.
+ * @summary Approve or deny a pushed authorization request (RFC 6749 section 4.1.2)
  */
 export const postOauthAuthorizeDecision = async (authorizationDecisionRequest: AuthorizationDecisionRequest, options?: Parameters<typeof customInstance>[1]): Promise<AuthorizationRedirectResource> => {
 
@@ -11998,7 +12012,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostOauthAuthorizeDecisionMutationVariables = {data: BodyType<AuthorizationDecisionRequest>}
 
     /**
- * @summary Approve or deny an authorization request (RFC 6749 section 4.1.2)
+ * @summary Approve or deny a pushed authorization request (RFC 6749 section 4.1.2)
  */
 export const usePostOauthAuthorizeDecision = <TError = ErrorType<AuthorizationErrorResource | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postOauthAuthorizeDecision>>, TError,PostOauthAuthorizeDecisionMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -12011,6 +12025,95 @@ export const usePostOauthAuthorizeDecision = <TError = ErrorType<AuthorizationEr
       return useMutation(getPostOauthAuthorizeDecisionMutationOptions(options), queryClient);
     }
 
+export const getPostOauthParUrl = () => {
+
+
+
+
+  return `/api/oauth/par`
+}
+
+/**
+ * Every authorization request is pushed here first. The client authenticates as at the token endpoint and binds the request to its DPoP key (RFC 9449 section 10.1) with a `DPoP` proof header carrying a server-issued nonce, the `dpop_jkt` parameter, or both naming the same key; the authorization code is later bound to that key. A proof is checked as at the token endpoint: `use_dpop_nonce` and `invalid_dpop_proof` answers carry a `DPoP-Nonce` header, and every answer to a verified proof carries the next nonce. Send the browser to the authorization endpoint with only `client_id` and the returned `request_uri`. Parameters may be form-encoded (RFC 9126) or JSON. Answers carry `Cache-Control: no-store`.
+ * @summary Push an authorization request (RFC 9126 section 2)
+ */
+export const postOauthPar = async (postOauthParBody: PostOauthParBody, options?: Parameters<typeof customInstance>[1]): Promise<PushedAuthorizationRequestResource> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<PushedAuthorizationRequestResource>(getPostOauthParUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(postOauthParBody)
+  }
+);}
+
+
+
+
+
+export const getPostOauthParMutationKey = () => ['postOauthPar'] as const;
+
+export const getPostOauthParMutationOptions = <TError = ErrorType<OAuthError | ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postOauthPar>>, TError,PostOauthParMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postOauthPar>>, TError,PostOauthParMutationVariables, TContext> => {
+
+const mutationKey = getPostOauthParMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postOauthPar>>, PostOauthParMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  postOauthPar(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostOauthParMutationResult = NonNullable<Awaited<ReturnType<typeof postOauthPar>>>
+    export type PostOauthParMutationBody = BodyType<PostOauthParBody>
+    export type PostOauthParMutationError = ErrorType<OAuthError | ApiError>
+    export type PostOauthParMutationVariables = {data: BodyType<PostOauthParBody>}
+
+    /**
+ * @summary Push an authorization request (RFC 9126 section 2)
+ */
+export const usePostOauthPar = <TError = ErrorType<OAuthError | ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postOauthPar>>, TError,PostOauthParMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postOauthPar>>,
+        TError,
+        PostOauthParMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostOauthParMutationOptions(options), queryClient);
+    }
+
 export const getPostOauthTokenUrl = () => {
 
 
@@ -12020,7 +12123,7 @@ export const getPostOauthTokenUrl = () => {
 }
 
 /**
- * Requires a DPoP proof carrying a server-issued nonce. A missing or invalid proof is answered with `invalid_dpop_proof`, a proof without a fresh nonce with `use_dpop_nonce`; both carry a `DPoP-Nonce` header. Every answer carries the nonce for the next proof and `Cache-Control: no-store`. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded (RFC 6749) or JSON. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`.
+ * Requires a DPoP proof carrying a server-issued nonce. A missing or invalid proof is answered with `invalid_dpop_proof`, a proof without a fresh nonce with `use_dpop_nonce`; both carry a `DPoP-Nonce` header. Every answer carries the nonce for the next proof and `Cache-Control: no-store`. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded (RFC 6749) or JSON. Every request names its client in `client_id`. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`, or `client_assertion` with `client_assertion_type`, by the one method they were registered with. A client assertion (RFC 7523 as updated by RFC 10070) is a JWT signed with one of the client's registered keys: `iss` and `sub` are the `client_id`, `aud` is the issuer identifier as its sole value, `exp` and `jti` are required, it lives at most 300 seconds by default, and its `jti` is accepted once. Its `typ` header is `client-authentication+jwt` or absent.
  * @summary OAuth 2.0 token endpoint (RFC 6749 section 3.2)
  */
 export const postOauthToken = async (postOauthTokenBody: PostOauthTokenBody, options?: Parameters<typeof customInstance>[1]): Promise<OAuthTokenResource> => {

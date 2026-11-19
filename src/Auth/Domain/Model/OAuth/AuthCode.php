@@ -33,9 +33,7 @@ final class AuthCode
     /**
      * Create a new authorization code.
      *
-     * A code is stored only with the thumbprint of the DPoP key it is bound to; the
-     * repository refuses one without it.
-     *
+     * @param string  $dpopJkt The JWK SHA-256 thumbprint of the DPoP key the code is bound to
      * @param Scope[] $scopes
      */
     public static function create(
@@ -44,9 +42,9 @@ final class AuthCode
         string $redirectUri,
         string $codeChallenge,
         string $codeChallengeMethod,
+        string $dpopJkt,
         array $scopes = [],
         ?DateInterval $ttl = null,
-        ?string $dpopJkt = null,
     ): self {
         if ($codeChallengeMethod !== self::CODE_CHALLENGE_METHOD) {
             throw new InvalidArgumentException('Authorization codes require the S256 code challenge method.');
@@ -59,7 +57,7 @@ final class AuthCode
             throw new InvalidArgumentException('Authorization codes require a redirect URI.');
         }
         // A JWK SHA-256 thumbprint (RFC 7638) is unpadded base64url as well: 43 characters.
-        if ($dpopJkt !== null && preg_match('/^[A-Za-z0-9_-]{43}$/', $dpopJkt) !== 1) {
+        if (preg_match('/^[A-Za-z0-9_-]{43}$/', $dpopJkt) !== 1) {
             throw new InvalidArgumentException('The DPoP key thumbprint is not a SHA-256 thumbprint.');
         }
 
@@ -190,9 +188,15 @@ final class AuthCode
     }
 
     /** The JWK SHA-256 thumbprint of the DPoP key the code is bound to. */
-    public function getDpopJkt(): ?string
+    public function getDpopJkt(): string
     {
         return $this->state->dpopJkt;
+    }
+
+    /** RFC 9449 section 10: only a proof from the key the code is bound to may redeem it. */
+    public function isBoundTo(string $dpopJkt): bool
+    {
+        return hash_equals($this->state->dpopJkt, $dpopJkt);
     }
 
     /** RFC 7636 section 4.6: BASE64URL(SHA256(code_verifier)) must equal the stored challenge. */

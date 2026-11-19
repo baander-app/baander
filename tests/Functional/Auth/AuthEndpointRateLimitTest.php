@@ -71,6 +71,13 @@ final class AuthEndpointRateLimitTest extends RateLimitTestCase
         self::assertSame(400, $other->getStatusCode(), (string) $other->getContent());
     }
 
+    public function testPushedAuthorizationRequestsAreLimitedPerIp(): void
+    {
+        $this->exhaust('oauth_par_ip', '198.51.100.66');
+
+        $this->assertTooManyRequests($this->requestFrom('198.51.100.66', 'POST', '/api/oauth/par', content: ['client_id' => 'rate_limit_client_0006']));
+    }
+
     public function testDeviceAuthorizationIsLimitedPerIp(): void
     {
         $this->exhaust('oauth_device_authorize_ip', '198.51.100.63');
@@ -84,7 +91,7 @@ final class AuthEndpointRateLimitTest extends RateLimitTestCase
         $this->exhaust('oauth_authorize_ip', '198.51.100.64');
         $this->exhaust('oauth_device_verify_ip', '198.51.100.64');
 
-        $this->assertTooManyRequests($this->requestFrom('198.51.100.64', 'GET', '/api/oauth/authorize?response_type=code&client_id=rate_limit_client_0005', $user->getId()->toString()));
+        $this->assertTooManyRequests($this->requestFrom('198.51.100.64', 'GET', '/api/oauth/authorize?client_id=rate_limit_client_0005&request_uri=urn:ietf:params:oauth:request_uri:unknown', $user->getId()->toString()));
         $this->assertTooManyRequests($this->requestFrom('198.51.100.64', 'GET', '/api/oauth/device/verify?user_code=BCDF-GHJK', $user->getId()->toString()));
         $this->assertTooManyRequests($this->requestFrom('198.51.100.64', 'POST', '/api/oauth/device/approve', $user->getId()->toString(), ['userCode' => 'BCDF-GHJK', 'action' => 'approve']));
 

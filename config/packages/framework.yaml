@@ -15,6 +15,8 @@ parameters:
         auth_passkey_ip: 'Passkey sign-in requests per IP'
         oauth_token_ip: 'OAuth token endpoint requests per IP'
         oauth_token_client: 'OAuth token endpoint requests per client'
+        oauth_par_ip: 'OAuth pushed authorization requests per IP'
+        oauth_par_client: 'OAuth pushed authorization requests per client'
         oauth_authorize_ip: 'OAuth authorization requests per IP'
         oauth_device_authorize_ip: 'Device authorization requests per IP'
         oauth_device_verify_ip: 'Device user code lookups, approvals and denials per IP'
@@ -110,6 +112,14 @@ framework:
             policy: fixed_window
             limit: '%auth.rate_limit.oauth_token_client.max_attempts%'
             interval: '%auth.rate_limit.oauth_token.window% seconds'
+        oauth_par_ip:
+            policy: fixed_window
+            limit: '%auth.rate_limit.oauth_par.max_attempts%'
+            interval: '%auth.rate_limit.oauth_par.window% seconds'
+        oauth_par_client:
+            policy: fixed_window
+            limit: '%auth.rate_limit.oauth_par_client.max_attempts%'
+            interval: '%auth.rate_limit.oauth_par.window% seconds'
         oauth_authorize_ip:
             policy: fixed_window
             limit: '%auth.rate_limit.oauth_authorize.max_attempts%'
@@ -204,6 +214,10 @@ when@test:
             oauth_token_ip:
                 limit: 10000
             oauth_token_client:
+                limit: 10000
+            oauth_par_ip:
+                limit: 10000
+            oauth_par_client:
                 limit: 10000
             oauth_authorize_ip:
                 limit: 10000

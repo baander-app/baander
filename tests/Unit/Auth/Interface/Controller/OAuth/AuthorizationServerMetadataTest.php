@@ -30,6 +30,7 @@ final class AuthorizationServerMetadataTest extends TestCase
     {
         $paths = [
             'oauth_token' => '/api/oauth/token',
+            'oauth_par' => '/api/oauth/par',
             'oauth_revoke' => '/api/oauth/revoke',
             'oauth_device_authorize' => '/api/oauth/device/authorize',
             'jwks' => '/.well-known/jwks.json',
@@ -44,6 +45,8 @@ final class AuthorizationServerMetadataTest extends TestCase
         self::assertSame('https://music.baander.app/oauth/authorize', $metadata['authorization_endpoint'], 'The web app consent page.');
         self::assertSame('https://music.baander.app/api/oauth/token', $metadata['token_endpoint']);
         self::assertSame('https://music.baander.app/api/oauth/device/authorize', $metadata['device_authorization_endpoint']);
+        self::assertSame('https://music.baander.app/api/oauth/par', $metadata['pushed_authorization_request_endpoint']);
+        self::assertTrue($metadata['require_pushed_authorization_requests'], 'Every authorization request is pushed first.');
         self::assertSame(['S256'], $metadata['code_challenge_methods_supported']);
         self::assertSame(['authorization_code', 'refresh_token', 'urn:ietf:params:oauth:grant-type:device_code'], $metadata['grant_types_supported']);
         self::assertSame(['profile', 'library'], $metadata['scopes_supported']);

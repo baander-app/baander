@@ -5,22 +5,19 @@ declare(strict_types=1);
 namespace App\Auth\Application\DTO;
 
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\PushedAuthorizationRequest;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
 use App\Auth\Domain\Model\User;
 
 /**
- * An authorization request that passed every check and may be granted.
+ * A pushed authorization request that passed every check for the signed-in user and may be granted.
  */
 final readonly class ValidatedAuthorizationRequest
 {
-    /** @param Scope[] $scopes The requested scopes inside the allowlist; empty means the default scopes */
     public function __construct(
         public Client $client,
         public User $user,
-        public string $redirectUri,
-        public string $codeChallenge,
-        public string $codeChallengeMethod,
-        public array $scopes,
+        public PushedAuthorizationRequest $pushedRequest,
     ) {
     }
 
@@ -31,8 +28,8 @@ final readonly class ValidatedAuthorizationRequest
      */
     public function effectiveScopes(): array
     {
-        $scopes = $this->scopes === [] ? Scope::defaultScopes() : $this->scopes;
+        $scopes = $this->pushedRequest->getScopes();
 
-        return array_map(static fn (Scope $scope): string => $scope->toString(), $scopes);
+        return array_map(static fn (Scope $scope): string => $scope->toString(), $scopes === [] ? Scope::defaultScopes() : $scopes);
     }
 }

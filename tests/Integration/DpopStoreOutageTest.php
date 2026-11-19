@@ -228,6 +228,42 @@ final class DpopStoreOutageTest extends TestCase
         self::assertStoreUnavailable($response);
     }
 
+    /**
+     * The pushed authorization request endpoint's rate limits need the store, so during the
+     * outage every push answers 503 with Retry-After, whether it binds its key through a
+     * proof or only through the dpop_jkt parameter, and nothing is stored.
+     */
+    public function testAPushedAuthorizationRequestDuringTheOutageAnswers503WithEitherKeyBinding(): void
+    {
+        $key = new SignedDpopProof();
+        $publicId = new PublicId();
+        $this->manager->persist(new ClientEntity($publicId, 'Store outage player', json_encode([self::REDIRECT], JSON_THROW_ON_ERROR)));
+        $this->manager->flush();
+        $request = [
+            'response_type' => 'code',
+            'client_id' => $publicId->toString(),
+            'redirect_uri' => self::REDIRECT,
+            'code_challenge' => 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+            'code_challenge_method' => 'S256',
+        ];
+
+        try {
+            $withProof = $this->send('POST', '/api/oauth/par', form: $request, headers: [
+                'DPoP' => $key->createWithNonce('POST', self::ORIGIN . '/api/oauth/par', $this->nonce()),
+            ], kernel: $this->refusedKernel(isolateRateLimiters: false));
+            $withThumbprint = $this->send('POST', '/api/oauth/par', form: [...$request, 'dpop_jkt' => $key->thumbprint()], kernel: $this->refusedKernel(isolateRateLimiters: false));
+
+            self::assertStoreUnavailable($withProof, retryAfter: '1');
+            self::assertStoreUnavailable($withThumbprint, retryAfter: '1');
+            self::assertSame(0, (int) $this->connection->fetchOne(
+                'SELECT COUNT(*) FROM oauth_pushed_authorization_requests r JOIN oauth_clients c ON c.id = r.client_id WHERE c.public_id = ?',
+                [$publicId->toString()],
+            ));
+        } finally {
+            $this->connection->executeStatement('DELETE FROM oauth_clients WHERE public_id = ?', [$publicId->toString()]);
+        }
+    }
+
     /** A database fault during the grant is answered like the first-party refresh answers it. */
     public function testTheTokenEndpointAnswersADatabaseFaultWith503AndRetryAfter(): void
     {

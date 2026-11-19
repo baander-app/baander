@@ -51,7 +51,7 @@ final class AuthCodeRepositoryFlushTest extends TestCase
             confidential: true,
             firstParty: true,
         );
-        $authCode = AuthCode::create($user, $client, 'http://localhost', str_repeat('A', 43), 'S256', [new Scope('profile')], dpopJkt: 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs');
+        $authCode = AuthCode::create($user, $client, 'http://localhost', str_repeat('A', 43), 'S256', 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs', [new Scope('profile')]);
 
         $clientEntity = $this->createStub(ClientEntity::class);
         $userEntity = $this->createStub(UserEntity::class);

@@ -224,7 +224,7 @@ final class OAuthPushedAuthorizationRequestPersistenceTest extends TestCase
         $client = Client::create('Thumbprint player', [self::REDIRECT]);
         new ClientRepository($this->manager, new JsonEncoder())->saveClient($client);
         $codes = new AuthCodeRepository($this->manager, new JsonEncoder());
-        $code = AuthCode::create($user, $client, self::REDIRECT, self::CHALLENGE, 'S256', [new Scope('library')], new DateInterval('PT60S'), self::THUMBPRINT);
+        $code = AuthCode::create($user, $client, self::REDIRECT, self::CHALLENGE, 'S256', self::THUMBPRINT, [new Scope('library')], new DateInterval('PT60S'));
 
         $codes->save($code);
         $this->manager->clear();

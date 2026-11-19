@@ -478,6 +478,8 @@ services:
             $authEmailVerificationIpLimiter: '@limiter.auth_email_verification_ip'
             $oauthTokenIpLimiter: '@limiter.oauth_token_ip'
             $oauthTokenClientLimiter: '@limiter.oauth_token_client'
+            $oauthParIpLimiter: '@limiter.oauth_par_ip'
+            $oauthParClientLimiter: '@limiter.oauth_par_client'
             $oauthAuthorizeIpLimiter: '@limiter.oauth_authorize_ip'
             $oauthDeviceAuthorizeIpLimiter: '@limiter.oauth_device_authorize_ip'
             $oauthDeviceVerifyIpLimiter: '@limiter.oauth_device_verify_ip'
@@ -545,6 +547,10 @@ services:
     App\Auth\Application\CommandHandler\OAuth\CreateAuthorizationCodeHandler:
         arguments:
             $authCodeTtl: '%auth.auth_code.ttl%'
+
+    App\Auth\Application\CommandHandler\OAuth\PushAuthorizationRequestHandler:
+        arguments:
+            $requestUriTtlSeconds: '%auth.par.request_uri_ttl%'
 
     App\Auth\Application\CommandHandler\OAuth\RequestDeviceAuthorizationHandler:
         arguments:

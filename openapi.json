@@ -2085,21 +2085,10 @@
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Check an authorization request (RFC 6749 section 4.1.1)",
-                "description": "Backs the consent page at `APP_URL/oauth/authorize`, which RFC 8414 metadata advertises as the authorization endpoint. The page passes on the query parameters it received; this endpoint checks them for the signed-in user and describes the request. It never redirects. When the client or redirect URI is invalid, the error has no `redirect_uri`: show it to the user. Any other error carries `redirect_uri`, the client's redirect URI with `error`, `error_description`, `state` and `iss` (RFC 6749 section 4.1.2.1, RFC 9207); navigate there.",
+                "summary": "Look up a pushed authorization request (RFC 9126 section 4)",
+                "description": "Backs the consent page at `APP_URL/oauth/authorize`, which RFC 8414 metadata advertises as the authorization endpoint. The client pushed its request to the pushed authorization request endpoint first; the page passes on only `client_id` and `request_uri`, and this endpoint describes the pushed request for the signed-in user. Looking it up does not use it up. It never redirects. When the client is invalid, or the pushed request is unknown, expired, already used or another client's (`invalid_request_uri`), the error has no `redirect_uri`: show it to the user. Any other error carries `redirect_uri`, the pushed redirect URI with `error`, `error_description`, the pushed `state` and `iss` (RFC 6749 section 4.1.2.1, RFC 9207); navigate there.",
                 "operationId": "get_oauth_authorize",
                 "parameters": [
-                    {
-                        "name": "response_type",
-                        "in": "query",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "enum": [
-                                "code"
-                            ]
-                        }
-                    },
                     {
                         "name": "client_id",
                         "in": "query",
@@ -2109,53 +2098,18 @@
                         }
                     },
                     {
-                        "name": "redirect_uri",
+                        "name": "request_uri",
                         "in": "query",
-                        "description": "Required unless the client registered exactly one redirect URI",
-                        "schema": {
-                            "type": "string",
-                            "format": "uri"
-                        }
-                    },
-                    {
-                        "name": "scope",
-                        "in": "query",
-                        "description": "Space-separated scopes",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "state",
-                        "in": "query",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "code_challenge",
-                        "in": "query",
-                        "description": "BASE64URL(SHA256(code_verifier))",
+                        "description": "The request URI the pushed authorization request endpoint returned",
                         "required": true,
                         "schema": {
                             "type": "string"
-                        }
-                    },
-                    {
-                        "name": "code_challenge_method",
-                        "in": "query",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "enum": [
-                                "S256"
-                            ]
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "A valid request awaiting the user's decision",
+                        "description": "A pushed request awaiting the user's decision",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2165,7 +2119,7 @@
                         }
                     },
                     "400": {
-                        "description": "Invalid request; with `redirect_uri` once the client and redirect URI are valid",
+                        "description": "Invalid request; with `redirect_uri` when the user cannot grant a valid pushed request",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2190,8 +2144,8 @@
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Approve or deny an authorization request (RFC 6749 section 4.1.2)",
-                "description": "Records the signed-in user's decision on the request the consent page showed, sent with the same parameters. Approval answers with the client's redirect URI carrying `code`, `state` and `iss` (RFC 9207); denial with `error=access_denied`, `state` and `iss`. The page navigates to `redirect_uri`. Errors follow GET.",
+                "summary": "Approve or deny a pushed authorization request (RFC 6749 section 4.1.2)",
+                "description": "Records the signed-in user's decision on the pushed request the consent page showed, named by the same `client_id` and `request_uri`. Either decision uses the request up. Approval answers with the pushed redirect URI carrying `code`, the pushed `state` and `iss` (RFC 9207); denial with `error=access_denied`, the pushed `state` and `iss`. The page navigates to `redirect_uri`. Errors follow GET; a request another decision already used answers `invalid_request_uri`.",
                 "operationId": "post_oauth_authorize_decision",
                 "requestBody": {
                     "required": true,
@@ -2215,7 +2169,7 @@
                         }
                     },
                     "400": {
-                        "description": "Invalid request; with `redirect_uri` once the client and redirect URI are valid",
+                        "description": "Invalid request; with `redirect_uri` when the user cannot grant a valid pushed request",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2237,13 +2191,132 @@
                 }
             }
         },
+        "/api/oauth/par": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Push an authorization request (RFC 9126 section 2)",
+                "description": "Every authorization request is pushed here first. The client authenticates as at the token endpoint and binds the request to its DPoP key (RFC 9449 section 10.1) with a `DPoP` proof header carrying a server-issued nonce, the `dpop_jkt` parameter, or both naming the same key; the authorization code is later bound to that key. A proof is checked as at the token endpoint: `use_dpop_nonce` and `invalid_dpop_proof` answers carry a `DPoP-Nonce` header, and every answer to a verified proof carries the next nonce. Send the browser to the authorization endpoint with only `client_id` and the returned `request_uri`. Parameters may be form-encoded (RFC 9126) or JSON. Answers carry `Cache-Control: no-store`.",
+                "operationId": "post_oauth_par",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "response_type",
+                                    "client_id",
+                                    "code_challenge",
+                                    "code_challenge_method"
+                                ],
+                                "properties": {
+                                    "response_type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "code"
+                                        ]
+                                    },
+                                    "client_id": {
+                                        "type": "string"
+                                    },
+                                    "client_secret": {
+                                        "description": "Confidential clients only",
+                                        "type": "string"
+                                    },
+                                    "redirect_uri": {
+                                        "description": "Required unless the client registered exactly one redirect URI",
+                                        "type": "string",
+                                        "format": "uri"
+                                    },
+                                    "scope": {
+                                        "description": "Space-separated scopes",
+                                        "type": "string"
+                                    },
+                                    "state": {
+                                        "type": "string"
+                                    },
+                                    "code_challenge": {
+                                        "description": "BASE64URL(SHA256(code_verifier))",
+                                        "type": "string"
+                                    },
+                                    "code_challenge_method": {
+                                        "type": "string",
+                                        "enum": [
+                                            "S256"
+                                        ]
+                                    },
+                                    "dpop_jkt": {
+                                        "description": "JWK SHA-256 thumbprint of the DPoP key (RFC 7638); required without a DPoP proof header",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The request URI for the authorization endpoint (RFC 9126 section 2.2)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PushedAuthorizationRequestResource"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "OAuth error, including invalid_dpop_proof when the proof and dpop_jkt name different keys, use_dpop_nonce, and request_not_supported for a request object",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OAuthError"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Client authentication failed, or the client is revoked",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OAuthError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The server could not store the request, for example while its database restarts or the rate limit or DPoP nonce store is unavailable; push again after the Retry-After delay. Carries no DPoP-Nonce header.",
+                        "headers": {
+                            "Retry-After": {
+                                "description": "Seconds to wait before retrying",
+                                "schema": {
+                                    "type": "integer",
+                                    "example": 5
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        },
         "/api/oauth/token": {
             "post": {
                 "tags": [
                     "Auth"
                 ],
                 "summary": "OAuth 2.0 token endpoint (RFC 6749 section 3.2)",
-                "description": "Requires a DPoP proof carrying a server-issued nonce. A missing or invalid proof is answered with `invalid_dpop_proof`, a proof without a fresh nonce with `use_dpop_nonce`; both carry a `DPoP-Nonce` header. Every answer carries the nonce for the next proof and `Cache-Control: no-store`. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded (RFC 6749) or JSON. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`.",
+                "description": "Requires a DPoP proof carrying a server-issued nonce. A missing or invalid proof is answered with `invalid_dpop_proof`, a proof without a fresh nonce with `use_dpop_nonce`; both carry a `DPoP-Nonce` header. Every answer carries the nonce for the next proof and `Cache-Control: no-store`. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded (RFC 6749) or JSON. Every request names its client in `client_id`. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`, or `client_assertion` with `client_assertion_type`, by the one method they were registered with. A client assertion (RFC 7523 as updated by RFC 10070) is a JWT signed with one of the client's registered keys: `iss` and `sub` are the `client_id`, `aud` is the issuer identifier as its sole value, `exp` and `jti` are required, it lives at most 300 seconds by default, and its `jti` is accepted once. Its `typ` header is `client-authentication+jwt` or absent.",
                 "operationId": "post_oauth_token",
                 "requestBody": {
                     "required": true,
@@ -2267,8 +2340,19 @@
                                         "type": "string"
                                     },
                                     "client_secret": {
-                                        "description": "Confidential clients only",
+                                        "description": "Confidential clients registered for client_secret_post only",
                                         "type": "string"
+                                    },
+                                    "client_assertion": {
+                                        "description": "Signed JWT client assertion; confidential clients registered for private_key_jwt only",
+                                        "type": "string"
+                                    },
+                                    "client_assertion_type": {
+                                        "description": "Sent with client_assertion",
+                                        "type": "string",
+                                        "enum": [
+                                            "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+                                        ]
                                     },
                                     "code": {
                                         "description": "Authorization code (authorization_code grant)",
@@ -2329,7 +2413,7 @@
                         }
                     },
                     "503": {
-                        "description": "The server could not decide on the grant, for example while its database restarts or the DPoP nonce store is unavailable; the presented token may still be valid, so retry after the Retry-After delay. Carries no DPoP-Nonce header.",
+                        "description": "The server could not decide on the grant, for example while its database restarts or the DPoP nonce store or client assertion jti store is unavailable; the presented token may still be valid, so retry after the Retry-After delay, with a newly signed client assertion. Carries no DPoP-Nonce header.",
                         "headers": {
                             "Retry-After": {
                                 "description": "Seconds to wait before retrying",
@@ -26827,7 +26911,7 @@
                 "type": "object"
             },
             "AuthorizationErrorResource": {
-                "description": "An OAuth error (RFC 6749 section 4.1.2.1). Without redirect_uri the client or redirect URI is invalid and the user must see the error; never redirect. With redirect_uri, navigate there.",
+                "description": "An OAuth error (RFC 6749 section 4.1.2.1). Without redirect_uri the client or the pushed request is invalid and the user must see the error; never redirect. `invalid_request_uri` means the pushed request is unknown, expired, already used, or was pushed by another client. With redirect_uri, navigate there.",
                 "required": [
                     "error",
                     "error_description",
@@ -26839,9 +26923,8 @@
                         "enum": [
                             "invalid_request",
                             "invalid_client",
+                            "invalid_request_uri",
                             "unauthorized_client",
-                            "unsupported_response_type",
-                            "invalid_scope",
                             "access_denied"
                         ]
                     },
@@ -26857,16 +26940,11 @@
                 "type": "object"
             },
             "AuthorizationDecisionRequest": {
-                "description": "The parameters of the authorization request the consent page showed, unchanged, with the user's decision. JSON or form-encoded.",
+                "description": "The pushed request the consent page showed, named by its client_id and request_uri, with the user's decision. JSON or form-encoded; any other parameter is ignored.",
                 "required": [
                     "decision",
-                    "response_type",
                     "client_id",
-                    "redirect_uri",
-                    "scope",
-                    "state",
-                    "code_challenge",
-                    "code_challenge_method"
+                    "request_uri"
                 ],
                 "properties": {
                     "decision": {
@@ -26876,34 +26954,12 @@
                             "deny"
                         ]
                     },
-                    "response_type": {
-                        "type": "string",
-                        "enum": [
-                            "code"
-                        ]
-                    },
                     "client_id": {
                         "type": "string"
                     },
-                    "redirect_uri": {
-                        "type": "string",
-                        "format": "uri"
-                    },
-                    "scope": {
-                        "description": "Space-separated scopes",
+                    "request_uri": {
+                        "description": "The request URI the client received from the pushed authorization request endpoint",
                         "type": "string"
-                    },
-                    "state": {
-                        "type": "string"
-                    },
-                    "code_challenge": {
-                        "type": "string"
-                    },
-                    "code_challenge_method": {
-                        "type": "string",
-                        "enum": [
-                            "S256"
-                        ]
                     }
                 },
                 "type": "object"
@@ -26919,6 +26975,48 @@
                         "type": "string",
                         "format": "uri",
                         "example": "https://player.baander.app/callback?code=abc&state=xyz&iss=https%3A%2F%2Fbaander.app"
+                    }
+                },
+                "type": "object"
+            },
+            "PushedAuthorizationRequestResource": {
+                "description": "A pushed authorization request (RFC 9126 section 2.2). Send the browser to the authorization endpoint with `client_id` and this `request_uri`.",
+                "required": [
+                    "request_uri",
+                    "expires_in"
+                ],
+                "properties": {
+                    "request_uri": {
+                        "description": "Single-use reference to the pushed request",
+                        "type": "string",
+                        "example": "urn:ietf:params:oauth:request_uri:6esc_11ACC5bwc014ltc14eY22c"
+                    },
+                    "expires_in": {
+                        "description": "Seconds the request URI stays usable",
+                        "type": "integer",
+                        "example": 300
+                    }
+                },
+                "type": "object"
+            },
+            "OAuthError": {
+                "description": "OAuth2 error response",
+                "required": [
+                    "error",
+                    "error_description"
+                ],
+                "properties": {
+                    "error": {
+                        "type": "string",
+                        "example": "invalid_grant"
+                    },
+                    "error_description": {
+                        "type": "string",
+                        "example": "The provided authorization code is invalid."
+                    },
+                    "error_uri": {
+                        "type": "string",
+                        "nullable": true
                     }
                 },
                 "type": "object"
@@ -26954,28 +27052,6 @@
                         "description": "Space-separated scopes the access token carries",
                         "type": "string",
                         "example": "library playlist"
-                    }
-                },
-                "type": "object"
-            },
-            "OAuthError": {
-                "description": "OAuth2 error response",
-                "required": [
-                    "error",
-                    "error_description"
-                ],
-                "properties": {
-                    "error": {
-                        "type": "string",
-                        "example": "invalid_grant"
-                    },
-                    "error_description": {
-                        "type": "string",
-                        "example": "The provided authorization code is invalid."
-                    },
-                    "error_uri": {
-                        "type": "string",
-                        "nullable": true
                     }
                 },
                 "type": "object"

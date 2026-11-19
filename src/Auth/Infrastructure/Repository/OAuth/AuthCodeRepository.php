@@ -78,7 +78,7 @@ final class AuthCodeRepository implements AuthCodeRepositoryInterface
             $authCode->getRedirectUri(),
             $authCode->getCodeChallenge(),
             $authCode->getCodeChallengeMethod(),
-            $authCode->getDpopJkt() ?? throw new \InvalidArgumentException('An authorization code is stored only with its DPoP key thumbprint.'),
+            $authCode->getDpopJkt(),
             $authCode->getScopes() !== [] ? $authCode->getScopeIdentifiers() : null,
             $authCode->getExpiresAt(),
             id: $authCode->getId(),

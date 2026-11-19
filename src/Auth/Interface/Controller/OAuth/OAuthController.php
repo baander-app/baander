@@ -10,6 +10,7 @@ use App\Auth\Application\Command\OAuth\DenyDeviceCodeCommand;
 use App\Auth\Application\Command\OAuth\ExchangeAuthorizationCodeCommand;
 use App\Auth\Application\Command\OAuth\ExchangeDeviceCodeCommand;
 use App\Auth\Application\Command\OAuth\ExchangeRefreshTokenCommand;
+use App\Auth\Application\Command\OAuth\PushAuthorizationRequestCommand;
 use App\Auth\Application\Command\OAuth\RequestDeviceAuthorizationCommand;
 use App\Auth\Application\Command\OAuth\RevokeTokenCommand;
 use App\Auth\Application\DTO\AuthorizationRequestDTO;
@@ -17,6 +18,7 @@ use App\Auth\Application\DTO\AuthorizationResponseDTO;
 use App\Auth\Application\DTO\ClientCredentials;
 use App\Auth\Application\DTO\DeviceAuthorizationDTO;
 use App\Auth\Application\DTO\PendingDeviceAuthorizationDTO;
+use App\Auth\Application\DTO\PushedAuthorizationRequestDTO;
 use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Application\DTO\VerifiedDpopProof;
 use App\Auth\Application\Exception\DeviceUserCodeException;
@@ -34,6 +36,7 @@ use App\Auth\Interface\Resource\OAuth\AuthorizationRequestResource;
 use App\Auth\Interface\Resource\OAuth\DeviceAuthorizationResource;
 use App\Auth\Interface\Resource\OAuth\OAuthTokenResource;
 use App\Auth\Interface\Resource\OAuth\PendingDeviceAuthorizationResource;
+use App\Auth\Interface\Resource\OAuth\PushedAuthorizationRequestResource;
 use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\Uuid;
@@ -59,12 +62,14 @@ use Symfony\Component\Routing\Attribute\Route;
 /**
  * OAuth 2.0 authorization server endpoints for clients other than the first-party apps.
  *
- * The token and device authorization endpoints answer in the RFC 6749 and
- * RFC 8628 formats. The authorization and device verification endpoints back
- * the web app's consent and device pages: a browser redirect cannot carry the
- * DPoP-bound access token, so the page calls them and navigates itself.
+ * The token, pushed authorization request and device authorization endpoints answer
+ * in the RFC 6749, RFC 9126 and RFC 8628 formats. The authorization and device
+ * verification endpoints back the web app's consent and device pages: a browser
+ * redirect cannot carry the DPoP-bound access token, so the page calls them and
+ * navigates itself.
  *
- * - authorization code grant with mandatory S256 PKCE (RFC 6749 section 4.1, RFC 7636)
+ * - authorization code grant with mandatory S256 PKCE (RFC 6749 section 4.1, RFC 7636), whose
+ *   every request is pushed first (RFC 9126) and whose code is bound to the pushed DPoP key
  * - device authorization grant (RFC 8628) for devices without a browser, such as TV apps
  * - refresh token grant for tokens issued here (RFC 6749 section 6)
  * - token revocation (RFC 7009)
@@ -90,20 +95,15 @@ final class OAuthController
 
     #[OA\Get(
         path: '/api/oauth/authorize',
-        description: 'Backs the consent page at `APP_URL/oauth/authorize`, which RFC 8414 metadata advertises as the authorization endpoint. The page passes on the query parameters it received; this endpoint checks them for the signed-in user and describes the request. It never redirects. When the client or redirect URI is invalid, the error has no `redirect_uri`: show it to the user. Any other error carries `redirect_uri`, the client\'s redirect URI with `error`, `error_description`, `state` and `iss` (RFC 6749 section 4.1.2.1, RFC 9207); navigate there.',
-        summary: 'Check an authorization request (RFC 6749 section 4.1.1)',
+        description: 'Backs the consent page at `APP_URL/oauth/authorize`, which RFC 8414 metadata advertises as the authorization endpoint. The client pushed its request to the pushed authorization request endpoint first; the page passes on only `client_id` and `request_uri`, and this endpoint describes the pushed request for the signed-in user. Looking it up does not use it up. It never redirects. When the client is invalid, or the pushed request is unknown, expired, already used or another client\'s (`invalid_request_uri`), the error has no `redirect_uri`: show it to the user. Any other error carries `redirect_uri`, the pushed redirect URI with `error`, `error_description`, the pushed `state` and `iss` (RFC 6749 section 4.1.2.1, RFC 9207); navigate there.',
+        summary: 'Look up a pushed authorization request (RFC 9126 section 4)',
         parameters: [
-            new OA\Parameter(name: 'response_type', in: 'query', required: true, schema: new OA\Schema(type: 'string', enum: ['code'])),
             new OA\Parameter(name: 'client_id', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'redirect_uri', description: 'Required unless the client registered exactly one redirect URI', in: 'query', schema: new OA\Schema(type: 'string', format: 'uri')),
-            new OA\Parameter(name: 'scope', description: 'Space-separated scopes', in: 'query', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'state', in: 'query', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'code_challenge', description: 'BASE64URL(SHA256(code_verifier))', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'code_challenge_method', in: 'query', required: true, schema: new OA\Schema(type: 'string', enum: ['S256'])),
+            new OA\Parameter(name: 'request_uri', description: 'The request URI the pushed authorization request endpoint returned', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'A valid request awaiting the user\'s decision', content: new OA\JsonContent(ref: new Model(type: AuthorizationRequestResource::class))),
-            new OA\Response(response: '400', description: 'Invalid request; with `redirect_uri` once the client and redirect URI are valid', content: new OA\JsonContent(ref: new Model(type: AuthorizationErrorResource::class))),
+            new OA\Response(response: '200', description: 'A pushed request awaiting the user\'s decision', content: new OA\JsonContent(ref: new Model(type: AuthorizationRequestResource::class))),
+            new OA\Response(response: '400', description: 'Invalid request; with `redirect_uri` when the user cannot grant a valid pushed request', content: new OA\JsonContent(ref: new Model(type: AuthorizationErrorResource::class))),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
         ],
     )]
@@ -115,21 +115,11 @@ final class OAuthController
             return $this->unauthorized();
         }
 
-        $parameters = $request->query->all();
-        $state = self::stringOrNull($parameters['state'] ?? null);
-
         try {
-            $authorization = $this->dispatch(new GetAuthorizationRequestQuery(
-                userId: Uuid::fromString($user->getId()),
-                responseType: (string) self::stringOrNull($parameters['response_type'] ?? null),
-                clientId: (string) self::stringOrNull($parameters['client_id'] ?? null),
-                redirectUri: self::stringOrNull($parameters['redirect_uri'] ?? null),
-                codeChallenge: self::stringOrNull($parameters['code_challenge'] ?? null),
-                codeChallengeMethod: self::stringOrNull($parameters['code_challenge_method'] ?? null),
-                scopes: self::scopes($parameters['scope'] ?? null),
-            ));
+            [$clientId, $requestUri] = self::pushedRequestReference($request->query->all());
+            $authorization = $this->dispatch(new GetAuthorizationRequestQuery(Uuid::fromString($user->getId()), $clientId, $requestUri));
         } catch (OAuthProtocolException $exception) {
-            return $this->authorizationError($exception, $state);
+            return $this->authorizationError($exception);
         }
         assert($authorization instanceof AuthorizationRequestDTO);
 
@@ -138,12 +128,12 @@ final class OAuthController
 
     #[OA\Post(
         path: '/api/oauth/authorize',
-        description: 'Records the signed-in user\'s decision on the request the consent page showed, sent with the same parameters. Approval answers with the client\'s redirect URI carrying `code`, `state` and `iss` (RFC 9207); denial with `error=access_denied`, `state` and `iss`. The page navigates to `redirect_uri`. Errors follow GET.',
-        summary: 'Approve or deny an authorization request (RFC 6749 section 4.1.2)',
+        description: 'Records the signed-in user\'s decision on the pushed request the consent page showed, named by the same `client_id` and `request_uri`. Either decision uses the request up. Approval answers with the pushed redirect URI carrying `code`, the pushed `state` and `iss` (RFC 9207); denial with `error=access_denied`, the pushed `state` and `iss`. The page navigates to `redirect_uri`. Errors follow GET; a request another decision already used answers `invalid_request_uri`.',
+        summary: 'Approve or deny a pushed authorization request (RFC 6749 section 4.1.2)',
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: AuthorizationDecisionRequest::class))),
         responses: [
             new OA\Response(response: '200', description: 'Where to send the user agent', content: new OA\JsonContent(ref: new Model(type: AuthorizationRedirectResource::class))),
-            new OA\Response(response: '400', description: 'Invalid request; with `redirect_uri` once the client and redirect URI are valid', content: new OA\JsonContent(ref: new Model(type: AuthorizationErrorResource::class))),
+            new OA\Response(response: '400', description: 'Invalid request; with `redirect_uri` when the user cannot grant a valid pushed request', content: new OA\JsonContent(ref: new Model(type: AuthorizationErrorResource::class))),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
         ],
     )]
@@ -157,36 +147,89 @@ final class OAuthController
 
         try {
             $parameters = self::parameters($request);
+            [$clientId, $requestUri] = self::pushedRequestReference($parameters);
+            $decision = self::stringOrNull($parameters['decision'] ?? null);
+            if ($decision !== 'approve' && $decision !== 'deny') {
+                throw OAuthProtocolException::invalidRequest('The decision must be "approve" or "deny".');
+            }
+            $answer = $this->dispatch(new CreateAuthorizationCodeCommand(Uuid::fromString($user->getId()), $clientId, $requestUri, $decision === 'approve'));
         } catch (OAuthProtocolException $exception) {
-            return $this->authorizationError($exception, null);
-        }
-        $state = self::stringOrNull($parameters['state'] ?? null);
-        $decision = self::stringOrNull($parameters['decision'] ?? null);
-        if ($decision !== 'approve' && $decision !== 'deny') {
-            return $this->authorizationError(OAuthProtocolException::invalidRequest('The decision must be "approve" or "deny".'), $state);
-        }
-
-        try {
-            $answer = $this->dispatch(new CreateAuthorizationCodeCommand(
-                userId: Uuid::fromString($user->getId()),
-                responseType: (string) self::stringOrNull($parameters['response_type'] ?? null),
-                clientId: (string) self::stringOrNull($parameters['client_id'] ?? null),
-                redirectUri: self::stringOrNull($parameters['redirect_uri'] ?? null),
-                codeChallenge: self::stringOrNull($parameters['code_challenge'] ?? null),
-                codeChallengeMethod: self::stringOrNull($parameters['code_challenge_method'] ?? null),
-                scopes: self::scopes($parameters['scope'] ?? null),
-                approved: $decision === 'approve',
-            ));
-        } catch (OAuthProtocolException $exception) {
-            return $this->authorizationError($exception, $state);
+            return $this->authorizationError($exception);
         }
         assert($answer instanceof AuthorizationResponseDTO);
 
         $redirect = $answer->code !== null
-            ? $this->clientRedirect($answer->redirectUri, ['code' => $answer->code, 'state' => $state])
-            : $this->clientRedirect($answer->redirectUri, ['error' => $answer->error, 'error_description' => $answer->errorDescription, 'state' => $state]);
+            ? $this->clientRedirect($answer->redirectUri, ['code' => $answer->code, 'state' => $answer->state])
+            : $this->clientRedirect($answer->redirectUri, ['error' => $answer->error, 'error_description' => $answer->errorDescription, 'state' => $answer->state]);
 
         return self::noStore(new JsonResponse(['redirect_uri' => $redirect]));
+    }
+
+    /** @throws ServiceUnavailableHttpException for a server fault while storing the request */
+    #[OA\Post(
+        path: '/api/oauth/par',
+        description: 'Every authorization request is pushed here first. The client authenticates as at the token endpoint and binds the request to its DPoP key (RFC 9449 section 10.1) with a `DPoP` proof header carrying a server-issued nonce, the `dpop_jkt` parameter, or both naming the same key; the authorization code is later bound to that key. A proof is checked as at the token endpoint: `use_dpop_nonce` and `invalid_dpop_proof` answers carry a `DPoP-Nonce` header, and every answer to a verified proof carries the next nonce. Send the browser to the authorization endpoint with only `client_id` and the returned `request_uri`. Parameters may be form-encoded (RFC 9126) or JSON. Answers carry `Cache-Control: no-store`.',
+        summary: 'Push an authorization request (RFC 9126 section 2)',
+        security: [],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['response_type', 'client_id', 'code_challenge', 'code_challenge_method'],
+                properties: [
+                    new OA\Property(property: 'response_type', type: 'string', enum: ['code']),
+                    new OA\Property(property: 'client_id', type: 'string'),
+                    new OA\Property(property: 'client_secret', description: 'Confidential clients only', type: 'string'),
+                    new OA\Property(property: 'redirect_uri', description: 'Required unless the client registered exactly one redirect URI', type: 'string', format: 'uri'),
+                    new OA\Property(property: 'scope', description: 'Space-separated scopes', type: 'string'),
+                    new OA\Property(property: 'state', type: 'string'),
+                    new OA\Property(property: 'code_challenge', description: 'BASE64URL(SHA256(code_verifier))', type: 'string'),
+                    new OA\Property(property: 'code_challenge_method', type: 'string', enum: ['S256']),
+                    new OA\Property(property: 'dpop_jkt', description: 'JWK SHA-256 thumbprint of the DPoP key (RFC 7638); required without a DPoP proof header', type: 'string'),
+                ],
+            ),
+        ),
+        responses: [
+            new OA\Response(response: '201', description: 'The request URI for the authorization endpoint (RFC 9126 section 2.2)', content: new OA\JsonContent(ref: new Model(type: PushedAuthorizationRequestResource::class))),
+            new OA\Response(response: '400', description: 'OAuth error, including invalid_dpop_proof when the proof and dpop_jkt name different keys, use_dpop_nonce, and request_not_supported for a request object', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
+            new OA\Response(response: '401', description: 'Client authentication failed, or the client is revoked', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
+            new OA\Response(
+                response: '503',
+                description: 'The server could not store the request, for example while its database restarts or the rate limit or DPoP nonce store is unavailable; push again after the Retry-After delay. Carries no DPoP-Nonce header.',
+                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 5))],
+                content: new OA\JsonContent(ref: new Model(type: ApiError::class)),
+            ),
+        ],
+    )]
+    #[Route('/par', name: 'par', methods: ['POST'])]
+    public function par(Request $request): Response
+    {
+        // TokenEndpointDpopListener verified the proof when the request carried one.
+        $proof = $request->attributes->get(VerifiedDpopProof::class);
+        $proof = $proof instanceof VerifiedDpopProof ? $proof : null;
+
+        try {
+            $pushed = $this->dispatch($this->pushCommand(self::parameters($request), $proof));
+            assert($pushed instanceof PushedAuthorizationRequestDTO);
+            $response = new JsonResponse(PushedAuthorizationRequestResource::from($pushed), Response::HTTP_CREATED);
+        } catch (OAuthProtocolException $exception) {
+            $response = $this->oauthError($exception);
+        } catch (HttpExceptionInterface $exception) {
+            throw $exception;
+        } catch (\Throwable $exception) {
+            // As at the token endpoint: a server fault says nothing about the request.
+            throw new ServiceUnavailableHttpException(
+                DpopStoreUnavailableException::RETRY_AFTER_SECONDS,
+                'The pushed authorization request could not be stored.',
+                HandlerFailure::cause($exception),
+                headers: ['Cache-Control' => 'no-store'],
+            );
+        }
+
+        if ($proof !== null) {
+            $response->headers->set('DPoP-Nonce', $proof->nextNonce);
+        }
+
+        return self::noStore($response);
     }
 
     /** @throws ServiceUnavailableHttpException for a server fault during the grant */
@@ -462,12 +505,7 @@ final class OAuthController
             throw OAuthProtocolException::invalidClient('The client_id parameter is required.');
         }
 
-        $credentials = new ClientCredentials(
-            clientId: $clientId,
-            secret: self::stringOrNull($parameters['client_secret'] ?? null),
-            assertion: self::stringOrNull($parameters['client_assertion'] ?? null),
-            assertionType: self::stringOrNull($parameters['client_assertion_type'] ?? null),
-        );
+        $credentials = self::credentials($clientId, $parameters);
         $ipAddress = $request->getClientIp();
         $userAgent = $request->headers->get('User-Agent');
         $fingerprint = $request->headers->get(BaanderHeader::ClientFingerprint->value);
@@ -504,6 +542,53 @@ final class OAuthController
     }
 
     /**
+     * @param array<string, mixed> $parameters
+     *
+     * @throws OAuthProtocolException
+     */
+    /**
+     * The client authentication a back-channel request presents.
+     *
+     * @param array<string, mixed> $parameters
+     */
+    private static function credentials(string $clientId, array $parameters): ClientCredentials
+    {
+        return new ClientCredentials(
+            clientId: $clientId,
+            secret: self::stringOrNull($parameters['client_secret'] ?? null),
+            assertion: self::stringOrNull($parameters['client_assertion'] ?? null),
+            assertionType: self::stringOrNull($parameters['client_assertion_type'] ?? null),
+        );
+    }
+
+    private function pushCommand(array $parameters, ?VerifiedDpopProof $proof): PushAuthorizationRequestCommand
+    {
+        // RFC 9126 section 2.1: a pushed request cannot itself name a pushed request.
+        if (array_key_exists('request_uri', $parameters)) {
+            throw OAuthProtocolException::invalidRequest('A pushed authorization request cannot carry a request_uri.');
+        }
+        if (array_key_exists('request', $parameters)) {
+            throw OAuthProtocolException::requestNotSupported();
+        }
+        $clientId = self::stringOrNull($parameters['client_id'] ?? null);
+        if ($clientId === null || $clientId === '') {
+            throw OAuthProtocolException::invalidRequest('The client_id parameter is required.');
+        }
+
+        return new PushAuthorizationRequestCommand(
+            credentials: self::credentials($clientId, $parameters),
+            responseType: self::stringOrNull($parameters['response_type'] ?? null),
+            redirectUri: self::stringOrNull($parameters['redirect_uri'] ?? null),
+            scopes: self::scopes($parameters['scope'] ?? null),
+            state: self::stringOrNull($parameters['state'] ?? null),
+            codeChallenge: self::stringOrNull($parameters['code_challenge'] ?? null),
+            codeChallengeMethod: self::stringOrNull($parameters['code_challenge_method'] ?? null),
+            proofJkt: $proof?->jkt,
+            dpopJkt: self::stringOrNull($parameters['dpop_jkt'] ?? null),
+        );
+    }
+
+    /**
      * Dispatches synchronously and rethrows the protocol and user-code errors the
      * handlers raise; anything else propagates to the kernel's error handling.
      */
@@ -533,18 +618,19 @@ final class OAuthController
     /**
      * An authorization endpoint error for the consent page; never a redirect.
      *
-     * Before the client and redirect URI are validated the page shows the error,
-     * so the answer is 400 even for an unknown client (401 would read as an
-     * expired session). Afterwards it carries the redirect URI with the error.
+     * While the client or the pushed request is invalid the page shows the error, so
+     * the answer is 400 even for an unknown client (401 would read as an expired
+     * session). An error about a valid pushed request carries its redirect URI with
+     * the error and the pushed state.
      */
-    private function authorizationError(OAuthProtocolException $exception, ?string $state): JsonResponse
+    private function authorizationError(OAuthProtocolException $exception): JsonResponse
     {
         $body = [
             'error' => $exception->error,
             'error_description' => $exception->getDescription(),
         ];
         if ($exception->redirectUri !== null) {
-            $body['redirect_uri'] = $this->clientRedirect($exception->redirectUri, [...$body, 'state' => $state]);
+            $body['redirect_uri'] = $this->clientRedirect($exception->redirectUri, [...$body, 'state' => $exception->state]);
         }
 
         return self::noStore(new JsonResponse($body, Response::HTTP_BAD_REQUEST));
@@ -596,6 +682,25 @@ final class OAuthController
         } catch (JsonException) {
             throw OAuthProtocolException::invalidRequest('The request body must be form-encoded or a JSON object.');
         }
+    }
+
+    /**
+     * The client_id and request_uri naming a pushed request; the authorization endpoint reads no other parameter.
+     *
+     * @param array<string, mixed> $parameters
+     * @return array{string, string}
+     *
+     * @throws OAuthProtocolException invalid_request, never redirected
+     */
+    private static function pushedRequestReference(array $parameters): array
+    {
+        $clientId = self::stringOrNull($parameters['client_id'] ?? null);
+        $requestUri = self::stringOrNull($parameters['request_uri'] ?? null);
+        if ($clientId === null || $clientId === '' || $requestUri === null || $requestUri === '') {
+            throw OAuthProtocolException::invalidRequest('Authorization requests must be pushed first; client_id and request_uri are required.');
+        }
+
+        return [$clientId, $requestUri];
     }
 
     /** @return string[] */
