@@ -1,8 +1,41 @@
 # Baander roadmap
 
-Updated: 2026-11-18. This roadmap selects future work and records unresolved
+Updated: 2026-11-19. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
+
+## TypePHP application packaging
+
+The [TypePHP setup plan](docs/plans/2026-11-19-1159-feat-typephp-setup-plan.md) targets the main PHP application as packaged CLI executables using ZendVM.
+The [setup guide](tools/typephp/README.md) covers the console used by the HTTP server and workers, and the independent deployment operator.
+
+Setup verification on 2026-11-19: the reviewed plan has no open setup findings; the isolated compiler lock installs 12 packages and passes strict Composer validation and locked reinstall.
+The source compiler reports v0.10.0 at locked revision `41d91fe69d2f7ec99dffe252a95244793000c6d2`; PHPX is locked at `90e6d22a9c3f4d5dbd2c75d62e90bf5adfe58c89`.
+The optional Docker toolchain builds and reports PHP 8.5.12 ZTS with OPcache.
+Both project YAML files parse and resolve their selected paths, the console adapter passes PHP syntax checking, and the production application installation contains 153 packages with development mode disabled.
+Root application Composer manifests are unchanged.
+Two builder-only patches address failures observed in real builds: missing nested igbinary object directories and Swoole's relative source-directory discovery.
+The rebuilt Makefile contains 145 Swoole object inputs, including the previously omitted module entry and coroutine system sources; the original PECL source remains unchanged.
+The focused code review and simplification pass found no remaining setup issues.
+
+Both `make typephp-build` and `make typephp-build-operator` passed with eight compilation jobs.
+Each package contains 13,217 files and 12,191 opcode blobs; nine skipped PHP files are IDE-helper declarations and Swoole library copies outside Composer's autoload paths, with no application PHP files skipped.
+The operator build reused 9,498 vendor opcode blobs from the console build with the same runtime signature and source paths.
+The console executable is 311,125,560 bytes; the operator is 311,125,912 bytes.
+
+In disposable containers with networking disabled, the console executable loaded all 13 root Composer extension requirements and reported PHP 8.5.12 ZTS, Swoole 6.2.6, Redis 6.3.0 and FFI 8.5.12.
+Explicit script dispatch booted Symfony 8.1.10 and listed the application commands, including `app:serve` and `app:worker`, using only tracked dotenv defaults, a temporary writable state directory, FFI enabled and `memory_limit=2048M` from the development runtime's settings.
+Default-entry dispatch also passed `baander list --raw` with those settings supplied through an external INI file; interpreter `-v` and `-m` checks passed.
+Explicit application `--version` dispatch reported Symfony 8.1.10.
+The initial 128 MiB default failed during container compilation; `-d ... list` without `-f` treated `list` as a PHP filename.
+The separate operator's explicit `--help` dispatch passed without loading its services or accessing Docker.
+
+Open acceptance:
+
+- Package generation and console boot passed; application runtime qualification remains open.
+- The private PHP builder resolves patch and PECL versions outside Composer's lock. This build selected PHP 8.5.12, igbinary 3.2.17RC1, inotify 3.0.1, msgpack 3.0.1, Redis 6.3.0 and Swoole 6.2.6; the latter differs from the application's current Swoole 6.2.4.
+- Remaining runtime gates cover ZEngine/source reflection during coroutine execution, extension feature parity, HTTP/worker behavior, coroutine isolation, drain/reload, operator separation and `PHP_BINARY` subprocess dispatch. The ordinary PHP runtime and physical resource tree remain required until those checks pass.
+- No backend suites or browser checks have run against a packaged application.
 
 ## Forge-neutral CI
 
