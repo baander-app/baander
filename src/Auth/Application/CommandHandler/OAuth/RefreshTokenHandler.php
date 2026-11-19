@@ -123,12 +123,13 @@ final class RefreshTokenHandler
             throw RefreshTokenRejectedException::expired();
         }
 
-        // At the token endpoint the token must belong to the client that authenticated
-        // (RFC 6749 section 6). Checked first, so another client's revocation is not
-        // reported as a failure of the authenticated one.
+        // The token must belong to the client the endpoint serves: the client that
+        // authenticated at the token endpoint (RFC 6749 section 6), or the first-party
+        // client at the first-party endpoint. Checked first, so another client's
+        // revocation is not reported as a failure of the expected one.
         $tokenClient = $refreshToken->getAccessToken()->getClient();
         $clientId = $command->getClientId();
-        if ($clientId !== null && !$tokenClient->getId()->equals($clientId)) {
+        if ($clientId !== null && !$tokenClient->getPublicId()->equals($clientId)) {
             throw RefreshTokenRejectedException::issuedToAnotherClient();
         }
         // A revoked client's tokens cannot be refreshed. This early check uses the

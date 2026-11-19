@@ -84,6 +84,7 @@ final class AuthControllerVerifyEmailTest extends TestCase
             $this->jsonEncoder,
             new NullLogger(),
             new AcceptLanguageMatcher(),
+            'baander_dev_spa_00001',
         );
 
         $translator = $this->createStub(TranslatorInterface::class);

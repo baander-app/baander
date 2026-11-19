@@ -8,6 +8,7 @@ use App\Auth\Application\Command\OAuth\ExchangeRefreshTokenCommand;
 use App\Auth\Application\Command\OAuth\RefreshTokenCommand;
 use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Application\Exception\OAuthProtocolException;
+use App\Auth\Application\Port\OAuthClientThrottleInterface;
 use App\Auth\Application\Exception\RefreshTokenRejectedException;
 use App\Auth\Application\Service\OAuthClientAuthenticator;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -27,6 +28,7 @@ final readonly class ExchangeRefreshTokenHandler
     public function __construct(
         private OAuthClientAuthenticator $clientAuthenticator,
         private RefreshTokenHandler $refreshTokenHandler,
+        private OAuthClientThrottleInterface $clientThrottle,
     ) {
     }
 
@@ -34,6 +36,7 @@ final readonly class ExchangeRefreshTokenHandler
     public function __invoke(ExchangeRefreshTokenCommand $command): TokenResponseDTO
     {
         $client = $this->clientAuthenticator->authenticate($command->credentials);
+        $this->clientThrottle->chargeTokenRequest($client, $command->ipAddress);
 
         if ($command->refreshToken === null || $command->refreshToken === '') {
             throw OAuthProtocolException::invalidRequest('The refresh_token parameter is required.');
@@ -46,7 +49,7 @@ final readonly class ExchangeRefreshTokenHandler
                 userAgent: $command->userAgent,
                 clientFingerprint: $command->clientFingerprint,
                 dpopJkt: $command->dpopJkt,
-                clientId: $client->getId(),
+                clientId: $client->getPublicId(),
             ));
         } catch (RefreshTokenRejectedException) {
             throw self::invalidGrant();

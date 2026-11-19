@@ -18,6 +18,7 @@ final readonly class PushAuthorizationRequestCommand
      * @param string|null $redirectUri Optional only when the client registered exactly one redirect URI
      * @param string|null $proofJkt    Thumbprint of the key of the verified DPoP proof the request carried, if any
      * @param string|null $dpopJkt     The dpop_jkt parameter (RFC 9449 section 10), if sent
+     * @param string|null $ipAddress   The caller's address, which keys a public client's allowance
      */
     public function __construct(
         public ClientCredentials $credentials,
@@ -29,6 +30,7 @@ final readonly class PushAuthorizationRequestCommand
         public ?string $codeChallengeMethod,
         public ?string $proofJkt,
         public ?string $dpopJkt,
+        public ?string $ipAddress = null,
     ) {
     }
 }

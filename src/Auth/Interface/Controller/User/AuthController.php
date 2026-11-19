@@ -42,6 +42,7 @@ use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Application\Exception\RateLimiterUnavailableException;
 use App\Shared\Application\Http\AcceptLanguageMatcher;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
@@ -49,6 +50,7 @@ use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -77,6 +79,8 @@ final class AuthController
         private readonly JsonEncoder $jsonEncoder,
         private readonly LoggerInterface $logger,
         private readonly AcceptLanguageMatcher $acceptLanguage,
+        #[Autowire(param: 'auth.spa_client_id')]
+        private readonly string $spaClientId,
     )
     {
     }
@@ -264,6 +268,9 @@ final class AuthController
             ipAddress: $request->getClientIp(),
             userAgent: $request->headers->get('User-Agent'),
             dpopJkt: $result->getJkt(),
+            // Only the first-party client's tokens rotate here; any other client
+            // refreshes at the token endpoint with its own client authentication.
+            clientId: PublicId::fromString($this->spaClientId),
         );
 
         try {

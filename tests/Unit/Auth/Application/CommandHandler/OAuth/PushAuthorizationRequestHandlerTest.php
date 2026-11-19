@@ -8,6 +8,7 @@ use App\Auth\Application\Command\OAuth\PushAuthorizationRequestCommand;
 use App\Auth\Application\CommandHandler\OAuth\PushAuthorizationRequestHandler;
 use App\Auth\Application\DTO\ClientCredentials;
 use App\Auth\Application\DTO\PushedAuthorizationRequestDTO;
+use App\Auth\Application\Exception\OAuthClientRateLimitedException;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\ScopeAllowlist;
 use App\Auth\Application\Service\AuthorizationRequestValidator;
@@ -119,6 +120,34 @@ final class PushAuthorizationRequestHandlerTest extends TestCase
         self::assertCount(1, $this->saved);
     }
 
+    public function testThePushIsChargedToTheAuthenticatedClientAndTheCallerAddress(): void
+    {
+        $this->push(proofJkt: self::KEY_ONE);
+
+        self::assertSame([['par', $this->client->getPublicId()->toString(), '198.51.100.7']], $this->clientCharges);
+    }
+
+    public function testAFailedClientAuthenticationChargesNoClient(): void
+    {
+        $confidential = $this->register(Client::create('Server app', [self::REDIRECT], secret: ClientSecret::fromString('shared-secret'), confidential: true));
+
+        $this->assertRejected('invalid_client', fn () => $this->push(clientId: $confidential->getPublicId()->toString(), clientSecret: 'wrong', proofJkt: self::KEY_ONE), 401);
+        self::assertSame([], $this->clientCharges);
+    }
+
+    public function testAClientOverItsAllowanceStoresNothing(): void
+    {
+        $this->clientAllowanceSpentFor = 30;
+
+        try {
+            $this->push(proofJkt: self::KEY_ONE);
+            self::fail('A client over its allowance must be refused.');
+        } catch (OAuthClientRateLimitedException $exception) {
+            self::assertSame(30, $exception->retryAfterSeconds);
+        }
+        self::assertSame([], $this->saved);
+    }
+
     public function testAnUnknownClientIsRejected(): void
     {
         $this->assertRejected('invalid_client', fn () => $this->push(clientId: 'unknown_client_000001', proofJkt: self::KEY_ONE), 401);
@@ -195,6 +224,7 @@ final class PushAuthorizationRequestHandlerTest extends TestCase
                 $this->clock,
             ),
             $this->pushedRequests(),
+            $this->clientThrottle(),
             $this->clock,
             300,
         );
@@ -209,6 +239,7 @@ final class PushAuthorizationRequestHandlerTest extends TestCase
             codeChallengeMethod: $method,
             proofJkt: $proofJkt,
             dpopJkt: $dpopJkt,
+            ipAddress: '198.51.100.7',
         ));
     }
 

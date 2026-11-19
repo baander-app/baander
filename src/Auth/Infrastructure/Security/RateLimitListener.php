@@ -33,7 +33,7 @@ final class RateLimitListener
      * Map of route patterns to the rate limiter factory to use.
      *
      * Each entry maps a route path regex to the limiter factory. Every matching
-     * rule is charged, so one path can have several limits (per IP and per client).
+     * rule is charged, so one path can have several limits (per IP and per IP and email).
      *
      * Rules apply to POST unless they list their methods.
      *
@@ -50,9 +50,7 @@ final class RateLimitListener
         RateLimiterFactoryInterface $authPasskeyIpLimiter,
         RateLimiterFactoryInterface $authEmailVerificationIpLimiter,
         RateLimiterFactoryInterface $oauthTokenIpLimiter,
-        RateLimiterFactoryInterface $oauthTokenClientLimiter,
         RateLimiterFactoryInterface $oauthParIpLimiter,
-        RateLimiterFactoryInterface $oauthParClientLimiter,
         RateLimiterFactoryInterface $oauthAuthorizeIpLimiter,
         RateLimiterFactoryInterface $oauthDeviceAuthorizeIpLimiter,
         RateLimiterFactoryInterface $oauthDeviceVerifyIpLimiter,
@@ -109,40 +107,29 @@ final class RateLimitListener
                 'limiter' => $authEmailVerificationIpLimiter,
                 'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
             ],
-                        // Token refresh: per-client (uses the refresh token as the client identifier)
+            // Token refresh: per presented refresh token, keyed by its SHA-256 so the
+            // limiter store never holds a usable token. Without a token, per IP.
             [
                 'pattern' => '#^/api/auth/refresh$#',
                 'limiter' => $authRefreshClientLimiter,
                 'key_resolver' => function (Request $r): string {
                     $token = $this->jsonStringField($r, 'refreshToken');
 
-                    return $token !== '' ? $token : ($r->getClientIp() ?? 'unknown');
+                    return $token !== '' ? hash('sha256', $token) : ($r->getClientIp() ?? 'unknown');
                 },
             ],
-            // OAuth token endpoint: per IP, and per client across all addresses.
+            // OAuth token endpoint and pushed authorization requests: per IP here. The
+            // per-client buckets are charged once the client has authenticated
+            // (OAuthClientThrottleInterface), so no one else can drain them.
             [
                 'pattern' => '#^/api/oauth/token$#',
                 'limiter' => $oauthTokenIpLimiter,
                 'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
             ],
             [
-                'pattern' => '#^/api/oauth/token$#',
-                'limiter' => $oauthTokenClientLimiter,
-                'key_resolver' => fn (Request $r): string => $this->oauthClientId($r),
-                'skip_empty_key' => true,
-            ],
-            // Pushed authorization requests: per IP, and per client across all addresses;
-            // each request stores a row, so a public client cannot fill the table.
-            [
                 'pattern' => '#^/api/oauth/par$#',
                 'limiter' => $oauthParIpLimiter,
                 'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
-            ],
-            [
-                'pattern' => '#^/api/oauth/par$#',
-                'limiter' => $oauthParClientLimiter,
-                'key_resolver' => fn (Request $r): string => $this->oauthClientId($r),
-                'skip_empty_key' => true,
             ],
             // Authorization endpoint: per IP, for both methods it accepts.
             [
@@ -178,17 +165,6 @@ final class RateLimitListener
         $value = is_array($body) ? ($body[$field] ?? null) : null;
 
         return is_string($value) ? $value : '';
-    }
-
-    /** The client_id of a form-encoded or JSON token or pushed authorization request, or an empty string. */
-    private function oauthClientId(Request $request): string
-    {
-        $clientId = $request->request->all()['client_id'] ?? null;
-        if ($clientId === null) {
-            return $this->jsonStringField($request, 'client_id');
-        }
-
-        return is_string($clientId) ? $clientId : '';
     }
 
     #[AsEventListener(event: KernelEvents::REQUEST, priority: 10)]

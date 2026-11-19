@@ -156,12 +156,38 @@ final class PushedAuthorizationRequestEndpointTest extends RateLimitTestCase
         self::assertSame(0, (int) $this->entityManager->getConnection()->fetchOne('SELECT COUNT(*) FROM oauth_pushed_authorization_requests'));
     }
 
-    public function testPushesAreLimitedPerClient(): void
+    public function testAPublicClientDrainedFromOtherNetworksStillAcceptsAPushFromAnother(): void
     {
         $clientId = $this->publicClient();
-        $this->exhaust('oauth_par_client', $clientId);
+        // Anyone can name a public client and sign their own proofs; they drain only
+        // the allowance of the networks they send from.
+        $this->exhaust('oauth_par_client', $clientId . '|198.51.100.0');
+        $this->exhaust('oauth_par_client', $clientId . '|192.0.2.0');
+        $request = [...$this->request($clientId), 'dpop_jkt' => (new SignedDpopProof())->thumbprint()];
 
-        $this->assertTooManyRequests($this->push([...$this->request($clientId), 'dpop_jkt' => (new SignedDpopProof())->thumbprint()]));
+        $this->assertTooManyRequests($this->push($request, ip: '198.51.100.66'));
+        $this->trackLimiter('oauth_par_client', $clientId . '|203.0.113.0');
+        self::assertSame(Response::HTTP_CREATED, $this->push($request, ip: '203.0.113.66')->getStatusCode());
+    }
+
+    public function testAConfidentialClientIsChargedOnlyByPushesThatAuthenticateAsIt(): void
+    {
+        $client = Client::create('PAR server app', [self::REDIRECT], secret: ClientSecret::fromString('par-shared-secret'), confidential: true);
+        static::getContainer()->get(ClientRepositoryInterface::class)->saveClient($client);
+        $clientId = $client->getPublicId()->toString();
+        $this->trackLimiter('oauth_par_client', $clientId);
+        $request = [...$this->request($clientId), 'dpop_jkt' => (new SignedDpopProof())->thumbprint()];
+
+        $this->assertOAuthError('invalid_client', $this->push([...$request, 'client_secret' => 'wrong']), Response::HTTP_UNAUTHORIZED);
+        self::assertSame(10000, $this->remaining('oauth_par_client', $clientId), 'A failed authentication charges no one.');
+
+        self::assertSame(Response::HTTP_CREATED, $this->push([...$request, 'client_secret' => 'par-shared-secret'])->getStatusCode());
+        self::assertSame(9999, $this->remaining('oauth_par_client', $clientId));
+    }
+
+    private function remaining(string $limiter, string $key): int
+    {
+        return $this->limiter($limiter)->create($key)->consume(0)->getRemainingTokens();
     }
 
     /** @return array<string, string> */
@@ -179,9 +205,9 @@ final class PushedAuthorizationRequestEndpointTest extends RateLimitTestCase
     }
 
     /** @param array<string, string> $form */
-    private function push(array $form, ?string $proof = null): Response
+    private function push(array $form, ?string $proof = null, string $ip = '198.51.100.90'): Response
     {
-        $server = ['REMOTE_ADDR' => '198.51.100.90'];
+        $server = ['REMOTE_ADDR' => $ip];
         if ($proof !== null) {
             $server['HTTP_DPOP'] = $proof;
         }

@@ -23,6 +23,7 @@ use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Application\DTO\VerifiedDpopProof;
 use App\Auth\Application\Exception\DeviceUserCodeException;
 use App\Auth\Application\Exception\DpopStoreUnavailableException;
+use App\Auth\Application\Exception\OAuthClientRateLimitedException;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Application\Query\OAuth\GetAuthorizationRequestQuery;
@@ -54,6 +55,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
+use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
@@ -639,12 +641,14 @@ final class OAuthController
             codeChallengeMethod: self::stringOrNull($parameters['code_challenge_method'] ?? null),
             proofJkt: $proof?->jkt,
             dpopJkt: self::stringOrNull($parameters['dpop_jkt'] ?? null),
+            ipAddress: $request->getClientIp(),
         );
     }
 
     /**
      * Dispatches synchronously and rethrows the protocol and user-code errors the
-     * handlers raise; anything else propagates to the kernel's error handling.
+     * handlers raise. A client over its allowance is answered 429 with Retry-After;
+     * anything else propagates to the kernel's error handling.
      */
     private function dispatch(object $message): mixed
     {
@@ -654,6 +658,9 @@ final class OAuthController
             foreach ($exception->getWrappedExceptions() as $wrapped) {
                 if ($wrapped instanceof OAuthProtocolException || $wrapped instanceof DeviceUserCodeException) {
                     throw $wrapped;
+                }
+                if ($wrapped instanceof OAuthClientRateLimitedException) {
+                    throw new TooManyRequestsHttpException($wrapped->retryAfterSeconds, $wrapped->getMessage(), $wrapped);
                 }
             }
 

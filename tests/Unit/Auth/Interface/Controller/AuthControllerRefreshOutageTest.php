@@ -91,6 +91,7 @@ final class AuthControllerRefreshOutageTest extends TestCase
             $jsonEncoder,
             $this->logger,
             new AcceptLanguageMatcher(),
+            'baander_dev_spa_00001',
         );
         $translator = $this->createStub(TranslatorInterface::class);
         $translator->method('trans')->willReturnArgument(0);

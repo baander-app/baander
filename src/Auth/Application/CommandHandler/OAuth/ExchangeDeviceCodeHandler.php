@@ -7,6 +7,7 @@ namespace App\Auth\Application\CommandHandler\OAuth;
 use App\Auth\Application\Command\OAuth\ExchangeDeviceCodeCommand;
 use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Application\Exception\OAuthProtocolException;
+use App\Auth\Application\Port\OAuthClientThrottleInterface;
 use App\Auth\Application\Service\OAuthClientAuthenticator;
 use App\Auth\Application\Service\TokenPairIssuer;
 use App\Auth\Domain\Model\OAuth\DeviceCode;
@@ -30,6 +31,7 @@ final readonly class ExchangeDeviceCodeHandler
         private OAuthClientAuthenticator $clientAuthenticator,
         private DeviceCodeRepositoryInterface $deviceCodeRepository,
         private TokenPairIssuer $tokenPairIssuer,
+        private OAuthClientThrottleInterface $clientThrottle,
     ) {
     }
 
@@ -37,6 +39,7 @@ final readonly class ExchangeDeviceCodeHandler
     public function __invoke(ExchangeDeviceCodeCommand $command): TokenResponseDTO
     {
         $client = $this->clientAuthenticator->authenticate($command->credentials);
+        $this->clientThrottle->chargeTokenRequest($client, $command->ipAddress);
         if (!$client->isDeviceClient()) {
             throw OAuthProtocolException::unauthorizedClient('The client is not registered for the device authorization grant.');
         }

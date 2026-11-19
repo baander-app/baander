@@ -7,6 +7,7 @@ namespace App\Auth\Application\CommandHandler\OAuth;
 use App\Auth\Application\Command\OAuth\ExchangeAuthorizationCodeCommand;
 use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Application\Exception\OAuthProtocolException;
+use App\Auth\Application\Port\OAuthClientThrottleInterface;
 use App\Auth\Application\Service\OAuthClientAuthenticator;
 use App\Auth\Application\Service\TokenChainRevoker;
 use App\Auth\Application\Service\TokenPairIssuer;
@@ -36,6 +37,7 @@ final readonly class ExchangeAuthorizationCodeHandler
         private AuthCodeRepositoryInterface $authCodeRepository,
         private TokenPairIssuer $tokenPairIssuer,
         private TokenChainRevoker $chainRevoker,
+        private OAuthClientThrottleInterface $clientThrottle,
     ) {
     }
 
@@ -43,6 +45,7 @@ final readonly class ExchangeAuthorizationCodeHandler
     public function __invoke(ExchangeAuthorizationCodeCommand $command): TokenResponseDTO
     {
         $client = $this->clientAuthenticator->authenticate($command->credentials);
+        $this->clientThrottle->chargeTokenRequest($client, $command->ipAddress);
 
         if ($command->code === null || $command->code === '') {
             throw OAuthProtocolException::invalidRequest('The code parameter is required.');

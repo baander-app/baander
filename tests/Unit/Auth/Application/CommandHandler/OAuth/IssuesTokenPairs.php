@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Application\CommandHandler\OAuth;
 
+use App\Auth\Application\Exception\OAuthClientRateLimitedException;
 use App\Auth\Application\Port\ClientAssertionVerifierInterface;
 use App\Auth\Application\Port\JwtGeneratorInterface;
+use App\Auth\Application\Port\OAuthClientThrottleInterface;
 use App\Auth\Application\ScopeAllowlist;
 use App\Auth\Application\Service\OAuthClientAuthenticator;
 use App\Auth\Application\Service\ChainConnectionCloser;
@@ -47,6 +49,10 @@ trait IssuesTokenPairs
     private array $clients = [];
     /** @var list<string> Chains revoked, in order */
     private array $revokedChains = [];
+    /** @var list<array{string, string, ?string}> Per-client charges: endpoint, client public ID, caller address */
+    private array $clientCharges = [];
+    /** When set, every per-client charge is refused with this Retry-After. */
+    private ?int $clientAllowanceSpentFor = null;
 
     private function tokenPairIssuer(): TokenPairIssuer
     {
@@ -115,6 +121,21 @@ trait IssuesTokenPairs
         );
 
         return new OAuthClientAuthenticator($repository, $this->createStub(ClientAssertionVerifierInterface::class));
+    }
+
+    private function clientThrottle(): OAuthClientThrottleInterface
+    {
+        $charge = function (string $endpoint, Client $client, ?string $ipAddress): void {
+            if ($this->clientAllowanceSpentFor !== null) {
+                throw new OAuthClientRateLimitedException($this->clientAllowanceSpentFor);
+            }
+            $this->clientCharges[] = [$endpoint, $client->getPublicId()->toString(), $ipAddress];
+        };
+        $throttle = $this->createStub(OAuthClientThrottleInterface::class);
+        $throttle->method('chargeTokenRequest')->willReturnCallback(fn (Client $client, ?string $ip) => $charge('token', $client, $ip));
+        $throttle->method('chargePushedRequest')->willReturnCallback(fn (Client $client, ?string $ip) => $charge('par', $client, $ip));
+
+        return $throttle;
     }
 
     private function register(Client $client): Client

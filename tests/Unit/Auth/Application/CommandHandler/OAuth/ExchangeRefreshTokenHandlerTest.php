@@ -12,6 +12,7 @@ use App\Auth\Application\DTO\ClientCredentials;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Port\ClientAssertionVerifierInterface;
 use App\Auth\Application\Port\JwtGeneratorInterface;
+use App\Auth\Application\Port\OAuthClientThrottleInterface;
 use App\Auth\Application\Service\OAuthClientAuthenticator;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
@@ -37,6 +38,8 @@ use RuntimeException;
 final class ExchangeRefreshTokenHandlerTest extends TestCase
 {
     private Client $client;
+    /** @var list<array{string, ?string}> */
+    private array $charges = [];
 
     protected function setUp(): void
     {
@@ -63,6 +66,20 @@ final class ExchangeRefreshTokenHandlerTest extends TestCase
             self::assertSame('invalid_grant', $exception->error);
             self::assertSame(400, $exception->statusCode);
         }
+    }
+
+    public function testTheAuthenticatedClientIsChargedBeforeTheTokenIsJudged(): void
+    {
+        $refreshTokens = $this->createStub(RefreshTokenRepositoryInterface::class);
+        $refreshTokens->method('findByTokenId')->willReturn(null);
+
+        try {
+            ($this->handler($refreshTokens))($this->command(str_repeat('u', 80)));
+            self::fail('An unknown refresh token must be refused.');
+        } catch (OAuthProtocolException) {
+        }
+
+        self::assertSame([[$this->client->getPublicId()->toString(), '203.0.113.5']], $this->charges);
     }
 
     /** @return iterable<string, array{\Throwable}> */
@@ -114,6 +131,7 @@ final class ExchangeRefreshTokenHandlerTest extends TestCase
                 refreshTokenTtl: 2592000,
                 reuseGraceSeconds: 60,
             ),
+            $this->throttle(),
         );
     }
 
@@ -123,6 +141,17 @@ final class ExchangeRefreshTokenHandlerTest extends TestCase
             credentials: new ClientCredentials($this->client->getPublicId()->toString()),
             refreshToken: $refreshToken,
             dpopJkt: 'exchange-test-proof-key-thumbprint',
+            ipAddress: '203.0.113.5',
         );
+    }
+
+    private function throttle(): OAuthClientThrottleInterface
+    {
+        $throttle = $this->createStub(OAuthClientThrottleInterface::class);
+        $throttle->method('chargeTokenRequest')->willReturnCallback(function (Client $client, ?string $ipAddress): void {
+            $this->charges[] = [$client->getPublicId()->toString(), $ipAddress];
+        });
+
+        return $throttle;
     }
 }

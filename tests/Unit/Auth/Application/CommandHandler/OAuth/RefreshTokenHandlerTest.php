@@ -749,7 +749,7 @@ final class RefreshTokenHandlerTest extends TestCase
         ($this->handler)(new RefreshTokenCommand(
             refreshTokenId: $refreshToken->getTokenId()->toString(),
             dpopJkt: self::JKT,
-            clientId: Uuid::generate(),
+            clientId: new PublicId(),
         ));
     }
 
@@ -764,7 +764,7 @@ final class RefreshTokenHandlerTest extends TestCase
             ($this->handler)(new RefreshTokenCommand(
                 refreshTokenId: $refreshToken->getTokenId()->toString(),
                 dpopJkt: self::JKT,
-                clientId: Uuid::generate(),
+                clientId: new PublicId(),
             ));
         } finally {
             self::assertFalse($refreshToken->hasBeenUsed());
@@ -778,7 +778,7 @@ final class RefreshTokenHandlerTest extends TestCase
         $result = ($this->handler)(new RefreshTokenCommand(
             refreshTokenId: $refreshToken->getTokenId()->toString(),
             dpopJkt: self::JKT,
-            clientId: $refreshToken->getAccessToken()->getClient()->getId(),
+            clientId: $refreshToken->getAccessToken()->getClient()->getPublicId(),
         ));
 
         self::assertNotEmpty($result->getRefreshToken());

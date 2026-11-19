@@ -8,6 +8,7 @@ use App\Auth\Application\Command\OAuth\IssueTokenCommand;
 use App\Auth\Application\Command\OAuth\RefreshTokenCommand;
 use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Domain\Model\User;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
 use League\OAuth2\Server\Exception\OAuthServerException;
@@ -126,7 +127,7 @@ final class PersonalAccessClientTest extends TestCase
             $this->bus()->dispatch(new RefreshTokenCommand(
                 $refreshToken,
                 dpopJkt: self::DPOP_JKT,
-                clientId: $this->clientId($client['publicId']),
+                clientId: PublicId::fromString($client['publicId']),
             ));
             self::fail('A refresh token of a revoked client must not be redeemable.');
         } catch (HandlerFailedException) {

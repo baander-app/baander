@@ -179,7 +179,8 @@ parameters:
     # whether the account exists. Default: 10 per 15 minutes.
     auth.rate_limit.password_reset_per_email.max_attempts: 10
 
-    # Maximum token refresh requests per client within the window. Default: 60 per minute.
+    # Maximum first-party token refresh requests per presented refresh token within the
+    # window, counted under the token's SHA-256. Default: 60 per minute.
     auth.rate_limit.refresh.max_attempts: 60
     auth.rate_limit.refresh.window: 60
 
@@ -196,8 +197,10 @@ parameters:
     auth.rate_limit.oauth_token.max_attempts: 120
     auth.rate_limit.oauth_token.window: 60
 
-    # Maximum OAuth token endpoint requests per client_id within the oauth_token
-    # window, from all addresses together. Default: 600 per minute.
+    # Maximum OAuth token endpoint requests per client within the oauth_token window,
+    # charged after the client authenticates. A client with a secret or keys has one
+    # allowance for all addresses; a public client has one per caller network (/24 for
+    # IPv4, /64 for IPv6). Default: 600 per minute.
     auth.rate_limit.oauth_token_client.max_attempts: 600
 
     # Maximum pushed authorization requests per IP within the window. Each one stores a
@@ -205,8 +208,9 @@ parameters:
     auth.rate_limit.oauth_par.max_attempts: 120
     auth.rate_limit.oauth_par.window: 60
 
-    # Maximum pushed authorization requests per client_id within the oauth_par window,
-    # from all addresses together. Default: 600 per minute.
+    # Maximum pushed authorization requests per client within the oauth_par window,
+    # charged after the client authenticates and counted as at the token endpoint.
+    # Default: 600 per minute.
     auth.rate_limit.oauth_par_client.max_attempts: 600
 
     # Maximum authorization endpoint requests per IP within the window. Default: 30 per minute.

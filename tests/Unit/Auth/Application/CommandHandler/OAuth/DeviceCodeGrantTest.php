@@ -104,6 +104,8 @@ final class DeviceCodeGrantTest extends TestCase
 
         $this->assertProtocolError('invalid_grant', fn () => $this->poll($deviceCode));
         self::assertCount(1, $this->issuedAccessTokens);
+        $charge = ['token', $this->tv->getPublicId()->toString(), '2001:db8::7'];
+        self::assertSame([$charge, $charge], $this->clientCharges, 'Every poll of the authenticated client is charged.');
     }
 
     public function testAConcurrentPollThatLosesTheRedemptionIssuesNothing(): void
@@ -178,12 +180,13 @@ final class DeviceCodeGrantTest extends TestCase
 
     private function poll(?string $deviceCode, ?string $clientId = null): \App\Auth\Application\DTO\TokenResponseDTO
     {
-        $handler = new ExchangeDeviceCodeHandler($this->clientAuthenticator(), $this->deviceCodes(), $this->tokenPairIssuer());
+        $handler = new ExchangeDeviceCodeHandler($this->clientAuthenticator(), $this->deviceCodes(), $this->tokenPairIssuer(), $this->clientThrottle());
 
         return $handler(new ExchangeDeviceCodeCommand(
             credentials: new ClientCredentials($clientId ?? $this->tv->getPublicId()->toString()),
             deviceCode: $deviceCode,
             dpopJkt: self::JKT,
+            ipAddress: '2001:db8::7',
             clientFingerprint: 'fp-tv',
         ));
     }

@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Auth;
 
+use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
+use App\Tests\Fixtures\Auth\SignedDpopProof;
+use Symfony\Component\HttpFoundation\Response;
+
 final class AuthEndpointRateLimitTest extends RateLimitTestCase
 {
     public function testPasswordResetUnderTheAccountLimitIssuesAToken(): void
@@ -58,17 +63,56 @@ final class AuthEndpointRateLimitTest extends RateLimitTestCase
         self::assertSame(200, $other->getStatusCode(), (string) $other->getContent());
     }
 
-    public function testOAuthTokenEndpointIsLimitedPerIpAndPerClient(): void
+    public function testOAuthTokenEndpointIsLimitedPerIpBeforeTheClientAuthenticates(): void
     {
         $this->exhaust('oauth_token_ip', '198.51.100.60');
+
         $this->assertTooManyRequests($this->requestFrom('198.51.100.60', 'POST', '/api/oauth/token', content: ['grant_type' => 'refresh_token', 'client_id' => 'rate_limit_client_0001']));
+    }
 
-        $this->exhaust('oauth_token_client', 'rate_limit_client_0002');
-        $this->assertTooManyRequests($this->requestFrom('198.51.100.61', 'POST', '/api/oauth/token', content: ['grant_type' => 'refresh_token', 'client_id' => 'rate_limit_client_0002']));
+    public function testTheTokenEndpointChargesAnAuthenticatedPublicClientPerCallerNetwork(): void
+    {
+        $client = Client::registerPublic('Rate limited player', ['https://player.baander.app/callback']);
+        static::getContainer()->get(ClientRepositoryInterface::class)->saveClient($client);
+        $clientId = $client->getPublicId()->toString();
+        $this->exhaust('oauth_token_client', $clientId . '|198.51.100.0');
+        $this->trackLimiter('oauth_token_client', $clientId . '|203.0.113.0');
 
-        // Another address and client still reach the endpoint, which then asks for a DPoP proof.
-        $other = $this->requestFrom('198.51.100.62', 'POST', '/api/oauth/token', content: ['grant_type' => 'refresh_token', 'client_id' => 'rate_limit_client_0003']);
+        $this->assertTooManyRequests($this->refreshGrantFrom('198.51.100.61', $clientId));
+
+        // Callers on another network still reach the grant, which refuses the unknown token.
+        $other = $this->refreshGrantFrom('203.0.113.61', $clientId);
         self::assertSame(400, $other->getStatusCode(), (string) $other->getContent());
+        self::assertSame('invalid_grant', json_decode((string) $other->getContent(), true, flags: JSON_THROW_ON_ERROR)['error']);
+    }
+
+    public function testTheRefreshLimiterIsKeyedOnTheHashOfThePresentedToken(): void
+    {
+        $token = 'refresh-limit-' . bin2hex(random_bytes(16));
+        $this->trackLimiter('auth_refresh_client', hash('sha256', $token));
+        $this->trackLimiter('auth_refresh_client', $token);
+
+        $this->requestFrom('198.51.100.67', 'POST', '/api/auth/refresh', content: ['refreshToken' => $token]);
+
+        $remaining = fn (string $key): int => $this->limiter('auth_refresh_client')->create($key)->consume(0)->getRemainingTokens();
+        self::assertSame(9999, $remaining(hash('sha256', $token)));
+        self::assertSame(10000, $remaining($token), 'No bucket is keyed on the raw token.');
+    }
+
+    private function refreshGrantFrom(string $ip, string $clientId): Response
+    {
+        $key = new SignedDpopProof();
+        $challenge = $this->requestFrom($ip, 'POST', '/api/oauth/token', content: ['grant_type' => 'refresh_token', 'client_id' => $clientId]);
+        $nonce = $challenge->headers->get('DPoP-Nonce');
+        self::assertIsString($nonce, (string) $challenge->getContent());
+
+        $this->client->request('POST', '/api/oauth/token', [], [], [
+            'REMOTE_ADDR' => $ip,
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_DPOP' => $key->createWithNonce('POST', 'http://localhost/api/oauth/token', $nonce),
+        ], json_encode(['grant_type' => 'refresh_token', 'client_id' => $clientId, 'refresh_token' => str_repeat('r', 80)], JSON_THROW_ON_ERROR));
+
+        return $this->client->getResponse();
     }
 
     public function testPushedAuthorizationRequestsAreLimitedPerIp(): void

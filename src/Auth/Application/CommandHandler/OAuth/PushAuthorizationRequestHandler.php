@@ -6,7 +6,9 @@ namespace App\Auth\Application\CommandHandler\OAuth;
 
 use App\Auth\Application\Command\OAuth\PushAuthorizationRequestCommand;
 use App\Auth\Application\DTO\PushedAuthorizationRequestDTO;
+use App\Auth\Application\Exception\OAuthClientRateLimitedException;
 use App\Auth\Application\Exception\OAuthProtocolException;
+use App\Auth\Application\Port\OAuthClientThrottleInterface;
 use App\Auth\Application\Service\AuthorizationRequestValidator;
 use App\Auth\Application\Service\OAuthClientAuthenticator;
 use App\Auth\Domain\Model\OAuth\PushedAuthorizationRequest;
@@ -18,7 +20,8 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 /**
  * Stores a client's pushed authorization request (RFC 9126) and answers its request URI.
  *
- * The client authenticates as at the token endpoint, and every check that needs no
+ * The client authenticates as at the token endpoint and is then charged against its
+ * per-client allowance. Every check that needs no
  * user runs now. The request is bound to a DPoP key (RFC 9449 section 10.1): the key of
  * a proof the request carried, the dpop_jkt parameter, or both when they name the same
  * key. The authorization code issued for the request is later bound to that key.
@@ -31,17 +34,22 @@ final readonly class PushAuthorizationRequestHandler
         private OAuthClientAuthenticator $clientAuthenticator,
         private AuthorizationRequestValidator $validator,
         private PushedAuthorizationRequestRepositoryInterface $pushedRequests,
+        private OAuthClientThrottleInterface $clientThrottle,
         private ClockInterface $clock,
         private int $requestUriTtlSeconds,
     ) {
         $this->requestUriTtl = new DateInterval(sprintf('PT%dS', $requestUriTtlSeconds));
     }
 
-    /** @throws OAuthProtocolException */
+    /**
+     * @throws OAuthProtocolException
+     * @throws OAuthClientRateLimitedException when the authenticated client has used up its allowance
+     */
     #[AsMessageHandler]
     public function __invoke(PushAuthorizationRequestCommand $command): PushedAuthorizationRequestDTO
     {
         $client = $this->clientAuthenticator->authenticate($command->credentials);
+        $this->clientThrottle->chargePushedRequest($client, $command->ipAddress);
         if ($command->state !== null && strlen($command->state) > PushedAuthorizationRequest::MAX_STATE_BYTES) {
             throw OAuthProtocolException::invalidRequest(sprintf('The state parameter is longer than %d bytes.', PushedAuthorizationRequest::MAX_STATE_BYTES));
         }

@@ -237,6 +237,7 @@ final class AuthorizationCodeGrantTest extends TestCase
         self::assertSame('fp-tv', $this->issuedMetadata[0]->getClientFingerprint());
         self::assertSame(['library'], $tokens->getScopes());
         self::assertArrayHasKey($code, $this->redeemed);
+        self::assertSame([['token', $this->client->getPublicId()->toString(), '192.0.2.10']], $this->clientCharges);
     }
 
     public function testExchangeWithAProofFromAnotherKeyIsRejectedAndTheCodeStaysUnredeemed(): void
@@ -458,7 +459,7 @@ final class AuthorizationCodeGrantTest extends TestCase
 
     private function exchanger(): ExchangeAuthorizationCodeHandler
     {
-        return new ExchangeAuthorizationCodeHandler($this->clientAuthenticator(), $this->authCodes(), $this->tokenPairIssuer(), $this->chainRevoker());
+        return new ExchangeAuthorizationCodeHandler($this->clientAuthenticator(), $this->authCodes(), $this->tokenPairIssuer(), $this->chainRevoker(), $this->clientThrottle());
     }
 
     private function exchange(string $code, ?string $redirectUri = self::REDIRECT, ?string $verifier = self::VERIFIER, string $jkt = self::JKT): ExchangeAuthorizationCodeCommand
