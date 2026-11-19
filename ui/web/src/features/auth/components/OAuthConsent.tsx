@@ -43,27 +43,28 @@ type View =
   | { name: 'loading' }
   | { name: 'consent' }
   | { name: 'leaving'; target: string }
-  | { name: 'rejected' }
+  | { name: 'rejected'; error: string }
   | { name: 'unsafeRedirect' }
   | { name: 'lookupFailed'; error: unknown }
 
-function viewForOutcome(outcome: AuthorizationLookup | AuthorizationOutcome, requestedRedirect: string | null): View | null {
-  if (outcome.kind === 'rejected') return { name: 'rejected' }
+function viewForOutcome(outcome: AuthorizationLookup | AuthorizationOutcome, expectedRedirect: string | null): View | null {
+  if (outcome.kind === 'rejected') return { name: 'rejected', error: outcome.error }
   if (outcome.kind === 'consent') return null
 
-  const target = checkedClientRedirect(outcome.redirectUri, requestedRedirect)
+  const target = checkedClientRedirect(outcome.redirectUri, expectedRedirect)
   return target === null ? { name: 'unsafeRedirect' } : { name: 'leaving', target }
 }
 
 interface OAuthConsentProps {
-  /** The authorization request's query string without the leading `?`, passed on unchanged. */
+  /** The page's query string without the leading `?`; only its `client_id` and `request_uri` reach the server. */
   query: string
 }
 
 /**
- * The consent step of the authorization code flow. The server checks the request; the page
- * shows the client and scopes, sends the user's decision, and sends the browser back to the
- * client. When the client or redirect URI is invalid, the page reports it and never redirects.
+ * The consent step of the authorization code flow, on a request the client pushed to the server
+ * beforehand. The server checks the pushed request; the page shows the client and scopes, sends
+ * the user's decision, and sends the browser back to the redirect URI the server validated. When
+ * the client or pushed request is invalid, the page reports it and never redirects.
  */
 export function OAuthConsent({ query }: OAuthConsentProps) {
   const { t } = useTranslation()
@@ -98,19 +99,19 @@ export function OAuthConsent({ query }: OAuthConsentProps) {
   const { mutate: decide } = decision
 
   const details = lookup.data?.kind === 'consent' ? lookup.data.details : null
-  // The decision must return to the URI the request named or, without one, to the one the
-  // server validated for it.
-  const requestedRedirect = new URLSearchParams(query).get('redirect_uri') ?? details?.redirectUri ?? null
+  // The decision must return to the redirect URI the lookup reported for the pushed request; a
+  // redirect_uri in the browser URL is never trusted.
+  const expectedRedirect = details?.redirectUri ?? null
 
   let view: View
   if (decision.data !== undefined) {
-    view = viewForOutcome(decision.data, requestedRedirect) ?? { name: 'consent' }
+    view = viewForOutcome(decision.data, expectedRedirect) ?? { name: 'consent' }
   } else if (lookup.isPending) {
     view = { name: 'loading' }
   } else if (lookup.isError) {
     view = { name: 'lookupFailed', error: lookup.error }
   } else {
-    view = viewForOutcome(lookup.data, requestedRedirect) ?? { name: 'consent' }
+    view = viewForOutcome(lookup.data, expectedRedirect) ?? { name: 'consent' }
   }
 
   // Leave for each checked target once, also when StrictMode replays the effect.
@@ -154,7 +155,9 @@ export function OAuthConsent({ query }: OAuthConsentProps) {
     case 'rejected':
       return (
         <Form as="div">
-          <ErrorAlert role="alert">{t('auth.consent.invalidRequest')}</ErrorAlert>
+          <ErrorAlert role="alert">
+            {view.error === 'invalid_request_uri' ? t('auth.consent.requestUnavailable') : t('auth.consent.invalidRequest')}
+          </ErrorAlert>
         </Form>
       )
 

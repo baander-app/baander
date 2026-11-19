@@ -15,15 +15,8 @@ const mockPost = vi.mocked(AXIOS_INSTANCE.post)
 const mockLeave = vi.mocked(leaveAppFor)
 
 const REDIRECT_URI = 'https://app.baander.app/callback'
-const QUERY = new URLSearchParams({
-  response_type: 'code',
-  client_id: 'tv-app',
-  redirect_uri: REDIRECT_URI,
-  code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
-  code_challenge_method: 'S256',
-  scope: 'library playlist',
-  state: 'af0ifjsldkj',
-}).toString()
+const REQUEST_URI = 'urn:ietf:params:oauth:request_uri:6esc_11ACC5bwc014ltc14eY22c'
+const QUERY = new URLSearchParams({ client_id: 'tv-app', request_uri: REQUEST_URI }).toString()
 
 function consent(consentRequired = true) {
   return {
@@ -38,9 +31,14 @@ function consent(consentRequired = true) {
   }
 }
 
-/** The body the page sends: the request's parameters, unchanged, with the decision. */
-function decisionBody(decision: 'approve' | 'deny', query = QUERY) {
-  return { ...Object.fromEntries(new URLSearchParams(query)), decision }
+/** The body the page sends: the pushed request's reference with the decision. */
+function decisionBody(decision: 'approve' | 'deny') {
+  return { client_id: 'tv-app', request_uri: REQUEST_URI, decision }
+}
+
+/** The parameters the first lookup sent. */
+function lookupParams() {
+  return mockGet.mock.calls[0][1]?.params
 }
 
 function axiosError(status: number, data: unknown, headers: Record<string, string> = {}) {
@@ -81,7 +79,7 @@ describe('OAuthConsentPage', () => {
     expect(clientName.parentElement).toHaveTextContent('Bånder TV wants to use your Bånder account.')
     expect(screen.getByText('App on your device')).toBeInTheDocument()
     expect(screen.getByText('Browse and play your library')).toBeInTheDocument()
-    expect(String(mockGet.mock.calls[0][1]?.params)).toBe(QUERY)
+    expect(lookupParams()).toEqual({ client_id: 'tv-app', request_uri: REQUEST_URI })
     expect(mockLeave).not.toHaveBeenCalled()
 
     const user = userEvent.setup()
@@ -106,17 +104,46 @@ describe('OAuthConsentPage', () => {
     expect(mockPost).toHaveBeenCalledWith('/api/oauth/authorize', decisionBody('deny'))
   })
 
-  it.each([
-    ['an invalid client', 400, { error: 'invalid_client', error_description: 'Unknown or revoked client.' }],
-    ['an invalid redirect URI', 400, { error: 'invalid_request', error_description: 'The redirect URI is not registered.' }],
-  ])('reports %s and never navigates', async (_label, status, body) => {
-    mockGet.mockRejectedValue(axiosError(status, body))
+  it('reports an invalid client and never navigates', async () => {
+    mockGet.mockRejectedValue(axiosError(400, { error: 'invalid_client', error_description: 'Unknown or revoked client.' }))
     mount()
 
     expect(await screen.findByRole('alert')).toHaveTextContent('This sign-in request is not valid')
     expect(screen.queryByRole('button', { name: 'Allow' })).not.toBeInTheDocument()
     expect(mockPost).not.toHaveBeenCalled()
     expect(mockLeave).not.toHaveBeenCalled()
+  })
+
+  it('asks the user to start again from the app when the pushed request is unknown, expired or used', async () => {
+    mockGet.mockRejectedValue(axiosError(400, { error: 'invalid_request_uri', error_description: 'The request has expired.' }))
+    mount()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Start again from the app')
+    expect(screen.queryByRole('button', { name: 'Allow' })).not.toBeInTheDocument()
+    expect(mockPost).not.toHaveBeenCalled()
+    expect(mockLeave).not.toHaveBeenCalled()
+  })
+
+  it('sends only the pushed request reference and returns to the server\'s redirect URI, not the URL\'s', async () => {
+    const query = new URLSearchParams({
+      client_id: 'tv-app',
+      request_uri: REQUEST_URI,
+      redirect_uri: 'https://other.baander.app/callback',
+      scope: 'admin',
+      state: 'forged',
+    }).toString()
+    mockGet.mockResolvedValue(consent())
+    const approved = `${REDIRECT_URI}?code=c0de&state=af0ifjsldkj`
+    mockPost.mockResolvedValue({ data: { redirect_uri: approved } })
+    mount(query)
+
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Allow' }))
+
+    await waitFor(() => expect(mockLeave).toHaveBeenCalledWith(approved))
+    expect(lookupParams()).toEqual({ client_id: 'tv-app', request_uri: REQUEST_URI })
+    expect(mockPost).toHaveBeenCalledWith('/api/oauth/authorize', decisionBody('approve'))
+    expect(screen.queryByText(/unexpected return address/)).not.toBeInTheDocument()
   })
 
   it('follows an error redirect from the lookup', async () => {
@@ -171,18 +198,17 @@ describe('OAuthConsentPage', () => {
     expect(screen.queryByRole('button', { name: 'Allow' })).not.toBeInTheDocument()
   })
 
-  it('checks the answer against the validated redirect URI when the request names none', async () => {
-    const query = new URLSearchParams(QUERY)
-    query.delete('redirect_uri')
+  it('refuses a decision answer that matches the URL\'s redirect URI but not the server\'s', async () => {
+    const forged = 'https://other.baander.app/callback'
+    const query = new URLSearchParams({ client_id: 'tv-app', request_uri: REQUEST_URI, redirect_uri: forged }).toString()
     mockGet.mockResolvedValue(consent())
-    mockPost.mockResolvedValue({ data: { redirect_uri: 'https://evil.baander.app/callback?code=c0de' } })
-    mount(query.toString())
+    mockPost.mockResolvedValue({ data: { redirect_uri: `${forged}?code=c0de` } })
+    mount(query)
 
     const user = userEvent.setup()
     await user.click(await screen.findByRole('button', { name: 'Allow' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('unexpected return address')
-    expect(mockPost).toHaveBeenCalledWith('/api/oauth/authorize', decisionBody('approve', query.toString()))
     expect(mockLeave).not.toHaveBeenCalled()
   })
 

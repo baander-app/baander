@@ -105,6 +105,7 @@
       "deny": "Deny",
       "redirecting": "Returning you to the app…",
       "invalidRequest": "This sign-in request is not valid, so you can't continue. Go back to the app and try again.",
+      "requestUnavailable": "This sign-in request has expired or was already used. Start again from the app.",
       "unsafeRedirect": "The server answered with an unexpected return address, so you were not sent back to the app.",
       "rateLimited_one": "Too many attempts. Try again in {{count}} second.",
       "rateLimited_other": "Too many attempts. Try again in {{count}} seconds.",

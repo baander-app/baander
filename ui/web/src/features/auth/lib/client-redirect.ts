@@ -12,20 +12,22 @@ function parseAbsolute(value: string): URL | null {
 /**
  * Checks a redirect URI the authorization endpoint returned before the browser leaves for it.
  * The server has already validated the client's URI; this is a second line of defence so the
- * page never follows a script URL or a target other than the one the client asked for.
+ * page never follows a script URL or a target other than the one the server reported for the
+ * pushed request.
  *
  * Native apps register custom schemes (`app.baander.tv:/callback`), so any other scheme is
- * allowed. When the request named a redirect URI, the answer must keep its scheme, host,
+ * allowed. When an expected redirect URI is known, the answer must keep its scheme, host,
  * port, and path; only the query (code, state, iss, or error) may differ.
  *
+ * @param expectedUri the redirect URI the lookup reported, or null before one is known
  * @returns the URL to navigate to, or null when it must not be followed
  */
-export function checkedClientRedirect(candidate: string, requested: string | null): string | null {
+export function checkedClientRedirect(candidate: string, expectedUri: string | null): string | null {
   const target = parseAbsolute(candidate)
   if (target === null || BLOCKED_PROTOCOLS.has(target.protocol)) return null
-  if (requested === null) return target.href
+  if (expectedUri === null) return target.href
 
-  const expected = parseAbsolute(requested)
+  const expected = parseAbsolute(expectedUri)
   if (expected === null) return null
 
   const sameTarget = target.protocol === expected.protocol

@@ -74,9 +74,8 @@ describe('sign-in guard', () => {
     expect(screen.getByTestId('location')).toHaveTextContent(/^\/device\?user_code=BCDF-GHJK$/)
   })
 
-  it('keeps the full authorization query through the login page', async () => {
-    const query = '?response_type=code&client_id=tv-app&redirect_uri=https%3A%2F%2Fapp.baander.app%2Fcb'
-      + '&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256&state=s1'
+  it('keeps the pushed request reference through the login page', async () => {
+    const query = '?client_id=tv-app&request_uri=urn%3Aietf%3Aparams%3Aoauth%3Arequest_uri%3A6esc_11ACC5bwc014ltc14eY22c'
     mount(`/oauth/authorize${query}`)
 
     await logIn()

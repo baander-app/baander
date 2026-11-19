@@ -6,11 +6,11 @@ import type {
 } from '@/shared/api-client/gen/endpoints'
 
 /*
- * The consent page passes the authorization request's query through unchanged, so these calls
- * use the shared Axios instance (authentication, DPoP, and refresh included) with that query
- * rather than the generated functions. Nelmio marks every documented property required, so the
- * generated request and error types require `redirect_uri`, `scope`, and `state`, which the
- * endpoint treats as optional. The answers are read with checks rather than trusted casts.
+ * The client pushed its authorization request to the server beforehand; the browser URL names
+ * it only by `client_id` and `request_uri`, and those two parameters are all these calls send.
+ * Anything else in the URL is dropped, because only the pushed parameters govern the request.
+ * The calls use the shared Axios instance (authentication, DPoP, and refresh included), and the
+ * answers are read with checks rather than trusted casts.
  */
 
 const AUTHORIZE_URL = '/api/oauth/authorize'
@@ -29,7 +29,11 @@ export interface AuthorizationRequestDetails {
   consentRequired: boolean
 }
 
-/** The client or redirect URI is invalid: report the error and never redirect. */
+/**
+ * The client or pushed request is invalid: report the error and never redirect. An
+ * `invalid_request_uri` error means the pushed request is unknown, expired, already used, or was
+ * pushed by another client.
+ */
 export interface AuthorizationRejected {
   kind: 'rejected'
   error: string
@@ -105,20 +109,27 @@ function outcomeFromError(err: unknown): AuthorizationOutcome {
   return outcome
 }
 
-/** The authorization request's parameters with the decision, as the decision body expects. */
-function decisionBody(query: string, decision: AuthorizationDecision): Record<string, string> {
-  return { ...Object.fromEntries(new URLSearchParams(query)), decision }
+/** The pushed request's reference in a browser query: its `client_id` and `request_uri`, when present. */
+function pushedRequestReference(query: string): Record<string, string> {
+  const params = new URLSearchParams(query)
+
+  return Object.fromEntries(
+    ['client_id', 'request_uri'].flatMap((name) => {
+      const value = params.get(name)
+      return value === null ? [] : [[name, value]]
+    }),
+  )
 }
 
 /**
- * Asks the server what the client in `query` (the authorization request's query string, passed
- * through unchanged) wants, or where to send the browser instead.
+ * Asks the server what the pushed request named in `query` (the consent page's query string)
+ * asks for, or where to send the browser instead.
  */
 export async function lookupAuthorization(query: string, signal?: AbortSignal): Promise<AuthorizationLookup> {
   let body: unknown
   try {
     const response = await AXIOS_INSTANCE.get<AuthorizationRequestResource>(AUTHORIZE_URL, {
-      params: new URLSearchParams(query),
+      params: pushedRequestReference(query),
       signal,
     })
     body = response.data
@@ -132,11 +143,14 @@ export async function lookupAuthorization(query: string, signal?: AbortSignal): 
   return { kind: 'consent', details }
 }
 
-/** Records the user's decision on the request in `query`; the answer names where to send the browser. */
+/** Records the user's decision on the pushed request named in `query`; the answer names where to send the browser. */
 export async function decideAuthorization(query: string, decision: AuthorizationDecision): Promise<AuthorizationOutcome> {
   let body: unknown
   try {
-    const response = await AXIOS_INSTANCE.post<AuthorizationRedirectResource>(AUTHORIZE_URL, decisionBody(query, decision))
+    const response = await AXIOS_INSTANCE.post<AuthorizationRedirectResource>(AUTHORIZE_URL, {
+      ...pushedRequestReference(query),
+      decision,
+    })
     body = response.data
   } catch (err: unknown) {
     return outcomeFromError(err)

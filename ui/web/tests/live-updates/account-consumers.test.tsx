@@ -77,7 +77,7 @@ describe('account consumers', () => {
     })
     mock.onPost('/api/oauth/authorize').reply(200, { redirect_uri: redirect + '?code=once' })
     const { coordinator, wrapper } = setup()
-    render(<OAuthConsent query={new URLSearchParams({ client_id: 'first-party', redirect_uri: redirect }).toString()} />, { wrapper })
+    render(<OAuthConsent query={new URLSearchParams({ client_id: 'first-party', request_uri: 'urn:ietf:params:oauth:request_uri:first-party-request' }).toString()} />, { wrapper })
     await waitFor(() => expect(mock.history.post).toHaveLength(1))
     act(() => { coordinator.hint(['account']); coordinator.hint(['account']) })
     await new Promise(resolve => setTimeout(resolve, 100))
