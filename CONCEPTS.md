@@ -32,6 +32,12 @@ The registered OAuth client's public ID, used in authorization requests, adminis
 
 It is separate from a token identifier or secret.
 
+### Pushed authorization request
+
+An authorization-code request that a client sends to the authorization server over the back channel, authenticated and with a DPoP proof, before it sends the user's browser to the consent page. The client gets back a short-lived `request_uri`. The browser carries only that `request_uri` and the client identifier, and the user's approve or deny decision uses the `request_uri` up.
+
+Every authorization-code request is a pushed request. The authorization code it produces works only with the DPoP key that pushed it.
+
 ## Local development
 
 ### Persistent development instance
