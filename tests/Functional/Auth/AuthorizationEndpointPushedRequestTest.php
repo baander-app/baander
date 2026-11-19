@@ -162,14 +162,15 @@ final class AuthorizationEndpointPushedRequestTest extends TestCase
         self::assertSame(0, $this->codeCount());
     }
 
-    public function testAPersonalAccessClientOfAnotherUserIsRedirectedWithUnauthorizedClient(): void
+    public function testAPersonalAccessClientOfAnotherUserIsRedirectedWithUnauthorizedClientOnLookupApprovalAndDenial(): void
     {
         $client = Client::createPersonalAccess('Someone else\'s CLI', $this->createTestUser()->getId());
         static::getContainer()->get(ClientRepositoryInterface::class)->saveClient($client);
         $clientId = $client->getPublicId()->toString();
         $requestUri = $this->push($clientId, 'http://localhost:53682');
 
-        foreach (['GET' => [], 'POST' => ['decision' => 'approve']] as $method => $extra) {
+        // A denial runs the same user checks as an approval, so it cannot use up the owner's request.
+        foreach ([['GET', []], ['POST', ['decision' => 'approve']], ['POST', ['decision' => 'deny']]] as [$method, $extra]) {
             $response = $this->authorize($method, ['client_id' => $clientId, 'request_uri' => $requestUri, ...$extra]);
             $error = $this->error($response);
             self::assertSame('unauthorized_client', $error['error']);

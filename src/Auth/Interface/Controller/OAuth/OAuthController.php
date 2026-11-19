@@ -86,6 +86,9 @@ final class OAuthController
     use ApiResponsesTrait;
     use TranslatorTrait;
 
+    /** The largest pushed authorization request body accepted, in bytes. */
+    private const int MAX_PAR_BODY_BYTES = 65536;
+
     public function __construct(
         private readonly Security $security,
         private readonly MessageBusInterface $bus,
@@ -181,7 +184,7 @@ final class OAuthController
                     new OA\Property(property: 'client_secret', description: 'Secret clients that do not send it with HTTP Basic', type: 'string'),
                     new OA\Property(property: 'redirect_uri', description: 'Required unless the client registered exactly one redirect URI', type: 'string', format: 'uri'),
                     new OA\Property(property: 'scope', description: 'Space-separated scopes', type: 'string'),
-                    new OA\Property(property: 'state', type: 'string'),
+                    new OA\Property(property: 'state', description: 'At most 1024 bytes', type: 'string'),
                     new OA\Property(property: 'code_challenge', description: 'BASE64URL(SHA256(code_verifier))', type: 'string'),
                     new OA\Property(property: 'code_challenge_method', type: 'string', enum: ['S256']),
                     new OA\Property(property: 'dpop_jkt', description: 'JWK SHA-256 thumbprint of the DPoP key (RFC 7638); required without a DPoP proof header', type: 'string'),
@@ -192,6 +195,7 @@ final class OAuthController
             new OA\Response(response: '201', description: 'The request URI for the authorization endpoint (RFC 9126 section 2.2)', content: new OA\JsonContent(ref: new Model(type: PushedAuthorizationRequestResource::class))),
             new OA\Response(response: '400', description: 'OAuth error, including invalid_dpop_proof when the proof and dpop_jkt name different keys, use_dpop_nonce, and request_not_supported for a request object', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
             new OA\Response(response: '401', description: 'Client authentication failed, or the client is revoked', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
+            new OA\Response(response: '413', description: 'The request body is larger than 64 KiB (`invalid_request`)', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
             new OA\Response(
                 response: '503',
                 description: 'The server could not store the request, for example while its database restarts, the rate limit or DPoP nonce store is unavailable, or the client\'s jwks_uri key set cannot be fetched; push again after the Retry-After delay. Carries no DPoP-Nonce header.',
@@ -208,6 +212,9 @@ final class OAuthController
         $proof = $proof instanceof VerifiedDpopProof ? $proof : null;
 
         try {
+            if (strlen($request->getContent()) > self::MAX_PAR_BODY_BYTES) {
+                throw OAuthProtocolException::requestTooLarge(self::MAX_PAR_BODY_BYTES);
+            }
             $pushed = $this->dispatch($this->pushCommand(self::parameters($request), $proof, $request));
             assert($pushed instanceof PushedAuthorizationRequestDTO);
             $response = new JsonResponse(PushedAuthorizationRequestResource::from($pushed), Response::HTTP_CREATED);

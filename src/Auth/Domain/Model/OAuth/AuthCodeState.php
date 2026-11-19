@@ -6,6 +6,7 @@ namespace App\Auth\Domain\Model\OAuth;
 
 use App\Auth\Domain\Model\User;
 
+use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
@@ -36,6 +37,7 @@ final class AuthCodeState
         public readonly string $codeChallengeMethod,
         public readonly string $dpopJkt,
         public bool $revoked = false,
+        public ?ChainId $issuedChainId = null,
     ) {
         $this->scopes = $scopes;
     }

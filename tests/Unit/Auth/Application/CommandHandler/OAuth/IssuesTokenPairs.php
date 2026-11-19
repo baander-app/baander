@@ -8,20 +8,25 @@ use App\Auth\Application\Port\ClientAssertionVerifierInterface;
 use App\Auth\Application\Port\JwtGeneratorInterface;
 use App\Auth\Application\ScopeAllowlist;
 use App\Auth\Application\Service\OAuthClientAuthenticator;
+use App\Auth\Application\Service\ChainConnectionCloser;
+use App\Auth\Application\Service\TokenChainRevoker;
 use App\Auth\Application\Service\TokenPairIssuer;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
 use App\Auth\Domain\Model\OAuth\TokenMetadata;
+use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Tests\Fixtures\Catalog\PassThroughTransaction;
+use App\Shared\Application\Port\LiveConnectionsPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\NullLogger;
 
 /**
  * An in-memory token pair issuer and client registry for grant handler tests.
@@ -40,6 +45,8 @@ trait IssuesTokenPairs
     private array $jwtBindings = [];
     /** @var array<string, Client> */
     private array $clients = [];
+    /** @var list<string> Chains revoked, in order */
+    private array $revokedChains = [];
 
     private function tokenPairIssuer(): TokenPairIssuer
     {
@@ -80,6 +87,24 @@ trait IssuesTokenPairs
         $transaction = new PassThroughTransaction();
 
         return new TokenPairIssuer($accessTokens, $refreshTokens, new ScopeAllowlist(['profile', 'email', 'library', 'playlist']), $entityManager, $jwt, $metadata, $clients, $transaction, 3600, 2592000);
+    }
+
+    /** Records each revoked chain; no web server runs, so no socket closes. */
+    private function chainRevoker(): TokenChainRevoker
+    {
+        $refreshTokens = $this->createStub(RefreshTokenRepositoryInterface::class);
+        $refreshTokens->method('revokeByChainId')->willReturnCallback(function (ChainId $chainId): void {
+            $this->revokedChains[] = $chainId->toString();
+        });
+        $accessTokens = $this->createStub(AccessTokenRepositoryInterface::class);
+        $accessTokens->method('findTokenIdsByChainId')->willReturn([]);
+
+        return new TokenChainRevoker(
+            $refreshTokens,
+            $accessTokens,
+            new PassThroughTransaction(),
+            new ChainConnectionCloser($this->createStub(LiveConnectionsPortInterface::class), new NullLogger()),
+        );
     }
 
     private function clientAuthenticator(): OAuthClientAuthenticator

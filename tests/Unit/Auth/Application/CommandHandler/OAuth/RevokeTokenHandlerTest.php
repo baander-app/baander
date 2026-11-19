@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Auth\Application\CommandHandler;
 use App\Auth\Application\Command\OAuth\RevokeTokenCommand;
 use App\Auth\Application\CommandHandler\OAuth\RevokeTokenHandler;
 use App\Auth\Application\Service\ChainConnectionCloser;
+use App\Auth\Application\Service\TokenChainRevoker;
 use App\Shared\Domain\Model\Email;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
@@ -19,6 +20,7 @@ use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Shared\Application\Port\LiveConnectionsPortInterface;
 use App\Shared\Application\Port\ServerControlException;
 use App\Shared\Application\Port\ServerNotRunningException;
+use App\Shared\Application\Port\TransactionPortInterface;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -65,7 +67,27 @@ final class RevokeTokenHandlerTest extends TestCase
             $this->refreshTokenRepository,
             $this->entityManager,
             $this->eventDispatcher,
-            new ChainConnectionCloser($this->liveConnections, $logger ?? new NullLogger()),
+            new TokenChainRevoker(
+                $this->refreshTokenRepository,
+                $this->accessTokenRepository,
+                // The transaction port over the test's connection, so its transactional() expectations hold.
+                new readonly class ($this->connection) implements TransactionPortInterface {
+                    public function __construct(private Connection $connection)
+                    {
+                    }
+
+                    /**
+                     * @template T
+                     * @param callable(): T $operation
+                     * @return T
+                     */
+                    public function run(callable $operation): mixed
+                    {
+                        return $this->connection->transactional(static fn (): mixed => $operation());
+                    }
+                },
+                new ChainConnectionCloser($this->liveConnections, $logger ?? new NullLogger()),
+            ),
         );
     }
 

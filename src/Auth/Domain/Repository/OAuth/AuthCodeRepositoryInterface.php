@@ -6,6 +6,7 @@ namespace App\Auth\Domain\Repository\OAuth;
 
 use App\Auth\Domain\Model\OAuth\AuthCode;
 use App\Auth\Domain\Model\OAuth\TokenId;
+use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use DateTimeImmutable;
 
 interface AuthCodeRepositoryInterface
@@ -15,12 +16,12 @@ interface AuthCodeRepositoryInterface
     public function findByCodeId(TokenId $codeId): ?AuthCode;
 
     /**
-     * Atomically marks an unexpired, unused code as used.
+     * Atomically marks an unexpired, unused code as used and records the token chain it started.
      *
      * Returns false when the code was already redeemed, revoked or has expired,
      * so exactly one of several concurrent redemptions succeeds.
      */
-    public function redeem(AuthCode $authCode): bool;
+    public function redeem(AuthCode $authCode, ChainId $chainId): bool;
 
     /**
      * Deletes codes that expired before the cutoff, redeemed or not.

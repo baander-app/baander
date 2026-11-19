@@ -130,6 +130,32 @@ final class PushedAuthorizationRequestEndpointTest extends RateLimitTestCase
         $this->assertOAuthError('invalid_request', $this->push($request));
     }
 
+    public function testAStateOfAtMost1024BytesIsAccepted(): void
+    {
+        $clientId = $this->publicClient();
+        $jkt = (new SignedDpopProof())->thumbprint();
+
+        $accepted = $this->push([...$this->request($clientId), 'dpop_jkt' => $jkt, 'state' => str_repeat('s', 1024)]);
+        self::assertSame(Response::HTTP_CREATED, $accepted->getStatusCode(), (string) $accepted->getContent());
+
+        $this->assertOAuthError('invalid_request', $this->push([...$this->request($clientId), 'dpop_jkt' => $jkt, 'state' => str_repeat('s', 1025)]));
+    }
+
+    public function testABodyOver64KilobytesIsRefusedWith413(): void
+    {
+        $body = json_encode([
+            ...$this->request($this->publicClient()),
+            'dpop_jkt' => (new SignedDpopProof())->thumbprint(),
+            'padding' => str_repeat('p', 100 * 1024),
+        ], JSON_THROW_ON_ERROR);
+
+        $this->client->request('POST', '/api/oauth/par', [], [], ['REMOTE_ADDR' => '198.51.100.90', 'CONTENT_TYPE' => 'application/json'], $body);
+        $response = $this->client->getResponse();
+
+        self::assertSame(Response::HTTP_REQUEST_ENTITY_TOO_LARGE, $response->getStatusCode(), (string) $response->getContent());
+        self::assertSame(0, (int) $this->entityManager->getConnection()->fetchOne('SELECT COUNT(*) FROM oauth_pushed_authorization_requests'));
+    }
+
     public function testPushesAreLimitedPerClient(): void
     {
         $clientId = $this->publicClient();

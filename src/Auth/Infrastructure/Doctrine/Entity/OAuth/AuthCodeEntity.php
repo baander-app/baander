@@ -65,6 +65,10 @@ class AuthCodeEntity implements AuthCodeEntityInterface
     #[ORM\Column(type: 'text')]
     private string $dpopJkt;
 
+    /** The token chain the code's exchange started; presenting the code again revokes it. */
+    #[ORM\Column(type: 'uuid', nullable: true)]
+    private ?Uuid $chainId = null;
+
     /** @param array<array-key, string>|null $scopes */
     public function __construct(
         string $codeId,
@@ -267,6 +271,11 @@ class AuthCodeEntity implements AuthCodeEntityInterface
     public function getDpopJkt(): string
     {
         return $this->dpopJkt;
+    }
+
+    public function getChainId(): ?Uuid
+    {
+        return $this->chainId;
     }
 
     public function setCodeChallengeMethod(string $codeChallengeMethod): void

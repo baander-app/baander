@@ -24,6 +24,9 @@ final class PushedAuthorizationRequest
     /** RFC 9126 section 2.2: the URN namespace registered for request URIs. */
     public const string REQUEST_URI_PREFIX = 'urn:ietf:params:oauth:request_uri:';
 
+    /** The longest state a client may push, in bytes; chk_oauth_pushed_authorization_requests_state_length holds the same bound. */
+    public const int MAX_STATE_BYTES = 1024;
+
     private function __construct(
         private PushedAuthorizationRequestState $state,
     ) {

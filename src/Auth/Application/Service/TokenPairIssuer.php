@@ -67,7 +67,8 @@ final class TokenPairIssuer
 
     /**
      * @param string[] $requestedScopes Filtered against the allowlist; none requested yields the default scopes
-     * @param (callable(): void)|null $persistWithTokens Further writes that commit or roll back with the tokens
+     * @param (callable(ChainId): void)|null $persistWithTokens Further writes that commit or roll back with the tokens;
+     *                                                     it receives the chain the pair starts
      *
      * @throws OAuthProtocolException invalid_client when the client was revoked before the tokens were stored
      */
@@ -101,13 +102,13 @@ final class TokenPairIssuer
             $this->refreshTokenTtl,
         );
 
-        return $this->transaction->run(function () use ($client, $accessToken, $refreshToken, $persistWithTokens, $dpopJkt, $clientFingerprint, $userAgent, $ipAddress): TokenResponseDTO {
+        return $this->transaction->run(function () use ($client, $chainId, $accessToken, $refreshToken, $persistWithTokens, $dpopJkt, $clientFingerprint, $userAgent, $ipAddress): TokenResponseDTO {
             IssuanceLockTimeout::apply($this->entityManager);
             if (!$this->clientRepository->lockActiveClientForIssuance($client->getId())) {
                 throw OAuthProtocolException::invalidClient('The client has been revoked.');
             }
             if ($persistWithTokens !== null) {
-                $persistWithTokens();
+                $persistWithTokens($chainId);
             }
             $this->accessTokenRepository->save($accessToken, false);
             $this->refreshTokenRepository->save($refreshToken, false);

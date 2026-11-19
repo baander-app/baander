@@ -42,6 +42,9 @@ final readonly class PushAuthorizationRequestHandler
     public function __invoke(PushAuthorizationRequestCommand $command): PushedAuthorizationRequestDTO
     {
         $client = $this->clientAuthenticator->authenticate($command->credentials);
+        if ($command->state !== null && strlen($command->state) > PushedAuthorizationRequest::MAX_STATE_BYTES) {
+            throw OAuthProtocolException::invalidRequest(sprintf('The state parameter is longer than %d bytes.', PushedAuthorizationRequest::MAX_STATE_BYTES));
+        }
         $validated = $this->validator->validatePush(
             $client,
             $command->responseType,

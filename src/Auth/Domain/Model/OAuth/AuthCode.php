@@ -6,6 +6,7 @@ namespace App\Auth\Domain\Model\OAuth;
 
 use App\Auth\Domain\Model\User;
 
+use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
@@ -100,6 +101,24 @@ final class AuthCode
 
         $this->state->revoked = true;
         $this->state->updatedAt = new DateTimeImmutable();
+    }
+
+    /**
+     * Uses the code up for the token chain its exchange started.
+     *
+     * The chain is remembered so that presenting the code again can end it (RFC 6749 section 4.1.2).
+     */
+    public function redeemFor(ChainId $chainId): void
+    {
+        $this->state->revoked = true;
+        $this->state->issuedChainId = $chainId;
+        $this->state->updatedAt = new DateTimeImmutable();
+    }
+
+    /** The token chain the code's exchange started, or null while it is unredeemed. */
+    public function getIssuedChainId(): ?ChainId
+    {
+        return $this->state->issuedChainId;
     }
 
     public function isExpired(): bool

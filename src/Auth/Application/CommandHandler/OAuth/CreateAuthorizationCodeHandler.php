@@ -24,7 +24,8 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * single-use authorization code bound to the pushed PKCE challenge, redirect URI and
  * DPoP key thumbprint, in the transaction that uses the request up; of two concurrent
  * approvals one issues a code. Denial answers access_denied at the pushed redirect URI.
- * A check that fails for the user leaves the request unused.
+ * Both run the same user checks first; a check that fails for the user leaves the
+ * request unused.
  */
 final readonly class CreateAuthorizationCodeHandler
 {
@@ -44,15 +45,16 @@ final readonly class CreateAuthorizationCodeHandler
     #[AsMessageHandler]
     public function __invoke(CreateAuthorizationCodeCommand $command): AuthorizationResponseDTO
     {
+        // Both decisions run the user checks first, so no one but the request's rightful
+        // user can use it up, not even by denying it.
+        $request = $this->validator->validate($command->userId, $command->clientId, $command->requestUri);
+        $pushedRequest = $request->pushedRequest;
+
         if (!$command->approved) {
-            [$client, $pushedRequest] = $this->validator->resolvePushedRequest($command->clientId, $command->requestUri);
-            $this->useUp($pushedRequest, $client);
+            $this->useUp($pushedRequest, $request->client);
 
             return AuthorizationResponseDTO::denied($pushedRequest->getRedirectUri(), $pushedRequest->getState());
         }
-
-        $request = $this->validator->validate($command->userId, $command->clientId, $command->requestUri);
-        $pushedRequest = $request->pushedRequest;
 
         $code = $this->transaction->run(function () use ($request, $pushedRequest): AuthCode {
             $this->useUp($pushedRequest, $request->client);

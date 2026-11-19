@@ -77,6 +77,14 @@ final class PushAuthorizationRequestHandlerTest extends TestCase
         self::assertSame(self::KEY_ONE, $this->stored()->getDpopJkt());
     }
 
+    public function testAStateIsAtMost1024Bytes(): void
+    {
+        $this->push(proofJkt: self::KEY_ONE, state: str_repeat('é', 512));
+        self::assertSame(str_repeat('é', 512), $this->stored()->getState());
+
+        $this->assertRejected('invalid_request', fn () => $this->push(proofJkt: self::KEY_ONE, state: str_repeat('é', 512) . 's'));
+    }
+
     public function testARequestWithoutAKeyBindingIsRejected(): void
     {
         $this->assertRejected('invalid_request', fn () => $this->push());
@@ -175,6 +183,7 @@ final class PushAuthorizationRequestHandlerTest extends TestCase
         ?string $responseType = 'code',
         ?string $proofJkt = null,
         ?string $dpopJkt = null,
+        ?string $state = 'state-1',
     ): PushedAuthorizationRequestDTO {
         $handler = new PushAuthorizationRequestHandler(
             $this->clientAuthenticator(),
@@ -195,7 +204,7 @@ final class PushAuthorizationRequestHandlerTest extends TestCase
             responseType: $responseType,
             redirectUri: $redirectUri,
             scopes: ['library', 'admin'],
-            state: 'state-1',
+            state: $state,
             codeChallenge: $challenge,
             codeChallengeMethod: $method,
             proofJkt: $proofJkt,

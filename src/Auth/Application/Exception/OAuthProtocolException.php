@@ -40,6 +40,12 @@ final class OAuthProtocolException extends RuntimeException
         return new self('invalid_request', $description);
     }
 
+    /** A request body over the endpoint's size bound answers 413. */
+    public static function requestTooLarge(int $maxBytes): self
+    {
+        return new self('invalid_request', sprintf('The request body is larger than %d bytes.', $maxBytes), 413);
+    }
+
     /** RFC 6749 section 5.2: failed client authentication answers 401. */
     public static function invalidClient(string $description = 'Client authentication failed.'): self
     {

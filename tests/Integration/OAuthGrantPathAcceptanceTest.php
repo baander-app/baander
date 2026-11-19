@@ -676,6 +676,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
 
         [$replay] = $this->tokenRequest($app, $nonce, [...$exchange, 'code_verifier' => $verifier]);
         self::assertSame('invalid_grant', $replay['error'], 'A code is redeemed once.');
+        self::assertSame(401, $this->me($tokens['access_token'], $app)->getStatusCode(), 'Presenting the redeemed code again ends the chain it started.');
     }
 
     /** RFC 9449 section 10.1: the dpop_jkt parameter alone binds the code to the key it names. */

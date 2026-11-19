@@ -11,6 +11,7 @@ use App\Auth\Domain\Model\OAuth\ClientState;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Model\UserState;
+use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
 use App\Auth\Domain\Repository\OAuth\AuthCodeRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AuthCodeEntity;
@@ -104,6 +105,7 @@ final class AuthCodeRepository implements AuthCodeRepositoryInterface
             codeChallengeMethod: $entity->getCodeChallengeMethod(),
             dpopJkt: $entity->getDpopJkt(),
             revoked: $entity->isRevoked(),
+            issuedChainId: $entity->getChainId() !== null ? ChainId::fromUuid($entity->getChainId()) : null,
         ));
     }
 
@@ -114,24 +116,25 @@ final class AuthCodeRepository implements AuthCodeRepositoryInterface
         }
     }
 
-    public function redeem(AuthCode $authCode): bool
+    public function redeem(AuthCode $authCode, ChainId $chainId): bool
     {
-        // One conditional UPDATE decides between concurrent redemptions of the same code.
+        // One conditional UPDATE decides between concurrent redemptions of the same code,
+        // and records the chain the winner starts in the same statement.
         $redeemed = $this->entityManager->getConnection()->executeStatement(
             <<<'SQL'
                 UPDATE oauth_auth_codes
-                SET revoked = TRUE, updated_at = NOW()
+                SET revoked = TRUE, chain_id = :chain_id, updated_at = NOW()
                 WHERE id = :id
                   AND revoked = FALSE
                   AND (expires_at IS NULL OR expires_at > clock_timestamp())
                 SQL,
-            ['id' => $authCode->getId()->toString()],
+            ['id' => $authCode->getId()->toString(), 'chain_id' => $chainId->toString()],
         );
         if ($redeemed !== 1) {
             return false;
         }
 
-        $authCode->revoke();
+        $authCode->redeemFor($chainId);
         $entity = $this->entityManager->getRepository(AuthCodeEntity::class)->find($authCode->getId());
         if ($entity !== null) {
             $this->entityManager->refresh($entity);

@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace App\Auth\Application\CommandHandler\OAuth;
 
 use App\Auth\Application\Command\OAuth\RevokeTokenCommand;
-use App\Auth\Application\Service\ChainConnectionCloser;
+use App\Auth\Application\Service\TokenChainRevoker;
 use App\Auth\Domain\Event\OAuth\TokenRevoked;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
 use App\Auth\Domain\Model\OAuth\TokenId;
-use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use Doctrine\ORM\EntityManagerInterface;
@@ -37,7 +36,7 @@ final class RevokeTokenHandler
         private readonly RefreshTokenRepositoryInterface $refreshTokenRepository,
         private readonly EntityManagerInterface $entityManager,
         private readonly EventDispatcherInterface $eventDispatcher,
-        private readonly ChainConnectionCloser $connectionCloser,
+        private readonly TokenChainRevoker $chainRevoker,
     ) {
     }
 
@@ -57,7 +56,7 @@ final class RevokeTokenHandler
 
         $chainId = $token->getChainId();
         if ($command->shouldRevokeChain() && $chainId !== null) {
-            $this->revokeChain($chainId);
+            $this->chainRevoker->revoke($chainId);
 
             $this->eventDispatcher->dispatch(new TokenRevoked(
                 tokenId: $tokenId->toString(),
@@ -105,25 +104,5 @@ final class RevokeTokenHandler
         $holder = $accessToken->getUser()?->getId();
 
         return $holder !== null && $holder->toString() === $ownerUserId;
-    }
-
-    private function revokeChain(ChainId $chainId): void
-    {
-        $accessTokenIds = $this->entityManager->getConnection()->transactional(function () use ($chainId): array {
-            // Lock order of every chain revocation: refresh rows before access rows. A
-            // refresh of the same chain locks its refresh row first, so the two never
-            // wait on each other in opposite order.
-            $this->refreshTokenRepository->revokeByChainId($chainId);
-
-            // The ids are listed under the refresh-row locks, before the access rows are
-            // revoked: a rotation that committed a replacement pair while this revocation
-            // waited is in the list, so its socket is closed too.
-            $accessTokenIds = $this->accessTokenRepository->findTokenIdsByChainId($chainId);
-            $this->accessTokenRepository->revokeByChainId($chainId);
-
-            return $accessTokenIds;
-        });
-
-        $this->connectionCloser->close($accessTokenIds, $chainId);
     }
 }

@@ -21,6 +21,7 @@ use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\PushedAuthorizationRequest;
 use App\Auth\Domain\Model\OAuth\PushedAuthorizationRequestState;
 use App\Auth\Domain\Model\OAuth\TokenId;
+use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
 use App\Auth\Domain\Model\User;
@@ -209,6 +210,9 @@ final class AuthorizationCodeGrantTest extends TestCase
         self::assertSame('http://localhost', $exception->redirectUri);
         self::assertSame('pushed-state', $exception->state);
         self::assertFalse($this->pushed[$foreignRequest->getRequestId()->toString()]->isConsumed());
+
+        $this->assertProtocolError('unauthorized_client', fn () => $this->decide($foreignRequest, clientId: $foreign->getPublicId()->toString(), approved: false));
+        self::assertFalse($this->pushed[$foreignRequest->getRequestId()->toString()]->isConsumed(), 'Another user cannot burn the request by denying it.');
     }
 
     public function testExchangeIssuesAProofBoundTokenPairAndRedeemsTheCode(): void
@@ -301,6 +305,33 @@ final class AuthorizationCodeGrantTest extends TestCase
         self::assertCount(1, $this->issuedAccessTokens);
     }
 
+    public function testPresentingARedeemedCodeAgainRevokesTheChainItProduced(): void
+    {
+        $code = $this->issuedCode();
+        ($this->exchanger())($this->exchange($code));
+        $chainId = $this->issuedAccessTokens[0]->getChainId();
+        self::assertNotNull($chainId);
+        self::assertSame([], $this->revokedChains);
+
+        $this->assertProtocolError('invalid_grant', fn () => ($this->exchanger())($this->exchange($code)));
+
+        self::assertSame([$chainId->toString()], $this->revokedChains);
+        self::assertCount(1, $this->issuedAccessTokens);
+    }
+
+    public function testAnotherClientPresentingARedeemedCodeRevokesNothing(): void
+    {
+        $code = $this->issuedCode();
+        ($this->exchanger())($this->exchange($code));
+        $other = $this->register(Client::create('Other app', [self::REDIRECT]));
+
+        $this->assertProtocolError('invalid_grant', fn () => ($this->exchanger())(new ExchangeAuthorizationCodeCommand(
+            new ClientCredentials($other->getPublicId()->toString()), $code, self::REDIRECT, self::VERIFIER, self::JKT,
+        )));
+
+        self::assertSame([], $this->revokedChains);
+    }
+
     public function testAConcurrentRedemptionLosesWithoutIssuingTokens(): void
     {
         $code = $this->issuedCode();
@@ -308,6 +339,7 @@ final class AuthorizationCodeGrantTest extends TestCase
 
         $this->assertProtocolError('invalid_grant', fn () => ($this->exchanger())($this->exchange($code)));
         self::assertSame([], $this->issuedRefreshTokens);
+        self::assertSame([], $this->revokedChains, 'The winner\'s chain is not ended by the loser of a race.');
     }
 
     public function testConfidentialClientsMustSendTheirSecret(): void
@@ -426,7 +458,7 @@ final class AuthorizationCodeGrantTest extends TestCase
 
     private function exchanger(): ExchangeAuthorizationCodeHandler
     {
-        return new ExchangeAuthorizationCodeHandler($this->clientAuthenticator(), $this->authCodes(), $this->tokenPairIssuer());
+        return new ExchangeAuthorizationCodeHandler($this->clientAuthenticator(), $this->authCodes(), $this->tokenPairIssuer(), $this->chainRevoker());
     }
 
     private function exchange(string $code, ?string $redirectUri = self::REDIRECT, ?string $verifier = self::VERIFIER, string $jkt = self::JKT): ExchangeAuthorizationCodeCommand
@@ -441,13 +473,13 @@ final class AuthorizationCodeGrantTest extends TestCase
             $this->codes[$code->getCodeId()->toString()] = $code;
         });
         $repository->method('findByCodeId')->willReturnCallback(fn (TokenId $id): ?AuthCode => $this->codes[$id->toString()] ?? null);
-        $repository->method('redeem')->willReturnCallback(function (AuthCode $code): bool {
+        $repository->method('redeem')->willReturnCallback(function (AuthCode $code, ChainId $chainId): bool {
             $id = $code->getCodeId()->toString();
             if (isset($this->redeemed[$id])) {
                 return false;
             }
             $this->redeemed[$id] = true;
-            $code->revoke();
+            $code->redeemFor($chainId);
 
             return true;
         });
