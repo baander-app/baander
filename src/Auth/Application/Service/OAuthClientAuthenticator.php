@@ -18,10 +18,12 @@ use InvalidArgumentException;
  * Identifies and authenticates the client of an OAuth request by its public ID.
  *
  * Each client authenticates by the one method it was registered with: public clients
- * with their ID alone (`none`), confidential clients with their secret
- * (`client_secret_post`) or with a JWT assertion signed by one of their keys
- * (`private_key_jwt`). A request that presents any other method, or more than one,
- * fails (RFC 6749 section 2.3). Unknown, malformed and revoked clients fail alike, so
+ * with their ID alone (`none`), confidential clients with their secret or with a JWT
+ * assertion signed by one of their keys (`private_key_jwt`). A secret client presents
+ * its secret in the body (`client_secret_post`) or in HTTP Basic (`client_secret_basic`,
+ * which RFC 6749 section 2.3.1 requires every server to accept). A request that
+ * presents any other method, or more than one, such as a secret both in HTTP Basic
+ * and in the body, fails (RFC 6749 section 2.3). Unknown, malformed and revoked clients fail alike, so
  * the response does not reveal which it was.
  */
 final readonly class OAuthClientAuthenticator
@@ -43,7 +45,7 @@ final readonly class OAuthClientAuthenticator
         $authenticated = match ($client->getAuthMethod()) {
             ClientAuthMethod::None => !$credentials->presentsSecret() && !$credentials->presentsAssertion(),
             // The stored digest is compared in constant time (ClientSecret::matches).
-            ClientAuthMethod::ClientSecretPost => !$credentials->presentsAssertion() && $client->authenticatesWith($credentials->secret),
+            ClientAuthMethod::ClientSecretPost => !$credentials->presentsAssertion() && $client->authenticatesWith($credentials->presentedSecret()),
             ClientAuthMethod::PrivateKeyJwt => !$credentials->presentsSecret() && $this->verifiesAssertion($credentials, $client),
         };
         if (!$authenticated) {

@@ -4761,8 +4761,9 @@ export const PostOauthParBodyCodeChallengeMethod = {
 
 export type PostOauthParBody = {
   response_type: PostOauthParBodyResponseType;
-  client_id: string;
-  /** Confidential clients only */
+  /** Required unless an HTTP Basic header names the client; it may repeat that client */
+  client_id?: string;
+  /** Secret clients that do not send it with HTTP Basic */
   client_secret?: string;
   /** Required unless the client registered exactly one redirect URI */
   redirect_uri?: string;
@@ -4797,8 +4798,9 @@ export const PostOauthTokenBodyClientAssertionType = {
 
 export type PostOauthTokenBody = {
   grant_type: PostOauthTokenBodyGrantType;
-  client_id: string;
-  /** Confidential clients registered for client_secret_post only */
+  /** Required unless an HTTP Basic header names the client; it may repeat that client */
+  client_id?: string;
+  /** Secret clients that do not send it with HTTP Basic */
   client_secret?: string;
   /** Signed JWT client assertion; confidential clients registered for private_key_jwt only */
   client_assertion?: string;
@@ -12306,7 +12308,7 @@ export const getPostOauthTokenUrl = () => {
 }
 
 /**
- * Requires a DPoP proof carrying a server-issued nonce. A missing or invalid proof is answered with `invalid_dpop_proof`, a proof without a fresh nonce with `use_dpop_nonce`; both carry a `DPoP-Nonce` header. Every answer carries the nonce for the next proof and `Cache-Control: no-store`. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded (RFC 6749) or JSON. Every request names its client in `client_id`. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`, or `client_assertion` with `client_assertion_type`, by the one method they were registered with. A client assertion (RFC 7523 as updated by RFC 10070) is a JWT signed with one of the client's registered keys: `iss` and `sub` are the `client_id`, `aud` is the issuer identifier as its sole value, `exp` and `jti` are required, it lives at most 300 seconds by default, and its `jti` is accepted once. Its `typ` header is `client-authentication+jwt` or absent.
+ * Requires a DPoP proof carrying a server-issued nonce. A missing or invalid proof is answered with `invalid_dpop_proof`, a proof without a fresh nonce with `use_dpop_nonce`; both carry a `DPoP-Nonce` header. Every answer carries the nonce for the next proof and `Cache-Control: no-store`. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded (RFC 6749) or JSON. Every request names its client in `client_id` or in an HTTP Basic `Authorization` header. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`, or `client_assertion` with `client_assertion_type`, by the one method they were registered with. A secret client sends its secret in the body or, with its client ID, in HTTP Basic (`client_secret_basic`, each part form-urlencoded first), never both; a failed Basic authentication is answered with a `WWW-Authenticate: Basic` challenge. A client assertion (RFC 7523 as updated by RFC 10070) is a JWT signed with one of the client's registered keys: `iss` and `sub` are the `client_id`, `aud` is the issuer identifier as its sole value, `exp` and `jti` are required, it lives at most 300 seconds by default, and its `jti` is accepted once. Its `typ` header is `client-authentication+jwt` or absent.
  * @summary OAuth 2.0 token endpoint (RFC 6749 section 3.2)
  */
 export const postOauthToken = async (postOauthTokenBody: PostOauthTokenBody, options?: Parameters<typeof customInstance>[1]): Promise<OAuthTokenResource> => {

@@ -22,6 +22,7 @@ use Throwable;
  * Verifies `private_key_jwt` client assertions (RFC 7523 as updated by RFC 10070).
  *
  * - `alg` is one of the asymmetric algorithms DPoP proofs use; `none` and HMAC never are.
+ * - No `crit` header: no JWS extension is understood (RFC 7515 section 4.1.11).
  * - `typ` is absent or `client-authentication+jwt`, with or without the `application/`
  *   prefix and in any case; any other type, such as a DPoP proof's, is refused.
  * - `iss` and `sub` are the client's ID. `aud` is exactly the issuer identifier, sent as a
@@ -32,7 +33,9 @@ use Throwable;
  *   exceed the maximum lifetime either. `nbf` is honored.
  * - The signature verifies with one of the client's registered keys, selected by `kid`.
  * - `jti` is required and accepted once per client, recorded only for an assertion that
- *   passed every other check, for its remaining lifetime plus the skew.
+ *   passed every other check, for its remaining lifetime plus the skew and one second:
+ *   times are checked in whole seconds, so the assertion stays acceptable to the end of
+ *   the second its window ends in.
  *
  * Which check failed is logged, never answered.
  */
@@ -73,6 +76,9 @@ final readonly class ClientAssertionVerifier implements ClientAssertionVerifierI
         if (!is_string($alg) || !in_array($alg, self::SUPPORTED_ALGORITHMS, true)) {
             return $this->reject('its algorithm is not accepted');
         }
+        if ($headers->has('crit')) {
+            return $this->reject('it carries a crit header');
+        }
         if (!self::isAcceptedType(self::sentType($assertion))) {
             return $this->reject('its typ is not client-authentication+jwt');
         }
@@ -100,7 +106,7 @@ final readonly class ClientAssertionVerifier implements ClientAssertionVerifierI
 
         // The time checks above guarantee an exp.
         $remainingSeconds = (self::timestamp($claims, 'exp') ?? $now) - $now;
-        if ($this->jtiStore->isReplay($clientId, $jti, max(1, $remainingSeconds + $this->clockSkewSeconds))) {
+        if ($this->jtiStore->isReplay($clientId, $jti, max(1, $remainingSeconds + $this->clockSkewSeconds) + 1)) {
             return $this->reject('its jti was used before');
         }
 

@@ -88,7 +88,42 @@ final class ClientAssertionVerifierTest extends TestCase
         $otherId = $otherClient->getPublicId()->toString();
         self::assertTrue($this->verifier()->verify($other->create($otherId, self::ISSUER, ['jti' => 'shared-jti'], now: self::NOW), $otherClient), 'Another client may use the same jti.');
 
-        self::assertSame([$this->clientId . '|shared-jti' => 180, $otherId . '|shared-jti' => 180], $this->jtis);
+        // The 120 seconds left, the skew, and one second for the whole second the window ends in.
+        self::assertSame([$this->clientId . '|shared-jti' => 181, $otherId . '|shared-jti' => 181], $this->jtis);
+    }
+
+    /**
+     * Times are checked in whole seconds, so an assertion stays acceptable to the end of the
+     * second its window ends in; a jti recorded part-way through a second must outlive that.
+     */
+    public function testTheJtiRecordOutlivesTheAcceptanceWindow(): void
+    {
+        $assertion = $this->assertion(['exp' => self::NOW + 120]);
+        $recordedAt = self::NOW + 0.7;
+        self::assertTrue($this->verifier(clockAt: $recordedAt)->verify($assertion, $this->client));
+        $recordExpiresAt = $recordedAt + array_first($this->jtis);
+
+        $this->jtis = [];
+        self::assertFalse($this->verifier(clockAt: $recordExpiresAt)->verify($assertion, $this->client), 'The assertion is still acceptable when its jti record expires.');
+    }
+
+    /** @return iterable<string, array{array<string, mixed>}> */
+    public static function criticalHeaders(): iterable
+    {
+        yield 'an extension' => [['crit' => ['b64'], 'b64' => true]];
+        yield 'an empty list' => [['crit' => []]];
+    }
+
+    /**
+     * No JWS extension is understood, so any `crit` header refuses the assertion (RFC 7515 section 4.1.11).
+     *
+     * @param array<string, mixed> $headers
+     */
+    #[DataProvider('criticalHeaders')]
+    public function testAnAssertionWithACritHeaderFails(array $headers): void
+    {
+        self::assertFalse($this->verify($this->assertion(headers: $headers)));
+        self::assertSame([], $this->jtis);
     }
 
     /** @return iterable<string, array{array<string, mixed>, bool}> */
@@ -233,12 +268,12 @@ final class ClientAssertionVerifierTest extends TestCase
         return $this->key->create($this->clientId, self::ISSUER, $claims, $headers, self::NOW);
     }
 
-    private function verifier(?ClientAssertionJtiStoreInterface $store = null): ClientAssertionVerifier
+    private function verifier(?ClientAssertionJtiStoreInterface $store = null, int|float $clockAt = self::NOW): ClientAssertionVerifier
     {
         return new ClientAssertionVerifier(
             self::inlineKeyProvider(),
             $store ?? $this->recordingStore(),
-            new MockClock('@' . self::NOW),
+            new MockClock(\DateTimeImmutable::createFromFormat('U.u', sprintf('%.6F', $clockAt)) ?: throw new \LogicException('Bad clock time.')),
             self::ISSUER,
             maxLifetimeSeconds: 300,
             clockSkewSeconds: 60,

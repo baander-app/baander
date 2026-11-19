@@ -89,6 +89,10 @@ final class JwkPublicKeyConverter
     private static function okpToKey(array $jwk): InMemory
     {
         // EdDSA with Ed25519: sodium expects the raw 32-byte public key.
+        $crv = self::member($jwk, 'crv');
+        if ($crv !== 'Ed25519') {
+            throw new InvalidArgumentException(sprintf('Unsupported OKP curve: "%s"; only Ed25519 signs.', $crv));
+        }
         $x = self::member($jwk, 'x');
         if ($x === '') {
             throw new InvalidArgumentException('OKP JWK missing "x" parameter.');

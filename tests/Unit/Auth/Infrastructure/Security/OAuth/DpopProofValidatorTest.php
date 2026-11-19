@@ -32,11 +32,15 @@ final class DpopProofValidatorTest extends TestCase
         self::assertTrue($result->isValid(), $result->getErrorDescription() ?? '');
     }
 
-    public function testTheJtiIsRecordedForTheConfiguredAcceptanceWindow(): void
+    /**
+     * The `iat` check works in whole seconds, so a proof stays acceptable to the end of the
+     * second its window ends in; the record lasts one second longer than the window.
+     */
+    public function testTheJtiIsRecordedForTheConfiguredAcceptanceWindowAndOneSecond(): void
     {
         $proof = new SignedDpopProof();
         $cache = $this->createMock(DpopJtiCacheInterface::class);
-        $cache->expects($this->once())->method('isReplay')->with(self::isString(), 420)->willReturn(false);
+        $cache->expects($this->once())->method('isReplay')->with(self::isString(), 421)->willReturn(false);
         $validator = new DpopProofValidator($cache, publicUrl: self::ORIGIN, jtiTtlSeconds: 420);
         $token = 'disposable-access-token';
         $uri = 'https://baander.app/api/auth/me';

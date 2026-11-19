@@ -53,6 +53,29 @@ final class ClientKeySourceTest extends TestCase
         ClientKeySource::fromJwks(['keys' => [['kty' => 'oct', 'kid' => 'shared', 'k' => 'c2VjcmV0']]]);
     }
 
+    public function testAnEd25519KeyIsKept(): void
+    {
+        $key = ['kty' => 'OKP', 'crv' => 'Ed25519', 'x' => '11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo'];
+
+        self::assertSame(['keys' => [$key]], ClientKeySource::fromJwks(['keys' => [$key]])->jwks());
+    }
+
+    /** @return iterable<string, array{array<string, string>}> */
+    public static function nonSigningOkpKeys(): iterable
+    {
+        yield 'X25519' => [['kty' => 'OKP', 'crv' => 'X25519', 'x' => 'hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo']];
+        yield 'Ed448' => [['kty' => 'OKP', 'crv' => 'Ed448', 'x' => 'X9dEm1m0Yf0s54fsYWrUah2hNCSFpw4fig6nXYDpZ3jt8SR2m0bHBhvWeD3x5Q9s0foavq_oJWGA']];
+        yield 'no curve' => [['kty' => 'OKP', 'x' => '11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo']];
+    }
+
+    /** @param array<string, string> $key */
+    #[DataProvider('nonSigningOkpKeys')]
+    public function testAnOkpKeyMustBeEd25519(array $key): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        ClientKeySource::fromJwks(['keys' => [$key]]);
+    }
+
     public function testElevenKeysAreRejected(): void
     {
         $keys = array_map(static fn (int $i): array => self::ecKey('signing-' . $i), range(1, 11));
@@ -108,6 +131,15 @@ final class ClientKeySourceTest extends TestCase
         yield 'another port' => ['https://keys.baander.app:8443/jwks.json'];
         yield 'no host' => ['https:///jwks.json'];
         yield 'credentials' => ['https://user:pass@keys.baander.app/jwks.json'];
+        yield 'an IPv4 literal' => ['https://10.0.0.5/jwks.json'];
+        yield 'an IPv6 literal' => ['https://[2001:db8::1]/jwks.json'];
+        yield 'a single-label host' => ['https://localhost/jwks'];
+        yield 'a host with a trailing dot' => ['https://keys.baander.app./jwks.json'];
+        yield 'a fragment' => ['https://keys.baander.app/jwks.json#keys'];
+        yield 'an empty fragment' => ['https://keys.baander.app/jwks.json#'];
+        yield 'a backslash' => ['https://keys.baander.app\\@evil.baander.app/jwks.json'];
+        yield 'a space' => ['https://keys.baander.app/jw ks.json'];
+        yield 'an invalid hostname' => ['https://keys_baander.app/jwks.json'];
     }
 
     #[DataProvider('unsafeUris')]

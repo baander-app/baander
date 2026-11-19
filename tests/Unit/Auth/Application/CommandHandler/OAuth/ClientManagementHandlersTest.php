@@ -122,6 +122,10 @@ final class ClientManagementHandlersTest extends TestCase
         yield 'both key sources' => [new RegisterClientCommand('App', 'confidential', $uris, 'private_key_jwt', $jwks, self::JWKS_URI)];
         yield 'a key set with a private key' => [new RegisterClientCommand('App', 'confidential', $uris, 'private_key_jwt', ['keys' => [[...$jwks['keys'][0], 'd' => 'private']]])];
         yield 'an http jwks_uri' => [new RegisterClientCommand('App', 'confidential', $uris, 'private_key_jwt', jwksUri: 'http://server.baander.app/jwks.json')];
+        yield 'a jwks_uri naming an IP address' => [new RegisterClientCommand('App', 'confidential', $uris, 'private_key_jwt', jwksUri: 'https://10.0.0.5/jwks.json')];
+        yield 'a jwks_uri naming a single-label host' => [new RegisterClientCommand('App', 'confidential', $uris, 'private_key_jwt', jwksUri: 'https://localhost/jwks')];
+        yield 'a jwks_uri with a fragment' => [new RegisterClientCommand('App', 'confidential', $uris, 'private_key_jwt', jwksUri: 'https://server.baander.app/jwks.json#keys')];
+        yield 'an X25519 key' => [new RegisterClientCommand('App', 'confidential', $uris, 'private_key_jwt', ['keys' => [['kty' => 'OKP', 'crv' => 'X25519', 'x' => 'hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo']]])];
         yield 'keys for a secret client' => [new RegisterClientCommand('App', 'confidential', $uris, 'client_secret_post', $jwks)];
         yield 'keys without a method' => [new RegisterClientCommand('App', 'confidential', $uris, jwksUri: self::JWKS_URI)];
         yield 'a method for a public client' => [new RegisterClientCommand('App', 'public', $uris, 'private_key_jwt', $jwks)];
@@ -213,6 +217,10 @@ final class ClientManagementHandlersTest extends TestCase
         yield 'both key sources' => [(new SignedClientAssertion())->jwks(), self::JWKS_URI];
         yield 'an empty key set' => [['keys' => []], null];
         yield 'a jwks_uri on another port' => [null, 'https://server.baander.app:8443/jwks.json'];
+        yield 'a jwks_uri naming an IP address' => [null, 'https://10.0.0.5/jwks.json'];
+        yield 'a jwks_uri naming a single-label host' => [null, 'https://localhost/jwks'];
+        yield 'a jwks_uri with a fragment' => [null, 'https://server.baander.app/jwks.json#keys'];
+        yield 'an X25519 key' => [['keys' => [['kty' => 'OKP', 'crv' => 'X25519', 'x' => 'hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo']]], null];
     }
 
     /** @param array<string, mixed>|null $jwks */

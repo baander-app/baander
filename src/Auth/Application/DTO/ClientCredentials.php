@@ -6,11 +6,12 @@ namespace App\Auth\Application\DTO;
 
 /**
  * What a back-channel request presents to authenticate its client: the `client_id`,
- * and a `client_secret` or a JWT client assertion (RFC 7521 section 4.2, RFC 7523).
+ * and a `client_secret` in the body or in HTTP Basic (RFC 6749 section 2.3.1), or a
+ * JWT client assertion (RFC 7521 section 4.2, RFC 7523).
  *
- * The request names its client in `client_id` every time, also when it carries an
- * assertion; the assertion's `iss` and `sub` must equal it. An empty value counts as
- * not sent.
+ * The request names its client every time, also when it carries an assertion; the
+ * assertion's `iss` and `sub` must equal it. An empty body value counts as not sent;
+ * an HTTP Basic header counts as sent even with an empty password.
  */
 final readonly class ClientCredentials
 {
@@ -22,12 +23,26 @@ final readonly class ClientCredentials
         public ?string $secret = null,
         public ?string $assertion = null,
         public ?string $assertionType = null,
+        /** The password of an HTTP Basic `Authorization` header; null when the request sent none. */
+        public ?string $basicSecret = null,
     ) {
     }
 
     public function presentsSecret(): bool
     {
-        return ($this->secret ?? '') !== '';
+        return ($this->secret ?? '') !== '' || $this->basicSecret !== null;
+    }
+
+    /** The secret presented by exactly one means, or null when none was sent or both were. */
+    public function presentedSecret(): ?string
+    {
+        $inBody = ($this->secret ?? '') !== '';
+
+        return match (true) {
+            $inBody && $this->basicSecret !== null => null,
+            $inBody => $this->secret,
+            default => $this->basicSecret,
+        };
     }
 
     public function presentsAssertion(): bool

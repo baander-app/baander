@@ -91,7 +91,7 @@ final class AuthorizationServerMetadataController
                 'urn:ietf:params:oauth:grant-type:device_code',
             ],
             'scopes_supported'                      => $this->scopes,
-            'token_endpoint_auth_methods_supported' => ['none', 'client_secret_post', 'private_key_jwt'],
+            'token_endpoint_auth_methods_supported' => ['none', 'client_secret_basic', 'client_secret_post', 'private_key_jwt'],
             'token_endpoint_auth_signing_alg_values_supported' => self::CLIENT_ASSERTION_SIGNING_ALGORITHMS,
             'code_challenge_methods_supported'      => ['S256'],
             'dpop_signing_alg_values_supported'     => self::DPOP_SIGNING_ALGORITHMS,

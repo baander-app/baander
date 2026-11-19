@@ -50,7 +50,7 @@ final class AuthorizationServerMetadataTest extends TestCase
         self::assertSame(['S256'], $metadata['code_challenge_methods_supported']);
         self::assertSame(['authorization_code', 'refresh_token', 'urn:ietf:params:oauth:grant-type:device_code'], $metadata['grant_types_supported']);
         self::assertSame(['profile', 'library'], $metadata['scopes_supported']);
-        self::assertSame(['none', 'client_secret_post', 'private_key_jwt'], $metadata['token_endpoint_auth_methods_supported']);
+        self::assertSame(['none', 'client_secret_basic', 'client_secret_post', 'private_key_jwt'], $metadata['token_endpoint_auth_methods_supported']);
         self::assertSame(AuthorizationServerMetadataController::CLIENT_ASSERTION_SIGNING_ALGORITHMS, $metadata['token_endpoint_auth_signing_alg_values_supported']);
         self::assertArrayNotHasKey('introspection_endpoint', $metadata);
     }

@@ -16,7 +16,10 @@ enum ClientAuthMethod: string
     /** A public client, identified by its client_id alone. */
     case None = 'none';
 
-    /** A confidential client that presents its secret in the request body. */
+    /**
+     * A confidential client that presents its secret, in the request body or in HTTP
+     * Basic (`client_secret_basic`); never by both in one request.
+     */
     case ClientSecretPost = 'client_secret_post';
 
     /** A confidential client that signs a JWT assertion with one of its registered keys (RFC 7523). */

@@ -9,6 +9,7 @@ use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Application\Port\ClientKeySetProviderInterface;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientKeySource;
+use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Infrastructure\Security\OAuth\ClientJwksFetcher;
 use App\Auth\Infrastructure\Security\OAuth\ClientKeySetProvider;
@@ -29,6 +30,7 @@ use Symfony\Component\Messenger\Stamp\HandledStamp;
  * A `private_key_jwt` client authenticates at the token endpoint with a signed client
  * assertion, here through the refresh token grant, behind the DPoP proof check. Key sets
  * published at a `jwks_uri` come from a stubbed transport and DNS, never the network.
+ * A secret client may send its secret with HTTP Basic instead of in the body.
  */
 final class ClientAssertionAuthenticationTest extends TestCase
 {
@@ -132,6 +134,27 @@ final class ClientAssertionAuthenticationTest extends TestCase
         self::assertSame('invalid_client', $this->body($response)['error']);
     }
 
+    public function testASecretClientAuthenticatesWithHttpBasic(): void
+    {
+        $this->register(Client::registerConfidential('Secret server', ['https://server.baander.app/callback'], ClientSecret::fromString('basic-client-secret')));
+
+        $response = $this->sendWithBasic($this->proof($this->nonceChallenge()), 'basic-client-secret');
+
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+        self::assertIsString($this->body($response)['access_token']);
+    }
+
+    public function testASecretInHttpBasicAndInTheBodyFails(): void
+    {
+        $this->register(Client::registerConfidential('Secret server', ['https://server.baander.app/callback'], ClientSecret::fromString('basic-client-secret')));
+
+        $response = $this->sendWithBasic($this->proof($this->nonceChallenge()), 'basic-client-secret', ['client_secret' => 'basic-client-secret']);
+
+        self::assertSame(401, $response->getStatusCode(), (string) $response->getContent());
+        self::assertSame('invalid_client', $this->body($response)['error']);
+        self::assertStringStartsWith('Basic ', (string) $response->headers->get('WWW-Authenticate'));
+    }
+
     /** A client publishes a new key and signs with it, and no admin acts. */
     public function testAJwksUriClientRotatesItsKeyWithoutAnAdmin(): void
     {
@@ -204,6 +227,25 @@ final class ClientAssertionAuthenticationTest extends TestCase
             'refresh_token' => $this->refreshToken,
             ...$authentication,
         ], server: ['HTTP_DPOP' => $proof]);
+
+        return $this->client->getResponse();
+    }
+
+    /**
+     * A refresh naming the client only in the HTTP Basic header.
+     *
+     * @param array<string, string> $body
+     */
+    private function sendWithBasic(string $proof, string $secret, array $body = []): Response
+    {
+        $this->client->request('POST', '/api/oauth/token', [
+            'grant_type' => 'refresh_token',
+            'refresh_token' => $this->refreshToken,
+            ...$body,
+        ], server: [
+            'HTTP_DPOP' => $proof,
+            'HTTP_AUTHORIZATION' => 'Basic ' . base64_encode(rawurlencode($this->keyClient->getPublicId()->toString()) . ':' . rawurlencode($secret)),
+        ]);
 
         return $this->client->getResponse();
     }

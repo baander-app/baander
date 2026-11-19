@@ -11,9 +11,11 @@ use InvalidArgumentException;
  * Set or an https `jwks_uri`, never both (OpenID Connect Registration section 2).
  *
  * An inline set holds only public asymmetric keys, at most ten of them and at most
- * 64 KB encoded. When it holds more than one key, every key names a distinct `kid`,
- * so an assertion's `kid` header selects exactly one. A `jwks_uri` is https on the
- * default port and carries no credentials.
+ * 64 KB encoded; an OKP key names the Ed25519 curve, the only one that signs here.
+ * When it holds more than one key, every key names a distinct `kid`, so an
+ * assertion's `kid` header selects exactly one. A `jwks_uri` passes the syntactic
+ * half of the outbound fetch policy: https on the default port, a dotted DNS name
+ * rather than an IP literal, no credentials, fragment, whitespace or backslash.
  */
 final readonly class ClientKeySource
 {
@@ -104,6 +106,9 @@ final readonly class ClientKeySource
         if (array_intersect(array_keys($key), self::SECRET_MEMBERS) !== []) {
             throw new InvalidArgumentException('A client key must be public; the JWK Set holds private key material.');
         }
+        if ($key['kty'] === 'OKP' && ($key['crv'] ?? null) !== 'Ed25519') {
+            throw new InvalidArgumentException('An OKP client key must name the Ed25519 curve.');
+        }
     }
 
     /** @param list<array<string, mixed>> $keys */
@@ -122,18 +127,34 @@ final readonly class ClientKeySource
         }
     }
 
+    /**
+     * The checks the outbound fetch policy makes before resolving a URL, so a `jwks_uri`
+     * it would refuse at every fetch is refused when an administrator gives it.
+     */
     private static function assertValidUri(string $uri): void
     {
         $parts = parse_url($uri);
         $valid = is_array($parts)
+            && filter_var($uri, FILTER_VALIDATE_URL) !== false
             && strtolower($parts['scheme'] ?? '') === 'https'
-            && ($parts['host'] ?? '') !== ''
             && ($parts['port'] ?? 443) === 443
             && !isset($parts['user'])
             && !isset($parts['pass'])
-            && preg_match('/[\s\x00-\x1F\x7F]/', $uri) !== 1;
+            && !str_contains($uri, '#')
+            && preg_match('/[\s\x00-\x20\x7F\\\\]/', $uri) !== 1
+            && self::isPublicDnsName(strtolower($parts['host'] ?? ''));
         if (!$valid) {
-            throw new InvalidArgumentException(sprintf('The jwks_uri "%s" must be an https URI on port 443 without credentials.', $uri));
+            throw new InvalidArgumentException(sprintf('The jwks_uri "%s" must be an https URI on port 443 naming a dotted DNS host, without credentials or fragment.', $uri));
         }
+    }
+
+    /** A dotted hostname, never an IP literal, a single label such as `localhost`, or a name ending in a dot. */
+    private static function isPublicDnsName(string $host): bool
+    {
+        return $host !== ''
+            && str_contains($host, '.')
+            && !str_ends_with($host, '.')
+            && filter_var($host, FILTER_VALIDATE_IP) === false
+            && filter_var($host, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) !== false;
     }
 }

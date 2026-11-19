@@ -25,9 +25,9 @@ final class RedisDpopJtiCache implements DpopJtiCacheInterface
 
         try {
             $isFirstUse = $this->redisClientFactory->borrow(
-                // SET NX EX records the jti and its expiry in one command, so no key
-                // outlives the acceptance window: a separate EXPIRE could be lost
-                // between the two commands. The key is set only when it is absent;
+                // SET NX EX records the jti and its expiry in one command: a separate
+                // EXPIRE could be lost between the two commands and leave the key
+                // without one. The key is set only when it is absent;
                 // false means the jti was seen before (a replay).
                 static fn(\Redis $redis): bool => $redis->set($key, '1', ['NX', 'EX' => $ttlSeconds]) === true,
             );

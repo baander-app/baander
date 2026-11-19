@@ -174,11 +174,11 @@ final class OAuthController
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ['response_type', 'client_id', 'code_challenge', 'code_challenge_method'],
+                required: ['response_type', 'code_challenge', 'code_challenge_method'],
                 properties: [
                     new OA\Property(property: 'response_type', type: 'string', enum: ['code']),
-                    new OA\Property(property: 'client_id', type: 'string'),
-                    new OA\Property(property: 'client_secret', description: 'Confidential clients only', type: 'string'),
+                    new OA\Property(property: 'client_id', description: 'Required unless an HTTP Basic header names the client; it may repeat that client', type: 'string'),
+                    new OA\Property(property: 'client_secret', description: 'Secret clients that do not send it with HTTP Basic', type: 'string'),
                     new OA\Property(property: 'redirect_uri', description: 'Required unless the client registered exactly one redirect URI', type: 'string', format: 'uri'),
                     new OA\Property(property: 'scope', description: 'Space-separated scopes', type: 'string'),
                     new OA\Property(property: 'state', type: 'string'),
@@ -208,11 +208,11 @@ final class OAuthController
         $proof = $proof instanceof VerifiedDpopProof ? $proof : null;
 
         try {
-            $pushed = $this->dispatch($this->pushCommand(self::parameters($request), $proof));
+            $pushed = $this->dispatch($this->pushCommand(self::parameters($request), $proof, $request));
             assert($pushed instanceof PushedAuthorizationRequestDTO);
             $response = new JsonResponse(PushedAuthorizationRequestResource::from($pushed), Response::HTTP_CREATED);
         } catch (OAuthProtocolException $exception) {
-            $response = $this->oauthError($exception);
+            $response = self::challengeBasic($request, $exception, $this->oauthError($exception));
         } catch (HttpExceptionInterface $exception) {
             throw $exception;
         } catch (\Throwable $exception) {
@@ -235,17 +235,17 @@ final class OAuthController
     /** @throws ServiceUnavailableHttpException for a server fault during the grant */
     #[OA\Post(
         path: '/api/oauth/token',
-        description: 'Requires a DPoP proof carrying a server-issued nonce. A missing or invalid proof is answered with `invalid_dpop_proof`, a proof without a fresh nonce with `use_dpop_nonce`; both carry a `DPoP-Nonce` header. Every answer carries the nonce for the next proof and `Cache-Control: no-store`. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded (RFC 6749) or JSON. Every request names its client in `client_id`. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`, or `client_assertion` with `client_assertion_type`, by the one method they were registered with. A client assertion (RFC 7523 as updated by RFC 10070) is a JWT signed with one of the client\'s registered keys: `iss` and `sub` are the `client_id`, `aud` is the issuer identifier as its sole value, `exp` and `jti` are required, it lives at most 300 seconds by default, and its `jti` is accepted once. Its `typ` header is `client-authentication+jwt` or absent.',
+        description: 'Requires a DPoP proof carrying a server-issued nonce. A missing or invalid proof is answered with `invalid_dpop_proof`, a proof without a fresh nonce with `use_dpop_nonce`; both carry a `DPoP-Nonce` header. Every answer carries the nonce for the next proof and `Cache-Control: no-store`. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded (RFC 6749) or JSON. Every request names its client in `client_id` or in an HTTP Basic `Authorization` header. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`, or `client_assertion` with `client_assertion_type`, by the one method they were registered with. A secret client sends its secret in the body or, with its client ID, in HTTP Basic (`client_secret_basic`, each part form-urlencoded first), never both; a failed Basic authentication is answered with a `WWW-Authenticate: Basic` challenge. A client assertion (RFC 7523 as updated by RFC 10070) is a JWT signed with one of the client\'s registered keys: `iss` and `sub` are the `client_id`, `aud` is the issuer identifier as its sole value, `exp` and `jti` are required, it lives at most 300 seconds by default, and its `jti` is accepted once. Its `typ` header is `client-authentication+jwt` or absent.',
         summary: 'OAuth 2.0 token endpoint (RFC 6749 section 3.2)',
         security: [],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ['grant_type', 'client_id'],
+                required: ['grant_type'],
                 properties: [
                     new OA\Property(property: 'grant_type', type: 'string', enum: ['authorization_code', 'refresh_token', 'urn:ietf:params:oauth:grant-type:device_code']),
-                    new OA\Property(property: 'client_id', type: 'string'),
-                    new OA\Property(property: 'client_secret', description: 'Confidential clients registered for client_secret_post only', type: 'string'),
+                    new OA\Property(property: 'client_id', description: 'Required unless an HTTP Basic header names the client; it may repeat that client', type: 'string'),
+                    new OA\Property(property: 'client_secret', description: 'Secret clients that do not send it with HTTP Basic', type: 'string'),
                     new OA\Property(property: 'client_assertion', description: 'Signed JWT client assertion; confidential clients registered for private_key_jwt only', type: 'string'),
                     new OA\Property(property: 'client_assertion_type', description: 'Sent with client_assertion', type: 'string', enum: [ClientCredentials::JWT_BEARER_ASSERTION_TYPE]),
                     new OA\Property(property: 'code', description: 'Authorization code (authorization_code grant)', type: 'string'),
@@ -283,7 +283,7 @@ final class OAuthController
             assert($tokens instanceof TokenResponseDTO);
             $response = new JsonResponse(OAuthTokenResource::from($tokens));
         } catch (OAuthProtocolException $exception) {
-            $response = $this->oauthError($exception);
+            $response = self::challengeBasic($request, $exception, $this->oauthError($exception));
         } catch (HttpExceptionInterface $exception) {
             throw $exception;
         } catch (\Throwable $exception) {
@@ -497,15 +497,11 @@ final class OAuthController
     private function grantCommand(array $parameters, VerifiedDpopProof $proof, Request $request): object
     {
         $grantType = self::stringOrNull($parameters['grant_type'] ?? null);
-        $clientId = self::stringOrNull($parameters['client_id'] ?? null);
         if ($grantType === null || $grantType === '') {
             throw OAuthProtocolException::invalidRequest('The grant_type parameter is required.');
         }
-        if ($clientId === null || $clientId === '') {
-            throw OAuthProtocolException::invalidClient('The client_id parameter is required.');
-        }
 
-        $credentials = self::credentials($clientId, $parameters);
+        $credentials = self::credentials($request, $parameters, OAuthProtocolException::invalidClient('The client_id parameter is required.'));
         $ipAddress = $request->getClientIp();
         $userAgent = $request->headers->get('User-Agent');
         $fingerprint = $request->headers->get(BaanderHeader::ClientFingerprint->value);
@@ -542,26 +538,82 @@ final class OAuthController
     }
 
     /**
-     * @param array<string, mixed> $parameters
-     *
-     * @throws OAuthProtocolException
-     */
-    /**
-     * The client authentication a back-channel request presents.
+     * The client authentication a back-channel request presents, in the body or in an
+     * HTTP Basic header. With Basic the header names the client, and a body `client_id`
+     * may only repeat it.
      *
      * @param array<string, mixed> $parameters
+     *
+     * @throws OAuthProtocolException $missingClientId when no client is named, invalid_client for a malformed or contradicting Basic header
      */
-    private static function credentials(string $clientId, array $parameters): ClientCredentials
+    private static function credentials(Request $request, array $parameters, OAuthProtocolException $missingClientId): ClientCredentials
     {
+        $bodyClientId = self::stringOrNull($parameters['client_id'] ?? null) ?? '';
+        $basic = self::basicCredentials($request);
+        if ($basic !== null && $bodyClientId !== '' && $bodyClientId !== $basic[0]) {
+            throw OAuthProtocolException::invalidClient('The client_id parameter names another client than the Authorization header.');
+        }
+        $clientId = $basic[0] ?? $bodyClientId;
+        if ($clientId === '') {
+            throw $missingClientId;
+        }
+
         return new ClientCredentials(
             clientId: $clientId,
             secret: self::stringOrNull($parameters['client_secret'] ?? null),
             assertion: self::stringOrNull($parameters['client_assertion'] ?? null),
             assertionType: self::stringOrNull($parameters['client_assertion_type'] ?? null),
+            basicSecret: $basic[1] ?? null,
         );
     }
 
-    private function pushCommand(array $parameters, ?VerifiedDpopProof $proof): PushAuthorizationRequestCommand
+    /**
+     * The client ID and secret of an HTTP Basic `Authorization` header, each form-urlencoded
+     * before they were joined (RFC 6749 section 2.3.1); null when the request sent no Basic header.
+     *
+     * @return array{string, string}|null
+     *
+     * @throws OAuthProtocolException invalid_client when the header is not valid Basic credentials
+     */
+    private static function basicCredentials(Request $request): ?array
+    {
+        $header = $request->headers->get('Authorization') ?? '';
+        if (strncasecmp($header, 'Basic ', 6) !== 0) {
+            return null;
+        }
+
+        $decoded = base64_decode(trim(substr($header, 6)), strict: true);
+        if ($decoded === false || !str_contains($decoded, ':')) {
+            throw OAuthProtocolException::invalidClient('The Authorization header does not carry valid Basic credentials.');
+        }
+        [$clientId, $secret] = array_map(urldecode(...), explode(':', $decoded, 2));
+        if ($clientId === '') {
+            throw OAuthProtocolException::invalidClient('The Authorization header does not name a client.');
+        }
+
+        return [$clientId, $secret];
+    }
+
+    /**
+     * A failed authentication through HTTP Basic is answered with 401 and a Basic challenge
+     * (RFC 6749 section 5.2).
+     */
+    private static function challengeBasic(Request $request, OAuthProtocolException $exception, JsonResponse $response): JsonResponse
+    {
+        if ($exception->error === 'invalid_client' && strncasecmp($request->headers->get('Authorization') ?? '', 'Basic ', 6) === 0) {
+            $response->setStatusCode(Response::HTTP_UNAUTHORIZED);
+            $response->headers->set('WWW-Authenticate', 'Basic realm="baander", charset="UTF-8"');
+        }
+
+        return $response;
+    }
+
+    /**
+     * @param array<string, mixed> $parameters
+     *
+     * @throws OAuthProtocolException
+     */
+    private function pushCommand(array $parameters, ?VerifiedDpopProof $proof, Request $request): PushAuthorizationRequestCommand
     {
         // RFC 9126 section 2.1: a pushed request cannot itself name a pushed request.
         if (array_key_exists('request_uri', $parameters)) {
@@ -570,13 +622,9 @@ final class OAuthController
         if (array_key_exists('request', $parameters)) {
             throw OAuthProtocolException::requestNotSupported();
         }
-        $clientId = self::stringOrNull($parameters['client_id'] ?? null);
-        if ($clientId === null || $clientId === '') {
-            throw OAuthProtocolException::invalidRequest('The client_id parameter is required.');
-        }
 
         return new PushAuthorizationRequestCommand(
-            credentials: self::credentials($clientId, $parameters),
+            credentials: self::credentials($request, $parameters, OAuthProtocolException::invalidRequest('The client_id parameter is required.')),
             responseType: self::stringOrNull($parameters['response_type'] ?? null),
             redirectUri: self::stringOrNull($parameters['redirect_uri'] ?? null),
             scopes: self::scopes($parameters['scope'] ?? null),

@@ -35,7 +35,9 @@ final class DpopProofValidator
      * @param string $publicUrl The URL users reach Baander at (APP_URL); its origin is always allowed
      * @param list<string> $extraOrigins Further origins the deployment answers on, such as a LAN address
      * @param int $jtiTtlSeconds The proof acceptance window a jti is refused for: the larger
-     *     of the nonce TTL and twice the clock skew (wired in config/services.yaml).
+     *     of the nonce TTL and twice the clock skew (wired in config/services.yaml). The
+     *     record lasts one second longer, because `iat` is checked in whole seconds and a
+     *     proof stays acceptable to the end of the second its window ends in.
      *
      * @throws InvalidArgumentException when an origin is not an absolute http or https URL
      */
@@ -203,7 +205,7 @@ final class DpopProofValidator
         // skipped; the jti is then not recorded, and the checks below still run.
         $replayUnchecked = false;
         try {
-            if ($this->jtiCache->isReplay($jti, $this->jtiTtlSeconds)) {
+            if ($this->jtiCache->isReplay($jti, $this->jtiTtlSeconds + 1)) {
                 return DpopValidationResult::invalid('invalid_dpop_proof', 'DPoP proof "jti" has been reused.');
             }
         } catch (DpopStoreUnavailableException $outage) {

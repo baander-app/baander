@@ -179,7 +179,6 @@ final class ClientKeySetProviderTest extends TestCase
         yield 'loopback address' => ['https://keys.baander.app/jwks.json', '127.0.0.1'];
         yield 'private address' => ['https://keys.baander.app/jwks.json', '10.0.0.7'];
         yield 'mapped loopback address' => ['https://keys.baander.app/jwks.json', '::ffff:127.0.0.1'];
-        yield 'literal IP host' => ['https://93.184.216.34/jwks.json', '93.184.216.34'];
     }
 
     #[DataProvider('refusedDestinations')]
