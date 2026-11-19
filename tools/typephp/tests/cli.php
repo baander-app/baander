@@ -45,6 +45,12 @@ try {
         verifyCommand([$binary, '-d', 'memory_limit=256M', $path, 'value'], '["value"]', 17);
     }
     verifyCommand([$binary, '--'], 'stdin', input: '<?php echo "stdin";');
+    verifyCommand([$binary], 'piped stdin', 17, input: '<?php echo "piped stdin"; exit(17);');
+    verifyCommand(
+        [$binary, '-r', '$process = proc_open([PHP_BINARY], [["file", $argv[1], "r"], STDOUT, STDERR], $pipes); exit(proc_close($process));', '--', $script],
+        '[]',
+        17,
+    );
     verifyCommand(
         [$binary, '-r', '$process = proc_open([PHP_BINARY, $argv[1], "child argument"], [STDIN, STDOUT, STDERR], $pipes); exit(proc_close($process));', '--', $script],
         '["child argument"]',

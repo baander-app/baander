@@ -29,5 +29,6 @@ COPY tools/typephp/qualification.ini /usr/local/etc/typephp/qualification.ini
 COPY tools/typephp/qualification-php /usr/local/bin/php
 RUN chmod 0755 /usr/local/bin/php /usr/local/lib/typephp/baander /usr/local/lib/typephp/baander-operator
 ENV PHPRC=/usr/local/etc/typephp/qualification.ini \
-    PHP_INI_SCAN_DIR=/usr/local/etc/typephp/conf.d
+    PHP_INI_SCAN_DIR=/usr/local/etc/typephp/conf.d \
+    BAANDER_TYPEPHP_QUALIFICATION=1
 USER www-data

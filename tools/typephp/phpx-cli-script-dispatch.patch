@@ -7,3 +7,8 @@
 +        struct stat script_status {};
 +        php_cli_mode = (stat((*argv)[1], &script_status) == 0 && S_ISREG(script_status.st_mode))
 +            || strcmp((*argv)[1], "-") == 0 || strcmp((*argv)[1], "--") == 0;
+@@ -25,0 +29,4 @@
++    } else if (*argc == 1) {
++        struct stat input_status {};
++        php_cli_mode = fstat(fileno(stdin), &input_status) == 0
++            && (S_ISFIFO(input_status.st_mode) || S_ISSOCK(input_status.st_mode) || S_ISREG(input_status.st_mode));

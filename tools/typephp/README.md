@@ -32,7 +32,9 @@ Without it, the generated Makefile omitted Swoole's main sources and linking fai
 `php-builder-swoole-pdo-symbols.patch` isolates Swoole's copied PDO PostgreSQL and SQLite symbols from the native PDO drivers during static linking. It prefixes only Swoole's C symbols; PHP method names stay unchanged.
 `php-builder-swoole-copy-result.patch` returns PostgreSQL COPY statuses to the caller before draining further results. Without it, a COPY input operation waits for data that its caller has not yet had a chance to send.
 Both PDO patches change the derived source-cache identity and leave the downloaded archives unchanged.
-`phpx-cli-script-dispatch.patch` recognizes existing regular script files before applying the default application entry, preserving bare script calls made through `PHP_BINARY`.
+`phpx-cli-script-dispatch.patch` recognizes existing regular script files before applying the default application entry, preserving bare script calls made through `PHP_BINARY`. With no arguments, piped, socket or regular-file stdin selects interpreter input; terminal and `/dev/null` input retain the default application entry.
+`php-builder-qualification-bootstrap.patch` adds the qualification-only direct-evaluation bootstrap described below.
+`phpx-file-access.patch` restores fresh physical existence and permission checks with `open_basedir` enforcement while delegating embedded paths and custom stream wrappers to their existing handlers. TypePHP compiles `typephp_opcode_table.cc` as a project object, so this correction is picked up by package compilation without rebuilding the cached PHPX archive.
 The original PHP and PECL source caches are unchanged.
 The host-installed compiler stays unpatched and serves setup/version inspection.
 `TYPEPHP_IMAGE` overrides the local image tag; use a distinct tag when changing the toolchain in concurrent worktrees.
@@ -134,7 +136,7 @@ During the initial package checks, its default 128 MiB memory limit exhausted me
 Supply deployment settings through an external INI file or explicit interpreter options.
 With those settings in an external INI file, the initial package's default entry also passed `baander list --raw`.
 The patched adapter recognizes a bare `bin/console` or another existing script filename, including in `PHP_BINARY` child processes.
-The focused CLI checks verify argument boundaries, exit statuses, interpreter options and nested script dispatch.
+The focused CLI checks verify argument boundaries, exit statuses, interpreter options, no-argument stdin and nested script dispatch.
 
 Build the qualification image after both executables, using a CI base with the same Composer lock:
 
@@ -162,6 +164,9 @@ Its `php` dispatcher selects the operator executable for operator scripts, inclu
 The external test loader adds missing development autoload entries while preserving the embedded production mappings and Symfony Runtime's first-autoload contract.
 Its generated metadata also supplies missing development package records to Composer's installed-version inventory. Without those records, the web profiler can autoload but console boot fails when it asks Composer for its package version.
 The loader merges only missing records marked as development requirements, preserving production package versions and root metadata; [dump-test-support.php](dump-test-support.php) and [test-support.php](test-support.php) implement that boundary.
+The qualification image sets `BAANDER_TYPEPHP_QUALIFICATION=1`. In that environment, the generated CLI adapter executes the effective `auto_prepend_file` before `-r` code; ordinary PHP skips that prepend for direct evaluation.
+The hook honors `-n` by leaving configuration unloaded, while an explicit `-d auto_prepend_file=...` still selects a prepend. It preserves explicit overrides and prepend exit statuses, and stops the supplied code when the prepend exits or fails. Without the qualification marker, direct evaluation keeps upstream behavior.
+The candidate INI sets `register_argc_argv=0`, matching CI. Enabling it emits a PHP 8.5 deprecation before local HTTP router code, contaminating response bodies and committing headers before redirects or media headers. Real CLI arguments remain available with this setting disabled.
 Development dependencies remain outside both packaged executables.
 The ordinary CI PHP is retained for diagnostics; executable-identity checks must prove each runner uses the packaged runtime.
 The paired worker drills create and remove their own Docker resources. They require the documented host resources and a controlled Docker endpoint; operator help alone does not qualify deployment behavior.
@@ -171,7 +176,9 @@ Both final executables passed [the CLI regression checks](tests/cli.php); [the d
 The console booted through its default entry and explicit script entry, listed commands and warmed the production cache. It also booted with the qualification loader after the development package metadata correction.
 In a disposable copied tree, ordinary PHP threw the marker inserted into the physical kernel while the packaged runtime loaded its embedded kernel, proving that the check executed embedded application code.
 The focused native tests passed: [ContextualDoctrineRegistryTest](../../tests/Unit/Shared/Infrastructure/Swoole/ContextualDoctrineRegistryTest.php) ran 2 tests and 16 assertions, and [CoroutineSafeLoggingTest](../../tests/Unit/Shared/Infrastructure/Swoole/CoroutineSafeLoggingTest.php) ran 2 tests and 6 assertions.
-The full backend suites are still running; the remaining runtime drills are pending. These focused results do not establish full application acceptance.
+Both executables passed all 11 [qualification bootstrap checks](tests/bootstrap.php), including explicit prepend exits and failure statuses, and all 142 [filesystem checks](tests/filesystem.php). Embedded-file and directory access and kernel autoload also passed after removing the physical source tree in a disposable container.
+The initial full run used the earlier candidate: its ordinary lane ran 8,487 tests and 49,813 assertions with 2 errors and 12 failures; its native lane ran 948 tests and 26,410 assertions with 43 errors, 3 failures and 1 warning. Investigation traced those failures to the stdin, direct-evaluation loader, HTTP INI and filesystem boundaries described above.
+The remaining database lanes were stopped because that candidate had been superseded. A focused rerun of ten affected files passed 71 tests and 5,315 assertions, including ZEngine, isolated heap checks, worker subprocesses, socket cleanup and progressive media publication. Fresh full backend results and the remaining runtime drills are pending; the focused checks do not establish full application acceptance.
 
 Application acceptance requires kernel/container boot, ZEngine source reflection and mutation, a database-backed HTTP request, worker message processing, coroutine isolation, drain/reload and the independent operator path.
 Then run the backend suites and runtime drills named in the [testing guide](../../docs-book/part-2-developer-guide/testing/README.md) against the candidate image.
