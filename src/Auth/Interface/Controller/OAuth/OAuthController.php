@@ -398,12 +398,8 @@ final class OAuthController
     {
         try {
             $parameters = self::parameters($request);
-            $clientId = self::stringOrNull($parameters['client_id'] ?? null);
-            if ($clientId === null || $clientId === '') {
-                throw OAuthProtocolException::invalidRequest('The client_id parameter is required.');
-            }
             $authorization = $this->dispatch(new RequestDeviceAuthorizationCommand(
-                credentials: self::credentials($clientId, $parameters),
+                credentials: self::credentials($request, $parameters, OAuthProtocolException::invalidRequest('The client_id parameter is required.')),
                 scopes: self::scopes($parameters['scope'] ?? null),
             ));
         } catch (OAuthProtocolException $exception) {
