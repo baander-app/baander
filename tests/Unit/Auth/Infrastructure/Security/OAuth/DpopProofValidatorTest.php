@@ -225,10 +225,10 @@ final class DpopProofValidatorTest extends TestCase
     {
         yield 'matching HTTPS' => ['https://baander.app/api/auth/me', 'https://baander.app/api/auth/me', true];
         yield 'HTTPS proof on a request the proxy forwarded as HTTP' => ['http://baander.app/api/auth/me', 'https://baander.app/api/auth/me', true];
-        yield 'HTTPS proof on a request to an internal host' => ['http://web:9501/api/auth/me', 'https://baander.app/api/auth/me', true];
+        yield 'HTTPS proof on a request to an internal host' => ['http://internal.baander.app/api/auth/me', 'https://baander.app/api/auth/me', true];
         yield 'HTTP proof for an HTTPS origin' => ['http://baander.app/api/auth/me', 'http://baander.app/api/auth/me', false];
         yield 'origin from the Host header alone' => ['https://evil.baander.app/api/auth/me', 'https://evil.baander.app/api/auth/me', false];
-        yield 'extra origin' => ['http://web:9501/api/auth/me', 'https://lan.baander.app:8443/api/auth/me', true];
+        yield 'extra origin' => ['http://internal.baander.app/api/auth/me', 'https://lan.baander.app:8443/api/auth/me', true];
         yield 'request query ignored' => ['https://baander.app/api/auth/me?page=2', 'https://baander.app/api/auth/me', true];
         yield 'request fragment ignored' => ['https://baander.app/api/auth/me#profile', 'https://baander.app/api/auth/me', true];
         yield 'different path' => ['https://baander.app/api/auth/me', 'https://baander.app/api/favorites/', false];
@@ -253,6 +253,26 @@ final class DpopProofValidatorTest extends TestCase
         if (!$accepted) {
             self::assertSame('DPoP proof "htu" does not match request URI.', $result->getErrorDescription());
         }
+    }
+
+    public function testConfiguredOriginsAreNormalized(): void
+    {
+        $proof = new SignedDpopProof();
+        $cache = $this->createStub(DpopJtiCacheInterface::class);
+        $validator = new DpopProofValidator($cache, publicUrl: ' HTTPS://Baander.App:443/app ', extraOrigins: ['', 'http://LAN.baander.app:80']);
+        $accessToken = 'disposable-access-token';
+
+        foreach (['https://baander.app/api/auth/me', 'http://lan.baander.app/api/auth/me'] as $proofUri) {
+            $result = $validator->validate($proof->create('GET', $proofUri, $accessToken), Request::create('http://internal.baander.app/api/auth/me'), $accessToken, $proof->thumbprint());
+
+            self::assertTrue($result->isValid(), $proofUri . ': ' . ($result->getErrorDescription() ?? ''));
+        }
+    }
+
+    public function testAnOriginWithoutSchemeIsRefused(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class), publicUrl: 'https://baander.app', extraOrigins: ['lan.baander.app:8443']);
     }
 
     /** A jti store that raises the outage signal on every call, as a refused Redis does. */

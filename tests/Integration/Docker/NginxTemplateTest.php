@@ -393,6 +393,23 @@ final class NginxTemplateTest extends TestCase
     }
 
     /**
+     * A location that sets any proxy header inherits none from the server block, so each
+     * such location repeats the forwarding headers.
+     */
+    public function testProdLocationsWithTheirOwnProxyHeadersStillForwardTheClientRequest(): void
+    {
+        preg_match_all('/^    location [^{]+\{(?:[^{}]|\{[^{}]*\})*\}/m', $this->readProdConfig(), $locations);
+        $withOwnHeaders = array_filter($locations[0], static fn (string $block): bool => str_contains($block, 'proxy_set_header'));
+
+        $this->assertNotEmpty($withOwnHeaders);
+        foreach ($withOwnHeaders as $block) {
+            foreach (['Host $host', 'X-Forwarded-Host $host', 'X-Forwarded-For $proxy_add_x_forwarded_for', 'X-Forwarded-Proto $forwarded_proto', 'X-Real-IP $remote_addr'] as $header) {
+                $this->assertStringContainsString('proxy_set_header ' . $header . ';', $block, strtok($block, "\n"));
+            }
+        }
+    }
+
+    /**
      * Production config has all the same streaming location blocks as dev.
      */
     public function testProdConfigHasStreamingLocations(): void
