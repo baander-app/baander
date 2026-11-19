@@ -194,7 +194,7 @@ final class OAuthController
             new OA\Response(response: '401', description: 'Client authentication failed, or the client is revoked', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
             new OA\Response(
                 response: '503',
-                description: 'The server could not store the request, for example while its database restarts or the rate limit or DPoP nonce store is unavailable; push again after the Retry-After delay. Carries no DPoP-Nonce header.',
+                description: 'The server could not store the request, for example while its database restarts, the rate limit or DPoP nonce store is unavailable, or the client\'s jwks_uri key set cannot be fetched; push again after the Retry-After delay. Carries no DPoP-Nonce header.',
                 headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 5))],
                 content: new OA\JsonContent(ref: new Model(type: ApiError::class)),
             ),
@@ -262,7 +262,7 @@ final class OAuthController
             new OA\Response(response: '401', description: 'Client authentication failed, or the client is revoked', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
             new OA\Response(
                 response: '503',
-                description: 'The server could not decide on the grant, for example while its database restarts or the DPoP nonce store or client assertion jti store is unavailable; the presented token may still be valid, so retry after the Retry-After delay, with a newly signed client assertion. Carries no DPoP-Nonce header.',
+                description: 'The server could not decide on the grant, for example while its database restarts, the DPoP nonce store or client assertion jti store is unavailable, or the client\'s jwks_uri key set cannot be fetched; the presented token may still be valid, so retry after the Retry-After delay, with a newly signed client assertion. Carries no DPoP-Nonce header.',
                 headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 5))],
                 content: new OA\JsonContent(ref: new Model(type: ApiError::class)),
             ),

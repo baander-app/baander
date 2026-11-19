@@ -8,14 +8,15 @@ use RuntimeException;
 use Throwable;
 
 /**
- * The DPoP nonce or jti store, or the client assertion jti store, did not answer, so no
- * proof or assertion can be judged.
+ * The DPoP nonce or jti store, the client assertion jti store, or a client's published
+ * key set did not answer, so no proof or assertion can be judged.
  *
- * Only a failure to reach the store raises it: a refused or dropped connection, a read
- * that timed out, or an exhausted connection pool. A nonce that is missing and a jti
- * that was seen before are verdicts and keep their boolean answers. The endpoints
- * answer this exception with 503 and `Retry-After`; the checks stay fail-closed, since
- * no proof is accepted without the replay check.
+ * Only a failure to reach the store or the key set raises it: a refused or dropped
+ * connection, a read that timed out, an exhausted connection pool, or a key set fetch
+ * that failed or was refused. A nonce that is missing, a jti that was seen before and
+ * a key set without the assertion's key are verdicts and keep their boolean answers.
+ * The endpoints answer this exception with 503 and `Retry-After`; the checks stay
+ * fail-closed, since no proof is accepted without the replay check.
  */
 final class DpopStoreUnavailableException extends RuntimeException
 {
@@ -38,5 +39,15 @@ final class DpopStoreUnavailableException extends RuntimeException
     public static function assertionJtiStore(Throwable $cause): self
     {
         return new self('The client assertion jti store is unavailable.', previous: $cause);
+    }
+
+    public static function clientKeySetLock(Throwable $cause): self
+    {
+        return new self('The client key set fetch lock is unavailable.', previous: $cause);
+    }
+
+    public static function clientKeySetFetch(): self
+    {
+        return new self('The client key set could not be fetched.');
     }
 }

@@ -6,19 +6,29 @@ namespace App\Tests\Functional\Auth;
 
 use App\Auth\Application\Command\OAuth\IssueTokenCommand;
 use App\Auth\Application\DTO\TokenResponseDTO;
+use App\Auth\Application\Port\ClientKeySetProviderInterface;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientKeySource;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
+use App\Auth\Infrastructure\Security\OAuth\ClientJwksFetcher;
+use App\Auth\Infrastructure\Security\OAuth\ClientKeySetProvider;
+use App\Shared\Infrastructure\Http\PublicDestinationPolicy;
+use App\Shared\Infrastructure\Http\PublicHttpClient;
+use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Tests\Fixtures\Auth\SignedClientAssertion;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
 use App\Tests\Functional\TestCase;
+use Psr\Cache\CacheItemPoolInterface;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 
 /**
  * A `private_key_jwt` client authenticates at the token endpoint with a signed client
- * assertion, here through the refresh token grant, behind the DPoP proof check.
+ * assertion, here through the refresh token grant, behind the DPoP proof check. Key sets
+ * published at a `jwks_uri` come from a stubbed transport and DNS, never the network.
  */
 final class ClientAssertionAuthenticationTest extends TestCase
 {
@@ -29,6 +39,10 @@ final class ClientAssertionAuthenticationTest extends TestCase
     private Client $keyClient;
     private string $issuer;
     private string $refreshToken;
+    /** @var list<array<string, string>> The keys the jwks_uri client publishes */
+    private array $publishedKeys = [];
+    private int $fetches = 0;
+    private int $keySetStatus = 200;
 
     protected function setUp(): void
     {
@@ -38,16 +52,41 @@ final class ClientAssertionAuthenticationTest extends TestCase
         self::assertIsString($issuer);
         $this->issuer = $issuer;
 
-        $this->clientKey = new SignedClientAssertion();
         $this->proofKey = new SignedDpopProof();
-        $this->keyClient = Client::registerConfidentialWithKeys('Signing server', ['https://server.baander.app/callback'], ClientKeySource::fromJwks($this->clientKey->jwks()));
-        $this->service(ClientRepositoryInterface::class)->saveClient($this->keyClient);
+        $cache = static::getContainer()->get('cache.app');
+        self::assertInstanceOf(CacheItemPoolInterface::class, $cache);
+        static::getContainer()->set(ClientKeySetProviderInterface::class, new ClientKeySetProvider(
+            new ClientJwksFetcher(new PublicHttpClient(
+                new MockHttpClient($this->publishedKeySet(...)),
+                new PublicDestinationPolicy(static fn (string $host): array => $host === 'keys.baander.app' ? ['93.184.216.34'] : []),
+            )),
+            $cache,
+            $this->service(RedisClientFactory::class),
+        ));
+
+        $this->clientKey = new SignedClientAssertion();
+        $this->register(Client::registerConfidentialWithKeys('Signing server', ['https://server.baander.app/callback'], ClientKeySource::fromJwks($this->clientKey->jwks())));
+    }
+
+    private function register(Client $client): void
+    {
+        $this->keyClient = $client;
+        $this->service(ClientRepositoryInterface::class)->saveClient($client);
 
         $tokens = $this->service(MessageBusInterface::class)
-            ->dispatch(new IssueTokenCommand($this->keyClient->getId(), $this->createTestUser()->getId(), $this->proofKey->thumbprint()))
+            ->dispatch(new IssueTokenCommand($client->getId(), $this->createTestUser()->getId(), $this->proofKey->thumbprint()))
             ->last(HandledStamp::class)?->getResult();
         self::assertInstanceOf(TokenResponseDTO::class, $tokens);
         $this->refreshToken = (string) $tokens->getRefreshToken();
+    }
+
+    /** Serves the key set the client currently publishes at its jwks_uri, counting the fetches. */
+    private function publishedKeySet(string $method, string $url): MockResponse
+    {
+        self::assertSame(['GET', 'https://keys.baander.app/jwks.json'], [$method, $url]);
+        ++$this->fetches;
+
+        return new MockResponse(json_encode(['keys' => $this->publishedKeys], JSON_THROW_ON_ERROR), ['http_code' => $this->keySetStatus]);
     }
 
     /**
@@ -91,6 +130,38 @@ final class ClientAssertionAuthenticationTest extends TestCase
 
         self::assertSame(401, $response->getStatusCode(), (string) $response->getContent());
         self::assertSame('invalid_client', $this->body($response)['error']);
+    }
+
+    /** A client publishes a new key and signs with it, and no admin acts. */
+    public function testAJwksUriClientRotatesItsKeyWithoutAnAdmin(): void
+    {
+        $this->publishedKeys[] = $this->clientKey->publicJwk();
+        $this->register(Client::registerConfidentialWithKeys('Publishing server', ['https://server.baander.app/callback'], ClientKeySource::fromJwksUri('https://keys.baander.app/jwks.json')));
+
+        $first = $this->tokenRequest($this->proof($this->nonceChallenge()), $this->assertion());
+        self::assertSame(200, $first->getStatusCode(), (string) $first->getContent());
+        $this->refreshToken = $this->body($first)['refresh_token'];
+
+        $rotated = new SignedClientAssertion('client-key-2');
+        $this->publishedKeys[] = $rotated->publicJwk();
+        $this->clientKey = $rotated;
+
+        $second = $this->tokenRequest($this->proof($first), $this->assertion());
+        self::assertSame(200, $second->getStatusCode(), (string) $second->getContent());
+        self::assertSame(2, $this->fetches, 'The set was fetched once, and again for the unknown kid.');
+    }
+
+    public function testAKeySetThatCannotBeFetchedIsAnsweredWith503AndRetryAfter(): void
+    {
+        $this->publishedKeys[] = $this->clientKey->publicJwk();
+        $this->keySetStatus = 500;
+        $this->register(Client::registerConfidentialWithKeys('Failing server', ['https://server.baander.app/callback'], ClientKeySource::fromJwksUri('https://keys.baander.app/jwks.json')));
+
+        $response = $this->tokenRequest($this->proof($this->nonceChallenge()), $this->assertion());
+
+        self::assertSame(503, $response->getStatusCode(), (string) $response->getContent());
+        self::assertSame('5', $response->headers->get('Retry-After'));
+        self::assertSame(1, $this->fetches);
     }
 
     /** @param array<string, mixed> $claims */

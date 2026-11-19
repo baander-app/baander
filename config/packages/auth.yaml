@@ -141,6 +141,15 @@ parameters:
     # Each assertion's jti is accepted once while the assertion is valid. Default: 5 minutes.
     auth.client_assertion.max_lifetime: 300
 
+    # How long a key set fetched from a client's jwks_uri is cached. Replacing the
+    # client's keys makes the cached set unreachable at once. Default: 1 hour.
+    auth.client_jwks.cache_ttl: 3600
+
+    # Shortest time between two fetches of a client's cached key set when an assertion
+    # names a kid the set lacks, so a client can rotate keys without an admin while an
+    # unknown kid cannot make the server fetch on every request. Default: 60 seconds.
+    auth.client_jwks.refetch_interval: 60
+
     # --- Rate Limiting (Brute-Force Protection) ---
 
     # Maximum login attempts per IP within the window. Default: 20 per 5 minutes.

@@ -9,13 +9,19 @@ use App\Auth\Application\Port\ClientAssertionJtiStoreInterface;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientKeySource;
 use App\Auth\Infrastructure\Security\OAuth\ClientAssertionVerifier;
+use App\Auth\Infrastructure\Security\OAuth\ClientJwksFetcher;
 use App\Auth\Infrastructure\Security\OAuth\ClientKeySetProvider;
+use App\Shared\Infrastructure\Http\PublicDestinationPolicy;
+use App\Shared\Infrastructure\Http\PublicHttpClient;
+use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Tests\Fixtures\Auth\SignedClientAssertion;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RedisException;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\Clock\MockClock;
+use Symfony\Component\HttpClient\MockHttpClient;
 
 /**
  * The claim rules for `private_key_jwt` client assertions (RFC 7523 as updated by RFC 10070),
@@ -194,14 +200,6 @@ final class ClientAssertionVerifierTest extends TestCase
         self::assertFalse($this->verify($this->assertion()));
     }
 
-    public function testAJwksUriClientHasNoKeyUntilFetchedKeySetsExist(): void
-    {
-        $this->client = Client::registerConfidentialWithKeys('Fetched key client', ['https://baander.app/callback'], ClientKeySource::fromJwksUri('https://keys.baander.app/jwks.json'));
-        $this->clientId = $this->client->getPublicId()->toString();
-
-        self::assertFalse($this->verify($this->assertion()));
-    }
-
     public function testADpopProofIsNotAClientAssertion(): void
     {
         $proof = (new SignedDpopProof())->createWithNonce('POST', self::ISSUER . '/api/oauth/token', 'nonce');
@@ -238,12 +236,22 @@ final class ClientAssertionVerifierTest extends TestCase
     private function verifier(?ClientAssertionJtiStoreInterface $store = null): ClientAssertionVerifier
     {
         return new ClientAssertionVerifier(
-            new ClientKeySetProvider(),
+            self::inlineKeyProvider(),
             $store ?? $this->recordingStore(),
             new MockClock('@' . self::NOW),
             self::ISSUER,
             maxLifetimeSeconds: 300,
             clockSkewSeconds: 60,
+        );
+    }
+
+    /** Serves inline key sets; a fetch or a Redis call would fail the test. */
+    private function inlineKeyProvider(): ClientKeySetProvider
+    {
+        return new ClientKeySetProvider(
+            new ClientJwksFetcher(new PublicHttpClient(new MockHttpClient([]), new PublicDestinationPolicy(static fn (): array => []))),
+            new ArrayAdapter(),
+            $this->createStub(RedisClientFactory::class),
         );
     }
 
