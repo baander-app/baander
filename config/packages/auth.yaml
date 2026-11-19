@@ -7,10 +7,12 @@
 parameters:
     # --- OAuth 2.0 Scope Allowlist ---
 
-    # Scopes a user token may carry, whether issued by password or passkey login,
-    # the authorization code grant or the device grant. Requested scopes outside
-    # this list are silently dropped. The RFC 8414 metadata lists them as
-    # scopes_supported.
+    # Scopes a delegated token may carry: one the authorization code grant or the
+    # device grant issues to a client other than the first-party client. Requested
+    # scopes outside this list are dropped, and a request left with none is refused
+    # with invalid_scope; there is no default scope. First-party tokens from password
+    # and passkey login carry no scopes. ScopeRouteMap names the routes each scope
+    # reaches. The RFC 8414 metadata lists them as scopes_supported.
     auth.scopes.user_grants:
         - profile
         - email
@@ -59,6 +61,8 @@ parameters:
     # --- First-Party Login Client ---
     # Public ID of the pre-registered client that password and passkey login
     # issue tokens to, for every first-party app (web, Electron and mobile).
+    # Only its tokens act with the user's full authority; every other client's
+    # tokens are delegated and limited to their scopes.
     # Run `php bin/console app:auth:setup-clients` to create it.
     auth.spa_client_id: '%env(AUTH_SPA_CLIENT_ID)%'
 
@@ -136,7 +140,8 @@ parameters:
     auth.dpop.nonce_ttl: 300
 
     # A DPoP proof's htu names APP_URL's origin or one of these comma-separated
-    # origins, never the scheme and Host the request arrived with. Default: none.
+    # origins, never the scheme and Host the request arrived with. An entry that is
+    # not an absolute http or https URL stops the container from booting. Default: none.
     env(AUTH_DPOP_EXTRA_ORIGINS): ''
     auth.dpop.extra_origins: '%env(csv:AUTH_DPOP_EXTRA_ORIGINS)%'
 
@@ -162,7 +167,9 @@ parameters:
     auth.rate_limit.login.max_attempts: 20
     auth.rate_limit.login.window: 300
 
-    # Maximum login attempts per IP+email within the window (prevents distributed brute force). Default: 10 per 5 minutes.
+    # Maximum login attempts per IP+email within the window. Every attempt from one
+    # address counts, so it slows one address down but not an attack spread over many
+    # addresses; the per-account failure limit below counts across addresses. Default: 10 per 5 minutes.
     auth.rate_limit.login_per_email.max_attempts: 10
 
     # Maximum failed logins per account (normalized email) from all IPs together, in a

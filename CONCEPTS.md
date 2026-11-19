@@ -81,17 +81,21 @@ It identifies the account independently of the authenticator's credential ID.
 
 ### First-party client
 
-The OAuth client registered for Baander's own web, desktop and mobile apps, named by `AUTH_SPA_CLIENT_ID`. Password and passkey login issue tokens only to it, and its tokens act with the user's full authority.
+The OAuth client registered with type `first_party` for Baander's own web, desktop and mobile apps, named by `AUTH_SPA_CLIENT_ID`. Password and passkey login issue tokens only to it, only its tokens refresh at `/api/auth/refresh`, and its tokens act with the user's full authority.
 
 A personal access client is not first-party, even though it skips the consent screen.
 
 ### Delegated token
 
-An access token issued to any client other than the first-party client: a third-party app, a device or a personal access client. It reaches only the routes its granted scopes cover; every other route answers `insufficient_scope`.
+An access token issued to any client other than the first-party client: a third-party app, a device or a personal access client. Its user counts as a plain user, without any administrator role, and it reaches only public routes and the routes its granted scopes cover; every other route answers `insufficient_scope`.
 
 ### Step-up re-authentication
 
 Proof of the current password, plus a current TOTP code when TOTP is enabled, that a signed-in user gives before a sensitive change to their own account: their email address, a new TOTP factor or a new passkey.
+
+### Pending email change
+
+A new address a user asked for in a self-service email change that is not yet confirmed. The account keeps its current address, and that address's verification, until the user opens the link sent to the new address; then the new address replaces it, verified. Asking for the current address, an operator's email change and a password reset drop it.
 
 ### Refresh token chain
 

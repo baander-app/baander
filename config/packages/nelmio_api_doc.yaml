@@ -21,10 +21,10 @@ nelmio_api_doc:
                             tokenUrl: /api/oauth/token
                             refreshUrl: /api/oauth/token
                             scopes:
-                                profile: 'Read the profile'
-                                email: 'Read the email address'
-                                library: 'Use the music library'
-                                playlist: 'Manage playlists'
+                                profile: 'Read the user''s own profile (GET /api/auth/me): public ID, name and creation date'
+                                email: 'Read the user''s own profile (GET /api/auth/me) with the email address and its verification date'
+                                library: 'Browse and stream the user''s libraries, control playback on their devices, and use transcoding, favorites, listening history, recommendations and radio'
+                                playlist: 'Read, create, change, share and delete the user''s playlists'
             parameters:
                 Accept-Language:
                     name: Accept-Language

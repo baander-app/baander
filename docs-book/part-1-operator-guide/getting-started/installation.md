@@ -109,13 +109,15 @@ accept `HW_ACCEL_DEVICE` or `HW_BITRATE_MULTIPLIER`; those two come from the ima
 see [Transcoding](../media/transcoding.md#hardware-acceleration).
 
 Create `.env.dev.local` with mode `0600`. Put the following settings in it, replacing
-the secret placeholders with independently generated values from `openssl rand -hex 32`.
+the secret placeholders with independently generated values from `openssl rand -hex 32`,
+except the TOTP key, which takes `openssl rand -base64 32`.
 Use the same database password in `DB_PASSWORD`, `DATABASE_URL` and
 `DATABASE_CONTROL_URL`, and the same Redis password in all three Redis settings:
 
 ```env
 APP_SECRET=<chosen-random-secret>
 STREAM_URL_HMAC_SECRET=<another-random-secret>
+AUTH_TOTP_ENCRYPTION_KEY=<base64-random-key>
 DB_USERNAME=baander
 DB_PASSWORD=<chosen-database-password>
 DB_DATABASE=baander
@@ -348,8 +350,10 @@ export APP_HOME="$(sed -n 's/^APP_HOME=//p' .env.compose.local)"
 
 The current layout is `/var/www/html`. Use the network and media volumes prepared above;
 the host and worker database URLs must reach the same migrated database. Supply the
-same application secret and Redis credentials through the worker credentials file.
-Worker runtime uses `APP_ENV=prod` and does not load the web's `.env.dev.local`.
+same `APP_SECRET`, `STREAM_URL_HMAC_SECRET`, `AUTH_TOTP_ENCRYPTION_KEY` and Redis
+credentials through the worker credentials file.
+Worker runtime uses `APP_ENV=prod` and does not load the web's `.env.dev.local`; it
+refuses to boot while one of the three secrets is missing or still a committed default.
 
 The admitted worker pair owns background consumption, scheduling, outbox relay and
 media execution. Compose starts none of these. Check worker logs and operational

@@ -1,6 +1,6 @@
 # Security, Firewall, and Network Suites
 
-This page covers the integration and functional suites for token rotation and reuse grace, DPoP store outages, signed video delivery, catalog and playlist mutation firewalls, atomic rate-limit storage, and outbound destination policies.
+This page covers the integration and functional suites for token rotation and reuse grace, DPoP store outages, signed video delivery, catalog and playlist mutation firewalls, delegated token scopes, step-up and sign-in limits, atomic rate-limit storage, and outbound destination policies.
 
 ## Session, Token, and Firewall Matrices
 
@@ -115,6 +115,30 @@ real membership), `ImageReadFirewallTest.php`, `PlaylistReadFirewallTest.php`,
 `PlaylistMutationFirewallTest.php` and `PushUnsubscribeFirewallTest.php` (the
 production OAuth and DPoP chain over the image, playlist, artist, catalog and library
 mutation, lyrics and push unsubscribe routes with PostgreSQL adapters).
+These suites act as the web app, so their tokens are minted on the first-party client
+(`tests/Fixtures/Auth/FirstPartyOAuthClient.php`).
+
+## Delegated tokens, step-up and sign-in limits
+
+- `tests/Unit/Auth/Infrastructure/Security/OAuth/ScopeRouteInventoryTest.php` holds
+  `ScopeRouteMap` to the routes in `config/routes.yaml`: every route is public,
+  first-party only or reachable with named scopes, and no route a delegated token may
+  reach requires an admin role. A new route fails it until it is classified. It loads
+  the routes through the routing component, without compiling the container.
+- `tests/Integration/OAuthScopeEnforcementTest.php` sends delegated tokens through the
+  production firewall, PostgreSQL and Redis: a token of any client other than the
+  first-party one reaches only the routes its scopes cover and never carries its
+  user's admin authority, while the first-party token keeps both.
+- `tests/Integration/TotpLoginReplayTest.php` signs in with a TOTP code through the
+  production firewall: the web client's nonce challenge and retry with the same code,
+  single use of each code, the encrypted secret at rest, and two logins racing with
+  one code (the second in a child process, `tests/Fixtures/Auth/totp-login-race.php`).
+- `tests/Functional/Auth/StepUpTest.php` covers the email change, TOTP setup and
+  passkey registration options: each needs the current password, plus a code when
+  TOTP is on, every mismatch gets one answer, and attempts are limited per account.
+- `tests/Functional/Auth/LoginAccountThrottleTest.php` limits failed logins per
+  account across client addresses. The test environment raises every limit to 10000,
+  so each test spends the bucket down to the failures it then makes over HTTP.
 
 ## Atomic rate-limit storage
 

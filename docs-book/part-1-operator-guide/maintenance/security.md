@@ -163,8 +163,8 @@ state can be restored; do not reset the installation as an investigation step.
 
 | Exposure | State to investigate |
 |----------|----------------------|
-| Application environment or secret provider | Database/Redis credentials, OAuth key paths and key access, APP_SECRET, stream URL secret, VAPID and external-provider credentials |
-| PostgreSQL | Accounts and password hashes, OAuth grants and codes, token metadata, notification data, encrypted webhook secrets and push subscriptions |
+| Application environment or secret provider | Database/Redis credentials, OAuth key paths and key access, APP_SECRET, stream URL secret, TOTP encryption key, VAPID and external-provider credentials |
+| PostgreSQL | Accounts and password hashes, encrypted TOTP secrets, OAuth grants and codes (refresh tokens only as hashes), token metadata, notification data, encrypted webhook secrets and push subscriptions |
 | Redis | Framework sessions, rate limits, DPoP state, handshake tickets, caches and pending work |
 | Application host or process | All credentials it can read, running processes, open connections and source media permissions |
 
@@ -197,6 +197,12 @@ transactionally and clears the token cache without a blanket Redis flush.
 - Replace `STREAM_URL_HMAC_SECRET` and restart the web server if signed video
   URLs must end globally. OAuth revocation does not end those URLs; see
   [Disabled accounts](#disabled-accounts).
+- Replacing an exposed `AUTH_TOTP_ENCRYPTION_KEY` locks out every user who has TOTP on.
+  Baander does not re-encrypt stored secrets, so under a new key those users' logins
+  answer `AUTH_TOTP_UNAVAILABLE` until an operator resets their
+  TOTP with [app:user:reset-totp](../commands/app-user-reset-totp.md); they then sign
+  in with their password and set TOTP up again. Whoever holds both the database and
+  the old key can read the old secrets.
 - Rotate exposed webhook receiver credentials, external-provider credentials and
   VAPID keys. VAPID rotation requires users to subscribe again; a webhook signing
   secret is independent of the receiver URL's own credentials.
@@ -282,10 +288,21 @@ Besides Baander's own apps, other clients can obtain tokens through the OAuth 2.
   exception: a consumed token presented again with its own key within
   `auth.refresh.reuse_grace_seconds`, while the pair it was exchanged for is still unused,
   gets a fresh pair and that unused pair is revoked, so a client whose refresh answer was lost
-  keeps its session. See [Token lifetimes](../configuration/authentication-and-limits.md#token-lifetimes).
+  keeps its session. Baander stores refresh tokens only as SHA-256 hashes, and every chain
+  ends 90 days after its sign-in by default (`auth.refresh.max_chain_lifetime`), however
+  often it was refreshed. See [Token lifetimes](../configuration/authentication-and-limits.md#token-lifetimes).
+- **Delegated tokens.** Only tokens of the first-party client, the one `AUTH_SPA_CLIENT_ID`
+  names, carry the user's full authority. Every other client's tokens count the user as a
+  plain user, whatever roles the account has, and reach only the routes their scopes cover;
+  any other route answers `403` `insufficient_scope`. No scope reaches administration or
+  account security. See [Delegated tokens and scopes](../configuration/authentication-and-limits.md#delegated-tokens-and-scopes).
+- **DPoP origins.** A proof is valid only for the URL it names, and Baander compares that
+  URL with `APP_URL` and `AUTH_DPOP_EXTRA_ORIGINS`, not with the scheme and `Host` the
+  request arrived with, which a proxy or the client can change.
 - **Client secrets.** A confidential client's secret is shown once, when it is generated, and stored only as a SHA-256 digest. Rotating it ends the old secret at once and leaves issued tokens valid.
+- **Client keys.** A key a client withdraws from the set it publishes at its `jwks_uri` keeps working until Baander's cached copy expires, up to `auth.client_jwks.cache_ttl` (one hour by default). To end a leaked key at once, replace the client's keys, with the same URL if it is unchanged; see [Client assertions and key sets](../configuration/authentication-and-limits.md#client-assertions-and-key-sets).
 - **Cross-origin access.** The pushed authorization request endpoint, the token endpoint and the device authorization endpoint accept requests from any origin, because their callers prove possession with DPoP instead of cookies. Revocation, device approval, the authorization endpoint `/api/oauth/authorize`, and all other API routes except the discovery routes under `/api/discovery/` accept only the `APP_URL` origin; the discovery routes accept any origin and still apply their own authentication. Third-party clients do not call the authorization endpoint; they push the request to `POST /api/oauth/par` and send the user's browser to the web app's consent page, which calls it for the signed-in user. See [HTTP](../configuration/environment-variables.md#http).
-- **Rate limits.** The authorization, token, and device authorization endpoints each have a per-IP limiter, and the token endpoint also counts requests per client. User code lookups and approvals share a per-IP limit that bounds code guessing. See [Rate limiting](../configuration/authentication-and-limits.md#rate-limiting).
+- **Rate limits.** The authorization, pushed authorization request, token, and device authorization endpoints each have a per-IP limiter. The pushed authorization request and token endpoints also count requests per client, charged only after the client has authenticated; a public client, which has no secret to prove, is counted per client and caller network. User code lookups and approvals share a per-IP limit that bounds code guessing. See [Rate limiting](../configuration/authentication-and-limits.md#rate-limiting).
 - **Revocation.** Revoking a client also revokes every access and refresh token issued to it. This holds for an administrator revoking a device, public or confidential client and for a user revoking a personal access client. Deleting a user deletes their tokens, authorization codes, and device codes.
 
 ### Disabled accounts
@@ -312,7 +329,7 @@ A session is a chain of token pairs: the pair a login issued and every pair a re
 - **Logout.** `POST /api/auth/logout` revokes the whole chain of the access token that authenticated the request, and the web server closes every WebSocket connection that was opened with any access token of that chain. A refresh with any token of the chain afterwards answers `401`. Rotation alone never closes a socket. When the chain could not be revoked, the request answers `503` with `Retry-After: 5` instead of `200`: the tokens are still live, and the same logout sent again revokes them. A connection the web server could not close at that moment is closed by the socket reconciliation below. The web app signs out every tab of the account at once: the other tabs close their session socket and show the login page without calling the server.
 - **The web app keeps a pending logout.** The web app ends the session in the browser before the server answers and keeps the logout as a pending entry, with the key that signs it, until the server confirms it: it sends the entry again when the app starts, when the browser comes back online, when the tab becomes visible, and on a timer that backs off. When the access token has expired it refreshes first, with the entry's own refresh token, and the entry ends when the logout answers `200` or when that refresh is refused, so a logout lost on a bad network, during an outage or while offline still reaches the server. Until then a logged-out browser still holds the ended session's refresh token and signing key in its storage; anyone who can run script on the origin in that browser can use them, which is why the entry is deleted the moment the server confirms. At most 20 entries are kept.
 - **Socket reconciliation.** Once a minute, the web server lists the access tokens behind its open WebSocket connections and closes every connection whose token chain is dead: every access token of the chain is revoked or expired, or the chain is no longer stored, whatever ended it. That covers a logout whose close failed, a password change, a client revocation, a user disabled from a console process in another container, and a session whose tokens expired without a refresh. The chain is the unit, not the token the socket was opened with: a refresh revokes that token while the session goes on, and rotation alone never closes a socket. A dead chain therefore keeps its sockets for at most one minute.
-- **`POST /api/oauth/revoke`.** Revokes a token of the signed-in user together with its chain and sockets, like logout. It answers a token of another user and an unknown token exactly alike (`200`, nothing revoked), so it cannot be used to find out whether a token exists.
+- **`POST /api/oauth/revoke`.** Revokes a token of the signed-in user together with its chain and sockets, like logout. It takes an access token, found by its ID, or a refresh token, and only Baander's own apps can call it. It answers a token of another user and an unknown token exactly alike (`200`, nothing revoked), so it cannot be used to find out whether a token exists.
 - **Reuse of a refresh token.** A consumed refresh token presented outside the lost-response grace (see the token binding rule under [OAuth clients and cross-origin access](#oauth-clients-and-cross-origin-access)) is treated as stolen: the chain is revoked and the web server closes its WebSocket connections, exactly as a logout does, before the `401` is answered.
 - **A Redis outage.** Rate-limit state and the DPoP nonce/replay stores live in
   Redis. Requests that require unavailable state answer `503` with

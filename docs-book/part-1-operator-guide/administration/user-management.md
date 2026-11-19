@@ -59,6 +59,8 @@ Baander uses three roles:
 | `ROLE_ADMIN` | Administrator — has access to the operational and management API endpoints; some changes there need `ROLE_SUPER_ADMIN` |
 | `ROLE_SUPER_ADMIN` | Super administrator — includes `ROLE_ADMIN` and may also make the changes reserved for it, such as creating administrators, changing [server settings](../configuration/server-settings.md#server-settings) and [users' settings](#user-settings), and registering, rotating secrets of, replacing keys of and revoking [OAuth clients](#oauth-clients) |
 
+Roles apply in Baander's own web and desktop apps. A token that another application obtained through [OAuth](#oauth-clients) counts the user as `ROLE_USER` alone, whatever roles the account has, so an administrator who connects a third-party app does not hand it administrator access.
+
 Roles are assigned at creation time with the `--role` flag. To change them later, [app:user:roles](../commands/app-user-roles.md) replaces a user's roles with the set you give; a super administrator can do the same in the admin panel or through the admin API (`POST /api/admin/users/{publicId}/roles`):
 
 ```bash
@@ -80,7 +82,7 @@ The console commands are not affected by these settings: console access carries 
 
 ## Passkeys (WebAuthn)
 
-Each user registers their own passkeys in the browser through the standard WebAuthn API; operators do not manage passkeys on a user's behalf.
+Each user registers their own passkeys in the browser through the standard WebAuthn API; operators do not manage passkeys on a user's behalf. Adding a passkey needs a verified email address and the user's current password, plus a TOTP code when TOTP is on. An account with TOTP on accepts a passkey sign-in only when the authenticator verified the user, for example with a PIN or fingerprint.
 
 Browser and authenticator support depend on the client device. Test registration and
 sign-in with the clients your installation supports.
@@ -92,13 +94,28 @@ Users can register multiple passkeys on the same account and use any of them to 
 Users enable and disable time-based one-time password (TOTP) two-factor
 authentication through the API, using a compatible authenticator app.
 
-The setup endpoint returns a secret and provisioning URI. The user confirms a code
-from their authenticator before TOTP is enabled; disabling TOTP also requires a
-current code. The current implementation has no operator CLI reset and no recovery
-codes, so do not promise that a password reset will remove this second factor. For a
-lost authenticator this manual has no qualified account-recovery procedure: preserve
-the account while you investigate, rather than handing out a replacement secret
-written into the database.
+The setup endpoint needs a verified email address and the user's current password,
+and returns a secret and provisioning URI. The user confirms a code from their
+authenticator before TOTP is enabled; disabling TOTP also requires a current code.
+Each code works once. Baander stores the secret encrypted under
+`AUTH_TOTP_ENCRYPTION_KEY`; see [Authentication](../configuration/authentication-and-limits.md#totp).
+
+There are no recovery codes. When a user has lost their authenticator, or their
+sign-in answers that TOTP is unavailable because the configured key no longer opens
+their secret, turn TOTP off for them:
+
+```bash
+dc exec app php bin/console app:user:reset-totp alice@baander.app
+```
+
+The reset also signs the user out of every session. Afterwards they sign in with their
+password and can set TOTP up again. Confirm the request with the user through a
+channel you trust first, because the reset removes their second factor. A super
+administrator can do the same through the admin API
+(`POST /api/admin/users/{publicId}/reset-totp`), but not for their own account. A
+password reset leaves TOTP on, unless the account's address was never verified; see
+[Resetting a Password](#resetting-a-password). See
+[app:user:reset-totp](../commands/app-user-reset-totp.md).
 
 ## Resetting a Password
 
@@ -117,15 +134,25 @@ Users who forget their password can reset it themselves once [email is configure
 3. The user enters the new password twice. It must be 8 to 255 characters. If the link was already used, has expired, or the account is disabled, the page says the link is invalid or has expired and links to the request page.
 4. Baander sets the password, signs the user out of every session, and returns to the login page with a confirmation.
 
+Opening the link proves the user reads that mailbox. If the account's address had never been verified, someone else may have registered it, so the reset also verifies the address and removes the account's TOTP and passkeys.
+
 By default a user can ask for a link 10 times per 15 minutes; after that the page still confirms but no email is sent. See [Password reset](../configuration/authentication-and-limits.md#password-reset) for the limits and how the link is built. API clients use the same two endpoints as the web pages: `POST /api/auth/password/reset-request` and `POST /api/auth/password/reset`.
 
 ## Verifying Email Addresses
 
-Baander sends notification email only to verified addresses. Operator-created accounts start verified. Self-registered accounts, and any account whose address changes, start unverified, and Baander emails the address a verification link once [email is configured](../configuration/environment-variables.md#mail):
+Baander sends notification email only to verified addresses, and a user needs a verified address to add a passkey or turn on TOTP. Operator-created accounts start verified. Self-registered accounts start unverified, and Baander emails the address a verification link once [email is configured](../configuration/environment-variables.md#mail):
 
 1. The user opens the link, which leads to the web app's **Verify your email** page. The page confirms the address, or says the link is invalid or has expired.
 2. The link works once and expires after 24 hours. It verifies only the address it was sent to, so after another email change it no longer works.
 3. A signed-in user whose address is unverified sees **Not verified** under the email address in **Settings** and can select **Resend verification email**. A new link replaces the earlier one. By default a user can ask 3 times per hour; after that the page still confirms but no email is sent.
+
+On an installation without email, or for a user who cannot receive the link, mark the current address verified yourself:
+
+```bash
+dc exec app php bin/console app:user:mark-email-verified alice@baander.app
+```
+
+A super administrator can do the same through the admin API (`POST /api/admin/users/{publicId}/verify-email`). See [app:user:mark-email-verified](../commands/app-user-mark-email-verified.md).
 
 See [Email verification](../configuration/authentication-and-limits.md#email-verification) for the lifetime, the limits and how the link is built.
 
@@ -137,7 +164,12 @@ Users change their own address in **Settings**. Operators change it in the admin
 dc exec app php bin/console app:user:change-email alice@baander.app alice.new@baander.app
 ```
 
-The command accepts the current email address or the public ID. All three ways make the new address unverified, email it a verification link, and end the verification and password reset links sent to the old address. See [app:user:change-email](../commands/app-user-change-email.md).
+The command accepts the current email address or the public ID. The two ways differ:
+
+- **A user's own change** needs their current password, plus a TOTP code when TOTP is on. The new address stays pending, shown in **Settings**, and Baander emails it a verification link. The account keeps its old address, and that address's verification, until the user opens the link. The request gets the same answer whether or not another account uses the new address; if one does when the link is opened, the change is dropped.
+- **An operator's change** in the admin panel or with the CLI takes effect at once and counts as verified. It drops a pending change. An administrator cannot change their own address through the admin API; they use **Settings** like any user.
+
+When the change takes effect, Baander emails the old address that the account's address changed, and the verification and password reset links sent to the old address stop working. See [app:user:change-email](../commands/app-user-change-email.md).
 
 ## User Settings
 
@@ -200,7 +232,7 @@ Deletion cannot be undone. To stop someone from signing in while keeping their a
 
 ## OAuth Clients
 
-Baander's web and desktop apps sign in through one first-party OAuth client, which [app:auth:setup-clients](../commands/app-auth-setup-clients.md) creates during setup. Any other application that wants to act for a user, such as a TV app, a native player or a server-side integration, gets its tokens from Baander's OAuth 2.0 authorization server, and it must be registered as a client first. The client's ID is what the application sends as `client_id`. Registration alone grants nothing: a signed-in user still has to approve the application before it gets tokens for them.
+Baander's web and desktop apps sign in through one first-party OAuth client, which [app:auth:setup-clients](../commands/app-auth-setup-clients.md) creates during setup. Any other application that wants to act for a user, such as a TV app, a native player or a server-side integration, gets its tokens from Baander's OAuth 2.0 authorization server, and it must be registered as a client first. The client's ID is what the application sends as `client_id`. Registration alone grants nothing: a signed-in user still has to approve the application before it gets tokens for them. Those tokens are delegated: they reach only what the scopes the user approved cover, such as browsing and playing the user's libraries or managing their playlists, and never administration or account security. See [Delegated tokens and scopes](../configuration/authentication-and-limits.md#delegated-tokens-and-scopes).
 
 ### Client types
 
@@ -246,7 +278,7 @@ A redirect URI must be absolute, without a fragment or credentials, and use `htt
 
 A confidential client authenticates in one of two ways, chosen at registration and fixed afterwards:
 
-- **With a secret** (`client_secret_post`, the default). Baander generates the secret; see [Client secrets](#client-secrets).
+- **With a secret** (`client_secret_post`, the default). Baander generates the secret; see [Client secrets](#client-secrets). The application sends it in the request body or with HTTP Basic authentication (`client_secret_basic`), never both at once.
 - **With its own keys** (`private_key_jwt`). The application signs a short-lived token with a private key that never leaves it, and Baander checks the signature against the client's public keys. No shared secret exists that could leak from Baander.
 
 To move an application from a secret to keys, or back, register a new client and revoke the old one.
@@ -260,9 +292,11 @@ Register a key client when the application can sign with its own key pair, and g
 
 In the admin panel, choose the confidential type and the key authentication method in **Create client**, then give the key set or its URL. The admin API takes the same choice as `authMethod` with `jwks` or `jwksUri`, and [app:oauth:client:create](../commands/app-oauth-client-create.md) takes `--auth-method` with `--jwks-file` or `--jwks-uri`.
 
-A key set holds at most 10 public keys and 64 KB, and when it holds several keys, each needs its own `kid`. Baander refuses private and symmetric keys, so a key set never carries secret material into Baander. A key set URL must use `https` on the default port and carry no user name or password. Baander fetches it only from a public address of that host, does not follow redirects, and gives up after 3 seconds. Baander caches the fetched keys, so the URL is needed only for the first fetch, after the cache expires, and when the application signs with a key Baander has not seen. If the URL cannot be reached then, the application's request answers `503` and it should retry; nothing is cached from a failed fetch.
+A key set holds at most 10 public keys and 64 KB, and when it holds several keys, each needs its own `kid`. Baander refuses private and symmetric keys, so a key set never carries secret material into Baander. An `OKP` key must use the `Ed25519` curve. A key set URL must use `https` on the default port, name a host by a DNS name with at least one dot rather than an IP address, and carry no user name, password or fragment. Baander fetches it only from a public address of that host, does not follow redirects, and gives up after 3 seconds. Baander caches the fetched keys, so the URL is needed only for the first fetch, after the cache expires, and when the application signs with a key Baander has not seen. If the URL cannot be reached then, the application's request answers `503` and it should retry; nothing is cached from a failed fetch.
 
-To change the keys, use **Replace keys** on the client's row, the admin API's `POST /api/admin/oauth/clients/{clientId}/keys`, or [app:oauth:client:replace-keys](../commands/app-oauth-client-replace-keys.md). Replacing may switch a client between an inline set and a URL. The new keys apply to the application's next request, and a cached copy of the old set is never used again. Tokens the application already holds stay valid. A secret client has no keys to replace, and a key client has no secret to rotate.
+To change the keys, use **Replace keys** on the client's row, the admin API's `POST /api/admin/oauth/clients/{clientId}/keys`, or [app:oauth:client:replace-keys](../commands/app-oauth-client-replace-keys.md). Replacing may switch a client between an inline set and a URL. The new keys apply to the application's next request, and a cached copy of the old set is never used again. Tokens the application already holds stay valid.
+
+A key the application removes from its published set is not withdrawn at once: Baander keeps using its cached copy, for up to an hour by default, because it fetches early only for a key it has not seen. If a key leaked, replace the client's keys with the same URL right after the application removes the key; Baander then fetches the set again at the next request. A secret client has no keys to replace, and a key client has no secret to rotate.
 
 The settings that bound key clients are in [Client assertions and key sets](../configuration/authentication-and-limits.md#client-assertions-and-key-sets).
 
@@ -280,7 +314,7 @@ Revoking a client also revokes every access and refresh token issued to it, in t
 
 Both user-facing flows run through pages of the web app. A user has to be signed in to the web app to approve anything there.
 
-**Consent page.** An application using the authorization code grant first pushes its request to Baander directly, server to server, and gets back a short-lived reference to it. It then sends the user's browser to `APP_URL/oauth/authorize`, the authorization endpoint that the metadata document at `/.well-known/oauth-authorization-server` advertises, with only its client ID and that reference. The request's details, such as the scopes and the redirect URI, stay out of the browser's address bar, where they could be changed. The page shows the client's name and the scopes it would get. The user approves or denies, and the page sends the browser back to the client's redirect URI with an authorization code or an `access_denied` error.
+**Consent page.** An application using the authorization code grant first pushes its request to Baander directly, server to server, and gets back a short-lived reference to it. It then sends the user's browser to `APP_URL/oauth/authorize`, the authorization endpoint that the metadata document at `/.well-known/oauth-authorization-server` advertises, with only its client ID and that reference. The request's details, such as the scopes and the redirect URI, stay out of the browser's address bar, where they could be changed. The page shows the client's name and one line for each scope it would get. A request that asks for no scope Baander grants is refused before the user sees it. The user approves or denies, and the page sends the browser back to the client's redirect URI with an authorization code or an `access_denied` error.
 
 The reference works for 5 minutes by default (`auth.par.request_uri_ttl`), long enough to sign in first, and only for one decision. If the client is unknown or revoked, or the reference is unknown, expired or already used, the page shows the error and does not redirect; the application has to start over. The authorization code itself lives 60 seconds by default (`auth.auth_code.ttl`) and works only for the application that holds the key its pushed request named. Baander keeps no record of earlier consent. The page may approve a request from the first-party client or from one of the user's own personal access clients without asking; every other client asks the user each time. Another user's personal access client is refused.
 

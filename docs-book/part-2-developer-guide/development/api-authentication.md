@@ -23,7 +23,7 @@ A successful login or refresh request returns:
 
 Login responses also include a `user` object inside `data`, identified by `publicId`.
 
-Access-token JWTs use the user's public ID as `sub` and the OAuth client's public ID as `client_id`. OAuth `client_id` parameters and administration's `clientId` identify that same registered client. Previously issued access tokens with UUID identity claims are rejected. Refresh with the existing refresh token to obtain the current claims; if refresh is refused, sign in again.
+Access-token JWTs use the user's public ID as `sub` and the OAuth client's public ID as `client_id`. OAuth `client_id` parameters and administration's `clientId` identify that same registered client. Each token also carries `iss`, the issuer `APP_URL`; the resource server refuses a token whose `iss` is missing or names another issuer. Its header names the type `at+jwt` and, as `kid`, the RFC 7638 thumbprint of the signing key, the same `kid` that `GET /.well-known/jwks.json` publishes for that key. Previously issued access tokens with UUID identity claims are rejected. Refresh with the existing refresh token to obtain the current claims; if refresh is refused, sign in again.
 
 | Field | Description |
 |-------|-------------|
@@ -48,7 +48,8 @@ The OAuth token endpoint, `POST /api/oauth/token`, answers with the same tokens 
 
 Token lifetimes are configured in `config/packages/auth.yaml`:
 - **Access token**: 3600 seconds (1 hour) — `auth.access_token.ttl`
-- **Refresh token**: 2592000 seconds (30 days) — `auth.refresh_token.ttl`
+- **Refresh token**: 2592000 seconds (30 days) — `auth.refresh_token.ttl`, counted again from each rotation
+- **Refresh token chain**: 7776000 seconds (90 days) — `auth.refresh.max_chain_lifetime`, counted from the sign-in that started the chain; no rotation extends it
 - **Authorization code**: 60 seconds — `auth.auth_code.ttl`
 - **Pushed authorization request** (`request_uri`): 300 seconds (5 minutes) — `auth.par.request_uri_ttl`
 - **Device code**: 900 seconds (15 minutes) — `auth.device_code.ttl`
@@ -79,6 +80,8 @@ sequenceDiagram
     A-->>C: Resource
 ```
 
+A proof's `htu` must name one of the deployment's public origins followed by the request path: the origin of `APP_URL`, or one of the comma-separated origins in `AUTH_DPOP_EXTRA_ORIGINS` (empty by default). The scheme and `Host` the request arrived with play no part, because behind a TLS-terminating proxy the request reaches Baander as plain HTTP and the client chooses the `Host` header. An origin in `AUTH_DPOP_EXTRA_ORIGINS` that is not an absolute `http` or `https` URL stops the application from booting.
+
 Issued tokens are bound to the proof key: the access token carries `cnf.jkt`. API requests send `Authorization: DPoP <accessToken>` with a `DPoP` proof from the same key that includes the access token hash (`ath`). Signed stream delivery URLs do not need a proof.
 
 ### Password Login
@@ -91,7 +94,9 @@ DPoP: <proof>
 {"email": "user@baander.app", "password": "secret", "totpCode": "123456"}
 ```
 
-`totpCode` is required only when the account has TOTP enabled; without it, the response is `401` with code `AUTH_TOTP_REQUIRED`.
+`totpCode` is required only when the account has TOTP enabled; without it, or with an empty string, the response is `401` with code `AUTH_TOTP_REQUIRED`. The server checks the DPoP proof before the credentials, so a nonce challenge leaves the code unspent for the retry. Each code is accepted once: a successful login spends the code's 30-second time step in the transaction that stores the tokens, and the same code is refused afterwards, also when two logins race with it. A code is accepted for the current step and `auth.totp.window` steps on either side (1 by default). When the stored TOTP secret cannot be decrypted with `AUTH_TOTP_ENCRYPTION_KEY`, the response is `401` with code `AUTH_TOTP_UNAVAILABLE`; an operator's TOTP reset lets the account sign in with its password alone.
+
+An unknown address, a wrong password, a wrong TOTP code and a disabled account with a wrong password all get the same `401` `AUTH_INVALID_CREDENTIALS` answer after the same work, so the answer does not reveal whether an account exists. A disabled account is reported as disabled only once its password matches. Each rejected password or code counts against the address's failure limit from all client addresses together; once the limit is reached, every login for that address answers `429` with `Retry-After`, the right password included (see [Rate limiting](../../part-1-operator-guide/configuration/authentication-and-limits.md#rate-limiting)).
 
 ### Passkey Login
 
@@ -109,9 +114,11 @@ DPoP: <proof>
 {"challengeKey": "...", "response": { ... }, "userId": "..."}
 ```
 
-`userId` is an optional user public ID. The server checks the DPoP proof before the assertion, so a nonce challenge leaves the assertion valid for the retry. Disabled accounts cannot sign in.
+`userId` is an optional user public ID. The server checks the DPoP proof before the assertion, so a nonce challenge leaves the assertion valid for the retry. Disabled accounts cannot sign in. For an account with TOTP enabled, the assertion must carry the user-verified flag (a PIN or biometric check on the authenticator); the flag is checked only after the signature verifies. An authenticator that always reports a signature counter of 0 can sign in; the clone check compares counters only when one of them is non-zero.
 
-To register a passkey, an authenticated user calls `POST /api/auth/passkey/options` and passes the browser's credential to `POST /api/auth/passkey/register`. Registration options encode the user's public ID as the WebAuthn user handle. Authentication and account signals use the same public identity; there is no UUID-handle fallback.
+Each challenge works once. Challenges live only in Redis, under a key bound to the ceremony: a registration challenge to the user who asked for it, a login challenge to its `challengeKey`. While Redis is unavailable, the options, verification and login endpoints answer `503` with `Retry-After`.
+
+To register a passkey, an authenticated user calls `POST /api/auth/passkey/options` and passes the browser's credential to `POST /api/auth/passkey/register`. The options request needs a verified email address and [step-up](#step-up-re-authentication). Registration options encode the user's public ID as the WebAuthn user handle. Authentication and account signals use the same public identity; there is no UUID-handle fallback.
 
 ### Refresh
 
@@ -123,7 +130,9 @@ DPoP: <proof>
 {"refreshToken": "..."}
 ```
 
-The proof must be signed by the key the token pair was issued to. Refresh consumes the token and returns a new pair with the same key binding. A lost response can be recovered within `auth.refresh.reuse_grace_seconds` (default and maximum 60 seconds; 0 disables recovery): a retry of the consumed token with the same proof key, while its live replacement remains unused, revokes that replacement pair and issues a fresh one. A retry outside the grace window or after a replacement was used revokes the whole rotation chain. A proof from another key is refused without revoking the chain.
+This endpoint refreshes only tokens of the [first-party client](#first-party-and-delegated-tokens); a refresh token issued to any other client answers `401` here, and that client refreshes at the token endpoint with its own client authentication (see [Refresh at the token endpoint](#oauth-20-authorization-server)). The proof must be signed by the key the token pair was issued to. Refresh consumes the token and returns a new pair with the same key binding. A lost response can be recovered within `auth.refresh.reuse_grace_seconds` (default and maximum 60 seconds; 0 disables recovery): a retry of the consumed token with the same proof key, while its live replacement remains unused, revokes that replacement pair and issues a fresh one. A retry outside the grace window or after a replacement was used revokes the whole rotation chain. A proof from another key is refused without revoking the chain.
+
+Baander stores each refresh token only as its SHA-256 hash, so the database holds no usable refresh token. Every rotation chain also has an absolute lifetime, `auth.refresh.max_chain_lifetime` (90 days by default), counted from the sign-in that started it: once it has passed, the chain's refresh tokens are refused however recently they were rotated, and the user signs in again.
 
 A refused refresh token answers `401`; sign in again. `503` with `Retry-After` means the server could not check the token, for example while its database or nonce store is unavailable; keep the token and retry after the given delay.
 
@@ -131,9 +140,58 @@ A refused refresh token answers `401`; sign in again. `503` with `Retry-After` m
 
 Password login, passkey login, and the token endpoint accept an optional `X-Baander-Client-Fingerprint` header. If it is sent, the access token is bound to that value, and every API request with the token must send the same header or get `401` (`AUTH_INVALID_TOKEN`). Refresh, at `/api/auth/refresh` or with `grant_type=refresh_token`, keeps the binding of the token it rotates and ignores a header sent with the refresh request. Tokens issued without the header ignore it. The WebSocket upgrade authenticates with a handshake ticket issued over HTTP and does not carry the fingerprint header; see [Real-Time Patterns](../architecture/real-time-patterns.md#authentication).
 
+### First-party and Delegated Tokens
+
+A token is first-party when it was issued to the first-party client: the client registered with type `first_party` whose public ID is `AUTH_SPA_CLIENT_ID`. Password login, passkey login and `POST /api/auth/refresh` issue only first-party tokens, which act with the user's full authority and carry no scopes. Every other token is delegated, whichever grant issued it and whether its client is public, confidential, a device or one of the user's own personal access clients. A delegated token differs in two ways:
+
+- Its user authenticates with `ROLE_USER` alone, so no administrator authority travels with it, even for an administrator's account.
+- It reaches only public routes and the routes its scopes cover. Every other route answers `403` before the controller runs:
+
+```
+HTTP/1.1 403 Forbidden
+WWW-Authenticate: DPoP error="insufficient_scope"
+
+{"error": {"message": "The access token does not grant access to this resource.", "code": "insufficient_scope"}}
+```
+
+The scopes are `profile`, `email`, `library` and `playlist`, the list in `auth.scopes.user_grants`:
+
+| Scope | Routes it covers |
+|-------|------------------|
+| `profile` | Reading the user's own profile, `GET /api/auth/me` |
+| `email` | `GET /api/auth/me`, with the email address included |
+| `library` | Browsing the catalog, streaming, playback and its coordination across devices, transcoding, device registration, favorites, listening history, recommendations and radio |
+| `playlist` | The user's playlists: reading, creating, changing, sharing and deleting them |
+
+Everything else is first-party only: administration and monitoring, account security (passwords, email changes, passkeys, TOTP, logout, WebSocket tickets), consent and device approval, token revocation, personal access client management, notifications and push subscriptions, listening parties, and preferences and settings. A route that requires an administrator role is first-party only whatever its area. `ScopeRouteMap` (`src/Auth/Infrastructure/Security/OAuth/`) holds the classification, and `ScopeRouteInventoryTest` fails when a route is missing from it, so a new route stays out of reach of delegated tokens until it is classified.
+
+`GET /api/auth/me` answers a delegated token with `publicId`, `name` and `createdAt`, and adds `email` and `emailVerifiedAt` only when the token holds the `email` scope. A first-party token also gets `roles`, `totpEnabled` and `pendingEmail`.
+
+### Step-up Re-authentication
+
+Three self-service changes ask the signed-in user to prove they are present, with fields in the JSON body:
+
+| Request | Needs |
+|---------|-------|
+| `PUT /api/auth/me/email` | `currentPassword`, plus `totpCode` when TOTP is on |
+| `POST /api/auth/passkey/options` | `currentPassword`, plus `totpCode` when TOTP is on |
+| `POST /api/auth/totp/setup` | `currentPassword`; the request is refused with `409` while TOTP is on |
+
+A wrong password, and a missing or wrong code, all get the same `422` with `error.details.reason` `step_up_failed`. A code that confirms a change is spent like a login code and cannot confirm a second one. Every attempt counts against the account's step-up limit, 10 per 15 minutes by default from any address, checked before the password; over the limit the request answers `429` with `Retry-After`.
+
+Passkey registration options and TOTP setup also need a verified email address. An unverified one answers `422` with `error.details.reason` `email_unverified`, before step-up spends an attempt.
+
+### Changing the Email Address and Password
+
+`PUT /api/auth/me/email` with `{"email": "new@baander.app", "currentPassword": "...", "totpCode": "123456"}` does not change the address at once. It holds the new address as the account's pending address, which a first-party `GET /api/auth/me` returns as `pendingEmail`, and emails a verification link to it. The account keeps its current address, and that address's verification, until the link is used. The request answers `202` with the same body whether or not another account uses the new address; if one does by the time the link is opened, the link fails like an invalid one and the pending change is dropped. Using the link moves the pending address into the account, verifies it, and emails the previous address that the account's address changed. Asking for the current address drops a pending change, and asking for a different one ends the earlier link.
+
+`PUT /api/auth/me/password` changes the password. It ends every other session of the user, including one issued while the change was running, and the session that made the change stays signed in.
+
 ### OAuth 2.0 Authorization Server
 
-Clients other than Baander's own apps discover the endpoints at `GET /.well-known/oauth-authorization-server` (RFC 8414). The document roots every endpoint at the issuer (`APP_URL`, for example `https://baander.app`). It advertises `code` as the only response type, the three grant types, `S256` as the only PKCE method, the DPoP signing algorithms, and the scopes from `auth.scopes.user_grants` as `scopes_supported`. It lists `none`, `client_secret_post` and `private_key_jwt` as client authentication methods, and `token_endpoint_auth_signing_alg_values_supported` names the algorithms a client assertion may be signed with. It also names `pushed_authorization_request_endpoint` and sets `require_pushed_authorization_requests` to `true`.
+Clients other than Baander's own apps discover the endpoints at `GET /.well-known/oauth-authorization-server` (RFC 8414). The document roots every endpoint at the issuer (`APP_URL`, for example `https://baander.app`). It advertises `code` as the only response type, the three grant types, `S256` as the only PKCE method, the DPoP signing algorithms, and the scopes from `auth.scopes.user_grants` as `scopes_supported`. It lists `none`, `client_secret_basic`, `client_secret_post` and `private_key_jwt` as client authentication methods, and `token_endpoint_auth_signing_alg_values_supported` names the algorithms a client assertion may be signed with. It also names `pushed_authorization_request_endpoint` and sets `require_pushed_authorization_requests` to `true`. It names no `revocation_endpoint`: `POST /api/oauth/revoke` authenticates the signed-in user, not a client, and only first-party tokens reach it (see [Revocation](#revocation)).
+
+A client asks for at least one of the scopes in `scopes_supported` and gets a [delegated token](#first-party-and-delegated-tokens) limited to them. There is no default scope.
 
 **Authorization code with PKCE.** Every authorization request is pushed first (RFC 9126). The authorization endpoint accepts only the `client_id` and the `request_uri` a push returned, never the request parameters themselves. The flow has four steps:
 
@@ -142,7 +200,7 @@ Clients other than Baander's own apps discover the endpoints at `GET /.well-know
 3. The consent page looks the pushed request up and records the user's decision.
 4. The client redeems the code at the token endpoint with a proof from the bound key.
 
-**Pushing the request.** The parameters may be form-encoded (RFC 9126) or JSON. A public client sends its `client_id` alone; a confidential client adds its secret or a client assertion, by its registered method (see [Client authentication](#client-authentication)). The request must bind a DPoP key in one of two ways (RFC 9449 section 10.1):
+**Pushing the request.** The parameters may be form-encoded (RFC 9126) or JSON, in a body of at most 64 KiB; a larger body answers `413` with `invalid_request` before it is parsed. A public client sends its `client_id` alone; a confidential client adds its secret or a client assertion, by its registered method (see [Client authentication](#client-authentication)). The request must bind a DPoP key in one of two ways (RFC 9449 section 10.1):
 
 - a `DPoP` header carrying a proof, checked exactly as at the token endpoint, including the server nonce;
 - the `dpop_jkt` parameter, the base64url SHA-256 JWK thumbprint (RFC 7638) of the key, 43 characters long.
@@ -166,11 +224,12 @@ A client that sends no proof names its key instead, for example `...&code_challe
 }
 ```
 
-The `request_uri` stays usable for `auth.par.request_uri_ttl` seconds (300 by default) and is used up by one decision. A push runs every authorization request check that needs no user. The redirect URI must match a registered one exactly, except that a loopback URI matches on any port (RFC 8252), and it may be omitted only when the client registered exactly one. `response_type` must be `code`, and device clients are refused (`unauthorized_client`). PKCE with `S256` is required for every client; `plain` and a missing method are rejected. Requested scopes outside `auth.scopes.user_grants` are dropped.
+The `request_uri` stays usable for `auth.par.request_uri_ttl` seconds (300 by default) and is used up by one decision. A push runs every authorization request check that needs no user. The redirect URI must match a registered one exactly, except that a loopback URI matches on any port (RFC 8252), and it may be omitted only when the client registered exactly one. `response_type` must be `code`, and device clients are refused (`unauthorized_client`). PKCE with `S256` is required for every client; `plain` and a missing method are rejected. `state` may be at most 1024 bytes. Requested scopes outside `auth.scopes.user_grants` are dropped, and a request left with none of them, including one that names no scope, gets `invalid_scope`.
 
 Errors at the push answer the client directly, in the RFC 6749 shape `{"error": "...", "error_description": "..."}`: `401` for `invalid_client`, otherwise `400`. They include:
 
-- `invalid_request` when the request has neither a proof nor `dpop_jkt`, when `dpop_jkt` is malformed, or when it carries a `request_uri` parameter;
+- `invalid_request` when the request has neither a proof nor `dpop_jkt`, when `dpop_jkt` is malformed, when `state` is longer than 1024 bytes, or when it carries a `request_uri` parameter;
+- `invalid_scope` when none of the requested scopes can be granted;
 - `invalid_dpop_proof` when the proof and `dpop_jkt` name different keys;
 - `request_not_supported` for a `request` parameter, since request objects are not supported.
 
@@ -201,7 +260,7 @@ DPoP: <proof>
 }
 ```
 
-`scopes` are the scopes an approval grants: the pushed scopes Baander allows, or the default scopes when none are left. `client_type` is `public`, `confidential`, `first_party`, or `personal_access`. `consent_required` is false only for clients with the first-party flag: the first-party client and the user's own personal access clients. The page may approve those without asking. Another user's personal access client gets `unauthorized_client`.
+`scopes` are the scopes an approval grants: the pushed scopes Baander allows. The consent page describes each to the user: "See your name and profile picture" (`profile`), "See your email address" (`email`), "Browse and play your library, and control playback on your devices" (`library`), and "See, create and change your playlists" (`playlist`). `client_type` is `public`, `confidential`, `first_party`, or `personal_access`. `consent_required` is false only for clients with the first-party flag: the first-party client and the user's own personal access clients. The page may approve those without asking. A personal access client's tokens are still delegated and limited to their scopes. Another user's personal access client gets `unauthorized_client`.
 
 Then `POST /api/oauth/authorize` records the user's decision on the same pushed request. The body may be JSON or form-encoded:
 
@@ -219,7 +278,7 @@ Then `POST /api/oauth/authorize` records the user's decision on the same pushed 
 }
 ```
 
-Either decision uses the request up, so it is decided once; of two concurrent decisions, one wins and the other gets `invalid_request_uri`. On denial (`"decision": "deny"`), `redirect_uri` carries `error=access_denied`, `error_description`, the pushed `state`, and `iss` instead of `code`. `iss` (RFC 9207) lets the client detect a mix-up between authorization servers. The page navigates to `redirect_uri`; neither endpoint redirects. Their success and OAuth error answers carry `Cache-Control: no-store`; an unauthenticated request gets a `401` `ApiError` without it.
+Either decision uses the request up, so it is decided once; of two concurrent decisions, one wins and the other gets `invalid_request_uri`. A denial runs the same user checks as an approval, so another user cannot use up a request for someone's personal access client by denying it. On denial (`"decision": "deny"`), `redirect_uri` carries `error=access_denied`, `error_description`, the pushed `state`, and `iss` instead of `code`. `iss` (RFC 9207) lets the client detect a mix-up between authorization servers. The page navigates to `redirect_uri`; neither endpoint redirects. Their success and OAuth error answers carry `Cache-Control: no-store`; an unauthenticated request gets a `401` `ApiError` without it.
 
 The two endpoints read only `client_id`, `request_uri` and `decision`. Errors from either endpoint are `400` with `{"error": "...", "error_description": "..."}`:
 
@@ -236,9 +295,9 @@ DPoP: <proof with nonce, from the bound key>
 grant_type=authorization_code&client_id=V1StGXR8_Z5jdHi6B-myT&code=<code>&redirect_uri=http://127.0.0.1:53682/callback&code_verifier=<verifier>
 ```
 
-A proof from any other key gets `invalid_grant`, as do a wrong `code_verifier` and a code that is expired, used, or another client's.
+A proof from any other key gets `invalid_grant`, as do a wrong `code_verifier` and a code that is expired, used, or another client's. A code presented again after it was redeemed is treated as stolen: Baander revokes the token chain its redemption started, and commits the revocation, before answering `invalid_grant`. Of two concurrent redemptions, the loser does not revoke the winner's chain.
 
-**Device authorization.** A device client posts its `client_id` and an optional `scope`, form-encoded or JSON, to `POST /api/oauth/device/authorize`:
+**Device authorization.** A device client posts its `client_id` and a `scope`, form-encoded or JSON, to `POST /api/oauth/device/authorize`. The client authenticates as at the token endpoint:
 
 ```
 POST /api/oauth/device/authorize
@@ -258,7 +317,7 @@ client_id=<client_id>&scope=library
 }
 ```
 
-A missing `client_id` (`invalid_request`) or a client that is not a device client (`unauthorized_client`) gets `400`; an unknown or revoked client gets `401` `invalid_client`. The device shows the user code and `verification_uri`, or encodes `verification_uri_complete` in a QR code, and polls the token endpoint with `grant_type=urn:ietf:params:oauth:grant-type:device_code` and `device_code`.
+A missing `client_id` (`invalid_request`), a client that is not a device client (`unauthorized_client`) or a request with no scope Baander grants (`invalid_scope`) gets `400`; an unknown or revoked client gets `401` `invalid_client`. The device shows the user code and `verification_uri`, or encodes `verification_uri_complete` in a QR code, and polls the token endpoint with `grant_type=urn:ietf:params:oauth:grant-type:device_code` and `device_code`.
 
 `verification_uri` is the web app's device page (`auth.device.verification_uri`). For the signed-in user, the page looks the code up with `GET /api/oauth/device/verify?user_code=BCDF-GHJK`:
 
@@ -274,32 +333,35 @@ A missing `client_id` (`invalid_request`) or a client that is not a device clien
 }
 ```
 
-It then sends the user's decision to `POST /api/oauth/device/approve` with `{"userCode": "BCDF-GHJK", "decision": "approve"}` or `"deny"`, and gets `{"data": {"decision": "approved", "message": "..."}}`, or `"denied"`. Case, spaces, and dashes in the user code do not matter. An unusable code gets a `400` `ApiError` whose `error.details.reason` is `user_code_required` (lookup only), `invalid_user_code`, or `device_already_processed`.
+It then sends the user's decision to `POST /api/oauth/device/approve` with `{"userCode": "BCDF-GHJK", "decision": "approve"}` or `"deny"`, and gets `{"data": {"decision": "approved", "message": "..."}}`, or `"denied"`. Case, spaces, and dashes in the user code do not matter. An unusable code gets a `400` `ApiError` whose `error.details.reason` is `user_code_required` (lookup only), `invalid_user_code`, or `device_already_processed`. A code is decided once: of two concurrent approvals, the second gets `device_already_processed`.
 
 Polls answer `authorization_pending` until the user decides, `slow_down` when they come sooner than the interval (which then grows by 5 seconds), `access_denied` after a denial, and `expired_token` after expiry. An approved code is redeemed once.
 
-**Refresh at the token endpoint.** `grant_type=refresh_token` rotates a pair exactly as `POST /api/auth/refresh` does, and the refresh token must have been issued to the authenticated client.
+**Refresh at the token endpoint.** `grant_type=refresh_token` rotates a pair exactly as `POST /api/auth/refresh` does, and the refresh token must have been issued to the authenticated client. This is the only refresh path for delegated tokens.
 
-The token endpoint accepts form-encoded or JSON parameters, and every grant authenticates the client as described in [Client Authentication](#client-authentication). Errors use the RFC 6749 shape `{"error": "...", "error_description": "..."}`: `400`, or `401` for `invalid_client`. Every token answer and OAuth error carries `Cache-Control: no-store`, `Pragma: no-cache`, and a `DPoP-Nonce` for the next proof. Two answers carry no nonce: a rate-limited request gets `429`, and a request the server cannot decide gets `503` with `Retry-After` and `Cache-Control: no-store`. That happens, for example, while its database restarts, while the nonce store or the assertion `jti` store is unavailable, or when a client's `jwks_uri` set cannot be fetched; keep the tokens and retry after the delay. A successful answer uses the RFC 6749 token response above.
+The token endpoint accepts form-encoded or JSON parameters, and every grant authenticates the client as described in [Client Authentication](#client-authentication). Errors use the RFC 6749 shape `{"error": "...", "error_description": "..."}`: `400`, or `401` for `invalid_client`. Besides the per-IP limit, each client has its own request allowance, charged only after it has authenticated, so a caller who merely names a client cannot spend that client's allowance. A client with a secret or keys has one allowance for all addresses; a public client has one per caller network (the `/24` of an IPv4 address, the `/64` of an IPv6 address). The same holds at the pushed authorization request endpoint. Every token answer and OAuth error carries `Cache-Control: no-store`, `Pragma: no-cache`, and a `DPoP-Nonce` for the next proof. Two answers carry no nonce: a rate-limited request gets `429`, and a request the server cannot decide gets `503` with `Retry-After` and `Cache-Control: no-store`. That happens, for example, while its database restarts, while the nonce store or the assertion `jti` store is unavailable, or when a client's `jwks_uri` set cannot be fetched; keep the tokens and retry after the delay. A successful answer uses the RFC 6749 token response above.
 
 **Personal access clients.** `GET` and `POST /api/oauth/clients/` list and create the current user's personal access clients, and `DELETE /api/oauth/clients/{publicId}` revokes one together with its access and refresh tokens. Only the owner can revoke a client. The list carries no client secret.
 
 ### Client Authentication
 
-The pushed authorization request endpoint and the token endpoint authenticate the client the same way. Every request names its client in `client_id`. Each client has one authentication method, fixed at registration and listed in the admin API as `authMethod`:
+The pushed authorization request endpoint, the token endpoint and the device authorization endpoint authenticate the client the same way. Every request names its client in `client_id`, or in an HTTP Basic `Authorization` header. Each client has one authentication method, fixed at registration and listed in the admin API as `authMethod`:
 
 | Method | Client | What the request adds |
 |--------|--------|-----------------------|
 | `none` | Public, device, first-party and personal access clients | Nothing; `client_id` alone |
-| `client_secret_post` | Confidential client registered with a secret | `client_secret` |
+| `client_secret_post` | Confidential client registered with a secret | `client_secret` in the body, or the client ID and secret in HTTP Basic (`client_secret_basic`) |
 | `private_key_jwt` | Confidential client registered with keys | `client_assertion` and `client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer` |
 
 A request that presents a method other than the registered one, or more than one, gets `401` `invalid_client` (RFC 6749 section 2.3). So does a request from an unknown, malformed or revoked client, so the answer does not reveal which it was.
 
+**HTTP Basic.** A secret client may send `Authorization: Basic` with its client ID and secret, each form-urlencoded before they are joined with a colon (RFC 6749 section 2.3.1). The header then names the client, and a `client_id` in the body may only repeat it. A secret goes by exactly one means: Basic together with a body `client_secret` or with an assertion, and Basic from a public or key client, get `invalid_client`, as does a malformed header. At the token and pushed authorization request endpoints, every `invalid_client` answer to a request that sent Basic credentials carries a `WWW-Authenticate: Basic` challenge (RFC 6749 section 5.2). Both ways of sending the secret belong to the one stored method, `client_secret_post`.
+
 **Client assertions.** A `private_key_jwt` client signs a JWT (RFC 7523 as updated by RFC 10070) with one of its registered keys:
 
-- The `alg` header is one of `EdDSA`, `ES256`, `ES384`, `ES512`, `RS256`, `RS384` or `RS512`; `none` and HMAC algorithms are refused. The metadata lists them as `token_endpoint_auth_signing_alg_values_supported`.
+- The `alg` header is one of `EdDSA`, `ES256`, `ES384`, `ES512`, `PS256`, `RS256`, `RS384` or `RS512`; `none` and HMAC algorithms are refused. The metadata lists them as `token_endpoint_auth_signing_alg_values_supported`. RSA keys, for `PS256` as for the `RS` algorithms, must be at least 2048 bits, and an `EdDSA` key must be an Ed25519 `OKP` key.
 - The `typ` header is absent or `client-authentication+jwt`, with or without the `application/` prefix, in any case. Any other type is refused.
+- A `crit` header is refused, because Baander understands no JWS extension (RFC 7515 section 4.1.11).
 - The `kid` header selects the key. Without it, every registered signing key is tried. A `jwks_uri` client needs `kid` to rotate keys, because only an unknown `kid` makes Baander fetch the set again before the cache expires.
 - `iss` and `sub` are the `client_id`.
 - `aud` is exactly the issuer identifier, `APP_URL`, as a string or as a one-element array. The token endpoint or pushed request endpoint URL is refused, although OpenID Connect Core suggests the token endpoint. Nothing is normalized, so a trailing slash makes the audience differ.
@@ -341,10 +403,12 @@ An assertion that fails any check gets `401` `invalid_client`; the server logs w
 
 **Client keys.** A `private_key_jwt` client registers its public keys in one of two ways:
 
-- **Inline JWK Set.** The administrator stores the set with the client. It holds at most 10 keys and 64 KB, only public asymmetric keys (no `oct` keys and no private members), and when it holds more than one key, each has its own `kid`.
-- **`jwks_uri`.** The client publishes the set at an `https` URI on port 443, without credentials. Baander fetches it from a public address on that host alone, without following redirects, within 3 seconds, and stops reading after 64 KB; the set must meet the rules of an inline one. Only keys with `use` absent or `sig` count.
+- **Inline JWK Set.** The administrator stores the set with the client. It holds at most 10 keys and 64 KB, only public asymmetric keys (no `oct` keys and no private members), and when it holds more than one key, each has its own `kid`. An `OKP` key must name the `Ed25519` curve.
+- **`jwks_uri`.** The client publishes the set at an `https` URI on port 443, without credentials. When an administrator registers or changes it, the URI must name a DNS host with at least one dot. An IP literal, a single label such as `localhost`, a name ending in a dot, a fragment, whitespace and a backslash are refused. Baander fetches it from a public address on that host alone, without following redirects, within 3 seconds, and stops reading after 64 KB; the set must meet the rules of an inline one. Only keys with `use` absent or `sig` count.
 
 A fetched set is cached for `auth.client_jwks.cache_ttl` seconds (3600 by default). An assertion whose `kid` the cached set lacks makes Baander fetch the set again, at most once per client every `auth.client_jwks.refetch_interval` seconds (60 by default), so a client can rotate its keys on its own: publish the new key, then sign with it. Replacing a client's keys through the admin API or the console makes the cached set unreachable at once. A fetch that fails, times out, answers anything but `200` or sends more than 64 KB gets `503` with `Retry-After` and caches nothing. So does a request that needs a fetch while another request is fetching the same client's uncached set, or while Redis, which holds the fetch lock, is unavailable. A set that is malformed, or that lacks the assertion's key after the refetch, gets `invalid_client`.
+
+Withdrawing a key works differently from adding one. A key the client removes from its published set stays in Baander's cached copy, and assertions signed with it keep working until the cache expires, up to `auth.client_jwks.cache_ttl` seconds later, because only an unknown `kid` triggers a refetch. To end a leaked or retired key at once, an administrator replaces the client's keys, giving the same `jwks_uri` again if it is unchanged: the next assertion then fetches the set afresh.
 
 
 ### OAuth Client Administration
@@ -426,5 +490,5 @@ All three take the `client_id` as `{clientId}`; an unknown one gets `404`. A fir
 
 ### Revocation
 
-`POST /api/auth/logout` revokes the presenting token's whole rotation chain, including its refresh tokens. `POST /api/oauth/revoke` (RFC 7009) requires authentication and revokes the chain of an access or refresh token held by the signed-in user. An unknown token or one held by another user gets the same `200` answer. Both operations close the chain's WebSocket connections after revocation commits; socket reconciliation retries closure when immediate closure fails. A revocation failure answers `503` with `Retry-After`; retry the request. Access tokens can be verified with the keys at `GET /.well-known/jwks.json`.
+`POST /api/auth/logout` revokes the presenting token's whole rotation chain, including its refresh tokens. `POST /api/oauth/revoke` (RFC 7009) requires a first-party token and revokes the chain of an access or refresh token held by the signed-in user. A presented value that is a JWT signed with Baander's key is read as an access token and found by its `jti`; any other value is looked up as a refresh token. A JWT signed with another key counts as unknown. An unknown token or one held by another user gets the same `200` answer. Delegated clients cannot reach this endpoint, and the server metadata does not advertise it. Both operations close the chain's WebSocket connections after revocation commits; socket reconciliation retries closure when immediate closure fails. A revocation failure answers `503` with `Retry-After`; retry the request. Access tokens can be verified with the keys at `GET /.well-known/jwks.json`.
 

@@ -78,16 +78,27 @@ Functional tests live in `tests/Functional/` and extend `App\Tests\Functional\Te
 
 | Method | Purpose |
 |--------|---------|
-| `createTestUser(?string $email, string $name, string $password)` | Creates a `ROLE_USER` user with a random email |
+| `createTestUser(?string $email, string $name, string $password, bool $verified = false)` | Creates a `ROLE_USER` user with a random email. The address starts unverified; pass `verified: true` for a test that adds a passkey or turns TOTP on, which need a verified address |
 | `createAdminUser()` | Creates a `ROLE_ADMIN` user |
 | `createSuperAdminUser()` | Creates a `ROLE_SUPER_ADMIN` user |
 | `authenticatedRequest(string $method, string $uri, User $user, array $content)` | Sends an HTTP request as the given user. Sets `X-Baander-Test-User-Id` header, which the `TestAuthenticator` picks up to authenticate without a real JWT. |
+| `delegatedRequest(string $method, string $uri, User $user, array $scopes, array $content)` | Sends an HTTP request as the given user through a delegated token holding `$scopes`; see below |
 | `anonymousRequest(string $method, string $uri, array $content)` | Sends an unauthenticated HTTP request |
 | `assertJsonResponse(Response $response, int $expectedStatus, ?string $expectedKey)` | Asserts status code + valid JSON. If `$expectedKey` is set, asserts the key exists in the decoded body. Returns the decoded array. |
 
 ### Authentication in Tests
 
 Tests do not use real JWT tokens or `loginUser()`. The `TestAuthenticator`, registered in `config/packages/test/security.yaml`, reads the `X-Baander-Test-User-Id` header and returns a `SecurityUser` for that user ID. `authenticatedRequest()` sets the header for you.
+
+By default the request counts as a first-party token, the kind Baander's own apps hold, with the user's full roles. To test what a third-party client may do, `delegatedRequest()` adds the `X-Baander-Test-Client-Scopes` header with the token's scopes, separated by spaces. The request then counts as a [delegated token](../development/api-authentication.md#first-party-and-delegated-tokens): the user authenticates with `ROLE_USER` alone, and the scope check answers `403` `insufficient_scope` on every route those scopes do not cover. An empty value models a delegated token with no scopes.
+
+```php
+// A token holding only the library scope cannot reach playlists
+$response = $this->delegatedRequest('GET', '/api/playlists/', $user, ['library']);
+$this->assertJsonResponse($response, 403);
+```
+
+Integration tests that mint real access tokens act as the web app, so they issue them to the first-party client: `App\Tests\Fixtures\Auth\FirstPartyOAuthClient::entity()` returns the client registered under `auth.spa_client_id`, creating it when missing, as `app:auth:setup-clients` does. A token minted for any other client is delegated and reaches only what its scopes cover.
 
 ```php
 // Anonymous request — no auth headers

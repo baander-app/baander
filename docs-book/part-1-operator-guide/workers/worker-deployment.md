@@ -273,7 +273,7 @@ Docker receives the admitted runtime values through a temporary private env-file
 trusted daemon operators can inspect the resulting container environment.
 Additional runtime keys are `CONVERT_STORAGE_PATH`, `MEDIA_STORAGE_PATH`,
 `REDIS_PASSWORD`, `MAILER_DSN`, `MAIL_FROM_ADDRESS`, `VIDEO_ENCODER`,
-`VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY`, `STREAM_URL_HMAC_SECRET`, `APP_URL`,
+`VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY`, `STREAM_URL_HMAC_SECRET`, `AUTH_TOTP_ENCRYPTION_KEY`, `APP_URL`,
 `DEFAULT_URI`, `OTEL_ENABLED` and `OTEL_EXPORTER_OTLP_ENDPOINT`. Without
 `MAIL_FROM_ADDRESS`, email a worker sends comes from `noreply@localhost`; the
 sender name is always Bånder. `VIDEO_ENCODER` reaches the media worker and
@@ -281,6 +281,12 @@ overrides the value in the image's `.env`; see
 [Hardware acceleration](../media/transcoding.md#hardware-acceleration) for the
 encoder it selects. Values cannot contain line breaks and their complete
 env-file is limited to 4 KiB.
+
+Workers run with `APP_ENV=prod`, so they refuse to boot while `APP_SECRET`,
+`STREAM_URL_HMAC_SECRET` or `AUTH_TOTP_ENCRYPTION_KEY` is unset, a value committed in
+`.env`, `.env.dev` or `.env.example`, a `replace-with-` placeholder or shorter than 32 bytes. Supply all
+three in `runtimeEnvironment`, with the values web uses; see the
+[hardening checklist](../maintenance/security.md#hardening-checklist).
 
 Worker credentials admit only canonical Redis URL forms that preserve the
 `messages` and `scheduler_occurrences` streams, the `baander` group and the
