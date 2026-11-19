@@ -38,7 +38,7 @@ Application console commands run inside `app`. The control and execution worker 
 | [app:oauth:client:revoke](app-oauth-client-revoke.md) | Revoke an OAuth client and every token issued to it |
 | [app:oauth:client:rotate-secret](app-oauth-client-rotate-secret.md) | Give an OAuth client that authenticates with a secret a new one |
 | [app:oauth:generate-keys](app-oauth-generate-keys.md) | Generate OAuth2 private and public keys for JWT signing |
-| [app:oauth:purge-codes](app-oauth-purge-codes.md) | Delete authorization and device codes that expired more than an hour ago |
+| [app:oauth:purge-codes](app-oauth-purge-codes.md) | Delete authorization codes, device codes and pushed authorization requests that expired more than an hour ago |
 | [app:user:change-email](app-user-change-email.md) | Change a user's email address and send a verification link to it |
 | [app:user:create](app-user-create.md) | Create a new user account |
 | [app:user:delete](app-user-delete.md) | Delete a user account |
