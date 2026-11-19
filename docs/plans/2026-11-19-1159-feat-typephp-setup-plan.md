@@ -16,7 +16,7 @@ execution: code
 - Authority: the Product Contract owns behavior; technical decisions own the build mechanism; units implement those decisions.
 - Execution profile: one branch, `feat/typephp-setup`, with local commits in a separate worktree; no push or deployment.
 - Stop conditions: report compiler, runtime or dependency failures with reproducible evidence; do not claim application acceptance from compiler installation or a toy program.
-- Ownership: the lead owns setup, integration and verification; production replacement waits for the application gates below.
+- Ownership: the lead owns setup, candidate-image integration and authoritative verification. Continue through runtime qualification in this worktree; production replacement remains outside scope.
 
 ## Product Contract
 
@@ -76,6 +76,10 @@ The separate relay keeps its SQLite/rqlite architecture; this setup does not rep
 - KTD4. Use explicit embedded paths for application PHP and production vendor files; retain the physical application/resource tree during initial qualification (R1, R6). TypePHP does not provide general directory enumeration over embedded files, and Baander's coroutine container inspects PHP source through reflection. Embedding all `config` is unsafe because it includes runtime secrets.
 - KTD5. Treat the PHP runtime as a separate qualification gate (R7). CLI packaging requires TypePHP's private PHP builder and the complete application extension set including FFI. The builder image is pinned to PHP 8.5.12 ZTS, but `php-version` accepts `8.5`, not `8.5.12`; normalization to `8.5.0` leaves the private builder selecting a cached or latest patch release. The exact private PHP runtime pin remains unresolved alongside PECL source pinning. Verify that the generated runtime matches PHP 8.5.12 and its ABI before publication or application qualification. The production image uses ZTS; an NTS host build cannot establish production compatibility. Upstream PECL resolution uses `stable.txt`, so a release recipe must pin or verify those extension sources before publication.
 - KTD6. Keep setup as Make adapters and declarative compiler configuration; add no application orchestration abstraction (R4, R5). Follow the current Makefile's thin command pattern and keep root Composer unchanged.
+- KTD7. Rebuild both packages at `/var/www/html`, the canonical root in `packages/baander-tooling/resources/application-layout.json`, and retain the matching physical source/resource tree there. The shared candidate image derives from the existing CI image and stores the generated executables outside that tree. Provide a candidate-only `/usr/local/bin/php` dispatcher selecting the operator executable for the paired fixture's operator-script invocation and the console executable otherwise. Both artifacts remain in one image, so existing controller and worker image selection stays intact. `PHP_BINARY` children identify the selected ELF executable and use the patched native CLI dispatch (R2, R3, R5).
+- KTD8. Patch only the locked PHPX CLI adapter to recognize an existing readable script before prepending the default entry, including the extensionless console and embedded scripts. Preserve interpreter options and the default application-command path. This addresses the bare script invocations in backend runners, container startup scripts and failure-transport retries without rewriting their call sites (R2). Apply the patch only in the optional TypePHP toolchain and rebuild both artifacts.
+- KTD9. Keep development dependencies outside embedded resources. Before replacing ordinary PHP in the candidate, generate the CI development autoload mappings and bootstrap-file metadata into `/opt/typephp/qualification`, outside embedded paths. An external `auto_prepend_file` initializes the packaged production loader through `vendor/composer/autoload_real.php` and its generated initializer, then extends that existing loader with development/test mappings and guarded development bootstrap files. Leave `vendor/autoload.php` un-included: Symfony Runtime uses its first `require_once` result to decide whether to execute the console closure. Do not initialize a second Composer loader with the same generated class name. Verify its behavior in nested test processes before claiming backend coverage. The candidate uses an isolated external INI with FFI enabled and the documented memory settings; it must not scan the CI image's shared-extension INI directory (R3, R6).
+- KTD10. Inventory extension versions and enabled features against the existing application runtime before qualification. Add the missing build flags and extensions needed to preserve application behavior, rather than treating `extension_loaded` as parity. Add a tool-owned runtime lock for PHP 8.5.12, the selected PECL source versions and SHA-256 checksums, and required GD/Redis/Swoole configure flags. A narrow patch makes the private builder consume that lock instead of dynamic stable metadata and includes its hash in the derived cache identity. No distribution is authorized (R2, R3, R7).
 
 ### Evidence and compatibility boundaries
 
@@ -91,11 +95,29 @@ PHP 8.5 pipes are supported and are not a known blocker.
 The runtime lessons in `docs/solutions/runtime-errors/swoole-callbacks-outside-the-bundle-leak-pooled-services.md` and `swoole-sigterm-waits-for-master-timers-and-closes-connections-before-workers-stop.md` govern runtime qualification.
 `docs/solutions/developer-experience/local-gate-images-and-webkit-harness-runs.md` distinguishes local checks from authoritative image checks.
 
+### Qualification design
+
+The runtime qualification follows these boundaries; the diagram shows responsibility rather than prescribing class structure.
+
+```mermaid
+flowchart TB
+  Toolchain[Locked TypePHP and patched PHPX toolchain] --> Console[Console executable built at canonical root]
+  Toolchain --> Operator[Independent operator executable built at canonical root]
+  Console --> Candidate[Disposable CI-derived application candidate]
+  Operator --> Candidate
+  Physical[Matching physical source and external configuration] --> Candidate
+  Dev[External development support loader] --> Candidate
+  Candidate --> Suites[Existing backend suites and runtime drills]
+  Candidate --> Paired[Existing paired operator and lifecycle drills]
+```
+
+The current setup's successful package builds and console listing are recorded in `tools/typephp/README.md` and `ROADMAP.md`; they do not establish runtime acceptance. `packages/baander-tooling/src/Backend/Runtime.php` invokes literal `php` and requires the canonical root, while `scripts/backend-test-runner.php` starts PHPUnit and ParaTest through `PHP_BINARY`. The web and worker fixtures also launch scripts through ordinary PHP command shapes. Therefore a candidate image tag alone does not prove that these tests execute the generated artifact.
+
 ### Open Questions and Execution Gates
 
 - Setup can proceed independently of runtime qualification. The matching build image is part of setup; a known host NTS mismatch alone does not complete the package attempt.
 - Package generation must verify the selected PHP/PHPX prerequisites and production dependency tree before running; `--dry` also provisions runtime dependencies and is not a syntax-only check.
-- Application acceptance remains blocked until the generated executable proves ZEngine, source reflection, extensions, path resolution and subprocess behavior. Failures must be recorded with the failing command and diagnostic, then resolved within the packaging design or brought back as a concrete design decision.
+- Runtime qualification proceeds through U4–U6 using disposable services only. Application acceptance remains blocked until the generated executable proves ZEngine, source reflection, extensions, path resolution and subprocess behavior. Failures must be recorded with the failing command and diagnostic, then resolved within the packaging design or brought back as a concrete design decision.
 - A distributable runtime must use verified PHP 8.5.12 ZTS and extension versions matching the application. The pinned builder image does not pin the private PHP runtime: resolve its patch selection and PECL source versions before publication, and verify the generated runtime against that target.
 
 ## Implementation Units
@@ -123,22 +145,56 @@ The runtime lessons in `docs/solutions/runtime-errors/swoole-callbacks-outside-t
 - Approach: document prerequisites, install/build commands, physical resource requirements, versions, observed results and unresolved runtime acceptance. Apply `prose-fix` and a focused code review before local delivery.
 - Verification: run each documented command that is available, check links and paths, and record the exact verification checkpoint in the roadmap.
 
+### U4. Preserve ordinary PHP CLI dispatch and rebuild at the application root
+
+- Goal: preserve the existing console, script and subprocess invocation contracts under the packaged runtime (R1–R3; AE3; KTD7, KTD8).
+- Files: `tools/typephp/phpx-cli-script-dispatch.patch`, `docker/typephp/Dockerfile`, `Makefile`, focused CLI regression fixtures under `tools/typephp/tests/`.
+- Approach: patch the pinned PHPX adapter before its private-runtime build, invalidate derived caches as needed, and build both artifacts with the application mounted at `/var/www/html`. Recognize script inputs before applying the default entry; preserve argument boundaries and exit statuses without introducing a shell wrapper that `PHP_BINARY` children bypass.
+- Test scenarios: the real console binary handles default-entry `list --raw`, an explicit console script and a small readable script with arguments; `-r`, `-d`, `-f` and `--` retain interpreter behavior; an unknown application command still fails through Symfony rather than becoming a filename. A child launched through `PHP_BINARY` executes the requested script once with its original arguments. Verify the separate operator entry similarly without invoking a real Docker socket.
+- Verification: run the focused scenarios against the rebuilt executables, inspect embedded path identity, and record the source revisions and artifact hashes. These tests cover the new dispatch behavior, not the one-line console adapter.
+
+### U5. Compose isolated runtime candidates and qualify prerequisites
+
+- Goal: give existing verification runners the generated application and operator runtimes with their required physical resources and development support (R2, R3, R5, R6; AE3; KTD7–KTD10).
+- Files: `docker/typephp/qualification.Dockerfile`, `tools/typephp/qualification.ini`, `tools/typephp/qualification-php`, `tools/typephp/test-support.php`, `tools/typephp/application.yml`, `tools/typephp/runtime-lock.json`, `tools/typephp/php-builder-runtime-lock.patch`, `Makefile`.
+- Approach: derive the shared application/operator qualification image from the existing CI image at the same source revision. Keep executables under `/usr/local/lib/typephp`, outside the canonical application tree. Select the appropriate executable through the candidate-only dispatcher described by KTD7. Match the fixture's canonical or relative operator script and its supported explicit `-f` form without consuming or reinterpreting application arguments; execute the chosen ELF with the original arguments. Isolate the INI scan path and externalize writable state and secrets. Generate the external support metadata with the ordinary CI PHP and the matching locked vendor tree before selecting the candidate executable. Extend the packaged production loader as described by KTD9, without replacing production autoload mappings or embedding development dependencies.
+- Prerequisites: compare the current runtime's PHP/ZTS/FFI, Swoole, Redis and GD versions and capabilities with the generated runtime, plus the complete enabled-extension inventory. The measured CI baseline is PHP 8.5.12 ZTS, Swoole 6.2.4, Redis 6.3.0 and GD with FreeType, JPEG, XPM and WebP; `Dockerfile` records the additional extension and configure requirements. Resolve missing application-required options and extensions in the private builder and rebuild from the verified runtime lock. Check downloaded source hashes before use, and make lock changes invalidate derived runtime caches; pre-seeding PECL caches alone does not prevent upstream stable-version resolution. Do not load the CI image's shared extension binaries into the private runtime or disable required behavior to obtain a passing check.
+- Test scenarios: prove literal `php`, absolute `/usr/local/bin/php` and `PHP_BINARY` children use the selected artifact; verify the dispatcher routes the fixture's operator-script forms to the operator ELF, ordinary scripts/default commands to the console ELF, and preserves arguments and exit status; the canonical physical tree supports source reflection and generated container loading; PHPUnit, ParaTest and test bootstrap classes load through the external support tree while production classes resolve to the intended application graph. Verify effective INI settings in parent and child processes. In a disposable copied tree, make a physical fixture differ from its embedded counterpart and demonstrate which one executes, so a matching path or image label cannot substitute for artifact coverage. The selected operator process remains independent of Symfony boot.
+- Verification: record executable identities, effective INI/extension manifests, dependency resolution and artifact-to-source identity. Run console listing, kernel boot and cache warmup through the candidate against disposable services before full suites. `BAANDER_TEST_CHECKOUT_IN_IMAGE=1` keeps the verified image checkout; do not let a runner replace its application/vendor tree with an unrelated checkout.
+
+### U6. Run application qualification and record its actual coverage
+
+- Goal: prove the existing application behavior through the generated executables and record any remaining blocker separately from setup/build success (R1–R3, R7; AE3; KTD7–KTD10).
+- Files: `Makefile` for thin qualification command adapters if needed, `tools/typephp/README.md`, `ROADMAP.md`; focused runtime regression tests only for verified packaging defects uncovered by these checks.
+- Approach: run the existing backend suites and runtime drills with the candidate image selected, serializing shared or expensive runs. Use disposable PostgreSQL, Redis and fixture-owned Docker resources only. `OperatorProvisioning::setup` derives controller and worker images from the same application role. Use the candidate-only dispatcher to select the independent operator executable for the fixture's `/usr/local/bin/php` operator-script command while keeping the worker on the console executable. Verify the controller process executable is the operator ELF and the worker process executable is the console ELF; ordinary console interpretation of the operator source is not proof of the separate operator artifact. Fix verified packaging defects within these units and rerun the affected checks.
+- Test scenarios: full Unit, StaticAnalysisRules, Functional and Integration suites; native Swoole coroutine isolation and logging; database-backed HTTP and authentication flows; outbox/producer rollback and message delivery; current worker supervision; web reload/drain and shutdown; paired operator and worker lifecycle. Keep each existing runner's assertions and deadlines, and record any skips or unsupported environment prerequisites without claiming the corresponding behavior passed.
+- Verification: execute the commands in the runtime matrix below. Store suite/assertion counts, runtime drill outcomes, candidate/artifact identities and applicable static gates inline in maintained documentation. Run `ce-simplify-code`, focused code review, `prose-fix` and `git diff --check` before local commits; do not push or change deployment configuration.
+
 ## Verification Contract
 
 Setup gates are `composer --working-dir=tools/typephp validate --strict`, a locked install, compiler version/help, YAML parsing, embedding-scope inspection and `git diff --check`.
 A real package build is the integration check for the new configuration; failure is a blocker to package acceptance, not a passing build.
 No backend behavior changes are planned during setup, so backend suites do not substitute for this compiler check.
 
-For application acceptance, use a disposable image and fixture services with the same PHP ZTS ABI and extension set as the current runtime.
-Verify console listing, kernel boot and container warmup before `app:serve`, then a database-backed request, worker message processing, coroutine service isolation, drain/reload and the separate operator path.
-Verify application options using explicit PHP script dispatch, including `-f /app/bin/console -- --version`: bare `--version` selects PHP's interpreter version in the pinned CLI adapter. Inventory `PHP_BINARY` child commands as well as `/usr/local/bin/php -r`. In particular, the failure-transport retry currently passes `bin/console` as a bare child argument, which the packaged adapter would interpret as an application argument after prepending its entry. Retain the ordinary PHP runtime dependency and block acceptance for affected paths until verified dispatch adapters or deliberate call-site changes preserve their behavior.
-Run the existing backend suites through `scripts/test-backend-container.sh` against that candidate image and the focused runtime drills from the testing guide.
-For browser acceptance, use `make preview-up` and pass `make preview-url` explicitly as `E2E_BASE_URL`.
-These application gates run only once a package builds; report them as not run otherwise.
+For application acceptance, first establish U4 dispatch and U5 candidate-image prerequisites. The commands below use `BAANDER_TEST_IMAGE` for the verified application candidate and `BAANDER_TEST_CHECKOUT_IN_IMAGE=1` where supported. The host coordinator may run through its ordinary development PHP; discovery, test workers, application processes and their children inside the candidate must use the generated executable. Do not infer artifact coverage from the image name: verify the runner's actual argv, selected executable and autoload graph.
+
+| Check | Existing command or scope | Required evidence |
+|---|---|---|
+| Backend suites | `bash scripts/test-backend-container.sh --no-coverage` | All four suites through the candidate, with counts and explicit skips; retain the runner's expected/observed test-identity checks. |
+| Coroutine behavior | Native lane including `ContextualDoctrineRegistryTest` and `CoroutineSafeLoggingTest` | Swoole remains enabled and the existing isolation assertions execute under the candidate. |
+| HTTP and persistence | `bash scripts/test-web-runtime-container.sh` | The existing database-backed HTTP, mail, streaming, PostgreSQL reload/outage and Redis recovery assertions pass. |
+| Web lifecycle | `bash scripts/test-web-shutdown-container.sh` | Existing PID-1, reload, signal, drain and descendant-cleanup assertions pass under the candidate. |
+| Message behavior | `bash scripts/test-outbox-runtime-container.sh` and `bash scripts/test-producer-runtime-container.sh` | Existing acknowledgement/replay, rollback and producer recovery assertions pass. |
+| Worker supervision | `bash scripts/test-worker-command-container.sh` | Current worker supervisor and lease lifecycle run through the candidate. |
+| Operator and worker lifecycle | `bash scripts/test-worker-operator-container.sh` and `bash scripts/test-worker-lifecycle-container.sh` | Use the shared candidate image and its operator dispatcher with the documented container-mode and host prerequisites; prove the independent packaged operator and candidate worker execute the existing disposable drill. |
+
+The runner contracts and detailed assertions are maintained in `docs-book/part-2-developer-guide/testing/README.md`, `backend-runners.md`, `runtime-drills.md` and `workers-and-messaging.md`. Their PostgreSQL and Redis services remain disposable; no schema redesign or persistent-instance change is included. The legacy Supervisor worker-runtime fixture does not establish current deployment behavior.
+
+Preserve the existing application behavior if a runtime mismatch is found. Record the failing command and diagnostic, resolve a packaging or candidate-environment defect within U4–U6, and rerun the affected check. An application design change requires a concrete decision rather than weakening an assertion. Browser checks are conditional on a verified affected browser flow; use `make preview-up` and its explicit `E2E_BASE_URL` only when that flow is needed, and do not claim that an ordinary preview verifies the candidate executable.
 
 ## Definition of Done
 
 Setup is delivered when the compiler is locked and runnable, application packaging configurations are present and checked, the real build attempt has an honest recorded outcome, and documentation and review are complete.
 The whole application is packaged only when package generation succeeds.
-It is qualified for application use only when the application runtime gates pass.
+It is qualified for application use only when the runtime matrix passes through the candidate artifacts, their extension/INI and physical-path prerequisites are verified, and maintained documentation records exact coverage and remaining limits. A successful test under ordinary PHP or a different dependency graph cannot close this acceptance gate.
 Local commits record delivered units; the roadmap records evidence and remaining acceptance.
