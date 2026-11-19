@@ -78,7 +78,7 @@ describe('OAuthConsentPage', () => {
     expect(clientName).toHaveAttribute('lang', 'en')
     expect(clientName.parentElement).toHaveTextContent('Bånder TV wants to use your Bånder account.')
     expect(screen.getByText('App on your device')).toBeInTheDocument()
-    expect(screen.getByText('Browse and play your library')).toBeInTheDocument()
+    expect(screen.getByText('Browse and play your library, and control playback on your devices')).toBeInTheDocument()
     expect(lookupParams()).toEqual({ client_id: 'tv-app', request_uri: REQUEST_URI })
     expect(mockLeave).not.toHaveBeenCalled()
 
@@ -121,6 +121,15 @@ describe('OAuthConsentPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Start again from the app')
     expect(screen.queryByRole('button', { name: 'Allow' })).not.toBeInTheDocument()
     expect(mockPost).not.toHaveBeenCalled()
+    expect(mockLeave).not.toHaveBeenCalled()
+  })
+
+  it('asks the user to start again from the app when the request asks for nothing that can be granted', async () => {
+    mockGet.mockRejectedValue(axiosError(400, { error: 'invalid_scope', error_description: 'None of the requested scopes can be granted.' }))
+    mount()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('asks for no access Bånder can give. Start again from the app.')
+    expect(screen.queryByRole('button', { name: 'Allow' })).not.toBeInTheDocument()
     expect(mockLeave).not.toHaveBeenCalled()
   })
 

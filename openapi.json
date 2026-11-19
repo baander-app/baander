@@ -2307,6 +2307,7 @@
                             "schema": {
                                 "required": [
                                     "response_type",
+                                    "scope",
                                     "code_challenge",
                                     "code_challenge_method"
                                 ],
@@ -2331,7 +2332,7 @@
                                         "format": "uri"
                                     },
                                     "scope": {
-                                        "description": "Space-separated scopes",
+                                        "description": "Space-separated scopes; at least one must be grantable (profile, email, library or playlist), others are dropped",
                                         "type": "string"
                                     },
                                     "state": {
@@ -2370,7 +2371,7 @@
                         }
                     },
                     "400": {
-                        "description": "OAuth error, including invalid_dpop_proof when the proof and dpop_jkt name different keys, use_dpop_nonce, and request_not_supported for a request object",
+                        "description": "OAuth error, including invalid_scope when no requested scope can be granted, invalid_dpop_proof when the proof and dpop_jkt name different keys, use_dpop_nonce, and request_not_supported for a request object",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2632,7 +2633,8 @@
                         "application/json": {
                             "schema": {
                                 "required": [
-                                    "client_id"
+                                    "client_id",
+                                    "scope"
                                 ],
                                 "properties": {
                                     "client_id": {
@@ -2654,7 +2656,7 @@
                                         ]
                                     },
                                     "scope": {
-                                        "description": "Space-separated scopes",
+                                        "description": "Space-separated scopes; at least one must be grantable (profile, email, library or playlist), others are dropped",
                                         "type": "string"
                                     }
                                 },
@@ -2675,7 +2677,7 @@
                         }
                     },
                     "400": {
-                        "description": "Missing client_id, or the client may not use the device flow",
+                        "description": "Missing client_id, the client may not use the device flow, or no requested scope can be granted (invalid_scope)",
                         "content": {
                             "application/json": {
                                 "schema": {

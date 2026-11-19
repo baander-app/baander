@@ -121,7 +121,7 @@ final class DisabledUserAccessTest extends TestCase
         $clientId = $client->getPublicId()->toString();
 
         $pushed = $this->bus()
-            ->dispatch(new PushAuthorizationRequestCommand(new ClientCredentials($clientId), 'code', $redirectUri, [], null, $challenge, 'S256', null, self::DPOP_JKT))
+            ->dispatch(new PushAuthorizationRequestCommand(new ClientCredentials($clientId), 'code', $redirectUri, ['library'], null, $challenge, 'S256', null, self::DPOP_JKT))
             ->last(HandledStamp::class)?->getResult();
         self::assertInstanceOf(PushedAuthorizationRequestDTO::class, $pushed);
         $authorization = $this->bus()
@@ -147,6 +147,8 @@ final class DisabledUserAccessTest extends TestCase
     /** The response the production access token authenticator gives a DPoP-bound token presented under its scheme: 200 lets the request through. */
     private function accessTokenStatus(string $accessToken): int
     {
+        $spaClientId = static::getContainer()->getParameter('auth.spa_client_id');
+        self::assertIsString($spaClientId);
         $authenticator = new OAuth2Authenticator(
             $this->service(ResourceServer::class),
             $this->userRepository,
@@ -155,7 +157,7 @@ final class DisabledUserAccessTest extends TestCase
             $this->service(TokenMetadataRepositoryInterface::class),
             AuthenticationFailureMessages::create(),
             $this->service(ClientRepositoryInterface::class),
-            (string) static::getContainer()->getParameter('auth.spa_client_id'),
+            $spaClientId,
         );
 
         $request = Request::create('https://baander.app/api/auth/me');

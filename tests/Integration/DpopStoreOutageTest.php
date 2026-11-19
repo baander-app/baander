@@ -261,6 +261,7 @@ final class DpopStoreOutageTest extends TestCase
             'response_type' => 'code',
             'client_id' => $publicId->toString(),
             'redirect_uri' => self::REDIRECT,
+            'scope' => 'library',
             'code_challenge' => 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
             'code_challenge_method' => 'S256',
         ];

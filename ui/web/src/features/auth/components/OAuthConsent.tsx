@@ -55,6 +55,18 @@ function viewForOutcome(outcome: AuthorizationLookup | AuthorizationOutcome, exp
   return target === null ? { name: 'unsafeRedirect' } : { name: 'leaving', target }
 }
 
+/** An expired, used or ungrantable request cannot be fixed on this page; the user starts again from the app. */
+function rejectionMessageKey(error: string) {
+  switch (error) {
+    case 'invalid_request_uri':
+      return 'auth.consent.requestUnavailable'
+    case 'invalid_scope':
+      return 'auth.consent.scopeUnavailable'
+    default:
+      return 'auth.consent.invalidRequest'
+  }
+}
+
 interface OAuthConsentProps {
   /** The page's query string without the leading `?`; only its `client_id` and `request_uri` reach the server. */
   query: string
@@ -155,9 +167,7 @@ export function OAuthConsent({ query }: OAuthConsentProps) {
     case 'rejected':
       return (
         <Form as="div">
-          <ErrorAlert role="alert">
-            {view.error === 'invalid_request_uri' ? t('auth.consent.requestUnavailable') : t('auth.consent.invalidRequest')}
-          </ErrorAlert>
+          <ErrorAlert role="alert">{t(rejectionMessageKey(view.error))}</ErrorAlert>
         </Form>
       )
 

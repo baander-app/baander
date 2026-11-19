@@ -179,13 +179,13 @@ final class OAuthController
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ['response_type', 'code_challenge', 'code_challenge_method'],
+                required: ['response_type', 'scope', 'code_challenge', 'code_challenge_method'],
                 properties: [
                     new OA\Property(property: 'response_type', type: 'string', enum: ['code']),
                     new OA\Property(property: 'client_id', description: 'Required unless an HTTP Basic header names the client; it may repeat that client', type: 'string'),
                     new OA\Property(property: 'client_secret', description: 'Secret clients that do not send it with HTTP Basic', type: 'string'),
                     new OA\Property(property: 'redirect_uri', description: 'Required unless the client registered exactly one redirect URI', type: 'string', format: 'uri'),
-                    new OA\Property(property: 'scope', description: 'Space-separated scopes', type: 'string'),
+                    new OA\Property(property: 'scope', description: 'Space-separated scopes; at least one must be grantable (profile, email, library or playlist), others are dropped', type: 'string'),
                     new OA\Property(property: 'state', description: 'At most 1024 bytes', type: 'string'),
                     new OA\Property(property: 'code_challenge', description: 'BASE64URL(SHA256(code_verifier))', type: 'string'),
                     new OA\Property(property: 'code_challenge_method', type: 'string', enum: ['S256']),
@@ -195,7 +195,7 @@ final class OAuthController
         ),
         responses: [
             new OA\Response(response: '201', description: 'The request URI for the authorization endpoint (RFC 9126 section 2.2)', content: new OA\JsonContent(ref: new Model(type: PushedAuthorizationRequestResource::class))),
-            new OA\Response(response: '400', description: 'OAuth error, including invalid_dpop_proof when the proof and dpop_jkt name different keys, use_dpop_nonce, and request_not_supported for a request object', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
+            new OA\Response(response: '400', description: 'OAuth error, including invalid_scope when no requested scope can be granted, invalid_dpop_proof when the proof and dpop_jkt name different keys, use_dpop_nonce, and request_not_supported for a request object', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
             new OA\Response(response: '401', description: 'Client authentication failed, or the client is revoked', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
             new OA\Response(response: '413', description: 'The request body is larger than 64 KiB (`invalid_request`)', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
             new OA\Response(
@@ -379,19 +379,19 @@ final class OAuthController
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ['client_id'],
+                required: ['client_id', 'scope'],
                 properties: [
                     new OA\Property(property: 'client_id', type: 'string'),
                     new OA\Property(property: 'client_secret', description: 'Confidential clients registered for client_secret_post only', type: 'string'),
                     new OA\Property(property: 'client_assertion', description: 'Signed JWT client assertion; confidential clients registered for private_key_jwt only', type: 'string'),
                     new OA\Property(property: 'client_assertion_type', description: 'Sent with client_assertion', type: 'string', enum: [ClientCredentials::JWT_BEARER_ASSERTION_TYPE]),
-                    new OA\Property(property: 'scope', description: 'Space-separated scopes', type: 'string'),
+                    new OA\Property(property: 'scope', description: 'Space-separated scopes; at least one must be grantable (profile, email, library or playlist), others are dropped', type: 'string'),
                 ],
             ),
         ),
         responses: [
             new OA\Response(response: '200', description: 'Device code issued (RFC 8628 section 3.2)', content: new OA\JsonContent(ref: new Model(type: DeviceAuthorizationResource::class))),
-            new OA\Response(response: '400', description: 'Missing client_id, or the client may not use the device flow', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
+            new OA\Response(response: '400', description: 'Missing client_id, the client may not use the device flow, or no requested scope can be granted (invalid_scope)', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
             new OA\Response(response: '401', description: 'Unknown or revoked client, or client authentication failed', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
         ],
     )]

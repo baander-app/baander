@@ -12,7 +12,6 @@ use App\Auth\Domain\Model\OAuth\AuthCode;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\PushedAuthorizationRequest;
 use App\Auth\Domain\Model\OAuth\TokenId;
-use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
 use App\Auth\Domain\Repository\OAuth\PushedAuthorizationRequestRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
@@ -77,12 +76,7 @@ final readonly class AuthorizationRequestValidator
             throw OAuthProtocolException::invalidRequest('The code_challenge is not a base64url SHA-256 digest.');
         }
 
-        $grantedScopes = array_map(
-            static fn (string $scope): Scope => new Scope($scope),
-            array_values(array_unique($this->scopeAllowlist->filter($scopes))),
-        );
-
-        return new ValidatedPushedAuthorizationRequest($client, $resolvedRedirectUri, $codeChallenge, $codeChallengeMethod, $grantedScopes);
+        return new ValidatedPushedAuthorizationRequest($client, $resolvedRedirectUri, $codeChallenge, $codeChallengeMethod, $this->scopeAllowlist->grantable($scopes));
     }
 
     /**

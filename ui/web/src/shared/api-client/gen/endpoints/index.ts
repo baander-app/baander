@@ -4767,8 +4767,8 @@ export type PostOauthParBody = {
   client_secret?: string;
   /** Required unless the client registered exactly one redirect URI */
   redirect_uri?: string;
-  /** Space-separated scopes */
-  scope?: string;
+  /** Space-separated scopes; at least one must be grantable (profile, email, library or playlist), others are dropped */
+  scope: string;
   /** At most 1024 bytes */
   state?: string;
   /** BASE64URL(SHA256(code_verifier)) */
@@ -4843,8 +4843,8 @@ export type PostOauthDeviceAuthorizeBody = {
   client_assertion?: string;
   /** Sent with client_assertion */
   client_assertion_type?: PostOauthDeviceAuthorizeBodyClientAssertionType;
-  /** Space-separated scopes */
-  scope?: string;
+  /** Space-separated scopes; at least one must be grantable (profile, email, library or playlist), others are dropped */
+  scope: string;
 };
 
 export type GetOauthDeviceVerifyParams = {

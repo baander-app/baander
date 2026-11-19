@@ -10,7 +10,6 @@ use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\ScopeAllowlist;
 use App\Auth\Application\Service\OAuthClientAuthenticator;
 use App\Auth\Domain\Model\OAuth\DeviceCode;
-use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
 use App\Auth\Domain\Repository\OAuth\DeviceCodeRepositoryInterface;
 use DateInterval;
 use RuntimeException;
@@ -45,10 +44,7 @@ final readonly class RequestDeviceAuthorizationHandler
             throw OAuthProtocolException::unauthorizedClient('The client is not registered for the device authorization grant.');
         }
 
-        $scopes = array_map(
-            static fn (string $scope): Scope => new Scope($scope),
-            array_values(array_unique($this->scopeAllowlist->filter($command->scopes))),
-        );
+        $scopes = $this->scopeAllowlist->grantable($command->scopes);
 
         $userCode = $this->unusedUserCode();
         $deviceCode = DeviceCode::create(

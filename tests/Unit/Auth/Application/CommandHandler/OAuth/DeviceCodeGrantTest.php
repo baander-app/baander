@@ -20,6 +20,7 @@ use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\OAuth\DeviceCodeRepositoryInterface;
 use App\Shared\Domain\Model\Email;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /** The device authorization grant from the device's side (RFC 8628 sections 3.1, 3.4 and 3.5). */
@@ -74,6 +75,21 @@ final class DeviceCodeGrantTest extends TestCase
 
         $this->authorize($boxId, 'box-secret');
         self::assertCount(1, $this->codes);
+    }
+
+    /** @return iterable<string, array{list<string>}> */
+    public static function ungrantableScopes(): iterable
+    {
+        yield 'no scope' => [[]];
+        yield 'only a scope the server does not grant' => [['admin']];
+    }
+
+    /** @param list<string> $scopes */
+    #[DataProvider('ungrantableScopes')]
+    public function testAnAuthorizationWithNothingGrantableIsRefusedWithInvalidScope(array $scopes): void
+    {
+        $this->assertProtocolError('invalid_scope', fn () => $this->authorize(scopes: $scopes));
+        self::assertSame([], $this->codes);
     }
 
     public function testPendingPollsAnswerAuthorizationPendingThenSlowDown(): void
@@ -161,7 +177,8 @@ final class DeviceCodeGrantTest extends TestCase
         $this->assertProtocolError('invalid_request', fn () => $this->poll(null));
     }
 
-    private function authorize(?string $clientId = null, ?string $clientSecret = null): DeviceAuthorizationDTO
+    /** @param list<string> $scopes */
+    private function authorize(?string $clientId = null, ?string $clientSecret = null, array $scopes = ['library', 'admin']): DeviceAuthorizationDTO
     {
         $handler = new RequestDeviceAuthorizationHandler(
             $this->clientAuthenticator(),
@@ -174,7 +191,7 @@ final class DeviceCodeGrantTest extends TestCase
 
         return $handler(new RequestDeviceAuthorizationCommand(
             new ClientCredentials($clientId ?? $this->tv->getPublicId()->toString(), $clientSecret),
-            ['library', 'admin'],
+            $scopes,
         ));
     }
 

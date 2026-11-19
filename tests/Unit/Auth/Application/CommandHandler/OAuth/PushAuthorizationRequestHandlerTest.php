@@ -148,6 +148,21 @@ final class PushAuthorizationRequestHandlerTest extends TestCase
         self::assertSame([], $this->saved);
     }
 
+    /** @return iterable<string, array{list<string>}> */
+    public static function ungrantableScopes(): iterable
+    {
+        yield 'no scope' => [[]];
+        yield 'only a scope the server does not grant' => [['admin']];
+    }
+
+    /** @param list<string> $scopes */
+    #[DataProvider('ungrantableScopes')]
+    public function testAPushWithNothingGrantableIsRefusedWithInvalidScope(array $scopes): void
+    {
+        $this->assertRejected('invalid_scope', fn () => $this->push(proofJkt: self::KEY_ONE, scopes: $scopes));
+        self::assertSame([], $this->saved);
+    }
+
     public function testAnUnknownClientIsRejected(): void
     {
         $this->assertRejected('invalid_client', fn () => $this->push(clientId: 'unknown_client_000001', proofJkt: self::KEY_ONE), 401);
@@ -203,6 +218,7 @@ final class PushAuthorizationRequestHandlerTest extends TestCase
         $this->assertRejected('invalid_request', fn () => $this->push(clientId: $native->getPublicId()->toString(), redirectUri: 'http://localhost.baander.app:53682', proofJkt: self::KEY_ONE));
     }
 
+    /** @param list<string> $scopes */
     private function push(
         ?string $clientId = null,
         ?string $clientSecret = null,
@@ -213,6 +229,7 @@ final class PushAuthorizationRequestHandlerTest extends TestCase
         ?string $proofJkt = null,
         ?string $dpopJkt = null,
         ?string $state = 'state-1',
+        array $scopes = ['library', 'admin'],
     ): PushedAuthorizationRequestDTO {
         $handler = new PushAuthorizationRequestHandler(
             $this->clientAuthenticator(),
@@ -233,7 +250,7 @@ final class PushAuthorizationRequestHandlerTest extends TestCase
             credentials: new ClientCredentials($clientId ?? $this->client->getPublicId()->toString(), $clientSecret),
             responseType: $responseType,
             redirectUri: $redirectUri,
-            scopes: ['library', 'admin'],
+            scopes: $scopes,
             state: $state,
             codeChallenge: $challenge,
             codeChallengeMethod: $method,

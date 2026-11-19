@@ -484,6 +484,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertTrue($metadata['require_pushed_authorization_requests']);
         self::assertSame(['S256'], $metadata['code_challenge_methods_supported']);
         self::assertContains('urn:ietf:params:oauth:grant-type:device_code', $metadata['grant_types_supported']);
+        self::assertSame(['profile', 'email', 'library', 'playlist'], $metadata['scopes_supported']);
     }
 
     /** RFC 9068: an access token names its issuer and type, and its key ID is the one the JWKS publishes. */
@@ -623,7 +624,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
     {
         $tv = new SignedDpopProof();
         $clientId = $this->deviceClient();
-        $codes = json_decode((string) $this->send('POST', '/api/oauth/device/authorize', form: ['client_id' => $clientId])->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        $codes = json_decode((string) $this->send('POST', '/api/oauth/device/authorize', form: ['client_id' => $clientId, 'scope' => 'library'])->getContent(), true, flags: JSON_THROW_ON_ERROR);
 
         $web = new SignedDpopProof();
         $login = $this->login($web);
@@ -841,7 +842,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertSame(400, $unknown->getStatusCode());
         self::assertSame('invalid_user_code', json_decode((string) $unknown->getContent(), true, flags: JSON_THROW_ON_ERROR)['error']['details']['reason']);
 
-        $codes = json_decode((string) $this->send('POST', '/api/oauth/device/authorize', form: ['client_id' => $this->deviceClient()])->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        $codes = json_decode((string) $this->send('POST', '/api/oauth/device/authorize', form: ['client_id' => $this->deviceClient(), 'scope' => 'library'])->getContent(), true, flags: JSON_THROW_ON_ERROR);
         $denial = $this->asUser($login['accessToken'], $web, 'POST', '/api/oauth/device/approve', json: ['userCode' => $codes['user_code'], 'decision' => 'deny']);
         self::assertSame('denied', json_decode((string) $denial->getContent(), true, flags: JSON_THROW_ON_ERROR)['data']['decision']);
         $decided = $this->asUser($login['accessToken'], $web, 'GET', '/api/oauth/device/verify', query: ['user_code' => $codes['user_code']]);

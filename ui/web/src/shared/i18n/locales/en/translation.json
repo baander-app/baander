@@ -68,12 +68,10 @@
     },
     "scopes": {
       "intro": "It will be able to:",
-      "default": "Use Bånder with your account",
-      "access-api": "Use Bånder with your account",
-      "profile": "See your name and profile",
+      "profile": "See your name and profile picture",
       "email": "See your email address",
-      "library": "Browse and play your library",
-      "playlist": "See and change your playlists"
+      "library": "Browse and play your library, and control playback on your devices",
+      "playlist": "See, create and change your playlists"
     },
     "device": {
       "title": "Connect a device",
@@ -108,6 +106,7 @@
       "redirecting": "Returning you to the app…",
       "invalidRequest": "This sign-in request is not valid, so you can't continue. Go back to the app and try again.",
       "requestUnavailable": "This sign-in request has expired or was already used. Start again from the app.",
+      "scopeUnavailable": "This sign-in request asks for no access Bånder can give. Start again from the app.",
       "unsafeRedirect": "The server answered with an unexpected return address, so you were not sent back to the app.",
       "rateLimited_one": "Too many attempts. Try again in {{count}} second.",
       "rateLimited_other": "Too many attempts. Try again in {{count}} seconds.",

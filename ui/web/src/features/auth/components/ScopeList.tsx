@@ -2,11 +2,14 @@ import styled from 'styled-components'
 import { useTranslation } from '@/shared/i18n'
 import { textRole } from '@/shared/theme'
 
-/**
- * Scopes the server grants (`auth.scopes.user_grants`) and the default `access-api`; others are
- * shown by name.
- */
-const KNOWN_SCOPES = new Set(['access-api', 'profile', 'email', 'library', 'playlist'])
+/** The scopes the server grants (`auth.scopes.user_grants`); the server drops any other. */
+const KNOWN_SCOPES = ['profile', 'email', 'library', 'playlist'] as const
+
+type KnownScope = (typeof KNOWN_SCOPES)[number]
+
+function isKnownScope(scope: string): scope is KnownScope {
+  return (KNOWN_SCOPES as readonly string[]).includes(scope)
+}
 
 const Intro = styled.p`
   ${textRole('body')}
@@ -23,15 +26,14 @@ const List = styled.ul`
   color: var(--color-foreground);
 `
 
-const ScopeName = styled.code`
-  ${textRole('mono-sm')}
-`
-
 interface ScopeListProps {
   scopes: string[]
 }
 
-/** What a client will be allowed to do, in words. No scopes means the default grant. */
+/**
+ * What a client will be allowed to do, in words. The server grants only the scopes it lists and
+ * refuses a request with none, so an unknown scope grants nothing and is not shown.
+ */
 export function ScopeList({ scopes }: ScopeListProps) {
   const { t } = useTranslation()
 
@@ -39,15 +41,9 @@ export function ScopeList({ scopes }: ScopeListProps) {
     <div>
       <Intro>{t('auth.scopes.intro')}</Intro>
       <List>
-        {scopes.length === 0 ? (
-          <li>{t('auth.scopes.default')}</li>
-        ) : (
-          scopes.map((scope) => (
-            <li key={scope}>
-              {KNOWN_SCOPES.has(scope) ? t(`auth.scopes.${scope}`) : <ScopeName>{scope}</ScopeName>}
-            </li>
-          ))
-        )}
+        {scopes.filter(isKnownScope).map((scope) => (
+          <li key={scope}>{t(`auth.scopes.${scope}`)}</li>
+        ))}
       </List>
     </div>
   )
