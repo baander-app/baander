@@ -109,10 +109,10 @@ final class InitialSchemaMigrationTest extends TestCase
         }
         $factory = $this->factory();
         $factory->getMetadataStorage()->ensureInitialized();
-        self::assertCount(29, $factory->getMigrationRepository()->getMigrations());
+        self::assertCount(31, $factory->getMigrationRepository()->getMigrations());
         self::assertSame(0, $this->migrate($factory));
-        self::assertSame(['DoctrineMigrations\\Version20261017000000', 'DoctrineMigrations\\Version20261017130000', 'DoctrineMigrations\\Version20261017150000', 'DoctrineMigrations\\Version20261017160000', 'DoctrineMigrations\\Version20261017170000', 'DoctrineMigrations\\Version20261018130000', 'DoctrineMigrations\\Version20261021120000', 'DoctrineMigrations\\Version20261030210000', 'DoctrineMigrations\\Version20261031120000', 'DoctrineMigrations\\Version20261101190000', 'DoctrineMigrations\\Version20261101203000', 'DoctrineMigrations\\Version20261101210000', 'DoctrineMigrations\\Version20261102190000', 'DoctrineMigrations\\Version20261102191000', 'DoctrineMigrations\\Version20261102200000', 'DoctrineMigrations\\Version20261103120000', 'DoctrineMigrations\\Version20261103210000', 'DoctrineMigrations\\Version20261104120000', 'DoctrineMigrations\\Version20261105120000', 'DoctrineMigrations\\Version20261107120000', 'DoctrineMigrations\\Version20261110120000', 'DoctrineMigrations\\Version20261111180000', 'DoctrineMigrations\\Version20261113120000', 'DoctrineMigrations\\Version20261114120000', 'DoctrineMigrations\\Version20261115090000', 'DoctrineMigrations\\Version20261115100000', 'DoctrineMigrations\\Version20261115110000', 'DoctrineMigrations\\Version20261115120000', 'DoctrineMigrations\\Version20261117130000'], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
-        self::assertSame(92, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
+        self::assertSame(['DoctrineMigrations\\Version20261017000000', 'DoctrineMigrations\\Version20261017130000', 'DoctrineMigrations\\Version20261017150000', 'DoctrineMigrations\\Version20261017160000', 'DoctrineMigrations\\Version20261017170000', 'DoctrineMigrations\\Version20261018130000', 'DoctrineMigrations\\Version20261021120000', 'DoctrineMigrations\\Version20261030210000', 'DoctrineMigrations\\Version20261031120000', 'DoctrineMigrations\\Version20261101190000', 'DoctrineMigrations\\Version20261101203000', 'DoctrineMigrations\\Version20261101210000', 'DoctrineMigrations\\Version20261102190000', 'DoctrineMigrations\\Version20261102191000', 'DoctrineMigrations\\Version20261102200000', 'DoctrineMigrations\\Version20261103120000', 'DoctrineMigrations\\Version20261103210000', 'DoctrineMigrations\\Version20261104120000', 'DoctrineMigrations\\Version20261105120000', 'DoctrineMigrations\\Version20261107120000', 'DoctrineMigrations\\Version20261110120000', 'DoctrineMigrations\\Version20261111180000', 'DoctrineMigrations\\Version20261113120000', 'DoctrineMigrations\\Version20261114120000', 'DoctrineMigrations\\Version20261115090000', 'DoctrineMigrations\\Version20261115100000', 'DoctrineMigrations\\Version20261115110000', 'DoctrineMigrations\\Version20261115120000', 'DoctrineMigrations\\Version20261117130000', 'DoctrineMigrations\\Version20261119120000', 'DoctrineMigrations\\Version20261119130000'], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
+        self::assertSame(93, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
         self::assertSame(['TimeZone=UTC'], $this->databaseSettings($this->connection));
         $this->assertSchedules();
         $this->assertIdentitiesAllocate();
@@ -125,13 +125,13 @@ final class InitialSchemaMigrationTest extends TestCase
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         $failure = $this->refused($this->factory(), '0');
-        self::assertStringContainsString('Party invitations cannot be removed: dropping the table loses which users each host invited.', $failure);
+        self::assertStringContainsString('Dropping the authentication method would leave clients that sign their own assertions without the keys they authenticate with.', $failure);
         self::assertSame($catalog, $this->catalog('public'));
         self::assertSame($seeds, $this->connection->fetchAllAssociative('SELECT * FROM scheduled_jobs ORDER BY id'));
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         self::assertSame(0, $this->migrate($this->factory(true)));
-        self::assertSame(30, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
+        self::assertSame(32, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
         self::assertSame('future_migration_probe', $this->connection->fetchOne("SELECT to_regclass('future_migration_probe')::text"));
     }
 
@@ -369,6 +369,35 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
         self::assertSame($after['playlists'], $snapshot()['playlists']);
         self::assertSame($after['playlist_song'], $snapshot()['playlist_song']);
         self::assertSame($after['playlist_collaborators'], $snapshot()['playlist_collaborators']);
+    }
+
+    public function testKeyBindingUpgradeDeletesUnboundAuthorizationCodesAndKeepsTheirClientsAndUsers(): void
+    {
+        self::assertSame(0, $this->migrate($this->factory(), 'DoctrineMigrations\\Version20261117130000'));
+        [$user, $client] = [Uuid::generate()->toString(), Uuid::generate()->toString()];
+        $this->connection->executeStatement(
+            "INSERT INTO users (id, public_id, name, email, password, created_at, updated_at) VALUES (?, ?, 'Key binding upgrade', 'key-binding-upgrade@baander.app', 'hash', clock_timestamp(), clock_timestamp())",
+            [$user, (new PublicId())->toString()],
+        );
+        $this->connection->insert('oauth_clients', [
+            'id' => $client, 'public_id' => (new PublicId())->toString(), 'name' => 'Key binding upgrade',
+            'redirect' => '["https://app.baander.app/callback"]', 'created_at' => '2026-11-19 12:00:00+00', 'updated_at' => '2026-11-19 12:00:00+00',
+        ]);
+        $this->connection->insert('oauth_auth_codes', [
+            'id' => Uuid::generate()->toString(), 'code_id' => bin2hex(random_bytes(16)), 'client_id' => $client, 'user_id' => $user,
+            'redirect_uri' => 'https://app.baander.app/callback', 'code_challenge' => 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+            'code_challenge_method' => 'S256', 'expires_at' => '2026-11-19 12:01:00+00', 'created_at' => '2026-11-19 12:00:00+00', 'updated_at' => '2026-11-19 12:00:00+00',
+        ]);
+
+        self::assertSame(0, $this->migrate($this->factory()));
+
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM oauth_auth_codes'), 'A code without a key binding cannot be given one.');
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT count(*) FROM oauth_clients WHERE id = ?', [$client]));
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT count(*) FROM users WHERE id = ?', [$user]));
+        self::assertSame('NO', $this->connection->fetchOne(
+            "SELECT is_nullable FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'oauth_auth_codes' AND column_name = 'dpop_jkt'",
+        ));
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM oauth_pushed_authorization_requests'));
     }
 
     public function testFreshDatabaseInitializesWithoutPreprovisionedExtensions(): void

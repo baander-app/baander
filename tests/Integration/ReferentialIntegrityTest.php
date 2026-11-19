@@ -49,6 +49,7 @@ final class ReferentialIntegrityTest extends TestCase
         'oauth_access_tokens.chain_id' => 'token chain identifier with no chain table',
         'oauth_access_tokens.token_id' => 'the token\'s own OAuth identifier',
         'oauth_auth_codes.code_id' => 'the code\'s own OAuth identifier',
+        'oauth_pushed_authorization_requests.request_id' => 'the pushed request\'s own OAuth identifier, carried in its request URI',
         'oauth_refresh_tokens.chain_id' => 'token chain identifier with no chain table',
         'oauth_refresh_tokens.token_id' => 'the token\'s own OAuth identifier',
         'oauth_token_metadata.session_id' => 'client-reported session identifier',
@@ -459,6 +460,7 @@ final class ReferentialIntegrityTest extends TestCase
             'redirect_uri' => 'https://app.baander.app/callback',
             'code_challenge' => 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
             'code_challenge_method' => 'S256',
+            'dpop_jkt' => 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs',
             'created_at' => '2026-10-07 12:00:00+00',
             'updated_at' => '2026-10-07 12:00:00+00',
         ]);

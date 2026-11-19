@@ -190,7 +190,8 @@ final class OAuthClientPersistenceTest extends TestCase
             'name' => 'Key client user', 'email' => 'key-client@baander.app', 'password' => 'test-only', 'totp_secret' => 'test-only-totp-secret', ...$times]);
         $this->writer->insert('oauth_auth_codes', ['id' => Uuid::generate()->toString(), 'code_id' => $tokens['auth code'],
             'client_id' => $client->toString(), 'user_id' => $user, 'redirect_uri' => 'https://server.baander.app/callback',
-            'code_challenge' => 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM', 'code_challenge_method' => 'S256', ...$times]);
+            'code_challenge' => 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM', 'code_challenge_method' => 'S256',
+            'dpop_jkt' => '0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I', ...$times]);
         $this->writer->insert('oauth_device_codes', ['id' => $deviceCode, 'device_code' => bin2hex(random_bytes(16)),
             'user_code' => strtoupper(bin2hex(random_bytes(6))), 'client_id' => $client->toString(),
             'verification_uri' => 'https://app.baander.app/device', 'expires_at' => '2026-11-19 12:15:00+00', ...$times]);

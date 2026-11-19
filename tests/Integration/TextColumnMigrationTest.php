@@ -97,7 +97,7 @@ final class TextColumnMigrationTest extends TestCase
         $connection->insert('oauth_auth_codes', ['id' => $authCode, 'code_id' => 'u19-' . $suffix, 'user_id' => $this->createUser()->toString(),
             'client_id' => $client, 'redirect_uri' => 'https://app.baander.app/callback',
             'code_challenge' => 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM', 'code_challenge_method' => 'S256',
-            'created_at' => $now, 'updated_at' => $now]);
+            'dpop_jkt' => 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs', 'created_at' => $now, 'updated_at' => $now]);
 
         $notification = str_repeat('n', 64);
         $connection->insert('domain_event_outbox_delivery', ['channel' => 'webhook', 'notification_id' => $notification, 'payload' => '{}']);

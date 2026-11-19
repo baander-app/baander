@@ -9,18 +9,21 @@ use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Exception\DriverException;
 use PHPUnit\Framework\TestCase;
 
-/** Authorization codes carry their redirect URI and an S256 PKCE challenge. */
+/** Authorization codes carry their redirect URI, an S256 PKCE challenge and the thumbprint of their DPoP key. */
 final class AuthCodePkceMigrationTest extends TestCase
 {
     use OwnershipPersistenceHarness;
 
     private const CHALLENGE = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
+    // RFC 7638 section 3.1.
+    private const THUMBPRINT = 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs';
 
-    public function testAnAuthCodeNeedsARedirectUriAndAnS256Challenge(): void
+    public function testAnAuthCodeNeedsARedirectUriAnS256ChallengeAndAKeyThumbprint(): void
     {
         self::assertSame([
             'code_challenge' => 'NO',
             'code_challenge_method' => 'NO',
+            'dpop_jkt' => 'NO',
             'redirect_uri' => 'NO',
         ], $this->columns());
         self::assertSame(
@@ -35,7 +38,7 @@ final class AuthCodePkceMigrationTest extends TestCase
 
         // DBAL 4.4 has no CHECK violation exception class; 23514 is check_violation, 23502 not_null_violation.
         $this->assertRejected('23514', fn () => $this->insertAuthCode($client, $user, ['code_challenge_method' => 'plain']));
-        foreach (['redirect_uri', 'code_challenge', 'code_challenge_method'] as $column) {
+        foreach (['redirect_uri', 'code_challenge', 'code_challenge_method', 'dpop_jkt'] as $column) {
             $this->assertRejected('23502', fn () => $this->insertAuthCode($client, $user, [$column => null]));
         }
     }
@@ -66,6 +69,7 @@ final class AuthCodePkceMigrationTest extends TestCase
             'redirect_uri' => 'https://app.baander.app/callback',
             'code_challenge' => self::CHALLENGE,
             'code_challenge_method' => 'S256',
+            'dpop_jkt' => self::THUMBPRINT,
             'created_at' => '2026-10-07 12:00:00+00',
             'updated_at' => '2026-10-07 12:00:00+00',
             ...$overrides,
@@ -87,13 +91,13 @@ final class AuthCodePkceMigrationTest extends TestCase
         return $id;
     }
 
-    /** @return array<string, string> column => is_nullable, for the redirect URI and PKCE columns */
+    /** @return array<string, string> column => is_nullable, for the redirect URI, PKCE and key-binding columns */
     private function columns(): array
     {
         return $this->manager->getConnection()->fetchAllKeyValue(
             "SELECT column_name, is_nullable FROM information_schema.columns
               WHERE table_schema = current_schema() AND table_name = 'oauth_auth_codes'
-                AND column_name IN ('redirect_uri', 'code_challenge', 'code_challenge_method')
+                AND column_name IN ('redirect_uri', 'code_challenge', 'code_challenge_method', 'dpop_jkt')
               ORDER BY 1",
         );
     }

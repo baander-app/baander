@@ -61,6 +61,9 @@ class AuthCodeEntity implements AuthCodeEntityInterface
     #[ORM\Column(type: 'text')]
     private string $codeChallengeMethod;
 
+    /** JWK SHA-256 thumbprint of the DPoP key the code is bound to. */
+    #[ORM\Column(type: 'text')]
+    private string $dpopJkt;
 
     /** @param array<array-key, string>|null $scopes */
     public function __construct(
@@ -70,6 +73,7 @@ class AuthCodeEntity implements AuthCodeEntityInterface
         string $redirectUri,
         string $codeChallenge,
         string $codeChallengeMethod,
+        string $dpopJkt,
         ?array $scopes = null,
         ?\DateTimeImmutable $expiresAt = null,
         ?Uuid $id = null,
@@ -83,6 +87,7 @@ class AuthCodeEntity implements AuthCodeEntityInterface
         $this->expiresAt = $expiresAt;
         $this->codeChallenge = $codeChallenge;
         $this->codeChallengeMethod = $codeChallengeMethod;
+        $this->dpopJkt = $dpopJkt;
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
     }
@@ -257,6 +262,11 @@ class AuthCodeEntity implements AuthCodeEntityInterface
     public function getCodeChallengeMethod(): string
     {
         return $this->codeChallengeMethod;
+    }
+
+    public function getDpopJkt(): string
+    {
+        return $this->dpopJkt;
     }
 
     public function setCodeChallengeMethod(string $codeChallengeMethod): void

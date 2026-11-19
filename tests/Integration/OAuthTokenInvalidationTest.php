@@ -206,7 +206,7 @@ final class OAuthTokenInvalidationTest extends TestCase
             'access_token_id' => $access, 'previous_refresh_token_id' => $refresh, ...$times]);
         $this->writer->insert('oauth_auth_codes', ['id' => Uuid::generate()->toString(), 'code_id' => 'rotation-auth-code',
             'client_id' => $client, 'user_id' => $user, 'code_challenge' => str_repeat('a', 43),
-            'code_challenge_method' => 'S256', 'redirect_uri' => 'https://baander.app/callback', ...$times]);
+            'code_challenge_method' => 'S256', 'dpop_jkt' => 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs', 'redirect_uri' => 'https://baander.app/callback', ...$times]);
         foreach (['pending', 'approved'] as $phase) {
             $this->writer->insert('oauth_device_codes', ['id' => Uuid::generate()->toString(), 'device_code' => 'rotation-device-' . $phase,
                 'user_code' => 'rotation-user-' . $phase, 'client_id' => $client, 'user_id' => $user,

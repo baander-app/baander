@@ -8,13 +8,14 @@ use App\Auth\Application\Command\OAuth\PurgeExpiredOAuthCodesCommand;
 use App\Auth\Application\CommandHandler\OAuth\PurgeExpiredOAuthCodesHandler;
 use App\Auth\Domain\Repository\OAuth\AuthCodeRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\DeviceCodeRepositoryInterface;
+use App\Auth\Domain\Repository\OAuth\PushedAuthorizationRequestRepositoryInterface;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Clock\MockClock;
 
 final class PurgeExpiredOAuthCodesHandlerTest extends TestCase
 {
-    public function testDeletesCodesExpiredMoreThanAnHourAgoAndReportsTheCounts(): void
+    public function testDeletesCodesAndPushedRequestsExpiredMoreThanAnHourAgoAndReportsTheCounts(): void
     {
         $now = new DateTimeImmutable('2026-10-07T03:30:00.250000+00:00');
         $cutoffs = [];
@@ -33,13 +34,21 @@ final class PurgeExpiredOAuthCodesHandlerTest extends TestCase
 
                 return 2;
             });
+        $pushedRequests = $this->createMock(PushedAuthorizationRequestRepositoryInterface::class);
+        $pushedRequests->expects($this->once())->method('deleteExpiredBefore')
+            ->willReturnCallback(static function (DateTimeImmutable $cutoff) use (&$cutoffs): int {
+                $cutoffs[] = $cutoff;
 
-        $result = (new PurgeExpiredOAuthCodesHandler($authCodes, $deviceCodes, new MockClock($now)))(new PurgeExpiredOAuthCodesCommand());
+                return 4;
+            });
+
+        $result = (new PurgeExpiredOAuthCodesHandler($authCodes, $deviceCodes, $pushedRequests, new MockClock($now)))(new PurgeExpiredOAuthCodesCommand());
 
         self::assertSame(3, $result->authorizationCodes);
         self::assertSame(2, $result->deviceCodes);
+        self::assertSame(4, $result->pushedAuthorizationRequests);
         $expected = new DateTimeImmutable('2026-10-07T02:30:00.250000+00:00');
         self::assertEquals($expected, $result->expiredBefore);
-        self::assertEquals([$expected, $expected], $cutoffs, 'Both kinds of code share one cutoff, fractions included.');
+        self::assertEquals([$expected, $expected, $expected], $cutoffs, 'Codes and pushed requests share one cutoff, fractions included.');
     }
 }

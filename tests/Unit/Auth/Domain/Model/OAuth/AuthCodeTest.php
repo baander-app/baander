@@ -23,6 +23,8 @@ final class AuthCodeTest extends TestCase
     // RFC 7636 appendix B.
     private const string VERIFIER = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
     private const string CHALLENGE = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
+    // RFC 7638 section 3.1.
+    private const string THUMBPRINT = 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs';
 
     private Client $client;
     private User $user;
@@ -46,6 +48,7 @@ final class AuthCodeTest extends TestCase
         $this->assertSame(self::REDIRECT, $code->getRedirectUri());
         $this->assertSame(self::CHALLENGE, $code->getCodeChallenge());
         $this->assertSame('S256', $code->getCodeChallengeMethod());
+        $this->assertSame(self::THUMBPRINT, $code->getDpopJkt());
     }
 
     public function testCreateWithTtl(): void
@@ -69,21 +72,36 @@ final class AuthCodeTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
 
-        AuthCode::create($this->user, $this->client, self::REDIRECT, self::VERIFIER, 'plain');
+        AuthCode::create($this->user, $this->client, self::REDIRECT, self::VERIFIER, 'plain', dpopJkt: self::THUMBPRINT);
     }
 
     public function testAChallengeThatIsNotAnS256DigestIsRejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
 
-        AuthCode::create($this->user, $this->client, self::REDIRECT, 'too-short', 'S256');
+        AuthCode::create($this->user, $this->client, self::REDIRECT, 'too-short', 'S256', dpopJkt: self::THUMBPRINT);
     }
 
     public function testAnEmptyRedirectUriIsRejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
 
-        AuthCode::create($this->user, $this->client, ' ', self::CHALLENGE, 'S256');
+        AuthCode::create($this->user, $this->client, ' ', self::CHALLENGE, 'S256', dpopJkt: self::THUMBPRINT);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function invalidThumbprints(): iterable
+    {
+        yield 'too short' => ['NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9X'];
+        yield 'padded base64' => ['NzbLsXh8uDCcd+6MNwXF4W/7noWXFZAfHkxZsRGC9X='];
+    }
+
+    #[DataProvider('invalidThumbprints')]
+    public function testAThumbprintThatIsNotASha256DigestIsRejected(string $thumbprint): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        AuthCode::create($this->user, $this->client, self::REDIRECT, self::CHALLENGE, 'S256', dpopJkt: $thumbprint);
     }
 
     public function testTheMatchingVerifierIsAccepted(): void
@@ -152,15 +170,17 @@ final class AuthCodeTest extends TestCase
             redirectUri: self::REDIRECT,
             codeChallenge: self::CHALLENGE,
             codeChallengeMethod: 'S256',
+            dpopJkt: self::THUMBPRINT,
             revoked: true,
         ));
 
         $this->assertTrue($code->isRevoked());
+        $this->assertSame(self::THUMBPRINT, $code->getDpopJkt());
     }
 
     /** @param Scope[] $scopes */
     private function code(array $scopes = [], ?DateInterval $ttl = null): AuthCode
     {
-        return AuthCode::create($this->user, $this->client, self::REDIRECT, self::CHALLENGE, 'S256', $scopes, $ttl);
+        return AuthCode::create($this->user, $this->client, self::REDIRECT, self::CHALLENGE, 'S256', $scopes, $ttl, self::THUMBPRINT);
     }
 }

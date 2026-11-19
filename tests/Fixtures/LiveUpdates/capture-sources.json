@@ -468,6 +468,13 @@
       "capture": "before-parent-delete"
     },
     {
+      "parent": "oauth_clients",
+      "child": "oauth_pushed_authorization_requests",
+      "foreign_key": "client_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
       "parent": "oauth_access_tokens",
       "child": "oauth_refresh_tokens",
       "foreign_key": "access_token_id",
@@ -1244,6 +1251,12 @@
       "scope_routes": ["user"],
       "readers": ["src/Auth/Infrastructure/Repository/OAuth/DeviceCodeRepository.php"],
       "response_cache": "authoritative-read"
+    },
+    {
+      "table": "oauth_pushed_authorization_requests",
+      "mapping": "src/Auth/Infrastructure/Doctrine/Entity/OAuth/PushedAuthorizationRequestEntity.php",
+      "classification": "excluded",
+      "reason": "Short-lived back-channel request a client pushed; it is used up by one consent decision, and the resulting grant is captured on access tokens."
     },
     {
       "table": "oauth_refresh_tokens",

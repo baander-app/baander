@@ -32,8 +32,14 @@ parameters:
     # The web client's refresh budget stays below it. Default and maximum: 60.
     auth.refresh.reuse_grace_seconds: 60
 
-    # Authorization code time-to-live (authorization code grant with PKCE). Default: 10 minutes.
-    auth.auth_code.ttl: 600
+    # Authorization code time-to-live (authorization code grant with PKCE). The code is
+    # issued after consent, so it only has to survive the redirect and the token request.
+    # Default: 60 seconds.
+    auth.auth_code.ttl: 60
+
+    # Pushed authorization request lifetime (RFC 9126): how long a request_uri stays
+    # usable. It allows for a sign-in with TOTP or a passkey before consent. Default: 5 minutes.
+    auth.par.request_uri_ttl: 300
 
     # Device code time-to-live (RFC 8628). Default: 15 minutes.
     auth.device_code.ttl: 900

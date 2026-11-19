@@ -16,7 +16,7 @@ use Symfony\Component\Messenger\Stamp\HandledStamp;
 
 #[AsCommand(
     name: 'app:oauth:purge-codes',
-    description: 'Delete OAuth authorization codes and device codes that expired more than an hour ago.',
+    description: 'Delete OAuth authorization codes, device codes and pushed authorization requests that expired more than an hour ago.',
 )]
 final class PurgeOAuthCodesCommand extends Command
 {
@@ -31,7 +31,7 @@ final class PurgeOAuthCodesCommand extends Command
         $this->setHelp(<<<'HELP'
             Runs the same purge as the daily scheduled job. An expired device code is kept
             for one hour, so a device that is still polling learns that its code expired.
-            Codes without an expiry are never deleted.
+            Codes without an expiry are never deleted. Pushed authorization requests always expire.
             HELP);
     }
 
@@ -55,9 +55,10 @@ final class PurgeOAuthCodesCommand extends Command
         }
 
         $io->success(sprintf(
-            'Deleted %d authorization code(s) and %d device code(s) that expired before %s.',
+            'Deleted %d authorization code(s), %d device code(s) and %d pushed authorization request(s) that expired before %s.',
             $result->authorizationCodes,
             $result->deviceCodes,
+            $result->pushedAuthorizationRequests,
             $result->expiredBefore->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s \U\T\C'),
         ));
 

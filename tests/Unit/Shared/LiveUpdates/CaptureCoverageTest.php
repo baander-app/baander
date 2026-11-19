@@ -139,7 +139,7 @@ final class CaptureCoverageTest extends TestCase
         foreach (['media_activities', 'notifications', 'audio_preferences', 'player_preferences', 'layout_preferences', 'preference_history'] as $table) {
             self::assertSame(['user'], $sources[$table]['scope_routes'], $table);
         }
-        foreach (['domain_event_outbox', 'domain_event_outbox_delivery', 'domain_event_outbox_receipt', 'password_reset_tokens', 'email_verification_tokens', 'oauth_auth_codes', 'transcode_control_receipts'] as $table) {
+        foreach (['domain_event_outbox', 'domain_event_outbox_delivery', 'domain_event_outbox_receipt', 'password_reset_tokens', 'email_verification_tokens', 'oauth_auth_codes', 'oauth_pushed_authorization_requests', 'transcode_control_receipts'] as $table) {
             self::assertSame('excluded', $sources[$table]['classification'], $table);
         }
         foreach (['users' => ['password', 'totp_secret'], 'oauth_clients' => ['secret_hash'], 'webhooks' => ['encrypted_secret'], 'push_subscriptions' => ['public_key', 'auth_key'], 'libraries' => ['claim_expires_at'], 'oauth_device_codes' => ['last_polled_at'], 'devices' => ['last_seen_at']] as $table => $columns) {

@@ -26,7 +26,7 @@ final class OAuthPurgeCodesCommandTest extends TestCase
 
         self::assertSame(Command::SUCCESS, $tester->execute([]), $tester->getDisplay());
         self::assertMatchesRegularExpression(
-            '/Deleted \d+ authorization code\(s\) and \d+ device code\(s\) that expired before \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC\./',
+            '/Deleted \d+ authorization code\(s\), \d+ device code\(s\) and \d+ pushed authorization request\(s\) that expired before \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC\./',
             preg_replace('/\s+/', ' ', $tester->getDisplay()) ?? '',
         );
         self::assertFalse($this->exists('oauth_auth_codes', $staleAuthCode));
@@ -62,6 +62,7 @@ final class OAuthPurgeCodesCommandTest extends TestCase
             'redirect_uri' => 'https://app.baander.app/callback',
             'code_challenge' => 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
             'code_challenge_method' => 'S256',
+            'dpop_jkt' => 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs',
             'expires_at' => (new \DateTimeImmutable($expiresIn))->format('Y-m-d H:i:s.uP'),
             'created_at' => '2026-10-07 12:00:00+00',
             'updated_at' => '2026-10-07 12:00:00+00',

@@ -18,7 +18,8 @@ use InvalidArgumentException;
  * A short-lived, single-use code issued at the authorization endpoint. Every code
  * carries an S256 PKCE challenge (RFC 7636) and the redirect URI it was issued
  * for; redeeming it requires the matching code verifier and the same redirect URI
- * (RFC 6749 section 4.1.3, RFC 9700 section 2.1.1).
+ * (RFC 6749 section 4.1.3, RFC 9700 section 2.1.1). Every code is also bound to the
+ * JWK SHA-256 thumbprint of the client's DPoP key (RFC 9449 section 10).
  */
 final class AuthCode
 {
@@ -32,6 +33,9 @@ final class AuthCode
     /**
      * Create a new authorization code.
      *
+     * A code is stored only with the thumbprint of the DPoP key it is bound to; the
+     * repository refuses one without it.
+     *
      * @param Scope[] $scopes
      */
     public static function create(
@@ -42,6 +46,7 @@ final class AuthCode
         string $codeChallengeMethod,
         array $scopes = [],
         ?DateInterval $ttl = null,
+        ?string $dpopJkt = null,
     ): self {
         if ($codeChallengeMethod !== self::CODE_CHALLENGE_METHOD) {
             throw new InvalidArgumentException('Authorization codes require the S256 code challenge method.');
@@ -52,6 +57,10 @@ final class AuthCode
         }
         if (trim($redirectUri) === '') {
             throw new InvalidArgumentException('Authorization codes require a redirect URI.');
+        }
+        // A JWK SHA-256 thumbprint (RFC 7638) is unpadded base64url as well: 43 characters.
+        if ($dpopJkt !== null && preg_match('/^[A-Za-z0-9_-]{43}$/', $dpopJkt) !== 1) {
+            throw new InvalidArgumentException('The DPoP key thumbprint is not a SHA-256 thumbprint.');
         }
 
         $expiresAt = null;
@@ -71,6 +80,7 @@ final class AuthCode
             redirectUri: $redirectUri,
             codeChallenge: $codeChallenge,
             codeChallengeMethod: $codeChallengeMethod,
+            dpopJkt: $dpopJkt,
         ));
     }
 
@@ -177,6 +187,12 @@ final class AuthCode
     public function getCodeChallengeMethod(): string
     {
         return $this->state->codeChallengeMethod;
+    }
+
+    /** The JWK SHA-256 thumbprint of the DPoP key the code is bound to. */
+    public function getDpopJkt(): ?string
+    {
+        return $this->state->dpopJkt;
     }
 
     /** RFC 7636 section 4.6: BASE64URL(SHA256(code_verifier)) must equal the stored challenge. */
