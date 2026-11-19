@@ -256,6 +256,41 @@ final class PasskeyControllerTest extends TestCase
         }
     }
 
+    /** @return iterable<string, array{bool, int}> */
+    public static function userVerification(): iterable
+    {
+        yield 'user verified' => [true, 200];
+        yield 'user not verified' => [false, 401];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('userVerification')]
+    public function testAnAccountWithTotpOnNeedsAVerifiedUser(bool $verifiesUser, int $status): void
+    {
+        $owner = \App\Auth\Domain\Model\User::register(new \App\Shared\Domain\Model\Email('passkey@baander.app'), 'hash', 'Owner');
+        $owner->setTotpSecret('JBSWY3DPEHPK3PXP');
+        $credential = new \App\Tests\Fixtures\Auth\WebAuthnTestCredential($owner->getPublicId()->toString(), 'baander.app', verifiesUser: $verifiesUser);
+        $passkey = $credential->passkey();
+        $service = $this->authenticationOptionsService();
+        $options = $service->createAuthenticationOptions();
+        $assertion = $credential->assert($options['options']['challenge'], 'https://baander.app');
+        $users = $this->createStub(\App\Auth\Application\Port\UserPortInterface::class);
+        $users->method('findByUuid')->willReturn($owner);
+        $repository = $this->createMock(PasskeyRepositoryInterface::class);
+        $repository->method('ofCredentialId')->willReturn($passkey);
+        $repository->method('userIdForCredentialId')->willReturn($owner->getId());
+        $repository->expects($status === 200 ? self::once() : self::never())->method('markUsed');
+        $this->passkeyRepository = $repository;
+        $this->controller = $this->createController();
+        $this->controller->setTranslator(new \Symfony\Component\Translation\Translator('en'));
+        $this->setPrivate($this->controller, 'users', $users);
+        $this->setPrivate($this->controller, 'passkeyService', $service);
+
+        $response = $this->controller->authenticate(new \App\Auth\Interface\Request\Passkey\VerifyPasskeyChallengeRequest($options['challengeKey'], $assertion, ''));
+
+        self::assertSame($status, $response->getStatusCode(), (string) $response->getContent());
+        self::assertSame($status === 200 ? 1 : 0, $passkey->getCounter());
+    }
+
     private function authenticationOptionsService(): \App\Auth\Infrastructure\Security\Passkey\PasskeyService
     {
         return new \App\Auth\Infrastructure\Security\Passkey\PasskeyService(
