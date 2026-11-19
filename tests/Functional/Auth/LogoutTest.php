@@ -179,6 +179,8 @@ final class LogoutTest extends TestCase
             new NullLogger(),
             $this->service(TokenMetadataRepositoryInterface::class),
             AuthenticationFailureMessages::create(),
+            $this->service(ClientRepositoryInterface::class),
+            (string) static::getContainer()->getParameter('auth.spa_client_id'),
         );
 
         $request = Request::create('https://baander.app/api/auth/me');

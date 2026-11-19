@@ -71,7 +71,7 @@ final class PasswordAuthenticatorTest extends TestCase
             $this->createStub(LoggerInterface::class),
             new JsonEncoder(),
             AuthenticationFailureMessages::create(),
-            new DpopTokenRequestVerifier(new DpopProofValidator($jtiCache), new DpopNonceManager($factory)),
+            new DpopTokenRequestVerifier(new DpopProofValidator($jtiCache, publicUrl: 'https://baander.app'), new DpopNonceManager($factory)),
         );
     }
 
