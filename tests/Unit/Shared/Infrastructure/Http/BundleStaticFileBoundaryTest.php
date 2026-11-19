@@ -41,10 +41,16 @@ final class BundleStaticFileBoundaryTest extends TestCase
             $handler->boot();
 
             if ($warmCache) {
+                $headers = [];
                 $allowed = $this->createMock(Response::class);
-                $allowed->expects(self::once())->method('header')->with('Content-Type', 'text/plain')->willReturn(true);
+                $allowed->method('header')->willReturnCallback(static function (string $name, string $value) use (&$headers): bool {
+                    $headers[$name] = $value;
+
+                    return true;
+                });
                 $allowed->expects(self::once())->method('sendfile')->with($public . '/asset.txt')->willReturn(true);
                 $handler->handle(self::request('/asset.txt'), $allowed);
+                self::assertSame('text/plain', $headers['Content-Type'] ?? null);
             }
 
             unlink($public . '/asset.txt');
