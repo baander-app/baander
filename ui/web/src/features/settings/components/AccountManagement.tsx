@@ -1,10 +1,10 @@
 import { type FormEvent, type ReactNode, useState } from 'react'
 import styled from 'styled-components'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { useCurrentUserRefresh } from '@/features/auth/hooks/use-current-user-refresh'
-import { applyCurrentUser } from '@/features/auth/lib/current-user'
 import { parseApiError } from '@/features/auth/lib/parse-api-error'
-import { getAuthMe, putAuthMeEmail } from '@/shared/api-client/gen/endpoints'
+import { getGetAuthMeQueryKey, putAuthMeEmail } from '@/shared/api-client/gen/endpoints'
 import { useTranslation } from '@/shared/i18n'
 import { textRole } from '@/shared/theme'
 import { Button } from '@/shared/components/ui/button'
@@ -212,12 +212,13 @@ function ChangeEmailDialog({ open, onOpenChange, children }: { open: boolean; on
   const { t } = useTranslation()
   const user = useAuthStore((s) => s.user)
   const [email, setEmail] = useState(user?.email ?? '')
+  const queryClient = useQueryClient()
 
   const changeEmail = async (stepUp: StepUpCredentials) => {
     await putAuthMeEmail({ email, ...stepUp })
-    // The change waits for the link sent to the new address; the profile now shows it as pending.
-    const profile = await getAuthMe()
-    if (profile.data) applyCurrentUser(profile.data)
+    // The change waits for the link sent to the new address. Reading the profile again shows it
+    // as pending; useCurrentUserRefresh copies the profile into the store.
+    await queryClient.invalidateQueries({ queryKey: getGetAuthMeQueryKey() })
 
     return true
   }
