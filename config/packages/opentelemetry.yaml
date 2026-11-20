@@ -1,6 +1,7 @@
-# OpenTelemetry. Every HTTP request records one server span in the diagnostics
-# buffer (/api/debug/spans, app:server:spans) whether or not export is enabled.
-# OTEL_ENABLED=true additionally exports spans to OTEL_EXPORTER_OTLP_ENDPOINT, the
+# OpenTelemetry. diagnostics.spans_enabled controls HTTP span capture, defaulting
+# to on only in dev. Captured spans reach the shared diagnostics buffer
+# (/api/debug/spans, app:server:spans).
+# OTEL_ENABLED=true additionally exports captured spans to OTEL_EXPORTER_OTLP_ENDPOINT, the
 # full OTLP/HTTP traces URL such as http://collector:4318/v1/traces.
 # The services are wired in config/services.yaml.
 

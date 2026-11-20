@@ -23,6 +23,8 @@ final class SystemSettingsControllerTest extends TestCase
         $this->assertFalse($settings['transcode.max_bitrate']['isExplicit']);
         $this->assertTrue($settings['admin.can_view_users']['value']);
         $this->assertSame('en', $settings['i18n.default_language']['value']);
+        $this->assertFalse($settings['diagnostics.spans_enabled']['value']);
+        $this->assertFalse($settings['diagnostics.spans_enabled']['isExplicit']);
     }
 
     public function testDefinitionsDescribeEverySettingForTheAdminPage(): void
@@ -31,6 +33,12 @@ final class SystemSettingsControllerTest extends TestCase
 
         $response = $this->authenticatedRequest('GET', '/api/admin/settings/definitions', $admin);
         $definitions = $this->byKey($this->assertJsonResponse($response, 200, 'data')['data']);
+
+        $diagnostics = $definitions['diagnostics.spans_enabled'];
+        $this->assertSame('boolean', $diagnostics['type']);
+        $this->assertSame('system', $diagnostics['scope']);
+        $this->assertFalse($diagnostics['default']);
+        $this->assertTrue($diagnostics['enforced']);
 
         $bitrate = $definitions['transcode.max_bitrate'];
         $this->assertSame('enum', $bitrate['type']);
@@ -155,6 +163,25 @@ final class SystemSettingsControllerTest extends TestCase
         $this->assertSame(320, $setting['value']);
         $this->assertFalse($setting['isExplicit']);
         $this->assertSame(320, $this->setting($superAdmin, 'transcode.max_bitrate')['value']);
+    }
+
+    public function testSpanCaptureCanBeEnabledDisabledAndReset(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        foreach ([true, false] as $enabled) {
+            $response = $this->authenticatedRequest('PATCH', '/api/admin/settings', $superAdmin, [
+                'settings' => ['diagnostics.spans_enabled' => $enabled],
+            ]);
+            $settings = $this->byKey($this->assertJsonResponse($response, 200, 'data')['data']);
+            $this->assertSame($enabled, $settings['diagnostics.spans_enabled']['value']);
+            $this->assertTrue($settings['diagnostics.spans_enabled']['isExplicit']);
+        }
+
+        $response = $this->authenticatedRequest('DELETE', '/api/admin/settings/diagnostics.spans_enabled', $superAdmin);
+        $setting = $this->assertJsonResponse($response, 200, 'data')['data'];
+        $this->assertFalse($setting['value']);
+        $this->assertFalse($setting['isExplicit']);
+        $this->assertFalse($this->setting($superAdmin, 'diagnostics.spans_enabled')['value']);
     }
 
     public function testDeletingAnUnsetSettingSucceeds(): void

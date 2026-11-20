@@ -197,7 +197,11 @@ services:
 
     # --- OpenTelemetry ---
     # The span buffer's table is created before the workers fork, so every worker
-    # shares it. Spans always reach it; app.otel.enabled only adds OTLP export.
+    # shares it, including when capture is enabled later from system settings.
+    App\Shared\Application\Settings\DiagnosticsSettingDefinitions:
+        arguments:
+            $environment: '%kernel.environment%'
+
     App\Shared\Infrastructure\OpenTelemetry\SpanBridge:
         tags:
             - { name: 'swoole_bundle.bootable_service' }

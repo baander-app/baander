@@ -17,7 +17,7 @@ use Symfony\Component\HttpKernel\KernelEvents;
 use WeakMap;
 
 /**
- * Opens one server span per main HTTP request and ends it on terminate.
+ * Opens a server span for captured main HTTP requests and ends it on terminate.
  *
  * The span records only the method, the route name, the status and the duration:
  * never the URL, query string or headers, so tokens and signed-URL signatures
@@ -33,7 +33,7 @@ final class HttpServerSpanSubscriber implements EventSubscriberInterface
     /** @var WeakMap<Request, SpanInterface> */
     private WeakMap $spans;
 
-    public function __construct(TracerProviderInterface $tracerProvider)
+    public function __construct(TracerProviderInterface $tracerProvider, private readonly HttpSpanCapturePolicy $capturePolicy)
     {
         $this->tracer = $tracerProvider->getTracer('baander.http');
         $this->spans = new WeakMap();
@@ -50,7 +50,7 @@ final class HttpServerSpanSubscriber implements EventSubscriberInterface
 
     public function start(RequestEvent $event): void
     {
-        if (!$event->isMainRequest()) {
+        if (!$event->isMainRequest() || !$this->capturePolicy->enabled()) {
             return;
         }
 

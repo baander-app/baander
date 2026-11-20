@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\OpenTelemetry;
 
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Infrastructure\OpenTelemetry\HttpServerSpanSubscriber;
+use App\Shared\Infrastructure\OpenTelemetry\HttpSpanCapturePolicy;
 use App\Shared\Infrastructure\OpenTelemetry\InMemorySpanProcessor;
 use App\Shared\Infrastructure\OpenTelemetry\SpanBridge;
 use App\Shared\Infrastructure\OpenTelemetry\TracerProviderFactory;
+use OpenTelemetry\API\Trace\Span;
 use OpenTelemetry\SDK\Trace\SpanExporter\InMemoryExporter;
 use OpenTelemetry\SDK\Trace\SpanExporterInterface;
 use PHPUnit\Framework\TestCase;
@@ -30,7 +33,7 @@ final class HttpServerSpanSubscriberTest extends TestCase
 
     public function testHandledRequestRecordsOneSpanWithMethodRouteStatusAndDurationOnly(): void
     {
-        $subscriber = new HttpServerSpanSubscriber($this->tracerProvider(exportEnabled: false));
+        $subscriber = new HttpServerSpanSubscriber($this->tracerProvider(exportEnabled: false), $this->capturePolicy());
         $request = Request::create(
             'https://baander.app/api/albums/42?access_token=query-secret&signature=signed-url-signature',
             'POST',
@@ -60,7 +63,7 @@ final class HttpServerSpanSubscriberTest extends TestCase
 
     public function testSubRequestsDoNotOpenSpans(): void
     {
-        $subscriber = new HttpServerSpanSubscriber($this->tracerProvider(exportEnabled: false));
+        $subscriber = new HttpServerSpanSubscriber($this->tracerProvider(exportEnabled: false), $this->capturePolicy());
         $kernel = $this->createStub(HttpKernelInterface::class);
         $request = Request::create('/fragment');
 
@@ -72,7 +75,7 @@ final class HttpServerSpanSubscriberTest extends TestCase
 
     public function testRequestWithoutRouteIsNamedByMethodAndServerErrorsAreMarked(): void
     {
-        $subscriber = new HttpServerSpanSubscriber($this->tracerProvider(exportEnabled: false));
+        $subscriber = new HttpServerSpanSubscriber($this->tracerProvider(exportEnabled: false), $this->capturePolicy());
 
         $this->handle($subscriber, Request::create('/missing'), null, 500);
 
@@ -84,13 +87,15 @@ final class HttpServerSpanSubscriberTest extends TestCase
 
     public function testConcurrentRequestsKeepTheirOwnSpans(): void
     {
-        $subscriber = new HttpServerSpanSubscriber($this->tracerProvider(exportEnabled: false));
+        $subscriber = new HttpServerSpanSubscriber($this->tracerProvider(exportEnabled: false), $this->capturePolicy());
         $kernel = $this->createStub(HttpKernelInterface::class);
         $first = Request::create('/first');
         $second = Request::create('/second', 'DELETE');
 
         $subscriber->start(new RequestEvent($kernel, $first, HttpKernelInterface::MAIN_REQUEST));
+        self::assertFalse(Span::getCurrent()->getContext()->isValid());
         $subscriber->start(new RequestEvent($kernel, $second, HttpKernelInterface::MAIN_REQUEST));
+        self::assertFalse(Span::getCurrent()->getContext()->isValid());
         $second->attributes->set('_route', 'second_route');
         $subscriber->end(new TerminateEvent($kernel, $second, new Response('', 204)));
         $first->attributes->set('_route', 'first_route');
@@ -118,7 +123,7 @@ final class HttpServerSpanSubscriberTest extends TestCase
         );
         $provider = $factory->create();
 
-        $this->handle(new HttpServerSpanSubscriber($provider), Request::create('/api/health'), 'health', 200);
+        $this->handle(new HttpServerSpanSubscriber($provider, $this->capturePolicy()), Request::create('/api/health'), 'health', 200);
         $provider->forceFlush();
 
         self::assertCount(1, $this->bridge->getRecentSpans());
@@ -142,13 +147,54 @@ final class HttpServerSpanSubscriberTest extends TestCase
         );
         $provider = $factory->create();
 
-        $this->handle(new HttpServerSpanSubscriber($provider), Request::create('/api/health'), 'health', 200);
+        $this->handle(new HttpServerSpanSubscriber($provider, $this->capturePolicy()), Request::create('/api/health'), 'health', 200);
         $provider->forceFlush();
 
         self::assertCount(1, $this->bridge->getRecentSpans());
         self::assertSame('http://collector.baander.app:4318/v1/traces', $endpoint);
         self::assertCount(1, $exporter->getSpans());
         self::assertSame('GET health', $exporter->getSpans()[0]->getName());
+    }
+
+    public function testDisabledCaptureDoesNotCreateOrExportSpans(): void
+    {
+        $exporter = new InMemoryExporter();
+        $provider = (new TracerProviderFactory(new InMemorySpanProcessor($this->bridge), true, '', 'baander', static fn (): SpanExporterInterface => $exporter))->create();
+        $subscriber = new HttpServerSpanSubscriber($provider, $this->capturePolicy(false));
+
+        $this->handle($subscriber, Request::create('/api/health'), 'health', 200);
+        $provider->forceFlush();
+
+        self::assertSame([], $this->bridge->getRecentSpans());
+        self::assertCount(0, $exporter->getSpans());
+    }
+
+    public function testAnOpenSpanCompletesAfterCaptureIsDisabled(): void
+    {
+        $now = 0.0;
+        $settings = $this->createMock(SystemSettingsPortInterface::class);
+        $settings->expects(self::exactly(2))->method('get')->willReturn(true, false);
+        $policy = new HttpSpanCapturePolicy($settings, static function () use (&$now): float {
+            return $now;
+        });
+        $subscriber = new HttpServerSpanSubscriber($this->tracerProvider(false), $policy);
+        $kernel = $this->createStub(HttpKernelInterface::class);
+        $first = Request::create('/first');
+        $subscriber->start(new RequestEvent($kernel, $first, HttpKernelInterface::MAIN_REQUEST));
+        $now = 5.0;
+        $this->handle($subscriber, Request::create('/second'), 'second', 200);
+        $subscriber->end(new TerminateEvent($kernel, $first, new Response()));
+
+        self::assertCount(1, $this->bridge->getRecentSpans());
+        self::assertSame('GET', $this->bridge->getRecentSpans()[0]['operation_name']);
+    }
+
+    private function capturePolicy(bool $enabled = true): HttpSpanCapturePolicy
+    {
+        $settings = $this->createStub(SystemSettingsPortInterface::class);
+        $settings->method('get')->willReturn($enabled);
+
+        return new HttpSpanCapturePolicy($settings);
     }
 
     private function tracerProvider(bool $exportEnabled): \OpenTelemetry\API\Trace\TracerProviderInterface
