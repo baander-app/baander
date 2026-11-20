@@ -262,8 +262,7 @@ that limitation is recorded for follow-up, with no runtime change in the 2026-10
 Not pushed: `fix/auth-security-hardening` in the worktree `baander-par` carries the
 OAuth pushed authorization requests and the auth hardening; see
 [OAuth pushed authorization requests and auth hardening](#oauth-pushed-authorization-requests-and-auth-hardening).
-Every user signs in again and re-enrols TOTP after its migrations, and an existing
-instance needs `AUTH_TOTP_ENCRYPTION_KEY` in its `env.json` before it runs that branch.
+Every user signs in again and re-enrols TOTP after its migrations.
 
 `master` on GitHub and Forgejo carries, on top of `6912eaaf6`, the work pushed on
 2026-11-15: the CI fixes (`d1504daa3` to `77bb3c8e4`), two web fixes (`9ecf84a3d`,
@@ -463,16 +462,17 @@ Hardening, by area:
   timed-out issuance lock now answer 503. `GET /api/auth/me` documents the delegated
   profile. A reused refresh chain ends through the shared chain revoker.
 
+An instance configured before this branch has no `AUTH_TOTP_ENCRYPTION_KEY` in its
+`env.json`, and a production instance refuses to boot without it. `Bootstrap::configure`
+adds a fresh key to such an `env.json` and keeps every other value (`f01a6c579`;
+`DevelopmentBootstrapTest`, 17 tests).
+
 After these migrations every user signs in again: `Version20261120110000` deletes all
 sessions. `Version20261119220000` drops the plaintext TOTP secret, so every user
 re-enrols TOTP. Device codes approved before the migration are refused.
 
 Open:
 
-- An existing instance's `env.json` lacks `AUTH_TOTP_ENCRYPTION_KEY`.
-  `Bootstrap::configure` generates the key only for a new instance, and a production
-  instance refuses to boot without it. This includes the persistent instance. The key
-  has to be added before such an instance runs this branch.
 - The CSP, step-up passkey registration and web TOTP login were not checked in a
   browser: the preview could not start from this worktree.
 - `/oauth/revoke` is a first-party route, so a delegated token cannot revoke itself;
