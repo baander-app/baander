@@ -140,8 +140,12 @@ final class OAuthScopeEnforcementTest extends TestCase
         $jwt = $this->token($this->deviceClient(), $member, ['library']);
 
         self::assertSame(200, $this->send($jwt, 'GET', '/api/albums/' . $album->getPublicId()->toString())->getStatusCode());
+        // The scope check passes and the stream controller looks the track up: an unknown
+        // track is its 404, not a refusal.
         $stream = $this->send($jwt, 'GET', '/api/stream/track', query: ['id' => (new PublicId())->toString()]);
-        self::assertNotSame(403, $stream->getStatusCode(), (string) $stream->getContent());
+        self::assertSame(404, $stream->getStatusCode(), (string) $stream->getContent());
+        self::assertNull($stream->headers->get('WWW-Authenticate'), 'No insufficient_scope challenge.');
+        self::assertSame('Track not found.', json_decode((string) $stream->getContent(), true, flags: JSON_THROW_ON_ERROR)['error']['message']);
         self::assertSame(200, $this->send($jwt, 'POST', '/api/devices', ['deviceId' => Uuid::v7()->toString(), 'name' => 'Living room TV'])->getStatusCode());
         $snapshot = $this->send($jwt, 'GET', '/api/session/snapshot');
         self::assertSame(200, $snapshot->getStatusCode(), (string) $snapshot->getContent());

@@ -274,6 +274,39 @@ final class PasswordChangeSessionRevocationTest extends TestCase
     }
 
     /**
+     * A refresh that reaches its transaction while the account's credential epoch moves, with
+     * no token revoked, waits for the change and refuses: the epoch comparison under the row
+     * lock alone ends the chain's use.
+     */
+    public function testARefreshRacingAnEpochChangeThatRevokesNothingIsRefused(): void
+    {
+        $this->assertReadCommitted();
+        [$session, , $keyPath] = $this->signInWithExportedKey();
+
+        $this->connection->beginTransaction();
+        try {
+            $this->connection->executeStatement(
+                'UPDATE users SET credential_epoch = credential_epoch + 1 WHERE id = ?',
+                [$this->user->getId()->toString()],
+            );
+            $refresh = $this->startRefresh($keyPath, $session['refreshToken']);
+            $this->awaitWaitOnThisSession($refresh);
+            $this->connection->commit();
+        } catch (\Throwable $failure) {
+            $this->connection->rollBack();
+            throw $failure;
+        }
+
+        $answer = $this->finish($refresh);
+
+        self::assertSame(401, $answer['status'], json_encode($answer, JSON_THROW_ON_ERROR));
+        self::assertSame(1, (int) $this->connection->fetchOne(
+            'SELECT count(*) FROM oauth_access_tokens WHERE user_id = ?',
+            [$this->user->getId()->toString()],
+        ), 'The refused refresh issued no access token.');
+    }
+
+    /**
      * A login whose issuance waits on the account's row past the issuance lock timeout is
      * answered with 503 and Retry-After, so the client retries, and issues no session.
      */
