@@ -47,6 +47,24 @@ counts for the new pages, that navigation test passed its focused rerun. PHP
 syntax checks pass for all four touched PHP files, and `git diff --check` passes.
 The final review has no unresolved findings. No application behavior changed.
 
+Release on 2026-11-20: `8572afba4f3e326c0210ba6c04a646a7518f2413` was
+fast-forwarded into `master` and pushed to both `origin` and `baander-github`.
+The site was rebuilt from that commit and published to the existing
+`martin-juuls-projects/baander` project. The
+[Vercel deployment](https://baander-eph84fzr5-martin-juuls-projects.vercel.app)
+is Ready and serves [baander.app](https://baander.app) and
+[baander.vercel.app](https://baander.vercel.app). Before promotion, the homepage
+and credential-rotation page returned 200, the moved credential-rotation anchor
+and source revision matched, and an unknown path returned 404. After promotion,
+the homepage, credential-rotation page and native-media page returned 200 and
+matched the build byte for byte on both public hostnames, with valid HTTPS.
+The rebuilt artifact also passed the 310-page link and reachability check above.
+All five live Chromium checks passed on `baander.app`: search reaches the new
+credential-rotation page, its moved section link lands correctly, light and dark
+themes persist across navigation and reload, navigation at 390 px reaches the
+native-media page without horizontal overflow, and an unknown path shows the
+404 page. No uncaught browser errors were reported.
+
 ## Tooling context packages and shared core
 
 The local PHP dependency audit reports seven existing Swoole
