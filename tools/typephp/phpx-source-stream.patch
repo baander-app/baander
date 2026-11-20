@@ -1,0 +1,8 @@
+--- a/src/misc/typephp_opcode_table.cc
++++ b/src/misc/typephp_opcode_table.cc
+@@ -251,3 +251,2 @@
+-    if (raw && std::filesystem::path(raw->path).extension() == ".php") {
+-        mark_embedded_handle(handle, raw->path, raw);
+-        return SUCCESS;
++    if (raw) {
++        return old_stream_open(handle);

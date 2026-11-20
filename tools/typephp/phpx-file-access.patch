@@ -1,0 +1,130 @@
+--- a/src/misc/typephp_opcode_table.cc
++++ b/src/misc/typephp_opcode_table.cc
+@@ -10,0 +11 @@
++#include "ext/standard/php_filestat.h"
+@@ -13,0 +15,2 @@
++#include <cctype>
++#include <exception>
+@@ -17,0 +21,3 @@
++#ifndef PHP_WIN32
++#include <unistd.h>
++#endif
+@@ -52,0 +59,114 @@
++
++struct FileAccessHook {
++    const char *name;
++    size_t name_length;
++    int type;
++    zif_handler handler;
++    zend_internal_function *function;
++    zif_handler original;
++};
++
++template<size_t Index> void file_access_handler(INTERNAL_FUNCTION_PARAMETERS);
++
++FileAccessHook file_access_hooks[] = {
++    {ZEND_STRL("file_exists"), FS_EXISTS, file_access_handler<0>, nullptr, nullptr},
++    {ZEND_STRL("is_readable"), FS_IS_R, file_access_handler<1>, nullptr, nullptr},
++    {ZEND_STRL("is_writable"), FS_IS_W, file_access_handler<2>, nullptr, nullptr},
++    {ZEND_STRL("is_writeable"), FS_IS_W, file_access_handler<3>, nullptr, nullptr},
++    {ZEND_STRL("is_executable"), FS_IS_X, file_access_handler<4>, nullptr, nullptr},
++};
++
++bool may_use_file_wrapper(const char *path) {
++    const char *cursor = path;
++    while (std::isalnum(static_cast<unsigned char>(*cursor)) || *cursor == '+' || *cursor == '-' || *cursor == '.') {
++        ++cursor;
++    }
++    const size_t length = static_cast<size_t>(cursor - path);
++    if (*cursor != ':' || length <= 1
++        || (strncmp(cursor + 1, "//", 2) != 0 && !(length == 4 && memcmp(path, "data:", 5) == 0))) {
++        return true;
++    }
++    return length == 4 && strncasecmp(path, "file", 4) == 0;
++}
++
++bool file_access_mode(int type, int &mode) {
++    switch (type) {
++#ifdef F_OK
++    case FS_EXISTS: mode = F_OK; return true;
++#endif
++#ifdef R_OK
++    case FS_IS_R: mode = R_OK; return true;
++#endif
++#ifdef W_OK
++    case FS_IS_W: mode = W_OK; return true;
++#endif
++#ifdef X_OK
++    case FS_IS_X: mode = X_OK; return true;
++#endif
++    default: return false;
++    }
++}
++
++template<size_t Index> void file_access_handler(INTERNAL_FUNCTION_PARAMETERS) {
++    zend_string *filename;
++    ZEND_PARSE_PARAMETERS_START(1, 1)
++        Z_PARAM_STR(filename)
++    ZEND_PARSE_PARAMETERS_END();
++
++    auto &hook = file_access_hooks[Index];
++    try {
++        int mode;
++        if (!ZSTR_LEN(filename) || zend_str_has_nul_byte(filename)
++            || !may_use_file_wrapper(ZSTR_VAL(filename)) || !file_access_mode(hook.type, mode)) {
++            hook.original(INTERNAL_FUNCTION_PARAM_PASSTHRU);
++            return;
++        }
++
++        const char *local = nullptr;
++        php_stream_wrapper *wrapper = php_stream_locate_url_wrapper(ZSTR_VAL(filename), &local, 0);
++        if (wrapper != &wrapped_file_wrapper || typephp_embedded_path_kind(local) != 0) {
++            hook.original(INTERNAL_FUNCTION_PARAM_PASSTHRU);
++            return;
++        }
++        if (php_check_open_basedir(local)) {
++            RETURN_FALSE;
++        }
++
++        char realpath[MAXPATHLEN];
++        const char *file_path_to_check;
++        if (EXPECTED(!php_is_stream_path(local) || expand_filepath(local, realpath) == nullptr)) {
++            file_path_to_check = local;
++        } else {
++            file_path_to_check = realpath;
++        }
++        RETURN_BOOL(VCWD_ACCESS(file_path_to_check, mode) == 0);
++    } catch (const std::exception &error) {
++        zend_throw_error(nullptr, "TypePHP file access lookup failed: %s", error.what());
++    } catch (...) {
++        zend_throw_error(nullptr, "TypePHP file access lookup failed");
++    }
++}
++
++void install_file_access_handlers() {
++    for (auto &hook : file_access_hooks) {
++        auto *function = static_cast<zend_function *>(
++            zend_hash_str_find_ptr(CG(function_table), hook.name, hook.name_length));
++        if (function == nullptr || function->type != ZEND_INTERNAL_FUNCTION || function->internal_function.handler == nullptr) {
++            continue;
++        }
++        hook.function = &function->internal_function;
++        hook.original = hook.function->handler;
++        hook.function->handler = hook.handler;
++    }
++}
++
++void restore_file_access_handlers() {
++    for (auto &hook : file_access_hooks) {
++        if (hook.function != nullptr && hook.function->handler == hook.handler) {
++            hook.function->handler = hook.original;
++        }
++        hook.function = nullptr;
++        hook.original = nullptr;
++    }
++}
++
+@@ -203,0 +324 @@
++    install_file_access_handlers();
+@@ -296,0 +418 @@
++    restore_file_access_handlers();

@@ -40,7 +40,14 @@ final class StoragePathBoundary
             // A dangling link is not a missing directory: following it when a
             // later operation creates files could escape the configured root.
             if (is_link($cursor) || file_exists($cursor)) {
-                throw new InvalidArgumentException('Cannot safely resolve filesystem path: ' . $path);
+                // A publisher may have created or renamed this path after the
+                // failed lookup. Resolve it once more before rejecting it.
+                clearstatcache(true, $cursor);
+                $resolved = realpath($cursor);
+                if ($resolved === false) {
+                    throw new InvalidArgumentException('Cannot safely resolve filesystem path: ' . $path);
+                }
+                break;
             }
             $parent = dirname($cursor);
             $name = basename($cursor);

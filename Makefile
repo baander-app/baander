@@ -9,6 +9,38 @@ override cmd := $(value cmd)
 export cmd
 INSIDE_DOCKER_CONTAINER ?= 0
 ERROR_ONLY_FOR_HOST = @echo "Run this command on the host."
+TYPEPHP_IMAGE ?= baander-typephp-toolchain:local
+TYPEPHP_JOBS ?= 2
+TYPEPHP_QUALIFICATION_BASE ?= baander-ci:local
+TYPEPHP_QUALIFICATION_IMAGE ?= baander-typephp-qualification:local
+
+.PHONY: typephp-setup typephp-version typephp-toolchain
+typephp-setup: ## Install the locked, isolated TypePHP compiler
+	composer --working-dir=tools/typephp install --no-dev --no-scripts --no-plugins --prefer-dist --no-interaction
+
+typephp-version: ## Print the installed TypePHP compiler version
+	php tools/typephp/vendor/bin/tpc.php --version
+
+typephp-toolchain: ## Build the optional PHP 8.5.12 ZTS packaging toolchain
+	docker build --file docker/typephp/Dockerfile --tag "$(TYPEPHP_IMAGE)" --build-arg BUILDER_UID="$$(id -u)" --build-arg BUILDER_GID="$$(id -g)" .
+
+.PHONY: typephp-check-dependencies typephp-build
+typephp-check-dependencies:
+	@test -f vendor/autoload_runtime.php || { echo 'Install application dependencies with composer install --no-dev --no-scripts first.' >&2; exit 1; }
+	@php -r '$$packages = json_decode(file_get_contents("vendor/composer/installed.json"), true, flags: JSON_THROW_ON_ERROR); if ($$packages["dev"] ?? true) { fwrite(STDERR, "TypePHP packaging requires a production vendor tree (composer install --no-dev --no-scripts).\n"); exit(1); }'
+
+typephp-build: typephp-check-dependencies ## Package the console and operator in one executable
+	mkdir -p var/typephp/cache
+	docker run --rm --workdir /var/www/html --volume "$(CURDIR):/var/www/html:ro,z" --volume "$(CURDIR)/var/typephp:/var/www/html/var/typephp:z" --volume "$(CURDIR)/var/typephp/cache:/home/typephp/.typephp:z" "$(TYPEPHP_IMAGE)" tools/typephp/application.yml --no-progress --no-color --job "$(TYPEPHP_JOBS)"
+
+.PHONY: typephp-test-process-cache
+typephp-test-process-cache: ## Check embedded class and callable caches across fork
+	mkdir -p var/typephp/cache
+	docker run --rm --network none --entrypoint php --workdir /var/www/html --volume "$(CURDIR):/var/www/html:ro,z" --volume "$(CURDIR)/var/typephp:/var/www/html/var/typephp:z" --volume "$(CURDIR)/var/typephp/cache:/home/typephp/.typephp:z" "$(TYPEPHP_IMAGE)" tools/typephp/tests/process-cache/build.php "$(TYPEPHP_JOBS)"
+
+.PHONY: typephp-qualification-image
+typephp-qualification-image: ## Build the candidate image for existing runtime qualification runners
+	docker build --file docker/typephp/qualification.Dockerfile --build-arg QUALIFICATION_BASE="$(TYPEPHP_QUALIFICATION_BASE)" --build-context typephp-artifacts=var/typephp --tag "$(TYPEPHP_QUALIFICATION_IMAGE)" .
 
 help: ## List available commands
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "%-25s %s\n", $$1, $$2}' Makefile

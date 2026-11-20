@@ -1,0 +1,30 @@
+--- a/src/Build/PhpBuilderSource.php
++++ b/src/Build/PhpBuilderSource.php
+@@ -48,6 +48,6 @@
+         ksort($external, SORT_STRING);
+         $version = OfficialPhpSource::version($officialSource);
+-        $fingerprint = substr(hash('sha256', json_encode($external, JSON_THROW_ON_ERROR)), 0, 16);
++        $fingerprint = substr(hash('sha256', json_encode([$external, 'swoole-absolute-source-directory'], JSON_THROW_ON_ERROR)), 0, 16);
+         $source = $this->cacheDirectory . '/php-builder-src/php-' . $version . '-' . $fingerprint;
+         $manifest = $source . '/.typephp-extensions.json';
+         $metadata = json_encode($external, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)
+@@ -69,6 +69,19 @@
+             $target = $temporary . '/ext/' . str_replace('-', '_', $extension);
+             $this->mkdir($target);
+             $this->run(['cp', '-a', rtrim($extensionSource, '/\\') . '/.', $target]);
++        }
++        if (isset($sources['swoole'])) {
++            $configuration = $temporary . '/ext/swoole/config.m4';
++            $contents = str_replace(
++                'swoole_source_dir="ext/swoole"',
++                'swoole_source_dir="$abs_srcdir/ext/swoole"',
++                (string) file_get_contents($configuration),
++                $replacements,
++            );
++            if ($replacements !== 1) {
++                throw new \RuntimeException('Swoole source-directory patch no longer matches config.m4');
++            }
++            AtomicFile::write($configuration, $contents);
+         }
+         $this->run(['sh', $temporary . '/buildconf', '--force'], $temporary);
+         AtomicFile::write($temporary . '/.typephp-extensions.json', $metadata);

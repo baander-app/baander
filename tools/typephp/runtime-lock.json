@@ -1,0 +1,93 @@
+{
+  "php": {
+    "version": "8.5.12",
+    "filename": "php-8.5.12.tar.xz",
+    "url": "https://www.php.net/distributions/php-8.5.12.tar.xz",
+    "sha256": "08bc2eba2a588654ade1357174aa646b761556c862dda0678345ee29ed481209"
+  },
+  "extensions": {
+    "swoole": {
+      "version": "6.2.4",
+      "filename": "swoole-6.2.4.tgz",
+      "url": "https://pecl.php.net/get/swoole-6.2.4.tgz",
+      "sha256": "cb41348708cb3a360672cd4ffe84b9a6b4efee61773be7d76a11c39949b95334"
+    },
+    "redis": {
+      "version": "6.3.0",
+      "filename": "redis-6.3.0.tgz",
+      "url": "https://pecl.php.net/get/redis-6.3.0.tgz",
+      "sha256": "0d5141f634bd1db6c1ddcda053d25ecf2c4fc1c395430d534fd3f8d51dd7f0b5"
+    },
+    "igbinary": {
+      "version": "3.2.17RC1",
+      "filename": "igbinary-3.2.17RC1.tgz",
+      "url": "https://pecl.php.net/get/igbinary-3.2.17RC1.tgz",
+      "sha256": "91da821443db125282a6aea039f24588dd28ff5d71e8187f6ecc41165bceafbc"
+    },
+    "imagick": {
+      "version": "3.8.1",
+      "filename": "imagick-3.8.1.tgz",
+      "url": "https://pecl.php.net/get/imagick-3.8.1.tgz",
+      "sha256": "3a3587c0a524c17d0dad9673a160b90cd776e836838474e173b549ed864352ee"
+    },
+    "mailparse": {
+      "version": "3.2.0",
+      "filename": "mailparse-3.2.0.tgz",
+      "url": "https://pecl.php.net/get/mailparse-3.2.0.tgz",
+      "sha256": "cc5111ae17bfa36efcc5ef23dcf75b6501593ac264c196aad3e39cd4ad765332"
+    },
+    "inotify": {
+      "version": "3.0.1",
+      "filename": "inotify-3.0.1.tgz",
+      "url": "https://pecl.php.net/get/inotify-3.0.1.tgz",
+      "sha256": "fbb7240abae502ea8f4b3c68264c6425fb46647402a8f93916482845394ad124"
+    },
+    "excimer": {
+      "version": "1.2.6",
+      "filename": "excimer-1.2.6.tgz",
+      "url": "https://pecl.php.net/get/excimer-1.2.6.tgz",
+      "sha256": "7b5fe1f68f2b1a62bd0394d4bf165eafe6b7ceb3fc20ab885e733d356db0d034"
+    },
+    "yaml": {
+      "version": "2.3.0",
+      "filename": "yaml-2.3.0.tgz",
+      "url": "https://pecl.php.net/get/yaml-2.3.0.tgz",
+      "sha256": "bc8404807a3a4dc896b310af21a7f8063aa238424ff77f27eb6ffa88b5874b8a"
+    },
+    "uv": {
+      "version": "0.3.1",
+      "filename": "uv-0.3.1.tgz",
+      "url": "https://pecl.php.net/get/uv-0.3.1.tgz",
+      "sha256": "1b18d961543f76eebae300893987b3f198874d9f039cf472ac6257f85a28db77"
+    },
+    "msgpack": {
+      "version": "3.0.1",
+      "filename": "msgpack-3.0.1.tgz",
+      "url": "https://pecl.php.net/get/msgpack-3.0.1.tgz",
+      "sha256": "e30be355ab79aaea4568692fbd6073fd7c7f50ea8d3cf12edce40fc0c921d868"
+    }
+  },
+  "configure": {
+    "gd": [
+      "--with-webp",
+      "--with-jpeg",
+      "--with-xpm",
+      "--with-freetype"
+    ],
+    "redis": [
+      "--enable-redis-igbinary",
+      "--enable-redis-lzf",
+      "--enable-redis-zstd",
+      "--with-liblz4"
+    ],
+    "swoole": [
+      "--enable-swoole-thread",
+      "--enable-sockets",
+      "--enable-swoole-curl",
+      "--enable-cares",
+      "--enable-swoole-pgsql",
+      "--enable-swoole-sqlite",
+      "--enable-zstd"
+    ]
+  }
+}

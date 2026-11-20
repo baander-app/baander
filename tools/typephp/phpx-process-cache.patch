@@ -1,0 +1,12 @@
+--- a/thirdparty/opcache/opcode_unserialize_85.c
++++ b/thirdparty/opcache/opcode_unserialize_85.c
+@@ -174 +174,2 @@
+-		ZEND_MAP_PTR_NEW(fcc->fptr);
++		/* Decoded ASTs are private to this process and need no shared cache slot. */
++		ZEND_MAP_PTR_INIT(fcc->fptr, NULL);
+@@ -264 +264,0 @@
+-		zend_alloc_ce_cache(type_name);
+@@ -522,3 +521,0 @@
+-	if (!(ce->ce_flags & ZEND_ACC_ANON_CLASS)) {
+-		zend_alloc_ce_cache(ce->name);
+-	}

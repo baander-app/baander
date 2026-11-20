@@ -86,6 +86,17 @@ final class AsyncSleepTest extends TestCase
         yield 'less than zero' => [-1.0];
     }
 
+    public function testCancellationCheckpointAllowsOrdinaryAndUncancelledExecution(): void
+    {
+        Async::throwIfCanceled();
+        $continued = false;
+        \Swoole\Coroutine\run(static function () use (&$continued): void {
+            Async::throwIfCanceled();
+            $continued = true;
+        });
+        self::assertTrue($continued);
+    }
+
     public function testACancelledWaitInACoroutineStillThrows(): void
     {
         $cancelled = false;

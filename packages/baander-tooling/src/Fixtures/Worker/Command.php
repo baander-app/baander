@@ -83,6 +83,8 @@ final class Command
     private function prepare(): void
     {
         $id = $this->resources->id;
+        $workspace = $this->runtime->layout()->root;
+        $inImage = ($this->runtime->environment['BAANDER_TEST_CHECKOUT_IN_IMAGE'] ?? '0') === '1';
 
         $this->resources->createNetwork($id, ['--internal']);
         $this->resources->createVolume($id . '-workspace');
@@ -138,10 +140,10 @@ final class Command
         $this->common = [
             '--network',
             $id,
-            '--volume',
-            $id . '-workspace:/workspace',
+            '--mount',
+            'type=volume,source=' . $id . '-workspace,target=' . $workspace . ($inImage ? '' : ',volume-nocopy'),
             '--workdir',
-            '/workspace',
+            $workspace,
             '-e',
             'APP_ENV=prod',
             '-e',
@@ -150,7 +152,7 @@ final class Command
             'XDEBUG_MODE=off',
             ...FixtureSecrets::dockerFlags(),
             '-e',
-            'CONVERT_STORAGE_PATH=/workspace/storage/conversions',
+            'CONVERT_STORAGE_PATH=' . $workspace . '/storage/conversions',
             '-e',
             'REDIS_PASSWORD=test-only',
             '-e',
@@ -189,10 +191,11 @@ final class Command
             'sh',
             $this->image,
             '-ec',
-            'touch /workspace/.fixture-ready; chown "$1:$2" /workspace',
+            'touch "$3/.fixture-ready"; chown "$1:$2" "$3"',
             'fixture-owner',
             $this->uid,
             $this->gid,
+            $workspace,
         ]);
         $this->resources->createContainer($id . '-prepare', [
             ...$this->common,
@@ -203,15 +206,7 @@ final class Command
             'exec sleep infinity',
         ]);
         $this->docker(['start', $id . '-prepare']);
-        if (($this->runtime->environment['BAANDER_TEST_CHECKOUT_IN_IMAGE'] ?? '0') === '1') {
-            $this->docker([
-                'exec',
-                $id . '-prepare',
-                'sh',
-                '-ec',
-                'cd ' . escapeshellarg($this->runtime->layout()->root) . '; tar -cf /tmp/worker-command-checkout.tar .; tar -xf /tmp/worker-command-checkout.tar -C /workspace; rm /tmp/worker-command-checkout.tar',
-            ]);
-        } else {
+        if (!$inImage) {
             $this->resources->stage(
                 $id . '-prepare',
                 [
@@ -231,7 +226,7 @@ final class Command
                     'composer.lock',
                     'translations',
                 ],
-                '/workspace',
+                $workspace,
             );
             $this->docker([
                 'exec',
@@ -241,7 +236,7 @@ final class Command
                 'chown',
                 '-R',
                 $this->uid . ':' . $this->gid,
-                '/workspace',
+                $workspace,
             ]);
         }
         $this->docker([

@@ -93,6 +93,48 @@ final class StreamedResponseProcessorTest extends TestCase
         self::assertFileDoesNotExist($this->directory . '/errors', 'A cut stream is not an error to report.');
     }
 
+    public function testCancellingABlockedWriteStopsBufferedProductionBeforeTheNextChunk(): void
+    {
+        $socket = stream_socket_client('tcp://127.0.0.1:'.$this->port, $errno, $error, 5);
+        self::assertIsResource($socket, $error);
+        stream_set_timeout($socket, 5);
+        try {
+            fwrite($socket, "GET /buffered HTTP/1.1\r\nHost: baander.app\r\nConnection: close\r\n\r\n");
+            $headers = '';
+            while (!str_ends_with($headers, "\r\n\r\n")) {
+                $byte = fread($socket, 1);
+                if ($byte === false || $byte === '') {
+                    throw new \RuntimeException('The stream headers ended early.');
+                }
+                $headers .= $byte;
+            }
+            self::assertStringContainsString('200', $headers);
+            $deadline = microtime(true) + 5;
+            do {
+                $state = json_decode($this->get('/buffered-state'), true, flags: JSON_THROW_ON_ERROR);
+                if ($state['blocked']) {
+                    break;
+                }
+                usleep(10_000);
+            } while (microtime(true) < $deadline);
+            self::assertTrue($state['blocked'], 'The sender never blocked in Response::write.');
+            $result = json_decode($this->get('/abort-buffered'), true, flags: JSON_THROW_ON_ERROR);
+            self::assertSame(1, $result['cut']);
+            self::assertSame($result['before'], $result['after'], 'Cancellation produced another buffered chunk.');
+            self::assertTrue($result['finished']);
+            $wire = stream_get_contents($socket);
+            self::assertIsString($wire);
+            self::assertFalse(stream_get_meta_data($socket)['timed_out']);
+            self::assertFalse(str_ends_with($wire, "\r\n0\r\n\r\n"), 'A cancelled stream sent the chunked terminator.');
+            $this->awaitStats(static fn (array $stats): bool => $stats === ['requests' => 0, 'streams' => 0]);
+            self::assertSame("buffered_finally\n", file_get_contents($this->directory.'/events'));
+            self::assertStringNotContainsString('buffered-body-', $this->server->getOutput());
+            self::assertFileDoesNotExist($this->directory.'/errors', 'Cancellation leaked an error or body into the log.');
+        } finally {
+            fclose($socket);
+        }
+    }
+
     public function testARangedFileResponseCutMidLoopIsShorterThanItsContentLength(): void
     {
         $client = $this->startCurl('/range', ['--limit-rate', '8M']);

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Controller;
 
+use App\Shared\Domain\Model\PublicId;
+use App\Shared\Infrastructure\Messenger\JobIdStamp;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use App\Tests\Fixtures\Messaging\FailureTransportProbe;
 use App\Tests\Functional\TestCase;
@@ -157,14 +159,18 @@ final class TransportControllerTest extends TestCase
     {
         $observer = $this->observer();
         $label = 'retry-success-' . bin2hex(random_bytes(4));
-        $id = $this->sendCommittedFailed($observer, $label, fail: false);
+        $jobId = new PublicId();
         try {
+            $id = $this->sendCommittedFailed($observer, $label, $jobId, fail: false);
             $data = $this->assertJsonResponse($this->authenticatedRequest('POST', self::BASE . '/failed/' . $id . '/retry', $this->createAdminUser()), 200, 'data');
 
             self::assertSame(['retried' => $id], $data['data']);
             self::assertSame([], $this->committedIds($observer, $label));
+            self::assertSame(['job_id' => $jobId->toString(), 'status' => 'finished'], $observer->fetchAssociative(
+                'SELECT job_id, status FROM job_monitors WHERE job_id = ?', [$jobId->toString()],
+            ));
         } finally {
-            $this->deleteCommitted($observer, $label);
+            $this->deleteCommitted($observer, $label, $jobId);
         }
     }
 
@@ -172,8 +178,9 @@ final class TransportControllerTest extends TestCase
     {
         $observer = $this->observer();
         $label = 'retry-failure-' . bin2hex(random_bytes(4));
-        $id = $this->sendCommittedFailed($observer, $label, fail: true);
+        $jobId = new PublicId();
         try {
+            $id = $this->sendCommittedFailed($observer, $label, $jobId, fail: true);
             $admin = $this->createAdminUser();
             $this->assertJsonResponse($this->authenticatedRequest('POST', self::BASE . '/failed/' . $id . '/retry', $admin), 200, 'data');
 
@@ -183,8 +190,11 @@ final class TransportControllerTest extends TestCase
             $data = $this->assertJsonResponse($this->authenticatedRequest('GET', self::BASE . '/failed/' . $ids[0], $admin), 200, 'data');
             self::assertSame(1, $data['data']['retryCount']);
             self::assertSame(sprintf('Probe "%s" failed.', $label), $data['data']['errorMessage']);
+            self::assertSame(['job_id' => $jobId->toString(), 'status' => 'failed'], $observer->fetchAssociative(
+                'SELECT job_id, status FROM job_monitors WHERE job_id = ?', [$jobId->toString()],
+            ));
         } finally {
-            $this->deleteCommitted($observer, $label);
+            $this->deleteCommitted($observer, $label, $jobId);
         }
     }
 
@@ -212,13 +222,16 @@ final class TransportControllerTest extends TestCase
     }
 
     /** Sends what SendFailedMessageToFailureTransportListener sends after the last attempt. */
-    private function sendFailed(string $label, int $retryCount = 0, bool $delayed = false, bool $fail = true, ?TransportInterface $transport = null): string
+    private function sendFailed(string $label, int $retryCount = 0, bool $delayed = false, bool $fail = true, ?TransportInterface $transport = null, ?PublicId $jobId = null): string
     {
         $envelope = new Envelope(new FailureTransportProbe($label, $fail), [
             new SentToFailureTransportStamp('async'),
             new RedeliveryStamp($retryCount),
             new ErrorDetailsStamp(\RuntimeException::class, 0, sprintf('Probe "%s" failed.', $label)),
         ]);
+        if ($jobId !== null) {
+            $envelope = $envelope->with(new JobIdStamp($jobId));
+        }
         if ($delayed) {
             $envelope = $envelope->with(new DelayStamp(60_000));
         }
@@ -248,7 +261,7 @@ final class TransportControllerTest extends TestCase
         return $observer;
     }
 
-    private function sendCommittedFailed(DbalConnection $observer, string $label, bool $fail): string
+    private function sendCommittedFailed(DbalConnection $observer, string $label, PublicId $jobId, bool $fail): string
     {
         $serializer = static::getContainer()->get(JsonTransportSerializer::class);
         self::assertInstanceOf(JsonTransportSerializer::class, $serializer);
@@ -257,7 +270,7 @@ final class TransportControllerTest extends TestCase
             $serializer,
         );
 
-        return $this->sendFailed($label, fail: $fail, transport: $transport);
+        return $this->sendFailed($label, fail: $fail, transport: $transport, jobId: $jobId);
     }
 
     /** @return list<string> */
@@ -269,9 +282,15 @@ final class TransportControllerTest extends TestCase
         ));
     }
 
-    private function deleteCommitted(DbalConnection $observer, string $label): void
+    private function deleteCommitted(DbalConnection $observer, string $label, PublicId $jobId): void
     {
-        $observer->executeStatement('DELETE FROM failed_messages WHERE position(? in body) > 0', [$label]);
-        $observer->close();
+        try {
+            $observer->transactional(static function (DbalConnection $connection) use ($label, $jobId): void {
+                $connection->executeStatement('DELETE FROM failed_messages WHERE position(? in body) > 0', [$label]);
+                $connection->executeStatement('DELETE FROM job_monitors WHERE job_id = ?', [$jobId->toString()]);
+            });
+        } finally {
+            $observer->close();
+        }
     }
 }

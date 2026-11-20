@@ -218,6 +218,7 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
                     }
                     if ($chunk !== '') {
                         yield $chunk;
+                        Async::throwIfCanceled();
                         continue;
                     }
                     fseek($handle, 0, SEEK_CUR);
