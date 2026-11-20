@@ -9,6 +9,10 @@ final class ServicePoolContainer
     /** @var array<int, true> */
     private array $releasing = [];
 
+    private bool $maintaining = false;
+
+    private bool $drainRequested = false;
+
     /**
      * @param array<int, array<ServicePool<object>>> $pools
      */
@@ -76,18 +80,62 @@ final class ServicePoolContainer
         }
     }
 
+    public function pruneFree(float $idleSeconds = 60.0, int $minimumFree = 1): int
+    {
+        if ($this->maintaining) {
+            return 0;
+        }
+
+        $this->maintaining = true;
+        $removed = 0;
+        try {
+            foreach ($this->uniquePools() as $pool) {
+                if (!$pool instanceof IdleServicePool) {
+                    continue;
+                }
+                try {
+                    $removed += $pool->pruneFree($idleSeconds, $minimumFree);
+                } catch (\Throwable $error) {
+                    $this->report('prune', $pool, $error);
+                }
+            }
+        } finally {
+            $this->finishMaintenance();
+        }
+
+        return $removed;
+    }
+
     public function drain(int $cId): void
     {
         $this->releaseFromCoroutine($cId);
-        foreach ($this->uniquePools() as $pool) {
-            if (!$pool instanceof LifecycleServicePool) {
-                continue;
+        $this->drainRequested = true;
+        if ($this->maintaining) {
+            return;
+        }
+
+        $this->maintaining = true;
+        $this->finishMaintenance();
+    }
+
+    private function finishMaintenance(): void
+    {
+        try {
+            while ($this->drainRequested) {
+                $this->drainRequested = false;
+                foreach ($this->uniquePools() as $pool) {
+                    if (!$pool instanceof LifecycleServicePool) {
+                        continue;
+                    }
+                    try {
+                        $pool->drainFree();
+                    } catch (\Throwable $error) {
+                        $this->report('drain', $pool, $error);
+                    }
+                }
             }
-            try {
-                $pool->drainFree();
-            } catch (\Throwable $error) {
-                $this->report('drain', $pool, $error);
-            }
+        } finally {
+            $this->maintaining = false;
         }
     }
 

@@ -13,13 +13,14 @@ use SwooleBundle\SwooleBundle\Component\Locking\Mutex;
 /**
  * @template T of object
  * @template-implements LifecycleServicePool<T>
+ * @template-implements IdleServicePool<T>
  */
-abstract class BaseServicePool implements LifecycleServicePool
+abstract class BaseServicePool implements LifecycleServicePool, IdleServicePool
 {
     private int $assignedCount = 0;
 
     /**
-     * @var array<int, T>
+     * @var list<array{service: T, releasedAt: float}>
      */
     private array $freePool = [];
 
@@ -124,7 +125,7 @@ abstract class BaseServicePool implements LifecycleServicePool
         $this->assignedCount--;
         try {
             if ($prepared !== null && $prepared['service'] === $service && $prepared['reusable'] && $this->isServiceStable($service)) {
-                $this->freePool[] = $service;
+                $this->freePool[] = ['service' => $service, 'releasedAt' => hrtime(true) / 1_000_000_000];
             }
         } catch (\Throwable $error) {
             error_log(sprintf('Service pool release failed for %s: %s: %s', $service::class, $error::class, $error->getMessage()));
@@ -135,7 +136,40 @@ abstract class BaseServicePool implements LifecycleServicePool
 
     public function drainFree(): void
     {
+        $discarded = $this->freePool;
         $this->freePool = [];
+        unset($discarded);
+    }
+
+    public function pruneFree(float $idleSeconds = 60.0, int $minimumFree = 1): int
+    {
+        if (!is_finite($idleSeconds) || $idleSeconds < 0.0 || $minimumFree < 0) {
+            throw new \InvalidArgumentException('Idle age and minimum free count must be non-negative and finite.');
+        }
+
+        $remaining = count($this->freePool) - $minimumFree;
+        if ($remaining <= 0) {
+            return 0;
+        }
+
+        $cutoff = hrtime(true) / 1_000_000_000 - $idleSeconds;
+        $retained = [];
+        $discarded = [];
+        foreach ($this->freePool as $entry) {
+            if ($remaining > 0 && $entry['releasedAt'] <= $cutoff) {
+                $discarded[] = $entry;
+                $remaining--;
+            } else {
+                $retained[] = $entry;
+            }
+        }
+        unset($entry);
+        $removed = count($discarded);
+        // Publish before destruction: hooked destructors may let borrowers run.
+        $this->freePool = $retained;
+        unset($discarded);
+
+        return $removed;
     }
 
     /**
@@ -149,7 +183,7 @@ abstract class BaseServicePool implements LifecycleServicePool
     private function getServiceToAssign(): object
     {
         if (!empty($this->freePool)) {
-            $assigned = array_shift($this->freePool);
+            $assigned = array_shift($this->freePool)['service'];
         } else {
             $assigned = $this->newServiceInstance();
         }

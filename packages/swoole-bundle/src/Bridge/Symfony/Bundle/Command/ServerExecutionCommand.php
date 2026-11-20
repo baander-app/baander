@@ -124,6 +124,10 @@ abstract class ServerExecutionCommand extends Command
             return 0;
         }
 
+        // Cold container compilation leaves cyclic graphs; discard them before workers inherit the heap.
+        gc_collect_cycles();
+        gc_mem_caches();
+
         $this->startServer($this->serverConfiguration, $this->server, $io);
 
         return 0;
