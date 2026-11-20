@@ -59,7 +59,7 @@ final class UserRepository implements UserRepositoryInterface
             return null;
         }
 
-        return $this->toDomain($entity);
+        return UserEntityMapping::toDomain($entity);
     }
 
     public function findByPublicId(PublicId $publicId): ?User
@@ -72,7 +72,7 @@ final class UserRepository implements UserRepositoryInterface
             return null;
         }
 
-        return $this->toDomain($entity);
+        return UserEntityMapping::toDomain($entity);
     }
 
     public function findByUuid(Uuid $uuid): ?User
@@ -85,7 +85,7 @@ final class UserRepository implements UserRepositoryInterface
             return null;
         }
 
-        return $this->toDomain($entity);
+        return UserEntityMapping::toDomain($entity);
     }
 
     public function existsWithEmail(Email $email): bool
@@ -140,7 +140,7 @@ final class UserRepository implements UserRepositoryInterface
         /** @var list<UserEntity> $entities */
         $entities = $query->getResult();
 
-        return array_map($this->toDomain(...), $entities);
+        return array_map(UserEntityMapping::toDomain(...), $entities);
     }
 
     public function count(?string $roleFilter = null, ?bool $disabledFilter = null): int
@@ -224,11 +224,6 @@ final class UserRepository implements UserRepositoryInterface
         }
 
         return (int) $epoch;
-    }
-
-    private function toDomain(UserEntity $entity): User
-    {
-        return UserEntityMapping::toDomain($entity);
     }
 
     private function syncToEntity(User $user, UserEntity $entity): void
