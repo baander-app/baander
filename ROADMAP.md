@@ -4,6 +4,29 @@ Updated: 2026-11-20. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
+## Runtime opcode-cache memory
+
+Application images now install the shared CLI OPcache profile directly instead
+of relying on the legacy development Compose mount. Development, production,
+worker, operator and CI targets inherit the same cache settings; PHP memory
+limits and worker counts are unchanged. The image build verifies that PHP can
+compile and cache a script. The retained image probe also verifies source-change
+revalidation.
+
+Verification: eight controlled cold/warm kernel boots and four boots using the
+rebuilt images' native configuration pass. Development, production-derived worker
+and CI images pass all three cache/revalidation probes with `memory_limit=512M`.
+The controlled cold development heap drops from 147.14 to 26.92 MiB; production
+kernel mode drops from 140.84 to 25.67 MiB. Measurements and their physical-memory
+limits are recorded in the [opcode-cache report](docs/optimize/http-worker-opcache-report.md).
+
+The isolated preview refresh preserves its data and returns HTTP 200. Browser
+login, media home and admin dashboard checks pass. After a minute of dashboard
+polling, diagnostics report 173.19 MiB of combined heap across four workers,
+compared with 735.32 MiB before refresh. Six-process PSS measures 444.58 MiB,
+compared with 560.42 MiB before. The report records the different process ages
+and request histories; this is not a long-session leak test.
+
 ## Tooling context packages and shared core
 
 The tooling monolith is split into thirteen packages, documented in

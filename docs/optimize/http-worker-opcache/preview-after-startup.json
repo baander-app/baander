@@ -1,0 +1,102 @@
+{
+  "capturedAt": "2026-11-20T20:35:59.865495+00:00",
+  "imageId": "sha256:e3f5088bd8d9ec623f61fd522f9aab26284315fb3669f298c22e5a5e5d4ed4ac",
+  "startedAt": "2026-11-20T20:35:30.057173812Z",
+  "environment": "isolated preview",
+  "opcacheEnabled": true,
+  "workload": "Refreshed preview with HTTP readiness requests and worker diagnostic sampling. No controlled replay of the earlier dashboard session.",
+  "workers": [
+    {
+      "worker_id": 0,
+      "memory": {
+        "usage": 34.69,
+        "peak": 69.88,
+        "real": 94,
+        "real_peak": 96
+      },
+      "process": {
+        "pid": 19,
+        "uid": 1000,
+        "gid": 1000,
+        "user": "www-data",
+        "uptime": 0
+      }
+    },
+    {
+      "worker_id": 1,
+      "memory": {
+        "usage": 34.61,
+        "peak": 69.88,
+        "real": 94,
+        "real_peak": 96
+      },
+      "process": {
+        "pid": 20,
+        "uid": 1000,
+        "gid": 1000,
+        "user": "www-data",
+        "uptime": 0
+      }
+    },
+    {
+      "worker_id": 2,
+      "memory": {
+        "usage": 34.61,
+        "peak": 69.88,
+        "real": 94,
+        "real_peak": 96
+      },
+      "process": {
+        "pid": 21,
+        "uid": 1000,
+        "gid": 1000,
+        "user": "www-data",
+        "uptime": 0
+      }
+    },
+    {
+      "worker_id": 3,
+      "memory": {
+        "usage": 34.54,
+        "peak": 69.88,
+        "real": 94,
+        "real_peak": 96
+      },
+      "process": {
+        "pid": 22,
+        "uid": 1000,
+        "gid": 1000,
+        "user": "www-data",
+        "uptime": 0
+      }
+    }
+  ],
+  "phpProcesses": [
+    {
+      "pid": 15,
+      "pssKiB": 28390
+    },
+    {
+      "pid": 19,
+      "pssKiB": 41786
+    },
+    {
+      "pid": 20,
+      "pssKiB": 40216
+    },
+    {
+      "pid": 21,
+      "pssKiB": 41482
+    },
+    {
+      "pid": 22,
+      "pssKiB": 38371
+    },
+    {
+      "pid": 7,
+      "pssKiB": 162935
+    }
+  ],
+  "totalWorkerHeapMiB": 138.45,
+  "totalPhpPssMiB": 344.90234375
+}

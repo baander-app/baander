@@ -1,0 +1,53 @@
+{
+  "date": "2026-11-20",
+  "probe": "docs/optimize/http-worker-opcache/image-probe.php",
+  "probeSha256": "77fa5335d80ae13396a9bbdc4c57924758d2827feb8cbf0f639ba92d4a381ea1",
+  "method": "Run the retained probe in each built image with network disabled and only the probe mounted read-only. No INI mount or PHP command-line override.",
+  "checks": [
+    {
+      "target": "dev-runtime",
+      "imageId": "sha256:e3f5088bd8d9ec623f61fd522f9aab26284315fb3669f298c22e5a5e5d4ed4ac",
+      "result": {
+        "cachedScript": true,
+        "changedSourceObserved": true,
+        "opcacheCapacityMiB": "256",
+        "internedStringsMiB": "32",
+        "timestampValidation": "1",
+        "revalidateFrequency": "0",
+        "jit": "",
+        "memoryLimit": "512M"
+      },
+      "exitCode": 0
+    },
+    {
+      "target": "worker (production-derived)",
+      "imageId": "sha256:10d3746d4f619e4078f4274bdf55f474be8986001fcb2ce562b8b0fd9a37a8a3",
+      "result": {
+        "cachedScript": true,
+        "changedSourceObserved": true,
+        "opcacheCapacityMiB": "256",
+        "internedStringsMiB": "32",
+        "timestampValidation": "1",
+        "revalidateFrequency": "0",
+        "jit": "",
+        "memoryLimit": "512M"
+      },
+      "exitCode": 0
+    },
+    {
+      "target": "ci",
+      "imageId": "sha256:8286c699e78d8a254dc6a0f1c887727ed711f4f0fa77c064763bb8aacaeadead",
+      "result": {
+        "cachedScript": true,
+        "changedSourceObserved": true,
+        "opcacheCapacityMiB": "256",
+        "internedStringsMiB": "32",
+        "timestampValidation": "1",
+        "revalidateFrequency": "0",
+        "jit": "",
+        "memoryLimit": "512M"
+      },
+      "exitCode": 0
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "capturedAt": "2026-11-20T20:38:36.284117+00:00",
+  "imageId": "sha256:e3f5088bd8d9ec623f61fd522f9aab26284315fb3669f298c22e5a5e5d4ed4ac",
+  "startedAt": "2026-11-20T20:35:30.057173812Z",
+  "environment": "isolated preview",
+  "opcacheEnabled": true,
+  "workload": "Successful browser login, media home and admin dashboard navigation, followed by 60 seconds of dashboard polling. Then diagnostics sampling. No controlled replay of the older baseline session.",
+  "workers": [
+    {
+      "worker_id": 0,
+      "memory": {
+        "usage": 38.44,
+        "peak": 69.88,
+        "real": 94,
+        "real_peak": 101
+      },
+      "process": {
+        "pid": 19,
+        "uid": 1000,
+        "gid": 1000,
+        "user": "www-data",
+        "uptime": 157
+      }
+    },
+    {
+      "worker_id": 1,
+      "memory": {
+        "usage": 41.21,
+        "peak": 69.88,
+        "real": 94,
+        "real_peak": 101
+      },
+      "process": {
+        "pid": 20,
+        "uid": 1000,
+        "gid": 1000,
+        "user": "www-data",
+        "uptime": 157
+      }
+    },
+    {
+      "worker_id": 2,
+      "memory": {
+        "usage": 52.6,
+        "peak": 73.91,
+        "real": 94,
+        "real_peak": 101
+      },
+      "process": {
+        "pid": 21,
+        "uid": 1000,
+        "gid": 1000,
+        "user": "www-data",
+        "uptime": 157
+      }
+    },
+    {
+      "worker_id": 3,
+      "memory": {
+        "usage": 40.94,
+        "peak": 69.88,
+        "real": 94,
+        "real_peak": 101
+      },
+      "process": {
+        "pid": 22,
+        "uid": 1000,
+        "gid": 1000,
+        "user": "www-data",
+        "uptime": 157
+      }
+    }
+  ],
+  "phpProcesses": [
+    {
+      "pid": 15,
+      "pssKiB": 33181
+    },
+    {
+      "pid": 19,
+      "pssKiB": 62320
+    },
+    {
+      "pid": 20,
+      "pssKiB": 71237
+    },
+    {
+      "pid": 21,
+      "pssKiB": 106077
+    },
+    {
+      "pid": 22,
+      "pssKiB": 66183
+    },
+    {
+      "pid": 7,
+      "pssKiB": 116254
+    }
+  ],
+  "totalWorkerHeapMiB": 173.19,
+  "totalPhpPssMiB": 444.58203125,
+  "dashboardDisplayedMiB": 173.31
+}

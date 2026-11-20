@@ -1,0 +1,106 @@
+{
+  "method": "Final image native ini, no source/ini overlays. Read-only retained probe bind at /tmp/boot-probe.php. Network disabled, fresh tmpfs /tmp, cwd /var/www/html. Two separate sequential PHP processes per image.",
+  "commandTemplate": "docker --host unix:///var/run/docker.sock run --rm --network none -e PROBE_ENV={environment} -e XDEBUG_MODE=off --security-opt label=disable --tmpfs /tmp:rw,exec,mode=1777 -v /home/martin/dev/baander/docs/optimize/http-worker-opcache/boot-probe.php:/tmp/boot-probe.php:ro -w /var/www/html --entrypoint /bin/sh {image} -c 'php /tmp/boot-probe.php && php /tmp/boot-probe.php'",
+  "images": [
+    {
+      "environment": "dev",
+      "image": "baander-development-dev-runtime:3be902ac7864711cd56323f9399cdd277d83733b89a49e37f339463cb69c1a7f-99082fd2971bddd0fdce83eed2290490",
+      "imageId": "sha256:e3f5088bd8d9ec623f61fd522f9aab26284315fb3669f298c22e5a5e5d4ed4ac",
+      "exitCode": 0,
+      "measurements": [
+        {
+          "environment": "dev",
+          "usedBytes": 28267816,
+          "allocatedBytes": 88080384,
+          "classes": 7792,
+          "collectedCycles": 46555,
+          "physicalKiB": {
+            "Rss": 266224,
+            "Pss": 233876
+          },
+          "opcache": {
+            "used_memory": 144135096,
+            "free_memory": 124300360,
+            "wasted_memory": 0,
+            "current_wasted_percentage": 0
+          },
+          "cacheState": "cold",
+          "usedMiB": 26.96,
+          "allocatedMiB": 84.0,
+          "pssMiB": 228.39
+        },
+        {
+          "environment": "dev",
+          "usedBytes": 5477640,
+          "allocatedBytes": 18874368,
+          "classes": 765,
+          "collectedCycles": 0,
+          "physicalKiB": {
+            "Rss": 92200,
+            "Pss": 60655
+          },
+          "opcache": {
+            "used_memory": 45033656,
+            "free_memory": 223401800,
+            "wasted_memory": 0,
+            "current_wasted_percentage": 0
+          },
+          "cacheState": "warm",
+          "usedMiB": 5.22,
+          "allocatedMiB": 18.0,
+          "pssMiB": 59.23
+        }
+      ]
+    },
+    {
+      "environment": "prod",
+      "image": "baander-development-worker:3be902ac7864711cd56323f9399cdd277d83733b89a49e37f339463cb69c1a7f-99082fd2971bddd0fdce83eed2290490",
+      "imageId": "sha256:10d3746d4f619e4078f4274bdf55f474be8986001fcb2ce562b8b0fd9a37a8a3",
+      "exitCode": 0,
+      "measurements": [
+        {
+          "environment": "prod",
+          "usedBytes": 26822176,
+          "allocatedBytes": 69206016,
+          "classes": 7579,
+          "collectedCycles": 62538,
+          "physicalKiB": {
+            "Rss": 238540,
+            "Pss": 206238
+          },
+          "opcache": {
+            "used_memory": 138815576,
+            "free_memory": 129619880,
+            "wasted_memory": 0,
+            "current_wasted_percentage": 0
+          },
+          "cacheState": "cold",
+          "usedMiB": 25.58,
+          "allocatedMiB": 66.0,
+          "pssMiB": 201.4
+        },
+        {
+          "environment": "prod",
+          "usedBytes": 4463960,
+          "allocatedBytes": 12582912,
+          "classes": 722,
+          "collectedCycles": 0,
+          "physicalKiB": {
+            "Rss": 79272,
+            "Pss": 47666
+          },
+          "opcache": {
+            "used_memory": 41960680,
+            "free_memory": 226474776,
+            "wasted_memory": 0,
+            "current_wasted_percentage": 0
+          },
+          "cacheState": "warm",
+          "usedMiB": 4.26,
+          "allocatedMiB": 12.0,
+          "pssMiB": 46.55
+        }
+      ]
+    }
+  ]
+}

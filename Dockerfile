@@ -456,9 +456,20 @@ COPY --from=builder /usr/local/lib/php/ /usr/local/lib/php/
 # Copy extension .ini configuration files
 COPY --from=builder /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
 
-# Create php.ini so the host mount target exists in the container.
-# The actual config is provided via docker-compose volume mount.
+# Standalone images carry the CLI opcode cache settings; development mounts
+# may replace php.ini without disabling the shared runtime configuration.
 RUN cp /usr/local/etc/php/php.ini-development /usr/local/etc/php/php.ini
+COPY docker/php/opcache.ini /usr/local/etc/php/conf.d/baander-opcache.ini
+RUN php -r '\
+    $probe = tempnam(sys_get_temp_dir(), "baander-opcache-"); \
+    try { \
+        file_put_contents($probe, "<?php return 42;\n"); \
+        touch($probe, time() - 10); \
+        if (!(opcache_get_status(false)["opcache_enabled"] ?? false) \
+            || !opcache_compile_file($probe) || !opcache_is_script_cached($probe)) { \
+            throw new RuntimeException("CLI OPcache must cache scripts in the runtime image."); \
+        } \
+    } finally { unlink($probe); }'
 
 # Copy compiled liburing shared libraries
 COPY --from=builder /usr/local/lib/liburing* /usr/local/lib/

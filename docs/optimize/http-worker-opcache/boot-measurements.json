@@ -1,0 +1,190 @@
+{
+  "probe": "docs/optimize/http-worker-opcache/boot-probe.php",
+  "probeSha256": "d1383a1ffaa5ad41afc41553c0d7076220895211f9cf0dc49793bd7ad9619635",
+  "image": "baander-package-split-ci:local",
+  "imageId": "sha256:9c2ffe76c9b3fd6c74c15d13023e4718b6d3154be3e87377da62a3b8b650ec8a",
+  "commandTemplate": "docker --host unix:///var/run/docker.sock run --rm --network none -e XDEBUG_MODE=off -e PROBE_ENV={environment} --security-opt label=disable --tmpfs /tmp:rw,exec,mode=1777 -v /home/martin/dev/baander:/app:ro -w /app --entrypoint /bin/sh baander-package-split-ci:local -c 'php -d memory_limit=1G -d opcache.enable_cli={opcache} -d opcache.memory_consumption=256 docs/optimize/http-worker-opcache/boot-probe.php && php -d memory_limit=1G -d opcache.enable_cli={opcache} -d opcache.memory_consumption=256 docs/optimize/http-worker-opcache/boot-probe.php'",
+  "unit": "MiB values divide bytes by 1048576 and physicalKiB by 1024.",
+  "measurements": [
+    {
+      "environment": "dev",
+      "opcacheEnabled": false,
+      "cacheState": "cold",
+      "usedBytes": 154292560,
+      "allocatedBytes": 206569472,
+      "classes": 7792,
+      "collectedCycles": 46815,
+      "physicalKiB": {
+        "Rss": 245580,
+        "Pss": 212717
+      },
+      "opcache": null,
+      "usedMiB": 147.14,
+      "allocatedMiB": 197.0,
+      "pssMiB": 207.73,
+      "rssMiB": 239.82,
+      "opcodeCacheMiB": 0.0,
+      "exitCode": 0
+    },
+    {
+      "environment": "dev",
+      "opcacheEnabled": false,
+      "cacheState": "warm",
+      "usedBytes": 17969032,
+      "allocatedBytes": 37748736,
+      "classes": 765,
+      "collectedCycles": 0,
+      "physicalKiB": {
+        "Rss": 85892,
+        "Pss": 53889
+      },
+      "opcache": null,
+      "usedMiB": 17.14,
+      "allocatedMiB": 36.0,
+      "pssMiB": 52.63,
+      "rssMiB": 83.88,
+      "opcodeCacheMiB": 0.0,
+      "exitCode": 0
+    },
+    {
+      "environment": "dev",
+      "opcacheEnabled": true,
+      "cacheState": "cold",
+      "usedBytes": 28223576,
+      "allocatedBytes": 90177536,
+      "classes": 7792,
+      "collectedCycles": 46554,
+      "physicalKiB": {
+        "Rss": 266200,
+        "Pss": 233907
+      },
+      "opcache": {
+        "used_memory": 143307312,
+        "free_memory": 125128144,
+        "wasted_memory": 0,
+        "current_wasted_percentage": 0
+      },
+      "usedMiB": 26.92,
+      "allocatedMiB": 86.0,
+      "pssMiB": 228.42,
+      "rssMiB": 259.96,
+      "opcodeCacheMiB": 136.67,
+      "exitCode": 0
+    },
+    {
+      "environment": "dev",
+      "opcacheEnabled": true,
+      "cacheState": "warm",
+      "usedBytes": 5472104,
+      "allocatedBytes": 20971520,
+      "classes": 765,
+      "collectedCycles": 0,
+      "physicalKiB": {
+        "Rss": 90464,
+        "Pss": 58675
+      },
+      "opcache": {
+        "used_memory": 44244688,
+        "free_memory": 224190768,
+        "wasted_memory": 0,
+        "current_wasted_percentage": 0
+      },
+      "usedMiB": 5.22,
+      "allocatedMiB": 20.0,
+      "pssMiB": 57.3,
+      "rssMiB": 88.34,
+      "opcodeCacheMiB": 42.2,
+      "exitCode": 0
+    },
+    {
+      "environment": "prod",
+      "opcacheEnabled": false,
+      "cacheState": "cold",
+      "usedBytes": 147679968,
+      "allocatedBytes": 183500800,
+      "classes": 7564,
+      "collectedCycles": 62829,
+      "physicalKiB": {
+        "Rss": 222524,
+        "Pss": 189743
+      },
+      "opcache": null,
+      "usedMiB": 140.84,
+      "allocatedMiB": 175.0,
+      "pssMiB": 185.3,
+      "rssMiB": 217.31,
+      "opcodeCacheMiB": 0.0,
+      "exitCode": 0
+    },
+    {
+      "environment": "prod",
+      "opcacheEnabled": false,
+      "cacheState": "warm",
+      "usedBytes": 14467928,
+      "allocatedBytes": 16777216,
+      "classes": 703,
+      "collectedCycles": 0,
+      "physicalKiB": {
+        "Rss": 64800,
+        "Pss": 32642
+      },
+      "opcache": null,
+      "usedMiB": 13.8,
+      "allocatedMiB": 16.0,
+      "pssMiB": 31.88,
+      "rssMiB": 63.28,
+      "opcodeCacheMiB": 0.0,
+      "exitCode": 0
+    },
+    {
+      "environment": "prod",
+      "opcacheEnabled": true,
+      "cacheState": "cold",
+      "usedBytes": 26914952,
+      "allocatedBytes": 71303168,
+      "classes": 7564,
+      "collectedCycles": 62545,
+      "physicalKiB": {
+        "Rss": 242248,
+        "Pss": 209793
+      },
+      "opcache": {
+        "used_memory": 139750400,
+        "free_memory": 128685056,
+        "wasted_memory": 0,
+        "current_wasted_percentage": 0
+      },
+      "usedMiB": 25.67,
+      "allocatedMiB": 68.0,
+      "pssMiB": 204.88,
+      "rssMiB": 236.57,
+      "opcodeCacheMiB": 133.28,
+      "exitCode": 0
+    },
+    {
+      "environment": "prod",
+      "opcacheEnabled": true,
+      "cacheState": "warm",
+      "usedBytes": 4595152,
+      "allocatedBytes": 10485760,
+      "classes": 703,
+      "collectedCycles": 0,
+      "physicalKiB": {
+        "Rss": 77300,
+        "Pss": 45306
+      },
+      "opcache": {
+        "used_memory": 42801968,
+        "free_memory": 225633488,
+        "wasted_memory": 0,
+        "current_wasted_percentage": 0
+      },
+      "usedMiB": 4.38,
+      "allocatedMiB": 10.0,
+      "pssMiB": 44.24,
+      "rssMiB": 75.49,
+      "opcodeCacheMiB": 40.82,
+      "exitCode": 0
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+{
+  "capturedAt": "2026-11-20T20:27:17Z",
+  "environment": "isolated preview",
+  "opcacheEnabled": false,
+  "workload": "Existing admin dashboard polling; live server after earlier startup. Not a controlled request replay.",
+  "workers": [
+    {
+      "worker_id": 0,
+      "memory": {
+        "usage": 183.88,
+        "peak": 191.99,
+        "real": 213,
+        "real_peak": 220
+      },
+      "process": {
+        "pid": 456,
+        "uid": 1000,
+        "gid": 1000,
+        "user": "www-data",
+        "uptime": 5579
+      }
+    },
+    {
+      "worker_id": 1,
+      "memory": {
+        "usage": 184.69,
+        "peak": 192.67,
+        "real": 213,
+        "real_peak": 220
+      },
+      "process": {
+        "pid": 459,
+        "uid": 1000,
+        "gid": 1000,
+        "user": "www-data",
+        "uptime": 5579
+      }
+    },
+    {
+      "worker_id": 2,
+      "memory": {
+        "usage": 186.91,
+        "peak": 196,
+        "real": 213,
+        "real_peak": 220
+      },
+      "process": {
+        "pid": 458,
+        "uid": 1000,
+        "gid": 1000,
+        "user": "www-data",
+        "uptime": 5579
+      }
+    },
+    {
+      "worker_id": 3,
+      "memory": {
+        "usage": 179.84,
+        "peak": 187.46,
+        "real": 213,
+        "real_peak": 220
+      },
+      "process": {
+        "pid": 457,
+        "uid": 1000,
+        "gid": 1000,
+        "user": "www-data",
+        "uptime": 5579
+      }
+    }
+  ],
+  "phpProcesses": [
+    {
+      "pid": 15,
+      "pssKiB": 62697
+    },
+    {
+      "pid": 456,
+      "pssKiB": 108650
+    },
+    {
+      "pid": 457,
+      "pssKiB": 102290
+    },
+    {
+      "pid": 458,
+      "pssKiB": 109623
+    },
+    {
+      "pid": 459,
+      "pssKiB": 106102
+    },
+    {
+      "pid": 7,
+      "pssKiB": 84511
+    }
+  ],
+  "totalWorkerHeapMiB": 735.32,
+  "totalPhpPssMiB": 560.4228515625
+}
