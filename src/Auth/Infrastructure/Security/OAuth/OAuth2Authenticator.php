@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Auth\Infrastructure\Security\OAuth;
 
 use App\Auth\Application\Http\AccessTokenAttributes;
-use App\Auth\Domain\Model\OAuth\ClientType;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
@@ -222,7 +221,7 @@ final class OAuth2Authenticator extends AbstractAuthenticator
             return false;
         }
 
-        return $this->clientRepository->findClientByPublicId(PublicId::fromString($clientId))?->getType() === ClientType::FirstParty;
+        return $this->clientRepository->isFirstPartyClient(PublicId::fromString($clientId));
     }
 
     /**

@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Auth\Infrastructure\Security;
 
 use App\Auth\Application\Http\AccessTokenAttributes;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\ClientType;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
@@ -416,7 +417,7 @@ final class OAuth2AuthenticatorTest extends TestCase
             $userRepository->method('findByPublicId')->willReturn($user ?? $this->user('test@baander.app'));
         }
         $clients = $this->createStub(ClientRepositoryInterface::class);
-        $clients->method('findClientByPublicId')->willReturn($client);
+        $clients->method('isFirstPartyClient')->willReturn($client?->getType() === ClientType::FirstParty);
         // Null stands for a token whose user changed the password after it was issued.
         $accessTokens = $this->createStub(AccessTokenRepositoryInterface::class);
         $accessTokens->method('currentCredentialEpoch')->willReturn($credentialEpoch);

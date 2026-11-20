@@ -20,6 +20,14 @@ interface ClientRepositoryInterface
     public function findClientByPublicId(PublicId $publicId): ?Client;
 
     /**
+     * Whether a stored client with this public ID is of the first-party type.
+     *
+     * Reads the row on every call. A personal access client is never first-party,
+     * and a revoked client is still reported by its type.
+     */
+    public function isFirstPartyClient(PublicId $publicId): bool;
+
+    /**
      * @return Client[]
      */
     public function findPersonalAccessClients(): array;

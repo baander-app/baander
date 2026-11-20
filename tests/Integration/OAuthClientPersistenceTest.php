@@ -8,6 +8,7 @@ use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
 use App\Auth\Application\Port\PasswordResetTokenRepositoryInterface;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\ClientAuthMethod;
+use App\Auth\Domain\Model\OAuth\ClientType;
 use App\Auth\Domain\Model\OAuth\DeviceCode;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientKeySource;
@@ -107,6 +108,32 @@ final class OAuthClientPersistenceTest extends TestCase
         self::assertSame($client->getId()->toString(), $loaded->getId()->toString());
         $repository->saveClient($loaded);
         self::assertSame(1, (int) $this->observer->fetchOne('SELECT count(*) FROM oauth_clients WHERE public_id = ?', [$client->getPublicId()->toString()]));
+    }
+
+    public function testTheFirstPartyCheckAgreesWithTheStoredClientsType(): void
+    {
+        $repository = new ClientRepository($this->manager, new JsonEncoder());
+        $revoked = Client::create('Revoked web app', ['https://baander.app/callback'], firstParty: true);
+        $revoked->revoke();
+        $clients = [
+            Client::create('Web app', ['https://baander.app/callback'], firstParty: true),
+            Client::create('First-party device', [], firstParty: true, deviceClient: true),
+            Client::createPersonalAccess('Personal access'),
+            Client::registerPublic('Public client', ['https://player.baander.app/callback']),
+            Client::registerDevice('Living room TV'),
+            $revoked,
+        ];
+        array_map($repository->saveClient(...), $clients);
+        $this->manager->clear();
+
+        foreach ($clients as $client) {
+            self::assertSame(
+                $repository->findClientByPublicId($client->getPublicId())?->getType() === ClientType::FirstParty,
+                $repository->isFirstPartyClient($client->getPublicId()),
+                $client->getName(),
+            );
+        }
+        self::assertFalse($repository->isFirstPartyClient(Client::registerPublic('Unsaved', ['https://baander.app/callback'])->getPublicId()));
     }
 
     public function testAKeyClientKeepsItsMethodAndKeysInEveryRepositoryThatRebuildsIt(): void

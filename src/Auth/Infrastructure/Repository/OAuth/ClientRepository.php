@@ -80,6 +80,15 @@ final class ClientRepository implements ClientRepositoryInterface
         return $entity !== null ? $this->toDomain($entity) : null;
     }
 
+    public function isFirstPartyClient(PublicId $publicId): bool
+    {
+        // Mirrors Client::getType(): the personal access flag takes precedence over first-party.
+        return $this->entityManager->getConnection()->fetchOne(
+            'SELECT 1 FROM oauth_clients WHERE public_id = :public_id AND first_party AND NOT personal_access_client',
+            ['public_id' => $publicId->toString()],
+        ) !== false;
+    }
+
     public function findPersonalAccessClients(): array
     {
         $entities = $this->entityManager
