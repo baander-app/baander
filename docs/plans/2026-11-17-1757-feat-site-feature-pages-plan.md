@@ -96,7 +96,7 @@ Some published statements are false. The homepage says smart playlists select mu
 
 **Deferred to follow-up work**
 
-- Feature pages for internet radio, movies, transcoding, accounts and passkeys, notifications, and metadata matching. Each has an entry under "More in Bånder" in this round. Radio needs an operator's station sync and shows real station names; a passkey picture needs a virtual authenticator; a match dialog cannot show a fictional album; the notification pane is being redesigned in parallel work (`docs/plans/2026-11-17-1705-feat-notification-pane-well-plan.md`).
+- Feature pages for internet radio, movies, transcoding, accounts and passkeys, notifications, and metadata matching. Each has an entry under "More in Bånder" in this round. Radio needs an operator's station sync and shows real station names; a passkey picture needs a virtual authenticator; a match dialog cannot show a fictional album; the notification-pane redesign is delivered; its evidence is recorded in [Notification pane well](../../ROADMAP.md#notification-pane-well).
 - The operator guide contradicts itself on `app:watch-files` without `--path` (`media/library-management.md:98` against `commands/app-watch-files.md:30,58-61`). Recorded as an open item.
 
 **Outside this work**
