@@ -1,0 +1,38 @@
+{
+  "started_utc": "2026-11-20T15:36:47.985327+00:00",
+  "source_commit": "7aeaccc30d86e15a8fb6de9bd46e2b94e317a2a1",
+  "harness_commit": "7d67377ba4cae05ce5729d456c6b135bf37ceb3c",
+  "harness_files": {
+    "identity.php": "c4b11fd9719de89044b5d09c921f3fa8cd7a3ede402e1daa9bf8fc24e5db7649",
+    "measure.py": "bf9c232f9c57ba247550651c160a0f356bfd4a04b46e4f6c51f32ac1ba4b71e9",
+    "run.py": "7bc8e926f3d5c0749660a958672926050225c86e224f746425ccb65aa2a4b4e5",
+    "test_measure.py": "e888099fd78bb6a64595bc38c87fda4e9c272ecf83969920add2a8cadc6e8bf7",
+    "workload.php": "3584e609d900d1efc4d4d86566fe097bae4841116a2feaf7f277b5418c1dabf5"
+  },
+  "checkout_status": "?? tools/typephp/benchmarks/",
+  "images": {
+    "ordinary": "sha256:78479bd47da48596ca757d4b41f663754240485c3a9f4e86450415fc4d2531d3",
+    "typephp": "sha256:e9ccdc03ba9c52c51ce730820f07261638a0101d024281959a3d6068a9d1b487"
+  },
+  "expected_typephp_sha256": "408ad77b210bb0a9bdf94acb0cc93ce01029aef043af50e81b8612a41be88b25",
+  "source_files": 13325,
+  "source_tree_sha256": "0827294d303fad84c8e19798ee9fd6785beabfae1aaa9203f2e80224d56dccc0",
+  "matched_checkout_files": 2886,
+  "composer_lock_sha256": "e6bfb4c5336b4e1e723edf7bcfcbc4599ef4e2683269bf18230628ba64f9a05e",
+  "production_packages": 157,
+  "samples": 30,
+  "warmups": 3,
+  "iterations": 100000,
+  "host": {
+    "kernel": "Linux 7.3.4-1-default x86_64 GNU/Linux",
+    "cpu": "{\n   \"lscpu\": [\n      {\n         \"field\": \"Architecture:\",\n         \"data\": \"x86_64\"\n      },{\n         \"field\": \"CPU op-mode(s):\",\n         \"data\": \"32-bit, 64-bit\"\n      },{\n         \"field\": \"Address sizes:\",\n         \"data\": \"48 bits physical, 48 bits virtual\"\n      },{\n         \"field\": \"Byte Order:\",\n         \"data\": \"Little Endian\"\n      },{\n         \"field\": \"CPU(s):\",\n         \"data\": \"16\"\n      },{\n         \"field\": \"On-line CPU(s) list:\",\n         \"data\": \"0-15\"\n      },{\n         \"field\": \"Vendor ID:\",\n         \"data\": \"AuthenticAMD\"\n      },{\n         \"field\": \"Model name:\",\n         \"data\": \"AMD Ryzen 7 5800X3D 8-Core Processor\"\n      },{\n         \"field\": \"CPU family:\",\n         \"data\": \"25\"\n      },{\n         \"field\": \"Model:\",\n         \"data\": \"33\"\n      },{\n         \"field\": \"Thread(s) per core:\",\n         \"data\": \"2\"\n      },{\n         \"field\": \"Core(s) per socket:\",\n         \"data\": \"8\"\n      },{\n         \"field\": \"Socket(s):\",\n         \"data\": \"1\"\n      },{\n         \"field\": \"Stepping:\",\n         \"data\": \"2\"\n      },{\n         \"field\": \"Microcode version:\",\n         \"data\": \"0xa201213\"\n      },{\n         \"field\": \"Frequency boost:\",\n         \"data\": \"enabled\"\n      },{\n         \"field\": \"CPU(s) scaling MHz:\",\n         \"data\": \"97%\"\n      },{\n         \"field\": \"CPU max MHz:\",\n         \"data\": \"3442.4761\"\n      },{\n         \"field\": \"CPU min MHz:\",\n         \"data\": \"559.9210\"\n      },{\n         \"field\": \"BogoMIPS:\",\n         \"data\": \"6800.96\"\n      },{\n         \"field\": \"Flags:\",\n         \"data\": \"fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb cat_l3 cdp_l3 hw_pstate ssbd mba ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local user_shstk clzero irperf xsaveerptr rdpru wbnoinvd arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif v_spec_ctrl umip pku ospke vaes vpclmulqdq rdpid overflow_recov succor smca fsrm debug_swap\"\n      },{\n         \"field\": \"Virtualization:\",\n         \"data\": \"AMD-V\"\n      },{\n         \"field\": \"L1d cache:\",\n         \"data\": \"256 KiB (8 instances)\"\n      },{\n         \"field\": \"L1i cache:\",\n         \"data\": \"256 KiB (8 instances)\"\n      },{\n         \"field\": \"L2 cache:\",\n         \"data\": \"4 MiB (8 instances)\"\n      },{\n         \"field\": \"L3 cache:\",\n         \"data\": \"96 MiB (1 instance)\"\n      },{\n         \"field\": \"NUMA node(s):\",\n         \"data\": \"1\"\n      },{\n         \"field\": \"NUMA node0 CPU(s):\",\n         \"data\": \"0-15\"\n      },{\n         \"field\": \"Vulnerability Gather data sampling:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Vulnerability Ghostwrite:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Vulnerability Indirect target selection:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Vulnerability Itlb multihit:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Vulnerability L1tf:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Vulnerability Mds:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Vulnerability Meltdown:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Vulnerability Mmio stale data:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Vulnerability Old microcode:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Vulnerability Reg file data sampling:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Vulnerability Retbleed:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Vulnerability Spec rstack overflow:\",\n         \"data\": \"Mitigation; Safe RET\"\n      },{\n         \"field\": \"Vulnerability Spec store bypass:\",\n         \"data\": \"Mitigation; Speculative Store Bypass disabled via prctl\"\n      },{\n         \"field\": \"Vulnerability Spectre v1:\",\n         \"data\": \"Mitigation; usercopy/swapgs barriers and __user pointer sanitization\"\n      },{\n         \"field\": \"Vulnerability Spectre v2:\",\n         \"data\": \"Mitigation; Retpolines; IBPB conditional; IBRS_FW; STIBP always-on; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected\"\n      },{\n         \"field\": \"Vulnerability Srbds:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Vulnerability Tsa:\",\n         \"data\": \"Mitigation; Clear CPU buffers\"\n      },{\n         \"field\": \"Vulnerability Tsx async abort:\",\n         \"data\": \"Not affected\"\n      },{\n         \"field\": \"Vulnerability Vmscape:\",\n         \"data\": \"Mitigation; IBPB before exit to userspace\"\n      }\n   ]\n}",
+    "loadavg_before": "10.84 5.00 3.66 13/1915 826991",
+    "loadavg_after": "7.50 5.56 3.99 2/1882 828809"
+  },
+  "isolation": "One networkless disposable container; shared read-only production source; private tmpfs var; no CPU pinning",
+  "archived_source_comparison": "All listed bytes match the production source tree",
+  "ordinary_sha256": "23a24a90a5e1185550003cf89db3ca6dfd3e2d7fa7be811803cca81a01e67670",
+  "completed_utc": "2026-11-20T15:38:15.427341+00:00",
+  "status": "passed",
+  "usage": "Calibration only; excluded from published comparison. Harness metadata and output storage were finalized during this pilot; final collection uses the committed harness."
+}

@@ -70,6 +70,11 @@ The sampling lifecycle is prepare, verify equivalence, warm, measure, validate r
 
 **Files:** new harness and deterministic driver under `tools/typephp/benchmarks/`; `tools/typephp/README.md` for the entry link. Follow existing qualification dispatch in `tools/typephp/application-entry.php` and runtime records in `tools/typephp/runtime-lock.json`. Do not refactor the application or runtime drills.
 
+The packaging guide labels its older shutdown-qualified executable as current,
+although the package-organization checkpoint in `ROADMAP.md` records a later
+verified build. Preserve that historical qualification evidence and name its
+checkpoint explicitly when adding the performance-report link.
+
 **Verification:** run small equivalence probes before timing: both commands exit successfully, console/operator outputs match after any explicitly documented nondeterministic fields, and the sustained workload has the same operation count and checksum. Test a deliberately failed child and incorrect checksum: neither may yield an accepted result or ratio. Exercise both runtime selections and confirm the timed child uses the expected executable. Preserve the successful harness command and exact workload settings in the report. Use focused harness checks rather than rerunning application qualification for benchmark-only changes.
 
 ### U2. Actual measurements and durable report

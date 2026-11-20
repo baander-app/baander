@@ -4,6 +4,33 @@ Updated: 2026-11-20. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
+## TypePHP performance comparison
+
+The [comparison plan](docs/plans/2026-11-20-1632-feat-typephp-performance-comparison-plan.md)
+adds a reproducible benchmark and a [measured report](tools/typephp/benchmarks/README.md)
+for the executable qualified by the package-organization checkpoint below.
+The harness checks production source bytes, executable hashes, selected effective
+INI settings and exact workload outputs before accepting timings. Its seven
+focused tests pass, including failed-child and incorrect-checksum rejection.
+The simplification pass removed one duplicated condition and retained the proof
+tests. PHP syntax, Python parsing and whitespace checks pass.
+
+The [final measurements](tools/typephp/benchmarks/results/2026-11-20/measurements.json)
+contain 180 accepted samples and 18 warmups: 30 samples and three warmups for each
+of two runtimes across three workloads. Independent recomputation confirms all
+ten metric summaries, output identities, counts and executable hashes against
+the [manifest](tools/typephp/benchmarks/results/2026-11-20/manifest.json).
+All 13,325 source/dependency reads match the production tree. Both runtimes use
+PHP 8.5.12 ZTS and Swoole 6.2.4, production dependencies and matching selected
+settings in one network-disabled disposable container.
+
+TypePHP/ordinary median-time ratios are 3.191 for console discovery, 1.042 for
+operator help and 1.066 for the sustained application loop. The report includes
+p95, observed ranges, process CPU and peak resident memory, plus the shared-host
+and extension-linkage limits. These results establish neither HTTP nor worker
+throughput. The calibration pilot is retained separately and excluded from the
+published tables. No application optimization or deployment is part of this work.
+
 ## Internal capability packages
 
 The [package extraction plan](docs/plans/2026-11-20-1148-refactor-internal-capability-packages-plan.md)
