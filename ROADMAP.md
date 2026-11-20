@@ -354,10 +354,15 @@ that limitation is recorded for follow-up, with no runtime change in the 2026-10
 
 ### State on 2026-11-17
 
-Not pushed: `fix/auth-security-hardening` in the worktree `baander-par` carries the
-OAuth pushed authorization requests and the auth hardening; see
+Pushed on 2026-11-20 to `master` on GitHub and Forgejo: `fix/auth-security-hardening`,
+merged with Forgejo's `master` (`3473a20c3`), which brought the TypePHP packaging work
+(`281a07a4c` to `cfc297b54`) to GitHub as well. It carries the OAuth pushed
+authorization requests and the auth hardening; see
 [OAuth pushed authorization requests and auth hardening](#oauth-pushed-authorization-requests-and-auth-hardening).
-Every user signs in again and re-enrols TOTP after its migrations.
+Every user signs in again and re-enrols TOTP after its migrations. The persistent
+instance's `env.json` gained its `AUTH_TOTP_ENCRYPTION_KEY` before the push, through
+the `Bootstrap::configure` back-fill, because its copied update controller predates
+that back-fill.
 
 `master` on GitHub and Forgejo carries, on top of `6912eaaf6`, the work pushed on
 2026-11-15: the CI fixes (`d1504daa3` to `77bb3c8e4`), two web fixes (`9ecf84a3d`,
@@ -495,8 +500,8 @@ trees; they are not acceptance evidence for a new change.
 
 ## OAuth pushed authorization requests and auth hardening
 
-Delivered on `fix/auth-security-hardening` on 2026-11-20, not yet pushed. The branch
-implements two plans:
+Delivered on `master` on 2026-11-20 from `fix/auth-security-hardening`, merged with
+Forgejo's `master` in `3473a20c3`. The branch implements two plans:
 `docs/plans/2026-11-19-1148-feat-oauth-pushed-authorization-requests-plan.md`
 (`ea416708d` to `9cf1c6499`) and
 `docs/plans/2026-11-19-2119-fix-auth-security-hardening-plan.md` (`5a80d108c` to
@@ -584,6 +589,15 @@ Verification on 2026-11-20:
   and one failure: `TranscodeCleanupConsoleOutputTest` started a production console
   with the committed default secrets, which production now refuses. `26a7fd0cb` gives
   that process private secrets, and both cases of the test pass.
+- On the merge with Forgejo's `master` (`3473a20c3`), `make ci` passed PHPStan,
+  Deptrac, the ordinary lane (8,905 tests) and the native lane (954). Both stack lanes
+  hit the one-hour limit with one process each. Their 347 files, rerun through
+  `scripts/test-functional-container.sh`, failed four `ApiRateLimitTest` cases:
+  `LoginAccountThrottleTest` charged the anonymous API limiter for addresses that test
+  expects unused. `233446bc5` moves the throttle test to `198.18.10.x`, and the rerun
+  then passed 3,950 tests (2,288 and 1,662) with both tests in one lane. The OpenAPI,
+  generated-client and typecheck checks and `DevelopmentBootstrapTest` (17 tests)
+  passed on the merge.
 - Web: 3,661 tests in 293 files passed; the typecheck passed. The OpenAPI document
   and the generated client match the code (`app:export-openapi-spec --check`,
   `generate:check`).
