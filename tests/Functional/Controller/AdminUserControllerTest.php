@@ -259,10 +259,6 @@ final class AdminUserControllerTest extends TestCase
         $this->assertSame($hash, $this->userRepository->findByUuid($superAdmin->getId())?->getPassword());
     }
 
-    // ---------------------------------------------------------------
-    // POST /api/admin/users/{id}/reset-totp — Reset TOTP
-    // ---------------------------------------------------------------
-
     public function testSuperAdminResetsAUsersTotpAndEndsTheirSessions(): void
     {
         $superAdmin = $this->createSuperAdminUser();
@@ -315,10 +311,6 @@ final class AdminUserControllerTest extends TestCase
         $this->entityManager->clear();
         $this->assertTrue($this->userRepository->findByUuid($superAdmin->getId())?->hasTotp());
     }
-
-    // ---------------------------------------------------------------
-    // POST /api/admin/users/{id}/verify-email — Mark the address verified
-    // ---------------------------------------------------------------
 
     public function testSuperAdminMarksAUsersAddressVerifiedAndRepeatingChangesNothing(): void
     {

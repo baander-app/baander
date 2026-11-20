@@ -8,7 +8,6 @@ use App\Auth\Application\Port\LoginFailureThrottleInterface;
 use App\Shared\Domain\Model\Email;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 
-/** Backs the per-account failed login limit with the `auth_login_email_failures` limiter. */
 final readonly class RateLimiterLoginFailureThrottle implements LoginFailureThrottleInterface
 {
     public function __construct(

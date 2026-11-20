@@ -273,8 +273,6 @@ final class PasswordChangeSessionRevocationTest extends TestCase
         $this->assertSignedOut($session, $key);
     }
 
-    // --- Races ---
-
     private function assertReadCommitted(): void
     {
         // The fence re-reads the account's epoch in a statement of its own after the lock.

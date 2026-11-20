@@ -11,7 +11,6 @@ namespace App\Auth\Application\Command\Totp;
  */
 final readonly class StartTotpSetupCommand
 {
-    /** @param string $userId User UUID string */
     public function __construct(
         private string $userId,
         #[\SensitiveParameter]

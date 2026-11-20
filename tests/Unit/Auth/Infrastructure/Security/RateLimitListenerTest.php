@@ -376,8 +376,6 @@ final class RateLimitListenerTest extends TestCase
         $this->listener->onKernelRequest($this->createRequestEvent($request));
     }
 
-    // --- OAuth authorization server endpoints ---
-
     /** @return iterable<string, array{string, string}> */
     public static function perIpBeforeAuthentication(): iterable
     {

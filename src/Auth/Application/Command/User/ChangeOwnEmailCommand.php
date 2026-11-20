@@ -11,7 +11,6 @@ namespace App\Auth\Application\Command\User;
 final readonly class ChangeOwnEmailCommand
 {
     public function __construct(
-        /** The user's UUID. */
         public string $userId,
         public string $email,
         #[\SensitiveParameter]

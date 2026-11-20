@@ -61,7 +61,6 @@ final class AuthenticatePasskeyHandler
             $passkey->getCounter(),
         );
 
-        // Verify the authentication response (challenge, origin, signature, user handle).
         // A passkey stands in for both factors only when the authenticator verified the
         // user, so an account with TOTP on refuses an assertion without that flag.
         $updatedCredential = $this->passkeyVerifier->verifyAuthenticationResponse(

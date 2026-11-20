@@ -76,7 +76,7 @@ final readonly class ExchangeDeviceCodeHandler
         if ($user === null || $user->isDisabled()) {
             throw OAuthProtocolException::invalidGrant('The approving user account is unavailable.');
         }
-        // An approval recorded before approvals carried the approving token's epoch issues nothing.
+        // An approved device code without a recorded credential epoch is refused.
         $credentialEpoch = $deviceCode->getCredentialEpoch()
             ?? throw self::credentialsChanged();
 
@@ -101,7 +101,6 @@ final readonly class ExchangeDeviceCodeHandler
         }
     }
 
-    /** The password changed after the user approved the code. */
     private static function credentialsChanged(): OAuthProtocolException
     {
         return OAuthProtocolException::invalidGrant('The approval is no longer valid.');

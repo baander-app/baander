@@ -10,7 +10,6 @@ use App\Shared\Domain\Model\Uuid;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 
-/** Backs the per-account step-up limit with the `auth_step_up_user` limiter. */
 final readonly class RateLimiterStepUpAttemptThrottle implements StepUpAttemptThrottleInterface
 {
     public function __construct(

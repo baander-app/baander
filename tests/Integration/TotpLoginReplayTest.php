@@ -215,8 +215,6 @@ final class TotpLoginReplayTest extends TestCase
         self::assertSame(1, $this->sessions());
     }
 
-    // --- Operator reset ---
-
     /**
      * `app:user:reset-totp` in a process of its own: stdout carries only the user, the sessions
      * end, and the user signs in with the password alone. A second reset has nothing to do.
@@ -256,8 +254,6 @@ final class TotpLoginReplayTest extends TestCase
 
         return $process;
     }
-
-    // --- Enrolment ---    // --- Enrolment ---
 
     /** Turns TOTP on through the API, as the settings page does. */
     private function enrol(): void
@@ -322,8 +318,6 @@ final class TotpLoginReplayTest extends TestCase
             [$this->user->getId()->toString()],
         );
     }
-
-    // --- Requests ---
 
     private function login(?string $code, string $proof): Response
     {
@@ -405,8 +399,6 @@ final class TotpLoginReplayTest extends TestCase
     {
         return $this->json($response)['error']['code'] ?? null;
     }
-
-    // --- Child processes ---
 
     private function faultDirectory(): string
     {

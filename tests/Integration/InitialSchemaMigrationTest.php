@@ -219,9 +219,9 @@ final class InitialSchemaMigrationTest extends TestCase
     }
 
     /**
-     * The snapshot as later migrations reshape `users`: the plaintext TOTP secret gives way to
-     * its ciphertext and spent step, and the pending address and credential epoch are added,
-     * all empty or at their defaults for accounts that predate them.
+     * The snapshot with the later `users` columns: the plaintext TOTP secret replaced by its
+     * ciphertext and spent step, plus the pending address and credential epoch, all empty or
+     * at their defaults.
      *
      * @param array<string, list<array<string, mixed>>> $snapshot
      * @return array<string, list<array<string, mixed>>>
@@ -422,7 +422,7 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
     /**
      * The credential epoch upgrade ends stored sessions and authorization codes, which carry
      * no epoch and raw refresh tokens, and keeps accounts, clients and device codes: users
-     * start at epoch 0, and an approval recorded before has no epoch, so it issues nothing.
+     * start at epoch 0, and a stored device code approval has no epoch, so it issues nothing.
      */
     public function testCredentialEpochUpgradeEndsStoredSessionsAndCodesAndKeepsAccounts(): void
     {

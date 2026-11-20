@@ -55,8 +55,6 @@ final class PasskeyServiceTest extends TestCase
         );
     }
 
-    // --- Challenge storage ---
-
     private const string USER_A = 'aaaaaaaaaaaaaaaaaaaaa';
     private const string USER_B = 'bbbbbbbbbbbbbbbbbbbbb';
 
