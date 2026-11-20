@@ -654,7 +654,7 @@ final readonly class OperatorProvisioning
         ]);
         $ready = false;
         for ($attempt = 0; $attempt < 30 && !$ready; ++$attempt) {
-            $ready = $this->qualification->docker(['exec', $s->runId . '-pooler', 'pg_isready', '-h', '127.0.0.1', '-p', (string) Pooler::PORT], false)->exitCode === 0;
+            $ready = $this->qualification->docker(['exec', $s->runId . '-pooler', 'pg_isready', '-h', '127.0.0.1', '-p', (string) Pooler::PORT, '-U', 'baander', '-d', 'worker_operator_test'], false)->exitCode === 0;
             if (!$ready) {
                 $this->qualification->commands->pause(0.5);
             }

@@ -196,7 +196,7 @@ services:
             pooler-credentials:
                 condition: service_completed_successfully
         healthcheck:
-            test: [ "CMD", "pg_isready", "-h", "127.0.0.1", "-p", "6432" ]
+            test: [ "CMD", "pg_isready", "-h", "127.0.0.1", "-p", "6432", "-U", "${DB_USERNAME:-baander}", "-d", "${DB_DATABASE:-baander}" ]
             interval: 5s
             timeout: 5s
             retries: 24

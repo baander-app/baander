@@ -120,7 +120,8 @@ final class Pooler
             'tmpfs' => [self::DATA_TMPFS],
             'depends_on' => [$postgresService => ['condition' => 'service_healthy']],
             'healthcheck' => [
-                'test' => ['CMD', 'pg_isready', '-h', '127.0.0.1', '-p', (string) self::PORT],
+                'test' => ['CMD', 'pg_isready', '-h', '127.0.0.1', '-p', (string) self::PORT,
+                    '-U', $environment['BAANDER_POOLER_USER'], '-d', $environment['BAANDER_POOLER_DATABASE']],
                 'interval' => '5s', 'timeout' => '5s', 'retries' => 24,
             ],
         ];

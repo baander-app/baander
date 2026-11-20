@@ -45,7 +45,7 @@ warning. Nine focused suites pass 57 tests, including automatic filters, time
 ranges, source availability and live sampling. Four browser cases pass: desktop and mobile
 interactions, authenticated multi-channel GET and SQL, and severity tints in light
 and dark themes. Message text retains at least 4.5:1 contrast, including selected
-rows. The running preview shows 105 collection issues in a collapsed notice about
+rows. A live-preview check displayed 105 collection issues in a collapsed notice about
 47 pixels high. Browser checks also confirm usable inspector height, bounded
 expanded issue lists and no horizontal overflow. Eight PTY cases cover
 quit, interruption, EOF, exception cleanup, resize, SQL after paging and multiple
@@ -67,7 +67,7 @@ The live five-second checkpoint now completes. Over-budget cleanup uses bounded
 FTS merges, deletion batches and vacuum steps. A disposable 18.36 MB fixture reduced
 one cleanup pass from 457.4 ms to 43.6 ms; repeated blocked appends returned in
 0.046 ms. Ingestion stays suspended until physical storage is within its cap.
-The final preview check found 88 sources with explicit availability: 53 available
+The availability check found 88 sources with explicit availability: 53 available
 and 35 unavailable. Readable files and archive members remained available during
 cleanup. Source queries took 12–52 ms while collection advanced; physical storage
 reclaimed 12,320,128 bytes and returned below the 1 GiB cap.
@@ -81,6 +81,20 @@ below the list; the selected snapshot survives live-window eviction. Initial
 history resumes after live-read readiness without a source toggle. Rapid
 channel choices survive pending URL navigation, and history retries keep their
 original time bounds. Delivery is local only; the persistent instance is unchanged.
+
+
+The viewer exposed two noisy runtime checks. The coroutine watchdog now recognizes
+only the serial queue's own wait for its next message as idle; a callback blocked
+on a channel still triggers stall detection. Native CI checks pass four tests and
+nine assertions. Pooler readiness probes now pass the configured database user and
+database name, avoiding repeated failed connections as the container's `postgres`
+account. Listener-readiness semantics and authentication are unchanged. Three
+focused tooling tests in the CI image pass 41 assertions. Targeted PHPStan passes
+for both corrections, and source Compose configuration validates with its required
+deployment variables. A single preview refresh passed seven activation checks: the
+readiness endpoint returned HTTP 200, six pooler health cycles succeeded, and a
+30.25-second post-readiness log window contained no pooler errors. Both replacement
+workers loaded the verified watchdog source.
 
 ## HTTP worker idle memory and span capture
 

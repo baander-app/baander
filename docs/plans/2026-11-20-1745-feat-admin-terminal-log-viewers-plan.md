@@ -366,3 +366,12 @@ U6 also corrects the pooler readiness probe exposed by repeated local
 configured pooler user and database explicitly instead of inheriting the container
 user. Preserve its listener-readiness contract and existing authentication; verify
 nondefault names and both generated and source Compose definitions.
+
+Both runtime-check corrections are implemented: native watchdog/queue checks pass
+four tests and nine assertions; the configured pooler probe and deployment-topology
+checks pass three tests and 41 assertions. Targeted static analysis passes.
+
+One preview refresh activated both runtime fixes. Seven activation checks passed,
+including six successful pooler health cycles with no new errors over 30.25 seconds
+and matching watchdog source hashes in both replacement workers. The readiness
+endpoint returned HTTP 200.

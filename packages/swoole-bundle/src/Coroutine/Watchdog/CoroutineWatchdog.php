@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SwooleBundle\SwooleBundle\Coroutine\Watchdog;
 
 use Swoole\Coroutine;
+use SwooleBundle\SwooleBundle\Component\Concurrency\SerialQueue;
 
 /**
  * Detects stalled coroutines by checking elapsed execution time.
@@ -157,6 +158,17 @@ final class CoroutineWatchdog
                 return true;
             }
 
+            // The queue consumer waits here between payloads, including after successful work.
+            // A channel wait inside its callback must still undergo stall detection.
+            $caller = $trace[1] ?? [];
+            if ($function === 'Swoole\\Coroutine\\Channel->pop'
+                && ($caller['class'] ?? '') === SerialQueue::class
+                && ($caller['type'] ?? '') === '->'
+                && ($caller['function'] ?? '') === 'consume'
+            ) {
+                return true;
+            }
+
             // Swoole\Http\Response->write — file streaming (audio, video, downloads)
             if ($function === 'Swoole\\Http\\Response->write') {
                 return $this->isStreamingResponse($trace);
@@ -171,6 +183,8 @@ final class CoroutineWatchdog
     /**
      * Check if the response->write() call is inside a known streaming handler
      * (StreamedResponseProcessor, not arbitrary code).
+     *
+     * @param array<array{file?: string, line?: int, function?: string, class?: string, type?: string}> $trace
      */
     private function isStreamingResponse(array $trace): bool
     {
