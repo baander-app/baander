@@ -57,6 +57,52 @@ test('pages set their text in the self-hosted Geist faces', async ({ page }) => 
   expect(codec.loaded).toContain('Geist Mono Variable');
 });
 
+test.describe('runtime performance report without JavaScript', () => {
+  test.use({ javaScriptEnabled: false });
+
+  for (const width of [1440, 390]) {
+    test(`${width}px: visitors reach the measured comparison and its evidence`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto('/');
+      const menu = await openMenuPanel(page, 'Resources');
+      await menu.getByRole('link', { name: 'Runtime performance', exact: true }).click();
+      await expect(page).toHaveURL(/\/runtime-performance\/$/);
+      await expect(page.getByRole('heading', { level: 1, name: 'TypePHP runtime performance', exact: true })).toBeVisible();
+
+      const article = page.locator('main article');
+      for (const name of ['Results', 'Method', 'Limits', 'Reproduce the comparison']) {
+        await expect(article.getByRole('heading', { level: 2, name, exact: true })).toBeVisible();
+      }
+      const tables = article.getByRole('table');
+      await expect(tables.first()).toBeVisible();
+      const rows = tables.getByRole('row');
+      for (const workload of [/console/i, /operator/i, /sustained/i]) {
+        await expect(rows.filter({ hasText: workload }).first()).toBeVisible();
+      }
+      await expect(tables.first()).toContainText(/ordinary PHP/i);
+      await expect(tables.first()).toContainText(/TypePHP/i);
+      for (const file of ['manifest', 'measurements']) {
+        await expect(article.locator(`a[href$="/tools/typephp/benchmarks/results/2026-11-20/${file}.json"]`).first()).toBeVisible();
+      }
+
+      const sections = article.getByRole('navigation', { name: 'On this page', exact: true });
+      await article.locator('.section-navigation > summary').click();
+      await sections.getByRole('link', { name: 'Limits', exact: true }).click();
+      await expect(page).toHaveURL(/\/runtime-performance\/#limits$/);
+      await expect(article.getByRole('heading', { level: 2, name: 'Limits', exact: true })).toBeInViewport();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+
+      if (width === 390) {
+        const table = tables.first();
+        expect(await table.evaluate((element) => {
+          element.scrollLeft = element.scrollWidth;
+          return element.scrollWidth <= element.clientWidth + 1 || element.scrollLeft > 0;
+        }), 'A wide results table scrolls within the article').toBe(true);
+      }
+    });
+  }
+});
+
 test('visitor reaches operating model and source-based installation', async ({ page }) => {
   await page.goto('/');
   const screenshot = page.getByRole('img', { name: /music library/ });

@@ -39,6 +39,26 @@ to ten tests. A [recheck](tools/typephp/benchmarks/results/2026-11-20/source-val
 confirms no unexpected application files in the measured snapshot. The timing
 collector and workload are unchanged, so the original measurements are retained.
 
+The site renders the report at `/runtime-performance/` through
+`ui/site/reference/runtime-performance.php`. Resources → Build on it, Pagefind
+search and the sitemap expose the page. Desktop and mobile browser inspection
+confirms that the report renders with the existing reference-page layout.
+The CI-image Website suite passes 164 tests and 1,521 assertions, and all ten
+harness tests pass in the same image. `composer analyse:tooling`, the site
+TypeScript check, targeted tooling formatting and `git diff --check` pass.
+Independent numerical and prose review found no report discrepancies. Code
+review has no outstanding actionable findings after the source-provenance fix.
+
+The website build passes with 246 manual pages and the new report. The full
+browser run passes 221 existing cases; the two new report cases initially fail
+because a raw heading-text assertion includes the decorative anchor symbol.
+After checking the exact accessible heading name, both cases pass against the
+rebuilt site at 1,440 px and 390 px with JavaScript disabled. These
+[report checks](ui/site/tests/website.spec.ts) cover menu access, results tables,
+evidence links, section navigation and narrow-screen containment. All 223 cases
+are covered by the full run and focused rerun. The work is committed locally;
+no push or deployment is included. No verification checkpoints remain open.
+
 ## Internal capability packages
 
 The [package extraction plan](docs/plans/2026-11-20-1148-refactor-internal-capability-packages-plan.md)

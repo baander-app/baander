@@ -1,10 +1,12 @@
 # Public website
 
 The website publishes the maintained `docs-book/` manuals with a static homepage,
-shared design tokens and local Pagefind search. Its reference pages publish four
+shared design tokens and local Pagefind search. Its reference pages publish five
 repository documents as they stand: `STRATEGY.md` at `/strategy/`, `CONCEPTS.md`
 at `/concepts/`, `THIRD_PARTY.md` at `/licensing/` and `deploy/preset/README.md`
-at `/deploy/`. The PHP builder writes a complete
+at `/deploy/`. The TypePHP comparison in `tools/typephp/benchmarks/README.md`
+appears at `/runtime-performance/`, with links to its raw measurements and run
+manifest. The PHP builder writes a complete
 artifact to `var/website/`, including `.vercel/output/` for Vercel. Serving the site
 requires no application server, account, database or worker deployment.
 
@@ -75,7 +77,7 @@ styles and the pictures of the application belong in `ui/site/assets/`. The buil
 copies shared token CSS, SVG branding and licensed fonts, then builds search from
 the rendered manual and reference pages, labelling each result with its page.
 
-A link in a manual or reference document to a manual page or to one of the four
+A link in a manual or reference document to a manual page or to one of the five
 published documents opens that page on the site, and the build fails when its
 `#fragment` names no heading there. A link to any other repository path opens the
 file in the source repository. For each rendered page it

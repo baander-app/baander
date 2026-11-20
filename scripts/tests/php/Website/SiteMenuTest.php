@@ -79,7 +79,7 @@ final class SiteMenuTest extends TestCase
         self::assertSame(
             [
                 [['Operator manual', '/docs/operator-guide/'], ['Deploy preset', '/deploy/']],
-                [['Developer guide', '/docs/developer-guide/'], ['Concepts', '/concepts/'], ['Typography', '/typography/']],
+                [['Developer guide', '/docs/developer-guide/'], ['Concepts', '/concepts/'], ['Runtime performance', '/runtime-performance/'], ['Typography', '/typography/']],
                 [['Third-party licensing', '/licensing/']],
             ],
             array_map(static fn(array $column): array => self::titlesAndUrls($column['groups'][0]['entries']), $resources['columns']),
