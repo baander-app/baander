@@ -25,6 +25,7 @@ import { useNavigate } from 'react-router-dom'
 import { EmailVerificationNotice } from './EmailVerificationNotice'
 import { PendingEmailNotice } from './PendingEmailNotice'
 import { StepUpDialog, type StepUpCredentials } from './StepUpDialog'
+import { ErrorBox, FieldLabel, Form, SpinningIconWithMargin } from './settings-form-styles'
 
 const CardContentStyled = styled(CardContent)`
   display: flex;
@@ -76,38 +77,6 @@ const SpinningIcon = styled(Loader2)`
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
   }
-`
-
-const SpinningIconWithMargin = styled(Loader2)`
-  margin-right: 0.25rem;
-  animation: spin 1s linear infinite;
-
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-`
-
-const Form = styled.form`
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-`
-
-const ErrorBox = styled.div`
-  border-radius: var(--radius-md);
-  background-color: var(--color-muted);
-  padding: 0.75rem;
-  ${textRole('body')}
-  color: var(--color-destructive);
-`
-
-const FieldLabel = styled.label`
-  display: block;
-  margin-bottom: 0.375rem;
-  ${textRole('caption')}
-  font-weight: 500;
-  color: var(--color-muted-foreground);
 `
 
 const Heading = styled.p`

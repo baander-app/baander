@@ -1,25 +1,10 @@
 import styled from 'styled-components'
 import { ResendVerification } from '@/features/auth/components/ResendVerification'
 import { useTranslation } from '@/shared/i18n'
-import { textRole } from '@/shared/theme'
+import { NoticeMessage, NoticePanel, NoticeStatus } from './verification-notice-styles'
 
-const Panel = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  border-radius: var(--radius-md);
-  background-color: var(--color-secondary);
-  padding: 0.5rem 0.75rem;
-`
-
-const Status = styled.p`
-  ${textRole('label')}
-  color: var(--color-muted-foreground);
-`
-
-const Message = styled.p`
-  ${textRole('body')}
-  color: var(--color-muted-foreground);
+/** The hint names the new address, which can be longer than the row is wide. */
+const AddressMessage = styled(NoticeMessage)`
   overflow-wrap: anywhere;
 `
 
@@ -28,14 +13,14 @@ export function PendingEmailNotice({ email }: { email: string }) {
   const { t } = useTranslation()
 
   return (
-    <Panel>
-      <Status>
+    <NoticePanel>
+      <NoticeStatus>
         {t('auth.emailVerification.pendingChange')}
-      </Status>
-      <Message>
+      </NoticeStatus>
+      <AddressMessage>
         {t('auth.emailVerification.pendingChangeHint', { email })}
-      </Message>
+      </AddressMessage>
       <ResendVerification compact />
-    </Panel>
+    </NoticePanel>
   )
 }
