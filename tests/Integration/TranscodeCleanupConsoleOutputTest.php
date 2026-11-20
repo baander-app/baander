@@ -46,6 +46,7 @@ final class TranscodeCleanupConsoleOutputTest extends TestCase
                 'APP_DEBUG' => $debug,
                 // The command reads the fixture schema; libpq applies this to every connection it opens.
                 'PGOPTIONS' => '-c search_path=' . $this->schema . ',public',
+                ...self::privateSecrets(),
             ],
             timeout: 300,
         );
@@ -57,5 +58,19 @@ final class TranscodeCleanupConsoleOutputTest extends TestCase
         self::assertStringContainsString('A stale transcode session could not be expired.', $process->getErrorOutput());
         self::assertSame('active', $this->second->fetchOne('SELECT state FROM transcode_sessions WHERE id = ?', [$this->sessionId->toString()]));
         self::assertSame(1, (int) $this->second->fetchOne('SELECT count(*) FROM transcode_jobs'));
+    }
+
+    /**
+     * Production refuses to boot with the committed default secrets, so the process gets private ones.
+     *
+     * @return array<string, string>
+     */
+    private static function privateSecrets(): array
+    {
+        return [
+            'APP_SECRET' => bin2hex(random_bytes(32)),
+            'STREAM_URL_HMAC_SECRET' => bin2hex(random_bytes(32)),
+            'AUTH_TOTP_ENCRYPTION_KEY' => base64_encode(random_bytes(32)),
+        ];
     }
 }
