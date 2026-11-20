@@ -30,6 +30,7 @@ declare(strict_types=1);
  *                                   the response ended
  */
 
+use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
 use App\Tests\Fixtures\WebRuntime\HeldRendition;
 use App\Tests\Fixtures\WebRuntime\StreamClient;
 use Doctrine\ORM\EntityManagerInterface;
@@ -101,6 +102,7 @@ $client = new StreamClient(
     $user,
     (string) file_get_contents($projectDir . '/config/secrets/oauth/private.key'),
     'http://127.0.0.1:9501/api/stream/track',
+    client: $mode === 'ws' ? FirstPartyOAuthClient::entity($kernel->getContainer(), $manager) : null,
 );
 
 if ($mode === 'ws') {

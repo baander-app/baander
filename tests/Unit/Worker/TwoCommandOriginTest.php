@@ -50,6 +50,33 @@ final class TwoCommandOriginTest extends TestCase
         }
     }
 
+    public function testFixtureUsesDelegatedClientUnlessConfiguredClientIsSupplied(): void
+    {
+        $user = new \App\Auth\Infrastructure\Doctrine\Entity\UserEntity(new \App\Shared\Domain\Model\PublicId(), 'Fixture listener', 'listener@baander.app', 'unused');
+        $repository = $this->createStub(\Doctrine\ORM\EntityRepository::class);
+        $repository->method('findOneBy')->willReturn($user);
+        $tokens = [];
+        $manager = $this->createStub(\Doctrine\ORM\EntityManagerInterface::class);
+        $manager->method('getRepository')->willReturn($repository);
+        $manager->method('persist')->willReturnCallback(static function (object $entity) use (&$tokens): void {
+            if ($entity instanceof \App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity) {
+                $tokens[] = $entity;
+            }
+        });
+        $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_RSA, 'private_key_bits' => 2048]);
+        self::assertNotFalse($key);
+        self::assertTrue(openssl_pkey_export($key, $private));
+        $configured = new \App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity(
+            new \App\Shared\Domain\Model\PublicId(), 'Baander', '["https://baander.app/callback"]', firstParty: true,
+        );
+        new \App\Tests\Fixtures\WebRuntime\StreamClient($manager, 'listener@baander.app', $private, LocalOrigin::BASE . '/api/stream/track');
+        new \App\Tests\Fixtures\WebRuntime\StreamClient($manager, 'listener@baander.app', $private, LocalOrigin::BASE . '/api/stream/track', client: $configured);
+        self::assertCount(2, $tokens);
+        self::assertFalse($tokens[0]->getClient()->isFirstParty());
+        self::assertNotSame($configured, $tokens[0]->getClient());
+        self::assertSame($configured, $tokens[1]->getClient());
+    }
+
     public function testHttpAndDecoderRefuseRedirects(): void
     {
         $directory = sys_get_temp_dir() . '/baander-origin-redirect-' . bin2hex(random_bytes(6));

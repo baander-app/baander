@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 // Production HTTP/upgrade checks; the runner owns disposable services and credentials.
 use App\Shared\Domain\Model\PublicId;
+use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
 use App\Tests\Fixtures\WebRuntime\HttpExchange;
 use App\Tests\Fixtures\WebRuntime\StreamClient;
@@ -112,7 +113,8 @@ $email = 'websocket-' . bin2hex(random_bytes(6)) . '@baander.app';
 $user = new App\Auth\Infrastructure\Doctrine\Entity\UserEntity(new PublicId(), 'WebSocket runtime', $email, 'test-only-unused-password');
 $manager->persist($user);
 $manager->flush();
-$client = new StreamClient($manager, $email, (string) file_get_contents('config/secrets/oauth/private.key'), WS_SERVER . '/api/stream/track');
+$client = new StreamClient($manager, $email, (string) file_get_contents('config/secrets/oauth/private.key'), WS_SERVER . '/api/stream/track',
+    client: FirstPartyOAuthClient::entity($kernel->getContainer(), $manager));
 wsRemember($client->accessToken());
 $ticket = static function () use ($client): string {
     $value = $client->webSocketTicket(WS_TICKETS, WS_ORIGIN);

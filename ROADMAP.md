@@ -88,18 +88,26 @@ DPoP proof was rejected by the existing explicit-origin validator. Runtime and
 shutdown fixtures now set `AUTH_DPOP_EXTRA_ORIGINS=http://127.0.0.1:9501` while
 retaining their public issuer. Both targeted regression checks fail without that
 setting and pass with it in the CI image: 2 tests and 21 assertions. Scoped
-tooling PHPStan and formatting pass. The packaged drills remain in progress. The correction changes only physical test tooling, and its focused
+tooling PHPStan and formatting pass. The correction changes only physical test tooling, and its focused
 code review has no findings. The refreshed fixture image is
 `sha256:2eb04ccea8ca2022eec22d35055f9a6646205ca9ff34826989d1ab393371f063`;
 its executable hash is identical to the fully tested binary above. A second
-probe confirmed that the fixture's delegated token also lacked library membership.
-Shared preparation now accepts the intended listener and grants only that user's
+probe confirmed that the delegated token's user also lacked access to the generated library.
+Shared preparation now accepts the intended listener and grants that user
 access to the generated library. Both workflow callers pass their listener;
 application authorization and delegated-token behavior stay unchanged. The
 membership correction's command regression fails before the fix and passes in the
 CI image afterward: 1 test and 11 assertions. Scoped application and tooling
-PHPStan pass, and its focused code review has no findings. Packaged web and
-shutdown drills remain in progress.
+PHPStan pass, and its focused code review has no findings. The corrected packaged web drill passes, including progressive streaming, byte
+ranges, Safari requests, PostgreSQL and Redis outages, recovery and revocation.
+
+The shutdown drill then exposed a separate fixture identity mismatch: WebSocket
+tickets require a first-party client, but the fixture sent a delegated token.
+`StreamClient` now accepts an optional concrete client. Only ticket-producing
+fixture paths supply the configured first-party client; general streaming and
+TwoCommand HTTP/transcode credentials remain delegated. The focused CI-image
+suite passes 11 tests and 26 assertions, and scoped PHPStan and review pass.
+The corrected shutdown drill is in progress.
 
 ## TypePHP application packaging
 

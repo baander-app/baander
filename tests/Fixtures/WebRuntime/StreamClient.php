@@ -29,12 +29,13 @@ final readonly class StreamClient
         string $privateKey,
         private string $endpoint,
         string $audience = 'https://baander.app',
+        ?ClientEntity $client = null,
     ) {
         $user = $manager->getRepository(UserEntity::class)->findOneBy(['email' => $email]);
         if (!$user instanceof UserEntity) {
             throw new RuntimeException('No user ' . $email);
         }
-        $client = new ClientEntity(new PublicId(), 'Web runtime drill', json_encode(['https://baander.app/callback'], JSON_THROW_ON_ERROR));
+        $client ??= new ClientEntity(new PublicId(), 'Web runtime drill', json_encode(['https://baander.app/callback'], JSON_THROW_ON_ERROR));
         $this->proof = new SignedDpopProof();
         $token = new AccessTokenEntity(
             (new Uuid())->toString(),
