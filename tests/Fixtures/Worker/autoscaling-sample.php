@@ -12,7 +12,7 @@ if (!in_array($unit, ['control', 'execution'], true) || $seconds < 1 || $seconds
 }
 $db = $unit === 'control' ? Doctrine\DBAL\DriverManager::getConnection((new Doctrine\DBAL\Tools\DsnParser(['postgresql' => 'pdo_pgsql']))->parse((string) getenv('DATABASE_URL'))) : null;
 $directory = (getenv('BAANDER_WORKER_IPC_DIRECTORY') ?: '/run/baander-worker') . '/' . getenv('BAANDER_WORKER_BOOT_ID');
-$completions = new \Baander\Tooling\Fixtures\Worker\CompletionCursor($directory . '/autoscaling-completions.jsonl');
+$completions = new \Baander\DevQualification\Fixtures\Worker\CompletionCursor($directory . '/autoscaling-completions.jsonl');
 $deadline = hrtime(true) / 1e9 + $seconds;
 // The figures an unlimited cgroup is measured against: the host's CPUs, memory and task bound.
 $kernel = static fn(string $name): int => (int) trim((string) @file_get_contents('/proc/sys/kernel/' . $name));
@@ -38,7 +38,7 @@ while (true) {
         $profile = App\Shared\Application\DTO\WorkerAutoscalingProfile::fromJson(json_encode($profileFields, JSON_THROW_ON_ERROR));
         $lease = new App\Shared\Infrastructure\Worker\DeploymentLease($state['namespace'], $state['bootId'], $state['epoch']);
         $status = new App\Shared\Infrastructure\Worker\Autoscaling\AutoscalingStatus(dirname($directory), $lease, $profile, \App\Shared\Application\DTO\DeploymentProfile::fromEnvironment());
-        $observation = \Baander\Tooling\Fixtures\Worker\AutoscalingStatusObservation::capture($status->snapshot(...));
+        $observation = \Baander\DevQualification\Fixtures\Worker\AutoscalingStatusObservation::capture($status->snapshot(...));
         $sample['status'] = $observation['status'];
         $sample['statusAttempts'] = $observation['attempts'];
     }
@@ -65,7 +65,7 @@ while (true) {
     if ($db !== null) {
         $sample['lease'] = $db->fetchAssociative('SELECT owner_boot_id, epoch, state, expires_at > clock_timestamp() AS unexpired FROM worker_deployment_leases WHERE namespace = ?', [getenv('BAANDER_WORKER_NAMESPACE')]);
         $sample['connections'] = (int) $db->fetchOne('SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()');
-        $sample['completions'] = $completions->read($stopping ? \Baander\Tooling\Fixtures\Worker\EvidenceMode::Completed : \Baander\Tooling\Fixtures\Worker\EvidenceMode::Live);
+        $sample['completions'] = $completions->read($stopping ? \Baander\DevQualification\Fixtures\Worker\EvidenceMode::Completed : \Baander\DevQualification\Fixtures\Worker\EvidenceMode::Live);
     }
     $sample['capturedAt'] = hrtime(true) / 1e9;
     echo json_encode($sample, JSON_THROW_ON_ERROR) . "\n";
@@ -73,5 +73,5 @@ while (true) {
     if ($stopping) {
         break;
     }
-    usleep(\Baander\Tooling\Fixtures\Worker\AutoscalingStatusObservation::INTERVAL_MICROSECONDS);
+    usleep(\Baander\DevQualification\Fixtures\Worker\AutoscalingStatusObservation::INTERVAL_MICROSECONDS);
 }

@@ -12,7 +12,7 @@ use Symfony\Component\Validator\Constraints\Regex;
     schema: 'TransferHostRequest',
     required: ['newHostUserId'],
     properties: [
-        new OA\Property(property: 'newHostUserId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+        new OA\Property(property: 'newHostUserId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
     ],
 )]
 final readonly class TransferHostRequest

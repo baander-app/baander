@@ -1,8 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<phpunit bootstrap="scripts/tests/php/bootstrap.php" colors="true" cacheDirectory="var/phpunit-tooling" failOnWarning="true" failOnRisky="true">
+<phpunit bootstrap="tests/Tooling/bootstrap.php" colors="true" cacheDirectory="var/phpunit-tooling" failOnWarning="true" failOnRisky="true">
     <testsuites>
         <testsuite name="Tooling">
-            <directory suffix="Test.php">scripts/tests/php</directory>
+            <directory suffix="Test.php">packages/baander-core/tests</directory>
+            <directory suffix="Test.php">packages/baander-filesystem/tests</directory>
+            <directory suffix="Test.php">packages/baander-process/tests</directory>
+            <directory suffix="Test.php">packages/baander-configuration/tests</directory>
+            <directory suffix="Test.php">packages/baander-containers/tests</directory>
+            <directory suffix="Test.php">packages/baander-images/tests</directory>
+            <directory suffix="Test.php">packages/baander-deployment/tests</directory>
+            <directory suffix="Test.php">packages/baander-dev-environment/tests</directory>
+            <directory suffix="Test.php">packages/baander-dev-qualification/tests</directory>
+            <directory suffix="Test.php">packages/baander-dev-ci/tests</directory>
+            <directory suffix="Test.php">packages/baander-dev-dependencies/tests</directory>
+            <directory suffix="Test.php">packages/baander-dev-registry/tests</directory>
+            <directory suffix="Test.php">packages/baander-dev-website/tests</directory>
+            <directory suffix="Test.php">tests/Tooling</directory>
         </testsuite>
     </testsuites>
 </phpunit>

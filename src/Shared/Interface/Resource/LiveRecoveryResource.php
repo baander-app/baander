@@ -16,10 +16,10 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'version', type: 'integer', enum: [1]),
         new OA\Property(property: 'families', type: 'array', items: new OA\Items(ref: new Model(type: LiveFamily::class))),
         new OA\Property(property: 'authorizationFingerprint', type: 'string', pattern: '^[0-9a-f]{64}$'),
-        new OA\Property(property: 'health', type: 'object', required: ['state', 'oldestPendingAgeMs'], properties: [
+        new OA\Property(property: 'health', required: ['state', 'oldestPendingAgeMs'], properties: [
             new OA\Property(property: 'state', type: 'string', enum: ['current', 'degraded']),
-            new OA\Property(property: 'oldestPendingAgeMs', type: 'integer', minimum: 0, nullable: true),
-        ]),
+            new OA\Property(property: 'oldestPendingAgeMs', type: 'integer', nullable: true, minimum: 0),
+        ], type: 'object'),
     ],
 )]
 final class LiveRecoveryResource extends AbstractResource

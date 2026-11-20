@@ -19,7 +19,7 @@ final readonly class AddFavoriteRequest
 
         #[Assert\NotBlank]
         #[Assert\Regex(pattern: '/^[A-Za-z0-9_-]{21}$/D')]
-        #[OA\Property(property: 'entityPublicId', type: 'string', pattern: '^[A-Za-z0-9_-]{21}$', minLength: 21, maxLength: 21)]
+        #[OA\Property(property: 'entityPublicId', type: 'string', pattern: '^[A-Za-z0-9_-]{21}$', maxLength: 21, minLength: 21)]
         public string $entityPublicId,
     ) {
     }

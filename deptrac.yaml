@@ -13,6 +13,7 @@ imports:
 
 deptrac:
   paths:
+    - packages/baander-core/src/
     - src/
     - packages/baander-http-client/src/
     - packages/baander-redis-rate-limiter/src/
@@ -56,6 +57,10 @@ deptrac:
         Command: ['Command Utility']
 
   layers:
+    - name: 'Core'
+      collectors:
+        - type: classLike
+          value: '^Baander\\Core\\'
     - name: 'Public HTTP Client'
       collectors:
         - type: classLike
@@ -1117,13 +1122,16 @@ deptrac:
           value: '^App\\Filesystem\\Infrastructure\\'
 
   ruleset:
+    Core: ~
     'Public HTTP Client': []
     'Rate Limiter Contracts': []
     'Rate Limiter Implementation':
+      - Core
       - 'Rate Limiter Contracts'
     'Image Processing': []
     'Media Metadata Values': []
     'Media Metadata Readers':
+      - Core
       - 'Media Metadata Values'
     # =============================================
     # IDEAL RULES — these define the target architecture.
@@ -1138,15 +1146,19 @@ deptrac:
 
     # --- Shared ---
     'Shared Live Snapshot Infrastructure':
+      - Core
       - 'Auth Live Authority Contract'
       - 'Library Live Audience Contract'
       - 'Playlist Live Audience Contract'
       - 'Shared Domain'
       - 'Shared Application'
-    'Shared Domain': ~
+    'Shared Domain':
+      - Core
     'Shared Application':
+      - Core
       - 'Shared Domain'
     'Shared Infrastructure':
+      - Core
       - 'Public HTTP Client'
       - 'Rate Limiter Implementation'
       - 'Rate Limiter Contracts'
@@ -1154,6 +1166,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Shared Interface':
+      - Core
       - 'Rate Limiter Contracts'
       - 'Shared Domain'
       - 'Shared Application'
@@ -1161,16 +1174,21 @@ deptrac:
 
     # --- Activity ---
     'Activity Artist Merge Contract':
+      - Core
       - 'Shared Domain'
     'Activity Album Merge Contract':
+      - Core
       - 'Shared Domain'
     'Activity Domain':
+      - Core
       - 'Shared Domain'
     'Activity Application':
+      - Core
       - 'Activity Domain'
       - 'Shared Domain'
       - 'Shared Application'
     'Activity Infrastructure':
+      - Core
       - 'Activity Artist Merge Contract'
       - 'Activity Album Merge Contract'
       - 'Library Read Scope Contract'
@@ -1181,12 +1199,14 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Activity Resources':
+      - Core
       - 'Activity Application'
       - 'Shared Application'
       - 'Activity Domain'
       - 'Shared Domain'
       - 'Shared Interface'
     'Activity Interface':
+      - Core
       - 'Activity Resources'
       - 'Auth Identity Contract'
       - 'Activity Application'
@@ -1196,17 +1216,22 @@ deptrac:
 
     # --- Auth ---
     'Auth Live Authority Contract':
+      - Core
       - 'Shared Domain'
     'Auth WebSocket Contract': []
     'Auth Identity Contract': []
     'Auth User Identifier Contract':
+      - Core
       - 'Shared Domain'
       - 'Shared Application'
     'Auth Device Approval Event Contract':
+      - Core
       - 'Shared Domain'
     'Auth Domain':
+      - Core
       - 'Shared Domain'
     'Auth Application':
+      - Core
       - 'Rate Limiter Contracts'
       - 'Auth WebSocket Contract'
       - 'UserPreference Settings Contract'
@@ -1218,6 +1243,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Auth Infrastructure':
+      - Core
       - 'Public HTTP Client'
       - 'Rate Limiter Contracts'
       - 'Auth Live Authority Contract'
@@ -1230,6 +1256,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Auth Resources':
+      - Core
       - 'UserPreference Settings Contract'
       - 'Auth Application'
       - 'Shared Application'
@@ -1237,6 +1264,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Auth Interface':
+      - Core
       - 'Rate Limiter Contracts'
       - 'Auth WebSocket Contract'
       - 'UserPreference Settings Contract'
@@ -1249,16 +1277,21 @@ deptrac:
 
     # --- Catalog ---
     'Catalog Video Contract':
+      - Core
       - 'Shared Domain'
       - 'Catalog Domain'
     'Catalog Song Availability Contract':
+      - Core
       - 'Shared Domain'
       - 'Catalog Domain'
     'Catalog Song Lookup Contract':
+      - Core
       - 'Shared Domain'
     'Catalog Domain':
+      - Core
       - 'Shared Domain'
     'Catalog Application':
+      - Core
       - 'Media Metadata Values'
       - 'Transcode Probe Contract'
       - 'Catalog Video Contract'
@@ -1276,6 +1309,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Catalog Infrastructure':
+      - Core
       - 'Activity Artist Merge Contract'
       - 'Activity Album Merge Contract'
       - 'Favorites Artist Merge Contract'
@@ -1296,12 +1330,14 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Catalog Resources':
+      - Core
       - 'Catalog Application'
       - 'Shared Application'
       - 'Catalog Domain'
       - 'Shared Domain'
       - 'Shared Interface'
     'Catalog Interface':
+      - Core
       - 'Catalog Video Contract'
       - 'Catalog Song Availability Contract'
       - 'Library Read Scope Contract'
@@ -1313,40 +1349,54 @@ deptrac:
 
     # --- Filesystem (utility) ---
     'Filesystem MIME Contract':
+      - Core
       - 'Shared Domain'
     'Filesystem Application':
+      - Core
       - 'Filesystem MIME Contract'
       - 'Shared Domain'
     'Filesystem Command':
+      - Core
       - 'Filesystem Application'
       - 'Shared Domain'
     'Filesystem Mime':
+      - Core
       - 'Shared Domain'
     'Filesystem Watcher':
+      - Core
       - 'Filesystem Application'
       - 'Shared Domain'
 
     # --- Library ---
     'Library Live Audience Contract':
+      - Core
       - 'Shared Domain'
     'Library File Availability Contract':
+      - Core
       - 'Shared Domain'
     'Library Read Scope Contract':
+      - Core
       - 'Shared Domain'
     'Library Content Stats Contract':
+      - Core
       - 'Shared Domain'
     'Library Files Discovered Contract':
+      - Core
       - 'Shared Domain'
     # Exception to the contract ruleset recipe: provisioning returns Files Discovered messages.
     'Library Provisioning Contract':
+      - Core
       - 'Shared Domain'
       - 'Library Files Discovered Contract'
     'Library Domain':
+      - Core
       - 'Shared Domain'
     'Library Media Files Contract':
+      - Core
       - 'Shared Domain'
       - 'Shared Application'
     'Library Application':
+      - Core
       - 'Auth User Identifier Contract'
       - 'Library Media Files Contract'
       - 'Library Files Discovered Contract'
@@ -1356,6 +1406,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Library Infrastructure':
+      - Core
       - 'Auth Live Authority Contract'
       - 'Library Live Audience Contract'
       - 'Library File Availability Contract'
@@ -1370,12 +1421,14 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Library Resources':
+      - Core
       - 'Library Application'
       - 'Shared Application'
       - 'Library Domain'
       - 'Shared Domain'
       - 'Shared Interface'
     'Library Interface':
+      - Core
       - 'Library Read Scope Contract'
       - 'Library Resources'
       - 'Auth Identity Contract'
@@ -1386,8 +1439,10 @@ deptrac:
 
     # --- Lyrics ---
     'Lyrics Domain':
+      - Core
       - 'Shared Domain'
     'Lyrics Infrastructure':
+      - Core
       - 'Rate Limiter Contracts'
       - 'Lyrics Album Merge Contract'
       - 'Catalog Song Lookup Contract'
@@ -1399,13 +1454,17 @@ deptrac:
 
     # --- Media ---
     'Media Playback Access Contract':
+      - Core
       - 'Shared Domain'
     'Media Image Contract':
+      - Core
       - 'Shared Domain'
     'Media Domain':
+      - Core
       - 'Media Image Contract'
       - 'Shared Domain'
     'Media Application':
+      - Core
       - 'Media Playback Access Contract'
       - 'Catalog Video Contract'
       - 'Transcode Audio Rendition Contract'
@@ -1416,6 +1475,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Media Infrastructure':
+      - Core
       - 'Image Processing'
       - 'Media Image Contract'
       - 'Auth Identity Contract'
@@ -1427,6 +1487,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Media Resources':
+      - Core
       - 'Media Image Contract'
       - 'Media Application'
       - 'Shared Application'
@@ -1434,6 +1495,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Media Interface':
+      - Core
       - 'Image Processing'
       - 'Media Image Contract'
       - 'Media Playback Access Contract'
@@ -1448,12 +1510,15 @@ deptrac:
 
     # --- Metadata ---
     'Metadata Domain':
+      - Core
       - 'Shared Domain'
     'Metadata Sync Contract':
+      - Core
       - 'Shared Domain'
       - 'Shared Application'
     'Metadata MusicBrainz Lookup Contract': []
     'Metadata Application':
+      - Core
       - 'Media Metadata Values'
       - 'Metadata Sync Contract'
       - 'Metadata MusicBrainz Lookup Contract'
@@ -1461,6 +1526,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Metadata Infrastructure':
+      - Core
       - 'Public HTTP Client'
       - 'Rate Limiter Contracts'
       - 'Media Metadata Readers'
@@ -1473,6 +1539,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Metadata Interface':
+      - Core
       - 'Auth Identity Contract'
       - 'Metadata Application'
       - 'Metadata MusicBrainz Lookup Contract'
@@ -1482,14 +1549,17 @@ deptrac:
 
     # --- Notification ---
     'Notification Domain':
+      - Core
       - 'Auth Device Approval Event Contract'
       - 'Shared Domain'
     'Notification Application':
+      - Core
       - 'UserPreference Settings Contract'
       - 'Notification Domain'
       - 'Shared Domain'
       - 'Shared Application'
     'Notification Infrastructure':
+      - Core
       - 'Public HTTP Client'
       - 'Shared Application'
       - 'Notification Domain'
@@ -1497,12 +1567,14 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Notification Resources':
+      - Core
       - 'Notification Application'
       - 'Shared Application'
       - 'Notification Domain'
       - 'Shared Domain'
       - 'Shared Interface'
     'Notification Interface':
+      - Core
       - 'Auth Identity Contract'
       - 'Notification Resources'
       - 'Notification Application'
@@ -1512,12 +1584,15 @@ deptrac:
 
     # --- Party ---
     'Party Domain':
+      - Core
       - 'Shared Domain'
     'Party Application':
+      - Core
       - 'Party Domain'
       - 'Shared Domain'
       - 'Shared Application'
     'Party Infrastructure':
+      - Core
       - 'Transcode Playback Access Contract'
       - 'Shared Application'
       - 'Party Domain'
@@ -1525,12 +1600,14 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Party Resources':
+      - Core
       - 'Party Application'
       - 'Shared Application'
       - 'Party Domain'
       - 'Shared Domain'
       - 'Shared Interface'
     'Party Interface':
+      - Core
       - 'Party Resources'
       - 'Auth Identity Contract'
       - 'Party Application'
@@ -1540,18 +1617,24 @@ deptrac:
 
     # --- Playlist ---
     'Playlist Live Audience Contract':
+      - Core
       - 'Shared Domain'
     'Playlist Deletion Preview Contract':
+      - Core
       - 'Shared Domain'
     'Playlist Album Merge Contract':
+      - Core
       - 'Shared Domain'
     'Playlist Domain':
+      - Core
       - 'Shared Domain'
     'Playlist Application':
+      - Core
       - 'Playlist Domain'
       - 'Shared Domain'
       - 'Shared Application'
     'Playlist Infrastructure':
+      - Core
       - 'Playlist Live Audience Contract'
       - 'Auth Identity Contract'
       - 'Auth User Identifier Contract'
@@ -1564,12 +1647,14 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Playlist Resources':
+      - Core
       - 'Playlist Application'
       - 'Shared Application'
       - 'Playlist Domain'
       - 'Shared Domain'
       - 'Shared Interface'
     'Playlist Interface':
+      - Core
       - 'Catalog Song Availability Contract'
       - 'Library Read Scope Contract'
       - 'Playlist Resources'
@@ -1581,16 +1666,20 @@ deptrac:
 
     # --- Recommendation ---
     'Recommendation Artist Merge Contract':
+      - Core
       - 'Shared Domain'
     'Recommendation Domain':
+      - Core
       - 'Shared Domain'
     'Recommendation Application':
+      - Core
       - 'Catalog Song Availability Contract'
       - 'Scheduler Schedulable Contract'
       - 'Recommendation Domain'
       - 'Shared Domain'
       - 'Shared Application'
     'Recommendation Infrastructure':
+      - Core
       - 'Recommendation Artist Merge Contract'
       - 'Shared Application'
       - 'Recommendation Domain'
@@ -1598,12 +1687,14 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Recommendation Resources':
+      - Core
       - 'Recommendation Application'
       - 'Shared Application'
       - 'Recommendation Domain'
       - 'Shared Domain'
       - 'Shared Interface'
     'Recommendation Interface':
+      - Core
       - 'Recommendation Resources'
       - 'Auth Identity Contract'
       - 'Recommendation Application'
@@ -1613,19 +1704,25 @@ deptrac:
 
     # --- Transcode ---
     'Transcode Playback Access Contract':
+      - Core
       - 'Shared Domain'
     'Transcode Audio Rendition Contract':
+      - Core
       - 'Shared Domain'
       - 'Shared Application'
     'Transcode Delivery Contract':
+      - Core
       - 'Shared Domain'
       - 'Shared Application'
     'Transcode Probe Contract':
+      - Core
       - 'Transcode Domain'
       - 'Shared Domain'
     'Transcode Domain':
+      - Core
       - 'Shared Domain'
     'Transcode Application':
+      - Core
       - 'Transcode Probe Contract'
       - 'Transcode Playback Access Contract'
       - 'Transcode Audio Rendition Contract'
@@ -1635,6 +1732,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Transcode Infrastructure':
+      - Core
       - 'Catalog Video Contract'
       - 'Media Playback Access Contract'
       - 'Transcode Probe Contract'
@@ -1651,12 +1749,14 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Transcode Resources':
+      - Core
       - 'Transcode Application'
       - 'Shared Application'
       - 'Transcode Domain'
       - 'Shared Domain'
       - 'Shared Interface'
     'Transcode Interface':
+      - Core
       - 'Transcode Playback Access Contract'
       - 'Transcode Delivery Contract'
       - 'Scheduler Schedulable Contract'
@@ -1670,15 +1770,19 @@ deptrac:
 
     # --- UserPreference ---
     'UserPreference Domain':
+      - Core
       - 'Shared Domain'
     'UserPreference Settings Contract':
+      - Core
       - 'Shared Application'
       - 'Shared Domain'
     'UserPreference Application':
+      - Core
       - 'UserPreference Domain'
       - 'Shared Domain'
       - 'Shared Application'
     'UserPreference Infrastructure':
+      - Core
       - 'UserPreference Settings Contract'
       - 'Shared Application'
       - 'UserPreference Domain'
@@ -1686,12 +1790,14 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'UserPreference Resources':
+      - Core
       - 'UserPreference Application'
       - 'Shared Application'
       - 'UserPreference Domain'
       - 'Shared Domain'
       - 'Shared Interface'
     'UserPreference Interface':
+      - Core
       - 'UserPreference Resources'
       - 'UserPreference Application'
       - 'Auth Identity Contract'
@@ -1701,24 +1807,29 @@ deptrac:
 
     # --- Discovery ---
     'Discovery Domain':
+      - Core
       - 'Shared Domain'
     'Discovery Application':
+      - Core
       - 'Discovery Domain'
       - 'Shared Domain'
       - 'Shared Application'
     'Discovery Infrastructure':
+      - Core
       - 'Shared Application'
       - 'Discovery Application'
       - 'Discovery Domain'
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Discovery Resources':
+      - Core
       - 'Discovery Application'
       - 'Shared Application'
       - 'Discovery Domain'
       - 'Shared Domain'
       - 'Shared Interface'
     'Discovery Interface':
+      - Core
       - 'Discovery Resources'
       - 'Discovery Application'
       - 'Discovery Domain'
@@ -1728,15 +1839,20 @@ deptrac:
 
     # --- Favorites ---
     'Favorites Artist Merge Contract':
+      - Core
       - 'Shared Domain'
     'Favorites Album Merge Contract':
+      - Core
       - 'Shared Domain'
     'Favorites Domain':
+      - Core
       - 'Shared Domain'
     'Favorites Application':
+      - Core
       - 'Favorites Domain'
       - 'Shared Domain'
     'Favorites Infrastructure':
+      - Core
       - 'Favorites Artist Merge Contract'
       - 'Favorites Album Merge Contract'
       - 'Shared Application'
@@ -1745,12 +1861,14 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Favorites Resources':
+      - Core
       - 'Favorites Application'
       - 'Shared Application'
       - 'Favorites Domain'
       - 'Shared Domain'
       - 'Shared Interface'
     'Favorites Interface':
+      - Core
       - 'Favorites Resources'
       - 'Auth Identity Contract'
       - 'Favorites Application'
@@ -1760,17 +1878,21 @@ deptrac:
 
     # --- Command (flat utility) ---
     'Command Utility':
+      - Core
       - 'Shared Domain'
 
     'Radio Domain':
+      - Core
       - 'Shared Domain'
 
     'Radio Application':
+      - Core
       - 'Radio Domain'
       - 'Shared Domain'
       - 'Shared Application'
 
     'Radio Infrastructure':
+      - Core
       - 'Public HTTP Client'
       - 'Radio Domain'
       - 'Radio Application'
@@ -1779,6 +1901,7 @@ deptrac:
       - 'Shared Infrastructure'
 
     'Radio Resources':
+      - Core
       - 'Radio Domain'
       - 'Radio Application'
       - 'Shared Domain'
@@ -1786,6 +1909,7 @@ deptrac:
       - 'Shared Interface'
 
     'Radio Interface':
+      - Core
       - 'Auth Identity Contract'
       - 'Radio Application'
       - 'Radio Resources'
@@ -1796,15 +1920,18 @@ deptrac:
     'Scheduler Schedulable Contract': []
 
     'Scheduler Domain':
+      - Core
       - 'Scheduler Schedulable Contract'
       - 'Shared Domain'
 
     'Scheduler Application':
+      - Core
       - 'Scheduler Domain'
       - 'Shared Domain'
       - 'Shared Application'
 
     'Scheduler Infrastructure':
+      - Core
       - 'Scheduler Domain'
       - 'Scheduler Application'
       - 'Shared Domain'
@@ -1812,6 +1939,7 @@ deptrac:
       - 'Shared Infrastructure'
 
     'Scheduler Resources':
+      - Core
       - 'Scheduler Domain'
       - 'Scheduler Application'
       - 'Shared Domain'
@@ -1819,6 +1947,7 @@ deptrac:
       - 'Shared Interface'
 
     'Scheduler Interface':
+      - Core
       - 'Scheduler Application'
       - 'Scheduler Resources'
       - 'Shared Domain'
@@ -1826,15 +1955,18 @@ deptrac:
       - 'Shared Interface'
 
     'Session Domain':
+      - Core
       - 'Shared Domain'
 
     'Session Application':
+      - Core
       - 'Media Playback Access Contract'
       - 'Session Domain'
       - 'Shared Domain'
       - 'Shared Application'
 
     'Session Infrastructure':
+      - Core
       - 'Session Domain'
       - 'Session Application'
       - 'Shared Domain'
@@ -1842,6 +1974,7 @@ deptrac:
       - 'Shared Infrastructure'
 
     'Session Resources':
+      - Core
       - 'Session Domain'
       - 'Session Application'
       - 'Shared Domain'
@@ -1849,6 +1982,7 @@ deptrac:
       - 'Shared Interface'
 
     'Session Interface':
+      - Core
       - 'Auth Identity Contract'
       - 'Session Application'
       - 'Session Resources'
@@ -1859,20 +1993,25 @@ deptrac:
     'QoL Encoder Profile Contract': []
     'QoL Quality Ladder Contract': []
     'QoL Stream Admission Contract':
+      - Core
       - 'Shared Domain'
     'QoL Allowed Tiers Contract': []
     'QoL Budget Guard Contract':
+      - Core
       - 'Shared Domain'
     'QoL Domain':
+      - Core
       - 'QoL Quality Ladder Contract'
       - 'Shared Domain'
 
     'QoL Application':
+      - Core
       - 'QoL Domain'
       - 'Shared Domain'
       - 'Shared Application'
 
     'QoL Infrastructure':
+      - Core
       - 'QoL Encoder Profile Contract'
       - 'QoL Stream Admission Contract'
       - 'QoL Allowed Tiers Contract'
@@ -1884,6 +2023,7 @@ deptrac:
       - 'Shared Infrastructure'
 
     'QoL Resources':
+      - Core
       - 'QoL Domain'
       - 'QoL Application'
       - 'Shared Domain'
@@ -1891,6 +2031,7 @@ deptrac:
       - 'Shared Interface'
 
     'QoL Interface':
+      - Core
       - 'QoL Application'
       - 'QoL Resources'
       - 'Shared Domain'
@@ -1898,10 +2039,13 @@ deptrac:
       - 'Shared Interface'
 
     'Lyrics Fetch Request Contract':
+      - Core
       - 'Shared Domain'
     'Lyrics Album Merge Contract':
+      - Core
       - 'Shared Domain'
     'Lyrics Application':
+      - Core
       - 'Lyrics Fetch Request Contract'
       - 'Catalog Song Lookup Contract'
       - 'Scheduler Schedulable Contract'
@@ -1910,6 +2054,7 @@ deptrac:
       - 'Shared Application'
 
     'Lyrics Resources':
+      - Core
       - 'Lyrics Domain'
       - 'Lyrics Application'
       - 'Shared Domain'
@@ -1917,6 +2062,7 @@ deptrac:
       - 'Shared Interface'
 
     'Lyrics Interface':
+      - Core
       - 'Catalog Song Lookup Contract'
       - 'Library Read Scope Contract'
       - 'Lyrics Application'
@@ -1926,6 +2072,7 @@ deptrac:
       - 'Shared Interface'
 
     'Filesystem Infrastructure':
+      - Core
       - 'Filesystem Application'
       - 'Shared Domain'
       - 'Shared Application'

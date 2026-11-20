@@ -12,6 +12,7 @@ use App\Shared\Infrastructure\Messaging\WorkerTransportConfiguration;
 use App\Shared\Infrastructure\Worker\Autoscaling\AdmissionLedger;
 use App\Shared\Infrastructure\Worker\Autoscaling\CgroupResourceSampler;
 use App\Shared\Infrastructure\Worker\Autoscaling\ResourceChannel;
+use Baander\Core\EnvironmentVariable;
 
 /** Resident-role PID-1 runtime; child replacement requires external deployment recovery. */
 final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInterface
@@ -54,18 +55,18 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
         pcntl_signal(SIGTERM, $stop);
         pcntl_signal(SIGINT, $stop);
         try {
-            $environment['DATABASE_URL'] = $this->databaseUrl;
-            $environment['DATABASE_CONTROL_URL'] = $this->controlDatabaseUrl;
-            $environment['BAANDER_WORKER_NAMESPACE'] = $configuration->namespace;
-            $environment['BAANDER_WORKER_BOOT_ID'] = $configuration->bootId;
+            $environment[EnvironmentVariable::DATABASE_URL] = $this->databaseUrl;
+            $environment[EnvironmentVariable::DATABASE_CONTROL_URL] = $this->controlDatabaseUrl;
+            $environment[EnvironmentVariable::BAANDER_WORKER_NAMESPACE] = $configuration->namespace;
+            $environment[EnvironmentVariable::BAANDER_WORKER_BOOT_ID] = $configuration->bootId;
             $startedAt = hrtime(true) / 1e9;
             $peer = new WorkerPeerHandshake($configuration->ipcDirectory, $configuration->namespace, $configuration->bootId, $configuration->unit, $startedAt, $configuration->deploymentProfile,
                 static fn (): float => hrtime(true) / 1e9);
-            $environment['BAANDER_NATIVE_SOCKET'] = $peer->socketPath();
-            $environment['BAANDER_WORKER_UNIT'] = $configuration->unit;
-            $environment['BAANDER_DEPLOYMENT_PROFILE'] = $configuration->deploymentProfile->toJson();
-            $environment['BAANDER_WORKER_AUTOSCALING_PROFILE'] = $configuration->autoscaling->toJson();
-            $environment['BAANDER_WORKER_IPC_DIRECTORY'] = $configuration->ipcDirectory;
+            $environment[EnvironmentVariable::BAANDER_NATIVE_SOCKET] = $peer->socketPath();
+            $environment[EnvironmentVariable::BAANDER_WORKER_UNIT] = $configuration->unit;
+            $environment[EnvironmentVariable::BAANDER_DEPLOYMENT_PROFILE] = $configuration->deploymentProfile->toJson();
+            $environment[EnvironmentVariable::BAANDER_WORKER_AUTOSCALING_PROFILE] = $configuration->autoscaling->toJson();
+            $environment[EnvironmentVariable::BAANDER_WORKER_IPC_DIRECTORY] = $configuration->ipcDirectory;
             $native = null;
             $nativeReady = false;
             $epoch = null;
@@ -107,9 +108,9 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
                     if ($configuration->unit === 'execution') {
                         if ($native === null) {
                             $nativeEnvironment = $environment;
-                            $nativeEnvironment['BAANDER_WORKER_LEASE_EPOCH'] = (string) $epoch;
-                            $nativeEnvironment['BAANDER_WORKER_ID'] = 'native';
-                            $nativeEnvironment['BAANDER_WORKER_GENERATION'] = '1';
+                            $nativeEnvironment[EnvironmentVariable::BAANDER_WORKER_LEASE_EPOCH] = (string) $epoch;
+                            $nativeEnvironment[EnvironmentVariable::BAANDER_WORKER_ID] = 'native';
+                            $nativeEnvironment[EnvironmentVariable::BAANDER_WORKER_GENERATION] = '1';
                             $native = WorkerChildProcess::start([PHP_BINARY, '-d', 'memory_limit=' . $configuration->deploymentProfile->nativeManagerHeapMiB() . 'M', $this->projectDirectory . '/bin/worker-native.php'], $this->projectDirectory, STDOUT, STDERR, $nativeEnvironment);
                         }
                         if (!$native->poll($now)) {
@@ -269,12 +270,12 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
         ) {
             throw new \RuntimeException('Worker admission requires current committed deployment authority and matching launch identity.');
         }
-        $environment['BAANDER_WORKER_NAMESPACE'] = $identity->deploymentId;
-        $environment['BAANDER_WORKER_BOOT_ID'] = $identity->supervisorBootId;
-        $environment['BAANDER_WORKER_ID'] = $identity->workerId;
-        $environment['BAANDER_WORKER_GENERATION'] = (string) $identity->generation;
-        $environment['BAANDER_WORKER_LEASE_EPOCH'] = (string) $lease->epoch;
-        $environment['MESSENGER_CONSUMER_NAME'] = 'worker-' . substr(hash('sha256', $identity->deploymentId), 0, 16) . '-' . $identity->supervisorBootId . '-' . $identity->workerId . '-' . $identity->generation;
+        $environment[EnvironmentVariable::BAANDER_WORKER_NAMESPACE] = $identity->deploymentId;
+        $environment[EnvironmentVariable::BAANDER_WORKER_BOOT_ID] = $identity->supervisorBootId;
+        $environment[EnvironmentVariable::BAANDER_WORKER_ID] = $identity->workerId;
+        $environment[EnvironmentVariable::BAANDER_WORKER_GENERATION] = (string) $identity->generation;
+        $environment[EnvironmentVariable::BAANDER_WORKER_LEASE_EPOCH] = (string) $lease->epoch;
+        $environment[EnvironmentVariable::MESSENGER_CONSUMER_NAME] = 'worker-' . substr(hash('sha256', $identity->deploymentId), 0, 16) . '-' . $identity->supervisorBootId . '-' . $identity->workerId . '-' . $identity->generation;
         return $this->roleEnvironment($environment, $definition, $configuration);
     }
 
@@ -297,7 +298,7 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
         // explicit launch identity when the child's kernel loads its own files.
         unset($environment['SYMFONY_DOTENV_VARS']);
         // Only the admitted consumer may receive a nested console reservation.
-        $environment['BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES'] = '0';
+        $environment[EnvironmentVariable::BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES] = '0';
         WorkerTransportConfiguration::validate($environment, required: true);
         return $environment;
     }
@@ -308,7 +309,7 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
      */
     private function roleEnvironment(array $environment, WorkerDefinition $definition, WorkerRuntimeConfiguration $configuration): array
     {
-        $environment['BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES'] = (string) ($definition->id === 'scheduled-consumer' ? $configuration->scheduledConsoleReservationBytes : 0);
+        $environment[EnvironmentVariable::BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES] = (string) ($definition->id === 'scheduled-consumer' ? $configuration->scheduledConsoleReservationBytes : 0);
         return $environment;
     }
 }

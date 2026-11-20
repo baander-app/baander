@@ -106,7 +106,7 @@ final class ArtistController
             new OA\Parameter(name: 'q', description: 'Search query', in: 'query', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'genre', description: 'Filter by genre slug', in: 'query', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'sort', description: 'Sort field (name)', in: 'query', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'order', description: 'Sort order (asc, desc)', in: 'query', schema: new OA\Schema(type: 'string', enum: ['asc', 'desc'], default: 'asc')),
+            new OA\Parameter(name: 'order', description: 'Sort order (asc, desc)', in: 'query', schema: new OA\Schema(type: 'string', default: 'asc', enum: ['asc', 'desc'])),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Paginated list of artists', content: new OA\JsonContent(ref: new Model(type: PaginatedResponse::class))),
@@ -165,7 +165,7 @@ final class ArtistController
         path: '/api/artists/{publicId}',
         summary: 'Get a single artist',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Artist details', content: new OA\JsonContent(
@@ -216,7 +216,7 @@ final class ArtistController
                 new OA\Property(property: 'biography', type: 'string', nullable: true),
             ])),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Artist updated', content: new OA\JsonContent(
@@ -254,7 +254,7 @@ final class ArtistController
         path: '/api/artists/{publicId}',
         summary: 'Delete an artist',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(
@@ -286,11 +286,11 @@ final class ArtistController
         path: '/api/artists/{publicId}/songs',
         summary: 'Add a song to an artist',
         requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'songId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
+                new OA\Property(property: 'songId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
                 new OA\Property(property: 'role', type: 'string'),
             ])),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Song added to artist, or the artist already had the credit'),
@@ -316,8 +316,8 @@ final class ArtistController
         path: '/api/artists/{publicId}/songs/{songId}',
         summary: 'Remove a song from an artist',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
-            new OA\Parameter(name: 'songId', description: 'Song public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(name: 'songId', description: 'Song public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '204', description: "Every one of the artist's credits on the song removed"),
@@ -347,8 +347,8 @@ final class ArtistController
                 new OA\Property(property: 'currentRole', description: 'The role of the credit to change; required when the artist holds several roles on the song', type: 'string', nullable: true),
             ])),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
-            new OA\Parameter(name: 'songId', description: 'Song public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(name: 'songId', description: 'Song public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Role updated; a credit changed to a role the artist already holds on the song is removed'),
@@ -374,11 +374,11 @@ final class ArtistController
         path: '/api/artists/{publicId}/albums',
         summary: 'Add an album to an artist',
         requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'albumId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
+                new OA\Property(property: 'albumId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
                 new OA\Property(property: 'role', type: 'string'),
             ])),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Album added to artist, or the artist already had the credit'),
@@ -404,8 +404,8 @@ final class ArtistController
         path: '/api/artists/{publicId}/albums/{albumId}',
         summary: 'Remove an album from an artist',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
-            new OA\Parameter(name: 'albumId', description: 'Album public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(name: 'albumId', description: 'Album public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '204', description: "Every one of the artist's credits on the album removed"),
@@ -435,8 +435,8 @@ final class ArtistController
                 new OA\Property(property: 'currentRole', description: 'The role of the credit to change; required when the artist holds several roles on the album', type: 'string', nullable: true),
             ])),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
-            new OA\Parameter(name: 'albumId', description: 'Album public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(name: 'albumId', description: 'Album public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Role updated; a credit changed to a role the artist already holds on the album is removed'),

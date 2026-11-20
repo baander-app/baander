@@ -11,13 +11,13 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'VideoResource',
     properties: [
-        new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, description: 'Public identifier'),
-        new OA\Property(property: 'path', type: 'string', description: 'File path'),
-        new OA\Property(property: 'duration', type: 'number', nullable: true, description: 'Duration in seconds'),
-        new OA\Property(property: 'height', type: 'integer', nullable: true, description: 'Video height in pixels'),
-        new OA\Property(property: 'width', type: 'integer', nullable: true, description: 'Video width in pixels'),
-        new OA\Property(property: 'videoBitrate', type: 'integer', nullable: true, description: 'Video bitrate in bps'),
-        new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', description: 'Creation timestamp'),
+        new OA\Property(property: 'publicId', description: 'Public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+        new OA\Property(property: 'path', description: 'File path', type: 'string'),
+        new OA\Property(property: 'duration', description: 'Duration in seconds', type: 'number', nullable: true),
+        new OA\Property(property: 'height', description: 'Video height in pixels', type: 'integer', nullable: true),
+        new OA\Property(property: 'width', description: 'Video width in pixels', type: 'integer', nullable: true),
+        new OA\Property(property: 'videoBitrate', description: 'Video bitrate in bps', type: 'integer', nullable: true),
+        new OA\Property(property: 'createdAt', description: 'Creation timestamp', type: 'string', format: 'date-time'),
     ],
 )]
 final class VideoResource extends AbstractResource

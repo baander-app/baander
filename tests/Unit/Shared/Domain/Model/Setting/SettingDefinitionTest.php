@@ -56,8 +56,8 @@ final class SettingDefinitionTest extends TestCase
             description: 'Language of the emails you receive.',
             group: 'Account',
             allowedValues: ['en', 'da', 'th'],
-            fallbackKey: 'i18n.default_language',
             editRole: SettingDefinition::ROLE_USER,
+            fallbackKey: 'i18n.default_language',
         );
 
         $this->assertNull($definition->default);

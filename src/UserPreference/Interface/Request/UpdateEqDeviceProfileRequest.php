@@ -10,7 +10,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[OA\Schema(
     schema: 'UpdateEqDeviceProfileRequest',
     properties: [
-        new OA\Property(property: 'name', type: 'string', maxLength: 255, example: 'Living Room'),
+        new OA\Property(property: 'name', type: 'string', example: 'Living Room', maxLength: 255),
         new OA\Property(property: 'icon', type: 'string', example: 'speakers'),
         new OA\Property(property: 'deviceId', description: 'Client audio-output token, independent of database identity', type: 'string', nullable: true),
         new OA\Property(property: 'payload', type: 'object'),

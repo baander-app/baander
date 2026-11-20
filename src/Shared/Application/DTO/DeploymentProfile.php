@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Shared\Application\DTO;
 
+use Baander\Core\EnvironmentVariable;
+
 /** Immutable startup capabilities shared by web and worker processes. */
 final readonly class DeploymentProfile
 {
@@ -95,7 +97,7 @@ final readonly class DeploymentProfile
 
     public static function fromEnvironment(): self
     {
-        $serialized = $_SERVER['BAANDER_DEPLOYMENT_PROFILE'] ?? $_ENV['BAANDER_DEPLOYMENT_PROFILE'] ?? getenv('BAANDER_DEPLOYMENT_PROFILE');
+        $serialized = $_SERVER[EnvironmentVariable::BAANDER_DEPLOYMENT_PROFILE] ?? $_ENV[EnvironmentVariable::BAANDER_DEPLOYMENT_PROFILE] ?? getenv(EnvironmentVariable::BAANDER_DEPLOYMENT_PROFILE);
         if ($serialized !== false && !is_string($serialized)) {
             throw new \InvalidArgumentException('The deployment profile environment value requires a string.');
         }

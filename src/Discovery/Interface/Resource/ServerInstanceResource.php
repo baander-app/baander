@@ -11,13 +11,13 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'ServerInstanceResource',
     properties: [
-        new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
-        new OA\Property(property: 'serverUrl', type: 'string', format: 'uri', description: 'Server base URL'),
-        new OA\Property(property: 'name', type: 'string', description: 'Server display name'),
-        new OA\Property(property: 'version', type: 'string', description: 'Server version'),
-        new OA\Property(property: 'status', type: 'string', enum: ['online', 'offline', 'maintenance'], description: 'Server status'),
-        new OA\Property(property: 'lastHeartbeatAt', type: 'string', format: 'date-time', nullable: true, description: 'Last heartbeat timestamp'),
-        new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', description: 'Registration timestamp'),
+        new OA\Property(property: 'publicId', description: 'Public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+        new OA\Property(property: 'serverUrl', description: 'Server base URL', type: 'string', format: 'uri'),
+        new OA\Property(property: 'name', description: 'Server display name', type: 'string'),
+        new OA\Property(property: 'version', description: 'Server version', type: 'string'),
+        new OA\Property(property: 'status', description: 'Server status', type: 'string', enum: ['online', 'offline', 'maintenance']),
+        new OA\Property(property: 'lastHeartbeatAt', description: 'Last heartbeat timestamp', type: 'string', format: 'date-time', nullable: true),
+        new OA\Property(property: 'createdAt', description: 'Registration timestamp', type: 'string', format: 'date-time'),
     ],
 )]
 final class ServerInstanceResource extends AbstractResource

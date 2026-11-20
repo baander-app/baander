@@ -15,7 +15,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'error', required: ['message', 'code'], properties: [
             new OA\Property(property: 'message', type: 'string'),
             new OA\Property(property: 'code', type: 'integer'),
-            new OA\Property(property: 'details', type: 'object', description: 'Additional error details, omitted when empty'),
+            new OA\Property(property: 'details', description: 'Additional error details, omitted when empty', type: 'object'),
         ], type: 'object'),
     ],
 )]

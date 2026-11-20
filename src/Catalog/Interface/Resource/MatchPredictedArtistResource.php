@@ -17,7 +17,7 @@ use OpenApi\Attributes as OA;
     description: 'The library artist a MusicBrainz credit would go to if the match were applied now, or the artist the match would create',
     required: ['publicId', 'name', 'takesId'],
     properties: [
-        new OA\Property(property: 'publicId', description: 'The artist\'s public ID; null for an artist the match would create', type: 'string', maxLength: 21, minLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true),
+        new OA\Property(property: 'publicId', description: 'The artist\'s public ID; null for an artist the match would create', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
         new OA\Property(property: 'name', description: 'The artist\'s name, or the name a new artist would get', type: 'string'),
         new OA\Property(property: 'takesId', description: 'Whether a library artist without a MusicBrainz ID would take on the credit\'s ID', type: 'boolean'),
     ],

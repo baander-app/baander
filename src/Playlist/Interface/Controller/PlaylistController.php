@@ -79,17 +79,12 @@ final class PlaylistController
     /**
      * List the playlists the authenticated user owns or collaborates on.
      */
-    #[OA\Get(
-        path: '/api/playlists/',
-        summary: 'List the playlists the authenticated user owns or collaborates on',
-        description: 'Each playlist carries the owner\'s public id and the number of songs the caller can see.',
-        responses: [
-            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: PlaylistResource::class)))], type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        ],
-    )]
+    #[OA\Get(path: '/api/playlists/', description: 'Each playlist carries the owner\'s public id and the number of songs the caller can see.', summary: 'List the playlists the authenticated user owns or collaborates on', responses: [
+        new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
+            properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: PlaylistResource::class)))], type: 'object',
+        )),
+        new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+    ])]
     #[Route('/', name: 'index', methods: ['GET'])]
     public function index(Request $request): JsonResponse
     {
@@ -165,34 +160,34 @@ final class PlaylistController
         path: '/api/playlists/{publicId}',
         summary: 'Get a playlist and its accessible songs (owner, collaborators and administrators)',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
                 properties: [
                     new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, example: 'aB3dE5fG7hJ9kL1mN3pQr'),
-                        new OA\Property(property: 'ownerPublicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, example: 'oWn3rPubL1cIdExampl_1'),
-                        new OA\Property(property: 'collaboratorPublicIds', type: 'array', items: new OA\Items(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+                        new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', example: 'aB3dE5fG7hJ9kL1mN3pQr', maxLength: 21, minLength: 21),
+                        new OA\Property(property: 'ownerPublicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', example: 'oWn3rPubL1cIdExampl_1', maxLength: 21, minLength: 21),
+                        new OA\Property(property: 'collaboratorPublicIds', type: 'array', items: new OA\Items(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
                         new OA\Property(property: 'name', type: 'string', example: 'My Favorites'),
-                        new OA\Property(property: 'description', type: 'string', nullable: true, example: 'A collection of my favorite songs'),
+                        new OA\Property(property: 'description', type: 'string', example: 'A collection of my favorite songs', nullable: true),
                         new OA\Property(property: 'isPublic', type: 'boolean', example: true),
                         new OA\Property(property: 'isCollaborative', type: 'boolean', example: false),
                         new OA\Property(property: 'isSmart', type: 'boolean', example: false),
-                        new OA\Property(property: 'songCount', type: 'integer', minimum: 0, description: 'Number of accessible songs returned in the songs array', example: 25),
+                        new OA\Property(property: 'songCount', description: 'Number of accessible songs returned in the songs array', type: 'integer', example: 25, minimum: 0),
                         new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
-                        new OA\Property(property: 'revision', description: 'Revision of the snapshot used to return songs', type: 'string', pattern: '^[a-f0-9]{64}$', minLength: 64, maxLength: 64),
+                        new OA\Property(property: 'revision', description: 'Revision of the snapshot used to return songs', type: 'string', pattern: '^[a-f0-9]{64}$', maxLength: 64, minLength: 64),
                         new OA\Property(property: 'songs', type: 'array', items: new OA\Items(required: ['available'], properties: [
-                            new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
-                            new OA\Property(property: 'albumId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, description: 'Album public identifier'),
-                            new OA\Property(property: 'position', type: 'integer', description: 'Stored playlist position', example: 0),
-                            new OA\Property(property: 'available', type: 'boolean', description: 'Whether the latest scan or ingestion observation marked the source available'),
+                            new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+                            new OA\Property(property: 'albumId', description: 'Album public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+                            new OA\Property(property: 'position', description: 'Stored playlist position', type: 'integer', example: 0),
+                            new OA\Property(property: 'available', description: 'Whether the latest scan or ingestion observation marked the source available', type: 'boolean'),
                             new OA\Property(property: 'title', type: 'string'),
                             new OA\Property(property: 'artistName', type: 'string', nullable: true),
                             new OA\Property(property: 'albumName', type: 'string', nullable: true),
-                            new OA\Property(property: 'albumLanguage', type: 'string', nullable: true, description: 'Release language stored on the album, unchanged; usually a language code, but tag readers may store free text'),
+                            new OA\Property(property: 'albumLanguage', description: 'Release language stored on the album, unchanged; usually a language code, but tag readers may store free text', type: 'string', nullable: true),
                             new OA\Property(property: 'year', type: 'integer', nullable: true),
-                            new OA\Property(property: 'length', type: 'number', nullable: true, description: 'Duration in seconds'),
+                            new OA\Property(property: 'length', description: 'Duration in seconds', type: 'number', nullable: true),
                             new OA\Property(property: 'track', type: 'integer', nullable: true),
                             new OA\Property(property: 'disc', type: 'integer', nullable: true),
                             new OA\Property(property: 'bitrate', type: 'integer', nullable: true),
@@ -275,13 +270,13 @@ final class PlaylistController
                         new OA\Property(property: 'name', type: 'string', nullable: true),
                         new OA\Property(property: 'description', type: 'string', nullable: true),
                         new OA\Property(property: 'isPublic', type: 'boolean', nullable: true),
-                        new OA\Property(property: 'isCollaborative', type: 'boolean', nullable: true, description: "The owner's switch for collaborator editing; collaborators keep viewing while it is off"),
+                        new OA\Property(property: 'isCollaborative', description: "The owner's switch for collaborator editing; collaborators keep viewing while it is off", type: 'boolean', nullable: true),
                     ],
                 ),
             ),
         ),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
@@ -332,7 +327,7 @@ final class PlaylistController
         path: '/api/playlists/{publicId}',
         summary: 'Delete a playlist',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Deleted'),
@@ -369,18 +364,18 @@ final class PlaylistController
                 schema: new OA\Schema(
                     required: ['songId'],
                     properties: [
-                        new OA\Property(property: 'songId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
+                        new OA\Property(property: 'songId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
                     ],
                 ),
             ),
         ),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '201', description: 'Created', content: new OA\JsonContent(
                 properties: [
-                    new OA\Property(property: 'songId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, example: 'aB3dE5fG7hJ9kL1mN3pQr'),
+                    new OA\Property(property: 'songId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', example: 'aB3dE5fG7hJ9kL1mN3pQr', maxLength: 21, minLength: 21),
                     new OA\Property(property: 'position', type: 'integer', example: 0),
                 ], type: 'object',
             )),
@@ -444,8 +439,8 @@ final class PlaylistController
         path: '/api/playlists/{publicId}/songs/{songId}',
         summary: 'Remove a song from a playlist',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
-            new OA\Parameter(name: 'songId', description: 'Song public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(name: 'songId', description: 'Song public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Deleted'),
@@ -486,23 +481,17 @@ final class PlaylistController
     /**
      * Add a collaborator. Only the owner may; adding a user who already collaborates changes nothing.
      */
-    #[OA\Put(
-        path: '/api/playlists/{publicId}/collaborators/{userPublicId}',
-        summary: 'Add a collaborator to a playlist',
-        description: 'Only the owner may add collaborators. A collaborator may view the playlist, and may change its songs while the playlist is collaborative. Adding a user who already collaborates changes nothing.',
-        parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
-            new OA\Parameter(name: 'userPublicId', description: "The user's public id", in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
-        ],
-        responses: [
-            new OA\Response(response: '204', description: 'The user is a collaborator'),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Only the owner may manage the collaborators', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Playlist not found, the value is not a public id, or no user has it', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '409', description: 'The playlist kept changing during the addition', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'The owner named themself', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        ],
-    )]
+    #[OA\Put(path: '/api/playlists/{publicId}/collaborators/{userPublicId}', description: 'Only the owner may add collaborators. A collaborator may view the playlist, and may change its songs while the playlist is collaborative. Adding a user who already collaborates changes nothing.', summary: 'Add a collaborator to a playlist', parameters: [
+        new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+        new OA\Parameter(name: 'userPublicId', description: "The user's public id", in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+    ], responses: [
+        new OA\Response(response: '204', description: 'The user is a collaborator'),
+        new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '403', description: 'Only the owner may manage the collaborators', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '404', description: 'Playlist not found, the value is not a public id, or no user has it', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '409', description: 'The playlist kept changing during the addition', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '422', description: 'The owner named themself', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+    ])]
     #[Route('/{publicId}/collaborators/{userPublicId}', name: 'add_collaborator', requirements: ['userPublicId' => self::PUBLIC_ID_REQUIREMENT], methods: ['PUT'])]
     public function addCollaborator(string $publicId, string $userPublicId): JsonResponse
     {
@@ -532,21 +521,15 @@ final class PlaylistController
      * collaborate changes nothing. Anyone else must be a collaborator, asked of the voter
      * before the named user is looked up, and may remove only their own row: leaving.
      */
-    #[OA\Delete(
-        path: '/api/playlists/{publicId}/collaborators/{userPublicId}',
-        summary: 'Remove a collaborator from a playlist',
-        description: 'The owner may remove any collaborator; a collaborator may remove their own row to leave. Removing a user who does not collaborate changes nothing.',
-        parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
-            new OA\Parameter(name: 'userPublicId', description: "The user's public id", in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
-        ],
-        responses: [
-            new OA\Response(response: '204', description: 'The user is not a collaborator'),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Only the owner may remove another user; only a collaborator may leave', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Playlist not found, the value is not a public id, or no user has it', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        ],
-    )]
+    #[OA\Delete(path: '/api/playlists/{publicId}/collaborators/{userPublicId}', description: 'The owner may remove any collaborator; a collaborator may remove their own row to leave. Removing a user who does not collaborate changes nothing.', summary: 'Remove a collaborator from a playlist', parameters: [
+        new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+        new OA\Parameter(name: 'userPublicId', description: "The user's public id", in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+    ], responses: [
+        new OA\Response(response: '204', description: 'The user is not a collaborator'),
+        new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '403', description: 'Only the owner may remove another user; only a collaborator may leave', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '404', description: 'Playlist not found, the value is not a public id, or no user has it', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+    ])]
     #[Route('/{publicId}/collaborators/{userPublicId}', name: 'remove_collaborator', requirements: ['userPublicId' => self::PUBLIC_ID_REQUIREMENT], methods: ['DELETE'])]
     public function removeCollaborator(string $publicId, string $userPublicId): JsonResponse
     {
@@ -587,19 +570,19 @@ final class PlaylistController
                 schema: new OA\Schema(
                     required: ['songIds', 'expectedRevision'],
                     properties: [
-                        new OA\Property(property: 'expectedRevision', description: 'Revision returned with the displayed playlist order', type: 'string', pattern: '^[a-f0-9]{64}$', minLength: 64, maxLength: 64),
-                        new OA\Property(property: 'songIds', description: 'Ordered array of song public IDs', type: 'array', items: new OA\Items(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+                        new OA\Property(property: 'expectedRevision', description: 'Revision returned with the displayed playlist order', type: 'string', pattern: '^[a-f0-9]{64}$', maxLength: 64, minLength: 64),
+                        new OA\Property(property: 'songIds', description: 'Ordered array of song public IDs', type: 'array', items: new OA\Items(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
                     ],
                 ),
             ),
         ),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', properties: [
-                    new OA\Property(property: 'revision', type: 'string', pattern: '^[a-f0-9]{64}$', minLength: 64, maxLength: 64),
+                    new OA\Property(property: 'revision', type: 'string', pattern: '^[a-f0-9]{64}$', maxLength: 64, minLength: 64),
                     new OA\Property(property: 'message', type: 'string', example: 'Songs reordered successfully.'),
                 ], type: 'object')], type: 'object',
             )),

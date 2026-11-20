@@ -1,0 +1,16 @@
+{
+  "name": "baander/configuration",
+  "description": "Workflow settings, application layout and image selections",
+  "type": "library",
+  "license": "Apache-2.0",
+  "require": {
+    "php": ">=8.5",
+    "baander/filesystem": "dev-main",
+    "baander/process": "dev-main"
+  },
+  "autoload": {
+    "psr-4": {
+      "Baander\\Configuration\\": "src/"
+    }
+  }
+}

@@ -139,8 +139,8 @@ final class HealthCheckMemoryPressureTest extends TestCase
             oauthPublicKeyPath: '/missing-baander-oauth/public.key',
             vapidPublicKey: '',
             vapidPrivateKey: '',
-            workerProfileHealth: new WorkerProfileHealth($connection, new DeploymentProfile()),
             messengerWorkerHealth: new MessengerWorkerHealth($factory, new MockClock(), new HealthAlertTable()),
+            workerProfileHealth: new WorkerProfileHealth($connection, new DeploymentProfile()),
             workerMemory: $workerMemory,
         );
     }

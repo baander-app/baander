@@ -11,16 +11,16 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'PartyMemberResource',
     properties: [
-        new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
-        new OA\Property(property: 'userId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'User public ID'),
-        new OA\Property(property: 'sessionId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Session public ID'),
-        new OA\Property(property: 'role', type: 'string', enum: ['host', 'member'], description: 'Member role'),
-        new OA\Property(property: 'audioProfileId', type: 'string', nullable: true, description: 'Playback audio profile token'),
-        new OA\Property(property: 'subtitleTrackId', type: 'string', nullable: true, description: 'Subtitle track ID'),
-        new OA\Property(property: 'lastSyncPosition', type: 'number', nullable: true, description: 'Last sync position'),
-        new OA\Property(property: 'jitterCompensation', type: 'number', nullable: true, description: 'Jitter compensation'),
-        new OA\Property(property: 'isConnected', type: 'boolean', description: 'Whether the member is connected'),
-        new OA\Property(property: 'joinedAt', type: 'string', format: 'date-time', description: 'Join timestamp'),
+        new OA\Property(property: 'publicId', description: 'Public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+        new OA\Property(property: 'userId', description: 'User public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+        new OA\Property(property: 'sessionId', description: 'Session public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+        new OA\Property(property: 'role', description: 'Member role', type: 'string', enum: ['host', 'member']),
+        new OA\Property(property: 'audioProfileId', description: 'Playback audio profile token', type: 'string', nullable: true),
+        new OA\Property(property: 'subtitleTrackId', description: 'Subtitle track ID', type: 'string', nullable: true),
+        new OA\Property(property: 'lastSyncPosition', description: 'Last sync position', type: 'number', nullable: true),
+        new OA\Property(property: 'jitterCompensation', description: 'Jitter compensation', type: 'number', nullable: true),
+        new OA\Property(property: 'isConnected', description: 'Whether the member is connected', type: 'boolean'),
+        new OA\Property(property: 'joinedAt', description: 'Join timestamp', type: 'string', format: 'date-time'),
     ],
 )]
 final class PartyMemberResource extends AbstractResource

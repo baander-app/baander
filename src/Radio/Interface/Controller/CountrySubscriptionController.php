@@ -42,7 +42,7 @@ final class CountrySubscriptionController
         responses: [
             new OA\Response(response: '200', description: 'List of subscriptions', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [
-                    new OA\Property(property: 'sourceId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                    new OA\Property(property: 'sourceId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
                     new OA\Property(property: 'countryCode', type: 'string'),
                     new OA\Property(property: 'subscribedAt', type: 'string', format: 'date-time'),
                 ], type: 'object'))],
@@ -72,17 +72,17 @@ final class CountrySubscriptionController
             content: new OA\JsonContent(
                 required: ['sourceId', 'countryCode'],
                 properties: [
-                    new OA\Property(property: 'sourceId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                    new OA\Property(property: 'sourceId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
                     new OA\Property(property: 'countryCode', type: 'string'),
                 ],
             ),
         ),
         responses: [
             new OA\Response(response: '201', description: 'Subscribed', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', type: 'object', properties: [
-                    new OA\Property(property: 'sourceId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                properties: [new OA\Property(property: 'data', properties: [
+                    new OA\Property(property: 'sourceId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
                     new OA\Property(property: 'countryCode', type: 'string'),
-                ])],
+                ], type: 'object')],
                 type: 'object',
             )),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
@@ -144,9 +144,9 @@ final class CountrySubscriptionController
         summary: 'Manual refresh of country stations',
         responses: [
             new OA\Response(response: '200', description: 'Sync triggered', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', type: 'object', properties: [
+                properties: [new OA\Property(property: 'data', properties: [
                     new OA\Property(property: 'synced', type: 'string', example: 'queued'),
-                ])],
+                ], type: 'object')],
                 type: 'object',
             )),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),

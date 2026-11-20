@@ -1,0 +1,19 @@
+{
+  "name": "baander/dev-website",
+  "description": "Development only: Documentation website content, rendering and publication",
+  "type": "library",
+  "license": "Apache-2.0",
+  "require": {
+    "php": ">=8.5",
+    "baander/configuration": "dev-main",
+    "baander/filesystem": "dev-main",
+    "baander/process": "dev-main",
+    "enshrined/svg-sanitize": "1.1.1",
+    "league/commonmark": "^2.8"
+  },
+  "autoload": {
+    "psr-4": {
+      "Baander\\DevWebsite\\": "src/"
+    }
+  }
+}

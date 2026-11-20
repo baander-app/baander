@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use Baander\Tooling\Architecture\SourcePolicy;
-use Baander\Tooling\Runtime\Requirements;
+use Baander\DevCi\Architecture\SourcePolicy;
+use Baander\Process\Runtime\Requirements;
 
 require __DIR__ . '/bootstrap.php';
 

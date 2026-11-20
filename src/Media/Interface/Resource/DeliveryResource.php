@@ -14,12 +14,12 @@ use OpenApi\Attributes as OA;
     new OA\Property(property: 'url', type: 'string', nullable: true),
     new OA\Property(property: 'requestId', description: 'The client-generated request identifier, echoed for correlation.', type: 'string', nullable: true),
     new OA\Property(property: 'jobId', type: 'string', nullable: true),
-    new OA\Property(property: 'selection', nullable: true, properties: [
+    new OA\Property(property: 'selection', properties: [
         new OA\Property(property: 'container', type: 'string'),
         new OA\Property(property: 'transport', type: 'string', enum: ['file', 'hls', 'dash']),
         new OA\Property(property: 'videoStreamIndex', type: 'integer', nullable: true),
         new OA\Property(property: 'audioStreamIndex', type: 'integer', nullable: true),
-    ]),
+    ], nullable: true),
 ])]
 final class DeliveryResource extends AbstractResource
 {

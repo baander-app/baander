@@ -46,7 +46,6 @@ final class TranscodeJob
             id: new Uuid(),
             publicId: new PublicId(),
             videoId: $videoId,
-            ownerUserId: $ownerUserId,
             qualityTierName: $qualityTier->name,
             status: TranscodeStatus::Pending,
             referenceCount: 0,
@@ -65,11 +64,12 @@ final class TranscodeJob
             framerate: 0.0,
             createdAt: new DateTimeImmutable(),
             updatedAt: new DateTimeImmutable(),
+            requestId: self::requestId($requestId),
             measuredLoudness: [],
             audioTrackLanguages: $audioTrackLanguages,
             audioSegmentMap: [],
+            ownerUserId: $ownerUserId,
             presentationSelection: $presentationSelection,
-            requestId: self::requestId($requestId),
         ));
     }
 
@@ -89,14 +89,13 @@ final class TranscodeJob
             throw new \InvalidArgumentException('Video copy requires a selected video stream and source dimensions.');
         }
         return new self(new TranscodeJobState(
-            id: new Uuid(), publicId: new PublicId(), videoId: $videoId, ownerUserId: $ownerUserId,
+            id: new Uuid(), publicId: new PublicId(), videoId: $videoId,
             qualityTierName: 'copy', status: TranscodeStatus::Pending, referenceCount: 0,
             totalSegments: 0, completedSegments: 0, outputDirectory: $outputDirectory,
             initSegmentPath: null, segmentMap: [], probeData: [], videoCodec: null, audioCodec: null,
             videoBitrate: 0, audioBitrate: 0, width: $width, height: $height, framerate: 0.0,
             createdAt: new DateTimeImmutable(), updatedAt: new DateTimeImmutable(),
-            presentationSelection: $presentationSelection,
-            requestId: self::requestId($requestId),
+            requestId: self::requestId($requestId), ownerUserId: $ownerUserId, presentationSelection: $presentationSelection,
         ));
     }
 

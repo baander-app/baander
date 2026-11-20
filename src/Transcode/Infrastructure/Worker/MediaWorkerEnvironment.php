@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Transcode\Infrastructure\Worker;
 
 use App\Transcode\Application\DTO\MediaWorkerIdentity;
+use Baander\Core\EnvironmentVariable;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 #[Exclude]
@@ -14,15 +15,15 @@ final class MediaWorkerEnvironment
     public static function identity(?array $environment = null): MediaWorkerIdentity
     {
         $environment ??= getenv();
-        if (($environment['BAANDER_WORKER_ID'] ?? null) !== 'media') {
+        if (($environment[EnvironmentVariable::BAANDER_WORKER_ID] ?? null) !== 'media') {
             throw new \InvalidArgumentException('Media requires private supervisor admission.');
         }
         return new MediaWorkerIdentity(
-            $environment['BAANDER_WORKER_NAMESPACE'] ?? '',
-            $environment['BAANDER_WORKER_BOOT_ID'] ?? '',
+            $environment[EnvironmentVariable::BAANDER_WORKER_NAMESPACE] ?? '',
+            $environment[EnvironmentVariable::BAANDER_WORKER_BOOT_ID] ?? '',
             'media',
-            self::positiveInteger($environment['BAANDER_WORKER_GENERATION'] ?? ''),
-            self::positiveInteger($environment['BAANDER_WORKER_LEASE_EPOCH'] ?? ''),
+            self::positiveInteger($environment[EnvironmentVariable::BAANDER_WORKER_GENERATION] ?? ''),
+            self::positiveInteger($environment[EnvironmentVariable::BAANDER_WORKER_LEASE_EPOCH] ?? ''),
         );
     }
 

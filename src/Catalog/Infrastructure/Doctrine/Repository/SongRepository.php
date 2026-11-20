@@ -313,10 +313,9 @@ final class SongRepository implements SongRepositoryInterface
         $result = [];
         foreach ($rows as $row) {
             $song = Song::reconstitute(new SongState(
-                album: $row['album']['id'],
-                albumPublicId: $row['album']['publicId'],
                 id: $row['id'],
                 publicId: $row['publicId'],
+                album: $row['album']['id'],
                 title: $row['title'],
                 path: $row['path'],
                 size: $row['size'],
@@ -332,8 +331,6 @@ final class SongRepository implements SongRepositoryInterface
                 sampleRate: $row['sampleRate'],
                 channels: $row['channels'],
                 codec: $row['codec'],
-                containerFormat: $row['containerFormat'],
-                streamIndex: $row['streamIndex'],
                 explicit: $row['explicit'],
                 energy: $row['energy'],
                 danceability: $row['danceability'],
@@ -347,8 +344,11 @@ final class SongRepository implements SongRepositoryInterface
                 discogsId: $row['discogsId'],
                 spotifyId: $row['spotifyId'],
                 lockedFields: $row['lockedFields'],
+                albumPublicId: $row['album']['publicId'],
                 createdAt: $row['createdAt'],
                 updatedAt: $row['updatedAt'],
+                containerFormat: $row['containerFormat'],
+                streamIndex: $row['streamIndex'],
                 matchedFields: $row['matchedFields'],
                 matchCheckedAt: $row['matchCheckedAt'],
             ));
@@ -888,11 +888,15 @@ final class SongRepository implements SongRepositoryInterface
      */
     public static function entityToDomain(SongEntity $entity): Song
     {
+        $id = $entity->getId();
+        $publicId = $entity->getPublicId();
+        $albumId = $entity->getAlbum()->getId();
+        $albumPublicId = $entity->getAlbum()->getPublicId();
+
         return Song::reconstitute(new SongState(
-            id: $entity->getId(),
-            publicId: $entity->getPublicId(),
-            album: $entity->getAlbum()->getId(),
-            albumPublicId: $entity->getAlbum()->getPublicId(),
+            id: $id,
+            publicId: $publicId,
+            album: $albumId,
             title: $entity->getTitle(),
             path: $entity->getPath(),
             size: $entity->getSize(),
@@ -908,8 +912,6 @@ final class SongRepository implements SongRepositoryInterface
             sampleRate: $entity->getSampleRate(),
             channels: $entity->getChannels(),
             codec: $entity->getCodec(),
-            containerFormat: $entity->getContainerFormat(),
-            streamIndex: $entity->getStreamIndex(),
             explicit: $entity->isExplicit(),
             energy: $entity->getEnergy(),
             danceability: $entity->getDanceability(),
@@ -923,8 +925,11 @@ final class SongRepository implements SongRepositoryInterface
             discogsId: $entity->getDiscogsId(),
             spotifyId: $entity->getSpotifyId(),
             lockedFields: $entity->getLockedFields(),
+            albumPublicId: $albumPublicId,
             createdAt: $entity->getCreatedAt(),
             updatedAt: $entity->getUpdatedAt(),
+            containerFormat: $entity->getContainerFormat(),
+            streamIndex: $entity->getStreamIndex(),
             matchedFields: $entity->getMatchedFields(),
             matchCheckedAt: $entity->getMatchCheckedAt(),
         ));

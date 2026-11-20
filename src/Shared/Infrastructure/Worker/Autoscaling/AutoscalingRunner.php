@@ -8,6 +8,7 @@ use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\WorkerAutoscalingProfile;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\WorkerLaunchIdentity;
+use Baander\Core\EnvironmentVariable;
 
 /** Dedicated control child; external observation never blocks supervisor renewal. */
 final readonly class AutoscalingRunner
@@ -18,20 +19,20 @@ final readonly class AutoscalingRunner
 
     public function runUntilSignalled(): void
     {
-        if (getenv('BAANDER_WORKER_UNIT') !== 'control' || getenv('BAANDER_WORKER_ID') !== 'autoscaler'
-            || getenv('BAANDER_WORKER_GENERATION') !== '1') {
+        if (getenv(EnvironmentVariable::BAANDER_WORKER_UNIT) !== 'control' || getenv(EnvironmentVariable::BAANDER_WORKER_ID) !== 'autoscaler'
+            || getenv(EnvironmentVariable::BAANDER_WORKER_GENERATION) !== '1') {
             throw new \RuntimeException('Autoscaler requires private control admission.');
         }
-        $epoch = getenv('BAANDER_WORKER_LEASE_EPOCH');
+        $epoch = getenv(EnvironmentVariable::BAANDER_WORKER_LEASE_EPOCH);
         if (!is_string($epoch) || preg_match('/^[1-9][0-9]{0,18}$/D', $epoch) !== 1
             || strlen($epoch) > strlen((string) PHP_INT_MAX)
             || (strlen($epoch) === strlen((string) PHP_INT_MAX) && strcmp($epoch, (string) PHP_INT_MAX) > 0)) {
             throw new \RuntimeException('Autoscaler requires a bounded lease epoch.');
         }
-        $namespace = getenv('BAANDER_WORKER_NAMESPACE');
-        $bootId = getenv('BAANDER_WORKER_BOOT_ID');
-        $profileJson = getenv('BAANDER_WORKER_AUTOSCALING_PROFILE');
-        $directory = getenv('BAANDER_WORKER_IPC_DIRECTORY');
+        $namespace = getenv(EnvironmentVariable::BAANDER_WORKER_NAMESPACE);
+        $bootId = getenv(EnvironmentVariable::BAANDER_WORKER_BOOT_ID);
+        $profileJson = getenv(EnvironmentVariable::BAANDER_WORKER_AUTOSCALING_PROFILE);
+        $directory = getenv(EnvironmentVariable::BAANDER_WORKER_IPC_DIRECTORY);
         if (!is_string($namespace) || !is_string($bootId) || !is_string($profileJson) || !is_string($directory)) {
             throw new \RuntimeException('Autoscaler requires inherited deployment configuration.');
         }

@@ -11,14 +11,14 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'LrclibSearchResource',
     properties: [
-        new OA\Property(property: 'id', type: 'integer', description: 'LRCLIB track ID'),
-        new OA\Property(property: 'trackName', type: 'string', nullable: true, description: 'Track name'),
-        new OA\Property(property: 'artistName', type: 'string', nullable: true, description: 'Artist name'),
-        new OA\Property(property: 'albumName', type: 'string', nullable: true, description: 'Album name'),
-        new OA\Property(property: 'duration', type: 'number', nullable: true, description: 'Track duration in seconds'),
-        new OA\Property(property: 'instrumental', type: 'boolean', nullable: true, description: 'Whether the track is instrumental'),
-        new OA\Property(property: 'plainLyrics', type: 'string', nullable: true, description: 'Plain text lyrics'),
-        new OA\Property(property: 'syncedLyrics', type: 'string', nullable: true, description: 'Synced (LRC) lyrics'),
+        new OA\Property(property: 'id', description: 'LRCLIB track ID', type: 'integer'),
+        new OA\Property(property: 'trackName', description: 'Track name', type: 'string', nullable: true),
+        new OA\Property(property: 'artistName', description: 'Artist name', type: 'string', nullable: true),
+        new OA\Property(property: 'albumName', description: 'Album name', type: 'string', nullable: true),
+        new OA\Property(property: 'duration', description: 'Track duration in seconds', type: 'number', nullable: true),
+        new OA\Property(property: 'instrumental', description: 'Whether the track is instrumental', type: 'boolean', nullable: true),
+        new OA\Property(property: 'plainLyrics', description: 'Plain text lyrics', type: 'string', nullable: true),
+        new OA\Property(property: 'syncedLyrics', description: 'Synced (LRC) lyrics', type: 'string', nullable: true),
     ],
 )]
 final class LrclibSearchResource extends AbstractResource

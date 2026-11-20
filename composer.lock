@@ -4,8 +4,34 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "1616ee2053df7967a90d2278964b6918",
+    "content-hash": "2c9a4910198c904b7062dac5ff84c22f",
     "packages": [
+        {
+            "name": "baander/core",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "./packages/baander-core",
+                "reference": "d247df37a3092264931919121c128c19611d820f"
+            },
+            "require": {
+                "php": ">=8.5"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Baander\\Core\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Shared Baander environment names and configuration paths",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
         {
             "name": "baander/http-client",
             "version": "dev-main",
@@ -5604,7 +5630,7 @@
         },
         {
             "name": "swoole-bundle/swoole-bundle",
-            "version": "dev-feat/public-project-website-plan",
+            "version": "dev-refactor/tooling-context-packages",
             "dist": {
                 "type": "path",
                 "url": "./packages/swoole-bundle",
@@ -11568,7 +11594,7 @@
         },
         {
             "name": "tsduck/php",
-            "version": "dev-feat/public-project-website-plan",
+            "version": "dev-refactor/tooling-context-packages",
             "dist": {
                 "type": "path",
                 "url": "./packages/tsduck-php-ffi",
@@ -12978,8 +13004,342 @@
             "published-time": "2024-08-04T17:35:41+00:00"
         },
         {
+            "name": "baander/configuration",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "./packages/baander-configuration",
+                "reference": "f6e5d54cfcfed67a2b02a19734e6056ce32b6fe0"
+            },
+            "require": {
+                "baander/filesystem": "dev-main",
+                "baander/process": "dev-main",
+                "php": ">=8.5"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Baander\\Configuration\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Workflow settings, application layout and image selections",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "baander/containers",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "./packages/baander-containers",
+                "reference": "17fa6d5b8d49d1df695ccd6791b6253b15953efd"
+            },
+            "require": {
+                "baander/configuration": "dev-main",
+                "baander/filesystem": "dev-main",
+                "baander/process": "dev-main",
+                "php": ">=8.5"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Baander\\Containers\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Docker transport and owned resource cleanup",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "baander/deployment",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "./packages/baander-deployment",
+                "reference": "ad41199288512410b3961edb7b4036bd1a2fb2f2"
+            },
+            "require": {
+                "baander/configuration": "dev-main",
+                "baander/containers": "dev-main",
+                "baander/core": "dev-main",
+                "baander/filesystem": "dev-main",
+                "baander/process": "dev-main",
+                "php": ">=8.5"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Baander\\Deployment\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Deployment presets, worker lifecycle and service configuration",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "baander/dev-ci",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "./packages/baander-dev-ci",
+                "reference": "53a19d0b7a562c1bebc8a56ad738dba55d477a16"
+            },
+            "require": {
+                "baander/configuration": "dev-main",
+                "baander/containers": "dev-main",
+                "baander/filesystem": "dev-main",
+                "baander/images": "dev-main",
+                "baander/process": "dev-main",
+                "php": ">=8.5"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Baander\\DevCi\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Development only: CI gates, backend tests, architecture checks and artifact storage",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "baander/dev-dependencies",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "./packages/baander-dev-dependencies",
+                "reference": "8aed197d110b1bd802a41e4db2f79435772b919e"
+            },
+            "require": {
+                "baander/configuration": "dev-main",
+                "baander/containers": "dev-main",
+                "baander/filesystem": "dev-main",
+                "baander/process": "dev-main",
+                "composer/semver": "^3.6.0",
+                "php": ">=8.5"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Baander\\DevDependencies\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Development only: PHP and JavaScript dependency maintenance",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "baander/dev-environment",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "./packages/baander-dev-environment",
+                "reference": "e077ec9b4c8b7e42883b094e0749323446181e71"
+            },
+            "require": {
+                "baander/configuration": "dev-main",
+                "baander/containers": "dev-main",
+                "baander/core": "dev-main",
+                "baander/deployment": "dev-main",
+                "baander/filesystem": "dev-main",
+                "baander/images": "dev-main",
+                "baander/process": "dev-main",
+                "php": ">=8.5"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Baander\\DevEnvironment\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Development only: Local development instances, host setup and retained releases",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "baander/dev-qualification",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "./packages/baander-dev-qualification",
+                "reference": "417b4151977ec544ffe6f6b5061f39d31bfc83b2"
+            },
+            "require": {
+                "baander/configuration": "dev-main",
+                "baander/containers": "dev-main",
+                "baander/deployment": "dev-main",
+                "baander/dev-environment": "dev-main",
+                "baander/filesystem": "dev-main",
+                "baander/images": "dev-main",
+                "baander/process": "dev-main",
+                "php": ">=8.5"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Baander\\DevQualification\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Development only: Disposable application and runtime qualification",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "baander/dev-registry",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "./packages/baander-dev-registry",
+                "reference": "c0d93c443a74d2f79780618ee5ff642a12dfefc8"
+            },
+            "require": {
+                "baander/configuration": "dev-main",
+                "baander/containers": "dev-main",
+                "baander/filesystem": "dev-main",
+                "baander/images": "dev-main",
+                "baander/process": "dev-main",
+                "php": ">=8.5"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Baander\\DevRegistry\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Development only: Registry qualification and diagnostics",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "baander/dev-website",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "./packages/baander-dev-website",
+                "reference": "43ea11df5f49e75e42bbf625c036ffdda418abd3"
+            },
+            "require": {
+                "baander/configuration": "dev-main",
+                "baander/filesystem": "dev-main",
+                "baander/process": "dev-main",
+                "enshrined/svg-sanitize": "1.1.1",
+                "league/commonmark": "^2.8",
+                "php": ">=8.5"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Baander\\DevWebsite\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Development only: Documentation website content, rendering and publication",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "baander/filesystem",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "./packages/baander-filesystem",
+                "reference": "bb0b927d8ece30c01ff47446f8bb1d935f455a98"
+            },
+            "require": {
+                "php": ">=8.5"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Baander\\Filesystem\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Private paths, durable atomic files and filesystem locks",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "baander/images",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "./packages/baander-images",
+                "reference": "3f3b5c42c26064e37d5b66f75b84ba1ccaf49143"
+            },
+            "require": {
+                "baander/configuration": "dev-main",
+                "baander/containers": "dev-main",
+                "baander/filesystem": "dev-main",
+                "baander/process": "dev-main",
+                "php": ">=8.5"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Baander\\Images\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Image source preparation, builds and artifact inventories",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
             "name": "baander/phpstan-rules",
-            "version": "dev-feat/public-project-website-plan",
+            "version": "dev-refactor/tooling-context-packages",
             "dist": {
                 "type": "path",
                 "url": "./packages/baander-phpstan-rules",
@@ -13020,29 +13380,27 @@
             }
         },
         {
-            "name": "baander/tooling",
+            "name": "baander/process",
             "version": "dev-main",
             "dist": {
                 "type": "path",
-                "url": "./packages/baander-tooling",
-                "reference": "66d1e247d85eb85ca0fe6f7f0c6f5c1bf5d492d5"
+                "url": "./packages/baander-process",
+                "reference": "f12136888cb5ff1ce99618f1d532267b1beecf63"
             },
             "require": {
-                "composer/semver": "^3.6.0",
-                "enshrined/svg-sanitize": "1.1.1",
-                "league/commonmark": "^2.8",
+                "baander/filesystem": "dev-main",
                 "php": ">=8.5"
             },
             "type": "library",
             "autoload": {
                 "psr-4": {
-                    "Baander\\Tooling\\": "src/"
+                    "Baander\\Process\\": "src/"
                 }
             },
             "license": [
                 "Apache-2.0"
             ],
-            "description": "Testing and development workflow library for Baander",
+            "description": "Child-process execution, cancellation, command arguments and runtime preflight",
             "transport-options": {
                 "symlink": true,
                 "relative": true
@@ -18054,19 +18412,30 @@
     "aliases": [],
     "minimum-stability": "dev",
     "stability-flags": {
+        "baander/configuration": 20,
+        "baander/containers": 20,
+        "baander/core": 20,
+        "baander/deployment": 20,
+        "baander/dev-ci": 20,
+        "baander/dev-dependencies": 20,
+        "baander/dev-environment": 20,
+        "baander/dev-qualification": 20,
+        "baander/dev-registry": 20,
+        "baander/dev-website": 20,
+        "baander/filesystem": 20,
         "baander/http-client": 20,
         "baander/image-processing": 20,
+        "baander/images": 20,
         "baander/media-metadata": 20,
         "baander/phpstan-rules": 20,
+        "baander/process": 20,
         "baander/redis-rate-limiter": 20,
-        "baander/tooling": 20,
         "swoole-bundle/swoole-bundle": 20,
         "tsduck/php": 20
     },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
-        "php": ">=8.5",
         "ext-ctype": "*",
         "ext-curl": "*",
         "ext-date": "*",
@@ -18103,7 +18472,8 @@
         "ext-uri": "*",
         "ext-xml": "*",
         "ext-zip": "*",
-        "ext-zlib": "*"
+        "ext-zlib": "*",
+        "php": ">=8.5"
     },
     "platform-dev": {
         "ext-pdo_sqlite": "*",
@@ -18114,5 +18484,5 @@
     "platform-overrides": {
         "ext-swoole": "6.2.4"
     },
-    "plugin-api-version": "2.9.0"
+    "plugin-api-version": "2.11.0"
 }

@@ -5,8 +5,8 @@ declare(strict_types=1);
 
 require __DIR__ . '/bootstrap.php';
 try {
-    Baander\Tooling\Runtime\Requirements::check();
-    exit(Baander\Tooling\Backend\Coordinator::main(array_slice($_SERVER['argv'], 1), dirname(__DIR__)));
+    Baander\Process\Runtime\Requirements::check();
+    exit(Baander\DevCi\Backend\Coordinator::main(array_slice($_SERVER['argv'], 1), dirname(__DIR__)));
 } catch (InvalidArgumentException $error) {
     fwrite(STDERR, $error->getMessage() . "\n");
     exit(2);

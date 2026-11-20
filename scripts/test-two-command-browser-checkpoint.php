@@ -5,12 +5,16 @@ declare(strict_types=1);
 
 require __DIR__ . '/bootstrap.php';
 
-use Baander\Tooling\Configuration\ToolingConfiguration;
-use Baander\Tooling\Development\Acceptance\BrowserCheckpoint;
-use Baander\Tooling\Docker\{Client, Target, TargetResolver};
-use Baander\Tooling\Filesystem\AtomicFile;
-use Baander\Tooling\Process\{CommandFailure, EngineExecutor, ExecutionContext};
-use Baander\Tooling\Runtime\Requirements;
+use Baander\Configuration\ToolingConfiguration;
+use Baander\DevQualification\Acceptance\BrowserCheckpoint;
+use Baander\Containers\Docker\Client;
+use Baander\Containers\Docker\Target;
+use Baander\Containers\Docker\TargetResolver;
+use Baander\Filesystem\AtomicFile;
+use Baander\Process\Execution\CommandFailure;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
+use Baander\Process\Runtime\Requirements;
 
 $executor = null;
 try {

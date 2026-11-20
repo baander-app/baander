@@ -3,6 +3,8 @@
 
 declare(strict_types=1);
 
+use Baander\Core\EnvironmentVariable;
+
 // Private admitted child: inherited configuration only, never reload Dotenv files.
 ini_set('display_errors', '0');
 ini_set('log_errors', '0');
@@ -16,9 +18,9 @@ try {
         throw new RuntimeException('Media requires private supervisor admission.');
     }
     $identity = \App\Transcode\Infrastructure\Worker\MediaWorkerEnvironment::identity();
-    $environment = getenv('APP_ENV');
-    $debug = getenv('APP_DEBUG');
-    $controlDatabaseUrl = getenv('DATABASE_CONTROL_URL');
+    $environment = getenv(EnvironmentVariable::APP_ENV);
+    $debug = getenv(EnvironmentVariable::APP_DEBUG);
+    $controlDatabaseUrl = getenv(EnvironmentVariable::DATABASE_CONTROL_URL);
     if (!is_string($environment) || preg_match('/\A[A-Za-z0-9_-]{1,64}\z/D', $environment) !== 1
         || !in_array($debug, ['0', '1'], true) || !is_string($controlDatabaseUrl) || $controlDatabaseUrl === ''
     ) {

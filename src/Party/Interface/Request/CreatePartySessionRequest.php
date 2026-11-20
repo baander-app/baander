@@ -13,8 +13,8 @@ use Symfony\Component\Validator\Constraints\Regex;
     schema: 'CreatePartySessionRequest',
     required: ['videoId'],
     properties: [
-        new OA\Property(property: 'videoId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
-        new OA\Property(property: 'transcodeJobId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, description: 'Transcode job of the video that the host\'s playback steers'),
+        new OA\Property(property: 'videoId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+        new OA\Property(property: 'transcodeJobId', description: 'Transcode job of the video that the host\'s playback steers', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
         new OA\Property(property: 'maxMembers', type: 'integer', example: 10, maximum: 50, minimum: 2),
     ],
 )]

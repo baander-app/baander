@@ -102,7 +102,7 @@ under `.agents/`.
   proxy and security header names.
 - Write PHP 8.5 idiom: the pipe operator, first-class callables, small named
   helpers over nested calls. Run `.php-cs-fixer.tooling.php` on files touched
-  under `packages/baander-tooling` and `scripts`.
+  under the workflow packages listed in `.php-cs-fixer.tooling.php` and `scripts`.
 - Code stands on its own: source, tests, comments and docblocks never cite planning
   artifacts (requirement, acceptance-example or decision ids such as `R5`, `AE4`,
   `KTD2`, roadmap item numbers, plan file paths). State the behaviour in plain

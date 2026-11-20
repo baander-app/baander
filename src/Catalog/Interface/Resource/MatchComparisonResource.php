@@ -32,7 +32,7 @@ use OpenApi\Attributes as OA;
     required: ['type', 'publicId', 'candidateId', 'fields', 'credits', 'tracks', 'artistActions'],
     properties: [
         new OA\Property(property: 'type', description: 'What is compared: an album with a release, a song with a recording, an artist with an artist', type: 'string', enum: ['album', 'song', 'artist']),
-        new OA\Property(property: 'publicId', description: 'The album\'s, song\'s or artist\'s public ID', type: 'string', maxLength: 21, minLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+        new OA\Property(property: 'publicId', description: 'The album\'s, song\'s or artist\'s public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
         new OA\Property(property: 'candidateId', description: 'The MusicBrainz ID compared: a release, recording or artist', type: 'string'),
         new OA\Property(property: 'fields', description: 'The item\'s own field rows; a field MusicBrainz gives no value for has no row', type: 'array', items: new OA\Items(ref: new Model(type: MatchFieldRowResource::class))),
         new OA\Property(property: 'credits', description: 'The album\'s or song\'s own credits row; null for an artist, or when MusicBrainz credits no artist', nullable: true, oneOf: [new OA\Schema(ref: new Model(type: MatchCreditsRowResource::class))]),

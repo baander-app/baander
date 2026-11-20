@@ -1,10 +1,41 @@
 deptrac:
   paths:
-    - packages/baander-tooling/src
+    - packages/baander-configuration/src
+    - packages/baander-containers/src
+    - packages/baander-core/src
+    - packages/baander-core/tests
+    - packages/baander-deployment/src
+    - packages/baander-dev-ci/src
+    - packages/baander-dev-dependencies/src
+    - packages/baander-dev-environment/src
+    - packages/baander-dev-qualification/src
+    - packages/baander-dev-registry/src
+    - packages/baander-dev-website/src
+    - packages/baander-filesystem/src
+    - packages/baander-images/src
+    - packages/baander-process/src
+    - packages/baander-configuration/tests
+    - packages/baander-containers/tests
+    - packages/baander-deployment/tests
+    - packages/baander-dev-ci/tests
+    - packages/baander-dev-dependencies/tests
+    - packages/baander-dev-environment/tests
+    - packages/baander-dev-qualification/tests
+    - packages/baander-dev-registry/tests
+    - packages/baander-dev-website/tests
+    - packages/baander-filesystem/tests
+    - packages/baander-images/tests
+    - packages/baander-process/tests
     - scripts
     - relay/tools
     - relay/tests
-    - packages/baander-tooling/resources
+    - tests/Support/Tooling
+    - tests/Tooling
+    - packages/baander-configuration/resources
+    - packages/baander-dev-dependencies/resources
+    - packages/baander-dev-environment/resources
+    - packages/baander-dev-qualification/resources
+    - packages/baander-process/resources
   exclude_files:
     - '#/(vendor|node_modules)/#'
   analyser:
@@ -17,230 +48,245 @@ deptrac:
   ignore_uncovered_internal_classes: true
   layers:
     -
+      name: Core
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Core\\(?!Tests\\)
+    -
+      name: Website
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\DevWebsite\\(?!Tests\\)
+        -
+          type: directory
+          value: /packages/baander-dev-website/src/
+    -
       name: Architecture
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\Architecture\\
+          value: ^Baander\\DevCi\\Architecture\\
         -
           type: directory
-          value: /packages/baander-tooling/src/Architecture/
+          value: /packages/baander-dev-ci/src/Architecture/
     -
       name: Configuration
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\Configuration\\
+          value: ^Baander\\Configuration\\(?!Tests\\)
         -
           type: directory
-          value: /packages/baander-tooling/src/Configuration/
+          value: /packages/baander-configuration/src/
     -
       name: Filesystem
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\Filesystem\\
+          value: ^Baander\\Filesystem\\(?!Tests\\)
         -
           type: directory
-          value: /packages/baander-tooling/src/Filesystem/
+          value: /packages/baander-filesystem/src/
     -
       name: Process
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\Process\\
+          value: ^Baander\\Process\\Execution\\
         -
           type: directory
-          value: /packages/baander-tooling/src/Process/
+          value: /packages/baander-process/src/Execution/
     -
       name: Docker
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\Docker\\
+          value: ^Baander\\Containers\\Docker\\
         -
           type: directory
-          value: /packages/baander-tooling/src/Docker/
+          value: /packages/baander-containers/src/Docker/
     -
       name: Resources
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\Resources\\
+          value: ^Baander\\Containers\\Resources\\
         -
           type: directory
-          value: /packages/baander-tooling/src/Resources/
+          value: /packages/baander-containers/src/Resources/
     -
       name: Inventory
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\Inventory\\
+          value: ^Baander\\Images\\Inventory\\
         -
           type: directory
-          value: /packages/baander-tooling/src/Inventory/
+          value: /packages/baander-images/src/Inventory/
     -
       name: Build
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\Build\\
+          value: ^Baander\\Images\\Build\\
         -
           type: directory
-          value: /packages/baander-tooling/src/Build/
+          value: /packages/baander-images/src/Build/
     -
       name: CommandLine
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\CommandLine\\
+          value: ^Baander\\Process\\Arguments\\
         -
           type: directory
-          value: /packages/baander-tooling/src/CommandLine/
+          value: /packages/baander-process/src/Arguments/
     -
       name: Runtime
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\Runtime\\
+          value: ^Baander\\Process\\Runtime\\
         -
           type: directory
-          value: /packages/baander-tooling/src/Runtime/
+          value: /packages/baander-process/src/Runtime/
     -
       name: Deployment
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\Deployment\\
+          value: ^Baander\\Deployment\\(?!Tests\\)
         -
           type: directory
-          value: /packages/baander-tooling/src/Deployment/
+          value: /packages/baander-deployment/src/
     -
       name: Development
       collectors:
         -
           type: classLike
-          value: '^Baander\\Tooling\\Development\\(?!Acceptance\\)'
+          value: '^Baander\\DevEnvironment\\(?!Tests\\)'
         -
           type: directory
-          value: '/packages/baander-tooling/src/Development/(?!Acceptance/)'
+          value: /packages/baander-dev-environment/src/
     -
       name: Acceptance
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\Development\\Acceptance\\
+          value: ^Baander\\DevQualification\\Acceptance\\
         -
           type: directory
-          value: /packages/baander-tooling/src/Development/Acceptance/
+          value: /packages/baander-dev-qualification/src/Acceptance/
     -
       name: Backend
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\Backend\\
+          value: ^Baander\\DevCi\\Backend\\
         -
           type: directory
-          value: /packages/baander-tooling/src/Backend/
+          value: /packages/baander-dev-ci/src/Backend/
     -
       name: FixturesHttp
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\Fixtures\\Http\\
+          value: ^Baander\\DevQualification\\Fixtures\\Http\\
         -
           type: directory
-          value: /packages/baander-tooling/src/Fixtures/Http/
+          value: /packages/baander-dev-qualification/src/Fixtures/Http/
     -
       name: FixturesWeb
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\Fixtures\\Web\\
+          value: ^Baander\\DevQualification\\Fixtures\\Web\\
         -
           type: directory
-          value: /packages/baander-tooling/src/Fixtures/Web/
+          value: /packages/baander-dev-qualification/src/Fixtures/Web/
     -
       name: FixturesWorker
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\Fixtures\\Worker\\
+          value: ^Baander\\DevQualification\\Fixtures\\Worker\\
         -
           type: directory
-          value: /packages/baander-tooling/src/Fixtures/Worker/
+          value: /packages/baander-dev-qualification/src/Fixtures/Worker/
     -
       name: FixturesMessaging
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\Fixtures\\Messaging\\
+          value: ^Baander\\DevQualification\\Fixtures\\Messaging\\
         -
           type: directory
-          value: /packages/baander-tooling/src/Fixtures/Messaging/
+          value: /packages/baander-dev-qualification/src/Fixtures/Messaging/
     -
       name: FixturesStartup
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\Fixtures\\Startup\\
+          value: ^Baander\\DevQualification\\Fixtures\\Startup\\
         -
           type: directory
-          value: /packages/baander-tooling/src/Fixtures/Startup/
+          value: /packages/baander-dev-qualification/src/Fixtures/Startup/
     -
       name: FixturesQualification
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\Fixtures\\Qualification\\
+          value: ^Baander\\DevQualification\\Fixtures\\Qualification\\
         -
           type: directory
-          value: /packages/baander-tooling/src/Fixtures/Qualification/
+          value: /packages/baander-dev-qualification/src/Fixtures/Qualification/
     -
       name: Fixtures
       collectors:
         -
           type: classLike
-          value: '^Baander\\Tooling\\Fixtures\\(?!Http\\|Web\\|Worker\\|Messaging\\|Startup\\|Qualification\\)'
+          value: '^Baander\\DevQualification\\Fixtures\\(?!Http\\|Web\\|Worker\\|Messaging\\|Startup\\|Qualification\\)'
         -
           type: directory
-          value: '/packages/baander-tooling/src/Fixtures/(?!Http/|Web/|Worker/|Messaging/|Startup/|Qualification/)'
+          value: '/packages/baander-dev-qualification/src/Fixtures/(?!Http/|Web/|Worker/|Messaging/|Startup/|Qualification/)'
     -
       name: Registry
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\Registry\\
+          value: ^Baander\\DevRegistry\\(?!Tests\\)
         -
           type: directory
-          value: /packages/baander-tooling/src/Registry/
+          value: /packages/baander-dev-registry/src/
     -
       name: Dependencies
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\Dependencies\\
+          value: ^Baander\\DevDependencies\\Php\\
         -
           type: directory
-          value: /packages/baander-tooling/src/Dependencies/
+          value: /packages/baander-dev-dependencies/src/Php/
     -
       name: JavaScriptDependencies
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\JavaScriptDependencies\\
+          value: ^Baander\\DevDependencies\\JavaScript\\
         -
           type: directory
-          value: /packages/baander-tooling/src/JavaScriptDependencies/
+          value: /packages/baander-dev-dependencies/src/JavaScript/
     -
       name: Ci
       collectors:
         -
           type: classLike
-          value: ^Baander\\Tooling\\Ci\\
+          value: ^Baander\\DevCi\\Artifacts\\
         -
           type: directory
-          value: /packages/baander-tooling/src/Ci/
+          value: /packages/baander-dev-ci/src/Artifacts/
     -
       name: ComposerSemver
       collectors:
@@ -258,10 +304,10 @@ deptrac:
       collectors:
         -
           type: classLike
-          value: ^Baander\\(Tooling\\Tests|Tests\\Tooling)\\
+          value: ^Baander\\Tests\\Tooling\\
         -
           type: directory
-          value: '/scripts/tests/.*\.php$'
+          value: '(?:/packages/baander-[^/]+/tests/|/tests/(?:Support/Tooling|Tooling)/|/scripts/tests/).*\.php$'
     -
       name: RegistryTests
       collectors:
@@ -285,7 +331,7 @@ deptrac:
       collectors:
         -
           type: directory
-          value: '/packages/baander-tooling/resources/.*\.php$'
+          value: '/packages/baander-[^/]+/(?:resources|bin)/.*\.php$'
     -
       name: RelayCLI
       collectors:
@@ -293,22 +339,35 @@ deptrac:
           type: directory
           value: '/relay/tools/(?:[^/]+|qualification/cleanup)\.php$'
   ruleset:
-    Architecture: {  }
-    Configuration:
+    Core: {  }
+    Website:
+      - Core
+      - Configuration
       - Filesystem
       - Process
-    Filesystem: {  }
+    Architecture:
+      - Core
+    Configuration:
+      - Core
+      - Filesystem
+      - Process
+    Filesystem:
+      - Core
     Process:
+      - Core
       - Filesystem
     Docker:
+      - Core
       - Configuration
       - Filesystem
       - Process
     Resources:
+      - Core
       - Docker
       - Filesystem
       - Process
     Inventory:
+      - Core
       - Configuration
       - Docker
       - Filesystem
@@ -316,14 +375,18 @@ deptrac:
       - Resources
       - Runtime
     Build:
+      - Core
       - Configuration
       - Docker
       - Filesystem
       - Inventory
       - Process
-    CommandLine: {  }
-    Runtime: {  }
+    CommandLine:
+      - Core
+    Runtime:
+      - Core
     Deployment:
+      - Core
       - CommandLine
       - Configuration
       - Docker
@@ -332,6 +395,7 @@ deptrac:
       - Resources
       - Runtime
     Development:
+      - Core
       - Build
       - Deployment
       - CommandLine
@@ -341,6 +405,7 @@ deptrac:
       - Process
       - Resources
     Acceptance:
+      - Core
       - Configuration
       - Development
       - Docker
@@ -348,17 +413,20 @@ deptrac:
       - Process
       - Resources
     Backend:
+      - Core
       - Build
       - Configuration
       - Docker
       - Process
       - Resources
     FixturesHttp:
+      - Core
       - Filesystem
       - Fixtures
       - Process
       - Resources
     FixturesWeb:
+      - Core
       - Configuration
       - Docker
       - Filesystem
@@ -366,6 +434,7 @@ deptrac:
       - Process
       - Resources
     FixturesWorker:
+      - Core
       - Configuration
       - Deployment
       - Docker
@@ -374,14 +443,17 @@ deptrac:
       - Process
       - Resources
     FixturesMessaging:
+      - Core
       - Docker
       - Fixtures
       - Resources
     FixturesStartup:
+      - Core
       - Configuration
       - Filesystem
       - Fixtures
     FixturesQualification:
+      - Core
       - Build
       - Configuration
       - Deployment
@@ -393,11 +465,13 @@ deptrac:
       - Process
       - Resources
     Fixtures:
+      - Core
       - Configuration
       - Docker
       - Process
       - Resources
     Registry:
+      - Core
       - Configuration
       - Docker
       - Filesystem
@@ -406,19 +480,24 @@ deptrac:
       - Resources
       - Runtime
     Dependencies:
+      - Core
       - Configuration
       - Docker
       - Filesystem
       - Process
       - ComposerSemver
     JavaScriptDependencies:
+      - Core
       - Configuration
       - Process
     Ci:
+      - Core
       - Filesystem
       - Process
     ComposerSemver: {  }
     CLI:
+      - Website
+      - Core
       - Ci
       - Deployment
       - JavaScriptDependencies
@@ -446,6 +525,9 @@ deptrac:
       - Runtime
       - Architecture
     ToolingTests:
+      - Ci
+      - Website
+      - Core
       - Deployment
       - JavaScriptDependencies
       - Dependencies
@@ -473,10 +555,16 @@ deptrac:
       - Architecture
       - FixturesStartup
     RegistryTests:
+      - Core
       - RelayHelpers
-    RelayHelpers: {  }
+    RelayHelpers:
+      - Core
     PackageEntrypoints:
+      - Development
+      - Inventory
+      - Core
       - Runtime
     RelayCLI:
+      - Core
       - RelayHelpers
       - RegistryTests

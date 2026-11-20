@@ -67,7 +67,7 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 browser_image="$(php -r '
 require "scripts/bootstrap.php";
-$image = \Baander\Tooling\Configuration\ToolingConfiguration::forRepository(getcwd(), getenv())->images->role("browser");
+$image = \Baander\Configuration\ToolingConfiguration::forRepository(getcwd(), getenv())->images->role("browser");
 $package = json_decode(file_get_contents("ui/web/node_modules/playwright-core/package.json"), true, flags: JSON_THROW_ON_ERROR);
 $image->assertPlaywrightVersion($package["version"]);
 echo $image->reference;

@@ -11,11 +11,11 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'ClientResource',
     properties: [
-        new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
-        new OA\Property(property: 'name', type: 'string', description: 'Client name'),
-        new OA\Property(property: 'redirect', type: 'string', description: 'JSON-encoded array of redirect URIs'),
-        new OA\Property(property: 'personalAccessClient', type: 'boolean', description: 'Whether this is a personal access client'),
-        new OA\Property(property: 'confidential', type: 'boolean', description: 'Whether the client is confidential'),
+        new OA\Property(property: 'publicId', description: 'Public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+        new OA\Property(property: 'name', description: 'Client name', type: 'string'),
+        new OA\Property(property: 'redirect', description: 'JSON-encoded array of redirect URIs', type: 'string'),
+        new OA\Property(property: 'personalAccessClient', description: 'Whether this is a personal access client', type: 'boolean'),
+        new OA\Property(property: 'confidential', description: 'Whether the client is confidential', type: 'boolean'),
         new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
     ],
 )]

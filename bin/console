@@ -2,6 +2,7 @@
 <?php
 
 use App\Kernel;
+use Baander\Core\EnvironmentVariable;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 
 if (!is_dir(dirname(__DIR__).'/vendor')) {
@@ -15,7 +16,7 @@ if (!is_file(dirname(__DIR__).'/vendor/autoload_runtime.php')) {
 require_once dirname(__DIR__).'/vendor/autoload_runtime.php';
 
 return function (array $context) {
-    $kernel = new Kernel($context['APP_ENV'], (bool) $context['APP_DEBUG']);
+    $kernel = new Kernel($context[EnvironmentVariable::APP_ENV], (bool) $context[EnvironmentVariable::APP_DEBUG]);
 
     return new Application($kernel);
 };

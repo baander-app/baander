@@ -3,10 +3,13 @@
 
 declare(strict_types=1);
 
-use Baander\Tooling\CommandLine\Words;
-use Baander\Tooling\Process\{CommandFailure, CompletionPolicy, EngineExecutor, ExecutionContext};
-use Baander\Tooling\Process\ProcessSpec;
-use Baander\Tooling\Runtime\Requirements;
+use Baander\Process\Arguments\Words;
+use Baander\Process\Execution\CommandFailure;
+use Baander\Process\Execution\CompletionPolicy;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
+use Baander\Process\Execution\ProcessSpec;
+use Baander\Process\Runtime\Requirements;
 
 require __DIR__ . '/bootstrap.php';
 

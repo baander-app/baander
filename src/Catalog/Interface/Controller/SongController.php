@@ -62,11 +62,11 @@ final class SongController
             new OA\Parameter(name: 'limit', description: 'Items per page (max 100)', in: 'query', schema: new OA\Schema(type: 'integer', default: 50)),
             new OA\Parameter(name: 'q', description: 'Search query', in: 'query', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'genres', description: 'Comma-separated genre slugs to filter by', in: 'query', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'artistId', description: 'Filter by artist public ID', in: 'query', schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
-            new OA\Parameter(name: 'albumId', description: 'Filter by album public ID', in: 'query', schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'artistId', description: 'Filter by artist public ID', in: 'query', schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(name: 'albumId', description: 'Filter by album public ID', in: 'query', schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
             new OA\Parameter(name: 'publicIds', description: 'Comma-separated public IDs to filter by', in: 'query', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'sort', description: 'Sort field. A cursor is valid only with the sort and order that issued it.', in: 'query', schema: new OA\Schema(type: 'string', enum: ['title', 'artist', 'album', 'year', 'added'], default: 'title')),
-            new OA\Parameter(name: 'order', description: 'Sort order', in: 'query', schema: new OA\Schema(type: 'string', enum: ['asc', 'desc'], default: 'asc')),
+            new OA\Parameter(name: 'sort', description: 'Sort field. A cursor is valid only with the sort and order that issued it.', in: 'query', schema: new OA\Schema(type: 'string', default: 'title', enum: ['title', 'artist', 'album', 'year', 'added'])),
+            new OA\Parameter(name: 'order', description: 'Sort order', in: 'query', schema: new OA\Schema(type: 'string', default: 'asc', enum: ['asc', 'desc'])),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Cursor-paginated list of songs', content: new OA\JsonContent(ref: new Model(type: CursorPaginatedResponse::class))),
@@ -111,7 +111,7 @@ final class SongController
         path: '/api/songs/{publicId}',
         summary: 'Get a single song',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Song public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'publicId', description: 'Song public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Song details', content: new OA\JsonContent(
@@ -159,7 +159,7 @@ final class SongController
                 new OA\Property(property: 'explicit', type: 'boolean', nullable: true),
             ])),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Song public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'publicId', description: 'Song public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Song updated', content: new OA\JsonContent(
@@ -200,7 +200,7 @@ final class SongController
         path: '/api/songs/{publicId}',
         summary: 'Delete a song',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Song public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'publicId', description: 'Song public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(

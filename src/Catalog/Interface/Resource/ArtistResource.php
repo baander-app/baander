@@ -12,15 +12,15 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'ArtistResource',
     properties: [
-        new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, description: 'Public identifier'),
-        new OA\Property(property: 'name', type: 'string', description: 'Artist name'),
-        new OA\Property(property: 'country', type: 'string', nullable: true, description: 'Country code'),
-        new OA\Property(property: 'type', type: 'string', nullable: true, description: 'Artist type'),
-        new OA\Property(property: 'disambiguation', type: 'string', nullable: true, description: 'Disambiguation text'),
-        new OA\Property(property: 'sortName', type: 'string', nullable: true, description: 'Sort name'),
-        new OA\Property(property: 'mbid', type: 'string', nullable: true, description: 'MusicBrainz artist ID'),
-        new OA\Property(property: 'lockedFields', type: 'array', items: new OA\Items(type: 'string'), description: 'Fields locked from automatic updates'),
-        new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', description: 'Creation timestamp'),
+        new OA\Property(property: 'publicId', description: 'Public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+        new OA\Property(property: 'name', description: 'Artist name', type: 'string'),
+        new OA\Property(property: 'country', description: 'Country code', type: 'string', nullable: true),
+        new OA\Property(property: 'type', description: 'Artist type', type: 'string', nullable: true),
+        new OA\Property(property: 'disambiguation', description: 'Disambiguation text', type: 'string', nullable: true),
+        new OA\Property(property: 'sortName', description: 'Sort name', type: 'string', nullable: true),
+        new OA\Property(property: 'mbid', description: 'MusicBrainz artist ID', type: 'string', nullable: true),
+        new OA\Property(property: 'lockedFields', description: 'Fields locked from automatic updates', type: 'array', items: new OA\Items(type: 'string')),
+        new OA\Property(property: 'createdAt', description: 'Creation timestamp', type: 'string', format: 'date-time'),
     ],
 )]
 final class ArtistResource extends AbstractResource

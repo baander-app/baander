@@ -51,7 +51,7 @@ use OpenApi\Attributes as OA;
                 new OA\Property(property: 'current', type: 'array', items: new OA\Items(
                     required: ['artistPublicId', 'role', 'creditedName'],
                     properties: [
-                        new OA\Property(property: 'artistPublicId', type: 'string', maxLength: 21, minLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                        new OA\Property(property: 'artistPublicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
                         new OA\Property(property: 'role', type: 'string', nullable: true),
                         new OA\Property(property: 'creditedName', type: 'string'),
                     ],

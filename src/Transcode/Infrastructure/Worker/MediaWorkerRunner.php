@@ -7,6 +7,7 @@ namespace App\Transcode\Infrastructure\Worker;
 use App\Shared\Application\DTO\DeploymentProfile;
 use App\Transcode\Application\Port\AudioRenditionRuntimePort;
 use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
+use Baander\Core\EnvironmentVariable;
 use Closure;
 
 /** Each executable child owns a fresh kernel and at most one claimed media job. */
@@ -112,8 +113,8 @@ final class MediaWorkerRunner
         }
         $generation = $this->slotGenerations[$slot] = $previous + 1;
         $environment = array_replace(getenv(), [
-            'BAANDER_NATIVE_CLIENT_ID' => $slot,
-            'BAANDER_NATIVE_CLIENT_GENERATION' => (string) $generation,
+            EnvironmentVariable::BAANDER_NATIVE_CLIENT_ID => $slot,
+            EnvironmentVariable::BAANDER_NATIVE_CLIENT_GENERATION => (string) $generation,
         ]);
         // Fresh children inherit authority, with a bounded native slot and launch fence.
         $process = proc_open([$this->phpBinary, $this->jobScript, $kind, $key], [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w'], 3 => STDERR], $pipes, env_vars: $environment);

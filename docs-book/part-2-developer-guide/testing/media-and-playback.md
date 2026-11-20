@@ -376,7 +376,7 @@ php scripts/build-application.php --buildx --target worker --tag baander-worker:
 The checkpoint hook copies the browser probe,
 `ui/web/tests/e2e/two-command/browser.mjs`, and `playwright-core` from the checkout
 into the browser container on every run, and the host-side orchestration under
-`scripts/` and `packages/baander-tooling` runs from the checkout as well. A change
+`scripts/` and the workflow packages under `packages/` runs from the checkout as well. A change
 to the probe or to that orchestration needs only another run:
 
 ```bash

@@ -19,7 +19,7 @@ use OpenApi\Attributes as OA;
     properties: [
         new OA\Property(property: 'key', description: 'The row\'s key, which an apply names the row by: the field for a row of the item itself, "<song public ID>:<field>" for a row of one of an album\'s songs', type: 'string'),
         new OA\Property(property: 'field', description: 'The field the row sets', type: 'string', enum: ['mbid', 'releaseMbid', 'title', 'year', 'label', 'catalogNumber', 'barcode', 'country', 'disambiguation', 'genres', 'cover', 'track', 'disc', 'name', 'sortName', 'type', 'lifeSpanBegin', 'lifeSpanEnd']),
-        new OA\Property(property: 'songPublicId', description: 'The album\'s song the row belongs to; null for a row of the item itself', type: 'string', maxLength: 21, minLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true),
+        new OA\Property(property: 'songPublicId', description: 'The album\'s song the row belongs to; null for a row of the item itself', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
         new OA\Property(
             property: 'current',
             description: 'The value the item holds now, which an apply rechecks before it writes the row; null when the field is empty. The cover row holds true when the album has a cover.',

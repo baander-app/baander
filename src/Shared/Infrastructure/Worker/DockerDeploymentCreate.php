@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Worker;
 
+use Baander\Core\EnvironmentVariable;
 use Closure;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
@@ -76,9 +77,9 @@ FORMAT;
             || !is_array($state['env'] ?? null)) {
             throw new \RuntimeException('Created container does not match the deployment recipe.');
         }
-        $expected = ['BAANDER_WORKER_NAMESPACE' => $recipe->namespace, 'BAANDER_WORKER_BOOT_ID' => $recipe->bootId, 'BAANDER_WORKER_UNIT' => $recipe->unit->value,
+        $expected = [EnvironmentVariable::BAANDER_WORKER_NAMESPACE => $recipe->namespace, EnvironmentVariable::BAANDER_WORKER_BOOT_ID => $recipe->bootId, EnvironmentVariable::BAANDER_WORKER_UNIT => $recipe->unit->value,
             ...$recipe->runtimeEnvironment->variables,
-            ...($recipe->logVolume === null ? [] : ['BAANDER_LOG_DIR' => $recipe->logDirectory()])];
+            ...($recipe->logVolume === null ? [] : [EnvironmentVariable::BAANDER_LOG_DIR => $recipe->logDirectory()])];
         foreach ($state['env'] as $item) {
             if (!is_string($item) || !str_contains($item, '=')) {
                 throw new \RuntimeException('Created container has invalid environment metadata.');

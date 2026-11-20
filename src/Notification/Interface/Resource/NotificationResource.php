@@ -12,14 +12,14 @@ use OpenApi\Attributes as OA;
     schema: 'NotificationResource',
     required: ['publicId', 'category', 'eventType', 'title', 'body', 'parameters', 'isRead', 'createdAt'],
     properties: [
-        new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public notification identifier (Nanoid)'),
-        new OA\Property(property: 'category', type: 'string', description: 'Notification category'),
-        new OA\Property(property: 'eventType', type: 'string', description: 'Event type'),
-        new OA\Property(property: 'title', type: 'string', description: 'Notification title'),
-        new OA\Property(property: 'body', type: 'string', description: 'Notification body'),
-        new OA\Property(property: 'parameters', type: 'object', nullable: true, description: 'Notification parameters'),
-        new OA\Property(property: 'isRead', type: 'boolean', description: 'Whether the notification has been read'),
-        new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', description: 'Creation timestamp'),
+        new OA\Property(property: 'publicId', description: 'Public notification identifier (Nanoid)', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+        new OA\Property(property: 'category', description: 'Notification category', type: 'string'),
+        new OA\Property(property: 'eventType', description: 'Event type', type: 'string'),
+        new OA\Property(property: 'title', description: 'Notification title', type: 'string'),
+        new OA\Property(property: 'body', description: 'Notification body', type: 'string'),
+        new OA\Property(property: 'parameters', description: 'Notification parameters', type: 'object', nullable: true),
+        new OA\Property(property: 'isRead', description: 'Whether the notification has been read', type: 'boolean'),
+        new OA\Property(property: 'createdAt', description: 'Creation timestamp', type: 'string', format: 'date-time'),
     ],
 )]
 final class NotificationResource extends AbstractResource

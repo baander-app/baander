@@ -71,7 +71,7 @@ export BAANDER_TEST_IMAGE=baander-ci:local
 The build entrypoint supplies the canonical `APP_HOME` and image layout metadata
 from the selected source and verifies the resulting image. Direct runtime-image
 builds without that contract fail. The
-[tooling package reference](../../../packages/baander-tooling/README.md#configuration-and-image-roles)
+[tooling package reference](../../../dev-docs/workflow-packages.md#configuration-and-image-roles)
 lists role image overrides, Docker selector precedence and finite budgets. Supported
 configuration is captured once per invocation; nested hooks use the same resolved
 target and image selections.
@@ -112,7 +112,7 @@ dependencies into each container.
 
 Without `BAANDER_TEST_POSTGRES_IMAGE`, the runners use the local tag
 `baander-database:latest`, the default in `compose.test.yaml` and
-`packages/baander-tooling/resources/tooling-defaults.json`. Nothing rebuilds that tag
+`packages/baander-configuration/resources/tooling-defaults.json`. Nothing rebuilds that tag
 for you: only a manual build refreshes it, so it keeps whatever
 `docker/postgres/Dockerfile` described when it was last built. On the development host
 it was a Debian 12 build with PGroonga 4.0.5 until 2026-11-16, although the
@@ -331,7 +331,7 @@ CI runs PHPStan, Deptrac and the OpenAPI check with a plain `docker run` on the
 image it has just built, so each analyses the source copied in at build time. To
 point such a container at the current tree instead, bind-mount the changed paths
 read-only over the application root, `/var/www/html`, and mount `packages` whenever
-you mount `vendor`. `vendor/baander/tooling`, `vendor/baander/phpstan-rules`,
+you mount `vendor`. The workflow packages under `vendor/baander/`, `vendor/baander/phpstan-rules`,
 `vendor/swoole-bundle/swoole-bundle` and `vendor/tsduck/php` are symlinks into
 `packages/`. Without that mount they resolve to the image's older package sources,
 and class loading against the current `src/` fails with incompatible-declaration

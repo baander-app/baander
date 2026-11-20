@@ -42,7 +42,7 @@ final class StreamManifestController
         summary: 'Get HLS master playlist',
         parameters: [
             new OA\Parameter(name: 'set', description: 'Canonical signed set of admitted job and generation pairs', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'videoId', description: 'Video public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
+            new OA\Parameter(name: 'videoId', description: 'Video public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'HLS master manifest', content: new OA\MediaType(mediaType: 'application/vnd.apple.mpegurl')),
@@ -95,7 +95,7 @@ final class StreamManifestController
         summary: 'Get DASH manifest for a video',
         parameters: [
             new OA\Parameter(name: 'set', description: 'Canonical signed set of admitted job and generation pairs', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'videoId', description: 'Video public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
+            new OA\Parameter(name: 'videoId', description: 'Video public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'DASH manifest', content: new OA\MediaType(mediaType: 'application/dash+xml')),
@@ -124,8 +124,8 @@ final class StreamManifestController
         summary: 'Get available quality tiers for a video',
         parameters: [
             new OA\Parameter(name: 'requestId', description: 'Playback client session identifier', in: 'query', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
-            new OA\Parameter(name: 'jobIds', description: 'Exact admitted jobs', in: 'query', required: true, schema: new OA\Schema(type: 'array', minItems: 1, maxItems: 3, items: new OA\Items(type: 'string'))),
-            new OA\Parameter(name: 'videoId', description: 'Video public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
+            new OA\Parameter(name: 'jobIds', description: 'Exact admitted jobs', in: 'query', required: true, schema: new OA\Schema(type: 'array', items: new OA\Items(type: 'string'), maxItems: 3, minItems: 1)),
+            new OA\Parameter(name: 'videoId', description: 'Video public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Available quality tiers', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'quality', type: 'string'), new OA\Property(property: 'width', type: 'integer'), new OA\Property(property: 'height', type: 'integer')]))])),

@@ -44,7 +44,7 @@ final class StarredStationController
         responses: [
             new OA\Response(response: '200', description: 'List of starred stations', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [
-                    new OA\Property(property: 'stationId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                    new OA\Property(property: 'stationId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
                     new OA\Property(property: 'name', type: 'string'),
                     new OA\Property(property: 'countryCode', type: 'string'),
                     new OA\Property(property: 'streamUrl', type: 'string', format: 'uri', nullable: true),
@@ -76,16 +76,16 @@ final class StarredStationController
             content: new OA\JsonContent(
                 required: ['stationId'],
                 properties: [
-                    new OA\Property(property: 'stationId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                    new OA\Property(property: 'stationId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
                 ],
             ),
         ),
         responses: [
             new OA\Response(response: '201', description: 'Station starred', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', type: 'object', properties: [
-                    new OA\Property(property: 'stationId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                properties: [new OA\Property(property: 'data', properties: [
+                    new OA\Property(property: 'stationId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
                     new OA\Property(property: 'starred', type: 'boolean'),
-                ])],
+                ], type: 'object')],
                 type: 'object',
             )),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
@@ -114,7 +114,7 @@ final class StarredStationController
         path: '/api/radio/starred/{stationId}',
         summary: 'Unstar a station',
         parameters: [
-            new OA\Parameter(name: 'stationId', description: 'Station public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
+            new OA\Parameter(name: 'stationId', description: 'Station public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Station unstarred'),

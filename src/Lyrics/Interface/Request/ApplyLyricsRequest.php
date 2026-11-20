@@ -11,7 +11,7 @@ use Symfony\Component\Validator\Constraints\NotBlank;
     schema: 'ApplyLyricsRequest',
     required: ['songPublicId'],
     properties: [
-        new OA\Property(property: 'songPublicId', description: 'Public ID of the song to apply lyrics to', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', example: '0123456789abABCD_-xyz'),
+        new OA\Property(property: 'songPublicId', description: 'Public ID of the song to apply lyrics to', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', example: '0123456789abABCD_-xyz', maxLength: 21, minLength: 21),
     ],
 )]
 final readonly class ApplyLyricsRequest

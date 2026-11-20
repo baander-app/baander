@@ -69,7 +69,7 @@ jobs:
 
             -   name: Prepare standalone PHP tooling on Forgejo
                 if: github.server_url != 'https://github.com'
-                run: composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
+                run: composer --working-dir=scripts install --no-interaction --no-scripts --no-plugins
 
             -   name: Restore yarn cache on Forgejo
                 if: github.server_url != 'https://github.com'
@@ -161,7 +161,7 @@ jobs:
 
             -   name: Prepare standalone PHP tooling on Forgejo
                 if: github.server_url != 'https://github.com'
-                run: composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
+                run: composer --working-dir=scripts install --no-interaction --no-scripts --no-plugins
 
             -   name: Restore yarn cache on Forgejo
                 if: github.server_url != 'https://github.com'
@@ -342,7 +342,7 @@ jobs:
 
             -   name: Prepare standalone PHP tooling on Forgejo
                 if: github.server_url != 'https://github.com'
-                run: composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
+                run: composer --working-dir=scripts install --no-interaction --no-scripts --no-plugins
 
             -   name: Restore yarn cache on Forgejo
                 if: github.server_url != 'https://github.com'

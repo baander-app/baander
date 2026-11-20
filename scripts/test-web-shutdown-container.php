@@ -5,9 +5,9 @@ declare(strict_types=1);
 
 require __DIR__ . '/bootstrap.php';
 
-use Baander\Tooling\Fixtures\Runtime;
-use Baander\Tooling\Fixtures\Web\ShutdownWorkflow;
-use Baander\Tooling\Runtime\Requirements;
+use Baander\DevQualification\Fixtures\Runtime;
+use Baander\DevQualification\Fixtures\Web\ShutdownWorkflow;
+use Baander\Process\Runtime\Requirements;
 
 try {
     Requirements::check();

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Worker;
 
+use Baander\Core\EnvironmentVariable;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
 use JsonSerializable;
@@ -42,7 +43,7 @@ final readonly class DeploymentOperatorCredentials implements JsonSerializable
                 throw new RuntimeException();
             }
             $variables = get_object_vars($document->runtimeEnvironment);
-            foreach (['APP_ENV', 'APP_DEBUG', 'DATABASE_URL', 'DATABASE_CONTROL_URL', 'REDIS_URL', 'MESSENGER_TRANSPORT_DSN', 'APP_SECRET'] as $key) {
+            foreach ([EnvironmentVariable::APP_ENV, EnvironmentVariable::APP_DEBUG, EnvironmentVariable::DATABASE_URL, EnvironmentVariable::DATABASE_CONTROL_URL, EnvironmentVariable::REDIS_URL, EnvironmentVariable::MESSENGER_TRANSPORT_DSN, EnvironmentVariable::APP_SECRET] as $key) {
                 if (!isset($variables[$key]) || !is_string($variables[$key]) || $variables[$key] === '') {
                     throw new RuntimeException();
                 }

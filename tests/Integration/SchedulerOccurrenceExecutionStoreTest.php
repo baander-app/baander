@@ -553,8 +553,8 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
     {
         $jobId = Uuid::v7();
         $minute = new DateTimeImmutable('2026-10-02 12:00:00Z');
-        $running = new SchedulerOccurrence(Uuid::v7(), $jobId, $minute, JobType::Console, 'app:baander-check', ['first' => 1.0, 'second' => 2], origin: $runningOrigin, jobPublicId: new \App\Shared\Domain\Model\PublicId());
-        $pending = new SchedulerOccurrence(Uuid::v7(), $jobId, $minute, JobType::Messenger, 'app:baander-next', ['manual' => 'scheduler@baander.app'], origin: $pendingOrigin, jobPublicId: new \App\Shared\Domain\Model\PublicId());
+        $running = new SchedulerOccurrence(Uuid::v7(), $jobId, $minute, JobType::Console, 'app:baander-check', ['first' => 1.0, 'second' => 2], jobPublicId: new \App\Shared\Domain\Model\PublicId(), origin: $runningOrigin);
+        $pending = new SchedulerOccurrence(Uuid::v7(), $jobId, $minute, JobType::Messenger, 'app:baander-next', ['manual' => 'scheduler@baander.app'], jobPublicId: new \App\Shared\Domain\Model\PublicId(), origin: $pendingOrigin);
         $intents = new DoctrineSchedulerOccurrenceStore($this->first);
         self::assertTrue($intents->record($running));
         self::assertTrue($intents->record($pending));
@@ -597,7 +597,7 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
     #[DataProvider('commitFailures')]
     public function testManualExecutionCommitUncertaintyNeverReexecutesCommittedAttempt(bool $after): void
     {
-        $manual = new SchedulerOccurrence(Uuid::v7(), Uuid::v7(), new DateTimeImmutable('2026-10-02 12:00:00Z'), JobType::Console, 'app:baander-check', ['address' => 'manual@baander.app'], origin: SchedulerOccurrenceOrigin::Manual, jobPublicId: new \App\Shared\Domain\Model\PublicId());
+        $manual = new SchedulerOccurrence(Uuid::v7(), Uuid::v7(), new DateTimeImmutable('2026-10-02 12:00:00Z'), JobType::Console, 'app:baander-check', ['address' => 'manual@baander.app'], jobPublicId: new \App\Shared\Domain\Model\PublicId(), origin: SchedulerOccurrenceOrigin::Manual);
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->first))->record($manual));
         $attempt = Uuid::v7();
         $connection = $this->uncertainConnection($after);

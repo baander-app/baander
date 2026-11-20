@@ -41,19 +41,13 @@ final class AdminUserSettingsController
     ) {
     }
 
-    #[OA\Get(
-        path: '/api/admin/users/{publicId}/settings',
-        summary: "List a user's settings",
-        description: 'A stored value that is no longer allowed is returned with storedValueValid false.',
-        parameters: [new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'))],
-        responses: [
-            new OA\Response(response: '200', description: "The user's settings", content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: AdminUserSettingResource::class))),
-            ])),
-            new OA\Response(response: '403', description: 'Forbidden; admins need the admin.can_view_users setting, as for the user list', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        ],
-    )]
+    #[OA\Get(path: '/api/admin/users/{publicId}/settings', description: 'A stored value that is no longer allowed is returned with storedValueValid false.', summary: "List a user's settings", parameters: [new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21))], responses: [
+        new OA\Response(response: '200', description: "The user's settings", content: new OA\JsonContent(properties: [
+            new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: AdminUserSettingResource::class))),
+        ])),
+        new OA\Response(response: '403', description: 'Forbidden; admins need the admin.can_view_users setting, as for the user list', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+    ])]
     #[Route('', name: 'index', methods: ['GET'])]
     #[IsGranted('USER_MANAGEMENT_LIST')]
     #[CliCounterpart('app:user:setting')]
@@ -72,24 +66,17 @@ final class AdminUserSettingsController
         return $this->successResponse(AdminUserSettingResource::collection($settings));
     }
 
-    #[OA\Put(
-        path: '/api/admin/users/{publicId}/settings/{key}',
-        summary: "Set a user's choice for a setting",
-        description: 'Works for every user setting, including ones users cannot change themselves. The change is logged.',
-        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: SetAdminUserSettingRequest::class))),
-        parameters: [
-            new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
-            new OA\Parameter(name: 'key', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-        ],
-        responses: [
-            new OA\Response(response: '200', description: 'The setting after the change', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', ref: new Model(type: AdminUserSettingResource::class)),
-            ])),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'User or setting not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid value', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
-        ],
-    )]
+    #[OA\Put(path: '/api/admin/users/{publicId}/settings/{key}', description: 'Works for every user setting, including ones users cannot change themselves. The change is logged.', summary: "Set a user's choice for a setting", requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: SetAdminUserSettingRequest::class))), parameters: [
+        new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+        new OA\Parameter(name: 'key', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+    ], responses: [
+        new OA\Response(response: '200', description: 'The setting after the change', content: new OA\JsonContent(properties: [
+            new OA\Property(property: 'data', ref: new Model(type: AdminUserSettingResource::class)),
+        ])),
+        new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '404', description: 'User or setting not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '422', description: 'Invalid value', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+    ])]
     #[Route('/{key}', name: 'set', requirements: ['key' => '[a-z0-9_.]+'], methods: ['PUT'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:user:setting')]
@@ -112,22 +99,16 @@ final class AdminUserSettingsController
         return $this->successResponse(AdminUserSettingResource::from($setting));
     }
 
-    #[OA\Delete(
-        path: '/api/admin/users/{publicId}/settings/{key}',
-        summary: "Remove a user's choice so the setting follows its default",
-        description: 'The change is logged.',
-        parameters: [
-            new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
-            new OA\Parameter(name: 'key', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-        ],
-        responses: [
-            new OA\Response(response: '200', description: 'The setting after the reset', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', ref: new Model(type: AdminUserSettingResource::class)),
-            ])),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'User or setting not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        ],
-    )]
+    #[OA\Delete(path: '/api/admin/users/{publicId}/settings/{key}', description: 'The change is logged.', summary: "Remove a user's choice so the setting follows its default", parameters: [
+        new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+        new OA\Parameter(name: 'key', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+    ], responses: [
+        new OA\Response(response: '200', description: 'The setting after the reset', content: new OA\JsonContent(properties: [
+            new OA\Property(property: 'data', ref: new Model(type: AdminUserSettingResource::class)),
+        ])),
+        new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '404', description: 'User or setting not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+    ])]
     #[Route('/{key}', name: 'reset', requirements: ['key' => '[a-z0-9_.]+'], methods: ['DELETE'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:user:setting')]

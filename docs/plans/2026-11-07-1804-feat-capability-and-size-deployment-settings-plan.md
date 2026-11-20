@@ -391,7 +391,7 @@ U1 defines the profile; U2 and U3 depend on it and can proceed in parallel. U4 d
 - `docker-compose.yml`
 - `packages/baander-tooling/src/Development/Runtime.php`, `packages/baander-tooling/src/Development/Workers.php`
 - `packages/baander-tooling/src/Fixtures/Worker/OperatorProvisioning.php`, `MediaLoad.php`, `DrillProfile.php`, `LifecycleCheckpoint.php`
-- `scripts/tests/php/WorkerLifecycleTest.php`, `WorkerMediaLoadTest.php`, `WorkerLifecycleManifestTest.php`
+- `packages/baander-deployment/tests/WorkerLifecycleTest.php`, `WorkerMediaLoadTest.php`, `WorkerLifecycleManifestTest.php`
 
 **Approach:**
 1. The compose `database` service mounts `docker/postgres/conf/postgresql.conf` and starts with `config_file` set; the pooler sizes stay 20 and 8, now pinned to the KTD3 derivation of the default profile.

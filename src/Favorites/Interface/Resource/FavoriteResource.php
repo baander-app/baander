@@ -11,10 +11,10 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'FavoriteResource',
     properties: [
-        new OA\Property(property: 'publicId', type: 'string', description: 'Public identifier', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
-        new OA\Property(property: 'entityType', type: 'string', enum: ['song', 'album', 'artist'], description: 'Entity type'),
-        new OA\Property(property: 'entityPublicId', type: 'string', description: 'Entity public ID'),
-        new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', description: 'Creation timestamp'),
+        new OA\Property(property: 'publicId', description: 'Public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+        new OA\Property(property: 'entityType', description: 'Entity type', type: 'string', enum: ['song', 'album', 'artist']),
+        new OA\Property(property: 'entityPublicId', description: 'Entity public ID', type: 'string'),
+        new OA\Property(property: 'createdAt', description: 'Creation timestamp', type: 'string', format: 'date-time'),
     ],
 )]
 final class FavoriteResource extends AbstractResource

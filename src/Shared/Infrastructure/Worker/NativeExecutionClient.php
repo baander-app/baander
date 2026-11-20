@@ -6,6 +6,7 @@ namespace App\Shared\Infrastructure\Worker;
 
 use App\Shared\Infrastructure\Swoole\Async;
 use App\Shared\Application\DTO\DeploymentProfile;
+use Baander\Core\EnvironmentVariable;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 #[Exclude]
@@ -32,10 +33,10 @@ final class NativeExecutionClient implements NativeExecutionClientInterface
     public static function fromEnvironment(string $clientId, int $generation = 1): self
     {
         return new self(
-            getenv('BAANDER_NATIVE_SOCKET') ?: '',
-            getenv('BAANDER_WORKER_NAMESPACE') ?: '',
-            getenv('BAANDER_WORKER_BOOT_ID') ?: '',
-            (int) getenv('BAANDER_WORKER_LEASE_EPOCH'),
+            getenv(EnvironmentVariable::BAANDER_NATIVE_SOCKET) ?: '',
+            getenv(EnvironmentVariable::BAANDER_WORKER_NAMESPACE) ?: '',
+            getenv(EnvironmentVariable::BAANDER_WORKER_BOOT_ID) ?: '',
+            (int) getenv(EnvironmentVariable::BAANDER_WORKER_LEASE_EPOCH),
             $clientId,
             $generation,
             DeploymentProfile::fromEnvironment(),

@@ -65,7 +65,7 @@ final class DeliveryDecisionServiceTest extends TestCase
         $remux = $this->service(metadata: $metadata)->track(new Uuid(), new PublicId(), $destination);
         self::assertSame(DeliveryKind::Incompatible, $remux->kind);
         self::assertSame('browser_rejected_source', $remux->reason);
-        $disabled = $this->service(profile: new DeploymentProfile(), enabled: false, metadata: $metadata)->track(new Uuid(), new PublicId(), $destination);
+        $disabled = $this->service(enabled: false, profile: new DeploymentProfile(), metadata: $metadata)->track(new Uuid(), new PublicId(), $destination);
         self::assertSame(DeliveryKind::Incompatible, $disabled->kind);
         self::assertSame('audio_transcoding_disabled', $disabled->reason);
     }

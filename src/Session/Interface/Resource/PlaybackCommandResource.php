@@ -24,7 +24,7 @@ use OpenApi\Attributes as OA;
             new OA\Property(property: 'currentTrackIndex', type: 'integer', minimum: 0),
             new OA\Property(property: 'position', type: 'number', minimum: 0),
             new OA\Property(property: 'desiredState', type: 'string', enum: ['playing', 'paused', 'stopped']),
-            new OA\Property(property: 'volume', type: 'number', minimum: 0, maximum: 1, nullable: true),
+            new OA\Property(property: 'volume', type: 'number', nullable: true, maximum: 1, minimum: 0),
         ], type: 'object'),
         new OA\Property(property: 'expiresAt', type: 'string', format: 'date-time'),
     ],

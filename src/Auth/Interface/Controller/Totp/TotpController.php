@@ -46,34 +46,28 @@ final class TotpController
     ) {
     }
 
-    #[OA\Post(
-        path: '/api/auth/totp/setup',
-        summary: 'Generate TOTP secret and provisioning URI',
-        description: 'Refused while TOTP is on, and for an unverified email address with 422 and `details.reason` `email_unverified`. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.',
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(ref: new Model(type: StartTotpSetupRequest::class)),
-        ),
-        responses: [
-            new OA\Response(
-                response: '200',
-                description: 'TOTP provisioning data',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'secret', type: 'string', example: 'JBSWY3DPEHPK3PXP'),
-                            new OA\Property(property: 'provisioningUri', type: 'string', example: 'otpauth://totp/B%C3%A5nder:alice%40baander.app?secret=JBSWY3DPEHPK3PXP&issuer=B%C3%A5nder'),
-                        ], type: 'object'),
-                    ],
-                    type: 'object',
-                ),
+    #[OA\Post(path: '/api/auth/totp/setup', description: 'Refused while TOTP is on, and for an unverified email address with 422 and `details.reason` `email_unverified`. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.', summary: 'Generate TOTP secret and provisioning URI', requestBody: new OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(ref: new Model(type: StartTotpSetupRequest::class)),
+    ), responses: [
+        new OA\Response(
+            response: '200',
+            description: 'TOTP provisioning data',
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'data', properties: [
+                        new OA\Property(property: 'secret', type: 'string', example: 'JBSWY3DPEHPK3PXP'),
+                        new OA\Property(property: 'provisioningUri', type: 'string', example: 'otpauth://totp/B%C3%A5nder:alice%40baander.app?secret=JBSWY3DPEHPK3PXP&issuer=B%C3%A5nder'),
+                    ], type: 'object'),
+                ],
+                type: 'object',
             ),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '409', description: 'TOTP is already on', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error, an unverified email address, or the password is wrong', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
-            new OA\Response(response: '429', description: 'Too many step-up attempts for this account', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        ],
-    )]
+        ),
+        new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '409', description: 'TOTP is already on', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '422', description: 'Validation error, an unverified email address, or the password is wrong', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+        new OA\Response(response: '429', description: 'Too many step-up attempts for this account', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+    ])]
     #[Route('/setup', name: 'setup', methods: ['POST'])]
     public function setup(#[MapRequestPayload(mapWhenEmpty: true)] StartTotpSetupRequest $payload): JsonResponse
     {

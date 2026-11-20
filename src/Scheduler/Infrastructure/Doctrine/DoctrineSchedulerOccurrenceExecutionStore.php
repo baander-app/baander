@@ -13,6 +13,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
+use Baander\Core\EnvironmentVariable;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
@@ -37,9 +38,9 @@ final class DoctrineSchedulerOccurrenceExecutionStore implements SchedulerOccurr
         if ($databaseUrl === '' || str_contains($databaseUrl, "\0")) {
             throw new \InvalidArgumentException('Scheduler execution store requires an explicit database URL.');
         }
-        $namespace = getenv('BAANDER_WORKER_NAMESPACE');
-        $bootId = getenv('BAANDER_WORKER_BOOT_ID');
-        $epoch = getenv('BAANDER_WORKER_LEASE_EPOCH');
+        $namespace = getenv(EnvironmentVariable::BAANDER_WORKER_NAMESPACE);
+        $bootId = getenv(EnvironmentVariable::BAANDER_WORKER_BOOT_ID);
+        $epoch = getenv(EnvironmentVariable::BAANDER_WORKER_LEASE_EPOCH);
         $authority = null;
         if ($namespace !== false && $bootId !== false && $epoch !== false) {
             $epochValue = filter_var($epoch, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
@@ -103,7 +104,13 @@ final class DoctrineSchedulerOccurrenceExecutionStore implements SchedulerOccurr
             if (!is_array($snapshot)) {
                 throw new \UnexpectedValueException('Persisted scheduler parameters must be an array or object.');
             }
-            $occurrence = new SchedulerOccurrence(Uuid::fromString($row['id']), Uuid::fromString($row['job_id']), new DateTimeImmutable($row['scheduled_for']), JobType::from($row['job_type']), $row['command'], $snapshot, origin: SchedulerOccurrenceOrigin::from($row['origin']), publicId: PublicId::fromString($row['public_id']), jobPublicId: PublicId::fromString($row['job_public_id']));
+            $storedOccurrenceId = Uuid::fromString($row['id']);
+            $storedJobId = Uuid::fromString($row['job_id']);
+            $scheduledFor = new DateTimeImmutable($row['scheduled_for']);
+            $jobType = JobType::from($row['job_type']);
+            $origin = SchedulerOccurrenceOrigin::from($row['origin']);
+            $publicId = PublicId::fromString($row['public_id']);
+            $occurrence = new SchedulerOccurrence($storedOccurrenceId, $storedJobId, $scheduledFor, $jobType, $row['command'], $snapshot, jobPublicId: PublicId::fromString($row['job_public_id']), origin: $origin, publicId: $publicId);
             $this->requireActiveAuthority($authority);
             return $occurrence;
         });

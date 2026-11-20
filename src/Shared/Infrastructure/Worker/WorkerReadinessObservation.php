@@ -7,6 +7,7 @@ namespace App\Shared\Infrastructure\Worker;
 use App\Shared\Application\DTO\WorkerAutoscalingProfile;
 use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Infrastructure\Messaging\WorkerTransportConfiguration;
+use Baander\Core\EnvironmentVariable;
 use Redis;
 use RuntimeException;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
@@ -34,9 +35,9 @@ final class WorkerReadinessObservation
             }
         }
         $roles = self::verifyProcesses($processes, $lease, $unit, $profile, $appHome, DeploymentProfile::fromJson($deploymentProfileJson));
-        $environment = ['REDIS_URL' => getenv('REDIS_URL'), 'MESSENGER_TRANSPORT_DSN' => getenv('MESSENGER_TRANSPORT_DSN')];
+        $environment = [EnvironmentVariable::REDIS_URL => getenv(EnvironmentVariable::REDIS_URL), EnvironmentVariable::MESSENGER_TRANSPORT_DSN => getenv(EnvironmentVariable::MESSENGER_TRANSPORT_DSN)];
         WorkerTransportConfiguration::validate($environment, true);
-        foreach (['REDIS_URL' => 'scheduler_occurrences', 'MESSENGER_TRANSPORT_DSN' => 'messages'] as $key => $stream) {
+        foreach ([EnvironmentVariable::REDIS_URL => 'scheduler_occurrences', EnvironmentVariable::MESSENGER_TRANSPORT_DSN => 'messages'] as $key => $stream) {
             $parts = parse_url($environment[$key]);
             if (!is_array($parts)) {
                 throw new RuntimeException('Worker dependency endpoint unavailable.');
@@ -105,23 +106,23 @@ final class WorkerReadinessObservation
                 }
             }
             if ($role === 'consumer') {
-                $role = $environment['BAANDER_WORKER_ID'] ?? '';
+                $role = $environment[EnvironmentVariable::BAANDER_WORKER_ID] ?? '';
                 if (!in_array($role, $profile->consumerIds(), true) || !in_array('async', $arguments, true) || in_array('scheduler', $arguments, true)) {
                     throw new RuntimeException('Unexpected ordinary consumer identity or transport.');
                 }
             } elseif ($role === 'scheduled-consumer' && in_array('async', $arguments, true)) {
                 throw new RuntimeException('Scheduler consumer uses the wrong transport.');
             }
-            $generation = $environment['BAANDER_WORKER_GENERATION'] ?? '';
+            $generation = $environment[EnvironmentVariable::BAANDER_WORKER_GENERATION] ?? '';
             if (preg_match('/\A[1-9][0-9]{0,8}\z/D', $generation) !== 1 || isset($roles[$role])) {
                 throw new RuntimeException('Duplicate or unidentified worker generation.');
             }
-            $expected = ['BAANDER_WORKER_NAMESPACE' => $lease->namespace, 'BAANDER_WORKER_BOOT_ID' => $lease->bootId,
-                'BAANDER_WORKER_LEASE_EPOCH' => (string) $lease->epoch, 'BAANDER_WORKER_UNIT' => $unit,
-                'BAANDER_WORKER_ID' => $role, 'BAANDER_WORKER_AUTOSCALING_PROFILE' => $profile->toJson(),
-                'BAANDER_DEPLOYMENT_PROFILE' => $deploymentProfile->toJson()];
+            $expected = [EnvironmentVariable::BAANDER_WORKER_NAMESPACE => $lease->namespace, EnvironmentVariable::BAANDER_WORKER_BOOT_ID => $lease->bootId,
+                EnvironmentVariable::BAANDER_WORKER_LEASE_EPOCH => (string) $lease->epoch, EnvironmentVariable::BAANDER_WORKER_UNIT => $unit,
+                EnvironmentVariable::BAANDER_WORKER_ID => $role, EnvironmentVariable::BAANDER_WORKER_AUTOSCALING_PROFILE => $profile->toJson(),
+                EnvironmentVariable::BAANDER_DEPLOYMENT_PROFILE => $deploymentProfile->toJson()];
             if ($role !== 'native') {
-                $expected['MESSENGER_CONSUMER_NAME'] = self::consumerName($lease, $role, (int) $generation);
+                $expected[EnvironmentVariable::MESSENGER_CONSUMER_NAME] = self::consumerName($lease, $role, (int) $generation);
             }
             foreach ($expected as $key => $value) {
                 if (($environment[$key] ?? null) !== $value) {

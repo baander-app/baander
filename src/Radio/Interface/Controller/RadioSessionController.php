@@ -43,12 +43,12 @@ final class RadioSessionController
         summary: 'Get current radio session',
         responses: [
             new OA\Response(response: '200', description: 'Current session data', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', type: 'object', properties: [
-                    new OA\Property(property: 'stationId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                properties: [new OA\Property(property: 'data', properties: [
+                    new OA\Property(property: 'stationId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
                     new OA\Property(property: 'stationName', type: 'string'),
                     new OA\Property(property: 'streamUrl', type: 'string', format: 'uri'),
                     new OA\Property(property: 'startedAt', type: 'string', format: 'date-time'),
-                ])],
+                ], type: 'object')],
                 type: 'object',
             )),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
@@ -81,17 +81,17 @@ final class RadioSessionController
             content: new OA\JsonContent(
                 required: ['stationId', 'streamUrl'],
                 properties: [
-                    new OA\Property(property: 'stationId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                    new OA\Property(property: 'stationId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
                     new OA\Property(property: 'streamUrl', type: 'string', format: 'uri'),
                 ],
             ),
         ),
         responses: [
             new OA\Response(response: '200', description: 'Radio playing', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', type: 'object', properties: [
-                    new OA\Property(property: 'stationId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                properties: [new OA\Property(property: 'data', properties: [
+                    new OA\Property(property: 'stationId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
                     new OA\Property(property: 'streamUrl', type: 'string', format: 'uri'),
-                ])],
+                ], type: 'object')],
                 type: 'object',
             )),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),

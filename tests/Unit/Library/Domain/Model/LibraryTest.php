@@ -100,8 +100,8 @@ final class LibraryTest extends TestCase
         $path = new LibraryPath('/media/audiobooks');
 
         $library = Library::reconstitute(new LibraryState(
-            publicId: new \App\Shared\Domain\Model\PublicId(),
             id: $id,
+            publicId: new \App\Shared\Domain\Model\PublicId(),
             name: 'Audiobooks',
             slug: $slug,
             path: $path,
@@ -127,9 +127,10 @@ final class LibraryTest extends TestCase
 
     public function testReconstituteWithNullLastScan(): void
     {
+        $publicId = new \App\Shared\Domain\Model\PublicId();
         $library = Library::reconstitute(new LibraryState(
-            publicId: new \App\Shared\Domain\Model\PublicId(),
             id: Uuid::v4(),
+            publicId: $publicId,
             name: 'Movies',
             slug: new LibrarySlug('movies'),
             path: new LibraryPath('/media/movies'),
@@ -149,10 +150,11 @@ final class LibraryTest extends TestCase
     public function testReconstituteRestoresDiscoveryStatus(): void
     {
         $now = new \DateTimeImmutable();
+        $publicId = new \App\Shared\Domain\Model\PublicId();
 
         $library = Library::reconstitute(new LibraryState(
-            publicId: new \App\Shared\Domain\Model\PublicId(),
             id: Uuid::v4(),
+            publicId: $publicId,
             name: 'Music',
             slug: new LibrarySlug('music'),
             path: new LibraryPath('/media/music'),

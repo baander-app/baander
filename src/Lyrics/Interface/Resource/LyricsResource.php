@@ -11,10 +11,10 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'LyricsResource',
     properties: [
-        new OA\Property(property: 'plainLyrics', type: 'string', nullable: true, description: 'Plain text lyrics'),
-        new OA\Property(property: 'syncedLyrics', type: 'string', nullable: true, description: 'Synced (LRC) lyrics'),
-        new OA\Property(property: 'source', type: 'string', nullable: true, description: 'Lyrics source'),
-        new OA\Property(property: 'isInstrumental', type: 'boolean', description: 'Whether the track is instrumental'),
+        new OA\Property(property: 'plainLyrics', description: 'Plain text lyrics', type: 'string', nullable: true),
+        new OA\Property(property: 'syncedLyrics', description: 'Synced (LRC) lyrics', type: 'string', nullable: true),
+        new OA\Property(property: 'source', description: 'Lyrics source', type: 'string', nullable: true),
+        new OA\Property(property: 'isInstrumental', description: 'Whether the track is instrumental', type: 'boolean'),
     ],
 )]
 final class LyricsResource extends AbstractResource

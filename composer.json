@@ -4,7 +4,18 @@
   "license": "Apache-2.0",
   "type": "project",
   "require": {
-    "php": ">=8.5",
+    "baander/core": "dev-main",
+    "baander/http-client": "dev-main",
+    "baander/image-processing": "dev-main",
+    "baander/media-metadata": "dev-main",
+    "baander/redis-rate-limiter": "dev-main",
+    "cweagans/composer-patches": "^2.0",
+    "defuse/php-encryption": "^2.4",
+    "doctrine/doctrine-bundle": "^3.3.4",
+    "doctrine/doctrine-migrations-bundle": "^4.0.1",
+    "doctrine/orm": "^3.7.6",
+    "dragonmantank/cron-expression": "^3.6.1",
+    "erusev/parsedown": ">=1.8",
     "ext-ctype": "*",
     "ext-curl": "*",
     "ext-date": "*",
@@ -42,17 +53,6 @@
     "ext-xml": "*",
     "ext-zip": "*",
     "ext-zlib": "*",
-    "baander/http-client": "dev-main",
-    "baander/image-processing": "dev-main",
-    "baander/media-metadata": "dev-main",
-    "baander/redis-rate-limiter": "dev-main",
-    "cweagans/composer-patches": "^2.0",
-    "defuse/php-encryption": "^2.4",
-    "doctrine/doctrine-bundle": "^3.3.4",
-    "doctrine/doctrine-migrations-bundle": "^4.0.1",
-    "doctrine/orm": "^3.7.6",
-    "dragonmantank/cron-expression": "^3.6.1",
-    "erusev/parsedown": ">=1.8",
     "guzzlehttp/guzzle": "^8.3.1",
     "guzzlehttp/psr7": "^3.2.0",
     "hidehalo/nanoid-php": "^2.0",
@@ -67,6 +67,7 @@
     "open-telemetry/exporter-otlp": ">=1.4",
     "open-telemetry/sdk": ">=1.15",
     "pentatrion/vite-bundle": "^8.2.4",
+    "php": ">=8.5",
     "php-http/httplug": "^2.4.1",
     "predis/predis": "^3.7.0",
     "ramsey/uuid": "^4.9.4",
@@ -105,16 +106,27 @@
     "web-token/jwt-library": "^4.2.4"
   },
   "require-dev": {
-    "ext-pdo_sqlite": "*",
-    "ext-phar": "*",
-    "ext-xmlwriter": "*",
-    "ext-yaml": "*",
+    "baander/configuration": "dev-main",
+    "baander/containers": "dev-main",
+    "baander/deployment": "dev-main",
+    "baander/dev-ci": "dev-main",
+    "baander/dev-dependencies": "dev-main",
+    "baander/dev-environment": "dev-main",
+    "baander/dev-qualification": "dev-main",
+    "baander/dev-registry": "dev-main",
+    "baander/dev-website": "dev-main",
+    "baander/filesystem": "dev-main",
+    "baander/images": "dev-main",
     "baander/phpstan-rules": "@dev",
-    "baander/tooling": "dev-main",
+    "baander/process": "dev-main",
     "brianium/paratest": "^7.27.5",
     "dama/doctrine-test-bundle": "^8.7.0",
     "deptrac/deptrac": "^4.7.2",
     "ergebnis/composer-normalize": "^2.56",
+    "ext-pdo_sqlite": "*",
+    "ext-phar": "*",
+    "ext-xmlwriter": "*",
+    "ext-yaml": "*",
     "php-cs-fixer/shim": "^3.95",
     "phpstan/phpstan": "^2.3.4",
     "phpstan/phpstan-doctrine": "^2.1.0",
@@ -143,17 +155,6 @@
     "symfony/symfony": "*"
   },
   "repositories": [
-    {
-      "type": "path",
-      "url": "./packages/baander-tooling",
-      "options": {
-        "reference": "config",
-        "symlink": true,
-        "versions": {
-          "baander/tooling": "dev-main"
-        }
-      }
-    },
     {
       "type": "path",
       "url": "./packages/baander-phpstan-rules",
@@ -218,6 +219,149 @@
           "baander/http-client": "dev-main"
         }
       }
+    },
+    {
+      "type": "path",
+      "url": "./packages/baander-configuration",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/configuration": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "./packages/baander-containers",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/containers": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "./packages/baander-core",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/core": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "./packages/baander-deployment",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/deployment": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "./packages/baander-dev-ci",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/dev-ci": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "./packages/baander-dev-dependencies",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/dev-dependencies": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "./packages/baander-dev-environment",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/dev-environment": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "./packages/baander-dev-qualification",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/dev-qualification": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "./packages/baander-dev-registry",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/dev-registry": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "./packages/baander-dev-website",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/dev-website": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "./packages/baander-filesystem",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/filesystem": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "./packages/baander-images",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/images": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "./packages/baander-process",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/process": "dev-main"
+        }
+      }
     }
   ],
   "minimum-stability": "dev",
@@ -233,11 +377,23 @@
       "Baander\\HttpClient\\Tests\\": "packages/baander-http-client/tests/",
       "Baander\\ImageProcessing\\Tests\\": "packages/baander-image-processing/tests/",
       "Baander\\MediaMetadata\\Tests\\": "packages/baander-media-metadata/tests/",
-      "Baander\\RedisRateLimiter\\Tests\\": "packages/baander-redis-rate-limiter/tests/"
-    },
-    "classmap": [
-      "scripts/tests/php/"
-    ]
+      "Baander\\RedisRateLimiter\\Tests\\": "packages/baander-redis-rate-limiter/tests/",
+      "Baander\\Filesystem\\Tests\\": "packages/baander-filesystem/tests/",
+      "Baander\\Process\\Tests\\": "packages/baander-process/tests/",
+      "Baander\\Configuration\\Tests\\": "packages/baander-configuration/tests/",
+      "Baander\\Containers\\Tests\\": "packages/baander-containers/tests/",
+      "Baander\\Images\\Tests\\": "packages/baander-images/tests/",
+      "Baander\\Deployment\\Tests\\": "packages/baander-deployment/tests/",
+      "Baander\\DevEnvironment\\Tests\\": "packages/baander-dev-environment/tests/",
+      "Baander\\DevQualification\\Tests\\": "packages/baander-dev-qualification/tests/",
+      "Baander\\DevCi\\Tests\\": "packages/baander-dev-ci/tests/",
+      "Baander\\DevDependencies\\Tests\\": "packages/baander-dev-dependencies/tests/",
+      "Baander\\DevRegistry\\Tests\\": "packages/baander-dev-registry/tests/",
+      "Baander\\DevWebsite\\Tests\\": "packages/baander-dev-website/tests/",
+      "Baander\\Tests\\Tooling\\Support\\": "tests/Support/Tooling/",
+      "Baander\\Tests\\Tooling\\": "tests/Tooling/",
+      "Baander\\Core\\Tests\\": "packages/baander-core/tests/"
+    }
   },
   "config": {
     "allow-plugins": {
@@ -308,7 +464,7 @@
       "@php vendor/bin/phpunit --configuration phpunit-tooling.xml.dist --exclude-group registry-python-subject"
     ],
     "tooling:autoload": [
-      "@composer --working-dir=scripts install --no-dev --optimize-autoloader --no-interaction --no-scripts --no-plugins",
+      "@composer --working-dir=scripts install --optimize-autoloader --no-interaction --no-scripts --no-plugins",
       "@composer --working-dir=relay install --no-dev --optimize-autoloader --no-interaction --no-scripts --no-plugins"
     ]
   }

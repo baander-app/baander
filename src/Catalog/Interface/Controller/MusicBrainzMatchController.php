@@ -69,7 +69,7 @@ final class MusicBrainzMatchController
                                     new OA\Property(property: 'title', description: 'The album\'s title', type: 'string'),
                                     new OA\Property(property: 'reason', description: 'Why the matcher left the album for an admin', type: 'string', enum: ['no_candidates', 'low_score', 'close_runner_up', 'track_count_differs', 'track_lengths_differ']),
                                     new OA\Property(property: 'checkedAt', description: 'When the matcher checked the album', type: 'string', format: 'date-time'),
-                                    new OA\Property(property: 'bestScore', description: 'The best candidate\'s fit score, from 0 to 100; null when MusicBrainz returned no candidate', type: 'integer', maximum: 100, minimum: 0, nullable: true),
+                                    new OA\Property(property: 'bestScore', description: 'The best candidate\'s fit score, from 0 to 100; null when MusicBrainz returned no candidate', type: 'integer', nullable: true, maximum: 100, minimum: 0),
                                 ],
                             )),
                             new OA\Property(property: 'next_cursor', description: 'Cursor for the next page; null on the last page', type: 'string', nullable: true),

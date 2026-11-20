@@ -6,10 +6,10 @@ declare(strict_types=1);
 require __DIR__ . '/bootstrap.php';
 require dirname(__DIR__) . '/relay/vendor/autoload.php';
 
-use Baander\Tooling\Registry\QualificationRunner;
+use Baander\DevRegistry\QualificationRunner;
 
 try {
-    exit(new QualificationRunner(dirname(__DIR__), new class implements \Baander\Tooling\Registry\StorageValidator {
+    exit(new QualificationRunner(dirname(__DIR__), new class implements \Baander\DevRegistry\StorageValidator {
         public function validate(string $root): void
         {
             \Baander\Registry\Qualification\BoundedStorage::validateRoot($root);

@@ -75,7 +75,7 @@ jobs:
                     test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
 
             -   name: Prepare standalone PHP tooling
-                run: composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
+                run: composer --working-dir=scripts install --no-interaction --no-scripts --no-plugins
 
             -   name: Login to Container Registry
                 if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
@@ -89,7 +89,7 @@ jobs:
             -   name: Pull fixture images
                 run: |
                     for role in fixtureRedis mailpit; do
-                        docker pull "$(php -r 'require "scripts/bootstrap.php"; echo \Baander\Tooling\Configuration\ToolingConfiguration::forRepository(getcwd(), getenv())->images->role($argv[1])->reference;' "$role")"
+                        docker pull "$(php -r 'require "scripts/bootstrap.php"; echo \Baander\Configuration\ToolingConfiguration::forRepository(getcwd(), getenv())->images->role($argv[1])->reference;' "$role")"
                     done
 
             -   name: Restore BuildKit cache on Forgejo
@@ -282,9 +282,9 @@ jobs:
             -   name: Backend runner regressions
                 run: |
                     docker run --rm --network none --entrypoint php "$CI_IMAGE" \
-                      vendor/bin/phpunit --configuration phpunit-tooling.xml.dist scripts/tests/php/RetainBuildEvidenceTest.php
+                      vendor/bin/phpunit --configuration phpunit-tooling.xml.dist packages/baander-images/tests/RetainBuildEvidenceTest.php
                     docker run --rm --network none --entrypoint php "$CI_IMAGE" \
-                      vendor/bin/phpunit --configuration phpunit-tooling.xml.dist scripts/tests/php/WorkerCleanupTest.php
+                      vendor/bin/phpunit --configuration phpunit-tooling.xml.dist packages/baander-dev-qualification/tests/WorkerCleanupTest.php
 
             -   name: PHP tooling regressions
                 run: |
@@ -309,7 +309,7 @@ jobs:
                     docker build --target tooling --file docker/runner/Dockerfile \
                       --tag "$TOOLING_IMAGE" .
                     docker build --file docker/runner/tooling-test.Dockerfile \
-                      --build-arg APP_HOME="$(php -r 'require "scripts/bootstrap.php"; echo Baander\Tooling\Configuration\ApplicationLayout::load()->root;')" \
+                      --build-arg APP_HOME="$(php -r 'require "scripts/bootstrap.php"; echo Baander\Configuration\ApplicationLayout::load()->root;')" \
                       --build-arg CI_IMAGE="$CI_IMAGE" \
                       --build-arg TOOLING_IMAGE="$TOOLING_IMAGE" .
 
@@ -664,7 +664,7 @@ jobs:
                     test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
             -   name: Prepare standalone PHP tooling
                 run: |
-                    composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
+                    composer --working-dir=scripts install --no-interaction --no-scripts --no-plugins
                     composer --working-dir=relay install --no-dev --no-interaction --no-scripts --no-plugins
             -   name: Install native test tools
                 run: |
@@ -696,7 +696,7 @@ jobs:
                     test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
             -   name: Prepare standalone PHP tooling
                 run: |
-                    composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
+                    composer --working-dir=scripts install --no-interaction --no-scripts --no-plugins
                     composer --working-dir=relay install --no-dev --no-interaction --no-scripts --no-plugins
             -   name: Install static analysis toolchain
                 run: |
@@ -730,7 +730,7 @@ jobs:
                     test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
             -   name: Prepare standalone PHP tooling
                 run: |
-                    composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
+                    composer --working-dir=scripts install --no-interaction --no-scripts --no-plugins
                     composer --working-dir=relay install --no-dev --no-interaction --no-scripts --no-plugins
             -   name: Install container test tools
                 run: |
@@ -784,7 +784,7 @@ jobs:
                     test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
             -   name: Prepare standalone PHP tooling
                 run: |
-                    composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
+                    composer --working-dir=scripts install --no-interaction --no-scripts --no-plugins
                     composer --working-dir=relay install --no-dev --no-interaction --no-scripts --no-plugins
             -   name: Install thread sanitizer toolchain
                 run: |
@@ -819,7 +819,7 @@ jobs:
                     test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
             -   name: Prepare standalone PHP tooling
                 run: |
-                    composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
+                    composer --working-dir=scripts install --no-interaction --no-scripts --no-plugins
                     composer --working-dir=relay install --no-dev --no-interaction --no-scripts --no-plugins
             -   name: Install parser fuzz toolchain
                 run: |
@@ -871,7 +871,7 @@ jobs:
                     test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
 
             -   name: Prepare standalone PHP tooling
-                run: composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
+                run: composer --working-dir=scripts install --no-interaction --no-scripts --no-plugins
 
             -   name: Login to Container Registry
                 if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository

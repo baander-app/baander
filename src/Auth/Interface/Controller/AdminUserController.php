@@ -113,22 +113,16 @@ final class AdminUserController
         ]);
     }
 
-    #[OA\Post(
-        path: '/api/admin/users',
-        summary: 'Create a new user',
-        description: 'Super admins may create any user. Admins may create users with ROLE_USER only, and only while the admin.can_create_users setting is on.',
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(ref: new Model(type: AdminCreateUserRequest::class)),
-        ),
-        responses: [
-            new OA\Response(response: '201', description: 'User created', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', ref: new Model(type: AdminUserResource::class)),
-            ])),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
-        ],
-    )]
+    #[OA\Post(path: '/api/admin/users', description: 'Super admins may create any user. Admins may create users with ROLE_USER only, and only while the admin.can_create_users setting is on.', summary: 'Create a new user', requestBody: new OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(ref: new Model(type: AdminCreateUserRequest::class)),
+    ), responses: [
+        new OA\Response(response: '201', description: 'User created', content: new OA\JsonContent(properties: [
+            new OA\Property(property: 'data', ref: new Model(type: AdminUserResource::class)),
+        ])),
+        new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+    ])]
     #[Route('', name: 'create', methods: ['POST'])]
     #[CliCounterpart('app:user:create')]
     public function create(
@@ -157,24 +151,18 @@ final class AdminUserController
         return $this->successResponse(AdminUserResource::from($user), Response::HTTP_CREATED);
     }
 
-    #[OA\Patch(
-        path: '/api/admin/users/{publicId}',
-        summary: 'Update a user',
-        description: 'A new email address takes effect at once, counts as verified and replaces a change the user had pending; the previous address is told of the change. The CLI counterparts are app:user:rename and app:user:change-email.',
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(ref: new Model(type: AdminUpdateUserRequest::class)),
-        ),
-        responses: [
-            new OA\Response(response: '200', description: 'User updated', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', ref: new Model(type: AdminUserResource::class)),
-            ])),
-            new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'The request changes the signed-in administrator\'s own email address', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '409', description: 'Email already taken', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
-        ],
-    )]
+    #[OA\Patch(path: '/api/admin/users/{publicId}', description: 'A new email address takes effect at once, counts as verified and replaces a change the user had pending; the previous address is told of the change. The CLI counterparts are app:user:rename and app:user:change-email.', summary: 'Update a user', requestBody: new OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(ref: new Model(type: AdminUpdateUserRequest::class)),
+    ), responses: [
+        new OA\Response(response: '200', description: 'User updated', content: new OA\JsonContent(properties: [
+            new OA\Property(property: 'data', ref: new Model(type: AdminUserResource::class)),
+        ])),
+        new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '403', description: 'The request changes the signed-in administrator\'s own email address', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '409', description: 'Email already taken', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+    ])]
     #[Route('/{publicId}', name: 'update', methods: ['PATCH'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:user:rename')]
@@ -245,24 +233,18 @@ final class AdminUserController
         return $this->successResponse(AdminUserResource::from($user));
     }
 
-    #[OA\Post(
-        path: '/api/admin/users/{publicId}/reset-password',
-        summary: 'Reset a user password',
-        description: 'Sets the password and signs the user out of every session.',
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(ref: new Model(type: AdminResetPasswordRequest::class)),
-        ),
-        responses: [
-            new OA\Response(response: '200', description: 'Password reset', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', properties: [
-                    new OA\Property(property: 'message', type: 'string'),
-                ], type: 'object'),
-            ])),
-            new OA\Response(response: '403', description: 'The target is the signed-in administrator', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        ],
-    )]
+    #[OA\Post(path: '/api/admin/users/{publicId}/reset-password', description: 'Sets the password and signs the user out of every session.', summary: 'Reset a user password', requestBody: new OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(ref: new Model(type: AdminResetPasswordRequest::class)),
+    ), responses: [
+        new OA\Response(response: '200', description: 'Password reset', content: new OA\JsonContent(properties: [
+            new OA\Property(property: 'data', properties: [
+                new OA\Property(property: 'message', type: 'string'),
+            ], type: 'object'),
+        ])),
+        new OA\Response(response: '403', description: 'The target is the signed-in administrator', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+    ])]
     #[Route('/{publicId}/reset-password', name: 'reset_password', methods: ['POST'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:user:reset-password')]
@@ -278,19 +260,14 @@ final class AdminUserController
         return $this->successResponse(['message' => 'Password reset successfully.']);
     }
 
-    #[OA\Post(
-        path: '/api/admin/users/{publicId}/reset-totp',
-        summary: 'Turn off a user\'s TOTP',
-        description: 'Removes the stored TOTP secret without reading it and signs the user out of every session, so they sign in with their password alone.',
-        responses: [
-            new OA\Response(response: '200', description: 'TOTP is off', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', ref: new Model(type: AdminUserResource::class)),
-            ])),
-            new OA\Response(response: '403', description: 'The target is the signed-in administrator', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '409', description: 'The user has no TOTP to reset', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        ],
-    )]
+    #[OA\Post(path: '/api/admin/users/{publicId}/reset-totp', description: 'Removes the stored TOTP secret without reading it and signs the user out of every session, so they sign in with their password alone.', summary: 'Turn off a user\'s TOTP', responses: [
+        new OA\Response(response: '200', description: 'TOTP is off', content: new OA\JsonContent(properties: [
+            new OA\Property(property: 'data', ref: new Model(type: AdminUserResource::class)),
+        ])),
+        new OA\Response(response: '403', description: 'The target is the signed-in administrator', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '409', description: 'The user has no TOTP to reset', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+    ])]
     #[Route('/{publicId}/reset-totp', name: 'reset_totp', methods: ['POST'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:user:reset-totp')]
@@ -307,17 +284,12 @@ final class AdminUserController
         return $this->successResponse(AdminUserResource::from($user));
     }
 
-    #[OA\Post(
-        path: '/api/admin/users/{publicId}/verify-email',
-        summary: 'Mark a user\'s email address verified',
-        description: 'Marks the current address verified, as redeeming its verification link would; a verified address stays as it is. A pending email change is left alone. The CLI counterpart is app:user:mark-email-verified.',
-        responses: [
-            new OA\Response(response: '200', description: 'The address is verified', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', ref: new Model(type: AdminUserResource::class)),
-            ])),
-            new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        ],
-    )]
+    #[OA\Post(path: '/api/admin/users/{publicId}/verify-email', description: 'Marks the current address verified, as redeeming its verification link would; a verified address stays as it is. A pending email change is left alone. The CLI counterpart is app:user:mark-email-verified.', summary: 'Mark a user\'s email address verified', responses: [
+        new OA\Response(response: '200', description: 'The address is verified', content: new OA\JsonContent(properties: [
+            new OA\Property(property: 'data', ref: new Model(type: AdminUserResource::class)),
+        ])),
+        new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+    ])]
     #[Route('/{publicId}/verify-email', name: 'verify_email', methods: ['POST'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:user:mark-email-verified')]

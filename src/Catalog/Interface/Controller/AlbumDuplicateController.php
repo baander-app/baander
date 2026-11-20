@@ -39,7 +39,7 @@ final class AlbumDuplicateController
                 description: 'Library ID to scan for duplicates',
                 in: 'query',
                 required: true,
-                schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
+                schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
             ),
         ],
         responses: [

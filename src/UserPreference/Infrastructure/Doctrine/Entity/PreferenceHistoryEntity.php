@@ -9,7 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'preference_history')]
-#[ORM\Index(columns: ['user_id', 'preference_type', 'version'], name: 'idx_preference_history_user_id_preference_type_version')]
+#[ORM\Index(name: 'idx_preference_history_user_id_preference_type_version', columns: ['user_id', 'preference_type', 'version'])]
 class PreferenceHistoryEntity
 {
     #[ORM\Id]

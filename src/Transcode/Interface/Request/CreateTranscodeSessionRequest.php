@@ -12,8 +12,8 @@ use Symfony\Component\Validator\Constraints\Choice;
     schema: 'CreateTranscodeSessionRequest',
     required: ['videoId', 'requestId'],
     properties: [
-        new OA\Property(property: 'videoId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', example: '0123456789abABCD_-xyz'),
-        new OA\Property(property: 'requestId', type: 'string', format: 'uuid', description: 'Stable playback client session identifier'),
+        new OA\Property(property: 'videoId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', example: '0123456789abABCD_-xyz', maxLength: 21, minLength: 21),
+        new OA\Property(property: 'requestId', description: 'Stable playback client session identifier', type: 'string', format: 'uuid'),
         new OA\Property(property: 'qualityTier', type: 'string', example: '1080p', enum: ['360p', '480p', '720p', '1080p', '1440p', '4K']),
         new OA\Property(property: 'audioProfile', type: 'string', example: 'streaming_stereo', enum: ['mobile_mono', 'mobile_stereo', 'streaming_stereo', 'streaming_5.1', 'broadcast_stereo', 'broadcast_5.1', 'hifi_stereo', 'opus_stereo']),
         new OA\Property(property: 'priority', type: 'string', example: 'normal', enum: ['critical', 'high', 'normal', 'low', 'bulk']),

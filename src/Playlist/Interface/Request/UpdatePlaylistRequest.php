@@ -12,7 +12,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'name', type: 'string', example: 'Updated Playlist Name', nullable: true),
         new OA\Property(property: 'description', type: 'string', example: 'Updated description', nullable: true),
         new OA\Property(property: 'isPublic', type: 'boolean', example: true, nullable: true),
-        new OA\Property(property: 'isCollaborative', type: 'boolean', example: false, nullable: true, description: "The owner's switch for collaborator editing"),
+        new OA\Property(property: 'isCollaborative', description: "The owner's switch for collaborator editing", type: 'boolean', example: false, nullable: true),
     ],
 )]
 final readonly class UpdatePlaylistRequest

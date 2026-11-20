@@ -1,0 +1,21 @@
+{
+  "name": "baander/dev-environment",
+  "description": "Development only: Local development instances, host setup and retained releases",
+  "type": "library",
+  "license": "Apache-2.0",
+  "require": {
+    "php": ">=8.5",
+    "baander/configuration": "dev-main",
+    "baander/containers": "dev-main",
+    "baander/core": "dev-main",
+    "baander/deployment": "dev-main",
+    "baander/filesystem": "dev-main",
+    "baander/images": "dev-main",
+    "baander/process": "dev-main"
+  },
+  "autoload": {
+    "psr-4": {
+      "Baander\\DevEnvironment\\": "src/"
+    }
+  }
+}

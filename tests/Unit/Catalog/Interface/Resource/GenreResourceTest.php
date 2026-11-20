@@ -48,15 +48,15 @@ final class GenreResourceTest extends TestCase
         $now = new DateTimeImmutable('2026-10-04T12:00:00Z');
         $childId = Uuid::generate();
         $child = Genre::reconstitute(new GenreState(
-            publicId: new \App\Shared\Domain\Model\PublicId(),
             id: $childId,
+            publicId: new \App\Shared\Domain\Model\PublicId(),
             name: 'Ambient',
             slug: 'ambient',
             mbid: null,
             parent: $parent->getId(),
-            parentPublicId: $parent->getPublicId(),
             createdAt: $now,
             updatedAt: $now,
+            parentPublicId: $parent->getPublicId(),
         ));
 
         $resources = GenreResource::collection([$parent, $child]);

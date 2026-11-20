@@ -65,7 +65,7 @@ final class ScheduledGenerationTest extends TestCase
         $jobs->expects(self::never())->method('create');
 
         $result = $this->handler($songs, $this->settings(false), $jobs)(
-            new GenerateRecommendationsCommand(foreground: true, mode: GenerateRecommendationsCommand::MODE_FULL, automatic: true),
+            new GenerateRecommendationsCommand(mode: GenerateRecommendationsCommand::MODE_FULL, automatic: true, foreground: true),
         );
 
         self::assertSame(GenerateRecommendationsHandler::SKIPPED_AUTO_GENERATE_OFF, $result);
@@ -79,7 +79,7 @@ final class ScheduledGenerationTest extends TestCase
         $songs->expects(self::once())->method('findAllForRecommendations')->willReturn([]);
 
         $result = $this->handler($songs, $this->settings(true))(
-            new GenerateRecommendationsCommand(foreground: true, mode: GenerateRecommendationsCommand::MODE_FULL, automatic: true),
+            new GenerateRecommendationsCommand(mode: GenerateRecommendationsCommand::MODE_FULL, automatic: true, foreground: true),
         );
 
         self::assertInstanceOf(RecommendationGenerationResult::class, $result);
@@ -95,7 +95,7 @@ final class ScheduledGenerationTest extends TestCase
         $settings = $this->createMock(SystemSettingsPortInterface::class);
         $settings->expects(self::never())->method('get');
 
-        $result = $this->handler($songs, $settings)(new GenerateRecommendationsCommand(foreground: true, mode: GenerateRecommendationsCommand::MODE_FULL));
+        $result = $this->handler($songs, $settings)(new GenerateRecommendationsCommand(mode: GenerateRecommendationsCommand::MODE_FULL, foreground: true));
 
         self::assertInstanceOf(RecommendationGenerationResult::class, $result);
         self::assertSame(['collaborative' => 0, 'content' => 0, 'genre' => 0], $result->counts);
@@ -107,7 +107,7 @@ final class ScheduledGenerationTest extends TestCase
         $songs->expects(self::never())->method('findUpdatedAfter');
 
         $this->expectException(InvalidInputException::class);
-        $this->handler($songs, $this->createStub(SystemSettingsPortInterface::class))(new GenerateRecommendationsCommand(foreground: true, mode: 'Full', automatic: true));
+        $this->handler($songs, $this->createStub(SystemSettingsPortInterface::class))(new GenerateRecommendationsCommand(mode: 'Full', automatic: true, foreground: true));
     }
 
     public function testAdmissionQueuesOnlyTheJobIdentifierWithoutReadingSongs(): void

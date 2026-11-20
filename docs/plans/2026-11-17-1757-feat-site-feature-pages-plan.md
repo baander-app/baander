@@ -313,7 +313,7 @@ After U6 the equalizer page is complete with retaken pictures. Show the user tha
 - **Goal:** The tooling loads feature data, rejects invalid data with complete messages and hands valid pages to the builder.
 - **Requirements:** R1, R3, R11, R15, R16, R18, AE4, AE6.
 - **Dependencies:** None.
-- **Files:** Create `packages/baander-tooling/src/Website/FeaturePages.php`, `scripts/tests/php/Website/FeaturePagesTest.php`, small WebP fixtures under `scripts/tests/php/Fixtures/`. Modify `packages/baander-tooling/src/Website/WebsiteBuilder.php`, `Command.php`, `SearchMetadata.php` only if the trail needs it, `scripts/tests/php/Website/WebsiteBuilderTest.php`, `scripts/tests/php/Website/BuilderBlockRenderingTest.php`.
+- **Files:** Create `packages/baander-tooling/src/Website/FeaturePages.php`, `packages/baander-dev-website/tests/FeaturePagesTest.php`, small WebP fixtures under `scripts/tests/php/Fixtures/`. Modify `packages/baander-tooling/src/Website/WebsiteBuilder.php`, `Command.php`, `SearchMetadata.php` only if the trail needs it, `packages/baander-dev-website/tests/WebsiteBuilderTest.php`, `packages/baander-dev-website/tests/BuilderBlockRenderingTest.php`.
 - **Approach:**
   1. `FeaturePages` reads `ui/site/features/index.php` and each data file in the shape of the High-Level Technical Design and returns public page descriptors plus the overview's data (KTD1).
   2. First-stage checks (KTD2): required parts, unknown keys, two to four tour sections, a hero figure of either kind, index and files in agreement both ways, well-formed prose fields without off-site links (KTD3), a description of at most 155 characters, a composed title of at most 60, no repeated title or description, alternative text present and unique within a page, both picture variants present with equal and even dimensions, and a size ceiling of 500 kB per file.
@@ -392,7 +392,7 @@ After U6 the equalizer page is complete with retaken pictures. Show the user tha
 - **Goal:** One command retakes every picture from the worktree preview and records what it took.
 - **Requirements:** R10, R11, R13, R14, R18, AE5.
 - **Dependencies:** U3, U4, U5.
-- **Files:** Create `ui/site/scripts/capture/capture.mjs`, `ui/site/scripts/capture/scenes/equalizer.mjs` as the first scene, `ui/site/assets/screenshots/captures.json`. Modify `packages/baander-tooling/src/Website/FeaturePages.php`, `scripts/tests/php/Website/FeaturePagesTest.php`, `ui/site/features/equalizer.php`.
+- **Files:** Create `ui/site/scripts/capture/capture.mjs`, `ui/site/scripts/capture/scenes/equalizer.mjs` as the first scene, `ui/site/assets/screenshots/captures.json`. Modify `packages/baander-tooling/src/Website/FeaturePages.php`, `packages/baander-dev-website/tests/FeaturePagesTest.php`, `ui/site/features/equalizer.php`.
 - **Approach:**
   1. The driver takes the preview URL, creates the sample accounts through console commands when they are missing, and checks the preconditions of KTD8 before any picture.
   2. A scene is a named list of steps and pictures for one page. Each picture names its size kind (window or crop region) and file name; the driver takes the dark and light variants from one state, and a scene finds or creates by name what it needs (KTD7).

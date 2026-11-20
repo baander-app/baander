@@ -1465,6 +1465,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *             http_compression_level?: scalar|Param|null, // Compression level 0–9. Lower = faster, higher = smaller output. Level 3 is the sweet spot for web servers. // Default: 3
  *             http_compression_types?: list<scalar|Param|null>,
  *             http_compression_min_length?: scalar|Param|null, // Minimum response body size (bytes) to trigger compression. Responses below this threshold are sent uncompressed. // Default: 1024
+ *             hook_flags?: int|Param, // Coroutine runtime hooks enabled in HTTP workers.
  *             dispatch_mode?: int|Param, // Default: 2
  *             reload_async?: bool|Param, // Default: false
  *             task_max_request?: int|Param, // Default: null

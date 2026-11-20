@@ -1,8 +1,35 @@
 parameters:
     level: 6
     paths:
-        - packages/baander-tooling/src
+        - packages/baander-configuration/src
+        - packages/baander-configuration/tests
+        - packages/baander-containers/src
+        - packages/baander-containers/tests
+        - packages/baander-deployment/src
+        - packages/baander-deployment/tests
+        - packages/baander-dev-ci/src
+        - packages/baander-dev-ci/tests
+        - packages/baander-dev-dependencies/src
+        - packages/baander-dev-dependencies/tests
+        - packages/baander-dev-environment/src
+        - packages/baander-dev-environment/tests
+        - packages/baander-dev-qualification/src
+        - packages/baander-dev-qualification/tests
+        - packages/baander-dev-registry/src
+        - packages/baander-dev-registry/tests
+        - packages/baander-dev-website/src
+        - packages/baander-dev-website/tests
+        - packages/baander-filesystem/src
+        - packages/baander-filesystem/tests
+        - packages/baander-images/src
+        - packages/baander-images/tests
+        - packages/baander-process/src
+        - packages/baander-process/tests
+        - packages/baander-core/src
+        - packages/baander-core/tests
         - scripts
+        - tests/Support/Tooling
+        - tests/Tooling
         - relay/tests
         - relay/tools
         - .agents/skills/prose-fix/scripts
@@ -24,4 +51,4 @@ parameters:
     bootstrapFiles:
         - vendor/autoload.php
     stubFiles:
-        - packages/baander-tooling/phpstan/ffi.stub
+        - packages/baander-dev-website/phpstan/ffi.stub

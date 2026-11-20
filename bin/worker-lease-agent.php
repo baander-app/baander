@@ -3,6 +3,8 @@
 
 declare(strict_types=1);
 
+use Baander\Core\EnvironmentVariable;
+
 // Fresh CLI only: no kernel, environment-file loading, handlers or containment acknowledgment.
 ini_set('display_errors', '0');
 ini_set('log_errors', '0');
@@ -27,7 +29,7 @@ try {
     exit(0);
 }
 try {
-    $url = getenv('DATABASE_CONTROL_URL');
+    $url = getenv(EnvironmentVariable::DATABASE_CONTROL_URL);
     if (!$url) {
         throw new RuntimeException('Database not configured.');
     }

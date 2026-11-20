@@ -14,15 +14,15 @@ use Symfony\Component\Validator\Constraints as Assert;
     properties: [
         new OA\Property(
             property: 'payload',
-            type: 'object',
             required: ['mode', 'activeTab'],
             properties: [
                 new OA\Property(property: 'mode', type: 'string', example: 'expanded', enum: SaveLayoutPreferencesRequest::MODES),
                 new OA\Property(property: 'activeTab', type: 'string', example: 'queue', enum: SaveLayoutPreferencesRequest::TABS),
             ],
+            type: 'object',
             additionalProperties: false,
         ),
-        new OA\Property(property: 'version', type: 'integer', minimum: 0, example: 0),
+        new OA\Property(property: 'version', type: 'integer', example: 0, minimum: 0),
     ],
 )]
 final readonly class SaveLayoutPreferencesRequest

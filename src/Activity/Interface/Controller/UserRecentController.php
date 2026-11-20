@@ -40,7 +40,7 @@ final class UserRecentController
         path: '/api/user/recent',
         summary: 'Get recently played items',
         parameters: [
-            new OA\Parameter(name: 'limit', description: 'Max items to return (1-20)', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 5, minimum: 1, maximum: 20)),
+            new OA\Parameter(name: 'limit', description: 'Max items to return (1-20)', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 5, maximum: 20, minimum: 1)),
             new OA\Parameter(name: 'mediaType', description: 'Filter by media type', in: 'query', required: false, schema: new OA\Schema(type: 'string', enum: ['music', 'movies', 'tv', 'podcasts', 'concerts', 'ebooks'])),
         ],
         responses: [

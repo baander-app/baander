@@ -45,10 +45,10 @@ final class DeviceController
                     properties: [
                         new OA\Property(
                             property: 'data',
-                            type: 'object',
                             properties: [
                                 new OA\Property(property: 'message', type: 'string', example: 'Device registered.'),
                             ],
+                            type: 'object',
                         ),
                     ],
                 ),
@@ -84,8 +84,8 @@ final class DeviceController
                     properties: [
                         new OA\Property(property: 'data', type: 'array', items: new OA\Items(
                             properties: [
-                                new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
-                                new OA\Property(property: 'deviceId', type: 'string', format: 'uuid', description: 'Browser-generated device token; distinct from publicId'),
+                                new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+                                new OA\Property(property: 'deviceId', description: 'Browser-generated device token; distinct from publicId', type: 'string', format: 'uuid'),
                                 new OA\Property(property: 'name', type: 'string'),
                                 new OA\Property(property: 'lastUsedAt', type: 'string', format: 'date-time', nullable: true),
                             ],
@@ -123,7 +123,7 @@ final class DeviceController
             ),
         ),
         parameters: [
-            new OA\Parameter(name: 'deviceId', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'deviceId', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(
@@ -171,7 +171,7 @@ final class DeviceController
         path: '/api/devices/{deviceId}',
         summary: 'Forget (remove) a device',
         parameters: [
-            new OA\Parameter(name: 'deviceId', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'deviceId', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(

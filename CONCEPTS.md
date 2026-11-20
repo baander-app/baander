@@ -1064,3 +1064,9 @@ The fixed source boundaries and filters used by a log query. Paging keeps those 
 ### Collection gap
 
 A known interval or source for which log collection cannot establish completeness, including unavailable hosts, expired history and ambiguous Docker replay. A gap remains visible alongside the records that are available; accepting a partial SQL result does not remove it.
+
+## Shared configuration
+
+### Configuration path
+
+An immutable sequence of literal keys and nonnegative indexes used to read a configuration value. `Baander\Core\Configuration\ConfigPath` builds these paths and reads values or strict integers; the owning context defines setting names, validation and defaults. A missing key differs from a present `null`, dots inside keys are literal, and diagnostics omit values.

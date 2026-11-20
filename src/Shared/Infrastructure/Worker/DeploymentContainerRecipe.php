@@ -6,6 +6,7 @@ namespace App\Shared\Infrastructure\Worker;
 
 use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\DeploymentUnit;
+use Baander\Core\EnvironmentVariable;
 use InvalidArgumentException;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
@@ -184,7 +185,7 @@ final readonly class DeploymentContainerRecipe
             || ($environmentFile !== null && (!str_starts_with($environmentFile, '/') || str_contains($environmentFile, "\0")))) {
             throw new InvalidArgumentException('Runtime configuration requires an absolute private environment file.');
         }
-        $profileArguments = array_key_exists('BAANDER_DEPLOYMENT_PROFILE', $this->runtimeEnvironment->variables)
+        $profileArguments = array_key_exists(EnvironmentVariable::BAANDER_DEPLOYMENT_PROFILE, $this->runtimeEnvironment->variables)
             ? [] : ['--env', 'BAANDER_DEPLOYMENT_PROFILE=' . $this->deploymentProfile->toJson()];
 
         return [

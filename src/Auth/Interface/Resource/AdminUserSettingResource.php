@@ -22,9 +22,9 @@ use OpenApi\Attributes as OA;
                 new OA\Property(property: 'label', type: 'string'),
             ],
         )),
-        new OA\Property(property: 'userEditable', type: 'boolean', description: 'Whether the user may change the setting themselves'),
+        new OA\Property(property: 'userEditable', description: 'Whether the user may change the setting themselves', type: 'boolean'),
         new OA\Property(property: 'storedValue', description: "The user's choice as stored, also when it is no longer allowed; null when they have none", nullable: true),
-        new OA\Property(property: 'storedValueValid', type: 'boolean', description: 'False when the stored choice is no longer allowed, so the user gets the value after a reset'),
+        new OA\Property(property: 'storedValueValid', description: 'False when the stored choice is no longer allowed, so the user gets the value after a reset', type: 'boolean'),
         new OA\Property(property: 'value', description: 'Effective value', oneOf: [
             new OA\Schema(type: 'boolean'),
             new OA\Schema(type: 'integer'),

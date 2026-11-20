@@ -22,13 +22,13 @@ The selected image stack uses PHP 8.5.12, Swoole 6.2.4 and Composer 2.11.1.
 The PHP ZTS application base, the Node tooling stage, the PostgreSQL 18
 database image and the runner image build on Debian 13 (trixie).
 Dependency maintenance needs PHP 8.5 or newer with the Swoole extension loaded
-(`Baander\Tooling\Runtime\Requirements::check()`) and exactly Composer 2.11.1 on
+(`Baander\Process\Runtime\Requirements::check()`) and exactly Composer 2.11.1 on
 `PATH`. See
-[PHP dependency maintenance](php-dependencies.md) for the seven projects, local
+[PHP dependency maintenance](php-dependencies.md) for the classified projects, local
 and online checks, retained fixes and recorded upgrade blockers.
 
 Host setup uses the Composer project under `scripts/`, which installs the local
-`baander/tooling` library from `packages/baander-tooling/`; application
+workflow packages from `packages/baander-*/`; application
 dependencies and the application kernel are not prerequisites. It checks the PHP
 runtime before writing state. Bash entrypoints forward to PHP; the application
 console keeps its application commands. The root command `composer tooling:autoload`
@@ -38,7 +38,7 @@ work. For host setup, use the `scripts/` installation shown below.
 Generate the host instructions before starting an instance:
 
 ```bash
-composer --working-dir=scripts install --no-dev
+composer --working-dir=scripts install
 make dev-host-setup
 ```
 
@@ -126,9 +126,9 @@ do not authorize a reset or database rollback.
 A preview has a stable worktree-specific hostname below `baander.test`. PHP and
 Vite read the live worktree. PHP's development watcher reloads included files on
 close-write events; atomic saves and configuration changes can require
-`make restart-app` or `make preview-up`. Workers run immutable code captured by the
-most recent `make preview-up` or `make restart-app`; run `make preview-up` again
-after worker changes. Preview PostgreSQL,
+`make restart-app` or `make preview-up`. Workers and the log collector run immutable
+code captured by the most recent `make preview-up` or `make restart-app`; run `make preview-up` again
+after worker or collector changes. Preview PostgreSQL,
 Redis, secrets, caches and generated media are separate from the persistent instance.
 Startup creates empty mount directories in the checkout; dependencies and runtime
 contents live in the preview volumes.
@@ -140,7 +140,7 @@ make preview-url
 ```
 
 A new linked worktree (`git worktree add`) lacks two host-side prerequisites,
-because neither is tracked. Run `composer --working-dir=scripts install --no-dev`
+because neither is tracked. Run `composer --working-dir=scripts install`
 in it first; without that, every lifecycle command stops with "Install workflow
 tooling first". On an SELinux host, also pass the new directory to `--share-path`
 as shown under host setup; otherwise preflight reports "Preview checkout is
@@ -172,7 +172,7 @@ separate disposable backend coordinator and frontend suites.
 
 The optional `tooling` object in `dev.local.json` selects role image references,
 Docker transport and finite workflow budgets alongside `libraries`. See the
-[tooling package reference](../../../packages/baander-tooling/README.md#configuration-and-image-roles)
+[tooling package reference](../../../dev-docs/workflow-packages.md#configuration-and-image-roles)
 for supported keys, environment names and browser compatibility metadata.
 Invocation settings take precedence over captured environment settings, local
 settings and tracked defaults. For example:

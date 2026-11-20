@@ -6,10 +6,10 @@
 declare(strict_types=1);
 
 use Baander\Registry\Inventory\Inventory;
-use Baander\Tooling\Registry\StaticAnalysis\Pins;
-use Baander\Tooling\Process\SignalScope;
-use Baander\Tooling\Registry\StaticQualification;
-use Baander\Tooling\Runtime\Requirements;
+use Baander\DevRegistry\StaticAnalysis\Pins;
+use Baander\Process\Execution\SignalScope;
+use Baander\DevRegistry\StaticQualification;
+use Baander\Process\Runtime\Requirements;
 
 require __DIR__ . '/bootstrap.php';
 require dirname(__DIR__) . '/relay/vendor/autoload.php';

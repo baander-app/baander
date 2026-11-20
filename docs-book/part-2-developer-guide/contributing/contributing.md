@@ -104,7 +104,7 @@ php scripts/check-js-dependencies.php --online --format json
 ```
 
 Local mode is the default and makes no requests. The
-[JavaScript policy](../../../packages/baander-tooling/resources/javascript-dependencies.json)
+[JavaScript policy](../../../packages/baander-dev-dependencies/resources/javascript-dependencies.json)
 classifies eight manifests inside its `scopeDirectories` (`ui/web`, `ui/site`,
 `ui/shared`, `ui/design-tokens`, and `tests/e2e`): web, player, site and shared
 own independent Yarn locks; `tests/e2e` owns its npm lock. The DPoP and BlurHash

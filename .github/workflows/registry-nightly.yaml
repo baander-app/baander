@@ -37,7 +37,7 @@ jobs:
                     test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
             -   name: Prepare standalone PHP tooling
                 run: |
-                    composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
+                    composer --working-dir=scripts install --no-interaction --no-scripts --no-plugins
                     composer --working-dir=relay install --no-dev --no-interaction --no-scripts --no-plugins
             -   name: Install parser fuzz toolchain
                 run: |

@@ -136,9 +136,10 @@ final class GenreTest extends TestCase
     {
         $now = new \DateTimeImmutable();
         $mbid = 'b1b2b3b4-b5b6-7890-abcd-ef1234567890';
+        $publicId = new \App\Shared\Domain\Model\PublicId();
         $genre = Genre::reconstitute(new GenreState(
-            publicId: new \App\Shared\Domain\Model\PublicId(),
             id: Uuid::v4(),
+            publicId: $publicId,
             name: 'Blues',
             slug: 'blues',
             mbid: $mbid,
@@ -156,9 +157,10 @@ final class GenreTest extends TestCase
     public function testReconstituteWithNullParent(): void
     {
         $now = new \DateTimeImmutable();
+        $publicId = new \App\Shared\Domain\Model\PublicId();
         $genre = Genre::reconstitute(new GenreState(
-            publicId: new \App\Shared\Domain\Model\PublicId(),
             id: Uuid::v4(),
+            publicId: $publicId,
             name: 'Classical',
             slug: 'classical',
             mbid: null,

@@ -41,7 +41,7 @@ error ([Libraries.php](../../../packages/baander-tooling/src/Development/Librari
 
 Passing reconciliation tests did not establish that the real command produced
 clean stdout. Their runner supplies JSON strings directly
-([DevelopmentLibrariesTest.php](../../../scripts/tests/php/DevelopmentLibrariesTest.php), lines 40–48).
+([DevelopmentLibrariesTest.php](../../../packages/baander-dev-environment/tests/DevelopmentLibrariesTest.php), lines 40–48).
 Those tests prove command sequencing and catalog reconciliation; they do not run
 the application's logging stack.
 

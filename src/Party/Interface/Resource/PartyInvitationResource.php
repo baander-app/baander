@@ -11,8 +11,8 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'PartyInvitationResource',
     properties: [
-        new OA\Property(property: 'userId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Invited user public ID'),
-        new OA\Property(property: 'invitedAt', type: 'string', format: 'date-time', description: 'Invitation timestamp'),
+        new OA\Property(property: 'userId', description: 'Invited user public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+        new OA\Property(property: 'invitedAt', description: 'Invitation timestamp', type: 'string', format: 'date-time'),
     ],
 )]
 final class PartyInvitationResource extends AbstractResource

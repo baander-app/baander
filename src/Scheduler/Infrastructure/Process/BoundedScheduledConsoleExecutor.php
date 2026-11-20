@@ -6,6 +6,7 @@ namespace App\Scheduler\Infrastructure\Process;
 
 use App\Scheduler\Application\Exception\ScheduledConsoleCompletionUnknown;
 use App\Scheduler\Application\Port\ScheduledConsoleExecutorInterface;
+use Baander\Core\EnvironmentVariable;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 /** CLI-only direct child. Deadlines cannot prove descendant containment or interrupt kernel-stalled processes. */
@@ -38,12 +39,12 @@ final class BoundedScheduledConsoleExecutor implements ScheduledConsoleExecutorI
     /** Supervisor declaration only: actual memory/process containment remains the deployment's responsibility. */
     public static function fromWorkerEnvironment(string $projectDirectory): self
     {
-        $raw = getenv('BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES');
+        $raw = getenv(EnvironmentVariable::BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES);
         if ($raw === false || $raw === '0') {
             return new self($projectDirectory);
         }
         $bytes = filter_var($raw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 1024 * 1024 * 1024 * 1024]]);
-        if (preg_match('/\A[1-9][0-9]*\z/D', $raw) !== 1 || $bytes === false || getenv('BAANDER_WORKER_ID') !== 'scheduled-consumer' || getenv('BAANDER_WORKER_UNIT') !== 'execution') {
+        if (preg_match('/\A[1-9][0-9]*\z/D', $raw) !== 1 || $bytes === false || getenv(EnvironmentVariable::BAANDER_WORKER_ID) !== 'scheduled-consumer' || getenv(EnvironmentVariable::BAANDER_WORKER_UNIT) !== 'execution') {
             throw new \InvalidArgumentException('Scheduled console requires an explicit execution scheduled-consumer subprocess reservation.');
         }
         return new self($projectDirectory, reservationBytes: $bytes);
@@ -60,7 +61,7 @@ final class BoundedScheduledConsoleExecutor implements ScheduledConsoleExecutorI
         }
         $argv = $this->arguments($command, $parameters);
         $environment = getenv();
-        $environment['BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES'] = '0';
+        $environment[EnvironmentVariable::BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES] = '0';
         // Preserve explicit launch configuration when the child reloads Dotenv.
         unset($environment['SYMFONY_DOTENV_VARS']);
         $process = proc_open($argv, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $this->projectDirectory, $environment);

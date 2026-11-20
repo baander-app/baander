@@ -17,7 +17,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'total_songs', type: 'integer'),
         new OA\Property(property: 'completed_songs', type: 'integer'),
         new OA\Property(property: 'current_strategy', type: 'string'),
-        new OA\Property(property: 'strategy_counts', type: 'object', description: 'Recommendations saved per strategy', additionalProperties: true),
+        new OA\Property(property: 'strategy_counts', description: 'Recommendations saved per strategy', type: 'object', additionalProperties: true),
         new OA\Property(property: 'progress_percentage', type: 'number'),
         new OA\Property(property: 'created_at', type: 'string', format: 'date-time'),
         new OA\Property(property: 'started_at', type: 'string', format: 'date-time', nullable: true),

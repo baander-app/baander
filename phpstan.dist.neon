@@ -10,6 +10,7 @@ parameters:
   tmpDir: var/cache/phpstan
   paths:
     - src/
+    - packages/baander-core/src/
     - packages/baander-http-client/src/
     - packages/baander-http-client/tests/
     - packages/baander-redis-rate-limiter/src/
@@ -23,6 +24,8 @@ parameters:
   excludePaths:
     analyse:
       - migrations/
+      - tests/Tooling/
+      - tests/Support/Tooling/
 
   # Doctrine discovers migration classes outside Composer PSR-4 autoloading.
   scanDirectories:

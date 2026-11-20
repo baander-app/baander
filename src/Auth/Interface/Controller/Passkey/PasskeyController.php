@@ -61,7 +61,7 @@ final class PasskeyController
                     properties: [
                         new OA\Property(property: 'data', type: 'array', items: new OA\Items(
                             properties: [
-                                new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                                new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
                                 new OA\Property(property: 'name', type: 'string'),
                                 new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
                                 new OA\Property(property: 'lastUsedAt', type: 'string', format: 'date-time', nullable: true),
@@ -96,36 +96,30 @@ final class PasskeyController
         return $this->successResponse($items);
     }
 
-    #[OA\Post(
-        path: '/api/auth/passkey/options',
-        summary: 'Get WebAuthn registration options',
-        description: 'Needs a verified email address, answered otherwise with 422 and `details.reason` `email_unverified`. Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.',
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(ref: new Model(type: PasskeyRegistrationOptionsRequest::class)),
+    #[OA\Post(path: '/api/auth/passkey/options', description: 'Needs a verified email address, answered otherwise with 422 and `details.reason` `email_unverified`. Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.', summary: 'Get WebAuthn registration options', requestBody: new OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(ref: new Model(type: PasskeyRegistrationOptionsRequest::class)),
+    ), responses: [
+        new OA\Response(
+            response: '200',
+            description: 'Registration options',
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'data', description: 'WebAuthn PublicKeyCredentialCreationOptions', type: 'object'),
+                ],
+                type: 'object',
+            ),
         ),
-        responses: [
-            new OA\Response(
-                response: '200',
-                description: 'Registration options',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', description: 'WebAuthn PublicKeyCredentialCreationOptions', type: 'object'),
-                    ],
-                    type: 'object',
-                ),
-            ),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error, an unverified email address, or the password or code is wrong', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
-            new OA\Response(response: '429', description: 'Too many step-up attempts for this account', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(
-                response: '503',
-                description: 'The passkey challenge store is unavailable; retry after the Retry-After delay.',
-                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 1))],
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
-            ),
-        ],
-    )]
+        new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '422', description: 'Validation error, an unverified email address, or the password or code is wrong', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+        new OA\Response(response: '429', description: 'Too many step-up attempts for this account', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(
+            response: '503',
+            description: 'The passkey challenge store is unavailable; retry after the Retry-After delay.',
+            headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 1))],
+            content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+        ),
+    ])]
     #[Route('/options', name: 'options', methods: ['POST'])]
     public function registrationOptions(#[MapRequestPayload(mapWhenEmpty: true)] PasskeyRegistrationOptionsRequest $payload): JsonResponse
     {
@@ -327,7 +321,7 @@ final class PasskeyController
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'userId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                            new OA\Property(property: 'userId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
                             new OA\Property(property: 'credentialId', type: 'string'),
                             new OA\Property(property: 'signCount', type: 'integer'),
                         ], type: 'object'),

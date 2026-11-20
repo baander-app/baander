@@ -753,7 +753,7 @@ SH;
             'client drift' => ['frontend-quality', 'Web checks', 'yarn generate:check'],
             'Deptrac' => ['quality-gate', 'Deptrac', 'vendor/bin/deptrac analyse'],
             'backend unit' => ['quality-gate', 'PHPUnit with coverage', 'scripts/test-backend-container.sh'],
-            'backend runner' => ['quality-gate', 'Backend runner regressions', 'scripts/tests/php/RetainBuildEvidenceTest.php'],
+            'backend runner' => ['quality-gate', 'Backend runner regressions', 'packages/baander-images/tests/RetainBuildEvidenceTest.php'],
             'PHP tooling format' => ['quality-gate', 'PHP tooling regressions', 'composer check:tooling-format'],
             'PHP tooling unit' => ['quality-gate', 'PHP tooling regressions', '--exclude-group registry-python-subject'],
             'PHP tooling subject' => ['quality-gate', 'PHP tooling regressions', '--group registry-python-subject'],

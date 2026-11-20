@@ -3,29 +3,31 @@
 
 declare(strict_types=1);
 
-use Baander\Tooling\Development\Bootstrap;
-use Baander\Tooling\Development\Database;
-use Baander\Tooling\Docker\Client;
-use Baander\Tooling\Docker\TargetResolver;
-use Baander\Tooling\Configuration\ToolingConfiguration;
-use Baander\Tooling\Configuration\ApplicationLayout;
-use Baander\Tooling\Development\Environment;
-use Baander\Tooling\Process\CommandExecutor;
-use Baander\Tooling\Process\CommandFailure;
-use Baander\Tooling\Process\CompletionPolicy;
-use Baander\Tooling\Process\EngineExecutor;
-use Baander\Tooling\Process\ExecutionContext;
-use Baander\Tooling\Process\ProcessSpec;
-use Baander\Tooling\Process\RunningProcess;
-use Baander\Tooling\Development\Runtime;
-use Baander\Tooling\Development\StateStore;
-use Baander\Tooling\Development\WorkflowError;
-use Baander\Tooling\Filesystem\AtomicFile;
-use Baander\Tooling\Filesystem\PrivateDirectory;
-use Baander\Tooling\Inventory\SafeTar;
-use Baander\Tooling\Resources\{ResourceLedger, ResourceKind, DisposableContainer};
-use Baander\Tooling\Process\ProcessResult;
-use Baander\Tooling\Runtime\Requirements;
+use Baander\DevEnvironment\Runtime\InstanceBootstrap;
+use Baander\DevEnvironment\Runtime\Database;
+use Baander\Containers\Docker\Client;
+use Baander\Containers\Docker\TargetResolver;
+use Baander\Configuration\ToolingConfiguration;
+use Baander\Configuration\ApplicationLayout;
+use Baander\DevEnvironment\Host\ProcessEnvironment;
+use Baander\Process\Execution\CommandExecutor;
+use Baander\Process\Execution\CommandFailure;
+use Baander\Process\Execution\CompletionPolicy;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
+use Baander\Process\Execution\ProcessSpec;
+use Baander\Process\Execution\RunningProcess;
+use Baander\DevEnvironment\Runtime\ComposeRuntime;
+use Baander\DevEnvironment\State\InstanceStateStore;
+use Baander\DevEnvironment\WorkflowError;
+use Baander\Filesystem\AtomicFile;
+use Baander\Filesystem\PrivateDirectory;
+use Baander\Images\Inventory\SafeTar;
+use Baander\Containers\Resources\ResourceLedger;
+use Baander\Containers\Resources\ResourceKind;
+use Baander\Containers\Resources\DisposableContainer;
+use Baander\Process\Execution\ProcessResult;
+use Baander\Process\Runtime\Requirements;
 
 require __DIR__ . '/bootstrap.php';
 
@@ -231,7 +233,7 @@ try {
     chdir(dirname(__DIR__));
     $name = 'baander-dev-database-' . time() . '-' . getmypid();
     $invocationEnvironment = getenv();
-    $commandEnvironment = Environment::clean($invocationEnvironment);
+    $commandEnvironment = ProcessEnvironment::clean($invocationEnvironment);
     $tooling = ToolingConfiguration::resolve(environment: $invocationEnvironment);
     $runner = new DatabaseDrillExecutor(new EngineExecutor(ExecutionContext::bounded($tooling->budgets->seconds('backend'), $commandEnvironment)));
     $root = sys_get_temp_dir() . '/' . $name . '-' . bin2hex(random_bytes(8));
@@ -242,7 +244,7 @@ try {
         $docker = new Client($runner, $target, $commandEnvironment);
         $docker->requireCompose();
         $runner->docker = $docker;
-        $store = new StateStore($root . '/state');
+        $store = new InstanceStateStore($root . '/state');
         $instance = [
             'id' => 'persistent',
             'kind' => 'persistent',
@@ -270,8 +272,8 @@ try {
                 'capabilities' => [], 'daemonId' => $target->daemonId];
         }
         $release['layout'] = ApplicationLayout::fromImage($imageMetadata[$applicationReference])->toArray();
-        $instance = new Bootstrap($store, $runner)->configure($instance);
-        $runtime = new Runtime($store, $runner);
+        $instance = new InstanceBootstrap($store, $runner)->configure($instance);
+        $runtime = new ComposeRuntime($store, $runner);
         $environment = $runtime->environment($instance);
         foreach ($environment as $key => $value) {
             if (preg_match('/SECRET|PASSWORD|PRIVATE_KEY/', $key) === 1) {

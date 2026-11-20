@@ -16,7 +16,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'scope', type: 'string', enum: ['system', 'user']),
         new OA\Property(property: 'label', type: 'string'),
         new OA\Property(property: 'description', type: 'string'),
-        new OA\Property(property: 'group', type: 'string', description: 'Group label the settings page shows the setting under'),
+        new OA\Property(property: 'group', description: 'Group label the settings page shows the setting under', type: 'string'),
         new OA\Property(property: 'default', description: 'Default value; null when the setting follows fallbackKey', nullable: true, oneOf: [
             new OA\Schema(type: 'boolean'),
             new OA\Schema(type: 'integer'),
@@ -32,9 +32,9 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'min', type: 'integer', nullable: true),
         new OA\Property(property: 'max', type: 'integer', nullable: true),
         new OA\Property(property: 'editRole', type: 'string', enum: ['ROLE_USER', 'ROLE_SUPER_ADMIN']),
-        new OA\Property(property: 'userVisible', type: 'boolean', description: 'Whether user settings may follow this system setting, which shows its value to signed-in users as their default'),
-        new OA\Property(property: 'enforced', type: 'boolean', description: 'False while the backend does not yet honour the setting'),
-        new OA\Property(property: 'fallbackKey', type: 'string', nullable: true, description: 'System setting a user setting follows when unset'),
+        new OA\Property(property: 'userVisible', description: 'Whether user settings may follow this system setting, which shows its value to signed-in users as their default', type: 'boolean'),
+        new OA\Property(property: 'enforced', description: 'False while the backend does not yet honour the setting', type: 'boolean'),
+        new OA\Property(property: 'fallbackKey', description: 'System setting a user setting follows when unset', type: 'string', nullable: true),
     ],
 )]
 final class SettingDefinitionResource extends AbstractResource

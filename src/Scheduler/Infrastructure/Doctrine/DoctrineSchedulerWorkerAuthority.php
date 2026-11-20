@@ -7,6 +7,7 @@ namespace App\Scheduler\Infrastructure\Doctrine;
 use App\Scheduler\Application\Port\SchedulerWorkerAuthorityInterface;
 use App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
+use Baander\Core\EnvironmentVariable;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
@@ -31,10 +32,10 @@ final class DoctrineSchedulerWorkerAuthority implements SchedulerWorkerAuthority
             throw new \InvalidArgumentException('Scheduler authority requires an explicit database URL.');
         }
         $authority = null;
-        if (getenv('BAANDER_WORKER_ID') === 'scheduler') {
-            $namespace = getenv('BAANDER_WORKER_NAMESPACE');
-            $bootId = getenv('BAANDER_WORKER_BOOT_ID');
-            $epoch = getenv('BAANDER_WORKER_LEASE_EPOCH');
+        if (getenv(EnvironmentVariable::BAANDER_WORKER_ID) === 'scheduler') {
+            $namespace = getenv(EnvironmentVariable::BAANDER_WORKER_NAMESPACE);
+            $bootId = getenv(EnvironmentVariable::BAANDER_WORKER_BOOT_ID);
+            $epoch = getenv(EnvironmentVariable::BAANDER_WORKER_LEASE_EPOCH);
             if ($namespace !== false && $bootId !== false && $epoch !== false) {
                 $epochValue = filter_var($epoch, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
                 try {

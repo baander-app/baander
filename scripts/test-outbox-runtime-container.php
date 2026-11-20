@@ -6,9 +6,9 @@ declare(strict_types=1);
 require __DIR__ . '/bootstrap.php';
 
 try {
-    Baander\Tooling\Runtime\Requirements::check();
-    exit(Baander\Tooling\Fixtures\Messaging\Qualification::main(dirname(__DIR__), 'outbox'));
+    Baander\Process\Runtime\Requirements::check();
+    exit(Baander\DevQualification\Fixtures\Messaging\Qualification::main(dirname(__DIR__), 'outbox'));
 } catch (Throwable $error) {
-    fwrite(STDERR, Baander\Tooling\Fixtures\Runtime::failure($error) . "\n");
-    exit(Baander\Tooling\Fixtures\Runtime::status($error));
+    fwrite(STDERR, Baander\DevQualification\Fixtures\Runtime::failure($error) . "\n");
+    exit(Baander\DevQualification\Fixtures\Runtime::status($error));
 }

@@ -100,10 +100,10 @@ final class ActivityController
         summary: 'Record a play event for a song or movie',
         requestBody: new OA\RequestBody(required: true, content: new OA\MediaType(mediaType: 'application/json', schema: new OA\Schema(
             properties: [
-                new OA\Property(property: 'songId', description: 'Public ID of the song being played', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true),
-                new OA\Property(property: 'albumId', description: 'Public ID of the album', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true),
-                new OA\Property(property: 'artistId', description: 'Public ID of the artist', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true),
-                new OA\Property(property: 'movieId', description: 'Public ID of the movie', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true),
+                new OA\Property(property: 'songId', description: 'Public ID of the song being played', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
+                new OA\Property(property: 'albumId', description: 'Public ID of the album', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
+                new OA\Property(property: 'artistId', description: 'Public ID of the artist', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
+                new OA\Property(property: 'movieId', description: 'Public ID of the movie', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
                 new OA\Property(property: 'platform', description: 'Playback platform (e.g. web, mobile, desktop)', type: 'string', nullable: true),
                 new OA\Property(property: 'player', description: 'Player application name', type: 'string', nullable: true),
             ],
@@ -216,7 +216,7 @@ final class ActivityController
         path: '/api/activity/love/{publicId}',
         summary: 'Toggle love on an activity',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Activity public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
+            new OA\Parameter(name: 'publicId', description: 'Activity public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(

@@ -1,11 +1,12 @@
 {
-  "name": "baander/development-tooling",
-  "description": "Standalone testing and development workflow tooling",
+  "name": "baander/workflows",
+  "description": "Standalone operational and development workflow composition",
   "type": "project",
   "license": "Apache-2.0",
   "require": {
     "php": ">=8.5",
-    "baander/tooling": "dev-main"
+    "baander/deployment": "dev-main",
+    "baander/images": "dev-main"
   },
   "config": {
     "allow-plugins": false,
@@ -14,14 +15,156 @@
   "repositories": [
     {
       "type": "path",
-      "url": "../packages/baander-tooling",
+      "url": "../packages/baander-configuration",
       "options": {
-        "symlink": true,
         "reference": "config",
+        "symlink": true,
         "versions": {
-          "baander/tooling": "dev-main"
+          "baander/configuration": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "../packages/baander-containers",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/containers": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "../packages/baander-core",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/core": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "../packages/baander-deployment",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/deployment": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "../packages/baander-dev-ci",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/dev-ci": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "../packages/baander-dev-dependencies",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/dev-dependencies": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "../packages/baander-dev-environment",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/dev-environment": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "../packages/baander-dev-qualification",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/dev-qualification": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "../packages/baander-dev-registry",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/dev-registry": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "../packages/baander-dev-website",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/dev-website": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "../packages/baander-filesystem",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/filesystem": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "../packages/baander-images",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/images": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "../packages/baander-process",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/process": "dev-main"
         }
       }
     }
-  ]
+  ],
+  "require-dev": {
+    "baander/dev-ci": "dev-main",
+    "baander/dev-dependencies": "dev-main",
+    "baander/dev-environment": "dev-main",
+    "baander/dev-qualification": "dev-main",
+    "baander/dev-registry": "dev-main",
+    "baander/dev-website": "dev-main"
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true
 }

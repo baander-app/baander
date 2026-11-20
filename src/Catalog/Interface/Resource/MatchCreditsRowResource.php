@@ -25,11 +25,11 @@ use OpenApi\Attributes as OA;
     required: ['key', 'songPublicId', 'current', 'proposed', 'ticked', 'changes'],
     properties: [
         new OA\Property(property: 'key', description: 'The row\'s key, which an apply names the row by: "credits" for the item\'s own credits, "<song public ID>:credits" for one of an album\'s songs', type: 'string'),
-        new OA\Property(property: 'songPublicId', description: 'The song the credits belong to; null for an album\'s own credits', type: 'string', maxLength: 21, minLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true),
+        new OA\Property(property: 'songPublicId', description: 'The song the credits belong to; null for an album\'s own credits', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
         new OA\Property(property: 'current', description: 'The primary and featured credits now, which an apply rechecks before it writes the row', type: 'array', items: new OA\Items(
             required: ['artistPublicId', 'artistName', 'role', 'creditedName'],
             properties: [
-                new OA\Property(property: 'artistPublicId', type: 'string', maxLength: 21, minLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                new OA\Property(property: 'artistPublicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
                 new OA\Property(property: 'artistName', type: 'string'),
                 new OA\Property(property: 'role', type: 'string', enum: ['primary', 'featured']),
                 new OA\Property(property: 'creditedName', description: 'The name the item is credited under, such as "Post Malone, Luke Combs"', type: 'string'),

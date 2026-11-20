@@ -90,7 +90,7 @@ final class MovieController
         path: '/api/movies/{publicId}',
         summary: 'Get a single movie',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Movie public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'publicId', description: 'Movie public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Movie details', content: new OA\JsonContent(
@@ -152,7 +152,7 @@ final class MovieController
                 new OA\Property(property: 'summary', type: 'string', nullable: true),
             ])),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Movie public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'publicId', description: 'Movie public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Movie updated', content: new OA\JsonContent(
@@ -184,7 +184,7 @@ final class MovieController
         path: '/api/movies/{publicId}',
         summary: 'Delete a movie',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Movie public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'publicId', description: 'Movie public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(

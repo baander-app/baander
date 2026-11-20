@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Messaging;
 
 use App\Shared\Application\Exception\WorkerTransportConfigurationException;
+use Baander\Core\EnvironmentVariable;
 use SensitiveParameter;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
@@ -15,7 +16,7 @@ final class WorkerTransportConfiguration
     /** @param array<array-key,mixed> $environment */
     public static function validate(#[SensitiveParameter] array $environment, bool $required = false): void
     {
-        foreach (['REDIS_URL', 'MESSENGER_TRANSPORT_DSN'] as $key) {
+        foreach ([EnvironmentVariable::REDIS_URL, EnvironmentVariable::MESSENGER_TRANSPORT_DSN] as $key) {
             if (!array_key_exists($key, $environment)) {
                 if ($required) {
                     throw new WorkerTransportConfigurationException($key . ' is required for worker transport configuration.');
@@ -35,7 +36,7 @@ final class WorkerTransportConfiguration
             ) {
                 throw new WorkerTransportConfigurationException($key . ' requires an unambiguous single Redis endpoint.');
             }
-            if ($key === 'REDIS_URL') {
+            if ($key === EnvironmentVariable::REDIS_URL) {
                 if (isset($parts['path']) || isset($parts['query'])) {
                     throw new WorkerTransportConfigurationException('REDIS_URL must be pathless and queryless for the scheduler transport.');
                 }

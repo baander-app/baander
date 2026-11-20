@@ -3,6 +3,8 @@
 
 declare(strict_types=1);
 
+use Baander\Core\EnvironmentVariable;
+
 // Trusted host-only composition root. Never boot Symfony, load dotenv, or mount
 // Docker authority into an application container. Bound this process externally;
 // interruption or an unconfirmed reply never permits repeating create/start.
@@ -37,7 +39,7 @@ try {
     if ($json === false) {
         throw new InvalidArgumentException('Cannot read manifest.');
     }
-    $appHome = getenv('APP_HOME');
+    $appHome = getenv(EnvironmentVariable::APP_HOME);
     if (!is_string($appHome) || $appHome === '') {
         throw new InvalidArgumentException('Operator image must declare APP_HOME.');
     }

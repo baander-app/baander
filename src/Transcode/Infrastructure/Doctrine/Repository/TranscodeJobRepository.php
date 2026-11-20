@@ -203,7 +203,6 @@ final class TranscodeJobRepository implements TranscodeJobRepositoryInterface
             id: $entity->getId(),
             publicId: $entity->getPublicId(),
             videoId: $entity->getVideoId(),
-            ownerUserId: $entity->getOwnerUserId(),
             qualityTierName: $entity->getQualityTierName(),
             status: TranscodeStatus::from($entity->getStatus()),
             referenceCount: $entity->getReferenceCount(),
@@ -222,11 +221,12 @@ final class TranscodeJobRepository implements TranscodeJobRepositoryInterface
             framerate: $entity->getFramerate(),
             createdAt: $entity->getCreatedAt(),
             updatedAt: $entity->getUpdatedAt(),
+            requestId: $entity->getRequestId(),
             failReason: $entity->getFailReason(),
             measuredLoudness: $entity->getMeasuredLoudness(),
             audioTrackLanguages: $entity->getAudioTrackLanguages(),
             audioSegmentMap: $entity->getAudioSegmentMap(),
-            requestId: $entity->getRequestId(),
+            ownerUserId: $entity->getOwnerUserId(),
             presentationSelection: $entity->getPresentationSelection() === null ? null : PresentationSelection::fromArray($entity->getPresentationSelection()),
         ));
     }

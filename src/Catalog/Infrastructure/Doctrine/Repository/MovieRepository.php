@@ -273,9 +273,9 @@ final class MovieRepository implements MovieRepositoryInterface
             tmdbCollectionId: $entity->getTmdbCollectionId(),
             collectionName: $entity->getCollectionName(),
             videoIds: $videoIds,
-            videoPublicIds: $videoPublicIds,
             createdAt: $entity->getCreatedAt(),
             updatedAt: $entity->getUpdatedAt(),
+            videoPublicIds: $videoPublicIds,
         ));
     }
 

@@ -62,12 +62,12 @@ final class ConfigBootCheckListenerTest extends TestCase
                 oauthPublicKeyPath: $keyPath,
                 vapidPublicKey: '',
                 vapidPrivateKey: '',
-                workerProfileHealth: new WorkerProfileHealth($connection, new DeploymentProfile()),
                 messengerWorkerHealth: new MessengerWorkerHealth(
                     $redis,
                     new MockClock(),
                     $this->createStub(WorkerHeartbeatSightingInterface::class),
                 ),
+                workerProfileHealth: new WorkerProfileHealth($connection, new DeploymentProfile()),
             );
             $logger = $this->createMock(LoggerInterface::class);
             $logger->expects(self::once())->method('warning')->with('[Config] {message}', [

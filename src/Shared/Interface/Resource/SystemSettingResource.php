@@ -18,8 +18,8 @@ use OpenApi\Attributes as OA;
             new OA\Schema(type: 'string'),
         ]),
         new OA\Property(property: 'storedValue', description: 'Raw stored value, also when it is no longer allowed; null when unset', nullable: true),
-        new OA\Property(property: 'isExplicit', type: 'boolean', description: 'Whether a value is stored rather than the default applying'),
-        new OA\Property(property: 'storedValueValid', type: 'boolean', description: 'False when the stored value is no longer allowed and the default applies'),
+        new OA\Property(property: 'isExplicit', description: 'Whether a value is stored rather than the default applying', type: 'boolean'),
+        new OA\Property(property: 'storedValueValid', description: 'False when the stored value is no longer allowed and the default applies', type: 'boolean'),
     ],
 )]
 final class SystemSettingResource extends AbstractResource

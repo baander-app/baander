@@ -36,7 +36,7 @@ final class RadioStationController
         responses: [
             new OA\Response(response: '200', description: 'List of countries', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [
-                    new OA\Property(property: 'code', type: 'string', description: 'ISO 3166-1 alpha-2 country code'),
+                    new OA\Property(property: 'code', description: 'ISO 3166-1 alpha-2 country code', type: 'string'),
                     new OA\Property(property: 'name', type: 'string'),
                 ], type: 'object'))],
                 type: 'object',
@@ -66,9 +66,9 @@ final class RadioStationController
         responses: [
             new OA\Response(response: '200', description: 'List of stations', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [
-                    new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
-                    new OA\Property(property: 'externalId', type: 'string', description: 'Station identifier assigned by the external provider'),
-                    new OA\Property(property: 'sourceId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                    new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+                    new OA\Property(property: 'externalId', description: 'Station identifier assigned by the external provider', type: 'string'),
+                    new OA\Property(property: 'sourceId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
                     new OA\Property(property: 'name', type: 'string'),
                     new OA\Property(property: 'countrycode', type: 'string'),
                     new OA\Property(property: 'url_resolved', type: 'string', format: 'uri', nullable: true),

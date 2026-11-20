@@ -54,7 +54,7 @@ class UserEntity
      * under. Only UserRepository::advanceCredentialEpoch() writes it, so saving an aggregate never
      * moves it back.
      */
-    #[ORM\Column(type: 'integer', options: ['default' => 0], insertable: false, updatable: false)]
+    #[ORM\Column(type: 'integer', insertable: false, updatable: false, options: ['default' => 0])]
     private int $credentialEpoch = 0;
 
     #[ORM\Column(type: 'datetime_immutable')]

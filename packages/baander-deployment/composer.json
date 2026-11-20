@@ -1,0 +1,19 @@
+{
+  "name": "baander/deployment",
+  "description": "Deployment presets, worker lifecycle and service configuration",
+  "type": "library",
+  "license": "Apache-2.0",
+  "require": {
+    "php": ">=8.5",
+    "baander/configuration": "dev-main",
+    "baander/containers": "dev-main",
+    "baander/core": "dev-main",
+    "baander/filesystem": "dev-main",
+    "baander/process": "dev-main"
+  },
+  "autoload": {
+    "psr-4": {
+      "Baander\\Deployment\\": "src/"
+    }
+  }
+}

@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use Baander\Tooling\Dependencies\Command;
-use Baander\Tooling\Runtime\Requirements;
+use Baander\DevDependencies\Php\Command;
+use Baander\Process\Runtime\Requirements;
 
 require __DIR__ . '/bootstrap.php';
 

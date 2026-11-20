@@ -9,7 +9,7 @@ that a rebuilt image has the required native behavior.
 
 ## Projects and locks
 
-The [dependency policy](../../../packages/baander-tooling/resources/php-dependencies.json)
+The [dependency policy](../../../packages/baander-dev-dependencies/resources/php-dependencies.json)
 classifies all seven owned Composer projects. Discovery reports newly added source
 manifests that have no classification.
 
@@ -19,7 +19,7 @@ manifests that have no classification.
 | `scripts/composer.json` | Standalone tooling loader lock |
 | `relay/composer.json` | Registry qualification loader lock |
 | `packages/tsduck-php-ffi/composer.json` | TSDuck package lock and independent tests |
-| `packages/baander-tooling/composer.json` | Local package consumed by root and scripts locks |
+| `packages/baander-*/composer.json` | Local workflow and core packages consumed by root and scripts locks |
 | `packages/baander-phpstan-rules/composer.json` | Local package consumed by the root lock |
 | `packages/swoole-bundle/composer.json` | Local fork consumed by the root lock |
 
@@ -33,7 +33,7 @@ Constraint eligibility alone does not establish a compatible full development se
 
 ## Repeatable checks
 
-Install the [standalone loader](../../../packages/baander-tooling/README.md)
+Install the [standalone loader](../../../dev-docs/workflow-packages.md)
 and put PHP 8.5 or newer with Swoole and exactly Composer 2.11.1 on `PATH`.
 Run these commands from the repository root:
 
@@ -44,7 +44,7 @@ php scripts/check-php-dependencies.php --local-only --format json
 php scripts/check-php-dependencies.php --format json
 ```
 
-Local mode validates all seven manifests, reads both package sections of each owned
+Local mode validates all classified manifests, reads both package sections of each owned
 lock, compares runtime declarations, and checks patch metadata and the fork's
 reviewed source hashes. Missing vendor metadata does not remove locked development
 packages from the inventory. Local output explicitly excludes online currency,
@@ -66,7 +66,7 @@ constraint or local path repository prevents Composer from selecting it.
 The checker disables Composer plugins and scripts, isolates Composer settings and
 cache, and does not install, update, relock or apply patches. Neither mode proves
 clean patch application, installed extension versions or native runtime behavior.
-See the [tooling command reference](../../../packages/baander-tooling/README.md#php-dependency-maintenance)
+See the [tooling command reference](../../../dev-docs/workflow-packages.md#php-dependency-maintenance)
 for budgets, environment handling and required interfaces. CI uses local mode;
 online assessment remains an explicit maintenance action.
 

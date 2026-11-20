@@ -12,11 +12,11 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'GenreResource',
     properties: [
-        new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, description: 'Genre public ID'),
-        new OA\Property(property: 'name', type: 'string', description: 'Genre name'),
-        new OA\Property(property: 'slug', type: 'string', description: 'URL-safe slug'),
-        new OA\Property(property: 'parentId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, nullable: true, description: 'Parent genre public ID'),
-        new OA\Property(property: 'mbid', type: 'string', nullable: true, description: 'MusicBrainz ID'),
+        new OA\Property(property: 'publicId', description: 'Genre public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+        new OA\Property(property: 'name', description: 'Genre name', type: 'string'),
+        new OA\Property(property: 'slug', description: 'URL-safe slug', type: 'string'),
+        new OA\Property(property: 'parentId', description: 'Parent genre public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
+        new OA\Property(property: 'mbid', description: 'MusicBrainz ID', type: 'string', nullable: true),
     ],
 )]
 final class GenreResource extends AbstractResource

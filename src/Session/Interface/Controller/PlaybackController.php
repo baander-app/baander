@@ -197,48 +197,42 @@ final readonly class PlaybackController
         return $this->respond(PlaybackOperation::Observe, $input->toArray(), $request);
     }
 
-    #[OA\Post(
-        path: '/api/session/control',
-        summary: 'Control the committed playback runner',
-        parameters: [
-            new OA\Parameter(
-                name: 'X-Baander-Playback-Endpoint',
-                in: 'header',
-                description: 'Required when incarnationId is supplied. Authenticates the endpoint receiving its pending commands in the response.',
-                required: false,
-                schema: new OA\Schema(type: 'string'),
-            ),
-        ],
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(ref: new Model(type: ControlPlaybackRequest::class)),
+    #[OA\Post(path: '/api/session/control', summary: 'Control the committed playback runner', requestBody: new OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(ref: new Model(type: ControlPlaybackRequest::class)),
+    ), parameters: [
+        new OA\Parameter(
+            name: 'X-Baander-Playback-Endpoint',
+            description: 'Required when incarnationId is supplied. Authenticates the endpoint receiving its pending commands in the response.',
+            in: 'header',
+            required: false,
+            schema: new OA\Schema(type: 'string'),
         ),
-        responses: [
-            new OA\Response(
-                response: '200',
-                description: 'Complete playback snapshot',
-                content: new OA\JsonContent(
-                    required: ['data'],
-                    properties: [new OA\Property(property: 'data', ref: new Model(type: PlaybackSnapshotResource::class))],
-                ),
+    ], responses: [
+        new OA\Response(
+            response: '200',
+            description: 'Complete playback snapshot',
+            content: new OA\JsonContent(
+                required: ['data'],
+                properties: [new OA\Property(property: 'data', ref: new Model(type: PlaybackSnapshotResource::class))],
             ),
-            new OA\Response(
-                response: '422',
-                description: 'Invalid playback request',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
-            ),
-            new OA\Response(
-                response: '401',
-                description: 'Not authenticated',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
-            ),
-            new OA\Response(
-                response: '409',
-                description: 'Playback authority or revision conflict',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
-            ),
-        ],
-    )]
+        ),
+        new OA\Response(
+            response: '422',
+            description: 'Invalid playback request',
+            content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+        ),
+        new OA\Response(
+            response: '401',
+            description: 'Not authenticated',
+            content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+        ),
+        new OA\Response(
+            response: '409',
+            description: 'Playback authority or revision conflict',
+            content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+        ),
+    ])]
     #[Route('/control', name: 'control', methods: ['POST'])]
     public function control(#[MapRequestPayload] ControlPlaybackRequest $input, Request $request): JsonResponse
     {
@@ -313,8 +307,8 @@ final readonly class PlaybackController
         parameters: [
             new OA\Parameter(
                 name: 'X-Baander-Playback-Endpoint',
-                in: 'header',
                 description: 'The capability of the incarnation that reports its close.',
+                in: 'header',
                 required: true,
                 schema: new OA\Schema(type: 'string'),
             ),
@@ -361,8 +355,8 @@ final readonly class PlaybackController
         parameters: [
             new OA\Parameter(
                 name: 'X-Baander-Playback-Endpoint',
-                in: 'header',
                 description: 'The capability of the registered endpoint that asks.',
+                in: 'header',
                 required: true,
                 schema: new OA\Schema(type: 'string'),
             ),

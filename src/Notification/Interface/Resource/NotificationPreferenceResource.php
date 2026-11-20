@@ -11,10 +11,10 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'NotificationPreferenceResource',
     properties: [
-        new OA\Property(property: 'category', type: 'string', enum: ['security', 'background_jobs', 'media_changes', 'admin_operations'], description: 'Notification category'),
-        new OA\Property(property: 'channel', type: 'string', enum: ['in_app', 'email', 'push', 'webhook'], description: 'Notification channel'),
-        new OA\Property(property: 'enabled', type: 'boolean', description: 'Whether this channel is enabled'),
-        new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time', description: 'Last update timestamp'),
+        new OA\Property(property: 'category', description: 'Notification category', type: 'string', enum: ['security', 'background_jobs', 'media_changes', 'admin_operations']),
+        new OA\Property(property: 'channel', description: 'Notification channel', type: 'string', enum: ['in_app', 'email', 'push', 'webhook']),
+        new OA\Property(property: 'enabled', description: 'Whether this channel is enabled', type: 'boolean'),
+        new OA\Property(property: 'updatedAt', description: 'Last update timestamp', type: 'string', format: 'date-time'),
     ],
 )]
 final class NotificationPreferenceResource extends AbstractResource

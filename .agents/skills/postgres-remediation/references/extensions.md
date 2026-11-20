@@ -82,7 +82,7 @@ The disposable test stacks in [compose.test.yaml](../../../../compose.test.yaml)
 give the postgres service no command, and the image's own command is plain
 `postgres`. PostgreSQL there runs on initdb's default configuration, not on
 [postgresql.conf](../../../../docker/postgres/conf/postgresql.conf) or the deployment
-settings in [PostgresConfiguration](../../../../packages/baander-tooling/src/Deployment/PostgresConfiguration.php):
+settings in [PostgresConfiguration](../../../../packages/baander-deployment/src/Database/PostgresConfiguration.php):
 autovacuum is on with default settings, `pgroonga.enable_wal` is off, and neither
 file's `shared_preload_libraries` line applies. The CI log and disposable containers
 of both 2026-11-16 builds show these defaults. Aligning the test configuration with
@@ -90,7 +90,7 @@ the project files is separate work that has not been done.
 
 Without `BAANDER_TEST_POSTGRES_IMAGE`, the runners select the local tag
 `baander-database:latest` ([compose.test.yaml](../../../../compose.test.yaml),
-[tooling-defaults.json](../../../../packages/baander-tooling/resources/tooling-defaults.json)),
+[tooling-defaults.json](../../../../packages/baander-configuration/resources/tooling-defaults.json)),
 and nothing in the repository rebuilds it. On the development host it was a Debian 12
 build from 2026-05-21 (PostgreSQL 18.4-1.pgdg12+1, `libgroonga0` 16.0.4-1, PGroonga
 4.0.5-1) until it was rebuilt from the 4.1.0 Dockerfile on 2026-11-16 (image
@@ -352,7 +352,7 @@ That fixture then required an installed version of at least 2.0.4, the tuple-sco
 API's minimum. Since 2026-11-16 it requires 4.1.0 in its own case,
 `testInstalledExtensionKeepsTheIndexesOfUncommittedTransactions`, whose failure
 message names the cleanup fix. The messaging gate runs the fixture
-([Qualification](../../../../packages/baander-tooling/src/Fixtures/Messaging/Qualification.php)),
+([Qualification](../../../../packages/baander-dev-qualification/src/Fixtures/Messaging/Qualification.php)),
 so that gate also fails on an image older than 4.1.0. The fixture also verifies a
 valid v2 text operator-class index with the mapped stem/Ngram options, production
 DQL matching, and positive indexed tuple scores with pagination.

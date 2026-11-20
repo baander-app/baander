@@ -31,7 +31,7 @@ use OpenApi\Attributes as OA;
             new OA\Schema(type: 'string'),
         ]),
         new OA\Property(property: 'source', type: 'string', enum: ['user', 'server_default', 'default']),
-        new OA\Property(property: 'editable', type: 'boolean', description: 'Whether the user may change the setting themselves'),
+        new OA\Property(property: 'editable', description: 'Whether the user may change the setting themselves', type: 'boolean'),
         new OA\Property(property: 'definition', ref: new Model(type: SettingDefinitionResource::class)),
     ],
 )]

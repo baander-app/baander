@@ -7,6 +7,7 @@ namespace App\Shared\Infrastructure\Worker;
 use App\Shared\Application\DTO\DeploymentUnit;
 use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\WorkerAutoscalingProfile;
+use Baander\Core\EnvironmentVariable;
 use InvalidArgumentException;
 use JsonException;
 use stdClass;
@@ -53,7 +54,7 @@ final readonly class DeploymentOperatorManifest
             throw new InvalidArgumentException('Worker manifest requires an ordinary concurrency within the profile and a scheduled console reservation of at least one PHP process.');
         }
         foreach (DeploymentUnit::cases() as $unit) {
-            $this->recipe($unit, new DeploymentRuntimeEnvironment(['BAANDER_DEPLOYMENT_PROFILE' => $deploymentProfile->toJson()]));
+            $this->recipe($unit, new DeploymentRuntimeEnvironment([EnvironmentVariable::BAANDER_DEPLOYMENT_PROFILE => $deploymentProfile->toJson()]));
         }
     }
 
@@ -127,7 +128,7 @@ final readonly class DeploymentOperatorManifest
 
     public function recipe(DeploymentUnit $unit, DeploymentRuntimeEnvironment $environment): DeploymentContainerRecipe
     {
-        if (DeploymentProfile::resolve($environment->variables['BAANDER_DEPLOYMENT_PROFILE'] ?? '') != $this->deploymentProfile) {
+        if (DeploymentProfile::resolve($environment->variables[EnvironmentVariable::BAANDER_DEPLOYMENT_PROFILE] ?? '') != $this->deploymentProfile) {
             throw new InvalidArgumentException('Worker manifest and web deployment profiles must agree.');
         }
         $recipe = new DeploymentContainerRecipe($this->namespace, $this->bootId, $this->daemonId, $this->imageId,
@@ -142,7 +143,7 @@ final readonly class DeploymentOperatorManifest
             throw new InvalidArgumentException('Operator media topology requires an explicitly authorized source storage.');
         }
         $paths = [[$this->appHome . '/storage', 'derived'], [$this->appHome . '/var/transcode_state', 'derived']];
-        foreach (['CONVERT_STORAGE_PATH' => 'derived', 'MEDIA_STORAGE_PATH' => 'source'] as $key => $role) {
+        foreach ([EnvironmentVariable::CONVERT_STORAGE_PATH => 'derived', EnvironmentVariable::MEDIA_STORAGE_PATH => 'source'] as $key => $role) {
             if (!isset($environment->variables[$key])) {
                 continue;
             }

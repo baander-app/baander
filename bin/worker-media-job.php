@@ -3,6 +3,8 @@
 
 declare(strict_types=1);
 
+use Baander\Core\EnvironmentVariable;
+
 ini_set('display_errors', '0');
 ini_set('log_errors', '0');
 $diagnosticReserve = str_repeat(' ', 65536);
@@ -50,9 +52,9 @@ try {
     $stop = static function () use (&$stopping): void { $stopping = true; };
     pcntl_signal(SIGTERM, $stop);
     pcntl_signal(SIGINT, $stop);
-    $environment = getenv('APP_ENV');
-    $debug = getenv('APP_DEBUG');
-    $controlDatabaseUrl = getenv('DATABASE_CONTROL_URL');
+    $environment = getenv(EnvironmentVariable::APP_ENV);
+    $debug = getenv(EnvironmentVariable::APP_DEBUG);
+    $controlDatabaseUrl = getenv(EnvironmentVariable::DATABASE_CONTROL_URL);
     if (!is_string($environment) || preg_match('/\A[A-Za-z0-9_-]{1,64}\z/D', $environment) !== 1
         || !in_array($debug, ['0', '1'], true) || !is_string($controlDatabaseUrl) || $controlDatabaseUrl === ''
     ) {
@@ -60,8 +62,8 @@ try {
     }
     swoole_async_set(['aio_core_worker_num' => 1, 'aio_worker_num' => 1]);
     \App\Transcode\Infrastructure\FFmpeg\ProcessExecutor::requireNativeExecution();
-    $clientId = getenv('BAANDER_NATIVE_CLIENT_ID');
-    $clientGeneration = getenv('BAANDER_NATIVE_CLIENT_GENERATION');
+    $clientId = getenv(EnvironmentVariable::BAANDER_NATIVE_CLIENT_ID);
+    $clientGeneration = getenv(EnvironmentVariable::BAANDER_NATIVE_CLIENT_GENERATION);
     $generation = is_string($clientGeneration) ? filter_var($clientGeneration, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : false;
     if (!is_string($clientId) || !in_array($clientId, $profile->mediaClientIds($kind), true) || $generation === false
         || !is_string($clientGeneration) || preg_match('/\A[1-9][0-9]*\z/D', $clientGeneration) !== 1

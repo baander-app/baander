@@ -6,6 +6,7 @@ namespace App\Shared\Infrastructure\Health;
 
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Shared\Infrastructure\Swoole\WorkerMemoryTable;
+use Baander\Core\EnvironmentVariable;
 use Doctrine\DBAL\Connection;
 use Swoole\Server;
 use Throwable;
@@ -261,7 +262,7 @@ final class HealthCheckService
         $isProd = $this->appEnv === 'prod';
 
         // Always required
-        foreach (['DATABASE_URL', 'REDIS_URL', 'APP_SECRET', 'APP_URL', 'APP_DOMAIN'] as $var) {
+        foreach ([EnvironmentVariable::DATABASE_URL, EnvironmentVariable::REDIS_URL, EnvironmentVariable::APP_SECRET, EnvironmentVariable::APP_URL, EnvironmentVariable::APP_DOMAIN] as $var) {
             $val = getenv($var);
             if ($val === false || $val === '') {
                 $results[] = new HealthCheckResult(
@@ -280,7 +281,7 @@ final class HealthCheckService
 
         // Production-only
         if ($isProd) {
-            foreach (['REDIS_PASSWORD'] as $var) {
+            foreach ([EnvironmentVariable::REDIS_PASSWORD] as $var) {
                 $val = getenv($var);
                 if ($val === false || $val === '') {
                     $results[] = new HealthCheckResult(
@@ -300,10 +301,10 @@ final class HealthCheckService
 
         // Feature-dependent (warn only)
         $featureVars = [
-            'MAILER_DSN' => 'email',
-            'OAUTH_PRIVATE_KEY_PATH' => 'OAuth',
-            'OAUTH_PUBLIC_KEY_PATH' => 'OAuth',
-            'MESSENGER_TRANSPORT_DSN' => 'async jobs',
+            EnvironmentVariable::MAILER_DSN => 'email',
+            EnvironmentVariable::OAUTH_PRIVATE_KEY_PATH => 'OAuth',
+            EnvironmentVariable::OAUTH_PUBLIC_KEY_PATH => 'OAuth',
+            EnvironmentVariable::MESSENGER_TRANSPORT_DSN => 'async jobs',
         ];
         foreach ($featureVars as $var => $feature) {
             $val = getenv($var);
@@ -334,7 +335,7 @@ final class HealthCheckService
         $isProd = $this->appEnv === 'prod';
 
         // DATABASE_URL format
-        $dbUrl = getenv('DATABASE_URL');
+        $dbUrl = getenv(EnvironmentVariable::DATABASE_URL);
         if ($dbUrl !== false && $dbUrl !== '') {
             if (!str_starts_with($dbUrl, 'postgresql://') && !str_starts_with($dbUrl, 'pdo-pgsql://')) {
                 $results[] = new HealthCheckResult(
@@ -343,7 +344,7 @@ final class HealthCheckService
                     responseTimeMs: 0.0,
                     details: [
                         'severity' => 'error',
-                        'var' => 'DATABASE_URL',
+                        'var' => EnvironmentVariable::DATABASE_URL,
                         'message' => 'DATABASE_URL must start with postgresql:// or pdo-pgsql://.',
                     ],
                 );
@@ -351,7 +352,7 @@ final class HealthCheckService
         }
 
         // REDIS_URL format
-        $redisUrl = getenv('REDIS_URL');
+        $redisUrl = getenv(EnvironmentVariable::REDIS_URL);
         if ($redisUrl !== false && $redisUrl !== '') {
             if (!str_starts_with($redisUrl, 'redis://')) {
                 $results[] = new HealthCheckResult(
@@ -360,7 +361,7 @@ final class HealthCheckService
                     responseTimeMs: 0.0,
                     details: [
                         'severity' => 'error',
-                        'var' => 'REDIS_URL',
+                        'var' => EnvironmentVariable::REDIS_URL,
                         'message' => 'REDIS_URL must start with redis://.',
                     ],
                 );
@@ -377,7 +378,7 @@ final class HealthCheckService
                     responseTimeMs: 0.0,
                     details: [
                         'severity' => 'error',
-                        'var' => 'APP_URL',
+                        'var' => EnvironmentVariable::APP_URL,
                         'message' => 'APP_URL must be a valid HTTPS URL in production.',
                         'suggestion' => 'Set APP_URL to https://your-domain.com.',
                     ],

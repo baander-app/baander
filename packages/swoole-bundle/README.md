@@ -31,7 +31,7 @@ behavior or completed fixes.
 Upstream changes must preserve coroutine-specific service release, pool
 diagnostics, authenticated WebSocket handshakes, the application's ownership of
 `BeforeShutdown`, and errors on interrupted streaming responses. The
-[dependency policy](../baander-tooling/resources/php-dependencies.json) names the
+[dependency policy](../baander-dev-dependencies/resources/php-dependencies.json) names the
 regression checks and upstream references for this fork and its dependencies.
 
 ## Requirements

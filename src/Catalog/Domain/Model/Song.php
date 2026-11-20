@@ -85,10 +85,10 @@ final class Song
             channels: $channels,
             codec: $codec,
             explicit: $explicit,
-            containerFormat: $containerFormat,
-            streamIndex: $streamIndex,
             createdAt: new DateTimeImmutable(),
             updatedAt: new DateTimeImmutable(),
+            containerFormat: $containerFormat,
+            streamIndex: $streamIndex,
         ));
     }
 

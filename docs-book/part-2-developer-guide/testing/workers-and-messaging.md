@@ -70,7 +70,7 @@ bash scripts/test-worker-operator-cleanup.sh
 ```
 
 CI runs the PHP tooling suite and the operator cleanup test that the script runs,
-`scripts/tests/php/WorkerCleanupTest.php`, as separate commands. The cleanup test
+`packages/baander-dev-qualification/tests/WorkerCleanupTest.php`, as separate commands. The cleanup test
 uses a disposable Docker CLI stub to check enumeration failures, removal failures,
 retained resources, browser-hook cleanup and preservation of an earlier failure exit
 code. It does not prove cleanup against a real daemon; the production operator drill
@@ -114,7 +114,7 @@ The operator runner requires the host tooling baseline above and Docker. Its
 default host mode also requires the operator PHP runtime with `posix` and
 `pdo_pgsql` (`BAANDER_TEST_PHP_BINARY` selects its executable) and a local Unix
 target selected through the
-[shared Docker configuration](../../../packages/baander-tooling/README.md#configuration-and-image-roles).
+[shared Docker configuration](../../../dev-docs/workflow-packages.md#configuration-and-image-roles).
 The host controller reaches a loopback-published database port; the worker reaches
 the same database through its private network. Its outer 240-second timeout bounds
 native database waits; DBAL `connect_timeout` is not a hard connection deadline.

@@ -1,0 +1,19 @@
+{
+  "name": "baander/dev-ci",
+  "description": "Development only: CI gates, backend tests, architecture checks and artifact storage",
+  "type": "library",
+  "license": "Apache-2.0",
+  "require": {
+    "php": ">=8.5",
+    "baander/configuration": "dev-main",
+    "baander/containers": "dev-main",
+    "baander/filesystem": "dev-main",
+    "baander/images": "dev-main",
+    "baander/process": "dev-main"
+  },
+  "autoload": {
+    "psr-4": {
+      "Baander\\DevCi\\": "src/"
+    }
+  }
+}

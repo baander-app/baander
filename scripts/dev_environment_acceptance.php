@@ -5,10 +5,10 @@ declare(strict_types=1);
 
 require __DIR__ . '/bootstrap.php';
 
-use Baander\Tooling\Development\Acceptance\Qualification;
-use Baander\Tooling\Development\Acceptance\Support;
-use Baander\Tooling\Development\StateStore;
-use Baander\Tooling\Runtime\Requirements;
+use Baander\DevQualification\Acceptance\Qualification;
+use Baander\DevQualification\Acceptance\Support;
+use Baander\DevEnvironment\State\InstanceStateStore;
+use Baander\Process\Runtime\Requirements;
 
 $qualification = null;
 try {
@@ -25,7 +25,7 @@ try {
         [
             'workspace' => '',
             'state-root' => '',
-            'host-state-root' => StateStore::default()->root,
+            'host-state-root' => InstanceStateStore::default()->root,
             'prepare-shared-paths' => '',
             'media-check' => __DIR__ . '/dev_environment_media_probe.php',
             'browser-check' => __DIR__ . '/dev_environment_browser_probe.mjs',
@@ -36,13 +36,13 @@ try {
     umask(0077);
     Support::check(!file_exists(Support::path((string) $args['workspace'])), 'Select a new workspace for disposable qualification.');
     $environment = getenv();
-    $configuration = \Baander\Tooling\Configuration\ToolingConfiguration::forRepository(dirname(__DIR__), $environment);
-    $executor = new \Baander\Tooling\Process\EngineExecutor(\Baander\Tooling\Process\ExecutionContext::bounded((float) $args['timeout'], $environment));
-    $target = new \Baander\Tooling\Docker\TargetResolver($executor, $environment)->resolve($configuration->docker, $args['state-root'] . '/host-setup/acceptance-transport');
+    $configuration = \Baander\Configuration\ToolingConfiguration::forRepository(dirname(__DIR__), $environment);
+    $executor = new \Baander\Process\Execution\EngineExecutor(\Baander\Process\Execution\ExecutionContext::bounded((float) $args['timeout'], $environment));
+    $target = new \Baander\Containers\Docker\TargetResolver($executor, $environment)->resolve($configuration->docker, $args['state-root'] . '/host-setup/acceptance-transport');
     $targetFile = $args['state-root'] . '/host-setup/acceptance-target.json';
-    \Baander\Tooling\Filesystem\AtomicFile::writeJson($targetFile, $target->toArray());
+    \Baander\Filesystem\AtomicFile::writeJson($targetFile, $target->toArray());
     $environment['BAANDER_TOOLING_TARGET_FILE'] = $targetFile;
-    $qualification = new Qualification($args, $executor, new \Baander\Tooling\Docker\Client($executor, $target, $environment), $environment);
+    $qualification = new Qualification($args, $executor, new \Baander\Containers\Docker\Client($executor, $target, $environment), $environment);
     $qualification->run();
 } catch (Throwable $error) {
     if ($qualification !== null) {

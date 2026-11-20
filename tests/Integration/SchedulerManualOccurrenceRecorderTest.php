@@ -382,7 +382,7 @@ CHILD;
     {
         $job = $this->job();
         $request = Uuid::v7();
-        $winner = new SchedulerOccurrence($request, $job, $this->databaseMinute()->modify('-1 day'), JobType::Console, 'app:winning-manual-fixture', ['z' => 1.0, 'a' => -0.0], origin: SchedulerOccurrenceOrigin::Manual, jobPublicId: new \App\Shared\Domain\Model\PublicId());
+        $winner = new SchedulerOccurrence($request, $job, $this->databaseMinute()->modify('-1 day'), JobType::Console, 'app:winning-manual-fixture', ['z' => 1.0, 'a' => -0.0], jobPublicId: new \App\Shared\Domain\Model\PublicId(), origin: SchedulerOccurrenceOrigin::Manual);
         $application = 'manual_retry_' . bin2hex(random_bytes(8));
         $code = <<<'CHILD'
 require $argv[1];

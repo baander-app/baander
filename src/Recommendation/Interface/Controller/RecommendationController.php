@@ -77,48 +77,42 @@ final class RecommendationController
     /**
      * Get "For You" recommendations with explanations.
      */
-    #[OA\Get(
-        path: '/api/recommendations/for-you',
-        summary: 'Get personalized recommendations with explanation breakdown',
-        description: 'Returns aggregated recommendations with one-line explanations and per-strategy scores',
-        parameters: [
-            new OA\Parameter(name: 'limit', description: 'Max recommendations (max 100)', in: 'query', schema: new OA\Schema(type: 'integer', default: 50)),
-        ],
-        responses: [
-            new OA\Response(
-                response: '200',
-                description: 'Success',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(
-                            property: 'data',
-                            type: 'array',
-                            items: new OA\Items(
-                                properties: [
-                                    new OA\Property(property: 'target_id', type: 'string'),
-                                    new OA\Property(property: 'target_type', type: 'string'),
-                                    new OA\Property(property: 'total_score', type: 'number'),
-                                    new OA\Property(property: 'explanation', type: 'string'),
-                                    new OA\Property(property: 'strategies', type: 'object', additionalProperties: true),
-                                    new OA\Property(property: 'song', required: ['public_id', 'title', 'album_id', 'track', 'disc', 'year', 'length', 'available'], properties: [
-                                        new OA\Property(property: 'public_id', type: 'string'),
-                                        new OA\Property(property: 'title', type: 'string'),
-                                        new OA\Property(property: 'album_id', type: 'string'),
-                                        new OA\Property(property: 'track', type: 'integer', nullable: true),
-                                        new OA\Property(property: 'disc', type: 'integer', nullable: true),
-                                        new OA\Property(property: 'year', type: 'integer', nullable: true),
-                                        new OA\Property(property: 'length', type: 'number', nullable: true),
-                                        new OA\Property(property: 'available', type: 'boolean'),
-                                    ]),
-                                ],
-                            ),
+    #[OA\Get(path: '/api/recommendations/for-you', description: 'Returns aggregated recommendations with one-line explanations and per-strategy scores', summary: 'Get personalized recommendations with explanation breakdown', parameters: [
+        new OA\Parameter(name: 'limit', description: 'Max recommendations (max 100)', in: 'query', schema: new OA\Schema(type: 'integer', default: 50)),
+    ], responses: [
+        new OA\Response(
+            response: '200',
+            description: 'Success',
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(
+                        property: 'data',
+                        type: 'array',
+                        items: new OA\Items(
+                            properties: [
+                                new OA\Property(property: 'target_id', type: 'string'),
+                                new OA\Property(property: 'target_type', type: 'string'),
+                                new OA\Property(property: 'total_score', type: 'number'),
+                                new OA\Property(property: 'explanation', type: 'string'),
+                                new OA\Property(property: 'strategies', type: 'object', additionalProperties: true),
+                                new OA\Property(property: 'song', required: ['public_id', 'title', 'album_id', 'track', 'disc', 'year', 'length', 'available'], properties: [
+                                    new OA\Property(property: 'public_id', type: 'string'),
+                                    new OA\Property(property: 'title', type: 'string'),
+                                    new OA\Property(property: 'album_id', type: 'string'),
+                                    new OA\Property(property: 'track', type: 'integer', nullable: true),
+                                    new OA\Property(property: 'disc', type: 'integer', nullable: true),
+                                    new OA\Property(property: 'year', type: 'integer', nullable: true),
+                                    new OA\Property(property: 'length', type: 'number', nullable: true),
+                                    new OA\Property(property: 'available', type: 'boolean'),
+                                ]),
+                            ],
                         ),
-                    ],
-                ),
+                    ),
+                ],
             ),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        ],
-    )]
+        ),
+        new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+    ])]
     #[Route('/for-you', name: 'for_you', methods: ['GET'])]
     public function forYou(Request $request): JsonResponse
     {
@@ -132,8 +126,8 @@ final class RecommendationController
         $recommendations = $this->bus->dispatch(new GetPersonalizedRecommendationsQuery(
             userId: Uuid::fromString($user->getId()),
             limit: $limit,
-            administrator: $this->security->isGranted('ROLE_ADMIN'),
             targetType: 'song',
+            administrator: $this->security->isGranted('ROLE_ADMIN'),
         ))->last(HandledStamp::class)?->getResult() ?? [];
 
         return $this->successResponse($recommendations);

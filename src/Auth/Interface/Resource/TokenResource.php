@@ -11,10 +11,10 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'TokenResource',
     properties: [
-        new OA\Property(property: 'accessToken', type: 'string', description: 'OAuth 2.0 access token'),
-        new OA\Property(property: 'tokenType', type: 'string', description: 'Token type, always DPoP: the access token is bound to the client\'s DPoP key (RFC 9449)'),
-        new OA\Property(property: 'expiresIn', type: 'integer', description: 'Seconds until token expiry'),
-        new OA\Property(property: 'refreshToken', type: 'string', nullable: true, description: 'OAuth 2.0 refresh token'),
+        new OA\Property(property: 'accessToken', description: 'OAuth 2.0 access token', type: 'string'),
+        new OA\Property(property: 'tokenType', description: 'Token type, always DPoP: the access token is bound to the client\'s DPoP key (RFC 9449)', type: 'string'),
+        new OA\Property(property: 'expiresIn', description: 'Seconds until token expiry', type: 'integer'),
+        new OA\Property(property: 'refreshToken', description: 'OAuth 2.0 refresh token', type: 'string', nullable: true),
     ],
 )]
 final class TokenResource extends AbstractResource

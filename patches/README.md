@@ -16,7 +16,7 @@ and native layouts are correct.
 
 ## Review inventory
 
-The tooling [dependency policy](../packages/baander-tooling/resources/php-dependencies.json)
+The tooling [dependency policy](../packages/baander-dev-dependencies/resources/php-dependencies.json)
 classifies Composer projects, runtime declarations, patches and forks. Reviewed
 upstream references identify comparison points; a changed reference requires a
 new review and does not establish that a patch is obsolete.

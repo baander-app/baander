@@ -1,0 +1,18 @@
+{
+  "name": "baander/images",
+  "description": "Image source preparation, builds and artifact inventories",
+  "type": "library",
+  "license": "Apache-2.0",
+  "require": {
+    "php": ">=8.5",
+    "baander/configuration": "dev-main",
+    "baander/containers": "dev-main",
+    "baander/filesystem": "dev-main",
+    "baander/process": "dev-main"
+  },
+  "autoload": {
+    "psr-4": {
+      "Baander\\Images\\": "src/"
+    }
+  }
+}

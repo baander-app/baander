@@ -86,7 +86,7 @@ final class DoctrineSchedulerManualOccurrenceRecorder implements SchedulerManual
             if (!is_array($parameters)) {
                 throw new \UnexpectedValueException('Scheduled manual parameters must be an array or object.');
             }
-            $occurrence = new SchedulerOccurrence($requestId, $jobId, $minute, JobType::from($row['job_type']), $row['command'], $parameters, origin: SchedulerOccurrenceOrigin::Manual, jobPublicId: PublicId::fromString($row['public_id']));
+            $occurrence = new SchedulerOccurrence($requestId, $jobId, $minute, JobType::from($row['job_type']), $row['command'], $parameters, jobPublicId: PublicId::fromString($row['public_id']), origin: SchedulerOccurrenceOrigin::Manual);
             // Global ID uniqueness and the writer's collision checks fail closed across different jobs.
             (new TransactionalSchedulerOccurrenceWriter($this->connection))->record($occurrence);
             return $this->findRequest($jobId, $requestId) ?? throw new \UnexpectedValueException('Recorded scheduler request has no snapshot.');
@@ -115,7 +115,12 @@ final class DoctrineSchedulerManualOccurrenceRecorder implements SchedulerManual
         if (!is_array($parameters)) {
             throw new \UnexpectedValueException('Persisted scheduler manual parameters must be an array or object.');
         }
-        return new SchedulerOccurrence(Uuid::fromString($row['id']), Uuid::fromString($row['job_id']), new DateTimeImmutable($row['scheduled_for']), JobType::from($row['job_type']), $row['command'], $parameters, origin: SchedulerOccurrenceOrigin::Manual, publicId: PublicId::fromString($row['public_id']), jobPublicId: PublicId::fromString($row['job_public_id']));
+        $storedOccurrenceId = Uuid::fromString($row['id']);
+        $storedJobId = Uuid::fromString($row['job_id']);
+        $scheduledFor = new DateTimeImmutable($row['scheduled_for']);
+        $jobType = JobType::from($row['job_type']);
+        $publicId = PublicId::fromString($row['public_id']);
+        return new SchedulerOccurrence($storedOccurrenceId, $storedJobId, $scheduledFor, $jobType, $row['command'], $parameters, jobPublicId: PublicId::fromString($row['job_public_id']), origin: SchedulerOccurrenceOrigin::Manual, publicId: $publicId);
     }
 
     /**

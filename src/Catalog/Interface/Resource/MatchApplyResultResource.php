@@ -19,7 +19,7 @@ use OpenApi\Attributes as OA;
     required: ['type', 'publicId', 'candidateId', 'fields', 'creditsChanged', 'songsChanged', 'mergedArtists', 'removedArtists'],
     properties: [
         new OA\Property(property: 'type', description: 'What was matched', type: 'string', enum: ['album', 'song', 'artist']),
-        new OA\Property(property: 'publicId', description: 'The album\'s, song\'s or artist\'s public ID', type: 'string', maxLength: 21, minLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+        new OA\Property(property: 'publicId', description: 'The album\'s, song\'s or artist\'s public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
         new OA\Property(property: 'candidateId', description: 'The MusicBrainz ID applied: a release, recording or artist', type: 'string'),
         new OA\Property(property: 'fields', description: 'The item\'s own fields the match wrote, by field name', type: 'array', items: new OA\Items(type: 'string')),
         new OA\Property(property: 'creditsChanged', description: 'Whether the item\'s own artist credits changed', type: 'boolean'),

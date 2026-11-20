@@ -10,7 +10,7 @@ Bånder tests backend domain logic, persistence, asynchronous workers, native me
 | **StaticAnalysisRules** | `packages/baander-phpstan-rules/tests/` | Custom PHPStan rules, including parsed-source request-payload fixtures |
 | **Functional** | `tests/Functional/` | HTTP controllers, console commands, and application flows with Symfony kernel, PostgreSQL, and Redis |
 | **Integration** | `tests/Integration/` | Database schema, firewall matrices, transport delivery, and concurrency contracts against disposable services |
-| **Tooling** | `scripts/tests/php/` | Standalone build, deployment, website, and test-runner orchestration contracts (`phpunit-tooling.xml.dist`) |
+| **Tooling** | `packages/baander-*/tests/`, `tests/Tooling/` | Standalone build, deployment, website, and test-runner orchestration contracts (`phpunit-tooling.xml.dist`) |
 
 ## Quick Start
 

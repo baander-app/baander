@@ -115,16 +115,24 @@ final class ScheduledJobRepository implements ScheduledJobRepositoryInterface
         if (!is_array($parameters)) {
             throw new \UnexpectedValueException('Scheduled job parameters must hydrate as an array.');
         }
+        $id = Uuid::fromString($row['id']);
+        $jobType = JobType::from($row['job_type']);
+        $status = ScheduleStatus::from($row['status']);
+        $createdAt = new \DateTimeImmutable($row['created_at']);
+        $updatedAt = new \DateTimeImmutable($row['updated_at']);
+        $lastRunAt = $row['last_run_at'] === null ? null : new \DateTimeImmutable($row['last_run_at']);
+        $nextRunAt = $row['next_run_at'] === null ? null : new \DateTimeImmutable($row['next_run_at']);
+        $lastFailureAt = $row['last_failure_at'] === null ? null : new \DateTimeImmutable($row['last_failure_at']);
+        $publicId = PublicId::fromString($row['public_id']);
         return ScheduledJob::reconstitute(new ScheduledJobState(
-            id: Uuid::fromString($row['id']), name: $row['name'], expression: $row['expression'],
-            jobType: JobType::from($row['job_type']), command: $row['command'], status: ScheduleStatus::from($row['status']),
+            id: $id, name: $row['name'], expression: $row['expression'],
+            jobType: $jobType, command: $row['command'], status: $status,
             description: $row['description'], parameters: $parameters,
-            createdAt: new \DateTimeImmutable($row['created_at']), updatedAt: new \DateTimeImmutable($row['updated_at']),
-            lastRunAt: $row['last_run_at'] === null ? null : new \DateTimeImmutable($row['last_run_at']),
-            nextRunAt: $row['next_run_at'] === null ? null : new \DateTimeImmutable($row['next_run_at']),
+            createdAt: $createdAt, updatedAt: $updatedAt,
+            lastRunAt: $lastRunAt,
+            nextRunAt: $nextRunAt,
             lastResult: $row['last_result'], runCount: (int) $row['run_count'],
-            lastFailureAt: $row['last_failure_at'] === null ? null : new \DateTimeImmutable($row['last_failure_at']),
-            publicId: PublicId::fromString($row['public_id']), lastError: $row['last_error'], revision: Uuid::fromString($row['revision']),
+            lastFailureAt: $lastFailureAt, lastError: $row['last_error'], revision: Uuid::fromString($row['revision']), publicId: $publicId,
         ));
     }
 }

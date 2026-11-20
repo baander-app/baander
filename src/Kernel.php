@@ -10,6 +10,7 @@ use App\Shared\Infrastructure\Logging\TerminalLogGuardPass;
 use App\Shared\Infrastructure\Security\ProductionSecrets;
 use App\Shared\Infrastructure\Swoole\DBAL\DBALAliveKeeperCompilerPass;
 use App\Shared\Infrastructure\Swoole\ServeCommandPass;
+use Baander\Core\EnvironmentVariable;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Kernel\CoroutinesSupportingKernel;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -49,7 +50,7 @@ class Kernel extends BaseKernel
 
     public function getLogDir(): string
     {
-        $directory = ProductionSecrets::environmentValue('BAANDER_LOG_DIR');
+        $directory = ProductionSecrets::environmentValue(EnvironmentVariable::BAANDER_LOG_DIR);
         if ($directory === null || $directory === '') {
             return parent::getLogDir();
         }

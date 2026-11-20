@@ -32,7 +32,7 @@ class ClientEntity implements ClientEntityInterface
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $secretHash = null;
 
-    #[ORM\Column(type: 'text', options: ['default' => 'none'], enumType: ClientAuthMethod::class)]
+    #[ORM\Column(type: 'text', enumType: ClientAuthMethod::class, options: ['default' => 'none'])]
     private ClientAuthMethod $tokenEndpointAuthMethod;
 
     /**

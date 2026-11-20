@@ -10,16 +10,16 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'EqDeviceProfileResource',
     properties: [
-        new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Profile public identifier'),
-        new OA\Property(property: 'name', type: 'string', description: 'Profile name'),
-        new OA\Property(property: 'icon', type: 'string', description: 'Icon identifier'),
-        new OA\Property(property: 'deviceId', type: 'string', nullable: true, description: 'Client audio-output token, independent of database identity'),
-        new OA\Property(property: 'payload', type: 'object', description: 'EQ configuration payload'),
-        new OA\Property(property: 'isDefault', type: 'boolean', description: 'Whether this is the default profile'),
-        new OA\Property(property: 'sortOrder', type: 'integer', description: 'Sort order'),
-        new OA\Property(property: 'version', type: 'integer', description: 'Profile version'),
-        new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', description: 'Creation timestamp'),
-        new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time', description: 'Last update timestamp'),
+        new OA\Property(property: 'publicId', description: 'Profile public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+        new OA\Property(property: 'name', description: 'Profile name', type: 'string'),
+        new OA\Property(property: 'icon', description: 'Icon identifier', type: 'string'),
+        new OA\Property(property: 'deviceId', description: 'Client audio-output token, independent of database identity', type: 'string', nullable: true),
+        new OA\Property(property: 'payload', description: 'EQ configuration payload', type: 'object'),
+        new OA\Property(property: 'isDefault', description: 'Whether this is the default profile', type: 'boolean'),
+        new OA\Property(property: 'sortOrder', description: 'Sort order', type: 'integer'),
+        new OA\Property(property: 'version', description: 'Profile version', type: 'integer'),
+        new OA\Property(property: 'createdAt', description: 'Creation timestamp', type: 'string', format: 'date-time'),
+        new OA\Property(property: 'updatedAt', description: 'Last update timestamp', type: 'string', format: 'date-time'),
     ],
 )]
 final class EqDeviceProfileResource

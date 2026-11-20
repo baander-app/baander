@@ -9,7 +9,7 @@ use App\Shared\Interface\Resource\AbstractResource;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(schema: 'WebSocketTicketResource', required: ['ticket', 'expiresAt'], properties: [
-    new OA\Property(property: 'ticket', type: 'string', pattern: '^[0-9a-f]{64}$', minLength: 64, maxLength: 64),
+    new OA\Property(property: 'ticket', type: 'string', pattern: '^[0-9a-f]{64}$', maxLength: 64, minLength: 64),
     new OA\Property(property: 'expiresAt', type: 'string', format: 'date-time'),
 ])]
 final class WebSocketTicketResource extends AbstractResource

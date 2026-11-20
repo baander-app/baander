@@ -22,7 +22,7 @@ final class AdminScheduledJobTriggerTest extends TestCase
     {
         $job = new PublicId();
         $requestId = Uuid::generate();
-        $occurrence = new SchedulerOccurrence($requestId, Uuid::generate(), new \DateTimeImmutable('2026-10-03T10:00:00Z'), JobType::Console, 'app:test', [], origin: SchedulerOccurrenceOrigin::Manual, jobPublicId: $job);
+        $occurrence = new SchedulerOccurrence($requestId, Uuid::generate(), new \DateTimeImmutable('2026-10-03T10:00:00Z'), JobType::Console, 'app:test', [], jobPublicId: $job, origin: SchedulerOccurrenceOrigin::Manual);
         $jobs = $this->createMock(ScheduledJobAdministrationInterface::class);
         $jobs->expects(self::never())->method('getByPublicId');
         $recorder = $this->createMock(SchedulerManualOccurrenceRecorderInterface::class);
@@ -48,7 +48,7 @@ final class AdminScheduledJobTriggerTest extends TestCase
         $recorder->expects(self::once())->method('recordByPublicId')->willReturnCallback(static function (PublicId $publicId, Uuid $requestId) use ($job): SchedulerOccurrence {
             self::assertTrue($publicId->equals($job));
             self::assertSame('7', $requestId->toString()[14]);
-            return new SchedulerOccurrence($requestId, Uuid::generate(), new \DateTimeImmutable('2026-10-03T10:00:00Z'), JobType::Console, 'app:test', [], origin: SchedulerOccurrenceOrigin::Manual, jobPublicId: $job);
+            return new SchedulerOccurrence($requestId, Uuid::generate(), new \DateTimeImmutable('2026-10-03T10:00:00Z'), JobType::Console, 'app:test', [], jobPublicId: $job, origin: SchedulerOccurrenceOrigin::Manual);
         });
         $response = (new AdminScheduledJobController($this->createStub(ScheduledJobAdministrationInterface::class), $recorder))->trigger($job->toString(), new Request());
         self::assertSame(202, $response->getStatusCode());

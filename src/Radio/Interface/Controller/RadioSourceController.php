@@ -36,7 +36,7 @@ final class RadioSourceController
         responses: [
             new OA\Response(response: '200', description: 'List of sources', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [
-                    new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                    new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
                     new OA\Property(property: 'name', type: 'string'),
                     new OA\Property(property: 'type', type: 'string'),
                     new OA\Property(property: 'syncUrl', type: 'string', format: 'uri'),
@@ -77,11 +77,11 @@ final class RadioSourceController
         ),
         responses: [
             new OA\Response(response: '201', description: 'Source created', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', type: 'object', properties: [
-                    new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                properties: [new OA\Property(property: 'data', properties: [
+                    new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
                     new OA\Property(property: 'name', type: 'string'),
                     new OA\Property(property: 'type', type: 'string'),
-                ])],
+                ], type: 'object')],
                 type: 'object',
             )),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),

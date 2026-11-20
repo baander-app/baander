@@ -49,7 +49,7 @@ final class RecommendationJobUseCasesTest extends TestCase
 
     public function testARunOutsideTheWebServerCreatesAJobRecordThatFollowsEachStrategy(): void
     {
-        $result = $this->generator()(new GenerateRecommendationsCommand(foreground: true, mode: 'incremental', actor: 'cli'));
+        $result = $this->generator()(new GenerateRecommendationsCommand(mode: 'incremental', actor: 'cli', foreground: true));
 
         self::assertInstanceOf(RecommendationGenerationResult::class, $result);
         self::assertSame(RecommendationGenerationResult::EXECUTION_SYNC, $result->execution);
@@ -75,7 +75,7 @@ final class RecommendationJobUseCasesTest extends TestCase
             }
         };
 
-        $result = $this->generator()(new GenerateRecommendationsCommand(foreground: true, mode: 'full'));
+        $result = $this->generator()(new GenerateRecommendationsCommand(mode: 'full', foreground: true));
 
         self::assertInstanceOf(RecommendationGenerationResult::class, $result);
         self::assertSame('cancelled', $result->status);
@@ -93,7 +93,7 @@ final class RecommendationJobUseCasesTest extends TestCase
             }
         };
 
-        $result = $this->generator()(new GenerateRecommendationsCommand(foreground: true, mode: 'full'));
+        $result = $this->generator()(new GenerateRecommendationsCommand(mode: 'full', foreground: true));
 
         self::assertInstanceOf(RecommendationGenerationResult::class, $result);
         self::assertSame('cancelled', $result->status);
@@ -111,7 +111,7 @@ final class RecommendationJobUseCasesTest extends TestCase
             }
         };
 
-        $result = $this->generator()(new GenerateRecommendationsCommand(foreground: true, mode: 'full'));
+        $result = $this->generator()(new GenerateRecommendationsCommand(mode: 'full', foreground: true));
 
         self::assertInstanceOf(RecommendationGenerationResult::class, $result);
         self::assertSame('cancelled', $result->status);
@@ -124,7 +124,7 @@ final class RecommendationJobUseCasesTest extends TestCase
         $activity->method('getAllListeningHistories')->willThrowException(new \RuntimeException('activity store unavailable'));
 
         try {
-            $this->generator(activity: $activity)(new GenerateRecommendationsCommand(foreground: true, mode: 'full'));
+            $this->generator(activity: $activity)(new GenerateRecommendationsCommand(mode: 'full', foreground: true));
             self::fail('The run should fail.');
         } catch (\RuntimeException $exception) {
             self::assertSame('activity store unavailable', $exception->getMessage());
@@ -140,7 +140,7 @@ final class RecommendationJobUseCasesTest extends TestCase
         $this->expectException(InvalidInputException::class);
 
         try {
-            $this->generator()(new GenerateRecommendationsCommand(foreground: true, mode: 'Full'));
+            $this->generator()(new GenerateRecommendationsCommand(mode: 'Full', foreground: true));
         } finally {
             self::assertSame([], $this->jobs->jobs);
         }
@@ -256,7 +256,7 @@ final class RecommendationJobUseCasesTest extends TestCase
         $done->markCancelled();
 
         $this->expectException(ConflictException::class);
-        $this->generator()(new GenerateRecommendationsCommand(foreground: true, mode: 'full', jobId: $done->getId()));
+        $this->generator()(new GenerateRecommendationsCommand(mode: 'full', jobId: $done->getId(), foreground: true));
     }
 
     public function testTheListClampsTheLimitAndRejectsAnUnknownStatus(): void

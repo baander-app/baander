@@ -328,7 +328,7 @@ final class SchedulerOccurrenceGuardTest extends TestCase
     public function testPersistedManualOriginRunsPausedJobAndCannotRepeatItsAttempt(): void
     {
         [$scheduled, $job] = $this->recordOccurrence();
-        $manual = new SchedulerOccurrence(Uuid::v7(), $job->getId(), $scheduled->scheduledFor, $scheduled->jobType, $scheduled->command, $scheduled->parameters, origin: SchedulerOccurrenceOrigin::Manual, jobPublicId: new \App\Shared\Domain\Model\PublicId());
+        $manual = new SchedulerOccurrence(Uuid::v7(), $job->getId(), $scheduled->scheduledFor, $scheduled->jobType, $scheduled->command, $scheduled->parameters, jobPublicId: new \App\Shared\Domain\Model\PublicId(), origin: SchedulerOccurrenceOrigin::Manual);
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->writer))->record($manual));
         $job->pause();
         $effects = 0;

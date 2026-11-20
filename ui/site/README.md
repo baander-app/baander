@@ -111,7 +111,7 @@ package version comes from `packages/baander-audio-core/package.json`. The build
 accepts the list of four references that `lossless.json` held before the harness
 measured Bånder Audio Core; that list has no Bånder Audio Core rows and no run record. The tooling tests
 read a made-up run in the harness's shape,
-`scripts/tests/php/Fixtures/aac-lossless-result.json`.
+`packages/baander-dev-website/tests/Fixtures/aac-lossless-result.json`.
 
 Capability and methodology text belongs in `ui/site/templates/bac.php`;
 review it against the linked package documentation when the codec changes.

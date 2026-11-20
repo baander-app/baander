@@ -24,7 +24,7 @@ final class SchedulerRunCommandTest extends TestCase
         $requestId = Uuid::generate();
         $recorder = $this->createMock(SchedulerManualOccurrenceRecorderInterface::class);
         $recorder->expects(self::once())->method('recordByPublicId')->with($jobId, $requestId)->willReturn(
-            new SchedulerOccurrence($requestId, Uuid::generate(), new \DateTimeImmutable('2026-10-03T10:00:00Z'), JobType::Console, 'app:test', [], origin: SchedulerOccurrenceOrigin::Manual, jobPublicId: $jobId),
+            new SchedulerOccurrence($requestId, Uuid::generate(), new \DateTimeImmutable('2026-10-03T10:00:00Z'), JobType::Console, 'app:test', [], jobPublicId: $jobId, origin: SchedulerOccurrenceOrigin::Manual),
         );
         $tester = new CommandTester(new SchedulerRunCommand($recorder));
         self::assertSame(Command::SUCCESS, $tester->execute(['id' => $jobId->toString(), '--request-id' => $requestId->toString()]));
@@ -39,7 +39,7 @@ final class SchedulerRunCommandTest extends TestCase
         $requestId = Uuid::generate();
         $recorder = $this->createStub(SchedulerManualOccurrenceRecorderInterface::class);
         $recorder->method('recordByPublicId')->willReturn(
-            new SchedulerOccurrence($requestId, Uuid::generate(), new \DateTimeImmutable('2026-10-03T10:00:00Z'), JobType::Console, 'app:test', [], origin: SchedulerOccurrenceOrigin::Manual, jobPublicId: $jobId),
+            new SchedulerOccurrence($requestId, Uuid::generate(), new \DateTimeImmutable('2026-10-03T10:00:00Z'), JobType::Console, 'app:test', [], jobPublicId: $jobId, origin: SchedulerOccurrenceOrigin::Manual),
         );
         $tester = new CommandTester(new SchedulerRunCommand($recorder));
 

@@ -63,7 +63,13 @@ final class DoctrineSchedulerOccurrenceStore implements SchedulerOccurrenceStore
         if (!is_array($parameters)) {
             throw new \UnexpectedValueException('Persisted scheduler parameters must be an array or object.');
         }
-        return new SchedulerOccurrence(Uuid::fromString($row['id']), Uuid::fromString($row['job_id']), new DateTimeImmutable($row['scheduled_for']), JobType::from($row['job_type']), $row['command'], $parameters, origin: SchedulerOccurrenceOrigin::from($row['origin']), publicId: PublicId::fromString($row['public_id']), jobPublicId: PublicId::fromString($row['job_public_id']));
+        $storedOccurrenceId = Uuid::fromString($row['id']);
+        $storedJobId = Uuid::fromString($row['job_id']);
+        $scheduledFor = new DateTimeImmutable($row['scheduled_for']);
+        $jobType = JobType::from($row['job_type']);
+        $origin = SchedulerOccurrenceOrigin::from($row['origin']);
+        $publicId = PublicId::fromString($row['public_id']);
+        return new SchedulerOccurrence($storedOccurrenceId, $storedJobId, $scheduledFor, $jobType, $row['command'], $parameters, jobPublicId: PublicId::fromString($row['job_public_id']), origin: $origin, publicId: $publicId);
     }
 
     /**

@@ -17,17 +17,17 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'RecommendationResource',
     properties: [
-        new OA\Property(property: 'public_id', type: 'string', description: 'Public recommendation identity'),
-        new OA\Property(property: 'name', type: 'string', description: 'Recommendation name'),
-        new OA\Property(property: 'source_type', type: 'string', description: 'Source entity type'),
-        new OA\Property(property: 'source_id', type: 'string', nullable: true, description: 'Source entity ID'),
-        new OA\Property(property: 'target_type', type: 'string', description: 'Target entity type'),
-        new OA\Property(property: 'target_id', type: 'string', nullable: true, description: 'Target entity ID'),
-        new OA\Property(property: 'score', type: 'number', nullable: true, description: 'Relevance score'),
-        new OA\Property(property: 'position', type: 'integer', nullable: true, description: 'Recommendation position'),
-        new OA\Property(property: 'user_id', type: 'string', nullable: true, description: 'Public user identity'),
-        new OA\Property(property: 'created_at', type: 'string', format: 'date-time', description: 'Creation timestamp'),
-        new OA\Property(property: 'updated_at', type: 'string', format: 'date-time', description: 'Last update timestamp'),
+        new OA\Property(property: 'public_id', description: 'Public recommendation identity', type: 'string'),
+        new OA\Property(property: 'name', description: 'Recommendation name', type: 'string'),
+        new OA\Property(property: 'source_type', description: 'Source entity type', type: 'string'),
+        new OA\Property(property: 'source_id', description: 'Source entity ID', type: 'string', nullable: true),
+        new OA\Property(property: 'target_type', description: 'Target entity type', type: 'string'),
+        new OA\Property(property: 'target_id', description: 'Target entity ID', type: 'string', nullable: true),
+        new OA\Property(property: 'score', description: 'Relevance score', type: 'number', nullable: true),
+        new OA\Property(property: 'position', description: 'Recommendation position', type: 'integer', nullable: true),
+        new OA\Property(property: 'user_id', description: 'Public user identity', type: 'string', nullable: true),
+        new OA\Property(property: 'created_at', description: 'Creation timestamp', type: 'string', format: 'date-time'),
+        new OA\Property(property: 'updated_at', description: 'Last update timestamp', type: 'string', format: 'date-time'),
     ],
 )]
 final class RecommendationResource

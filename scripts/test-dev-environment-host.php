@@ -5,22 +5,22 @@ declare(strict_types=1);
 
 require __DIR__ . '/bootstrap.php';
 
-use Baander\Tooling\Development\Acceptance\Support;
-use Baander\Tooling\Development\Host;
-use Baander\Tooling\Process\EngineExecutor;
-use Baander\Tooling\Process\ExecutionContext;
-use Baander\Tooling\Process\ProcessSpec;
-use Baander\Tooling\Development\Environment;
-use Baander\Tooling\Development\StateStore;
-use Baander\Tooling\Runtime\Requirements;
+use Baander\DevQualification\Acceptance\Support;
+use Baander\DevEnvironment\Host\HostSetup;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
+use Baander\Process\Execution\ProcessSpec;
+use Baander\DevEnvironment\Host\ProcessEnvironment;
+use Baander\DevEnvironment\State\InstanceStateStore;
+use Baander\Process\Runtime\Requirements;
 
 $temporary = null;
 $status = 0;
 try {
     Requirements::check(extensions: ['sockets']);
     $temporary = Support::temporary('baander-host-check-');
-    $executor = new EngineExecutor(ExecutionContext::bounded(120, Environment::clean()));
-    new Host(new StateStore($temporary), $executor)->inspect();
+    $executor = new EngineExecutor(ExecutionContext::bounded(120, ProcessEnvironment::clean()));
+    new HostSetup(new InstanceStateStore($temporary), $executor)->inspect();
     $executor->run(new ProcessSpec(['systemctl', '--user', 'show-environment'], processGroup: true));
     foreach (['baander.test', 'host-check.baander.test'] as $name) {
         $addresses = socket_addrinfo_lookup($name, '443', ['ai_socktype' => SOCK_STREAM]);

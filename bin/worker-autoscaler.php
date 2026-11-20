@@ -3,6 +3,8 @@
 
 declare(strict_types=1);
 
+use Baander\Core\EnvironmentVariable;
+
 // Private admitted child: inherited configuration only, never reload Dotenv files.
 ini_set('display_errors', '0');
 ini_set('log_errors', '0');
@@ -12,18 +14,18 @@ $exitCode = 0;
 try {
     require dirname(__DIR__) . '/vendor/autoload.php';
     \App\Shared\Application\DTO\DeploymentProfile::fromEnvironment();
-    if (PHP_SAPI !== 'cli' || count($_SERVER['argv'] ?? []) !== 1 || getenv('BAANDER_WORKER_ID') !== 'autoscaler'
-        || getenv('BAANDER_WORKER_UNIT') !== 'control'
+    if (PHP_SAPI !== 'cli' || count($_SERVER['argv'] ?? []) !== 1 || getenv(EnvironmentVariable::BAANDER_WORKER_ID) !== 'autoscaler'
+        || getenv(EnvironmentVariable::BAANDER_WORKER_UNIT) !== 'control'
     ) {
         throw new RuntimeException('Autoscaler requires private supervisor admission.');
     }
-    $namespace = getenv('BAANDER_WORKER_NAMESPACE');
-    $bootId = getenv('BAANDER_WORKER_BOOT_ID');
-    $generation = getenv('BAANDER_WORKER_GENERATION');
+    $namespace = getenv(EnvironmentVariable::BAANDER_WORKER_NAMESPACE);
+    $bootId = getenv(EnvironmentVariable::BAANDER_WORKER_BOOT_ID);
+    $generation = getenv(EnvironmentVariable::BAANDER_WORKER_GENERATION);
     if ($generation !== '1') {
         throw new RuntimeException('Autoscaler requires generation one.');
     }
-    $epoch = getenv('BAANDER_WORKER_LEASE_EPOCH');
+    $epoch = getenv(EnvironmentVariable::BAANDER_WORKER_LEASE_EPOCH);
     foreach ([$generation, $epoch] as $value) {
         if (!is_string($value) || preg_match('/\A[1-9][0-9]{0,18}\z/D', $value) !== 1
             || strlen($value) > strlen((string) PHP_INT_MAX)
@@ -37,8 +39,8 @@ try {
     }
     new \App\Shared\Infrastructure\Worker\WorkerLaunchIdentity($namespace, $bootId, 'autoscaler', (int) $generation);
     new \App\Shared\Infrastructure\Worker\DeploymentLease($namespace, $bootId, (int) $epoch);
-    $environment = getenv('APP_ENV');
-    $debug = getenv('APP_DEBUG');
+    $environment = getenv(EnvironmentVariable::APP_ENV);
+    $debug = getenv(EnvironmentVariable::APP_DEBUG);
     if (!is_string($environment) || preg_match('/\A[A-Za-z0-9_-]{1,64}\z/D', $environment) !== 1
         || !in_array($debug, ['0', '1'], true)
     ) {

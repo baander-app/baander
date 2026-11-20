@@ -205,23 +205,17 @@ final class LibraryController
         return $this->json(['data' => null]);
     }
 
-    #[OA\Post(
-        path: '/api/libraries/{id}/scan',
-        summary: 'Trigger a library scan (admin)',
-        description: 'Claims the library for a scan and dispatches an asynchronous scan job. The scan runs in the background; follow it in the job monitor and in the scan status of the library. A library that is already scanning answers 409.',
-        parameters: [
-            new OA\Parameter(name: 'id', description: 'Library public ID or slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-        ],
-        responses: [
-            new OA\Response(response: '202', description: 'Scan dispatched', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', ref: new Model(type: LibraryResource::class))], type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '409', description: 'Scan already in progress', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        ],
-    )]
+    #[OA\Post(path: '/api/libraries/{id}/scan', description: 'Claims the library for a scan and dispatches an asynchronous scan job. The scan runs in the background; follow it in the job monitor and in the scan status of the library. A library that is already scanning answers 409.', summary: 'Trigger a library scan (admin)', parameters: [
+        new OA\Parameter(name: 'id', description: 'Library public ID or slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+    ], responses: [
+        new OA\Response(response: '202', description: 'Scan dispatched', content: new OA\JsonContent(
+            properties: [new OA\Property(property: 'data', ref: new Model(type: LibraryResource::class))], type: 'object',
+        )),
+        new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '409', description: 'Scan already in progress', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+    ])]
     #[Route('/{id}/scan', name: 'scan', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
     #[CliCounterpart('app:library:scan')]
@@ -248,8 +242,8 @@ final class LibraryController
                         new OA\Property(property: 'albums', type: 'integer', example: 100),
                         new OA\Property(property: 'artists', type: 'integer', example: 50),
                         new OA\Property(property: 'genres', type: 'integer', example: 20),
-                        new OA\Property(property: 'totalSize', type: 'integer', description: 'Total file size in bytes', example: 53687091200),
-                        new OA\Property(property: 'totalDuration', type: 'number', description: 'Total duration in seconds', example: 259200.5),
+                        new OA\Property(property: 'totalSize', description: 'Total file size in bytes', type: 'integer', example: 53687091200),
+                        new OA\Property(property: 'totalDuration', description: 'Total duration in seconds', type: 'number', example: 259200.5),
                     ], type: 'object'),
                 ], type: 'object',
             )),
@@ -264,33 +258,27 @@ final class LibraryController
         return $this->successResponse($this->dispatch(new GetLibraryStatsQuery($id, $this->readScopes->current())));
     }
 
-    #[OA\Post(
-        path: '/api/libraries/validate-path',
-        summary: 'Validate a library path (admin)',
-        description: 'Checks whether a filesystem path exists and is readable. Use before creating a library. Requires the administrator role.',
-        requestBody: new OA\RequestBody(required: true, content: new OA\MediaType(mediaType: 'application/json', schema: new OA\Schema(
-                required: ['path'],
-                properties: [
-                    new OA\Property(property: 'path', type: 'string', example: '/mnt/media/music'),
-                ],
-            ))),
-        responses: [
-            new OA\Response(response: '200', description: 'Validation result', content: new OA\JsonContent(
-                properties: [
-                    new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'valid', type: 'boolean'),
-                        new OA\Property(property: 'error', type: 'string', nullable: true),
-                        new OA\Property(property: 'resolvedPath', type: 'string', nullable: true),
-                        new OA\Property(property: 'exists', type: 'boolean'),
-                        new OA\Property(property: 'readable', type: 'boolean'),
-                    ], type: 'object'),
-                ], type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Path is missing', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        ],
-    )]
+    #[OA\Post(path: '/api/libraries/validate-path', description: 'Checks whether a filesystem path exists and is readable. Use before creating a library. Requires the administrator role.', summary: 'Validate a library path (admin)', requestBody: new OA\RequestBody(required: true, content: new OA\MediaType(mediaType: 'application/json', schema: new OA\Schema(
+            required: ['path'],
+            properties: [
+                new OA\Property(property: 'path', type: 'string', example: '/mnt/media/music'),
+            ],
+        ))), responses: [
+        new OA\Response(response: '200', description: 'Validation result', content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'data', properties: [
+                    new OA\Property(property: 'valid', type: 'boolean'),
+                    new OA\Property(property: 'error', type: 'string', nullable: true),
+                    new OA\Property(property: 'resolvedPath', type: 'string', nullable: true),
+                    new OA\Property(property: 'exists', type: 'boolean'),
+                    new OA\Property(property: 'readable', type: 'boolean'),
+                ], type: 'object'),
+            ], type: 'object',
+        )),
+        new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '422', description: 'Path is missing', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+    ])]
     #[Route('/validate-path', name: 'validate_path', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
     #[CliCounterpart('app:library:validate-path')]
@@ -301,23 +289,18 @@ final class LibraryController
         return $this->successResponse(PathValidationResource::from($this->pathValidator->validateInput(is_string($path) ? $path : '')));
     }
 
-    #[OA\Post(
-        path: '/api/libraries/scan-all',
-        summary: 'Trigger scan for all libraries (admin)',
-        description: 'Dispatches an asynchronous scan job for every library. Skips libraries already scanning.',
-        responses: [
-            new OA\Response(response: '202', description: 'Scans dispatched', content: new OA\JsonContent(
-                properties: [
-                    new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'dispatched', type: 'integer', description: 'Number of scans dispatched'),
-                        new OA\Property(property: 'skipped', type: 'integer', description: 'Number of libraries skipped (already scanning)'),
-                    ], type: 'object'),
-                ], type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        ],
-    )]
+    #[OA\Post(path: '/api/libraries/scan-all', description: 'Dispatches an asynchronous scan job for every library. Skips libraries already scanning.', summary: 'Trigger scan for all libraries (admin)', responses: [
+        new OA\Response(response: '202', description: 'Scans dispatched', content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'data', properties: [
+                    new OA\Property(property: 'dispatched', description: 'Number of scans dispatched', type: 'integer'),
+                    new OA\Property(property: 'skipped', description: 'Number of libraries skipped (already scanning)', type: 'integer'),
+                ], type: 'object'),
+            ], type: 'object',
+        )),
+        new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+    ])]
     #[Route('/scan-all', name: 'scan_all', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
     #[CliCounterpart('app:library:scan')]

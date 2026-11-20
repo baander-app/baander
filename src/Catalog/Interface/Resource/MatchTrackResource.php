@@ -28,7 +28,7 @@ use OpenApi\Attributes as OA;
     required: ['song', 'release', 'fields', 'credits'],
     properties: [
         new OA\Property(property: 'song', description: 'The local song; null for a release track no song pairs with', required: ['publicId', 'title', 'disc', 'track', 'lengthSeconds'], properties: [
-            new OA\Property(property: 'publicId', type: 'string', maxLength: 21, minLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+            new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
             new OA\Property(property: 'title', type: 'string'),
             new OA\Property(property: 'disc', description: 'The tagged disc number', type: 'integer', nullable: true),
             new OA\Property(property: 'track', description: 'The tagged track number', type: 'integer', nullable: true),

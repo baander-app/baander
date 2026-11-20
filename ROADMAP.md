@@ -4,6 +4,94 @@ Updated: 2026-11-20. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
+## Tooling context packages and shared core
+
+The tooling monolith is split into thirteen packages, documented in
+[the package map](packages/README.md) and
+[the workflow guide](dev-docs/workflow-packages.md). Core, filesystem, process,
+configuration, containers, images and deployment own the shared and operational
+code. The six `baander-dev-*` packages own environment management, qualification,
+CI checks, dependency checks, registry development and website generation.
+Package-owned tests and fixtures live beside their source. Composer dependencies,
+controller generations, generated fixtures, Docker builds and static gates use
+the new boundaries. Production images remove development source and package tests.
+
+Core defines shared environment names and an immutable configuration-path builder.
+Paths compose literal keys, string-backed enum fields and list indexes; required
+and integer reads distinguish missing keys, nulls and wrong types. Deployment
+owns its field enum and uses it for slot and worker settings. Defaults, serialized
+keys and capacity formulas stay with deployment. The core suite passes 23 tests
+and 41 assertions, including nested paths and independent builder branches.
+
+The PHP 8.5 cleanup also corrects named arguments across project-owned code.
+The final declaration-aware scan and the later terminal-driver audit cover 4,940
+PHP files and 8,254 eligible calls,
+constructors and attributes, with no remaining ordering candidates or unvisited
+sites. Six variadic field bags have no declaration order. A separate audit of
+319 embedded PHP programs finds all six applicable calls ordered; the 27 incomplete
+fragments contain no named-argument markers. Effectful arguments retain their
+evaluation order through local variables. Full OpenAPI output before and after
+the correction is byte-identical at 1,392,844 bytes.
+
+Verification in PHP 8.5.12 CI images: focused application checks pass 250 tests
+and 578 assertions; the affected genre and library checks pass another 56 tests
+and 123 assertions. Application and tooling PHPStan pass. Tooling Deptrac reports
+zero violations, errors or warnings; application Deptrac does likewise with its
+444 existing baseline skips. Source policy passes with 161 reviewed exceptions.
+The application checks retain two existing PHPUnit configuration deprecations.
+
+Clean Composer installs pass for both root and scripts projects, with and without
+development requirements. Root production installs five internal packages;
+scripts production installs the seven shared and operational packages. Neither
+production install resolves development classes. The production Docker build and
+runtime smoke checks pass, including core and deployment loading and the absence
+of development source and package tests. The website build renders all 250 manual
+pages on the host; the CI image lacks the browser runtime needed for that build.
+
+The normal tooling run exercised 1,716 tests and 15,930 assertions in 43 minutes
+and 50 seconds. It reported two errors, four failures, two associated warnings
+and seven skips. The six failing conditions were corrected and verified in the
+focused runs below. Six skips require an explicit operator image and disposable
+database; the seventh requires `clang-tidy-19`. The corrected-tree lean suite and
+registry subject checks are in progress.
+The normal run exposed an old qualification assertion expecting 15 helper receipts;
+log seeding had increased the count to 16. The corrected report suite passes
+28 tests and 90 assertions, including rejection of helper out-of-memory failures.
+The current-checkout archive expectation now includes `scripts/vendor` and
+`scripts/bootstrap.php`, which supply independent package loading. Both checkout
+modes pass after the correction: 2 tests and 15 assertions.
+Three moved fixture roots lacked trailing path separators. The corrected worker
+fixture and sampler suites pass 189 tests and 623 assertions; the DSP developer
+helper suite passes 3 tests and 79 assertions. A broader audit of direct and stored
+path concatenation finds no further confirmed defects.
+The Python boundary check found the existing terminal PTY driver. Its PHP
+replacement preserves all eight terminal scenarios, which pass in the CI image.
+The boundary suite passes 8 tests and 8 assertions in both CI and lean images.
+The application terminal command requires PCNTL through Symfony, so the standalone
+terminal scenarios do not run in the lean tooling image, which omits that extension.
+The new PHP driver also passes application PHPStan; its FFI declarations use
+precise local callable types without suppressions or exclusions. The final tooling
+formatter check passes all 529 configured files, and the standalone driver passes
+its own formatting and syntax checks.
+
+Live preview startup exposed a collector source/dependency mismatch before vendor
+refresh. The collector now uses the prepared operator image's matching source and
+dependencies. Its regression fails before the correction; the focused CI class
+passes 16 tests and 105 assertions afterward. Retained preview log storage is over
+its configured 1 GiB cap, so collection remains suspended under the existing limit;
+the diagnosis used a temporary database snapshot and preserved live data.
+Recovery completes with web and workers ready, and
+`https://preview-fd790a887b6899cb.baander.test` returns HTTP 200.
+
+Separate open item: the local PHP dependency audit reports seven existing Swoole
+fork-review inventory discrepancies, covering server execution, configuration,
+pooling, the coroutine watchdog and static file serving. The affected source and
+review inventory are unchanged from `7491ddcecfa546a1845ff79f85878649e6f79560`;
+their review evidence needs a separate refresh. No dependency versions change
+in this split. Active TypePHP integration remains removed; historical measurement
+records remain evidence. The implemented-plan cleanup is recorded
+[below](#implemented-plan-retirement).
+
 ## Admin and terminal log viewers
 
 The log-viewer plan

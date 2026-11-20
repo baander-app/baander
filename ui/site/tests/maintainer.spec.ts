@@ -22,7 +22,7 @@ test('a maintained chapter edit updates its page and the real search index toget
     const chapter = join(fixture, 'docs-book/part-1-operator-guide/library.md');
     const build = (word: string, version: string) => {
       writeFileSync(chapter, `# Library\n\n## Scanning\n\n${word} is the current catalog checkpoint.\n`);
-      execFileSync('php', ['-r', 'require $argv[1]; (new Baander\\Tooling\\Website\\WebsiteBuilder($argv[2], "https://github.com/baander-app/baander/tree/master"))->build();', join(repository, 'scripts/bootstrap.php'), fixture]);
+      execFileSync('php', ['-r', 'require $argv[1]; (new Baander\\DevWebsite\\WebsiteBuilder($argv[2], "https://github.com/baander-app/baander/tree/master"))->build();', join(repository, 'scripts/bootstrap.php'), fixture]);
       execFileSync('corepack', ['yarn', 'pagefind', '--site', join(fixture, 'var/website')], { cwd: join(repository, 'ui/site'), stdio: 'pipe' });
       cpSync(join(fixture, 'var/website'), join(fixture, version), { recursive: true });
     };

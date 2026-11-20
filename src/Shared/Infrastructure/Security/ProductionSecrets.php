@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Security;
 
+use Baander\Core\EnvironmentVariable;
+
 /**
  * The secrets a production process refuses to start without. Each must be set, private
  * and at least 32 bytes long: not a value committed to the repository's environment
@@ -12,10 +14,10 @@ namespace App\Shared\Infrastructure\Security;
  */
 final readonly class ProductionSecrets
 {
-    public const array VARIABLES = ['APP_SECRET', 'STREAM_URL_HMAC_SECRET', 'AUTH_TOTP_ENCRYPTION_KEY'];
+    public const array VARIABLES = [EnvironmentVariable::APP_SECRET, EnvironmentVariable::STREAM_URL_HMAC_SECRET, EnvironmentVariable::AUTH_TOTP_ENCRYPTION_KEY];
     public const string PLACEHOLDER_PREFIX = 'replace-with-';
     private const int MINIMUM_BYTES = 32;
-    private const string BASE64_ENCODED = 'AUTH_TOTP_ENCRYPTION_KEY';
+    private const string BASE64_ENCODED = EnvironmentVariable::AUTH_TOTP_ENCRYPTION_KEY;
 
     /**
      * The values `.env`, `.env.dev` and `.env.example` commit for these variables. They

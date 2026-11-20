@@ -21,6 +21,7 @@ declare(strict_types=1);
 use App\Tests\Fixtures\Auth\SignedDpopProof;
 use App\Tests\Fixtures\WebRuntime\HttpExchange;
 
+
 $projectDir = dirname(__DIR__, 2);
 require $projectDir . '/vendor/autoload.php';
 

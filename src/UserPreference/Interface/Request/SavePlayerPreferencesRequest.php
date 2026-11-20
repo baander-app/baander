@@ -14,22 +14,22 @@ use Symfony\Component\Validator\Constraints as Assert;
     properties: [
         new OA\Property(
             property: 'payload',
-            type: 'object',
             required: ['shuffle', 'repeat', 'volume', 'muted', 'crossfadeEnabled', 'crossfadeDuration', 'replayGainEnabled', 'replayGainMode', 'replayGainPreAmp'],
             properties: [
                 new OA\Property(property: 'shuffle', type: 'boolean', example: false),
                 new OA\Property(property: 'repeat', type: 'string', example: 'off', enum: ['off', 'all', 'one']),
-                new OA\Property(property: 'volume', type: 'number', example: 0.8, minimum: 0, maximum: 1),
+                new OA\Property(property: 'volume', type: 'number', example: 0.8, maximum: 1, minimum: 0),
                 new OA\Property(property: 'muted', type: 'boolean', example: false),
                 new OA\Property(property: 'crossfadeEnabled', type: 'boolean', example: false),
-                new OA\Property(property: 'crossfadeDuration', type: 'number', example: 5.0, minimum: 0, maximum: 12),
+                new OA\Property(property: 'crossfadeDuration', type: 'number', example: 5.0, maximum: 12, minimum: 0),
                 new OA\Property(property: 'replayGainEnabled', type: 'boolean', example: false),
                 new OA\Property(property: 'replayGainMode', type: 'string', example: 'track', enum: ['track', 'album']),
-                new OA\Property(property: 'replayGainPreAmp', type: 'number', example: 0.0, minimum: -15, maximum: 15),
+                new OA\Property(property: 'replayGainPreAmp', type: 'number', example: 0.0, maximum: 15, minimum: -15),
             ],
+            type: 'object',
             additionalProperties: false,
         ),
-        new OA\Property(property: 'version', type: 'integer', minimum: 0, example: 0),
+        new OA\Property(property: 'version', type: 'integer', example: 0, minimum: 0),
     ],
 )]
 final readonly class SavePlayerPreferencesRequest

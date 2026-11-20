@@ -14,7 +14,7 @@ on:
             - 'tests/browser/**'
             - 'ui/design-tokens/**'
             - 'ui/web/public/*.svg'
-            - 'packages/baander-tooling/**'
+            - 'packages/baander-*/**'
             - 'packages/baander-audio-core/**'
             - 'ui/electron/src/**'
             - 'scripts/build-website.php'
@@ -38,7 +38,7 @@ on:
             - 'tests/browser/**'
             - 'ui/design-tokens/**'
             - 'ui/web/public/*.svg'
-            - 'packages/baander-tooling/**'
+            - 'packages/baander-*/**'
             - 'packages/baander-audio-core/**'
             - 'ui/electron/src/**'
             - 'scripts/build-website.php'
@@ -88,7 +88,7 @@ jobs:
                 run: php -r 'if (PHP_VERSION_ID < 80500 || !extension_loaded("dom") || !extension_loaded("mbstring") || !extension_loaded("tokenizer")) { throw new RuntimeException("Website builds require PHP 8.5, DOM, mbstring and tokenizer."); }'
 
             -   name: Install standalone PHP tooling
-                run: composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
+                run: composer --working-dir=scripts install --no-interaction --no-scripts --no-plugins
 
             -   name: Install site dependencies
                 working-directory: ui/site

@@ -176,8 +176,8 @@ final class HealthCheckWorkerOutageTest extends TestCase
             oauthPublicKeyPath: '/missing-baander-oauth/public.key',
             vapidPublicKey: '',
             vapidPrivateKey: '',
-            workerProfileHealth: new WorkerProfileHealth($connection, new DeploymentProfile()),
             messengerWorkerHealth: $messenger,
+            workerProfileHealth: new WorkerProfileHealth($connection, new DeploymentProfile()),
         );
     }
 }

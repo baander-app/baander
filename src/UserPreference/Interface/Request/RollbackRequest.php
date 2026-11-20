@@ -11,7 +11,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     schema: 'RollbackRequest',
     required: ['version'],
     properties: [
-        new OA\Property(property: 'version', type: 'integer', minimum: 1, example: 2),
+        new OA\Property(property: 'version', type: 'integer', example: 2, minimum: 1),
     ],
 )]
 final readonly class RollbackRequest

@@ -288,7 +288,7 @@ Each push tags the image `latest` and with the commit SHA. On GitHub the images 
 
 The application image copies `ffmpeg` and `ffprobe` from `ffmpeg-baander-static`
 through the `ffmpeg` role of the tooling image catalog
-(`packages/baander-tooling/resources/tooling-defaults.json`), passed to the build as
+(`packages/baander-configuration/resources/tooling-defaults.json`), passed to the build as
 `FFMPEG_IMAGE`. The role names the GHCR image by digest, so a new FFmpeg build reaches
 the application image only when that digest is updated. On Forgejo, `ci.yaml` sets
 `BAANDER_FFMPEG_IMAGE` to the copy in the Forgejo registry, which `ffmpeg.yaml`

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Worker;
 
 use App\Shared\Infrastructure\Messaging\WorkerTransportConfiguration;
+use Baander\Core\EnvironmentVariable;
 use Closure;
 use InvalidArgumentException;
 use JsonSerializable;
@@ -24,20 +25,20 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 final readonly class DeploymentRuntimeEnvironment implements JsonSerializable
 {
     private const array ALLOWED_KEYS = [
-        'BAANDER_DEPLOYMENT_PROFILE',
-        'APP_ENV', 'APP_DEBUG', 'APP_SECRET', 'DATABASE_URL', 'DATABASE_CONTROL_URL', 'REDIS_URL',
-        'REDIS_PASSWORD', 'MESSENGER_TRANSPORT_DSN', 'MAILER_DSN',
-        'CONVERT_STORAGE_PATH', 'MEDIA_STORAGE_PATH',
+        EnvironmentVariable::BAANDER_DEPLOYMENT_PROFILE,
+        EnvironmentVariable::APP_ENV, EnvironmentVariable::APP_DEBUG, EnvironmentVariable::APP_SECRET, EnvironmentVariable::DATABASE_URL, EnvironmentVariable::DATABASE_CONTROL_URL, EnvironmentVariable::REDIS_URL,
+        EnvironmentVariable::REDIS_PASSWORD, EnvironmentVariable::MESSENGER_TRANSPORT_DSN, EnvironmentVariable::MAILER_DSN,
+        EnvironmentVariable::CONVERT_STORAGE_PATH, EnvironmentVariable::MEDIA_STORAGE_PATH,
         // config/packages/mailer.yaml takes every email's From address from this; without
         // it a worker's notification email would fall back to noreply@localhost.
-        'MAIL_FROM_ADDRESS',
+        EnvironmentVariable::MAIL_FROM_ADDRESS,
         // The media worker qualifies the encoder this names; without it the worker keeps the
         // value baked into the image's .env.
-        'VIDEO_ENCODER',
-        'VAPID_PRIVATE_KEY', 'VAPID_PUBLIC_KEY', 'STREAM_URL_HMAC_SECRET', 'AUTH_TOTP_ENCRYPTION_KEY',
-        'APP_URL', 'DEFAULT_URI',
+        EnvironmentVariable::VIDEO_ENCODER,
+        EnvironmentVariable::VAPID_PRIVATE_KEY, EnvironmentVariable::VAPID_PUBLIC_KEY, EnvironmentVariable::STREAM_URL_HMAC_SECRET, EnvironmentVariable::AUTH_TOTP_ENCRYPTION_KEY,
+        EnvironmentVariable::APP_URL, EnvironmentVariable::DEFAULT_URI,
         // The managed preset turns OpenTelemetry export off unless the operator sets a collector.
-        'OTEL_ENABLED', 'OTEL_EXPORTER_OTLP_ENDPOINT',
+        EnvironmentVariable::OTEL_ENABLED, EnvironmentVariable::OTEL_EXPORTER_OTLP_ENDPOINT,
     ];
 
     /** @var array<string,string> */
@@ -62,7 +63,7 @@ final readonly class DeploymentRuntimeEnvironment implements JsonSerializable
             ) {
                 throw new InvalidArgumentException('Runtime environment values require printable UTF-8 within 2048 bytes.');
             }
-            if (($key === 'APP_ENV' && $value !== 'prod') || ($key === 'APP_DEBUG' && $value !== '0')) {
+            if (($key === EnvironmentVariable::APP_ENV && $value !== 'prod') || ($key === EnvironmentVariable::APP_DEBUG && $value !== '0')) {
                 throw new InvalidArgumentException('Runtime environment requires production mode with debugging disabled.');
             }
             $bytes += strlen($key) + strlen($value) + 2;

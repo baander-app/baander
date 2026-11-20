@@ -33,7 +33,7 @@ class SongEntity
     private AlbumEntity $album;
 
     /** @var Collection<int, GenreSongEntity> */
-    #[ORM\OneToMany(mappedBy: 'song', targetEntity: GenreSongEntity::class)]
+    #[ORM\OneToMany(targetEntity: GenreSongEntity::class, mappedBy: 'song')]
     private Collection $genres;
 
     #[ORM\Column(type: 'text')]

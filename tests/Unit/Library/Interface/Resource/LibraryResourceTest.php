@@ -25,8 +25,8 @@ final class LibraryResourceTest extends TestCase
         $now = new \DateTimeImmutable('2024-06-15T12:00:00+00:00');
 
         return Library::reconstitute(new LibraryState(
-            publicId: new \App\Shared\Domain\Model\PublicId(),
             id: $id,
+            publicId: new \App\Shared\Domain\Model\PublicId(),
             name: $name ?? 'My Music',
             slug: new LibrarySlug('my-music'),
             path: new LibraryPath('/media/music'),

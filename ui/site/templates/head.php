@@ -1,5 +1,5 @@
 <?php declare(strict_types=1);
-use Baander\Tooling\Website\SearchMetadata;
+use Baander\DevWebsite\Metadata\SearchMetadata;
 
 $escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 /** @var SearchMetadata $meta */

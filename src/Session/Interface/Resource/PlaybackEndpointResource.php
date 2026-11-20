@@ -14,10 +14,10 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'destinationId', type: 'string'),
         new OA\Property(property: 'incarnationId', description: 'Endpoint incarnation identifier, issued by the server when the endpoint registers.', type: 'string'),
         new OA\Property(property: 'epoch', type: 'integer', minimum: 1),
-        new OA\Property(property: 'recoveryCredential', type: 'string', nullable: true, description: 'Private stop-only recovery credential for durable local storage.'),
+        new OA\Property(property: 'recoveryCredential', description: 'Private stop-only recovery credential for durable local storage.', type: 'string', nullable: true),
         new OA\Property(property: 'recoveryExpiresAt', type: 'string', format: 'date-time', nullable: true),
         new OA\Property(property: 'recoveryTabId', description: 'Client-generated tab identifier that names the recovery record.', type: 'string', nullable: true),
-        new OA\Property(property: 'capability', type: 'string', nullable: true, description: 'Returned only to the HTTP registration caller; keep in tab memory.'),
+        new OA\Property(property: 'capability', description: 'Returned only to the HTTP registration caller; keep in tab memory.', type: 'string', nullable: true),
     ],
 )]
 final class PlaybackEndpointResource extends AbstractResource

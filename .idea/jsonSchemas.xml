@@ -31,7 +31,43 @@
                     <option name="path" value="composer.json" />
                   </Item>
                   <Item>
-                    <option name="path" value="packages/baander-tooling/composer.json" />
+                    <option name="path" value="packages/baander-configuration/composer.json" />
+                  </Item>
+                  <Item>
+                    <option name="path" value="packages/baander-containers/composer.json" />
+                  </Item>
+                  <Item>
+                    <option name="path" value="packages/baander-core/composer.json" />
+                  </Item>
+                  <Item>
+                    <option name="path" value="packages/baander-deployment/composer.json" />
+                  </Item>
+                  <Item>
+                    <option name="path" value="packages/baander-dev-ci/composer.json" />
+                  </Item>
+                  <Item>
+                    <option name="path" value="packages/baander-dev-dependencies/composer.json" />
+                  </Item>
+                  <Item>
+                    <option name="path" value="packages/baander-dev-environment/composer.json" />
+                  </Item>
+                  <Item>
+                    <option name="path" value="packages/baander-dev-qualification/composer.json" />
+                  </Item>
+                  <Item>
+                    <option name="path" value="packages/baander-dev-registry/composer.json" />
+                  </Item>
+                  <Item>
+                    <option name="path" value="packages/baander-dev-website/composer.json" />
+                  </Item>
+                  <Item>
+                    <option name="path" value="packages/baander-filesystem/composer.json" />
+                  </Item>
+                  <Item>
+                    <option name="path" value="packages/baander-images/composer.json" />
+                  </Item>
+                  <Item>
+                    <option name="path" value="packages/baander-process/composer.json" />
                   </Item>
                   <Item>
                     <option name="path" value="relay/composer.json" />

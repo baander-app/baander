@@ -81,7 +81,7 @@ final class SystemSettingsController
             content: new OA\JsonContent(
                 required: ['settings'],
                 properties: [
-                    new OA\Property(property: 'settings', type: 'object', description: 'Setting key to new value', additionalProperties: true),
+                    new OA\Property(property: 'settings', description: 'Setting key to new value', type: 'object', additionalProperties: true),
                 ],
             ),
         ),

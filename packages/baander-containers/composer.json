@@ -1,0 +1,17 @@
+{
+  "name": "baander/containers",
+  "description": "Docker transport and owned resource cleanup",
+  "type": "library",
+  "license": "Apache-2.0",
+  "require": {
+    "php": ">=8.5",
+    "baander/configuration": "dev-main",
+    "baander/filesystem": "dev-main",
+    "baander/process": "dev-main"
+  },
+  "autoload": {
+    "psr-4": {
+      "Baander\\Containers\\": "src/"
+    }
+  }
+}

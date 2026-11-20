@@ -8,6 +8,7 @@ use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\WorkerAutoscalingProfile;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\WorkerLaunchIdentity;
+use Baander\Core\EnvironmentVariable;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 #[Exclude]
@@ -19,19 +20,19 @@ final readonly class WorkerAdmissionContext
 
     public static function fromEnvironment(): ?self
     {
-        $id = getenv('BAANDER_WORKER_ID');
+        $id = getenv(EnvironmentVariable::BAANDER_WORKER_ID);
         if (!is_string($id) || !str_starts_with($id, 'consumer')) {
             return null;
         }
-        if (preg_match('/^consumer-[0-3]$/D', $id) !== 1 || getenv('BAANDER_WORKER_UNIT') !== 'execution') {
+        if (preg_match('/^consumer-[0-3]$/D', $id) !== 1 || getenv(EnvironmentVariable::BAANDER_WORKER_UNIT) !== 'execution') {
             throw new \RuntimeException('Ordinary receive requires an admitted execution slot.');
         }
-        $namespace = self::environment('BAANDER_WORKER_NAMESPACE');
-        $boot = self::environment('BAANDER_WORKER_BOOT_ID');
-        $generation = self::positiveInteger('BAANDER_WORKER_GENERATION');
-        $lease = new DeploymentLease($namespace, $boot, self::positiveInteger('BAANDER_WORKER_LEASE_EPOCH'));
-        $profile = WorkerAutoscalingProfile::fromJson(self::environment('BAANDER_WORKER_AUTOSCALING_PROFILE'));
-        $ledger = new AdmissionLedger(self::environment('BAANDER_WORKER_IPC_DIRECTORY'), $lease, $profile, DeploymentProfile::fromEnvironment());
+        $namespace = self::environment(EnvironmentVariable::BAANDER_WORKER_NAMESPACE);
+        $boot = self::environment(EnvironmentVariable::BAANDER_WORKER_BOOT_ID);
+        $generation = self::positiveInteger(EnvironmentVariable::BAANDER_WORKER_GENERATION);
+        $lease = new DeploymentLease($namespace, $boot, self::positiveInteger(EnvironmentVariable::BAANDER_WORKER_LEASE_EPOCH));
+        $profile = WorkerAutoscalingProfile::fromJson(self::environment(EnvironmentVariable::BAANDER_WORKER_AUTOSCALING_PROFILE));
+        $ledger = new AdmissionLedger(self::environment(EnvironmentVariable::BAANDER_WORKER_IPC_DIRECTORY), $lease, $profile, DeploymentProfile::fromEnvironment());
         return new self($ledger, new WorkerLaunchIdentity($namespace, $boot, $id, $generation));
     }
 

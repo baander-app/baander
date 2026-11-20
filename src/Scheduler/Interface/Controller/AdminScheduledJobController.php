@@ -76,7 +76,7 @@ final class AdminScheduledJobController
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}', name: 'show', methods: ['GET'], requirements: ['id' => self::PUBLIC_ID])]
+    #[Route('/{id}', name: 'show', requirements: ['id' => self::PUBLIC_ID], methods: ['GET'])]
     #[CliCounterpart('app:scheduler:show')]
     public function show(string $id): JsonResponse
     {
@@ -134,7 +134,7 @@ final class AdminScheduledJobController
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}', name: 'update', methods: ['PUT'], requirements: ['id' => self::PUBLIC_ID])]
+    #[Route('/{id}', name: 'update', requirements: ['id' => self::PUBLIC_ID], methods: ['PUT'])]
     #[CliCounterpart('app:scheduler:update')]
     public function update(string $id, #[MapRequestPayload] UpdateScheduledJobRequest $request): JsonResponse
     {
@@ -164,7 +164,7 @@ final class AdminScheduledJobController
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}', name: 'delete', methods: ['DELETE'], requirements: ['id' => self::PUBLIC_ID])]
+    #[Route('/{id}', name: 'delete', requirements: ['id' => self::PUBLIC_ID], methods: ['DELETE'])]
     #[CliCounterpart('app:scheduler:delete')]
     public function delete(string $id): JsonResponse
     {
@@ -188,7 +188,7 @@ final class AdminScheduledJobController
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}/pause', name: 'pause', methods: ['POST'], requirements: ['id' => self::PUBLIC_ID])]
+    #[Route('/{id}/pause', name: 'pause', requirements: ['id' => self::PUBLIC_ID], methods: ['POST'])]
     #[CliCounterpart('app:scheduler:pause')]
     public function pause(string $id): JsonResponse
     {
@@ -213,7 +213,7 @@ final class AdminScheduledJobController
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}/resume', name: 'resume', methods: ['POST'], requirements: ['id' => self::PUBLIC_ID])]
+    #[Route('/{id}/resume', name: 'resume', requirements: ['id' => self::PUBLIC_ID], methods: ['POST'])]
     #[CliCounterpart('app:scheduler:resume')]
     public function resume(string $id): JsonResponse
     {
@@ -231,8 +231,7 @@ final class AdminScheduledJobController
         path: '/api/admin/scheduler/jobs/{id}/trigger',
         summary: 'Record a durable manual scheduled job request',
         parameters: [new OA\Parameter(
-            name: 'Idempotency-Key', in: 'header', required: false,
-            description: 'Request UUID. Reuse this UUID after an uncertain response to recover the same occurrence. A UUID is generated if omitted.',
+            name: 'Idempotency-Key', description: 'Request UUID. Reuse this UUID after an uncertain response to recover the same occurrence. A UUID is generated if omitted.', in: 'header', required: false,
             schema: new OA\Schema(type: 'string', format: 'uuid'),
         )],
         responses: [
@@ -247,7 +246,7 @@ final class AdminScheduledJobController
             new OA\Response(response: '404', description: 'Job not found for a new request', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}/trigger', name: 'trigger', methods: ['POST'], requirements: ['id' => self::PUBLIC_ID])]
+    #[Route('/{id}/trigger', name: 'trigger', requirements: ['id' => self::PUBLIC_ID], methods: ['POST'])]
     #[CliCounterpart('app:scheduler:run')]
     public function trigger(string $id, Request $request): JsonResponse
     {
@@ -287,7 +286,7 @@ final class AdminScheduledJobController
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}/enable', name: 'enable', methods: ['POST'], requirements: ['id' => self::PUBLIC_ID])]
+    #[Route('/{id}/enable', name: 'enable', requirements: ['id' => self::PUBLIC_ID], methods: ['POST'])]
     #[CliCounterpart('app:scheduler:enable')]
     public function enable(string $id): JsonResponse
     {
@@ -312,7 +311,7 @@ final class AdminScheduledJobController
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}/disable', name: 'disable', methods: ['POST'], requirements: ['id' => self::PUBLIC_ID])]
+    #[Route('/{id}/disable', name: 'disable', requirements: ['id' => self::PUBLIC_ID], methods: ['POST'])]
     #[CliCounterpart('app:scheduler:disable')]
     public function disable(string $id): JsonResponse
     {

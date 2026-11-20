@@ -81,10 +81,9 @@ final class SegmentEncoderShortAudioMediaTest extends TestCase
         $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software('libx264'));
         $output = $this->directory.'/output';
         mkdir($output);
-        $arguments = $encoder->buildStreamArgs($source, $tier, $encoder->buildVideoFilters($probe, $tier), $output, 1,
+        $arguments = $encoder->buildStreamArgs($source, $tier, $encoder->buildVideoFilters($probe, $tier), $output, 1, audioStreamIndex: $probe->selectedAudioStreamOrdinal(),
             audioProfile: $profile, audioFilters: $encoder->buildAudioFiltersForProfile($probe, $profile),
-            hasAudio: true, sourceFrameRate: $probe->framerate, sourceTimestampOrigin: $probe->sourceTimestampOrigin,
-            audioStreamIndex: $probe->selectedAudioStreamOrdinal(), sourceDuration: $probe->videoEnd ?? 0.0);
+            hasAudio: true, sourceFrameRate: $probe->framerate, sourceTimestampOrigin: $probe->sourceTimestampOrigin, sourceDuration: $probe->videoEnd ?? 0.0);
         $input = array_search('-i', $arguments, true);
         self::assertIsInt($input);
         array_splice($arguments, $input, 0, ['-re']);

@@ -8,11 +8,12 @@ use App\Shared\Infrastructure\LogViewer\Agent\AgentProtocol;
 use App\Shared\Infrastructure\LogViewer\Agent\CheckpointExchange;
 use App\Shared\Infrastructure\LogViewer\Agent\Collector;
 use App\Shared\Infrastructure\LogViewer\LogIndex;
+use Baander\Core\EnvironmentVariable;
 
 require dirname(__DIR__).'/vendor/autoload.php';
 
 try {
-    $config = AgentConfiguration::load(getenv('BAANDER_LOG_AGENT_CONFIG') ?: '/etc/baander/log-agent.json');
+    $config = AgentConfiguration::load(getenv(EnvironmentVariable::BAANDER_LOG_AGENT_CONFIG) ?: '/etc/baander/log-agent.json');
     if ('--checkpoint' === ($argv[1] ?? null)) {
         $containerId = $argv[2] ?? '';
         $timeout = 5.0;

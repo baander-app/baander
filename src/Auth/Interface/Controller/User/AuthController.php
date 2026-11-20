@@ -346,33 +346,26 @@ final class AuthController
         ]);
     }
 
-    #[OA\Post(
-        path: '/api/auth/password/reset',
-        summary: 'Set a new password with a password reset token',
-        description: 'Redeems the token once and signs the account out of every session.',
-        security: [],
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(ref: new Model(type: ResetPasswordRequest::class)),
-        ),
-        responses: [
-            new OA\Response(
-                response: '200',
-                description: 'Password reset',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'message', type: 'string', example: 'Your password has been reset.'),
-                        ], type: 'object'),
-                    ],
-                    type: 'object',
-                ),
+    #[OA\Post(path: '/api/auth/password/reset', description: 'Redeems the token once and signs the account out of every session.', summary: 'Set a new password with a password reset token', security: [], requestBody: new OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(ref: new Model(type: ResetPasswordRequest::class)),
+    ), responses: [
+        new OA\Response(
+            response: '200',
+            description: 'Password reset',
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'data', properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Your password has been reset.'),
+                    ], type: 'object'),
+                ],
+                type: 'object',
             ),
-            new OA\Response(response: '400', description: 'The token is unknown, expired or already used', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
-            new OA\Response(response: '429', description: 'Too many password reset attempts from this IP', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        ],
-    )]
+        ),
+        new OA\Response(response: '400', description: 'The token is unknown, expired or already used', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+        new OA\Response(response: '429', description: 'Too many password reset attempts from this IP', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+    ])]
     #[Route('/password/reset', name: 'password_reset', methods: ['POST'])]
     public function resetPassword(#[MapRequestPayload] ResetPasswordRequest $payload): JsonResponse
     {
@@ -406,10 +399,10 @@ final class AuthController
                                 description: 'The profile a delegated token reads',
                                 required: ['publicId', 'name', 'createdAt'],
                                 properties: [
-                                    new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
-                                    new OA\Property(property: 'name', type: 'string', description: 'Display name'),
-                                    new OA\Property(property: 'email', type: 'string', format: 'email', description: 'Email address; only with the email scope'),
-                                    new OA\Property(property: 'emailVerifiedAt', type: 'string', format: 'date-time', nullable: true, description: 'When the email was verified; only with the email scope'),
+                                    new OA\Property(property: 'publicId', description: 'Public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+                                    new OA\Property(property: 'name', description: 'Display name', type: 'string'),
+                                    new OA\Property(property: 'email', description: 'Email address; only with the email scope', type: 'string', format: 'email'),
+                                    new OA\Property(property: 'emailVerifiedAt', description: 'When the email was verified; only with the email scope', type: 'string', format: 'date-time', nullable: true),
                                     new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
                                 ],
                                 type: 'object',
@@ -511,33 +504,26 @@ final class AuthController
         ]);
     }
 
-    #[OA\Post(
-        path: '/api/auth/email/verify',
-        summary: 'Verify an email address with a token',
-        description: 'Redeems the token from a verification email once. The token verifies only the address it was sent to, while the account still has that address.',
-        security: [],
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(ref: new Model(type: VerifyEmailRequest::class)),
-        ),
-        responses: [
-            new OA\Response(
-                response: '200',
-                description: 'Email address verified',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'message', type: 'string', example: 'Email verified.'),
-                        ], type: 'object'),
-                    ],
-                    type: 'object',
-                ),
+    #[OA\Post(path: '/api/auth/email/verify', description: 'Redeems the token from a verification email once. The token verifies only the address it was sent to, while the account still has that address.', summary: 'Verify an email address with a token', security: [], requestBody: new OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(ref: new Model(type: VerifyEmailRequest::class)),
+    ), responses: [
+        new OA\Response(
+            response: '200',
+            description: 'Email address verified',
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'data', properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Email verified.'),
+                    ], type: 'object'),
+                ],
+                type: 'object',
             ),
-            new OA\Response(response: '400', description: 'The token is unknown, expired, already used or for an address the account no longer has', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
-            new OA\Response(response: '429', description: 'Too many verification attempts from this IP', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        ],
-    )]
+        ),
+        new OA\Response(response: '400', description: 'The token is unknown, expired, already used or for an address the account no longer has', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+        new OA\Response(response: '429', description: 'Too many verification attempts from this IP', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+    ])]
     #[Route('/email/verify', name: 'email_verify', methods: ['POST'])]
     public function verifyEmail(#[MapRequestPayload] VerifyEmailRequest $payload): JsonResponse
     {
@@ -556,27 +542,22 @@ final class AuthController
         ]);
     }
 
-    #[OA\Post(
-        path: '/api/auth/me/email/verification',
-        summary: 'Send a new verification email',
-        description: 'Emails the current user a new verification link and ends the one sent earlier. The answer is the same whether or not an email was sent: nothing is sent when the address is already verified or the user has used up their resend allowance.',
-        responses: [
-            new OA\Response(
-                response: '200',
-                description: 'Request accepted',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'message', type: 'string', example: 'If your email address still needs verification, a new link has been sent.'),
-                        ], type: 'object'),
-                    ],
-                    type: 'object',
-                ),
+    #[OA\Post(path: '/api/auth/me/email/verification', description: 'Emails the current user a new verification link and ends the one sent earlier. The answer is the same whether or not an email was sent: nothing is sent when the address is already verified or the user has used up their resend allowance.', summary: 'Send a new verification email', responses: [
+        new OA\Response(
+            response: '200',
+            description: 'Request accepted',
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'data', properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'If your email address still needs verification, a new link has been sent.'),
+                    ], type: 'object'),
+                ],
+                type: 'object',
             ),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '429', description: 'Too many verification requests from this IP', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        ],
-    )]
+        ),
+        new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '429', description: 'Too many verification requests from this IP', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+    ])]
     #[Route('/me/email/verification', name: 'me_email_verification', methods: ['POST'])]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
     public function resendEmailVerification(): JsonResponse
@@ -603,32 +584,26 @@ final class AuthController
         ]);
     }
 
-    #[OA\Put(
-        path: '/api/auth/me/email',
-        summary: 'Ask to change the current user email',
-        description: 'Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The new address is held as `pendingEmail` and sent a verification link; the account keeps its address until that link is used. The answer is the same whether or not another account uses the new address: the link then fails. Asking for the current address drops a pending change.',
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(ref: new Model(type: ChangeEmailRequest::class)),
-        ),
-        responses: [
-            new OA\Response(
-                response: '202',
-                description: 'Change received; a verification link is on its way to the new address',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'message', type: 'string', example: 'Check the new address for a link to confirm the change.'),
-                        ], type: 'object'),
-                    ],
-                    type: 'object',
-                ),
+    #[OA\Put(path: '/api/auth/me/email', description: 'Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The new address is held as `pendingEmail` and sent a verification link; the account keeps its address until that link is used. The answer is the same whether or not another account uses the new address: the link then fails. Asking for the current address drops a pending change.', summary: 'Ask to change the current user email', requestBody: new OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(ref: new Model(type: ChangeEmailRequest::class)),
+    ), responses: [
+        new OA\Response(
+            response: '202',
+            description: 'Change received; a verification link is on its way to the new address',
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'data', properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Check the new address for a link to confirm the change.'),
+                    ], type: 'object'),
+                ],
+                type: 'object',
             ),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error, or the password or code is wrong', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
-            new OA\Response(response: '429', description: 'Too many step-up attempts for this account', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        ],
-    )]
+        ),
+        new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '422', description: 'Validation error, or the password or code is wrong', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+        new OA\Response(response: '429', description: 'Too many step-up attempts for this account', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+    ])]
     #[Route('/me/email', name: 'me_email', methods: ['PUT'])]
     public function changeEmail(#[MapRequestPayload] ChangeEmailRequest $payload): JsonResponse
     {
@@ -657,34 +632,28 @@ final class AuthController
         ], Response::HTTP_ACCEPTED);
     }
 
-    #[OA\Put(
-        path: '/api/auth/me/password',
-        summary: 'Change the current user password',
-        description: 'Signs the account out of every other session; the session that made the request stays signed in.',
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(required: ['currentPassword', 'newPassword'], properties: [
-                        new OA\Property(property: 'currentPassword', type: 'string', example: '********'),
-                        new OA\Property(property: 'newPassword', type: 'string', example: '********', maxLength: 255, minLength: 8),
-                    ]),
-        ),
-        responses: [
-            new OA\Response(
-                response: '200',
-                description: 'Password changed',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'message', type: 'string', example: 'Password changed.'),
-                        ], type: 'object'),
-                    ],
-                    type: 'object',
-                ),
+    #[OA\Put(path: '/api/auth/me/password', description: 'Signs the account out of every other session; the session that made the request stays signed in.', summary: 'Change the current user password', requestBody: new OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(required: ['currentPassword', 'newPassword'], properties: [
+                    new OA\Property(property: 'currentPassword', type: 'string', example: '********'),
+                    new OA\Property(property: 'newPassword', type: 'string', example: '********', maxLength: 255, minLength: 8),
+                ]),
+    ), responses: [
+        new OA\Response(
+            response: '200',
+            description: 'Password changed',
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'data', properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Password changed.'),
+                    ], type: 'object'),
+                ],
+                type: 'object',
             ),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error or wrong current password', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
-        ],
-    )]
+        ),
+        new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '422', description: 'Validation error or wrong current password', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+    ])]
     #[Route('/me/password', name: 'me_password', methods: ['PUT'])]
     public function changePassword(#[MapRequestPayload] ChangePasswordRequest $payload, Request $request): JsonResponse
     {

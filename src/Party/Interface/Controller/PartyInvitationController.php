@@ -50,20 +50,14 @@ final class PartyInvitationController
     ) {
     }
 
-    #[OA\Get(
-        path: '/api/party/sessions/{publicId}/invitations/',
-        summary: 'List the invitations of a party session',
-        description: 'Only the host may list the invitations. They are ordered oldest first.',
-        parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Party session public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
-        ],
-        responses: [
-            new OA\Response(response: '200', description: 'The invitations, oldest first', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: PartyInvitationResource::class)))])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'The caller is a member of the session but not its host', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'The session does not exist, or the caller is neither its host nor a member', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        ],
-    )]
+    #[OA\Get(path: '/api/party/sessions/{publicId}/invitations/', description: 'Only the host may list the invitations. They are ordered oldest first.', summary: 'List the invitations of a party session', parameters: [
+        new OA\Parameter(name: 'publicId', description: 'Party session public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+    ], responses: [
+        new OA\Response(response: '200', description: 'The invitations, oldest first', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: PartyInvitationResource::class)))])),
+        new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '403', description: 'The caller is a member of the session but not its host', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '404', description: 'The session does not exist, or the caller is neither its host nor a member', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+    ])]
     #[Route('/', name: 'index', methods: ['GET'])]
     public function index(string $publicId): JsonResponse
     {
@@ -86,22 +80,16 @@ final class PartyInvitationController
         return $this->successResponse(PartyInvitationResource::collection($this->identities->invitations($invitations)));
     }
 
-    #[OA\Put(
-        path: '/api/party/sessions/{publicId}/invitations/{userPublicId}',
-        summary: 'Invite a user to a party session',
-        description: 'Only the host may invite. Inviting a user who is invited already changes nothing.',
-        parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Party session public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
-            new OA\Parameter(name: 'userPublicId', description: "The invited user's public ID", in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
-        ],
-        responses: [
-            new OA\Response(response: '204', description: 'The user is invited'),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'The caller is a member of the session but not its host', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'The session does not exist, or the caller is neither its host nor a member; for the host, no user has the public ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'The host named themself', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        ],
-    )]
+    #[OA\Put(path: '/api/party/sessions/{publicId}/invitations/{userPublicId}', description: 'Only the host may invite. Inviting a user who is invited already changes nothing.', summary: 'Invite a user to a party session', parameters: [
+        new OA\Parameter(name: 'publicId', description: 'Party session public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+        new OA\Parameter(name: 'userPublicId', description: "The invited user's public ID", in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+    ], responses: [
+        new OA\Response(response: '204', description: 'The user is invited'),
+        new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '403', description: 'The caller is a member of the session but not its host', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '404', description: 'The session does not exist, or the caller is neither its host nor a member; for the host, no user has the public ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '422', description: 'The host named themself', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+    ])]
     #[Route('/{userPublicId}', name: 'invite', requirements: ['userPublicId' => self::PUBLIC_ID_REQUIREMENT], methods: ['PUT'])]
     public function invite(string $publicId, string $userPublicId): JsonResponse
     {
@@ -124,22 +112,16 @@ final class PartyInvitationController
         return $this->noContent();
     }
 
-    #[OA\Delete(
-        path: '/api/party/sessions/{publicId}/invitations/{userPublicId}',
-        summary: "Revoke a user's invitation to a party session",
-        description: 'Only the host may revoke. A revoked user who had joined stops being a member of the session. Revoking a user who is not invited changes nothing.',
-        parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Party session public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
-            new OA\Parameter(name: 'userPublicId', description: "The revoked user's public ID", in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
-        ],
-        responses: [
-            new OA\Response(response: '204', description: 'The user is neither invited nor a member'),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'The caller is a member of the session but not its host', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'The session does not exist, or the caller is neither its host nor a member; for the host, no user has the public ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'The host named themself', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        ],
-    )]
+    #[OA\Delete(path: '/api/party/sessions/{publicId}/invitations/{userPublicId}', description: 'Only the host may revoke. A revoked user who had joined stops being a member of the session. Revoking a user who is not invited changes nothing.', summary: "Revoke a user's invitation to a party session", parameters: [
+        new OA\Parameter(name: 'publicId', description: 'Party session public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+        new OA\Parameter(name: 'userPublicId', description: "The revoked user's public ID", in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+    ], responses: [
+        new OA\Response(response: '204', description: 'The user is neither invited nor a member'),
+        new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '403', description: 'The caller is a member of the session but not its host', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '404', description: 'The session does not exist, or the caller is neither its host nor a member; for the host, no user has the public ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        new OA\Response(response: '422', description: 'The host named themself', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+    ])]
     #[Route('/{userPublicId}', name: 'revoke', requirements: ['userPublicId' => self::PUBLIC_ID_REQUIREMENT], methods: ['DELETE'])]
     public function revoke(string $publicId, string $userPublicId): JsonResponse
     {

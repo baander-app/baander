@@ -86,7 +86,7 @@ final class GenreController
         requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'name', type: 'string'),
                 new OA\Property(property: 'slug', type: 'string'),
-                new OA\Property(property: 'parentId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, nullable: true),
+                new OA\Property(property: 'parentId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
                 new OA\Property(property: 'mbid', type: 'string', nullable: true),
             ])),
         responses: [
@@ -126,10 +126,10 @@ final class GenreController
             new OA\Response(response: '200', description: 'Genre with children', content: new OA\JsonContent(
                 properties: [
                     new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
+                        new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
                         new OA\Property(property: 'name', type: 'string'),
                         new OA\Property(property: 'slug', type: 'string'),
-                        new OA\Property(property: 'parentId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, nullable: true),
+                        new OA\Property(property: 'parentId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
                         new OA\Property(property: 'mbid', type: 'string'),
                         new OA\Property(property: 'children', type: 'array', items: new OA\Items(ref: new Model(type: GenreResource::class))),
                     ], type: 'object'),
@@ -166,7 +166,7 @@ final class GenreController
         requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'name', type: 'string', nullable: true),
                 new OA\Property(property: 'slug', type: 'string', nullable: true),
-                new OA\Property(property: 'parentId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, nullable: true),
+                new OA\Property(property: 'parentId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
                 new OA\Property(property: 'mbid', type: 'string', nullable: true),
             ])),
         parameters: [
@@ -229,7 +229,7 @@ final class GenreController
         path: '/api/genres/{slug}/songs',
         summary: 'Assign a genre to a song',
         requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'songId', description: 'Song public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
+                new OA\Property(property: 'songId', description: 'Song public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
             ])),
         parameters: [
             new OA\Parameter(name: 'slug', description: 'Genre slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
@@ -272,7 +272,7 @@ final class GenreController
         summary: 'Remove a song from a genre',
         parameters: [
             new OA\Parameter(name: 'slug', description: 'Genre slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'songId', description: 'Song public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'songId', description: 'Song public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Song removed from genre'),
@@ -311,7 +311,7 @@ final class GenreController
         path: '/api/genres/{slug}/albums',
         summary: 'Assign a genre to an album',
         requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'albumId', description: 'Album public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
+                new OA\Property(property: 'albumId', description: 'Album public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
             ])),
         parameters: [
             new OA\Parameter(name: 'slug', description: 'Genre slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
@@ -354,7 +354,7 @@ final class GenreController
         summary: 'Remove an album from a genre',
         parameters: [
             new OA\Parameter(name: 'slug', description: 'Genre slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'albumId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'albumId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Album removed from genre'),

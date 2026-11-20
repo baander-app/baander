@@ -11,17 +11,17 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'LibraryResource',
     properties: [
-        new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, description: 'Library public ID'),
-        new OA\Property(property: 'name', type: 'string', description: 'Library name'),
-        new OA\Property(property: 'slug', type: 'string', description: 'URL-friendly slug'),
-        new OA\Property(property: 'path', type: 'string', description: 'Filesystem path'),
-        new OA\Property(property: 'type', type: 'string', enum: ['music', 'podcast', 'audiobook', 'movie', 'tv_show'], description: 'Library type'),
-        new OA\Property(property: 'filesystemType', type: 'string', enum: ['local'], description: 'Filesystem type'),
-        new OA\Property(property: 'sortOrder', type: 'integer', description: 'Sort order'),
-        new OA\Property(property: 'lastScan', type: 'string', format: 'date-time', nullable: true, description: 'Last scan timestamp'),
-        new OA\Property(property: 'scanStatus', type: 'string', nullable: true, description: 'Current scan status'),
-        new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', description: 'Creation timestamp'),
-        new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time', description: 'Last update timestamp'),
+        new OA\Property(property: 'publicId', description: 'Library public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+        new OA\Property(property: 'name', description: 'Library name', type: 'string'),
+        new OA\Property(property: 'slug', description: 'URL-friendly slug', type: 'string'),
+        new OA\Property(property: 'path', description: 'Filesystem path', type: 'string'),
+        new OA\Property(property: 'type', description: 'Library type', type: 'string', enum: ['music', 'podcast', 'audiobook', 'movie', 'tv_show']),
+        new OA\Property(property: 'filesystemType', description: 'Filesystem type', type: 'string', enum: ['local']),
+        new OA\Property(property: 'sortOrder', description: 'Sort order', type: 'integer'),
+        new OA\Property(property: 'lastScan', description: 'Last scan timestamp', type: 'string', format: 'date-time', nullable: true),
+        new OA\Property(property: 'scanStatus', description: 'Current scan status', type: 'string', nullable: true),
+        new OA\Property(property: 'createdAt', description: 'Creation timestamp', type: 'string', format: 'date-time'),
+        new OA\Property(property: 'updatedAt', description: 'Last update timestamp', type: 'string', format: 'date-time'),
     ],
 )]
 final class LibraryResource extends AbstractResource

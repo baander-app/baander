@@ -431,7 +431,7 @@ final class LibraryDirectoryPublicationTest extends TestCase
             }
         });
         try {
-            $this->scanner($type, $transaction)->scan($library, lease: $lease, publishDirectory: $this->capture($library));
+            $this->scanner($type, $transaction)->scan($library, publishDirectory: $this->capture($library), lease: $lease);
             self::fail('The released holder must fail before writing.');
         } catch (LibraryScanClaimLostException) {
             self::assertTrue($changed);
@@ -488,7 +488,7 @@ final class LibraryDirectoryPublicationTest extends TestCase
             }
         });
         try {
-            $this->scanner($type, $transaction)->scan($library, lease: $lease, publishDirectory: $this->capture($library));
+            $this->scanner($type, $transaction)->scan($library, publishDirectory: $this->capture($library), lease: $lease);
             self::assertFalse($rollback);
         } catch (\RuntimeException $error) {
             self::assertTrue($rollback);

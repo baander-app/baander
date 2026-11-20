@@ -1,0 +1,15 @@
+{
+  "name": "baander/process",
+  "description": "Child-process execution, cancellation, command arguments and runtime preflight",
+  "type": "library",
+  "license": "Apache-2.0",
+  "require": {
+    "php": ">=8.5",
+    "baander/filesystem": "dev-main"
+  },
+  "autoload": {
+    "psr-4": {
+      "Baander\\Process\\": "src/"
+    }
+  }
+}

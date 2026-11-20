@@ -7,12 +7,12 @@ declare(strict_types=1);
 
 require __DIR__ . '/bootstrap.php';
 
-use Baander\Tooling\Configuration\ToolingConfiguration;
-use Baander\Tooling\Inventory\Worker;
-use Baander\Tooling\Process\CompletionPolicy;
-use Baander\Tooling\Process\EngineExecutor;
-use Baander\Tooling\Process\ExecutionContext;
-use Baander\Tooling\Runtime\Requirements;
+use Baander\Configuration\ToolingConfiguration;
+use Baander\Images\Inventory\Worker;
+use Baander\Process\Execution\CompletionPolicy;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
+use Baander\Process\Runtime\Requirements;
 
 try {
     Requirements::check();

@@ -415,16 +415,24 @@ final class GenreRepository implements GenreRepositoryInterface
 
     private function toDomain(GenreEntity $entity): Genre
     {
+        $id = $entity->getId();
+        $publicId = $entity->getPublicId();
+        $name = $entity->getName();
+        $slug = $entity->getSlug();
+        $mbid = $entity->getMbid();
+        $parentId = $entity->getParent()?->getId();
+        $parentPublicId = $entity->getParent()?->getPublicId();
+
         return Genre::reconstitute(new GenreState(
-            id: $entity->getId(),
-            publicId: $entity->getPublicId(),
-            name: $entity->getName(),
-            slug: $entity->getSlug(),
-            mbid: $entity->getMbid(),
-            parent: $entity->getParent()?->getId(),
-            parentPublicId: $entity->getParent()?->getPublicId(),
+            id: $id,
+            publicId: $publicId,
+            name: $name,
+            slug: $slug,
+            mbid: $mbid,
+            parent: $parentId,
             createdAt: $entity->getCreatedAt(),
             updatedAt: $entity->getUpdatedAt(),
+            parentPublicId: $parentPublicId,
         ));
     }
 

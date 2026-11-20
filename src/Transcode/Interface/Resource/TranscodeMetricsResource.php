@@ -11,15 +11,15 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'TranscodeMetricsResource',
     properties: [
-        new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
-        new OA\Property(property: 'videoId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Video public identifier'),
-        new OA\Property(property: 'qualityTier', type: 'string', description: 'Quality tier name'),
-        new OA\Property(property: 'status', type: 'string', description: 'Job status'),
-        new OA\Property(property: 'progress', type: 'number', description: 'Progress from 0 to 1'),
-        new OA\Property(property: 'totalSegments', type: 'integer', description: 'Total segments'),
-        new OA\Property(property: 'completedSegments', type: 'integer', description: 'Completed segments'),
-        new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', description: 'Creation timestamp'),
-        new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time', description: 'Last update timestamp'),
+        new OA\Property(property: 'publicId', description: 'Public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+        new OA\Property(property: 'videoId', description: 'Video public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+        new OA\Property(property: 'qualityTier', description: 'Quality tier name', type: 'string'),
+        new OA\Property(property: 'status', description: 'Job status', type: 'string'),
+        new OA\Property(property: 'progress', description: 'Progress from 0 to 1', type: 'number'),
+        new OA\Property(property: 'totalSegments', description: 'Total segments', type: 'integer'),
+        new OA\Property(property: 'completedSegments', description: 'Completed segments', type: 'integer'),
+        new OA\Property(property: 'createdAt', description: 'Creation timestamp', type: 'string', format: 'date-time'),
+        new OA\Property(property: 'updatedAt', description: 'Last update timestamp', type: 'string', format: 'date-time'),
     ],
 )]
 final class TranscodeMetricsResource extends AbstractResource

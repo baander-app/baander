@@ -93,11 +93,11 @@ final class PasskeyLoginController
             $envelope = $this->bus->dispatch(new IssueTokenCommand(
                 clientId: $client->getId(),
                 userId: $user->getId(),
+                dpopJkt: $login->dpopJkt,
+                credentialEpoch: $login->credentialEpoch,
                 ipAddress: $request->getClientIp(),
                 userAgent: $request->headers->get('User-Agent'),
                 clientFingerprint: $request->headers->get(BaanderHeader::ClientFingerprint->value),
-                dpopJkt: $login->dpopJkt,
-                credentialEpoch: $login->credentialEpoch,
             ));
         } catch (HandlerFailedException $exception) {
             if (HandlerFailure::cause($exception) instanceof CredentialsChangedException) {

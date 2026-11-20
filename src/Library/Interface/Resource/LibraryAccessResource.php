@@ -11,11 +11,11 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'LibraryAccessResource',
     properties: [
-        new OA\Property(property: 'libraryId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, description: 'Library public ID'),
-        new OA\Property(property: 'name', type: 'string', description: 'Library name'),
-        new OA\Property(property: 'slug', type: 'string', description: 'URL-friendly slug'),
-        new OA\Property(property: 'type', type: 'string', enum: ['music', 'podcast', 'audiobook', 'movie', 'tv_show'], description: 'Library type'),
-        new OA\Property(property: 'granted', type: 'boolean', description: 'Whether the user may see the library'),
+        new OA\Property(property: 'libraryId', description: 'Library public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+        new OA\Property(property: 'name', description: 'Library name', type: 'string'),
+        new OA\Property(property: 'slug', description: 'URL-friendly slug', type: 'string'),
+        new OA\Property(property: 'type', description: 'Library type', type: 'string', enum: ['music', 'podcast', 'audiobook', 'movie', 'tv_show']),
+        new OA\Property(property: 'granted', description: 'Whether the user may see the library', type: 'boolean'),
     ],
 )]
 final class LibraryAccessResource extends AbstractResource

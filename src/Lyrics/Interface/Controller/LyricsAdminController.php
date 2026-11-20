@@ -69,7 +69,7 @@ final class LyricsAdminController
             required: false,
             content: new OA\JsonContent(
                 properties: [
-                    new OA\Property(property: 'limit', type: 'integer', minimum: 1, nullable: true, description: 'Most songs to queue; absent or null queues every song without lyrics'),
+                    new OA\Property(property: 'limit', description: 'Most songs to queue; absent or null queues every song without lyrics', type: 'integer', nullable: true, minimum: 1),
                 ],
             ),
         ),

@@ -13,7 +13,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'error', properties: [
             new OA\Property(property: 'message', type: 'string', example: 'Validation failed'),
             new OA\Property(property: 'code', type: 'integer', example: 422),
-            new OA\Property(property: 'details', type: 'object', description: 'Field-level validation errors'),
+            new OA\Property(property: 'details', description: 'Field-level validation errors', type: 'object'),
         ], type: 'object'),
     ],
 )]

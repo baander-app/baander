@@ -10,6 +10,7 @@ use App\Shared\Application\DTO\WorkerAutoscalingProfile;
 use App\Shared\Application\Exception\DatabaseTimeZoneException;
 use App\Shared\Application\Exception\WorkerTransportConfigurationException;
 use App\Shared\Application\Port\WorkerSupervisorRunnerInterface;
+use Baander\Core\EnvironmentVariable;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -43,9 +44,9 @@ final class WorkerCommand extends Command
         $io = new SymfonyStyle($input, $output);
         try {
             $configuration = new WorkerRuntimeConfiguration(
-                $this->identity($input, 'deployment', 'BAANDER_WORKER_NAMESPACE'),
-                $this->identity($input, 'boot-id', 'BAANDER_WORKER_BOOT_ID'),
-                $this->identity($input, 'unit', 'BAANDER_WORKER_UNIT'),
+                $this->identity($input, 'deployment', EnvironmentVariable::BAANDER_WORKER_NAMESPACE),
+                $this->identity($input, 'boot-id', EnvironmentVariable::BAANDER_WORKER_BOOT_ID),
+                $this->identity($input, 'unit', EnvironmentVariable::BAANDER_WORKER_UNIT),
                 $input->getOption('scheduled-console-mib') === '0' ? 0 : $this->bytes($input, 'scheduled-console-mib'),
                 $this->stringOption($input, 'lock-dir'), $this->stringOption($input, 'ipc-dir'),
                 $this->deploymentProfile($input),

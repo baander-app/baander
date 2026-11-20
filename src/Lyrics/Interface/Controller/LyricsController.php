@@ -60,7 +60,7 @@ final class LyricsController
             new OA\Response(response: '200', description: 'Lyrics for the song', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', oneOf: [
                     new OA\Schema(ref: new Model(type: LyricsResource::class)),
-                    new OA\Schema(type: 'array', maxItems: 0, items: new OA\Items()),
+                    new OA\Schema(type: 'array', items: new OA\Items(), maxItems: 0),
                 ])],
             )),
             new OA\Response(response: '401', description: 'Authentication required'),
@@ -102,7 +102,7 @@ final class LyricsController
             new OA\Response(response: '200', description: 'The song\'s lyrics, just fetched or already stored; an empty array when LRCLIB has none', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', oneOf: [
                     new OA\Schema(ref: new Model(type: LyricsResource::class)),
-                    new OA\Schema(type: 'array', maxItems: 0, items: new OA\Items()),
+                    new OA\Schema(type: 'array', items: new OA\Items(), maxItems: 0),
                 ])],
             )),
             new OA\Response(response: '403', description: 'Administrator role required'),
@@ -172,29 +172,23 @@ final class LyricsController
     /**
      * Apply a specific LRCLIB search result to a song.
      */
-    #[OA\Post(
-        path: '/api/lyrics/search/{resultId}/apply',
-        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: ApplyLyricsRequest::class))),
-        summary: 'Apply an LRCLIB search result to a song',
-        parameters: [
-            new OA\Parameter(name: 'resultId', description: 'LRCLIB search result ID', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
-        ],
-        responses: [
-            new OA\Response(response: '200', description: 'Lyrics applied to song', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', ref: new Model(type: LyricsResource::class))],
-            )),
-            new OA\Response(response: '403', description: 'Administrator role required'),
-            new OA\Response(response: '401', description: 'Authentication required'),
-            new OA\Response(response: '404', description: 'Song or lyrics result not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(
-                response: '409',
-                description: 'The song already has lyrics, which stay unchanged (`details.reason` is `song_has_lyrics`), or LRCLIB rejected the request (`lrclib_rejected`)',
-                content: new OA\JsonContent(ref: new Model(type: ApiError::class)),
-            ),
-            new OA\Response(response: '422', description: 'Invalid song public ID', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '503', description: 'LRCLIB is unavailable', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-        ],
-    )]
+    #[OA\Post(path: '/api/lyrics/search/{resultId}/apply', summary: 'Apply an LRCLIB search result to a song', requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: ApplyLyricsRequest::class))), parameters: [
+        new OA\Parameter(name: 'resultId', description: 'LRCLIB search result ID', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+    ], responses: [
+        new OA\Response(response: '200', description: 'Lyrics applied to song', content: new OA\JsonContent(
+            properties: [new OA\Property(property: 'data', ref: new Model(type: LyricsResource::class))],
+        )),
+        new OA\Response(response: '403', description: 'Administrator role required'),
+        new OA\Response(response: '401', description: 'Authentication required'),
+        new OA\Response(response: '404', description: 'Song or lyrics result not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+        new OA\Response(
+            response: '409',
+            description: 'The song already has lyrics, which stay unchanged (`details.reason` is `song_has_lyrics`), or LRCLIB rejected the request (`lrclib_rejected`)',
+            content: new OA\JsonContent(ref: new Model(type: ApiError::class)),
+        ),
+        new OA\Response(response: '422', description: 'Invalid song public ID', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+        new OA\Response(response: '503', description: 'LRCLIB is unavailable', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+    ])]
     #[Route('/lyrics/search/{resultId}/apply', name: 'apply', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
     #[CliCounterpart('app:lyrics:apply')]

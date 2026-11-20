@@ -44,7 +44,7 @@ final class FavoritesController
         parameters: [
             new OA\Parameter(name: 'entityType', in: 'query', required: false, schema: new OA\Schema(type: 'string', enum: ['song', 'album', 'artist'])),
             new OA\Parameter(name: 'page', in: 'query', required: false, schema: new OA\Schema(type: 'integer', minimum: 1)),
-            new OA\Parameter(name: 'limit', in: 'query', required: false, schema: new OA\Schema(type: 'integer', minimum: 1, maximum: 100)),
+            new OA\Parameter(name: 'limit', in: 'query', required: false, schema: new OA\Schema(type: 'integer', maximum: 100, minimum: 1)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(properties: [

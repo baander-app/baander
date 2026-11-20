@@ -268,8 +268,8 @@ final class LogAgentTest extends TestCase
         $port = (int) substr(strrchr(stream_socket_get_name($reservation, false), ':'), 1);
         fclose($reservation);
         $configuration = array_replace($this->config()->values, ['listenHost' => '127.0.0.1', 'listenPort' => $port]);
-        $target = new \Baander\Tooling\Docker\Target('/usr/bin/docker', 'unix:///var/run/docker.sock', 'fixture-daemon', null, null);
-        $service = \Baander\Tooling\Deployment\LogCollection::service('baander:fixture', dirname(__DIR__, 2), $target, $this->directory, $configuration);
+        $target = new \Baander\Containers\Docker\Target('/usr/bin/docker', 'unix:///var/run/docker.sock', 'fixture-daemon', null, null);
+        $service = \Baander\Deployment\Observability\LogCollection::service('baander:fixture', dirname(__DIR__, 2), $target, $this->directory, $configuration);
         $process = proc_open([PHP_BINARY, dirname(__DIR__, 2).'/bin/log-agent.php'], [0 => ['file', '/dev/null', 'r'], 1 => ['file', $this->directory.'/stdout', 'w'], 2 => ['file', $this->directory.'/stderr', 'w']], $pipes, null, array_replace(getenv(), $service['environment']));
         self::assertIsResource($process);
         try {

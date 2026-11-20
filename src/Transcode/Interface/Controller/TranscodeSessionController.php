@@ -62,8 +62,8 @@ final class TranscodeSessionController
                 schema: new OA\Schema(
                     required: ['videoId', 'requestId'],
                     properties: [
-                        new OA\Property(property: 'videoId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
-                        new OA\Property(property: 'requestId', type: 'string', format: 'uuid', description: 'Stable playback client session identifier'),
+                        new OA\Property(property: 'videoId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+                        new OA\Property(property: 'requestId', description: 'Stable playback client session identifier', type: 'string', format: 'uuid'),
                         new OA\Property(property: 'qualityTier', type: 'string', enum: ['360p', '480p', '720p', '1080p', '1440p', '4K']),
                         new OA\Property(property: 'audioProfile', type: 'string', enum: ['mobile_mono', 'mobile_stereo', 'streaming_stereo', 'streaming_5.1', 'broadcast_stereo', 'broadcast_5.1', 'hifi_stereo', 'opus_stereo']),
                         new OA\Property(property: 'priority', type: 'string', enum: ['critical', 'high', 'normal', 'low', 'bulk']),
@@ -133,7 +133,7 @@ final class TranscodeSessionController
         path: '/api/transcode/sessions/{publicId}',
         summary: 'Get a transcode session by public identifier',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Session public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
+            new OA\Parameter(name: 'publicId', description: 'Session public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'publicId', type: 'string'), new OA\Property(property: 'status', type: 'string'), new OA\Property(property: 'qualityTier', type: 'string')])])),
@@ -153,7 +153,7 @@ final class TranscodeSessionController
         path: '/api/transcode/sessions/{publicId}/pause',
         summary: 'Pause a transcode session',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Session public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
+            new OA\Parameter(name: 'publicId', description: 'Session public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Paused', content: new OA\JsonContent(properties: [new OA\Property(property: 'message', type: 'string')])),
@@ -175,7 +175,7 @@ final class TranscodeSessionController
         path: '/api/transcode/sessions/{publicId}/resume',
         summary: 'Resume a paused transcode session',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Session public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
+            new OA\Parameter(name: 'publicId', description: 'Session public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Resumed', content: new OA\JsonContent(properties: [new OA\Property(property: 'message', type: 'string')])),
@@ -197,7 +197,7 @@ final class TranscodeSessionController
         path: '/api/transcode/sessions/{publicId}',
         summary: 'Cancel a transcode session',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Session public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
+            new OA\Parameter(name: 'publicId', description: 'Session public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Cancelled', content: new OA\JsonContent(properties: [new OA\Property(property: 'message', type: 'string')])),
@@ -230,7 +230,7 @@ final class TranscodeSessionController
             ),
         ),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Session public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
+            new OA\Parameter(name: 'publicId', description: 'Session public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Updated', content: new OA\JsonContent(properties: [new OA\Property(property: 'status', type: 'string')])),
@@ -284,18 +284,18 @@ final class TranscodeSessionController
                     properties: [
                         new OA\Property(property: 'position', type: 'number', format: 'float'),
                         new OA\Property(property: 'action', type: 'string', enum: ['seek', 'pause', 'resume', 'progress']),
-                        new OA\Property(property: 'generation', type: 'integer', minimum: 1, description: 'Required for progress; optional for seek to fence native events to the attached generation'),
-                        new OA\Property(property: 'revision', type: 'integer', minimum: 1, description: 'Required for progress; desired revision currently attached by the player'),
-                        new OA\Property(property: 'requestId', type: 'string', format: 'uuid', description: 'Optional control identity; reuse across retries of the same command'),
+                        new OA\Property(property: 'generation', description: 'Required for progress; optional for seek to fence native events to the attached generation', type: 'integer', minimum: 1),
+                        new OA\Property(property: 'revision', description: 'Required for progress; desired revision currently attached by the player', type: 'integer', minimum: 1),
+                        new OA\Property(property: 'requestId', description: 'Optional control identity; reuse across retries of the same command', type: 'string', format: 'uuid'),
                     ],
                 ),
             ),
         ),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Session public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
+            new OA\Parameter(name: 'publicId', description: 'Session public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Command processed; fences or replay may leave state unchanged. Read current session state separately for execution progress.', content: new OA\JsonContent(properties: [new OA\Property(property: 'status', type: 'string', enum: ['ok']), new OA\Property(property: 'position', type: 'number'), new OA\Property(property: 'requestId', type: 'string', format: 'uuid', description: 'Echoed when supplied in the request'), new OA\Property(property: 'acceptedGeneration', type: 'integer', minimum: 1, description: 'Resulting generation of a fresh accepted seek; absent for replayed, stale, terminal or non-seek commands')])),
+            new OA\Response(response: '200', description: 'Command processed; fences or replay may leave state unchanged. Read current session state separately for execution progress.', content: new OA\JsonContent(properties: [new OA\Property(property: 'status', type: 'string', enum: ['ok']), new OA\Property(property: 'position', type: 'number'), new OA\Property(property: 'requestId', description: 'Echoed when supplied in the request', type: 'string', format: 'uuid'), new OA\Property(property: 'acceptedGeneration', description: 'Resulting generation of a fresh accepted seek; absent for replayed, stale, terminal or non-seek commands', type: 'integer', minimum: 1)])),
         ],
     )]
     #[Route('/{publicId}/position', name: 'position', methods: ['POST'])]

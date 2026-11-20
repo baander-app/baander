@@ -46,11 +46,11 @@ final readonly class AdminLogController
         new OA\Parameter(name: 'sources', in: 'query', schema: new OA\Schema(type: 'string')),
         new OA\Parameter(name: 'levels', in: 'query', schema: new OA\Schema(type: 'string')),
         new OA\Parameter(name: 'search', in: 'query', schema: new OA\Schema(type: 'string')),
-        new OA\Parameter(name: 'channels[]', in: 'query', style: 'form', explode: true, schema: new OA\Schema(type: 'array', items: new OA\Items(type: 'string'))),
+        new OA\Parameter(name: 'channels[]', in: 'query', schema: new OA\Schema(type: 'array', items: new OA\Items(type: 'string')), style: 'form', explode: true),
         new OA\Parameter(name: 'correlationId', in: 'query', schema: new OA\Schema(type: 'string')),
         new OA\Parameter(name: 'since', in: 'query', schema: new OA\Schema(type: 'string', format: 'date-time')),
         new OA\Parameter(name: 'until', in: 'query', schema: new OA\Schema(type: 'string', format: 'date-time')),
-        new OA\Parameter(name: 'limit', in: 'query', schema: new OA\Schema(type: 'integer', minimum: 1, maximum: 500)),
+        new OA\Parameter(name: 'limit', in: 'query', schema: new OA\Schema(type: 'integer', maximum: 500, minimum: 1)),
         new OA\Parameter(name: 'cursor', in: 'query', schema: new OA\Schema(type: 'string')),
         new OA\Parameter(name: 'order', in: 'query', schema: new OA\Schema(type: 'string', enum: ['asc', 'desc'])),
     ], responses: [new OA\Response(response: 200, description: 'Log snapshot page', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', ref: new Model(type: LogEntriesResource::class))]))])]

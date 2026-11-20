@@ -193,8 +193,8 @@ final class HealthMonitorSubscriberTest extends TestCase
             oauthPublicKeyPath: '',
             vapidPublicKey: '',
             vapidPrivateKey: '',
-            workerProfileHealth: new WorkerProfileHealth($connection, new DeploymentProfile()),
             messengerWorkerHealth: new MessengerWorkerHealth($redis, new MockClock(), new HealthAlertTable()),
+            workerProfileHealth: new WorkerProfileHealth($connection, new DeploymentProfile()),
         );
         $alertService = new HealthAlertService(
             $checks,

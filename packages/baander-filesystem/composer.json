@@ -1,0 +1,14 @@
+{
+  "name": "baander/filesystem",
+  "description": "Private paths, durable atomic files and filesystem locks",
+  "type": "library",
+  "license": "Apache-2.0",
+  "require": {
+    "php": ">=8.5"
+  },
+  "autoload": {
+    "psr-4": {
+      "Baander\\Filesystem\\": "src/"
+    }
+  }
+}

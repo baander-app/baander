@@ -43,7 +43,7 @@ final class AudioPreferencesController
         summary: 'Get audio preferences',
         responses: [
             new OA\Response(response: '200', description: 'Audio preferences', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'payload', type: 'object', description: 'Audio settings snapshot; see SaveAudioPreferencesRequest for its fields.'),
+                new OA\Property(property: 'payload', description: 'Audio settings snapshot; see SaveAudioPreferencesRequest for its fields.', type: 'object'),
                 new OA\Property(property: 'version', type: 'integer'),
             ])),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
@@ -77,7 +77,7 @@ final class AudioPreferencesController
         ),
         responses: [
             new OA\Response(response: '200', description: 'Preferences saved', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'payload', type: 'object', description: 'Validated audio settings echoed back from the request.'),
+                new OA\Property(property: 'payload', description: 'Validated audio settings echoed back from the request.', type: 'object'),
                 new OA\Property(property: 'version', type: 'integer'),
             ])),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
@@ -157,7 +157,7 @@ final class AudioPreferencesController
         ),
         responses: [
             new OA\Response(response: '200', description: 'Preferences rolled back', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'payload', type: 'object', description: 'Audio settings at the rolled-back version.'),
+                new OA\Property(property: 'payload', description: 'Audio settings at the rolled-back version.', type: 'object'),
                 new OA\Property(property: 'version', type: 'integer'),
             ])),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
