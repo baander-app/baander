@@ -4,6 +4,49 @@ Updated: 2026-11-20. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
+## Documentation readability
+
+The [readability plan](docs/plans/2026-11-20-documentation-readability-plan.md)
+separates twelve long guides into task pages and references. Six operator guides
+now distinguish account administration, credential rotation, rate limits,
+playback delivery and upgrade procedures. Auth and Catalog overviews link to
+their inventories and mechanisms; media, worker and frontend testing guides
+separate runner selection from detailed qualification and historical results.
+The manual has 292 pages, including 42 new pages. Counts use whitespace-separated
+words in the Markdown sources, with `3adfbd9f0` as the before revision.
+
+| Entry page | Before | After |
+| --- | ---: | ---: |
+| Security | 4,838 | 862 |
+| Authentication configuration | 4,801 | 1,501 |
+| User management | 4,101 | 1,311 |
+| Transcoding | 4,837 | 1,388 |
+| External APIs | 3,560 | 1,325 |
+| Upgrading | 3,429 | 2,268 |
+| Auth context | 11,645 | 237 |
+| Catalog context | 9,020 | 1,984 |
+| API authentication | 5,951 | 2,513 |
+| Media and playback testing | 12,099 | 219 |
+| Workers and messaging testing | 4,818 | 598 |
+| Frontend and browser testing | 3,007 | 1,071 |
+
+Repeated navigation was removed from the manual landing pages. Technical limits,
+protocols and measurements were retained; historical results now sit with their
+qualification procedures. The frame-capture measurement's unavailable original
+receipt is identified in the adaptive-playback guide, and the database credential
+rotation procedure retains its source-derived, undrilled qualification.
+
+Verification on 2026-11-20: individual and aggregate prose audits, plus independent
+review, preserve all 96 fenced examples and 721 source table rows across the
+twelve source guides. The public-site build passes for all 292 manual pages;
+35 rendering tests pass. Across 310 rendered HTML pages, all 108,753 local links
+and 4,473 fragment links resolve, and every manual page is reachable. All 851
+relative file links in the changed Markdown resolve. The full browser run passed
+220 checks and found one stale chapter-size expectation; after updating the two
+counts for the new pages, that navigation test passed its focused rerun. PHP
+syntax checks pass for all four touched PHP files, and `git diff --check` passes.
+The final review has no unresolved findings. No application behavior changed.
+
 ## Tooling context packages and shared core
 
 The local PHP dependency audit reports seven existing Swoole
@@ -543,6 +586,17 @@ a new bootstrap run.
 
 ## Local development workflow
 
+The persistent instance was refreshed with `make dev-up` on 2026-11-20 after its
+installed controller failed to find the layout in the retired `baander-tooling`
+package. The refreshed controller reads `baander-configuration` and activated
+`3adfbd9f0d6a97c676dec44ffc5fa481e86a91b4`. Status reports web and workers ready,
+no failure, and automatic updates enabled; the HTTPS root returns 200. CLI OPcache
+is enabled. The first post-update sample reports 27.07, 27.06, 36.05 and 27.06 MiB
+of worker heap, versus 665.12 MiB combined before the update. The new combined
+117.24 MiB is a fresh-process observation, not a long-running memory bound.
+This refresh resolves the failed update; the controller-version issue below
+remains a separate design limitation.
+
 Open: in a linked worktree the PHP tooling suite fails up to three
 `ApplicationInventoryTest` cases (the two `testInterruptedCollection…` cases always,
 `testShellRecoversUncertainCreationWhenCollectorIsInterrupted` sometimes) because a
@@ -581,7 +635,7 @@ sessions. Unconditional cancellation from React effect cleanup is not prescribed
 24.60-second callback remains unexplained. Failure diagnostics are delivered and
 the mismatch did not recur in the prescribed runs; these results do not prove its
 cause or universal capture stability. The
-[sparse playback guide](docs-book/part-2-developer-guide/testing/media-and-playback.md#sparse-movie-playback)
+[sparse playback guide](docs-book/part-2-developer-guide/testing/adaptive-playback.md#sparse-movie-playback)
 retains the contract and evidence. No tolerance change or further implementation
 is selected by this historical failure.
 
@@ -598,7 +652,7 @@ Keep these limits separate from selected work:
   current demuxed output.
 - General variable-rate gaps, timestamp discontinuities, additional origins,
   arbitrary containers, hardware and untested browser/format combinations remain
-  outside the measured cases. A [Selected video endpoint](docs-book/part-2-developer-guide/testing/media-and-playback.md#selected-video-endpoint-playback)
+  outside the measured cases. A [Selected video endpoint](docs-book/part-2-developer-guide/testing/movie-endpoint-playback.md#selected-video-endpoint-playback)
   is qualified only for its calibrated metadata paths; missing or stale metadata
   still uses an estimate. Existing checks do not establish general cache or
   performance qualification.

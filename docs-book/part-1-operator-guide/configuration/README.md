@@ -13,7 +13,9 @@ database instead.
 |-------|-------|
 | [Deployment Capability, Size and Runtime](deployment-profiles.md) | `transcode` and `remux` capabilities, size settings and starting points, media slots, PgBouncer connection pooler, Swoole server drain budget, coroutine file I/O, and PHP memory limits |
 | [Environment Variables](environment-variables.md) | Application, PostgreSQL, Redis, Messenger, Web Push, mail, external APIs, scanner security, discovery, media storage, stream authentication, CORS, and job monitoring |
-| [Authentication and Rate Limiting](authentication-and-limits.md) | OAuth 2.0 keys, token lifetimes, authorization server parameters, rate limiters, trusted proxies, passkeys, Argon2id, password reset, email verification, and token binding |
+| [Authentication](authentication-and-limits.md) | OAuth 2.0 keys, token lifetimes, authorization server parameters and token binding |
+| [Account Security](account-security.md) | Passkeys, Argon2id, password reset and email verification configuration |
+| [Rate Limits](rate-limits.md) | Limiter defaults, route accounting, trusted proxies and outage behavior |
 | [Server and User Settings](server-settings.md) | Live `system_settings` via Admin UI/CLI/API, settings reference, scheduled recommendations, email language selection, and per-user settings |
 
 ## Where a change takes effect
@@ -60,4 +62,4 @@ transport settings. See [Shared media paths](../getting-started/storage-and-data
 - OAuth keys should be at least 2048-bit RSA. Generate with `openssl genrsa -out private.key 2048` and `openssl rsa -in private.key -pubout > public.key`.
 - Rate limiting requires Redis. While its state is unavailable, protected work stops
   with `503`; logout and revocation keep the narrow exceptions described in
-  [Sessions, logout and a Redis outage](../maintenance/security.md#sessions-logout-and-a-redis-outage).
+  [Sessions, logout and a Redis outage](../../part-2-developer-guide/development/session-and-access-behavior.md#sessions-logout-and-a-redis-outage).

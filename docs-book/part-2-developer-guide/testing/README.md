@@ -1,6 +1,10 @@
 # Testing
 
-Bånder tests backend domain logic, persistence, asynchronous workers, native media encoding, and browser and client behavior with isolated test suites and disposable container runners. Use this index to pick the runner that exercises your change, or go straight to the guide for a subsystem.
+Choose a runner that reaches the behavior you changed: domain logic, persistence,
+background work, native encoding or a browser flow. Start with the quick commands
+below, then read the subsystem guide for prerequisites and the limits of its
+results. Historical qualification results describe earlier runs; they do not
+replace running the checks for your change.
 
 ## Test Suites
 
@@ -59,13 +63,39 @@ These environment and fixture rules apply to every suite:
 
 | Guide | Coverage |
 |-------|----------|
-| [Messaging and Worker Qualification](workers-and-messaging.md) | Validated Messenger workloads, Redis fallback without Swoole (`BAANDER_TEST_DISABLE_SWOOLE=1`), worker containment/retirement/recovery/command/operator/lifecycle runners, production worker image checks, ordinary worker autoscaling qualification, and scheduler occurrence persistence |
-| [Media and Playback Qualification](media-and-playback.md) | Native FFmpeg segment encoder suites (`SegmentEncoder*MediaTest`), two-command deployment and Chromium/Firefox playback checkpoints, shared media control qualification (per-job CPU/memory cost, VAAPI hardware cost, 8 + 12 slot load proof), stream selection, sparse/delayed playback, deployment qualification, and the playback destination specs for close reports and "Play here anyway" |
+| [Messaging and Worker Qualification](workers-and-messaging.md) | Messenger workloads and a chooser for worker setup, lifecycle, capacity, runtime and scheduler checks |
+| [Media and Playback Qualification](media-and-playback.md) | Choose native encoding, playback lifecycle, adaptive playback, capacity or deployment checks |
 | [Production Runtime Drills](runtime-drills.md) | Container startup probes, worker/outbox/producer runtime drills, Swoole `app:serve` runtime and drain verification (`test-web-shutdown-container.sh`), WebSocket ticket and proxy log security drills, and manual Safari verification on macOS and iOS |
+
+### Worker runners
+
+| Guide | What it checks |
+| --- | --- |
+| [Worker Runner Setup](worker-runner-setup.md) | Prerequisites and runner selection |
+| [Worker Lifecycle](worker-lifecycle-qualification.md) | Containment, retirement, recovery and lifecycle operations |
+| [Worker Capacity](worker-capacity-qualification.md) | Ordinary worker scaling and capacity qualification |
+| [Worker Runtime](worker-runtime-qualification.md) | Runtime and production worker image checks |
+| [Scheduler Qualification](scheduler-qualification.md) | Scheduled work and occurrence persistence |
+
+### Media and playback runners
+
+| Guide | What it checks |
+| --- | --- |
+| [Native Media](native-media.md) | FFmpeg segment encoder suites and AAC implementation |
+| [Playback Lifecycle](playback-lifecycle.md) | Deployment-to-browser playback and client controls |
+| [Media Capacity](media-capacity.md) | Shared execution slots and load qualification |
+| [Encoder Cost](media-encoder-cost.md) | Per-job and hardware encoder measurement procedures and recorded results |
+| [Movie Endpoint Playback](movie-endpoint-playback.md) | Playback through the movie endpoints |
+| [Adaptive Playback](adaptive-playback.md) | Quality selection, sparse or delayed output and audio scenarios |
+| [Deployment Qualification](deployment-qualification.md) | Complete deployment checks and qualification VMs |
+| [Playback Destinations](playback-destinations.md) | Multi-tab close, takeover and recovery behavior |
 
 ## Frontend & Client Qualification
 
 | Guide | Coverage |
 |-------|----------|
-| [Frontend, Browser, and Audio Testing](frontend-and-browser.md) | Web Vitest and Playwright E2E suites, 32-combination mood × accent styling and recessed-footer checks, Web audio graph and spectrum/EQ calibration, browser authentication transport, web typography, store isolation and debugging, Electron Node tests, and Bånder Audio Core CTest and binding suites |
+| [Frontend, Browser, and Audio Testing](frontend-and-browser.md) | Choose web, Electron and Bånder Audio Core checks |
+| [Browser Harnesses](browser-harnesses.md) | Browser setup and dedicated UI verification |
+| [Web Audio Testing](web-audio-testing.md) | Audio graph, spectrum and EQ checks |
+| [Web Store Debugging](web-store-debugging.md) | Store isolation and debugging |
 | [Live-Update Qualification](live-updates.md) | End-to-end browser verification and production-mode capacity qualification for committed change capture, revision projection, and WebSocket `live.changed` hint delivery |

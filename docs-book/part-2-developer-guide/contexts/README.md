@@ -1,6 +1,10 @@
 # Bounded Contexts
 
-Each bounded context owns one business capability, with its own domain model, rules and language. Each page below covers one context, or the Shared kernel that the contexts build on: its domain models, ports, infrastructure, API endpoints and relationships with other contexts. For the four-layer structure and how contexts communicate, start with the [Architecture Overview](../architecture/overview.md).
+Use this index to find the context that owns the behavior you want to change.
+Each context has its own domain model, rules and language; its page explains
+responsibilities and links to models, ports, endpoints and related contexts.
+The Shared kernel supplies common building blocks. For the four-layer structure,
+start with the [Architecture Overview](../architecture/overview.md).
 
 | Page | Description |
 |------|-------------|
@@ -26,3 +30,19 @@ Each bounded context owns one business capability, with its own domain model, ru
 | [Transcode](transcode.md) | CMAF video transcoding via FFmpeg and Swoole |
 | [User Preference](user-preference.md) | Accent color, sidebar, audio/layout/player preferences, EQ profiles, theme mood, and user settings |
 | [Shared](shared.md) | Cross-cutting kernel: UUID, Swoole, caching, WebSocket, and settings |
+
+## Auth and Catalog references
+
+The Auth and Catalog overviews introduce the mechanisms. Use these references
+when you need their implementation detail.
+
+| Reference | What to find |
+| --- | --- |
+| [Auth inventory](auth-inventory.md) | Models, ports, events and endpoints |
+| [Account security](auth-account-security.md) | Passwords, account verification, passkeys and second factors |
+| [Auth tokens](auth-tokens.md) | Issuance, proof binding, rotation and revocation |
+| [OAuth server](auth-oauth-server.md) | Authorization and grant processing |
+| [OAuth client authentication](auth-client-authentication.md) | Client credentials and key verification |
+| [Catalog inventory](catalog-inventory.md) | Models, ports, events and endpoints |
+| [Catalog matching](catalog-matching.md) | Candidate selection, applying matches and background processing |
+| [Catalog imports](catalog-imports.md) | Import, rescan and media identity behavior |

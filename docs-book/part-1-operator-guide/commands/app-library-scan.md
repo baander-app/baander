@@ -64,7 +64,7 @@ While the `metadata.auto_sync` [server setting](../configuration/server-settings
 is on, ingestion also queues the fill of each artist that a batch of files created with a
 MusicBrainz artist ID from the tags, or gave such an ID, once that batch is committed. The fill
 looks the artist up in MusicBrainz by that ID and fills its empty details, as
-[Artist details](../media/external-apis.md#artist-details) describes. An album artist that only the
+[Artist details](../media/musicbrainz-matching.md#artist-details) describes. An album artist that only the
 album credit of an import creates, from an album-artist tag no song of the batch credits, is not
 queued; the next administrator's metadata sync, such as [app:metadata:sync](app-metadata-sync.md),
 fills it. While the setting is off, ingestion queues no artist fill.
@@ -115,7 +115,7 @@ returning file the same way. A repair works as follows:
   lyrics fetch.
 - While the `metadata.auto_sync` setting is on, each album the rescan touches that has no
   MusicBrainz match yet, or that is matched and holds songs no match has compared yet, is queued
-  for [automatic matching](../media/external-apis.md#automatic-matching).
+  for [automatic matching](../media/musicbrainz-matching.md#automatic-matching).
 
 The song stays in the album it is stored in, so a rescan after an album was renamed with
 [app:album:update](app-album-update.md) or merged with [app:album:merge](app-album-merge.md)

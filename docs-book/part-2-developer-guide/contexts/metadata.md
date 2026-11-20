@@ -24,7 +24,7 @@ The Metadata context enriches catalog entities with data from external music and
 | `SyncGenresMessage` | `SyncGenresHandler` | Queue a `SyncAlbumMessage` for every album and a `SyncSongMessage` for each of its songs; returns the number queued |
 | `SyncSongMessage` | `SyncSongHandler` | Add the genres of the MusicBrainz recording found for the song's title |
 
-Application enricher services (`SongMetadataEnricher`, and `MovieMetadataEnricher` in `Application/MovieMetadataEnricher.php`) perform the external lookups and write enriched fields and genres back to Catalog through its ports. `SongMetadataEnricher` writes genres only, and a forced run adds them the same way; a song's recording ID comes only from a Catalog match. Metadata has no album enricher: an album's MusicBrainz data comes from a match in Catalog, and no album lookup falls back to Discogs. Metadata has no artist enricher either: an artist's details come from Catalog's [artist sync](catalog.md#artist-sync), by the MusicBrainz ID the artist holds.
+Application enricher services (`SongMetadataEnricher`, and `MovieMetadataEnricher` in `Application/MovieMetadataEnricher.php`) perform the external lookups and write enriched fields and genres back to Catalog through its ports. `SongMetadataEnricher` writes genres only, and a forced run adds them the same way; a song's recording ID comes only from a Catalog match. Metadata has no album enricher: an album's MusicBrainz data comes from a match in Catalog, and no album lookup falls back to Discogs. Metadata has no artist enricher either: an artist's details come from Catalog's [artist sync](catalog-matching.md#artist-sync), by the MusicBrainz ID the artist holds.
 
 ## Album Syncs and Automatic Matching
 

@@ -39,7 +39,7 @@ VAPID_PRIVATE_KEY=MIGT...
    [Background work](../workers/background-work.md). Recreate containers when changing values
    injected by Compose; restarting an existing container retains its environment.
 
-A client that implements the subscription can then register for push notifications; the web application does not. To rotate the keys later, follow [VAPID key rotation](../maintenance/security.md#rotating-vapid-keys) in the security guide.
+A client that implements the subscription can then register for push notifications; the web application does not. To rotate the keys later, follow [VAPID key rotation](../maintenance/credential-rotation.md#rotating-vapid-keys) in the security guide.
 
 ## Webhooks
 
@@ -162,7 +162,7 @@ MAILER_DSN=smtp://user:pass@smtp.baander.app:587
 
 The Docker development environment includes [Mailpit](https://mailpit.axllent.org/) as a local SMTP server for testing; its default development DSN is `smtp://mailpit:1025`. The [Mail](../configuration/environment-variables.md#mail) section of the environment variable reference covers the remaining mail settings, including the sender address.
 
-Password reset emails use the same transport but are not notifications: they ignore notification preferences and are sent whenever a user asks for a reset. See [Password reset](../configuration/authentication-and-limits.md#password-reset).
+Password reset emails use the same transport but are not notifications: they ignore notification preferences and are sent whenever a user asks for a reset. See [Password reset](../configuration/account-security.md#password-reset).
 
 ### Language
 

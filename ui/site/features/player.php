@@ -72,6 +72,6 @@ return [
         'You cannot jump to another position in a track while the server is still converting it.',
     ],
     'manual' => [
-        ['label' => 'Operator guide: audio transcoding and the web player', 'href' => '/docs/operator-guide/media/transcoding/#web-player'],
+        ['label' => 'Operator guide: audio transcoding and the web player', 'href' => '/docs/operator-guide/media/audio-transcoding/#web-player'],
     ],
 ];

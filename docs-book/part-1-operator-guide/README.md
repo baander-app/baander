@@ -1,8 +1,7 @@
 # Part I — Operator's Guide
 
-This manual explains how to understand, install and maintain a Baander instance.
-For a new installation, follow the chapters or the reading path below. When you
-return to an existing instance, start from a task, a symptom or a component.
+For a new Baander instance, follow the reading path below. For an existing
+instance, use the task and symptom tables to find the procedure you need.
 
 Commands for an installed instance use the `dc` function that
 [Source Installation](getting-started/installation.md) defines, and run on the
@@ -27,11 +26,17 @@ before carrying a command from one environment to another.
 
 ## Reading path
 
-1. **Understand the instance.** [Understanding Baander](getting-started/understanding-baander.md) introduces the journey from files to playback. [Deployment Topology](getting-started/deployment-topology.md) shows the components in one diagram and what PostgreSQL and Redis hold. [Storage and Data](getting-started/storage-and-data.md) identifies the stores, their writers and what must be preserved.
-2. **Set it up.** Check [System Requirements](getting-started/system-requirements.md) to choose a capability and size, follow [Source Installation](getting-started/installation.md), then use [Configuration](configuration/README.md) for settings, [Worker Deployment](workers/worker-deployment.md) for the worker manifest, credentials and host controller, and [Background Work](workers/background-work.md) for queue flow and operating limits.
-3. **Run it day to day.** Use [Library Management](media/library-management.md), [User Management](administration/user-management.md), [External APIs](media/external-apis.md), [Transcoding](media/transcoding.md), [Notifications](administration/notifications.md) and [Watch Parties](media/watch-parties.md) for the work your instance supports.
-4. **Observe and diagnose.** [Monitoring and Troubleshooting](operations/README.md) connects [Health Checks, Metrics, and Logs](operations/health-and-metrics.md) and [Job and Transport Monitoring](operations/job-monitoring.md) to stage-by-stage evidence. [Troubleshooting](operations/troubleshooting.md) starts from symptoms and connects them to the responsible stage.
-5. **Maintain and recover.** Read [Backup and Recovery](maintenance/backup-and-recovery.md) before [Upgrading](maintenance/upgrading.md) or a recovery action. [Security](maintenance/security.md) covers credential changes and account/session effects. The optional [Registry](administration/registry.md) has separate storage and recovery requirements.
+1. **Understand what you will run.** Read [Understanding Baander](getting-started/understanding-baander.md)
+   for the path from files to playback, then [Deployment Topology](getting-started/deployment-topology.md)
+   for the components and [Storage and Data](getting-started/storage-and-data.md)
+   for what must be preserved.
+2. **Install it.** Check [System Requirements](getting-started/system-requirements.md),
+   then follow [Source Installation](getting-started/installation.md).
+3. **Operate it.** Choose a task below. [Monitoring and Troubleshooting](operations/README.md)
+   explains where to look when a step fails.
+4. **Prepare for changes.** Read [Backup and Recovery](maintenance/backup-and-recovery.md)
+   before upgrading or recovering an instance. The optional
+   [Registry](administration/registry.md) has separate storage and recovery requirements.
 
 ## Tasks
 
@@ -70,12 +75,6 @@ before carrying a command from one environment to another.
 
 ## Components and reference
 
-| Component or detail | Explanation and operating reference |
-| --- | --- |
-| Web, proxy and real-time connections | [Deployment Topology](getting-started/deployment-topology.md), [Health Checks, Metrics, and Logs](operations/health-and-metrics.md) |
-| Control/execution pair, queues, scheduler and outbox | [Background Work](workers/background-work.md) |
-| Worker manifest, credentials and host controller | [Worker Deployment](workers/worker-deployment.md) |
-| PostgreSQL, Redis, source media and generated output | [Storage and Data](getting-started/storage-and-data.md) |
-| Native encoding and delivery files | [Transcoding](media/transcoding.md) |
-| Optional registration/discovery service | [Registry](administration/registry.md) |
-| Command arguments, options and outcomes | [CLI Reference](commands/README.md) |
+[Deployment Topology](getting-started/deployment-topology.md) is the component map.
+For command arguments, options and outcomes, use the [CLI Reference](commands/README.md).
+The chapter indexes above link to each subsystem's operating reference.

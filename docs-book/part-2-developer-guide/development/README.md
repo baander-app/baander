@@ -1,6 +1,8 @@
 # Application Development
 
-Write backend domain logic, CQRS handlers, Doctrine mappings, PGroonga search queries, OpenAPI-documented HTTP endpoints, and React/TypeScript frontend features following Bånder's conventions.
+For a first backend change, follow [Adding a Feature](adding-a-feature.md).
+Use the references below when working on a specific layer, an API client or the
+web frontend. They explain the conventions the walkthrough uses.
 
 ## Backend & Persistence
 
@@ -17,10 +19,14 @@ Write backend domain logic, CQRS handlers, Doctrine mappings, PGroonga search qu
 | Guide | Scope |
 |-------|-------|
 | [API Reference](api-reference.md) | OpenAPI specification export, REST URL conventions, `PublicId` and playback identities, cursor/offset pagination, response envelopes, and resources |
-| [API Authentication and OAuth 2.0](api-authentication.md) | DPoP proof handshakes, password and passkey login, token refresh grace, client fingerprint binding, OAuth 2.0 PKCE/device flows, and revocation |
+| [API Authentication](api-authentication.md) | DPoP proofs, password and passkey login, token refresh, fingerprint binding and revocation |
+| [OAuth Flows](api-oauth.md) | Client-facing authorization-code, PKCE and device flows |
+| [OAuth Client Authentication](api-oauth-client-authentication.md) | Client authentication methods and administration requests |
+| [Session and Access Behavior](session-and-access-behavior.md) | Session revocation, proof validation and access checks behind operator actions |
 
 ## Frontend & Clients
 
 | Guide | Scope |
 |-------|-------|
 | [Frontend Development](frontend-development.md) | React 19, TypeScript, Vite, styled-components, TanStack Query, Orval client generation, Zustand stores, Electron's native Bånder Audio Core binding, and UI primitives |
+| [Video Playback Controls](video-playback-controls.md) | Seek commands, playback generations and client recovery |

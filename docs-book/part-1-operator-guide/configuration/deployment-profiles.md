@@ -164,7 +164,7 @@ A top-level `hardware` entry in a `transcode` configuration names a hardware
 encoder, for example
 `"hardware": {"accelerator": "vaapi", "device": "/dev/dri/renderD128"}`. When a
 hardware encoder is named, unset video slots default to 12 instead of 8. [Hardware
-Acceleration](../media/transcoding.md#hardware-acceleration) describes the fields, the
+Acceleration](../media/hardware-acceleration.md#hardware-acceleration) describes the fields, the
 device pass-through and the startup check.
 
 The maximums come from the pooler, the only fixed resource bound left. PgBouncer
@@ -246,7 +246,7 @@ they refuse to start as well.
 |----------|---------|-------------|
 | `DEFAULT_URI` | `https://localhost` | Base URL used by the router for generating absolute URLs. Should match `APP_URL` in production. |
 | `HEALTH_MONITOR_INTERVAL_SECONDS` | `60` | Seconds between the web server's health checks, which raise [health alerts](../administration/notifications.md#health-alerts). |
-| `WEB_DRAIN_SECONDS` | `30` | The web server's drain deadline: how many seconds a stop or restart of the web server may take at most. At least `8`; a smaller value stops the server from starting. Give the container a stop timeout of this value plus 5 seconds; see [Stopping and restarting the web server](../maintenance/upgrading.md#stopping-and-restarting-the-web-server). |
+| `WEB_DRAIN_SECONDS` | `30` | The web server's drain deadline: how many seconds a stop or restart of the web server may take at most. At least `8`; a smaller value stops the server from starting. Give the container a stop timeout of this value plus 5 seconds; see [Stopping and restarting the web server](../maintenance/web-server-restarts.md#stopping-and-restarting-the-web-server). |
 
 ### Swoole
 

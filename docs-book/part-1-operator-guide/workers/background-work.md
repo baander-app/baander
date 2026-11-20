@@ -150,7 +150,7 @@ names, mapped into execution only with its group. An `nvenc` encoder takes no
 device; execution receives the host's NVIDIA GPUs through the NVIDIA container
 runtime instead. Without a hardware encoder, execution receives no device and
 encodes in software. See
-[Hardware acceleration](../media/transcoding.md#hardware-acceleration), and do not infer worker
+[Hardware acceleration](../media/hardware-acceleration.md#hardware-acceleration), and do not infer worker
 hardware support from optional device examples in the web Compose file.
 
 ## Observe background work

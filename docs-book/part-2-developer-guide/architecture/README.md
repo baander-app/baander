@@ -1,6 +1,8 @@
 # System Architecture
 
-Bånder is divided into Domain-Driven Design bounded contexts built on a shared kernel. Around them sit asynchronous Messenger transports, one WebSocket for real-time traffic, and explicit security boundaries.
+Start with the overview to understand Bånder's bounded contexts and shared kernel.
+The communication map then follows work across clients, transports, stores and
+workers. Use the remaining pages for a specific mechanism or security boundary.
 
 ## Core Concepts
 

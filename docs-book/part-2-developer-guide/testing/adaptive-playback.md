@@ -131,11 +131,9 @@ The fixed diagnostic series at `54e3711c` recorded exactly two
 closed all owned frames without capture errors; the historical mismatch did not
 recur. Real-run failure retention was not exercised; only controlled mismatches
 entered that branch. This is bounded negative evidence, with no extra attempts
-or inference about its cause. The original report named
-`var/test-runs/frame-capture-diagnostics/acceptance-summary.json` for exact timings
-and counts. That untracked receipt is not durable evidence. The counts above are
-the historical report; the per-run timings cannot be rechecked from tracked
-sources, and no new run is claimed here.
+or inference about its cause. The original per-run receipt was not retained in
+tracked sources. The counts above come from the historical report; the per-run
+timings cannot be independently rechecked, and no new run is claimed here.
 
 Only explicitly canceled video media requests with `net::ERR_ABORTED` may wait
 for classification at natural completion. Server receipts and transfer timing

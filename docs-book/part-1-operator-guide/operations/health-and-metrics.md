@@ -16,7 +16,7 @@ Because the endpoints need no authentication, a failed check never shows its err
 
 `/health` lists the background worker, its deployment profile and memory, but none of them decides the response code: a worker outage, a worker started with a different deployment profile from web, or a web server worker near its memory limit does not turn `/health` into `503`, and `/ready` checks none of them. The web server [alerts administrators](../administration/notifications.md#health-alerts) about all three instead.
 
-While the web server [drains before it stops](../maintenance/upgrading.md#stopping-and-restarting-the-web-server), `/ready` answers `503` without checking any dependency. Its `checks` list holds a single `server` entry whose `details` are `{"draining": true}`. The server accepts no new connections once the drain starts, so only a client that holds a kept-alive connection from before the stop sees this answer, and the answer carries `Connection: close`. `/live` still answers `200` during the drain, so liveness probes do not restart the container, and its body says `"draining": true`. The web player reads that answer as "server not back yet".
+While the web server [drains before it stops](../maintenance/web-server-restarts.md#stopping-and-restarting-the-web-server), `/ready` answers `503` without checking any dependency. Its `checks` list holds a single `server` entry whose `details` are `{"draining": true}`. The server accepts no new connections once the drain starts, so only a client that holds a kept-alive connection from before the stop sees this answer, and the answer carries `Connection: close`. `/live` still answers `200` during the drain, so liveness probes do not restart the container, and its body says `"draining": true`. The web player reads that answer as "server not back yet".
 
 These endpoints are meant for orchestrator probes. The Docker healthcheck does not call one; it runs the `app:health:check` command. The development stack defines it in `docker-compose.yml` as below; the web image's `Dockerfile` defines the same check with a 10-second start period:
 
@@ -89,7 +89,7 @@ Clients keep their sessions and retry after the delay. Logout and token revocati
 retain a narrow availability exception: they can continue when the replay store or
 generic API budget is unavailable, but still require the other authentication and
 proof checks. A confirmed exhausted budget still applies. See
-[Sessions, logout and a Redis outage](../maintenance/security.md#sessions-logout-and-a-redis-outage).
+[Sessions, logout and a Redis outage](../../part-2-developer-guide/development/session-and-access-behavior.md#sessions-logout-and-a-redis-outage).
 
 The Redis health check alerts once for the outage. The alert is delivered at once
 because it is a row in PostgreSQL; the background worker check reads not available

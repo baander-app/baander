@@ -1,10 +1,17 @@
 # Media and Playback
 
-Manage your music and video libraries, configure optional external metadata and lyrics enrichment, tune original and transcoded media delivery, and run synchronized watch parties.
+Start with library management when files are missing from the catalog. For a
+playback problem, use the transcoding guide to identify how the file is delivered
+before changing encoder settings. External metadata and lyrics enrichment are
+configured separately.
 
 | Guide | Scope |
 |-------|-------|
 | [Library Management](library-management.md) | Creating libraries, scanning media, inotify file watching, supported audio and video formats, and cover art extraction |
-| [External APIs](external-apis.md) | MusicBrainz, Cover Art Archive, LRCLIB, Discogs, and Last.fm enrichment, degradation behavior, and API key configuration |
-| [Transcoding](transcoding.md) | Original playback vs CMAF/HLS/DASH video and audio transcoding, quality tiers, worker execution slots, VAAPI hardware acceleration, and Bånder Audio Core |
+| [External APIs](external-apis.md) | Configure providers and understand enrichment failures |
+| [MusicBrainz Matching](musicbrainz-matching.md) | Compare candidates, apply matches and follow queued matching work |
+| [Transcoding](transcoding.md) | Identify original or converted delivery, worker capacity and troubleshooting steps |
+| [Video Transcoding](video-transcoding.md) | CMAF/HLS/DASH output, quality tiers and playback behavior |
+| [Audio Transcoding](audio-transcoding.md) | Audio conversion, bitrate choices, caching and Bånder Audio Core |
+| [Hardware Acceleration](hardware-acceleration.md) | Configure and check the encoder and VAAPI device |
 | [Watch Parties](watch-parties.md) | Synchronized playback sessions, participant membership, host controls, and real-time WebSocket coordination |

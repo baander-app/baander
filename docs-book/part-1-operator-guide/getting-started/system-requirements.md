@@ -135,7 +135,7 @@ runs a PHP child in the control unit, which peaked at 92 MiB for a video job and
 The CPU figures apply to software encoding only. A codec handled by a hardware
 encoder, such as a GPU, QuickSync or another video engine, costs almost no CPU.
 A deployment encodes in software unless its profile names a hardware encoder; see
-[Hardware Acceleration](../media/transcoding.md#hardware-acceleration).
+[Hardware Acceleration](../media/hardware-acceleration.md#hardware-acceleration).
 
 ### Measured hardware cost per job
 

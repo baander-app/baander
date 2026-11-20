@@ -190,7 +190,7 @@ System settings live in `system_settings` (`key text` primary key, `value jsonb`
 | `PATCH /api/admin/settings` | `app:settings:set` | Validate all, then write; `422` with per-key messages |
 | `DELETE /api/admin/settings/{key}` | `app:settings:reset` | Reset to the default; `404` for an unknown key |
 
-The user settings endpoints are in [UserPreference](user-preference.md#user-settings), and the administrator's view of a user's settings is in [Auth](auth.md#admin--user-settings). The operator reference is [Server settings](../../part-1-operator-guide/configuration/server-settings.md#server-settings).
+The user settings endpoints are in [UserPreference](user-preference.md#user-settings), and the administrator's view of a user's settings is in [Auth](auth-inventory.md#admin--user-settings). The operator reference is [Server settings](../../part-1-operator-guide/configuration/server-settings.md#server-settings).
 
 ### Adding a setting
 

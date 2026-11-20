@@ -106,7 +106,7 @@ worker image: its media process requires all three. The worker credentials file
 can override `VIDEO_ENCODER` through its `runtimeEnvironment`, but it does not
 accept `HW_ACCEL_DEVICE` or `HW_BITRATE_MULTIPLIER`; those two come from the image's
 `.env`. A hardware encoder is configured in the deployment profile instead;
-see [Transcoding](../media/transcoding.md#hardware-acceleration).
+see [Transcoding](../media/hardware-acceleration.md#hardware-acceleration).
 
 Create `.env.dev.local` with mode `0600`. Put the following settings in it, replacing
 the secret placeholders with independently generated values from `openssl rand -hex 32`,
@@ -335,7 +335,7 @@ dc restart app
 Trust only the actual proxy address; do not trust the entire Docker network.
 Both HTTP layers default to no proxy trust, which is appropriate for direct client
 access. If nginx is recreated, inspect its address again, update the setting and
-restart app. See [Configuration](../configuration/authentication-and-limits.md#rate-limiting) for the shared
+restart app. See [Configuration](../configuration/rate-limits.md#rate-limiting) for the shared
 proxy trust setting.
 
 Follow [Worker deployment](../workers/worker-deployment.md) to build the worker

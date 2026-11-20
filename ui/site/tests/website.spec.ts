@@ -96,12 +96,12 @@ test('chapters fold out as collapsible categories in the manual navigation', asy
   await expect(archFold).not.toHaveAttribute('open', '');
   await expect(fold.getByRole('link', { name: 'Auth', exact: true })).toHaveAttribute('aria-current', 'page');
   await expect(fold.getByRole('link', { name: 'Overview', exact: true })).toHaveAttribute('href', '/docs/developer-guide/contexts/');
-  expect(await fold.getByRole('link').count()).toBe(23);
+  expect(await fold.getByRole('link').count()).toBe(31);
   await page.goto('/docs/developer-guide/testing/');
   await expect(fold).not.toHaveAttribute('open', '');
   await expect(testingFold).toHaveAttribute('open', '');
   await expect(testingFold.getByRole('link', { name: 'Overview', exact: true })).toHaveAttribute('aria-current', 'page');
-  expect(await testingFold.getByRole('link').count()).toBe(10);
+  expect(await testingFold.getByRole('link').count()).toBe(26);
   await page.goto('/docs/developer-guide/architecture/overview/');
   await expect(fold).not.toHaveAttribute('open', '');
   await expect(testingFold).not.toHaveAttribute('open', '');

@@ -141,7 +141,7 @@ requires it to remove protected content.
 Sessions, rate-limit checks, DPoP replay protection and background processing can
 fail together because they use Redis. Protected requests may return `503` with a
 retry delay. This is different from an exhausted rate limit or an invalid token;
-see [Redis outage behavior](../maintenance/security.md#sessions-logout-and-a-redis-outage).
+see [Redis outage behavior](../../part-2-developer-guide/development/session-and-access-behavior.md#sessions-logout-and-a-redis-outage).
 
 1. Inspect `dc ps`, `dc logs --tail=100 redis` and the Redis row in
    `app:health:check`. A stopped service, failed authentication and exhausted Redis
@@ -153,7 +153,7 @@ see [Redis outage behavior](../maintenance/security.md#sessions-logout-and-a-red
    paste connection URLs or environment-file contents into an incident report.
 3. If the service is stopped, establish why before starting that service with
    `dc up -d redis`. For a credential mismatch, use the coordinated
-   [Redis password rotation procedure](../maintenance/security.md#rotating-redis-password).
+   [Redis password rotation procedure](../maintenance/credential-rotation.md#rotating-redis-password).
    Recreating a service to apply environment changes is different from restarting
    an existing process; keep the application and worker credentials consistent.
 4. Run `app:health:check` again, observe worker readiness and follow a pending job
@@ -187,7 +187,7 @@ unsupported codec, FFmpeg, worker execution or resource exhaustion.
 4. Read app and worker logs around the failure. Check memory, disk space and codec
    errors before changing resource settings. A configured hardware encoder that
    fails its test encode stops media control with the reason
-   `hardware_encoder_unavailable`; see [Hardware acceleration](../media/transcoding.md#hardware-acceleration).
+   `hardware_encoder_unavailable`; see [Hardware acceleration](../media/hardware-acceleration.md#hardware-acceleration).
    Use [server statistics](health-and-metrics.md#server-stats) for the web process; they do
    not describe worker container limits.
 5. Once the cause is corrected, verify playback of the affected item and the
@@ -244,7 +244,7 @@ requires checking the container limit and workload before adjusting worker count
 or PHP's memory limit. Use the effective Swoole settings in
 `config/packages/swoole.yaml`; do not assume a shell variable changes them.
 
-After correcting the cause, use the [web stop and restart procedure](../maintenance/upgrading.md#stopping-and-restarting-the-web-server),
+After correcting the cause, use the [web stop and restart procedure](../maintenance/web-server-restarts.md#stopping-and-restarting-the-web-server),
 then verify `/live`, `/ready` and the failed user operation. A planned web restart
 leaves the admitted background worker deployment running.
 
@@ -290,7 +290,7 @@ valid request.
    rotation is an offline coordinated procedure, not a routine diagnostic step.
    Verify login, token refresh and a protected request with a supported client
    after the repair. If exposure is suspected, use
-   [Breach Recovery](../maintenance/security.md#breach-recovery).
+   [Breach Recovery](../maintenance/incident-response.md#breach-recovery).
 
 ### Media not appearing after scan
 

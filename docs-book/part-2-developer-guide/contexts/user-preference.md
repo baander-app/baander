@@ -116,7 +116,7 @@ Every port method takes the user's ID along with the profile ID. A profile that 
 
 An unknown key is `404`. A key that names a system setting, or a user setting whose `editRole` is not `ROLE_USER`, is `403`. An invalid value is `422` with the violation under the key, and nothing is stored. The controller identifies the user through Auth's `AuthenticatedUserIdentityInterface`; the older controllers cast to `SecurityUser`.
 
-Administrators reach the same store through Auth's endpoints under `/api/admin/users/{publicId}/settings` and `app:user:setting`, which call the settings contract (see [Auth](auth.md#admin--user-settings)).
+Administrators reach the same store through Auth's endpoints under `/api/admin/users/{publicId}/settings` and `app:user:setting`, which call the settings contract (see [Auth](auth-inventory.md#admin--user-settings)).
 
 ## Versioned Save Pattern
 

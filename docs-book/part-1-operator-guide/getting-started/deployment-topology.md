@@ -60,7 +60,7 @@ connections for real-time updates. The diagram labels the proxy "nginx
 proxy itself is your choice. Whatever sits in front of `app` must be the only
 address the application trusts for forwarded headers, so that a client cannot
 supply its own forwarded address. See the
-[proxy trust setting](../configuration/authentication-and-limits.md#rate-limiting) in Configuration.
+[proxy trust setting](../configuration/rate-limits.md#rate-limiting) in Configuration.
 
 ## PostgreSQL behind the connection pooler
 

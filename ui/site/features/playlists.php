@@ -73,6 +73,6 @@ return [
         'A collaborator can add only songs that their own library access lets them see, and in a shared playlist, each person sees the songs their libraries include.',
     ],
     'manual' => [
-        ['label' => 'Operator guide: who can share a playlist', 'href' => '/docs/operator-guide/maintenance/security/#who-can-change-the-catalog-and-who-can-share-a-playlist'],
+        ['label' => 'Operator guide: who can share a playlist', 'href' => '/docs/operator-guide/administration/sessions-and-access/#who-can-change-the-catalog-and-who-can-share-a-playlist'],
     ],
 ];

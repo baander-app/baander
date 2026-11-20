@@ -31,7 +31,7 @@ test('visitors discover Bånder Audio Core and its direct route has one canonica
   await expect(page.getByRole('heading', { name: 'Server transcoding through FFmpeg' })).toBeVisible();
   await expect(page.locator('#integration')).toContainText('libbac');
   await expect(page.locator('#integration').getByRole('link', { name: 'AAC implementation' }))
-    .toHaveAttribute('href', '/docs/operator-guide/media/transcoding/#aac-implementation');
+    .toHaveAttribute('href', '/docs/operator-guide/media/audio-transcoding/#aac-implementation');
   await expect((await openMenuPanel(page, 'Product')).getByRole('link', { name: 'Audio Core', exact: true }))
     .toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('navigation', { name: 'Footer navigation' }).getByRole('link', { name: 'Audio Core', exact: true }))

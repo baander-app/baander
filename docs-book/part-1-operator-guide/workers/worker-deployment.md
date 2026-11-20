@@ -162,7 +162,7 @@ capacity. The first burst follows harness work and already initialized duration
 history. During media pressure, three video encoders were active and one audio
 encoder was deliberately stopped after initial output to retain its occupied slot;
 uninterrupted audio throughput during pressure was not measured. See the
-[qualification record](../../part-2-developer-guide/testing/workers-and-messaging.md#ordinary-worker-autoscaling-qualification)
+[qualification record](../../part-2-developer-guide/testing/worker-capacity-qualification.md#ordinary-worker-autoscaling-qualification)
 for results and limits. The internal profile constructor remains conservative at
 maximum one; every production manifest must supply all fourteen fields explicitly.
 
@@ -187,7 +187,7 @@ are admitted separately.
 The media workload follows `deploymentProfile`. Print it with
 [app:deployment:profile:show](../commands/app-deployment-profile-show.md) rather than writing it
 by hand. Its `hardware` entry is `null` for software encoding or names the hardware
-encoder; see [Hardware acceleration](../media/transcoding.md#hardware-acceleration).
+encoder; see [Hardware acceleration](../media/hardware-acceleration.md#hardware-acceleration).
 `deviceGroup` is the numeric group the execution container joins to open that
 encoder's device. Leave it `null` and `bin/worker-deployment.php` reads the group that
 owns the device node on the host where it runs; set it when a different group opens
@@ -278,7 +278,7 @@ Additional runtime keys are `CONVERT_STORAGE_PATH`, `MEDIA_STORAGE_PATH`,
 `MAIL_FROM_ADDRESS`, email a worker sends comes from `noreply@localhost`; the
 sender name is always Bånder. `VIDEO_ENCODER` reaches the media worker and
 overrides the value in the image's `.env`; see
-[Hardware acceleration](../media/transcoding.md#hardware-acceleration) for the
+[Hardware acceleration](../media/hardware-acceleration.md#hardware-acceleration) for the
 encoder it selects. Values cannot contain line breaks and their complete
 env-file is limited to 4 KiB.
 

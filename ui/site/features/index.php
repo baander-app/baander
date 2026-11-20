@@ -49,7 +49,7 @@ return [
         [
             'name' => 'Audio transcoding',
             'text' => 'For clients that need another format, the server converts tracks to Opus, AAC or MP3. It is off by default, and a super administrator switches it on where the deployment profile permits encoding.',
-            'manual' => ['label' => 'Operator guide: audio transcoding', 'href' => '/docs/operator-guide/media/transcoding/#audio-transcoding'],
+            'manual' => ['label' => 'Operator guide: audio transcoding', 'href' => '/docs/operator-guide/media/audio-transcoding/#audio-transcoding'],
         ],
         [
             'name' => 'Metadata matching',
