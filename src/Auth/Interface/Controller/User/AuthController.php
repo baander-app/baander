@@ -397,10 +397,25 @@ final class AuthController
         responses: [
             new OA\Response(
                 response: '200',
-                description: 'User profile',
+                description: 'User profile: the full profile for a first-party session, and for a delegated token the public fields plus the email fields when it carries the email scope',
                 content: new OA\JsonContent(
                     properties: [
-                        new OA\Property(property: 'data', ref: new Model(type: UserResource::class)),
+                        new OA\Property(property: 'data', oneOf: [
+                            new OA\Schema(ref: new Model(type: UserResource::class)),
+                            new OA\Schema(
+                                description: 'The profile a delegated token reads',
+                                required: ['publicId', 'name', 'createdAt'],
+                                properties: [
+                                    new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
+                                    new OA\Property(property: 'name', type: 'string', description: 'Display name'),
+                                    new OA\Property(property: 'email', type: 'string', format: 'email', description: 'Email address; only with the email scope'),
+                                    new OA\Property(property: 'emailVerifiedAt', type: 'string', format: 'date-time', nullable: true, description: 'When the email was verified; only with the email scope'),
+                                    new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
+                                ],
+                                type: 'object',
+                                additionalProperties: false,
+                            ),
+                        ]),
                     ],
                     type: 'object',
                 ),

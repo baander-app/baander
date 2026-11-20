@@ -1861,6 +1861,9 @@ export interface TokenResource {
   refreshToken?: string | null;
 }
 
+/**
+ * The full profile of the account; GET /api/auth/me answers a delegated token with a narrower profile
+ */
 export interface UserResource {
   /**
      * Public identifier
@@ -1871,20 +1874,20 @@ export interface UserResource {
   publicId: string;
   /** Display name */
   name: string;
-  /** Email address; absent for a delegated token without the email scope */
+  /** Email address */
   email: string;
   /**
-     * When the email was verified; absent for a delegated token without the email scope
+     * When the email was verified
      * @nullable
      */
   emailVerifiedAt?: string | null;
   createdAt: string;
-  /** Assigned roles; absent for a delegated token */
+  /** Assigned roles */
   roles: string[];
-  /** Whether TOTP is on, so a sensitive change needs a code; absent for a delegated token */
+  /** Whether TOTP is on, so a sensitive change needs a code */
   totpEnabled: boolean;
   /**
-     * The address an email change waits to confirm through the link sent to it; absent for a delegated token
+     * The address an email change waits to confirm through the link sent to it
      * @nullable
      */
   pendingEmail?: string | null;
@@ -5121,8 +5124,28 @@ export type PostAuthPasswordReset200 = {
   data?: PostAuthPasswordReset200Data;
 };
 
+export type GetAuthMe200Data = UserResource | {
+  /**
+     * Public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId: string;
+  /** Display name */
+  name: string;
+  /** Email address; only with the email scope */
+  email?: string;
+  /**
+     * When the email was verified; only with the email scope
+     * @nullable
+     */
+  emailVerifiedAt?: string | null;
+  createdAt: string;
+};
+
 export type GetAuthMe200 = {
-  data?: UserResource;
+  data?: GetAuthMe200Data;
 };
 
 export type PutAuthMeUpdateBody = {

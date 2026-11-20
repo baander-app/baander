@@ -10,15 +10,16 @@ use OpenApi\Attributes as OA;
 
 #[OA\Schema(
     schema: 'UserResource',
+    description: 'The full profile of the account; GET /api/auth/me answers a delegated token with a narrower profile',
     properties: [
         new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
         new OA\Property(property: 'name', type: 'string', description: 'Display name'),
-        new OA\Property(property: 'email', type: 'string', format: 'email', description: 'Email address; absent for a delegated token without the email scope'),
-        new OA\Property(property: 'emailVerifiedAt', type: 'string', format: 'date-time', nullable: true, description: 'When the email was verified; absent for a delegated token without the email scope'),
+        new OA\Property(property: 'email', type: 'string', format: 'email', description: 'Email address'),
+        new OA\Property(property: 'emailVerifiedAt', type: 'string', format: 'date-time', nullable: true, description: 'When the email was verified'),
         new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
-        new OA\Property(property: 'roles', type: 'array', items: new OA\Items(type: 'string'), description: 'Assigned roles; absent for a delegated token'),
-        new OA\Property(property: 'totpEnabled', type: 'boolean', description: 'Whether TOTP is on, so a sensitive change needs a code; absent for a delegated token'),
-        new OA\Property(property: 'pendingEmail', type: 'string', format: 'email', nullable: true, description: 'The address an email change waits to confirm through the link sent to it; absent for a delegated token'),
+        new OA\Property(property: 'roles', type: 'array', items: new OA\Items(type: 'string'), description: 'Assigned roles'),
+        new OA\Property(property: 'totpEnabled', type: 'boolean', description: 'Whether TOTP is on, so a sensitive change needs a code'),
+        new OA\Property(property: 'pendingEmail', type: 'string', format: 'email', nullable: true, description: 'The address an email change waits to confirm through the link sent to it'),
     ],
 )]
 final class UserResource extends AbstractResource

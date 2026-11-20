@@ -4266,13 +4266,55 @@
                 "operationId": "get_auth_me",
                 "responses": {
                     "200": {
-                        "description": "User profile",
+                        "description": "User profile: the full profile for a first-party session, and for a delegated token the public fields plus the email fields when it carries the email scope",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/components/schemas/UserResource"
+                                            "oneOf": [
+                                                {
+                                                    "$ref": "#/components/schemas/UserResource"
+                                                },
+                                                {
+                                                    "description": "The profile a delegated token reads",
+                                                    "required": [
+                                                        "publicId",
+                                                        "name",
+                                                        "createdAt"
+                                                    ],
+                                                    "properties": {
+                                                        "publicId": {
+                                                            "description": "Public identifier",
+                                                            "type": "string",
+                                                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                            "maxLength": 21,
+                                                            "minLength": 21
+                                                        },
+                                                        "name": {
+                                                            "description": "Display name",
+                                                            "type": "string"
+                                                        },
+                                                        "email": {
+                                                            "description": "Email address; only with the email scope",
+                                                            "type": "string",
+                                                            "format": "email"
+                                                        },
+                                                        "emailVerifiedAt": {
+                                                            "description": "When the email was verified; only with the email scope",
+                                                            "type": "string",
+                                                            "format": "date-time",
+                                                            "nullable": true
+                                                        },
+                                                        "createdAt": {
+                                                            "type": "string",
+                                                            "format": "date-time"
+                                                        }
+                                                    },
+                                                    "type": "object",
+                                                    "additionalProperties": false
+                                                }
+                                            ]
                                         }
                                     },
                                     "type": "object"
@@ -27737,6 +27779,7 @@
                 "type": "object"
             },
             "UserResource": {
+                "description": "The full profile of the account; GET /api/auth/me answers a delegated token with a narrower profile",
                 "required": [
                     "publicId",
                     "name",
@@ -27758,12 +27801,12 @@
                         "type": "string"
                     },
                     "email": {
-                        "description": "Email address; absent for a delegated token without the email scope",
+                        "description": "Email address",
                         "type": "string",
                         "format": "email"
                     },
                     "emailVerifiedAt": {
-                        "description": "When the email was verified; absent for a delegated token without the email scope",
+                        "description": "When the email was verified",
                         "type": "string",
                         "format": "date-time",
                         "nullable": true
@@ -27773,18 +27816,18 @@
                         "format": "date-time"
                     },
                     "roles": {
-                        "description": "Assigned roles; absent for a delegated token",
+                        "description": "Assigned roles",
                         "type": "array",
                         "items": {
                             "type": "string"
                         }
                     },
                     "totpEnabled": {
-                        "description": "Whether TOTP is on, so a sensitive change needs a code; absent for a delegated token",
+                        "description": "Whether TOTP is on, so a sensitive change needs a code",
                         "type": "boolean"
                     },
                     "pendingEmail": {
-                        "description": "The address an email change waits to confirm through the link sent to it; absent for a delegated token",
+                        "description": "The address an email change waits to confirm through the link sent to it",
                         "type": "string",
                         "format": "email",
                         "nullable": true
