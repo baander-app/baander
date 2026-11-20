@@ -10,6 +10,119 @@ The [package extraction plan](docs/plans/2026-11-20-1148-refactor-internal-capab
 keeps application policy in `src/` and moves four reusable mechanisms into local
 Composer packages. Its document review has no open findings.
 
+### Organization correction
+
+U6–U8 organize the existing packages by responsibility and make application
+adapters explicit. Parsing, image processing, limiter scripts and HTTP validation
+retain their behavior.
+
+| Package | Source organization |
+| --- | --- |
+| `baander/media-metadata` | `Model`, `Reader`, `Parser`; format detection and the reader facade at the root |
+| `baander/image-processing` | `BlurHash`; GD conversion at the root |
+| `baander/redis-rate-limiter` | `Limiter`, `Storage`, `Administration`, `Exception`, `Bridge/Symfony` |
+| `baander/http-client` | Three related classes at the root |
+
+Nineteen package test files now live beside their source. The shared Unit suite
+and root development autoloader discover them. The tagged-media byte fixture
+belongs to the metadata package; application reader assembly remains in
+`tests/Support/Metadata/MetadataReaderFixture.php`. Application tests still cover image
+presets, provider settings, Redis pooling, command behavior and real transports.
+The before/after `vendor/bin/phpunit --list-tests` comparison accounts for all
+13,818 original cases, including provider datasets, exactly once. The final discovery lists
+13,819 cases; its only addition is the bundle administration-registration proof. Relocated
+files retain their ordinary-runner assignment; none belonged to the native lane.
+
+`MetadataContentReaderAdapter` and `ImageConversionAdapter` name the application
+wrappers. `config/services_packages.yaml` supplies application logger channels,
+HTTP transport, DNS resolution and Redis borrowing, with its own service defaults.
+The limiter bundle owns administration registration and its interface alias.
+TypePHP explicitly embeds the new service import and retains the recursive package
+source roots; package tests are outside those production roots.
+
+The CI-image focused suite passes with 761 tests and 2,903 assertions:
+
+```bash
+php scripts/check-backend-container.php --image baander-ci:local -- \
+  vendor/bin/phpunit packages/baander-media-metadata/tests \
+  packages/baander-image-processing/tests packages/baander-redis-rate-limiter/tests \
+  packages/baander-http-client/tests tests/Unit/Metadata tests/Unit/Media \
+  tests/Unit/Shared/Infrastructure/RateLimiter \
+  tests/Unit/Shared/Infrastructure/Redis/RedisRateLimiterStoreFactoryTest.php \
+  tests/Unit/Shared/Interface/Console/RateLimiterClearCommandTest.php
+```
+
+The same CI-image wrapper passes `vendor/bin/phpstan analyse --no-progress --memory-limit=2G`,
+`vendor/bin/deptrac analyse --no-cache --no-progress` and
+`php bin/console lint:container --env=test --no-debug`. Deptrac reports zero
+violations and errors with the same 444 existing skipped violations. Its existing
+metadata-adapter baseline key follows the class rename; no dependency permission
+was added. Review caught the old adapter name in the Catalog port alias; the
+corrected alias passes container lint and full PHPStan. The bundle registration
+proof failed before implementation and passes afterward with one test and five
+assertions. Simplification found no further changes, and review has no unresolved
+source findings.
+
+All four package manifests pass strict Composer validation. Root validation passes
+with its existing constraint warnings; root and package normalization checks pass.
+Production dependencies retain their versions.
+
+The rebuilt TypePHP executable contains 13,306 embedded files and 12,274 opcode
+blobs. Its nine skipped files are the same IDE-helper declarations and copies;
+no application or package PHP is skipped. All 35 package source files use their
+new paths without duplicate copies through vendor aliases; package tests are not
+embedded. Both archived service configuration files match the corrected build
+snapshot byte for byte.
+The executable remains 319,621,784 bytes, with SHA-256
+`408ad77b210bb0a9bdf94acb0cc93ce01029aef043af50e81b8612a41be88b25`.
+
+The qualification image is
+`sha256:e9ccdc03ba9c52c51ce730820f07261638a0101d024281959a3d6068a9d1b487`.
+Its focused coordinator run passes 358 tests and 1,505 assertions across 29 files:
+315 tests / 926 assertions in the ordinary lane, 22 / 165 in the first database
+lane and 21 / 414 in the second. The final identity comparison accounts for all
+358 selected cases.
+
+```bash
+BAANDER_TEST_IMAGE=baander-organization-qualification:way0tn \
+BAANDER_TEST_CHECKOUT_IN_IMAGE=1 BAANDER_TEST_PROCESSES=2 \
+BAANDER_TEST_POSTGRES_IMAGE=baander-database:latest \
+bash scripts/test-backend-container.sh --no-coverage \
+  packages/baander-http-client/tests packages/baander-image-processing/tests \
+  packages/baander-media-metadata/tests packages/baander-redis-rate-limiter/tests \
+  tests/Functional/Metadata/MetadataSyncControllerAccessTest.php \
+  tests/Functional/Metadata/Interface/Console/MetadataFileCliParityTest.php \
+  tests/Functional/Media/ImageDerivativeWorkerTest.php \
+  tests/Functional/Controller/RateLimiterMonitorControllerTest.php \
+  tests/Functional/Console/RateLimiterCommandsTest.php \
+  tests/Integration/RateLimiterConcurrencyTest.php \
+  tests/Integration/RateLimiterHttpAvailabilityTest.php \
+  tests/Unit/Shared/Infrastructure/Http/PublicHttpTransportTest.php \
+  tests/Unit/Shared/Infrastructure/EventListener/UseCaseOutcomeMappingTest.php \
+  tests/Unit/Media/Infrastructure/Converter/ImageConversionAdapterTest.php
+```
+
+Production console and operator boot pass with external development autoloading
+disabled. Ten moved package/application types load through the rebuilt executable.
+Twelve compiled-service inspections verify both application port aliases, all
+metadata/media logger channels, HTTP transport, DNS closure, Redis factory and
+administration alias. The compiled catalog contains exactly the 26 configured
+limiters with unchanged storage namespaces. The smoke container is removed.
+All 2,553 runtime/configuration inputs and 1,487 test inputs match implementation
+commit `7aeaccc30d86e15a8fb6de9bd46e2b94e317a2a1`.
+
+The build used an isolated checkout with production dependencies installed by
+`composer install --no-dev --no-scripts --prefer-dist --no-interaction --no-progress`.
+The cached toolchain invocation was
+`baander-typephp-toolchain:local tools/typephp/application.yml --no-progress --no-color --job 8`,
+with the checkout mounted at `/var/www/html` and the existing TypePHP output/cache directories mounted
+writable. The corrected build completed in 425.2 seconds.
+
+The coordinator exits successfully in 261.7 seconds after identity comparison and
+owned-resource cleanup. U6–U8 are delivered with no open verification checkpoints.
+
+### Initial extraction checkpoint
+
 File metadata readers and their values now live in `baander/media-metadata`.
 The Catalog reader port retains an application adapter; matching and enrichment
 remain in Metadata. The CI-image focused reader, value and matching checks pass:
