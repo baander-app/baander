@@ -7,7 +7,7 @@ and email language, among other things.
 
 ## Server Settings
 
-A server setting is a named value in the `system_settings` table that an administrator can change while Baander runs. The part of Baander that uses a setting also defines it: its key, its value type, the values it allows and its default. A setting nobody has changed has no row and takes its default. Baander reads a setting each time it acts on it, so a change applies to the next request, message or scheduled run without a restart, including in workers that are already running.
+A server setting is a named value in the `system_settings` table that an administrator can change while Baander runs. The part of Baander that uses a setting also defines it: its key, its value type, the values it allows and its default. A setting nobody has changed has no row and takes its default. Most settings are read each time Baander acts on them, so a change applies to the next request, message or scheduled run without a restart, including in workers that are already running. HTTP span capture uses a five-second cache in each web worker; its refresh behavior is described below.
 
 ### Changing a setting
 
@@ -34,6 +34,7 @@ A stored value can stop being allowed, for example when a setting's allowed valu
 |-----|---------|------------------|
 | `admin.can_view_users` | `true` | Whether administrators who are not super administrators may list users. See [Who can manage users](../administration/user-management.md#who-can-manage-users). |
 | `admin.can_create_users` | `false` | Whether those administrators may create users. They can create only users with the User role. |
+| `diagnostics.spans_enabled` | `true` with `APP_ENV=dev`; otherwise `false` | Capture HTTP request spans for diagnostics and, when `OTEL_ENABLED=true`, export. See [HTTP request spans](#http-request-spans). |
 | `i18n.default_language` | `en` | The language of emails to users who have not chosen one: `en` (English), `da` (Dansk) or `th` (ไทย). See [Email language](#email-language). |
 | `lyrics.auto_fetch` | `false` | Fetch lyrics from LRCLIB for each new track a scan adds that has no `.lrc` file beside it, and for each track without lyrics that a [rescan](../commands/app-library-scan.md#what-a-rescan-repairs) gives an artist credit or a new length. See [Library Management](../media/library-management.md#what-happens-to-new-music). |
 | `metadata.auto_sync` | `false` | Match each album a scan adds or changes against MusicBrainz, apply confident matches and leave the rest for review; labelled **Automatic MusicBrainz matching** in the admin panel. See [Automatic matching](../media/external-apis.md#automatic-matching) and [Library Management](../media/library-management.md#what-happens-to-new-music). |
@@ -45,6 +46,14 @@ A stored value can stop being allowed, for example when a setting's allowed valu
 | `transcode.aac_implementation` | `bac` | The codec implementation FFmpeg uses for AAC encodes and for decoding AAC sources in them: `bac`, `fdk_aac` or `ffmpeg`. See [AAC implementation](../media/transcoding.md#aac-implementation). |
 
 Every setting in the table is enforced. Four features arrived with server settings and start switched off: audio transcoding, automatic MusicBrainz matching, automatic lyrics fetch, and scheduled recommendations. Turn on the ones you want.
+
+### HTTP request spans
+
+**Admin → Settings → Diagnostics → HTTP request spans** controls capture. It starts enabled only with `APP_ENV=dev`; staging, production and test environments start with it disabled. The setting can also be changed or reset through the [settings commands](../commands/app-settings.md).
+
+Each web worker caches its decision for five seconds and refreshes it on the next request after expiry. Requests arriving during a lookup skip capture. A failed lookup disables capture until a request retries after five seconds. Spans already started finish, and disabling capture keeps retained spans until they are cleared or overwritten. Export requires capture to be enabled as well as `OTEL_ENABLED=true`.
+
+See [`app:server:spans`](../commands/app-server-spans.md#enabling-capture) for commands and buffer behavior. The defaults and refresh rules are defined in [`DiagnosticsSettingDefinitions`](../../../src/Shared/Application/Settings/DiagnosticsSettingDefinitions.php) and [`HttpSpanCapturePolicy`](../../../src/Shared/Infrastructure/OpenTelemetry/HttpSpanCapturePolicy.php).
 
 ### Scheduled recommendations
 

@@ -71,6 +71,14 @@ A drain has a deadline, which an operator configures, and a shorter drain window
 
 Replacing the web server's worker processes while the server itself keeps running and keeps its client connections. A reload never starts a drain, and a reload requested during a drain is ignored.
 
+### HTTP span capture
+
+The runtime decision to record HTTP request spans for diagnostics, controlled by `diagnostics.spans_enabled`. Each web worker shares a five-second decision cache among its request coroutines. Capture defaults to on only in `APP_ENV=dev`; disabling it leaves existing spans to finish and retained spans available. Export additionally requires `OTEL_ENABLED=true`. See [span capture](docs-book/part-1-operator-guide/commands/app-server-spans.md#enabling-capture).
+
+### Idle service-pool reclamation
+
+The periodic release of free service instances that have outlived their idle interval, retaining warm capacity in each web worker's pool. Instances borrowed by requests or streams remain assigned, and the pool can grow back to its configured concurrency. See [worker memory maintenance](docs-book/part-2-developer-guide/getting-started/development-environment.md#http-spans-and-worker-memory).
+
 ## Authentication
 
 ### Passkey user handle

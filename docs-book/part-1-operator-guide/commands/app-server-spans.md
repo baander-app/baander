@@ -25,7 +25,7 @@ make exec cmd="php bin/console app:server:spans --clear --force"
 
 ## Details
 
-Run the command in the web container: it talks to the web server running there. Every HTTP request the server handles records one span. All workers write to one buffer, which holds the last 500 spans, so the list covers requests handled by any worker.
+Run the command in the web container: it talks to the web server running there. Requests admitted by `diagnostics.spans_enabled` record one span each. All workers write to one buffer, which holds the last 500 spans, so the list covers requests handled by any worker. The buffer remains allocated when capture is off so capture can be enabled without restarting the server.
 
 The command prints one row per span:
 
@@ -39,7 +39,19 @@ The command prints one row per span:
 
 A span records the method, route name, status and duration only. It never holds the URL, query string or headers, so tokens and signed-URL signatures do not reach the buffer. When the buffer is empty, the command prints `No spans recorded.`
 
-Spans reach the buffer whether or not `OTEL_ENABLED` is set. `OTEL_ENABLED=true` additionally exports them to the OTLP endpoint in `OTEL_EXPORTER_OTLP_ENDPOINT`.
+### Enabling capture
+
+`diagnostics.spans_enabled` defaults to `true` only with `APP_ENV=dev`. It defaults to `false` in staging, production and test environments. A super administrator can change **Admin → Settings → Diagnostics → HTTP request spans**, or use the settings commands:
+
+```bash
+make exec cmd="php bin/console app:settings:set diagnostics.spans_enabled true"
+make exec cmd="php bin/console app:settings:set diagnostics.spans_enabled false"
+make exec cmd="php bin/console app:settings:reset diagnostics.spans_enabled"
+```
+
+Each web worker shares one capture decision among its request coroutines and caches it for five seconds. After the cache expires, the next request refreshes it. A request arriving during that lookup skips capture. If the lookup fails, capture stays off until a request retries after five seconds. No restart is needed.
+
+Disabling capture lets spans already started finish. Retained spans remain available until cleared or overwritten by newer spans. Captured spans reach the buffer whether or not `OTEL_ENABLED` is set. Export to the OTLP endpoint in `OTEL_EXPORTER_OTLP_ENDPOINT` requires both capture to be enabled and `OTEL_ENABLED=true`.
 
 With `--clear`, the command asks before it empties the buffer on a terminal. Without a terminal and without `--force` it changes nothing and exits with code 2. Clearing empties the buffer for every worker.
 

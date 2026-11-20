@@ -1,0 +1,57 @@
+{
+  "container_MiB": 349.8,
+  "workers": [
+    {
+      "worker_id": 0,
+      "pid": 14,
+      "memory_MiB": {
+        "usage": 162.6,
+        "peak": 162.64,
+        "real": 173,
+        "real_peak": 173
+      },
+      "pool_count": 91,
+      "free_instances": 1,
+      "assigned_instances": 20
+    },
+    {
+      "worker_id": 1,
+      "pid": 15,
+      "memory_MiB": {
+        "usage": 177.36,
+        "peak": 202.34,
+        "real": 195,
+        "real_peak": 211
+      },
+      "pool_count": 92,
+      "free_instances": 26,
+      "assigned_instances": 20
+    },
+    {
+      "worker_id": 2,
+      "pid": 16,
+      "memory_MiB": {
+        "usage": 162.57,
+        "peak": 162.61,
+        "real": 173,
+        "real_peak": 173
+      },
+      "pool_count": 91,
+      "free_instances": 0,
+      "assigned_instances": 20
+    },
+    {
+      "worker_id": 3,
+      "pid": 17,
+      "memory_MiB": {
+        "usage": 162.57,
+        "peak": 162.61,
+        "real": 173,
+        "real_peak": 173
+      },
+      "pool_count": 91,
+      "free_instances": 0,
+      "assigned_instances": 20
+    }
+  ]
+}

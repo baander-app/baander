@@ -1,0 +1,114 @@
+/proc/10 php
+55fe82400000-7fff7afff000 ---p 00000000 00:00 0                          [rollup]
+Rss:              199948 kB
+Pss:               40212 kB
+Pss_Dirty:         39911 kB
+Pss_Anon:          39909 kB
+Pss_File:            301 kB
+Pss_Shmem:             1 kB
+Shared_Clean:       6712 kB
+Shared_Dirty:     189612 kB
+Private_Clean:         0 kB
+Private_Dirty:      3624 kB
+Referenced:        53648 kB
+Anonymous:        193228 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:    163840 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+/proc/14 php
+55fe82400000-7fff7afff000 ---p 00000000 00:00 0                          [rollup]
+Rss:              208240 kB
+Pss:               46451 kB
+Pss_Dirty:         45721 kB
+Pss_Anon:          45583 kB
+Pss_File:            729 kB
+Pss_Shmem:           137 kB
+Shared_Clean:      15452 kB
+Shared_Dirty:     177308 kB
+Private_Clean:         0 kB
+Private_Dirty:     15480 kB
+Referenced:       188568 kB
+Anonymous:        192452 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:     28672 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+/proc/15 php
+55fe82400000-7fff7afff000 ---p 00000000 00:00 0                          [rollup]
+Rss:              241284 kB
+Pss:               88413 kB
+Pss_Dirty:         82979 kB
+Pss_Anon:          82242 kB
+Pss_File:           5433 kB
+Pss_Shmem:           737 kB
+Shared_Clean:      19404 kB
+Shared_Dirty:     162032 kB
+Private_Clean:      4364 kB
+Private_Dirty:     55484 kB
+Referenced:       232292 kB
+Anonymous:        215976 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:     32768 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+/proc/16 php
+55fe82400000-7fff7afff000 ---p 00000000 00:00 0                          [rollup]
+Rss:              203512 kB
+Pss:               45535 kB
+Pss_Dirty:         45032 kB
+Pss_Anon:          45019 kB
+Pss_File:            502 kB
+Pss_Shmem:            13 kB
+Shared_Clean:      11064 kB
+Shared_Dirty:     177764 kB
+Private_Clean:         0 kB
+Private_Dirty:     14684 kB
+Referenced:       179412 kB
+Anonymous:        192396 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:     32768 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+/proc/17 php
+55fe82400000-7fff7afff000 ---p 00000000 00:00 0                          [rollup]
+Rss:              203512 kB
+Pss:               45535 kB
+Pss_Dirty:         45032 kB
+Pss_Anon:          45019 kB
+Pss_File:            502 kB
+Pss_Shmem:            13 kB
+Shared_Clean:      11064 kB
+Shared_Dirty:     177764 kB
+Private_Clean:         0 kB
+Private_Dirty:     14684 kB
+Referenced:       179412 kB
+Anonymous:        192396 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:     32768 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+/proc/7 php
+55fe82400000-7fff7afff000 ---p 00000000 00:00 0                          [rollup]
+Rss:              249920 kB
+Pss:               63210 kB
+Pss_Dirty:         61050 kB
+Pss_Anon:          40796 kB
+Pss_File:           2160 kB
+Pss_Shmem:         20253 kB
+Shared_Clean:      36080 kB
+Shared_Dirty:     189372 kB
+Private_Clean:         4 kB
+Private_Dirty:     24464 kB
+Referenced:       249920 kB
+Anonymous:        192700 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:     43008 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB

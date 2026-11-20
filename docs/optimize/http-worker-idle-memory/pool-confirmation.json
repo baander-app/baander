@@ -1,0 +1,350 @@
+[
+  {
+    "baseline": {
+      "boot": {
+        "php_used": 2763608,
+        "php_allocated": 8388608,
+        "free": 0,
+        "assigned": 0,
+        "Rss_KiB": 64368,
+        "Pss_KiB": 36252,
+        "Private_Clean_KiB": 188,
+        "Private_Dirty_KiB": 31084
+      },
+      "burst": {
+        "php_used": 36788992,
+        "php_allocated": 75497472,
+        "free": 0,
+        "assigned": 32,
+        "Rss_KiB": 196920,
+        "Pss_KiB": 168614,
+        "Private_Clean_KiB": 300,
+        "Private_Dirty_KiB": 163316
+      },
+      "released": {
+        "php_used": 36492112,
+        "php_allocated": 75497472,
+        "free": 32,
+        "assigned": 0,
+        "Rss_KiB": 133320,
+        "Pss_KiB": 105014,
+        "Private_Clean_KiB": 300,
+        "Private_Dirty_KiB": 99716
+      },
+      "gc_only": {
+        "php_used": 36492648,
+        "php_allocated": 73400320,
+        "free": 32,
+        "assigned": 0,
+        "Rss_KiB": 131296,
+        "Pss_KiB": 102990,
+        "Private_Clean_KiB": 300,
+        "Private_Dirty_KiB": 97692
+      }
+    },
+    "reclaim": {
+      "boot": {
+        "php_used": 2763760,
+        "php_allocated": 8388608,
+        "free": 0,
+        "assigned": 0,
+        "Rss_KiB": 64296,
+        "Pss_KiB": 43802,
+        "Private_Clean_KiB": 11652,
+        "Private_Dirty_KiB": 31100
+      },
+      "burst": {
+        "php_used": 36789144,
+        "php_allocated": 75497472,
+        "free": 0,
+        "assigned": 32,
+        "Rss_KiB": 196984,
+        "Pss_KiB": 176308,
+        "Private_Clean_KiB": 11916,
+        "Private_Dirty_KiB": 163332
+      },
+      "released": {
+        "php_used": 36504296,
+        "php_allocated": 75497472,
+        "free": 32,
+        "assigned": 0,
+        "Rss_KiB": 133384,
+        "Pss_KiB": 112708,
+        "Private_Clean_KiB": 11916,
+        "Private_Dirty_KiB": 99732
+      },
+      "gc_only": {
+        "php_used": 36504832,
+        "php_allocated": 73400320,
+        "free": 32,
+        "assigned": 0,
+        "Rss_KiB": 131360,
+        "Pss_KiB": 110684,
+        "Private_Clean_KiB": 11916,
+        "Private_Dirty_KiB": 97708
+      },
+      "pruned": {
+        "php_used": 3847504,
+        "php_allocated": 8388608,
+        "free": 1,
+        "assigned": 0,
+        "Rss_KiB": 67876,
+        "Pss_KiB": 47200,
+        "Private_Clean_KiB": 11916,
+        "Private_Dirty_KiB": 34224
+      },
+      "reclaimed": {
+        "php_used": 3848040,
+        "php_allocated": 8388608,
+        "free": 1,
+        "assigned": 0,
+        "Rss_KiB": 67876,
+        "Pss_KiB": 47200,
+        "Private_Clean_KiB": 11916,
+        "Private_Dirty_KiB": 34224
+      },
+      "reborrowed": {
+        "php_used": 3848608,
+        "php_allocated": 8388608,
+        "free": 1,
+        "assigned": 0,
+        "Rss_KiB": 67876,
+        "Pss_KiB": 47200,
+        "Private_Clean_KiB": 11916,
+        "Private_Dirty_KiB": 34224
+      }
+    }
+  },
+  {
+    "baseline": {
+      "boot": {
+        "php_used": 2763608,
+        "php_allocated": 8388608,
+        "free": 0,
+        "assigned": 0,
+        "Rss_KiB": 64420,
+        "Pss_KiB": 44018,
+        "Private_Clean_KiB": 11908,
+        "Private_Dirty_KiB": 31084
+      },
+      "burst": {
+        "php_used": 36788992,
+        "php_allocated": 75497472,
+        "free": 0,
+        "assigned": 32,
+        "Rss_KiB": 197000,
+        "Pss_KiB": 176416,
+        "Private_Clean_KiB": 12064,
+        "Private_Dirty_KiB": 163316
+      },
+      "released": {
+        "php_used": 36492112,
+        "php_allocated": 75497472,
+        "free": 32,
+        "assigned": 0,
+        "Rss_KiB": 133400,
+        "Pss_KiB": 112816,
+        "Private_Clean_KiB": 12064,
+        "Private_Dirty_KiB": 99716
+      },
+      "gc_only": {
+        "php_used": 36492648,
+        "php_allocated": 73400320,
+        "free": 32,
+        "assigned": 0,
+        "Rss_KiB": 131376,
+        "Pss_KiB": 110792,
+        "Private_Clean_KiB": 12064,
+        "Private_Dirty_KiB": 97692
+      }
+    },
+    "reclaim": {
+      "boot": {
+        "php_used": 2763760,
+        "php_allocated": 8388608,
+        "free": 0,
+        "assigned": 0,
+        "Rss_KiB": 64164,
+        "Pss_KiB": 43748,
+        "Private_Clean_KiB": 11608,
+        "Private_Dirty_KiB": 31104
+      },
+      "burst": {
+        "php_used": 36789144,
+        "php_allocated": 75497472,
+        "free": 0,
+        "assigned": 32,
+        "Rss_KiB": 196844,
+        "Pss_KiB": 176246,
+        "Private_Clean_KiB": 11864,
+        "Private_Dirty_KiB": 163336
+      },
+      "released": {
+        "php_used": 36504296,
+        "php_allocated": 75497472,
+        "free": 32,
+        "assigned": 0,
+        "Rss_KiB": 133244,
+        "Pss_KiB": 112646,
+        "Private_Clean_KiB": 11864,
+        "Private_Dirty_KiB": 99736
+      },
+      "gc_only": {
+        "php_used": 36504832,
+        "php_allocated": 73400320,
+        "free": 32,
+        "assigned": 0,
+        "Rss_KiB": 131220,
+        "Pss_KiB": 110622,
+        "Private_Clean_KiB": 11864,
+        "Private_Dirty_KiB": 97712
+      },
+      "pruned": {
+        "php_used": 3847504,
+        "php_allocated": 8388608,
+        "free": 1,
+        "assigned": 0,
+        "Rss_KiB": 67736,
+        "Pss_KiB": 47138,
+        "Private_Clean_KiB": 11864,
+        "Private_Dirty_KiB": 34228
+      },
+      "reclaimed": {
+        "php_used": 3848040,
+        "php_allocated": 8388608,
+        "free": 1,
+        "assigned": 0,
+        "Rss_KiB": 67736,
+        "Pss_KiB": 47138,
+        "Private_Clean_KiB": 11864,
+        "Private_Dirty_KiB": 34228
+      },
+      "reborrowed": {
+        "php_used": 3848608,
+        "php_allocated": 8388608,
+        "free": 1,
+        "assigned": 0,
+        "Rss_KiB": 67736,
+        "Pss_KiB": 47138,
+        "Private_Clean_KiB": 11864,
+        "Private_Dirty_KiB": 34228
+      }
+    }
+  },
+  {
+    "baseline": {
+      "boot": {
+        "php_used": 2763608,
+        "php_allocated": 8388608,
+        "free": 0,
+        "assigned": 0,
+        "Rss_KiB": 64604,
+        "Pss_KiB": 44152,
+        "Private_Clean_KiB": 12028,
+        "Private_Dirty_KiB": 31084
+      },
+      "burst": {
+        "php_used": 36788992,
+        "php_allocated": 75497472,
+        "free": 0,
+        "assigned": 32,
+        "Rss_KiB": 197300,
+        "Pss_KiB": 176667,
+        "Private_Clean_KiB": 12300,
+        "Private_Dirty_KiB": 163316
+      },
+      "released": {
+        "php_used": 36492112,
+        "php_allocated": 75497472,
+        "free": 32,
+        "assigned": 0,
+        "Rss_KiB": 133700,
+        "Pss_KiB": 113067,
+        "Private_Clean_KiB": 12300,
+        "Private_Dirty_KiB": 99716
+      },
+      "gc_only": {
+        "php_used": 36492648,
+        "php_allocated": 73400320,
+        "free": 32,
+        "assigned": 0,
+        "Rss_KiB": 131676,
+        "Pss_KiB": 111043,
+        "Private_Clean_KiB": 12300,
+        "Private_Dirty_KiB": 97692
+      }
+    },
+    "reclaim": {
+      "boot": {
+        "php_used": 2763760,
+        "php_allocated": 8388608,
+        "free": 0,
+        "assigned": 0,
+        "Rss_KiB": 64668,
+        "Pss_KiB": 44182,
+        "Private_Clean_KiB": 12088,
+        "Private_Dirty_KiB": 31100
+      },
+      "burst": {
+        "php_used": 36789144,
+        "php_allocated": 75497472,
+        "free": 0,
+        "assigned": 32,
+        "Rss_KiB": 197364,
+        "Pss_KiB": 176696,
+        "Private_Clean_KiB": 12360,
+        "Private_Dirty_KiB": 163332
+      },
+      "released": {
+        "php_used": 36504296,
+        "php_allocated": 75497472,
+        "free": 32,
+        "assigned": 0,
+        "Rss_KiB": 133764,
+        "Pss_KiB": 113096,
+        "Private_Clean_KiB": 12360,
+        "Private_Dirty_KiB": 99732
+      },
+      "gc_only": {
+        "php_used": 36504832,
+        "php_allocated": 73400320,
+        "free": 32,
+        "assigned": 0,
+        "Rss_KiB": 131740,
+        "Pss_KiB": 111072,
+        "Private_Clean_KiB": 12360,
+        "Private_Dirty_KiB": 97708
+      },
+      "pruned": {
+        "php_used": 3847504,
+        "php_allocated": 8388608,
+        "free": 1,
+        "assigned": 0,
+        "Rss_KiB": 68256,
+        "Pss_KiB": 47588,
+        "Private_Clean_KiB": 12360,
+        "Private_Dirty_KiB": 34224
+      },
+      "reclaimed": {
+        "php_used": 3848040,
+        "php_allocated": 8388608,
+        "free": 1,
+        "assigned": 0,
+        "Rss_KiB": 68256,
+        "Pss_KiB": 47588,
+        "Private_Clean_KiB": 12360,
+        "Private_Dirty_KiB": 34224
+      },
+      "reborrowed": {
+        "php_used": 3848608,
+        "php_allocated": 8388608,
+        "free": 1,
+        "assigned": 0,
+        "Rss_KiB": 68256,
+        "Pss_KiB": 47588,
+        "Private_Clean_KiB": 12360,
+        "Private_Dirty_KiB": 34224
+      }
+    }
+  }
+]

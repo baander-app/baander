@@ -4,6 +4,44 @@ Updated: 2026-11-20. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
+## HTTP worker idle memory and span capture
+
+The [memory plan](docs/plans/2026-11-20-1702-perf-http-worker-idle-memory-plan.md)
+adds `diagnostics.spans_enabled` to the existing admin settings panel and settings
+commands. Capture defaults to enabled only in development. The persistent instance
+already runs with `APP_ENV=prod` and is treated as staging, so its default is off.
+Workers refresh the setting on requests with a five-second cache; lookup failures
+skip capture without failing the request. Existing spans finish and remain readable.
+
+HTTP workers now check for spare pooled services every 30 seconds, expiring those
+unused for 60 seconds while retaining one warm instance per pool. Borrowed services,
+request capacity and long-lived connections remain intact. Maintenance serializes
+destruction with worker-exit drain and releases allocator caches. Startup also
+collects abandoned compiler cycles before workers fork.
+
+The [measurement report](docs/optimize/http-worker-idle-memory-report.md) includes
+tracked raw observations. Three paired CI-image runs reduced PHP allocation from
+70 MiB to 8 MiB after a synthetic 32-instance burst. A separate cold production
+kernel probe reduced used heap from 50.51 MiB to 25.89 MiB by collecting compiler
+cycles; warm-cache boot collected none. These results do not establish the whole
+deployment's reduction. The unchanged persistent container used 349.8 MiB when
+inspected, despite its four workers reporting 714 MiB of PHP allocator reservation
+in total; shared parent mappings explain why those figures cannot be added as
+independent physical allocations.
+
+Verification checkpoints: the focused CI-image unit run passes 53 tests and
+248 assertions; the settings functional suite passes 14 tests and 90 assertions.
+The final supplementary run passes 10 tests and 28 assertions, covering the updated
+three-worker capture probe, pool expiry and maintenance overlap/retry tests. PHPStan passes with no errors; Deptrac
+reports zero violations, warnings or errors. Independent code review has no
+remaining findings after adding the timer coverage; simplification preserved the
+ownership and concurrency checks.
+
+The isolated preview starts successfully. Browser verification at 1,440 × 1,000
+and 390 × 844 confirms the generated Diagnostics switch, successful off/on/reset
+requests and no mobile overflow. Reset restores the implicit development default.
+The persistent checkout and deployment remain unchanged; delivery is local only.
+
 ## TypePHP retirement
 
 The [removal plan](docs/plans/2026-11-20-1652-feat-remove-typephp-plan.md)

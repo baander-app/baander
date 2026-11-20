@@ -322,6 +322,12 @@ There is no implicit state-root environment override. Keep state private: it hol
 credentials, certificates, manifests and recorded Docker identities. The state
 root must be outside the checkout.
 
+### HTTP spans and worker memory
+
+The persistent instance runs with `APP_ENV=prod` and serves as the local staging instance. HTTP request span capture therefore defaults to off. Previews use `APP_ENV=dev`, where capture defaults to on. A stored `diagnostics.spans_enabled` override takes precedence in either instance. Change it under **Admin → Settings → Diagnostics → HTTP request spans**, or use the [settings commands](../../part-1-operator-guide/commands/app-settings.md), selecting `INSTANCE=persistent` only when targeting the persistent instance. Each web worker refreshes its five-second decision cache on the next request after expiry; a restart is unnecessary. See [span capture](../../part-1-operator-guide/commands/app-server-spans.md#enabling-capture) for lookup failure and export behavior.
+
+Web workers run memory maintenance every 30 seconds. It releases only free pooled service instances that have been idle for at least 60 seconds, retaining one warm instance per pool. Borrowed instances, including those held by active requests and streams, remain in use. Pools can grow back to their configured concurrency. Maintenance also collects cycles and releases allocator caches; it does not reload workers. These defaults are defined by [`WorkerMemoryMaintenance`](../../../src/Shared/Infrastructure/Swoole/WorkerMemoryMaintenance.php) and [`IdleServicePool::pruneFree()`](../../../packages/swoole-bundle/src/Bridge/Symfony/Container/ServicePool/IdleServicePool.php).
+
 ## Adopting an existing instance
 
 Inspect existing resources before selecting adoption. Do not run a fresh setup or
