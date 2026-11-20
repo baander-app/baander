@@ -218,6 +218,40 @@ final class PushAuthorizationRequestHandlerTest extends TestCase
         $this->assertRejected('invalid_request', fn () => $this->push(clientId: $native->getPublicId()->toString(), redirectUri: 'http://localhost.baander.app:53682', proofJkt: self::KEY_ONE));
     }
 
+    /** @return iterable<string, array{string, string}> */
+    public static function loopbackMatches(): iterable
+    {
+        yield 'IPv4 on an ephemeral port' => ['http://127.0.0.1/callback', 'http://127.0.0.1:53111/callback'];
+        yield 'IPv6 on another port' => ['http://[::1]/cb', 'http://[::1]:8080/cb'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('loopbackMatches')]
+    public function testALoopbackRedirectUriMatchesOnAnotherPort(string $registered, string $requested): void
+    {
+        $native = $this->register(Client::registerPublic('Native', [$registered]));
+
+        $this->push(clientId: $native->getPublicId()->toString(), redirectUri: $requested, proofJkt: self::KEY_ONE);
+
+        self::assertSame($requested, $this->stored()->getRedirectUri());
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function loopbackMismatches(): iterable
+    {
+        yield 'a backslash the browser reads as the end of the host' => ['http://127.0.0.1/callback', 'http://evil.baander.app\\@127.0.0.1/callback'];
+        yield 'userinfo' => ['http://127.0.0.1/callback', 'http://u@127.0.0.1/callback'];
+        yield 'a fragment' => ['http://127.0.0.1/callback', 'http://127.0.0.1/callback#x'];
+        yield 'an added query' => ['http://localhost/cb', 'http://localhost/cb?x=1'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('loopbackMismatches')]
+    public function testALoopbackRedirectUriDoesNotMatchAnotherEndpoint(string $registered, string $requested): void
+    {
+        $native = $this->register(Client::registerPublic('Native', [$registered]));
+
+        $this->assertRejected('invalid_request', fn () => $this->push(clientId: $native->getPublicId()->toString(), redirectUri: $requested, proofJkt: self::KEY_ONE));
+    }
+
     /** @param list<string> $scopes */
     private function push(
         ?string $clientId = null,

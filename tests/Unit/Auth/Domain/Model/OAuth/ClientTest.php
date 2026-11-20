@@ -190,6 +190,10 @@ final class ClientTest extends TestCase
         yield 'fragment' => [['https://player.baander.app/callback#x']];
         yield 'plain http on a public host' => [['http://player.baander.app/callback']];
         yield 'credentials' => [['https://user:pass@player.baander.app/callback']];
+        yield 'userinfo on a loopback host' => [['http://u@127.0.0.1/callback']];
+        yield 'a backslash before the host ends' => [['http://evil.baander.app\\@127.0.0.1/callback']];
+        yield 'a backslash in the path' => [['https://player.baander.app\\callback']];
+        yield 'an empty fragment on a loopback host' => [['http://127.0.0.1/callback#']];
         yield 'javascript scheme' => [['javascript:alert(1)']];
         yield 'private-use scheme without a domain' => [['myapp:/callback']];
         yield 'whitespace' => [['https://player.baander.app/call back']];

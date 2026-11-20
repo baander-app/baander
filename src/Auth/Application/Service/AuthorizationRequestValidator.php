@@ -12,6 +12,7 @@ use App\Auth\Domain\Model\OAuth\AuthCode;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\PushedAuthorizationRequest;
 use App\Auth\Domain\Model\OAuth\TokenId;
+use App\Auth\Domain\Model\OAuth\ValueObject\RedirectUri;
 use App\Auth\Domain\Repository\OAuth\PushedAuthorizationRequestRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
@@ -156,7 +157,8 @@ final readonly class AuthorizationRequestValidator
 
     /**
      * Registered URIs match exactly. A loopback URI (RFC 8252 section 7.3) also matches on any port,
-     * since native apps listen on an ephemeral one. Omitting the URI is allowed only when the client
+     * since native apps listen on an ephemeral one, when a browser would send it to the same scheme,
+     * host, path and query; a backslash, userinfo or a fragment never matches. Omitting the URI is allowed only when the client
      * registered exactly one.
      *
      * @throws OAuthProtocolException invalid_request
@@ -184,20 +186,9 @@ final readonly class AuthorizationRequestValidator
 
     private static function isSameLoopbackEndpoint(string $registered, string $requested): bool
     {
-        $a = parse_url($registered);
-        $b = parse_url($requested);
-        if (!is_array($a) || !is_array($b)) {
-            return false;
-        }
+        $registeredUri = RedirectUri::parse($registered);
+        $requestedUri = RedirectUri::parse($requested);
 
-        $loopback = ['localhost', '127.0.0.1', '[::1]'];
-
-        return ($a['scheme'] ?? null) === 'http'
-            && ($b['scheme'] ?? null) === 'http'
-            && in_array($a['host'] ?? null, $loopback, true)
-            && $a['host'] === ($b['host'] ?? null)
-            && ($a['path'] ?? '') === ($b['path'] ?? '')
-            && !isset($b['user'], $b['pass'], $b['fragment'])
-            && ($a['query'] ?? null) === ($b['query'] ?? null);
+        return $registeredUri !== null && $requestedUri !== null && $registeredUri->isSameLoopbackEndpointAs($requestedUri);
     }
 }

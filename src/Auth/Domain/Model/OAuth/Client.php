@@ -6,6 +6,7 @@ namespace App\Auth\Domain\Model\OAuth;
 
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientKeySource;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
+use App\Auth\Domain\Model\OAuth\ValueObject\RedirectUri;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
@@ -355,8 +356,9 @@ final class Client
     /**
      * Redirect URIs of an authorization code client (RFC 6749 section 3.1.2, RFC 8252, RFC 9700 section 2.1).
      *
-     * Each URI is absolute, without a fragment, and compared exactly at the
-     * authorization endpoint. Plain http is allowed only for a loopback host
+     * Each URI is absolute, read the way a browser reads it, without a backslash,
+     * credentials or a fragment, and compared exactly at the authorization endpoint
+     * (a loopback URI on any port). Plain http is allowed only for a loopback host
      * (RFC 8252 section 7.3); a native app's private-use scheme must be in
      * reverse domain form, such as app.baander.tv:/callback (RFC 8252 section 7.1).
      *
@@ -386,19 +388,18 @@ final class Client
             throw new InvalidArgumentException(sprintf('The redirect URI "%s" is not valid.', $uri));
         }
 
-        $parts = parse_url($uri);
-        $scheme = is_array($parts) ? strtolower($parts['scheme'] ?? '') : '';
-        if ($scheme === '' || str_contains($uri, '#')) {
-            throw new InvalidArgumentException(sprintf('The redirect URI "%s" must be absolute and have no fragment.', $uri));
-        }
-        if (isset($parts['user']) || isset($parts['pass'])) {
-            throw new InvalidArgumentException(sprintf('The redirect URI "%s" cannot carry credentials.', $uri));
+        $parsed = RedirectUri::parse($uri);
+        if ($parsed === null) {
+            throw new InvalidArgumentException(sprintf(
+                'The redirect URI "%s" must be absolute, without a backslash, credentials or a fragment.',
+                $uri,
+            ));
         }
 
-        $host = strtolower($parts['host'] ?? '');
+        $scheme = $parsed->scheme();
         $valid = match ($scheme) {
-            'https' => $host !== '',
-            'http' => in_array($host, ['localhost', '127.0.0.1', '[::1]'], true),
+            'https' => $parsed->host() !== '',
+            'http' => $parsed->isLoopback(),
             'javascript', 'data', 'file', 'vbscript' => false,
             default => str_contains($scheme, '.'),
         };
