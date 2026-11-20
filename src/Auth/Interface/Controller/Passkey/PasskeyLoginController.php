@@ -11,6 +11,7 @@ use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Interface\Resource\TokenResource;
 use App\Auth\Interface\Resource\UserResource;
+use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
@@ -99,7 +100,7 @@ final class PasskeyLoginController
                 credentialEpoch: $login->credentialEpoch,
             ));
         } catch (HandlerFailedException $exception) {
-            if ($exception->getPrevious() instanceof CredentialsChangedException) {
+            if (HandlerFailure::cause($exception) instanceof CredentialsChangedException) {
                 // A password reset since the assertion was checked ended what it proved.
                 return $this->unauthorized();
             }

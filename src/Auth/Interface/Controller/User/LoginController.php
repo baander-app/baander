@@ -12,6 +12,7 @@ use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Interface\Resource\TokenResource;
 use App\Auth\Interface\Resource\UserResource;
+use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
@@ -97,11 +98,12 @@ final class LoginController
                 totpStep: $login->totpStep,
             ));
         } catch (HandlerFailedException $exception) {
-            if ($exception->getPrevious() instanceof TotpStepAlreadySpentException) {
+            $cause = HandlerFailure::cause($exception);
+            if ($cause instanceof TotpStepAlreadySpentException) {
                 // Another request spent the code first; the tokens were rolled back with the step.
                 return $this->invalidCredentials();
             }
-            if ($exception->getPrevious() instanceof CredentialsChangedException) {
+            if ($cause instanceof CredentialsChangedException) {
                 // The password changed after this login checked it; the password it used is gone.
                 return $this->invalidCredentials();
             }

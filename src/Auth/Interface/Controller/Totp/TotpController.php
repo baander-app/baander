@@ -16,6 +16,7 @@ use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Auth\Interface\Request\Totp\DisableTotpRequest;
 use App\Auth\Interface\Request\Totp\EnableTotpRequest;
 use App\Auth\Interface\Request\Totp\StartTotpSetupRequest;
+use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Application\Exception\RateLimiterUnavailableException;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
@@ -26,7 +27,6 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
-use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
@@ -218,7 +218,7 @@ final class TotpController
     /** A translated refusal the user can act on; anything else is logged and answered as a server fault. */
     private function refusal(\Throwable $exception): JsonResponse
     {
-        $cause = $exception instanceof HandlerFailedException ? ($exception->getPrevious() ?? $exception) : $exception;
+        $cause = HandlerFailure::cause($exception);
         // Shared outcomes, answered by the exception subscribers: 422, 429 and 503.
         if ($cause instanceof StepUpFailedException
             || $cause instanceof EmailUnverifiedException
