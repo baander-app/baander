@@ -19,7 +19,16 @@ permit bounded, revalidated redirects for bodyless GET requests. Request options
 are limited to headers, body and time budgets. `stream()` exposes response chunks.
 Provider credentials, rate limits and response interpretation remain in the application.
 
+The three source classes stay together in [src/](src/). [Package tests](tests/)
+cover destination policy and client behavior. Application transport wiring,
+provider integration and native DNS lifecycle tests stay in the application's
+test tree.
+
+The root [Unit suite](../../phpunit.xml.dist) discovers the package's tests.
+Use the existing [backend runners](../../docs-book/part-2-developer-guide/testing/README.md)
+from the repository root.
+
 The application owns transport registration in
-[services.yaml](../../config/services.yaml) and production embedding in its
+[services_packages.yaml](../../config/services_packages.yaml) and production embedding in its
 [TypePHP configuration](../../tools/typephp/application.yml). The package has no
 separate executable or build step.

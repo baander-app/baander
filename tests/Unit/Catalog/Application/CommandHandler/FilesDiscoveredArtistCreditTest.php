@@ -33,7 +33,7 @@ use App\Tests\Fixtures\Catalog\DiscoveredFileObservations;
 use App\Tests\Fixtures\Catalog\InMemoryQueuedArtistSyncs;
 use App\Tests\Fixtures\Catalog\PassThroughTransaction;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
-use Baander\MediaMetadata\ExtractedMetadata;
+use Baander\MediaMetadata\Model\ExtractedMetadata;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;

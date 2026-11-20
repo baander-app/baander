@@ -14,5 +14,10 @@
     "psr-4": {
       "Baander\\HttpClient\\": "src/"
     }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Baander\\HttpClient\\Tests\\": "tests/"
+    }
   }
 }

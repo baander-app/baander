@@ -8,7 +8,7 @@ use App\Metadata\Domain\Model\MetadataMatch;
 use App\Metadata\Infrastructure\Matching\Validator\AlbumValidator;
 use App\Metadata\Infrastructure\Matching\Validator\ArtistValidator;
 use App\Metadata\Infrastructure\Matching\Validator\SongValidator;
-use Baander\MediaMetadata\ExtractedMetadata;
+use Baander\MediaMetadata\Model\ExtractedMetadata;
 
 /**
  * Orchestrates matching of extracted file metadata against a set of external candidates.

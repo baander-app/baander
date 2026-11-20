@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-use Baander\RedisRateLimiter\RateLimiterUnavailableException;
-use Baander\RedisRateLimiter\RedisRateLimiterFactory;
-use Baander\RedisRateLimiter\RedisRateLimiterStore;
-use Baander\RedisRateLimiter\RateLimiterSnapshot;
+use Baander\RedisRateLimiter\Exception\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\Limiter\RedisRateLimiterFactory;
+use Baander\RedisRateLimiter\Storage\RedisRateLimiterStore;
+use Baander\RedisRateLimiter\Storage\RateLimiterSnapshot;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Tests\Fixtures\RateLimiter\RateLimiterFixture;
 

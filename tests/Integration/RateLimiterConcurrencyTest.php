@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
-use Baander\RedisRateLimiter\RateLimiterUnavailableException;
-use Baander\RedisRateLimiter\RedisRateLimiterStore;
+use Baander\RedisRateLimiter\Exception\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\Storage\RedisRateLimiterStore;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Tests\Fixtures\RateLimiter\RateLimiterFixture;
 use PHPUnit\Framework\Attributes\DataProvider;

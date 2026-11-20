@@ -28,7 +28,7 @@ use App\Transcode\Application\DTO\AudioProbeResult;
 use App\Transcode\Application\Port\AudioProbePortInterface;
 use App\Transcode\Application\Port\VideoProbePortInterface;
 use App\Transcode\Domain\ValueObject\VideoProbeResult;
-use Baander\MediaMetadata\ExtractedMetadata;
+use Baander\MediaMetadata\Model\ExtractedMetadata;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;

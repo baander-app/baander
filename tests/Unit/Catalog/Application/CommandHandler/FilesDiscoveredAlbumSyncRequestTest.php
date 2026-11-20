@@ -34,7 +34,7 @@ use App\Tests\Fixtures\Catalog\DiscoveredFileObservations;
 use App\Tests\Fixtures\Catalog\InMemoryAlbumMatchStates;
 use App\Tests\Fixtures\Catalog\PassThroughTransaction;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
-use Baander\MediaMetadata\ExtractedMetadata;
+use Baander\MediaMetadata\Model\ExtractedMetadata;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;

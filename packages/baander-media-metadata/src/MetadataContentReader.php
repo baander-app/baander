@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace Baander\MediaMetadata;
 
+use Baander\MediaMetadata\Model\ExtractedMetadata;
+use Baander\MediaMetadata\Reader\FlacReader;
+use Baander\MediaMetadata\Reader\Id3Reader;
+use Baander\MediaMetadata\Reader\OggReader;
+use Baander\MediaMetadata\Reader\WavReader;
+
 final class MetadataContentReader
 {
     public function __construct(

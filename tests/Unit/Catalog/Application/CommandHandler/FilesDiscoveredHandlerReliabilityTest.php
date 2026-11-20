@@ -24,7 +24,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Catalog\DiscoveredFileObservations;
 use App\Tests\Fixtures\Catalog\PassThroughTransaction;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
-use Baander\MediaMetadata\ExtractedMetadata;
+use Baander\MediaMetadata\Model\ExtractedMetadata;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;

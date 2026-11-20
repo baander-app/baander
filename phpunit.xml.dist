@@ -29,6 +29,10 @@
     <testsuites>
         <testsuite name="Unit">
             <directory>tests/Unit</directory>
+            <directory>packages/baander-http-client/tests</directory>
+            <directory>packages/baander-image-processing/tests</directory>
+            <directory>packages/baander-media-metadata/tests</directory>
+            <directory>packages/baander-redis-rate-limiter/tests</directory>
         </testsuite>
         <testsuite name="StaticAnalysisRules">
             <directory>packages/baander-phpstan-rules/tests</directory>

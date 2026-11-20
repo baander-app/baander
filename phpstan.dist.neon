@@ -11,9 +11,13 @@ parameters:
   paths:
     - src/
     - packages/baander-http-client/src/
+    - packages/baander-http-client/tests/
     - packages/baander-redis-rate-limiter/src/
+    - packages/baander-redis-rate-limiter/tests/
     - packages/baander-image-processing/src/
+    - packages/baander-image-processing/tests/
     - packages/baander-media-metadata/src/
+    - packages/baander-media-metadata/tests/
     - tests/
 
   excludePaths:

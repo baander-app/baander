@@ -7,7 +7,7 @@ namespace App\Tests\Unit\Shared\Infrastructure\Redis;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Shared\Infrastructure\Redis\RedisPoolExhaustedException;
 use App\Shared\Infrastructure\Redis\RedisRateLimiterStoreFactory;
-use Baander\RedisRateLimiter\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\Exception\RateLimiterUnavailableException;
 use PHPUnit\Framework\TestCase;
 
 final class RedisRateLimiterStoreFactoryTest extends TestCase
@@ -42,7 +42,7 @@ final class RedisRateLimiterStoreFactoryTest extends TestCase
     {
         $redis = $this->createMock(\Redis::class);
         $redis->expects(self::once())->method('set')
-            ->with(\Baander\RedisRateLimiter\RedisRateLimiterStore::namespace('api') . ':generation', self::matchesRegularExpression('/\A[0-9a-f]{32}\z/'))
+            ->with(\Baander\RedisRateLimiter\Storage\RedisRateLimiterStore::namespace('api') . ':generation', self::matchesRegularExpression('/\A[0-9a-f]{32}\z/'))
             ->willReturn(true);
         $pool = $this->createMock(RedisClientFactory::class);
         $pool->expects(self::once())->method('borrow')

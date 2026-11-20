@@ -11,7 +11,7 @@ use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Interface\Resource\ImageResource;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
-use Baander\ImageProcessing\BlurHashGenerator;
+use Baander\ImageProcessing\BlurHash\BlurHashGenerator;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;

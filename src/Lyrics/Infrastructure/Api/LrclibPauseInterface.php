@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Lyrics\Infrastructure\Api;
 
-use Baander\RedisRateLimiter\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\Exception\RateLimiterUnavailableException;
 
 /**
  * The pause LRCLIB asks for when it answers that requests come too fast. Every process reads

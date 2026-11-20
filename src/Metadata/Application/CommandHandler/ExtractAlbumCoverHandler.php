@@ -12,7 +12,7 @@ use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Domain\Model\Image;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Shared\Domain\Model\Uuid;
-use Baander\MediaMetadata\CoverArt;
+use Baander\MediaMetadata\Model\CoverArt;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;

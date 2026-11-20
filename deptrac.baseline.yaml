@@ -139,7 +139,7 @@ deptrac:
       - App\Catalog\Application\Port\SongPortInterface
       - App\Catalog\Domain\Model\Song
       - App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter
-    App\Metadata\Infrastructure\Reader\MetadataContentReader:
+    App\Metadata\Infrastructure\Reader\MetadataContentReaderAdapter:
       - App\Catalog\Application\Port\MetadataContentReaderPortInterface
     App\Metadata\Interface\Controller\MetadataBrowseController:
       - App\Metadata\Infrastructure\Api\LastFm\LastFmAdapter

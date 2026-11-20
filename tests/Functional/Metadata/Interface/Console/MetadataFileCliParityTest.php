@@ -6,7 +6,7 @@ namespace App\Tests\Functional\Metadata\Interface\Console;
 
 use App\Auth\Domain\Model\User;
 use App\Tests\Functional\TestCase;
-use App\Tests\Support\Metadata\TaggedMediaFiles;
+use Baander\MediaMetadata\Tests\Support\TaggedMediaFiles;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;

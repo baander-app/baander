@@ -8,7 +8,8 @@ use App\Metadata\Application\Exception\UnreadableMediaFileException;
 use App\Metadata\Interface\Controller\MetadataSyncController;
 use App\Metadata\Interface\Request\ExtractMetadataRequest;
 use App\Metadata\Interface\Request\MatchMetadataRequest;
-use App\Tests\Support\Metadata\TaggedMediaFiles;
+use App\Tests\Support\Metadata\MetadataReaderFixture;
+use Baander\MediaMetadata\Tests\Support\TaggedMediaFiles;
 use PHPUnit\Framework\TestCase;
 
 final class MetadataSyncControllerTest extends TestCase
@@ -26,7 +27,7 @@ final class MetadataSyncControllerTest extends TestCase
     {
         $this->files = new TaggedMediaFiles();
         $this->path = $this->files->mp3();
-        $this->controller = new MetadataSyncController(TaggedMediaFiles::reader());
+        $this->controller = new MetadataSyncController(MetadataReaderFixture::reader());
     }
 
     protected function tearDown(): void

@@ -24,7 +24,7 @@ use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use App\Shared\Infrastructure\Messenger\JobIdStamp;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
-use Baander\MediaMetadata\WavReader;
+use Baander\MediaMetadata\Reader\WavReader;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Shared\Interface\Console;
 
-use Baander\RedisRateLimiter\RateLimiterClearFailedException;
-use Baander\RedisRateLimiter\UnknownRateLimiterException;
-use Baander\RedisRateLimiter\RateLimiterAdministrationInterface;
+use Baander\RedisRateLimiter\Exception\RateLimiterClearFailedException;
+use Baander\RedisRateLimiter\Exception\UnknownRateLimiterException;
+use Baander\RedisRateLimiter\Administration\RateLimiterAdministrationInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;

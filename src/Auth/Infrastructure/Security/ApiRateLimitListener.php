@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Infrastructure\Security;
 
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
-use Baander\RedisRateLimiter\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\Exception\RateLimiterUnavailableException;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\Request;

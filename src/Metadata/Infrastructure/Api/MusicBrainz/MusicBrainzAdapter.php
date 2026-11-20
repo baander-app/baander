@@ -27,7 +27,7 @@ use App\Metadata\Infrastructure\Api\MusicBrainz\DTO\MusicBrainzArtistDto;
 use App\Metadata\Infrastructure\Api\MusicBrainz\DTO\MusicBrainzRecordingDto;
 use App\Metadata\Infrastructure\Api\MusicBrainz\DTO\MusicBrainzReleaseGroupDto;
 use App\Metadata\Infrastructure\Api\MusicBrainz\DTO\MusicBrainzSearchResultDto;
-use Baander\RedisRateLimiter\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\Exception\RateLimiterUnavailableException;
 use App\Shared\Application\Exception\ServiceUnavailableException;
 use Baander\HttpClient\PublicHttpClient;
 use App\Shared\Infrastructure\Swoole\Async;

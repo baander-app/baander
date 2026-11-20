@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Redis;
 
-use Baander\RedisRateLimiter\RateLimiterUnavailableException;
-use Baander\RedisRateLimiter\RedisRateLimiterStore;
+use Baander\RedisRateLimiter\Exception\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\Storage\RedisRateLimiterStore;
 
 /** Keeps the application's pool lifecycle outside the rate limiter package. */
 final readonly class RedisRateLimiterStoreFactory

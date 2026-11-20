@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Fixtures\Auth;
 
-use Baander\RedisRateLimiter\RedisRateLimiterFactory;
+use Baander\RedisRateLimiter\Limiter\RedisRateLimiterFactory;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;

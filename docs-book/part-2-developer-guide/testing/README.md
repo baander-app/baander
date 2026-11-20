@@ -6,7 +6,7 @@ Bånder tests backend domain logic, persistence, asynchronous workers, native me
 
 | Suite | Directory | Scope |
 |-------|-----------|-------|
-| **Unit** | `tests/Unit/` | Domain behavior and application/infrastructure contracts; no Symfony kernel boot |
+| **Unit** | `tests/Unit/`, `packages/baander-http-client/tests/`, `packages/baander-image-processing/tests/`, `packages/baander-media-metadata/tests/`, `packages/baander-redis-rate-limiter/tests/` | Domain behavior, package mechanisms and application/infrastructure contracts; no Symfony kernel boot |
 | **StaticAnalysisRules** | `packages/baander-phpstan-rules/tests/` | Custom PHPStan rules, including parsed-source request-payload fixtures |
 | **Functional** | `tests/Functional/` | HTTP controllers, console commands, and application flows with Symfony kernel, PostgreSQL, and Redis |
 | **Integration** | `tests/Integration/` | Database schema, firewall matrices, transport delivery, and concurrency contracts against disposable services |

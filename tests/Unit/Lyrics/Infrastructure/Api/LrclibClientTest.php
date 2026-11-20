@@ -11,7 +11,7 @@ use App\Lyrics\Application\DTO\LrclibUnavailable;
 use App\Lyrics\Application\DTO\LrclibWait;
 use App\Lyrics\Infrastructure\Api\LrclibClient;
 use App\Lyrics\Infrastructure\Api\LrclibPauseInterface;
-use Baander\RedisRateLimiter\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\Exception\RateLimiterUnavailableException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestWith;
 use PHPUnit\Framework\MockObject\Stub;

@@ -11,7 +11,8 @@ use App\Metadata\Interface\Console\MetadataFileMatchCommand;
 use App\Metadata\Interface\Controller\MetadataSyncController;
 use App\Metadata\Interface\Request\ExtractMetadataRequest;
 use App\Metadata\Interface\Request\MatchMetadataRequest;
-use App\Tests\Support\Metadata\TaggedMediaFiles;
+use App\Tests\Support\Metadata\MetadataReaderFixture;
+use Baander\MediaMetadata\Tests\Support\TaggedMediaFiles;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -36,7 +37,7 @@ final class MetadataFileCommandsTest extends TestCase
     protected function setUp(): void
     {
         $this->files = new TaggedMediaFiles();
-        $this->controller = new MetadataSyncController(TaggedMediaFiles::reader());
+        $this->controller = new MetadataSyncController(MetadataReaderFixture::reader());
     }
 
     protected function tearDown(): void
@@ -150,12 +151,12 @@ final class MetadataFileCommandsTest extends TestCase
 
     private function extract(): CommandTester
     {
-        return new CommandTester(new MetadataFileExtractCommand(TaggedMediaFiles::reader(), $this->inputReader()));
+        return new CommandTester(new MetadataFileExtractCommand(MetadataReaderFixture::reader(), $this->inputReader()));
     }
 
     private function match(): CommandTester
     {
-        return new CommandTester(new MetadataFileMatchCommand(TaggedMediaFiles::reader(), $this->inputReader()));
+        return new CommandTester(new MetadataFileMatchCommand(MetadataReaderFixture::reader(), $this->inputReader()));
     }
 
     private function inputReader(): MetadataFileInputReader

@@ -8,7 +8,7 @@ use App\Auth\Domain\Model\User;
 use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Tests\Functional\TestCase;
-use App\Tests\Support\Metadata\TaggedMediaFiles;
+use Baander\MediaMetadata\Tests\Support\TaggedMediaFiles;
 use Symfony\Component\HttpFoundation\Response;
 
 /**

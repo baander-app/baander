@@ -107,8 +107,8 @@ final class FlysystemStorage implements StoragePortInterface
             $derivedPaths[] = $webpPath;
         }
 
-        // Delete preset variants: iterate PRESETS keys from GdImageConverter to stay in sync
-        foreach (array_keys(\App\Media\Infrastructure\Converter\GdImageConverter::PRESETS) as $preset) {
+        // Delete preset variants: iterate PRESETS keys from ImageConversionAdapter to stay in sync
+        foreach (array_keys(\App\Media\Infrastructure\Converter\ImageConversionAdapter::PRESETS) as $preset) {
             $presetPath = $this->guardPathTraversal($relativeDirectory . '/' . $filename . '_' . $preset . '.webp');
             if (file_exists($presetPath)) {
                 $derivedPaths[] = $presetPath;

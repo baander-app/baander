@@ -17,7 +17,7 @@ use App\Transcode\Application\Port\AudioRendition;
 use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\Exception\ConflictException;
-use Baander\RedisRateLimiter\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\Exception\RateLimiterUnavailableException;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;

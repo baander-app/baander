@@ -12,5 +12,10 @@
     "psr-4": {
       "Baander\\MediaMetadata\\": "src/"
     }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Baander\\MediaMetadata\\Tests\\": "tests/"
+    }
   }
 }

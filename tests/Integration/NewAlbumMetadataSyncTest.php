@@ -57,7 +57,7 @@ use App\Tests\Support\FinalSchemaBootstrap;
 use App\Transcode\Application\DTO\AudioProbeResult;
 use App\Transcode\Application\Port\AudioProbePortInterface;
 use App\Transcode\Application\Port\VideoProbePortInterface;
-use Baander\MediaMetadata\ExtractedMetadata;
+use Baander\MediaMetadata\Model\ExtractedMetadata;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Console\Application;

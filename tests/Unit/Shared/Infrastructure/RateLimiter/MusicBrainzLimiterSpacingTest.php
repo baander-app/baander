@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\RateLimiter;
 
-use Baander\RedisRateLimiter\RateLimiterSnapshot;
-use Baander\RedisRateLimiter\RedisRateLimiterFactory;
-use Baander\RedisRateLimiter\RedisRateLimiterStore;
+use Baander\RedisRateLimiter\Storage\RateLimiterSnapshot;
+use Baander\RedisRateLimiter\Limiter\RedisRateLimiterFactory;
+use Baander\RedisRateLimiter\Storage\RedisRateLimiterStore;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Yaml\Yaml;
 

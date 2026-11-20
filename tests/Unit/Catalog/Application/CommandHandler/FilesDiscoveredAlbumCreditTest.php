@@ -29,7 +29,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Catalog\DiscoveredFileObservations;
 use App\Tests\Fixtures\Catalog\PassThroughTransaction;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
-use Baander\MediaMetadata\ExtractedMetadata;
+use Baander\MediaMetadata\Model\ExtractedMetadata;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;

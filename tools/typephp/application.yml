@@ -61,6 +61,7 @@ embedded-files:
   - ../../config/routes
   - ../../config/routes.yaml
   - ../../config/services.yaml
+  - ../../config/services_packages.yaml
   - ../../config/services_baander_navigator.yaml
   - ../../templates
   - ../../translations

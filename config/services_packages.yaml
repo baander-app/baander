@@ -1,0 +1,47 @@
+# Application-owned dependencies for internal packages.
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    Baander\MediaMetadata\FormatDetector: ~
+    Baander\MediaMetadata\Reader\Id3Reader:
+        arguments:
+            $logger: '@monolog.logger.metadata'
+    Baander\MediaMetadata\Reader\FlacReader:
+        arguments:
+            $logger: '@monolog.logger.metadata'
+    Baander\MediaMetadata\Reader\OggReader:
+        arguments:
+            $logger: '@monolog.logger.metadata'
+    Baander\MediaMetadata\Reader\WavReader:
+        arguments:
+            $logger: '@monolog.logger.metadata'
+    Baander\MediaMetadata\MetadataContentReader: ~
+
+    Baander\ImageProcessing\GdImageConverter: ~
+    Baander\ImageProcessing\BlurHash\BlurHashGenerator:
+        arguments:
+            $logger: '@monolog.logger.media'
+
+    baander.provider_http_transport:
+        class: Symfony\Component\HttpClient\CurlHttpClient
+        autowire: false
+        autoconfigure: false
+
+    baander.provider_dns_resolver:
+        class: Closure
+        factory: ['@App\Shared\Infrastructure\Http\NativeDnsResolver', 'resolver']
+        autowire: false
+        autoconfigure: false
+
+    Baander\HttpClient\PublicDestinationPolicy:
+        arguments:
+            $dnsResolver: '@baander.provider_dns_resolver'
+
+    Baander\HttpClient\PublicHttpClient:
+        arguments:
+            $httpClient: '@baander.provider_http_transport'
+
+    Baander\RedisRateLimiter\Storage\RedisRateLimiterStore:
+        factory: ['@App\Shared\Infrastructure\Redis\RedisRateLimiterStoreFactory', 'create']

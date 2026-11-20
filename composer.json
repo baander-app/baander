@@ -202,7 +202,11 @@
   },
   "autoload-dev": {
     "psr-4": {
-      "App\\Tests\\": "tests/"
+      "App\\Tests\\": "tests/",
+      "Baander\\HttpClient\\Tests\\": "packages/baander-http-client/tests/",
+      "Baander\\ImageProcessing\\Tests\\": "packages/baander-image-processing/tests/",
+      "Baander\\MediaMetadata\\Tests\\": "packages/baander-media-metadata/tests/",
+      "Baander\\RedisRateLimiter\\Tests\\": "packages/baander-redis-rate-limiter/tests/"
     },
     "classmap": [
       "scripts/tests/php/"

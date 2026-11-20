@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Lyrics\Infrastructure\Redis;
 
 use App\Lyrics\Infrastructure\Api\LrclibPauseInterface;
-use Baander\RedisRateLimiter\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\Exception\RateLimiterUnavailableException;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Shared\Infrastructure\Redis\RedisPoolExhaustedException;
 

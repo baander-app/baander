@@ -12,7 +12,7 @@
             "dist": {
                 "type": "path",
                 "url": "./packages/baander-http-client",
-                "reference": "fdcebae4937ce7a72682bb607aa2889cf81d39ce"
+                "reference": "7249642fac1518b9e990ca5ee6f5ac0dade28f2d"
             },
             "require": {
                 "ext-curl": "*",
@@ -25,6 +25,11 @@
             "autoload": {
                 "psr-4": {
                     "Baander\\HttpClient\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Baander\\HttpClient\\Tests\\": "tests/"
                 }
             },
             "license": [
@@ -42,7 +47,7 @@
             "dist": {
                 "type": "path",
                 "url": "./packages/baander-image-processing",
-                "reference": "ec9ecc36394e58e702fec0d70efae3334fc28763"
+                "reference": "3f2a4db8e36789170992d7d52cbaab2c52c3fe71"
             },
             "require": {
                 "ext-gd": "*",
@@ -53,6 +58,11 @@
             "autoload": {
                 "psr-4": {
                     "Baander\\ImageProcessing\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Baander\\ImageProcessing\\Tests\\": "tests/"
                 }
             },
             "license": [
@@ -70,7 +80,7 @@
             "dist": {
                 "type": "path",
                 "url": "./packages/baander-media-metadata",
-                "reference": "c0df093e77106fb8e235f9524492540ebf7e33a4"
+                "reference": "3c243f254743e73e98341ee891f148ed0772745b"
             },
             "require": {
                 "ext-mbstring": "*",
@@ -81,6 +91,11 @@
             "autoload": {
                 "psr-4": {
                     "Baander\\MediaMetadata\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Baander\\MediaMetadata\\Tests\\": "tests/"
                 }
             },
             "license": [
@@ -98,7 +113,7 @@
             "dist": {
                 "type": "path",
                 "url": "./packages/baander-redis-rate-limiter",
-                "reference": "1dbb4f4ec276d12c7713f9a27b6be2373a924f08"
+                "reference": "c92758e7d6e79bbdec8f9e5f1fe5e2d76f975be2"
             },
             "require": {
                 "ext-redis": "*",
@@ -111,6 +126,11 @@
             "autoload": {
                 "psr-4": {
                     "Baander\\RedisRateLimiter\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Baander\\RedisRateLimiter\\Tests\\": "tests/"
                 }
             },
             "license": [

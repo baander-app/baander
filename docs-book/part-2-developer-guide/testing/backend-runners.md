@@ -9,7 +9,7 @@ disposable coordinator.
 
 | Suite | Directory | Scope |
 |-------|-----------|-------|
-| **Unit** | `tests/Unit/` | Domain behavior and application/infrastructure contracts; no Symfony kernel boot |
+| **Unit** | `tests/Unit/`, `packages/baander-http-client/tests/`, `packages/baander-image-processing/tests/`, `packages/baander-media-metadata/tests/`, `packages/baander-redis-rate-limiter/tests/` | Domain behavior, package mechanisms and application/infrastructure contracts; no Symfony kernel boot |
 | **StaticAnalysisRules** | `packages/baander-phpstan-rules/tests/` | Custom PHPStan rules, including parsed-source request-payload fixtures |
 | **Functional** | `tests/Functional/` | With Symfony kernel container, database, and services |
 | **Integration** | `tests/Integration/` | Database, transport, and other integration contracts against configured test services |

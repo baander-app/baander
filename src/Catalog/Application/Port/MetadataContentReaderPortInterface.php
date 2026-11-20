@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Application\Port;
 
-use Baander\MediaMetadata\ExtractedMetadata;
+use Baander\MediaMetadata\Model\ExtractedMetadata;
 
 interface MetadataContentReaderPortInterface
 {

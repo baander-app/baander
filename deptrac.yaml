@@ -63,7 +63,7 @@ deptrac:
     - name: 'Rate Limiter Contracts'
       collectors:
         - type: classLike
-          value: '^Baander\\RedisRateLimiter\\(RateLimiterDefinition|RateLimiterAdministrationInterface|RateLimiterUnavailableException|RateLimiterClearFailedException|UnknownRateLimiterException)$'
+          value: '^Baander\\RedisRateLimiter\\(Administration\\(RateLimiterDefinition|RateLimiterAdministrationInterface)|Exception\\(RateLimiterUnavailableException|RateLimiterClearFailedException|UnknownRateLimiterException))$'
     - name: 'Rate Limiter Implementation'
       collectors:
         - type: bool
@@ -72,7 +72,7 @@ deptrac:
               value: '^Baander\\RedisRateLimiter\\'
           must_not:
             - type: classLike
-              value: '^Baander\\RedisRateLimiter\\(RateLimiterDefinition|RateLimiterAdministrationInterface|RateLimiterUnavailableException|RateLimiterClearFailedException|UnknownRateLimiterException)$'
+              value: '^Baander\\RedisRateLimiter\\(Administration\\(RateLimiterDefinition|RateLimiterAdministrationInterface)|Exception\\(RateLimiterUnavailableException|RateLimiterClearFailedException|UnknownRateLimiterException))$'
     - name: 'Image Processing'
       collectors:
         - type: classLike
@@ -80,7 +80,7 @@ deptrac:
     - name: 'Media Metadata Values'
       collectors:
         - type: classLike
-          value: '^Baander\\MediaMetadata\\(ExtractedMetadata|CoverArt)$'
+          value: '^Baander\\MediaMetadata\\Model\\(ExtractedMetadata|CoverArt)$'
     - name: 'Media Metadata Readers'
       collectors:
         - type: bool
@@ -89,7 +89,7 @@ deptrac:
               value: '^Baander\\MediaMetadata\\'
           must_not:
             - type: classLike
-              value: '^Baander\\MediaMetadata\\(ExtractedMetadata|CoverArt)$'
+              value: '^Baander\\MediaMetadata\\Model\\(ExtractedMetadata|CoverArt)$'
     # =============================================
     # Shared kernel
     # =============================================

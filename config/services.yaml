@@ -1,5 +1,6 @@
 imports:
     - { resource: 'services_baander_navigator.yaml' }
+    - { resource: 'services_packages.yaml' }
 
 # yaml-language-server: $schema=../vendor/symfony/dependency-injection/Loader/schema/services.schema.json
 
@@ -50,26 +51,6 @@ services:
                 json_encode_options: 4194304
                 json_decode_options: 4194304
 
-    Baander\MediaMetadata\FormatDetector: ~
-    Baander\MediaMetadata\Id3Reader:
-        arguments:
-            $logger: '@monolog.logger.metadata'
-    Baander\MediaMetadata\FlacReader:
-        arguments:
-            $logger: '@monolog.logger.metadata'
-    Baander\MediaMetadata\OggReader:
-        arguments:
-            $logger: '@monolog.logger.metadata'
-    Baander\MediaMetadata\WavReader:
-        arguments:
-            $logger: '@monolog.logger.metadata'
-    Baander\MediaMetadata\MetadataContentReader: ~
-
-    Baander\ImageProcessing\GdImageConverter: ~
-    Baander\ImageProcessing\BlurHashGenerator:
-        arguments:
-            $logger: '@monolog.logger.media'
-
     # Register all classes in src/ as services
     App\:
         resource: '../src/'
@@ -92,25 +73,6 @@ services:
 
     App\Transcode\Application\Port\MediaExecutionPolicyInterface:
         alias: App\Transcode\Application\Service\MediaExecutionPolicy
-
-    baander.provider_http_transport:
-        class: Symfony\Component\HttpClient\CurlHttpClient
-        autowire: false
-        autoconfigure: false
-
-    baander.provider_dns_resolver:
-        class: Closure
-        factory: ['@App\Shared\Infrastructure\Http\NativeDnsResolver', 'resolver']
-        autowire: false
-        autoconfigure: false
-
-    Baander\HttpClient\PublicDestinationPolicy:
-        arguments:
-            $dnsResolver: '@baander.provider_dns_resolver'
-
-    Baander\HttpClient\PublicHttpClient:
-        arguments:
-            $httpClient: '@baander.provider_http_transport'
 
     App\Notification\Infrastructure\Webhook\WebhookDestinationPolicy:
         arguments:
@@ -421,18 +383,6 @@ services:
         arguments:
             $failureSender: '@messenger.transport.failed'
             $failureTransportName: failed
-
-    Baander\RedisRateLimiter\RedisRateLimiterStore:
-        factory: ['@App\Shared\Infrastructure\Redis\RedisRateLimiterStoreFactory', 'create']
-
-    Baander\RedisRateLimiter\RedisRateLimiterAdministration:
-        arguments:
-            $limiters: []
-
-    # --- Rate Limiter Administration ---
-    # Arguments are filled from framework.rate_limiter by RateLimiterCatalogPass.
-    Baander\RedisRateLimiter\RateLimiterAdministrationInterface:
-        alias: Baander\RedisRateLimiter\RedisRateLimiterAdministration
 
     # --- TOTP ---
     App\Auth\Infrastructure\Security\Totp\TotpService:
@@ -832,7 +782,7 @@ services:
         alias: App\Catalog\Infrastructure\Doctrine\Query\CatalogStatsQuery
 
     App\Catalog\Application\Port\MetadataContentReaderPortInterface:
-        alias: App\Metadata\Infrastructure\Reader\MetadataContentReader
+        alias: App\Metadata\Infrastructure\Reader\MetadataContentReaderAdapter
 
     # --- Library Cross-Context Queries ---
     App\Library\Application\Query\LibraryMembershipQueryPort:
@@ -858,7 +808,7 @@ services:
         alias: App\Media\Application\Service\PlaybackMediaAccess
 
     App\Media\Application\Port\ImageConversionPortInterface:
-        alias: App\Media\Infrastructure\Converter\GdImageConverter
+        alias: App\Media\Infrastructure\Converter\ImageConversionAdapter
 
     App\Media\Application\Port\MediaAdminPortInterface:
         alias: App\Media\Infrastructure\Admin\MediaAdminService
