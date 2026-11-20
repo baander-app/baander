@@ -1,14 +1,20 @@
 # TypePHP runtime performance
 
+This report preserves the comparison recorded on 20 November 2026. The user
+chose to retire the TypePHP integration after reviewing these results. Ordinary
+PHP remains the application runtime; the current checkout has no TypePHP build,
+qualification tools or benchmark runner. The report and raw evidence remain here
+for historical reference.
+
 The TypePHP build did not improve the median time of these three workloads on the
 measured host. Console discovery took 3.19 times as long as ordinary PHP. Operator
 startup took 4.2% longer, and the sustained application loop took 6.6% longer.
 These are CLI and application-code measurements; they do not measure HTTP or worker
 throughput.
 
-The [raw measurements](results/2026-11-20/measurements.json) contain every sample,
+The [raw measurements](results/measurements.json) contain every sample,
 output check, effective setting and derived summary. The
-[run manifest](results/2026-11-20/manifest.json) identifies the source, executables,
+[run manifest](results/manifest.json) identifies the source, executables,
 images, host and collection parameters. Both records belong to the run on
 20 November 2026, from 15:39:16 to 15:40:38 UTC.
 
@@ -47,7 +53,7 @@ excluding interpreter startup, the initial Composer loader and process exit.
 
 ## Method
 
-The [collector](measure.py) runs both executables inside one disposable,
+The [collector](https://github.com/baander-app/baander/blob/104f48fc82deb49996d5da91e2013eb1d4df8c46/tools/typephp/benchmarks/measure.py) runs both executables inside one disposable,
 network-disabled container. Ordinary PHP is copied from the matching CI image;
 the packaged executable and native libraries come from the qualification image.
 Both see the same read-only production source and dependency tree at
@@ -68,7 +74,7 @@ lockfile and source-tree hashes, and the exact harness file hashes. The harness
 was committed as `861ba672`; the pending documentation and site edits listed in
 the manifest do not change the measured application inputs.
 Review subsequently tightened the runner's preflight to reject untracked
-application files. A [source recheck](results/2026-11-20/source-validation.json)
+application files. A [source recheck](results/source-validation.json)
 found none in the measured snapshot. The timing collector and workload are
 unchanged; the manifest retains the hashes of the exact measured harness.
 
@@ -87,7 +93,7 @@ The workloads are:
   prints the command list.
 - **Operator help:** the same entry dispatches `operator --help`, using the
   independent deployment-operator composition root.
-- **Sustained application loop:** the [driver](workload.php) loads the canonical
+- **Sustained application loop:** the [driver](https://github.com/baander-app/baander/blob/104f48fc82deb49996d5da91e2013eb1d4df8c46/tools/typephp/benchmarks/workload.php) loads the canonical
   Composer autoloader, then repeatedly constructs and validates fixed `PublicId`
   and `Uuid` values, compares them, converts the UUID to binary and serializes
   the values to JSON. It hashes every encoded result. The collector checks the
@@ -103,9 +109,9 @@ Startup output must match exactly, without normalization. A child failure,
 unexpected stderr or incorrect result stops collection and prevents an accepted
 comparison.
 
-A [pilot run](results/2026-11-20/pilot-measurements.json.gz) established that
+A [pilot run](results/pilot-measurements.json.gz) established that
 100,000 iterations produced loop samples lasting roughly 0.3 seconds. Its
-[manifest](results/2026-11-20/pilot-manifest.json) records that harness metadata
+[manifest](results/pilot-manifest.json) records that harness metadata
 and output storage were still being finalized. The tables use only the later
 run on the committed harness, with the same iteration count. The pilot is
 retained for audit and is not pooled with the final samples.
@@ -133,47 +139,30 @@ worker concurrency, compilation time or distribution size. Console discovery
 lists commands; it does not measure their execution. No application behavior was
 optimized for the benchmark.
 
-## Reproduce the comparison
+## Historical reproduction sources
 
-Use Linux with Docker and Python 3. Prepare a production source tree and matching
-ordinary and qualification images using the [packaging guide](../README.md).
-Keep that exact source tree, including its production `vendor`, after building
-the executable. The benchmark does not replace the current checkout's vendor
-directory or reset a running instance. Images must already be available locally;
-the recorded image IDs are local build identities, not published downloads.
+The runner and its build dependencies were removed when the integration was
+retired. To inspect or reconstruct the experiment, retrieve commit
+`104f48fc82deb49996d5da91e2013eb1d4df8c46` in a separate checkout. Its
+[packaging guide](https://github.com/baander-app/baander/blob/104f48fc82deb49996d5da91e2013eb1d4df8c46/tools/typephp/README.md),
+[runner](https://github.com/baander-app/baander/blob/104f48fc82deb49996d5da91e2013eb1d4df8c46/tools/typephp/benchmarks/run.py),
+[collector](https://github.com/baander-app/baander/blob/104f48fc82deb49996d5da91e2013eb1d4df8c46/tools/typephp/benchmarks/measure.py),
+[workload driver](https://github.com/baander-app/baander/blob/104f48fc82deb49996d5da91e2013eb1d4df8c46/tools/typephp/benchmarks/workload.php)
+and [focused checks](https://github.com/baander-app/baander/blob/104f48fc82deb49996d5da91e2013eb1d4df8c46/tools/typephp/benchmarks/test_measure.py)
+describe the historical build, collection and validation procedure. The run
+manifest retains the hashes of the exact harness used for timing; the historical
+runner also includes the later untracked-source preflight correction described
+above.
 
-From the repository root, set `TYPEPHP_SOURCE` to that production tree. For the
-recorded artifacts, the collection command is:
+Reconstruction requires Linux, Docker, Python 3, a matching production source
+and dependency tree, and ordinary and qualification images built from the
+historical packaging guide. The recorded image IDs identify local builds; they
+are not published downloads. The manifest supplies the executable hashes,
+application source commit, sample counts and iteration count. Use those records
+to identify the measured inputs rather than treating a new build as the same
+artifact.
 
-```sh
-python3 tools/typephp/benchmarks/run.py \
-  --source "$TYPEPHP_SOURCE" \
-  --ordinary-image sha256:78479bd47da48596ca757d4b41f663754240485c3a9f4e86450415fc4d2531d3 \
-  --typephp-image sha256:e9ccdc03ba9c52c51ce730820f07261638a0101d024281959a3d6068a9d1b487 \
-  --binary-sha256 408ad77b210bb0a9bdf94acb0cc93ce01029aef043af50e81b8612a41be88b25 \
-  --source-commit 7aeaccc30d86e15a8fb6de9bd46e2b94e317a2a1 \
-  --samples 30 --warmups 3 --iterations 100000 \
-  --output var/typephp-performance-repeat
-```
-
-Use a new output directory for each run. For a rebuilt application, supply its
-own matching images, binary hash and source commit; do not reuse these identities.
-Retain the new observations before publishing a new comparison.
-
-Recompute the stored summaries from the raw final samples:
-
-```sh
-python3 - <<'PY'
-import json
-import sys
-from pathlib import Path
-sys.path.insert(0, 'tools/typephp/benchmarks')
-from measure import summarize
-result = json.loads(Path('tools/typephp/benchmarks/results/2026-11-20/measurements.json').read_text())
-assert summarize(result['records']) == result['summary']
-print(json.dumps(result['summary'], indent=2))
-PY
-```
-
-The harness's focused failure, checksum and summary checks run with
-`python3 -m unittest discover -s tools/typephp/benchmarks -p 'test_*.py'`.
+The retained [measurements](results/measurements.json) include every observation
+and the derived summaries. The historical collector's `summarize` function can
+recompute them from the `records` array. This archive contains evidence only;
+reconstructing the retired tools requires retrieving their historical source.

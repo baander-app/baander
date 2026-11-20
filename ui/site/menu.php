@@ -48,11 +48,6 @@ return [
                     'description' => 'The terms the code and documentation use, each with its meaning in Bånder.',
                 ],
                 [
-                    'title' => 'Runtime performance',
-                    'url' => '/runtime-performance/',
-                    'description' => 'Measured TypePHP and ordinary PHP startup and sustained execution, with the method and raw results.',
-                ],
-                [
                     'title' => 'Typography',
                     'url' => '/typography/',
                     'description' => 'The fonts, glyph forms, script rules and type roles for every supported script.',

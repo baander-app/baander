@@ -26,6 +26,4 @@ The root [Unit suite](../../phpunit.xml.dist) discovers the package's tests.
 Use the existing [backend runners](../../docs-book/part-2-developer-guide/testing/README.md)
 from the repository root.
 
-Production embedding belongs to the application's
-[TypePHP configuration](../../tools/typephp/application.yml). The package has no
-separate executable or build step.
+The package has no separate executable or build step.

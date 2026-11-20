@@ -29,6 +29,5 @@ Use the existing [backend runners](../../docs-book/part-2-developer-guide/testin
 from the repository root.
 
 The application owns transport registration in
-[services_packages.yaml](../../config/services_packages.yaml) and production embedding in its
-[TypePHP configuration](../../tools/typephp/application.yml). The package has no
+[services_packages.yaml](../../config/services_packages.yaml). The package has no
 separate executable or build step.

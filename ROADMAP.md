@@ -4,10 +4,43 @@ Updated: 2026-11-20. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
-## TypePHP performance comparison
+## TypePHP retirement
+
+The [removal plan](docs/plans/2026-11-20-1652-feat-remove-typephp-plan.md)
+retires the optional TypePHP runtime at the user's request after its measured
+comparison. Ordinary PHP remains the application runtime. The dedicated compiler
+dependencies, build and qualification images, patches, entry adapters, test loader,
+benchmark runner and their Makefile targets have been removed. Generic storage,
+cancellation and fixture corrections remain; application source, ordinary runtime
+entry points and root Composer dependencies are unchanged.
+
+The comparison page and its references are removed from `ui/site`. Its
+[historical report](docs/benchmarks/2026-11-20-typephp/README.md) and all five raw
+evidence files remain in the repository only. The archived JSON and compressed
+pilot retain their original bytes. Local build output, Docker images, other
+worktrees and user data are outside this removal.
+
+Removal verification: all five archived raw files match their bytes at
+`104f48fc82deb49996d5da91e2013eb1d4df8c46`, before removal. The website build passes
+with 246 manual pages. The CI-image Website suite passes 164 tests and 1,520
+assertions; the affected menu, rendering and website browser suites pass all 76
+cases. Browser inspection confirms that `/runtime-performance/` returns HTTP 404
+and no longer appears in Pagefind results. The generated page, deployment copy,
+sitemap entry and menu entry are absent.
+
+Tooling PHPStan, site TypeScript, targeted formatting and whitespace checks pass.
+`make help` has no TypePHP targets, and the active-reference audit finds no
+remaining integration outside historical plans, this roadmap and the archive.
+Source comparison confirms no changes to ordinary application code, configuration,
+entry points, backend tests or root Composer dependencies. Simplification found
+no retained implementation to refactor, and code review returned no findings.
+The removal is committed locally with no push or deployment; no verification
+checkpoints remain open.
+
+### Historical performance checkpoint
 
 The [comparison plan](docs/plans/2026-11-20-1632-feat-typephp-performance-comparison-plan.md)
-adds a reproducible benchmark and a [measured report](tools/typephp/benchmarks/README.md)
+recorded a reproducible benchmark and a [measured report](docs/benchmarks/2026-11-20-typephp/README.md)
 for the executable qualified by the package-organization checkpoint below.
 The harness checks production source bytes, executable hashes, selected effective
 INI settings and exact workload outputs before accepting timings. Its ten
@@ -15,11 +48,11 @@ focused tests pass, including failed-child and incorrect-checksum rejection.
 The simplification pass removed one duplicated condition and retained the proof
 tests. PHP syntax, Python parsing and whitespace checks pass.
 
-The [final measurements](tools/typephp/benchmarks/results/2026-11-20/measurements.json)
+The [final measurements](docs/benchmarks/2026-11-20-typephp/results/measurements.json)
 contain 180 accepted samples and 18 warmups: 30 samples and three warmups for each
 of two runtimes across three workloads. Independent recomputation confirms all
 ten metric summaries, output identities, counts and executable hashes against
-the [manifest](tools/typephp/benchmarks/results/2026-11-20/manifest.json).
+the [manifest](docs/benchmarks/2026-11-20-typephp/results/manifest.json).
 All 13,325 source/dependency reads match the production tree. Both runtimes use
 PHP 8.5.12 ZTS and Swoole 6.2.4, production dependencies and matching selected
 settings in one network-disabled disposable container.
@@ -35,14 +68,14 @@ Review reproduced an untracked-source acceptance gap in the runner. Its CLI
 regression failed before the correction and passes afterward; the runner now
 checks application paths against the named source commit, allowing generated
 vendor files. Three source-provenance cases bring the harness suite from seven
-to ten tests. A [recheck](tools/typephp/benchmarks/results/2026-11-20/source-validation.json)
+to ten tests. A [recheck](docs/benchmarks/2026-11-20-typephp/results/source-validation.json)
 confirms no unexpected application files in the measured snapshot. The timing
 collector and workload are unchanged, so the original measurements are retained.
 
-The site renders the report at `/runtime-performance/` through
-`ui/site/reference/runtime-performance.php`. Resources → Build on it, Pagefind
-search and the sitemap expose the page. Desktop and mobile browser inspection
-confirms that the report renders with the existing reference-page layout.
+Before retirement, the site rendered the report at `/runtime-performance/` through
+its reference-page template. Resources → Build on it, Pagefind search and the
+sitemap exposed the page. Desktop and mobile browser inspection confirmed its
+layout. The following counts record that original publication checkpoint.
 The CI-image Website suite passes 164 tests and 1,521 assertions, and all ten
 harness tests pass in the same image. `composer analyse:tooling`, the site
 TypeScript check, targeted tooling formatting and `git diff --check` pass.
@@ -54,7 +87,7 @@ browser run passes 221 existing cases; the two new report cases initially fail
 because a raw heading-text assertion includes the decorative anchor symbol.
 After checking the exact accessible heading name, both cases pass against the
 rebuilt site at 1,440 px and 390 px with JavaScript disabled. These
-[report checks](ui/site/tests/website.spec.ts) cover menu access, results tables,
+[historical report checks](https://github.com/baander-app/baander/blob/104f48fc82deb49996d5da91e2013eb1d4df8c46/ui/site/tests/website.spec.ts) cover menu access, results tables,
 evidence links, section navigation and narrow-screen containment. All 223 cases
 are covered by the full run and focused rerun. The work is committed locally;
 no push or deployment is included. No verification checkpoints remain open.
@@ -293,13 +326,14 @@ These fixture corrections were verified with focused CI-image tests and the real
 runtime drills; the application binary and production dependencies were unchanged.
 All five extraction units are delivered, with no open verification checkpoints.
 
-## TypePHP application packaging
+## Retired TypePHP packaging experiment
 
-The results below record the 2026-11-19 runtime setup. The package extraction above
-records the newer application build.
+The results below record the retired 2026-11-19 runtime setup. The package
+extraction above records the later application build. TypePHP support has since
+been removed; these are historical qualification results.
 
 The [TypePHP setup plan](docs/plans/2026-11-19-1159-feat-typephp-setup-plan.md) targets the main PHP application as one packaged CLI executable using ZendVM.
-The [setup guide](tools/typephp/README.md) covers the console used by the HTTP server and workers, and the independent deployment operator.
+The [historical setup guide](https://github.com/baander-app/baander/blob/104f48fc82deb49996d5da91e2013eb1d4df8c46/tools/typephp/README.md) covers the console used by the HTTP server and workers, and the independent deployment operator.
 The user selected one binary on 2026-11-19: `baander console ...` and `baander operator ...` choose the existing composition roots. The reviewed implementation consolidates the project and build target, embeds both scripts, preserves CLI metadata for Symfony re-entry, and reserves those exact selector tokens ahead of same-named files. The qualification image uses a direct `php` symlink and contains no second application binary or retained ordinary PHP copy.
 
 The unified build passes: `var/typephp/baander` is 317,524,632 bytes, SHA-256 `fbef8d92218d62ec93dfa774de5879e170609f782667851b3ab3d247261d7452`, with 13,218 embedded files and 12,192 opcode blobs. The same nine IDE-helper files are skipped; no application PHP is skipped. The obsolete operator output has been removed. The package reports PHP 8.5.12 ZTS, Swoole 6.2.4 and 59 extensions. The `php` alias and `PHP_BINARY` resolve to that ELF. The toolchain image is `sha256:945e4439dd52e71434101ef0780fac0f5ccd3f43fb7f2f3520d75f684215863c`; the single-artifact qualification image is `sha256:688281c69ffd9719c9f01139ed8f3b34d76afac462960b8032730900f6a6b315`.
