@@ -109,9 +109,9 @@ final class InitialSchemaMigrationTest extends TestCase
         }
         $factory = $this->factory();
         $factory->getMetadataStorage()->ensureInitialized();
-        self::assertCount(31, $factory->getMigrationRepository()->getMigrations());
+        self::assertCount(35, $factory->getMigrationRepository()->getMigrations());
         self::assertSame(0, $this->migrate($factory));
-        self::assertSame(['DoctrineMigrations\\Version20261017000000', 'DoctrineMigrations\\Version20261017130000', 'DoctrineMigrations\\Version20261017150000', 'DoctrineMigrations\\Version20261017160000', 'DoctrineMigrations\\Version20261017170000', 'DoctrineMigrations\\Version20261018130000', 'DoctrineMigrations\\Version20261021120000', 'DoctrineMigrations\\Version20261030210000', 'DoctrineMigrations\\Version20261031120000', 'DoctrineMigrations\\Version20261101190000', 'DoctrineMigrations\\Version20261101203000', 'DoctrineMigrations\\Version20261101210000', 'DoctrineMigrations\\Version20261102190000', 'DoctrineMigrations\\Version20261102191000', 'DoctrineMigrations\\Version20261102200000', 'DoctrineMigrations\\Version20261103120000', 'DoctrineMigrations\\Version20261103210000', 'DoctrineMigrations\\Version20261104120000', 'DoctrineMigrations\\Version20261105120000', 'DoctrineMigrations\\Version20261107120000', 'DoctrineMigrations\\Version20261110120000', 'DoctrineMigrations\\Version20261111180000', 'DoctrineMigrations\\Version20261113120000', 'DoctrineMigrations\\Version20261114120000', 'DoctrineMigrations\\Version20261115090000', 'DoctrineMigrations\\Version20261115100000', 'DoctrineMigrations\\Version20261115110000', 'DoctrineMigrations\\Version20261115120000', 'DoctrineMigrations\\Version20261117130000', 'DoctrineMigrations\\Version20261119120000', 'DoctrineMigrations\\Version20261119130000'], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
+        self::assertSame(['DoctrineMigrations\\Version20261017000000', 'DoctrineMigrations\\Version20261017130000', 'DoctrineMigrations\\Version20261017150000', 'DoctrineMigrations\\Version20261017160000', 'DoctrineMigrations\\Version20261017170000', 'DoctrineMigrations\\Version20261018130000', 'DoctrineMigrations\\Version20261021120000', 'DoctrineMigrations\\Version20261030210000', 'DoctrineMigrations\\Version20261031120000', 'DoctrineMigrations\\Version20261101190000', 'DoctrineMigrations\\Version20261101203000', 'DoctrineMigrations\\Version20261101210000', 'DoctrineMigrations\\Version20261102190000', 'DoctrineMigrations\\Version20261102191000', 'DoctrineMigrations\\Version20261102200000', 'DoctrineMigrations\\Version20261103120000', 'DoctrineMigrations\\Version20261103210000', 'DoctrineMigrations\\Version20261104120000', 'DoctrineMigrations\\Version20261105120000', 'DoctrineMigrations\\Version20261107120000', 'DoctrineMigrations\\Version20261110120000', 'DoctrineMigrations\\Version20261111180000', 'DoctrineMigrations\\Version20261113120000', 'DoctrineMigrations\\Version20261114120000', 'DoctrineMigrations\\Version20261115090000', 'DoctrineMigrations\\Version20261115100000', 'DoctrineMigrations\\Version20261115110000', 'DoctrineMigrations\\Version20261115120000', 'DoctrineMigrations\\Version20261117130000', 'DoctrineMigrations\\Version20261119120000', 'DoctrineMigrations\\Version20261119130000', 'DoctrineMigrations\\Version20261119220000', 'DoctrineMigrations\\Version20261120090000', 'DoctrineMigrations\\Version20261120100000', 'DoctrineMigrations\\Version20261120110000'], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
         self::assertSame(93, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
         self::assertSame(['TimeZone=UTC'], $this->databaseSettings($this->connection));
         $this->assertSchedules();
@@ -215,7 +215,26 @@ final class InitialSchemaMigrationTest extends TestCase
         self::assertSame(0, $this->migrate($this->factory(), 'DoctrineMigrations\\Version20261031120000'));
         self::assertSame($afterHistory, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions ORDER BY version'));
         self::assertSame(0, $this->migrate($this->factory()));
-        self::assertSame($before, $snapshot(), 'Subsequent migrations preserve captured data and pending scopes.');
+        self::assertSame(self::withLaterUserColumns($before), $snapshot(), 'Subsequent migrations preserve captured data and pending scopes.');
+    }
+
+    /**
+     * The snapshot as later migrations reshape `users`: the plaintext TOTP secret gives way to
+     * its ciphertext and spent step, and the pending address and credential epoch are added,
+     * all empty or at their defaults for accounts that predate them.
+     *
+     * @param array<string, list<array<string, mixed>>> $snapshot
+     * @return array<string, list<array<string, mixed>>>
+     */
+    private static function withLaterUserColumns(array $snapshot): array
+    {
+        $snapshot['users'] = array_map(static function (array $row): array {
+            unset($row['totp_secret']);
+
+            return [...$row, 'totp_secret_ciphertext' => null, 'totp_last_used_step' => null, 'pending_email' => null, 'credential_epoch' => 0];
+        }, $snapshot['users']);
+
+        return $snapshot;
     }
 
     public function testMediaUpgradeKeepsKnownReceiptsAndDerivesOnlyEstablishedJobOwners(): void
