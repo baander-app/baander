@@ -24,13 +24,13 @@ final class LoginAccountThrottleTest extends RateLimitTestCase
         $this->spendAllBut(20, $user->getEmail());
 
         foreach (range(1, 20) as $host) {
-            $failed = $this->login('198.51.100.' . $host, $user->getEmail(), 'wrong-password-' . $host);
+            $failed = $this->login('198.18.10.' . $host, $user->getEmail(), 'wrong-password-' . $host);
             self::assertSame(401, $failed->getStatusCode(), (string) $failed->getContent());
         }
 
         // A new address with the right password, and a case variant of the address, wait too.
-        $this->assertTooManyRequests($this->login('198.51.100.21', $user->getEmail(), 'right-password-1'));
-        $this->assertTooManyRequests($this->login('198.51.100.22', strtoupper($user->getEmail()), 'right-password-1'));
+        $this->assertTooManyRequests($this->login('198.18.10.21', $user->getEmail(), 'right-password-1'));
+        $this->assertTooManyRequests($this->login('198.18.10.22', strtoupper($user->getEmail()), 'right-password-1'));
     }
 
     public function testASuccessfulLoginIsNotCharged(): void
@@ -39,12 +39,12 @@ final class LoginAccountThrottleTest extends RateLimitTestCase
         $user = $this->createTestUser(password: 'right-password-1');
         $this->spendAllBut(1, $user->getEmail());
 
-        $success = $this->login('198.51.100.30', $user->getEmail(), 'right-password-1');
+        $success = $this->login('198.18.10.30', $user->getEmail(), 'right-password-1');
         self::assertSame(200, $success->getStatusCode(), (string) $success->getContent());
 
-        $last = $this->login('198.51.100.31', $user->getEmail(), 'wrong-password');
+        $last = $this->login('198.18.10.31', $user->getEmail(), 'wrong-password');
         self::assertSame(401, $last->getStatusCode(), (string) $last->getContent());
-        $this->assertTooManyRequests($this->login('198.51.100.32', $user->getEmail(), 'right-password-1'));
+        $this->assertTooManyRequests($this->login('198.18.10.32', $user->getEmail(), 'right-password-1'));
     }
 
     public function testAnUnknownAddressIsLimitedLikeAKnownOne(): void
@@ -54,13 +54,13 @@ final class LoginAccountThrottleTest extends RateLimitTestCase
         $this->spendAllBut(1, $known);
         $this->spendAllBut(1, $unknown);
 
-        $knownFailure = $this->login('198.51.100.40', $known, 'wrong-password');
-        $unknownFailure = $this->login('198.51.100.40', $unknown, 'wrong-password');
+        $knownFailure = $this->login('198.18.10.40', $known, 'wrong-password');
+        $unknownFailure = $this->login('198.18.10.40', $unknown, 'wrong-password');
         self::assertSame(401, $unknownFailure->getStatusCode(), (string) $unknownFailure->getContent());
         self::assertSame($knownFailure->getContent(), $unknownFailure->getContent());
 
-        $knownLimited = $this->login('198.51.100.41', $known, 'wrong-password');
-        $unknownLimited = $this->login('198.51.100.41', $unknown, 'wrong-password');
+        $knownLimited = $this->login('198.18.10.41', $known, 'wrong-password');
+        $unknownLimited = $this->login('198.18.10.41', $unknown, 'wrong-password');
         $this->assertTooManyRequests($unknownLimited);
         self::assertSame($knownLimited->getStatusCode(), $unknownLimited->getStatusCode());
         self::assertSame($knownLimited->getContent(), $unknownLimited->getContent());
