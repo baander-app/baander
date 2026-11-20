@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Media\Infrastructure\Converter;
 
-use App\Media\Infrastructure\Converter\BlurHash;
+use Baander\ImageProcessing\BlurHash;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 

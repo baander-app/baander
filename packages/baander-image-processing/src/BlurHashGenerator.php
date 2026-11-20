@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Media\Infrastructure\Converter;
+namespace Baander\ImageProcessing;
 
 use Psr\Log\LoggerInterface;
 

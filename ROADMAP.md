@@ -14,8 +14,11 @@ File metadata readers and their values now live in `baander/media-metadata`.
 The Catalog reader port retains an application adapter; matching and enrichment
 remain in Metadata. The CI-image focused reader, value and matching checks pass:
 151 tests and 431 assertions on PHP 8.5.12 using `baander-ci:local`.
-Image processing, rate limiting, safe HTTP and final packaged verification remain
-in this plan's scope.
+GD conversion and BlurHash now live in `baander/image-processing`. The application
+keeps image presets, filenames and authorization. CI-image converter tests pass
+with 28 tests and 69 assertions, including dimensions, transparency, no upscaling
+and atomic publishing. Rate limiting, safe HTTP and final packaged verification
+remain in this plan's scope.
 
 ## TypePHP application packaging
 

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Media\Infrastructure\Converter;
+namespace Baander\ImageProcessing;
 
 /**
  * Encodes an image to a BlurHash string.

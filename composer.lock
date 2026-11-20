@@ -4,8 +4,36 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "07b8eb14ef185ef5f9d6a50788324cde",
+    "content-hash": "08226dacc40d85775faa7db2c6730abb",
     "packages": [
+        {
+            "name": "baander/image-processing",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "./packages/baander-image-processing",
+                "reference": "cd74b25e767bc0107991fb5a173d38c52e1de5ba"
+            },
+            "require": {
+                "ext-gd": "*",
+                "php": ">=8.5",
+                "psr/log": "^3.0.2"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Baander\\ImageProcessing\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "GD image conversion and BlurHash encoding for Baander",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
         {
             "name": "baander/media-metadata",
             "version": "dev-main",
@@ -17946,6 +17974,7 @@
     "aliases": [],
     "minimum-stability": "dev",
     "stability-flags": {
+        "baander/image-processing": 20,
         "baander/media-metadata": 20,
         "baander/phpstan-rules": 20,
         "baander/tooling": 20,

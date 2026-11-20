@@ -16,7 +16,7 @@ interface ImageConversionPortInterface
     /**
      * Convert an image to a specific preset size in WebP format.
      * Returns the path to the converted file.
-     * If the source width <= maxWidth, returns the source path unchanged.
+     * Sources smaller than the preset keep their dimensions and still produce a WebP file.
      */
     public function convertPreset(string $sourcePath, string $outputDirectory, string $preset): string;
 }

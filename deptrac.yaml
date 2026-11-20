@@ -14,6 +14,7 @@ imports:
 deptrac:
   paths:
     - src/
+    - packages/baander-image-processing/src/
     - packages/baander-media-metadata/src/
 
   exclude_files:
@@ -53,6 +54,10 @@ deptrac:
         Command: ['Command Utility']
 
   layers:
+    - name: 'Image Processing'
+      collectors:
+        - type: classLike
+          value: '^Baander\\ImageProcessing\\'
     - name: 'Media Metadata Values'
       collectors:
         - type: classLike
@@ -1093,6 +1098,7 @@ deptrac:
           value: '^App\\Filesystem\\Infrastructure\\'
 
   ruleset:
+    'Image Processing': []
     'Media Metadata Values': []
     'Media Metadata Readers':
       - 'Media Metadata Values'
@@ -1378,6 +1384,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Media Infrastructure':
+      - 'Image Processing'
       - 'Media Image Contract'
       - 'Auth Identity Contract'
       - 'Library Read Scope Contract'
@@ -1395,6 +1402,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Media Interface':
+      - 'Image Processing'
       - 'Media Image Contract'
       - 'Media Playback Access Contract'
       - 'Catalog Video Contract'

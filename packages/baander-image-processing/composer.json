@@ -1,0 +1,16 @@
+{
+  "name": "baander/image-processing",
+  "description": "GD image conversion and BlurHash encoding for Baander",
+  "type": "library",
+  "license": "Apache-2.0",
+  "require": {
+    "php": ">=8.5",
+    "ext-gd": "*",
+    "psr/log": "^3.0.2"
+  },
+  "autoload": {
+    "psr-4": {
+      "Baander\\ImageProcessing\\": "src/"
+    }
+  }
+}

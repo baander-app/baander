@@ -10,6 +10,7 @@ use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Infrastructure\Converter\GdImageConverter;
 use App\Media\Infrastructure\Converter\ImageDerivativeGenerator;
 use App\Tests\Fixtures\Messaging\MessageCodecFactory;
+use Baander\ImageProcessing\GdImageConverter as ImageProcessor;
 use PHPUnit\Framework\TestCase;
 
 final class ImageDerivativeWorkerTest extends TestCase
@@ -42,7 +43,7 @@ final class ImageDerivativeWorkerTest extends TestCase
             ),
         ]);
         $controller = new \App\Media\Interface\Controller\ImageController(
-            $images, $storage, new \App\Media\Infrastructure\Converter\BlurHashGenerator(new \Psr\Log\NullLogger()),
+            $images, $storage, new \Baander\ImageProcessing\BlurHashGenerator(new \Psr\Log\NullLogger()),
             new \Psr\Log\NullLogger(), $bus, $scope,
         );
         try {
@@ -51,7 +52,7 @@ final class ImageDerivativeWorkerTest extends TestCase
             self::assertSame($directory . '/source.png', $response->getFile()->getPathname());
             self::assertCount(1, $transport->getSent());
             self::assertFileDoesNotExist($directory . '/source.webp');
-            $worker = new GenerateImageDerivativeHandler(new ImageDerivativeGenerator($storage, new GdImageConverter()));
+            $worker = new GenerateImageDerivativeHandler(new ImageDerivativeGenerator($storage, new GdImageConverter(new ImageProcessor())));
             $worker($transport->getSent()[0]->getMessage());
             $response = $controller->file($publicId->toString(), new \Symfony\Component\HttpFoundation\Request());
             self::assertInstanceOf(\Symfony\Component\HttpFoundation\BinaryFileResponse::class, $response);
@@ -73,7 +74,7 @@ final class ImageDerivativeWorkerTest extends TestCase
         imagepng($source, $directory . '/source.png');
         $storage = $this->createStub(StoragePortInterface::class);
         $storage->method('resolve')->willReturnCallback(static fn (string $path): string => $directory . '/' . $path);
-        $handler = new GenerateImageDerivativeHandler(new ImageDerivativeGenerator($storage, new GdImageConverter()));
+        $handler = new GenerateImageDerivativeHandler(new ImageDerivativeGenerator($storage, new GdImageConverter(new ImageProcessor())));
         $codec = MessageCodecFactory::create();
         $message = $codec->decode($codec->encode(new GenerateImageDerivativeCommand('source.png', 'thumb')))->message;
 

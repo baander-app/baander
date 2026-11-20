@@ -19,6 +19,7 @@
     "ext-sockets": "*",
     "ext-sodium": "*",
     "ext-swoole": "*",
+    "baander/image-processing": "dev-main",
     "baander/media-metadata": "dev-main",
     "cweagans/composer-patches": "^2.0",
     "defuse/php-encryption": "^2.4",
@@ -153,6 +154,17 @@
         "symlink": true,
         "versions": {
           "baander/media-metadata": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "./packages/baander-image-processing",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/image-processing": "dev-main"
         }
       }
     }

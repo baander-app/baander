@@ -57,6 +57,9 @@ services:
     Baander\MediaMetadata\WavReader: ~
     Baander\MediaMetadata\MetadataContentReader: ~
 
+    Baander\ImageProcessing\GdImageConverter: ~
+    Baander\ImageProcessing\BlurHashGenerator: ~
+
     # Register all classes in src/ as services
     App\:
         resource: '../src/'
