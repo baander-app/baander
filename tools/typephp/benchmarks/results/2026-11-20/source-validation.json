@@ -1,0 +1,12 @@
+{
+  "checked_utc": "2026-11-20T15:45:41.838378+00:00",
+  "source_commit": "7aeaccc30d86e15a8fb6de9bd46e2b94e317a2a1",
+  "manifest_sha256": "c3d9465365c9eef0270960cc4bd598884ec320c5ce70c6edee7f4e4a0ab302a7",
+  "source_tree_sha256": "0827294d303fad84c8e19798ee9fd6785beabfae1aaa9203f2e80224d56dccc0",
+  "unexpected_application_files": [],
+  "method": "Compare source paths against git ls-tree of source_commit within run.ROOTS; generated vendor files excluded from path membership check. Full source tree hash equals the measured manifest.",
+  "unchanged_timing_files": [
+    "measure.py",
+    "workload.php"
+  ]
+}

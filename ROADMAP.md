@@ -10,7 +10,7 @@ The [comparison plan](docs/plans/2026-11-20-1632-feat-typephp-performance-compar
 adds a reproducible benchmark and a [measured report](tools/typephp/benchmarks/README.md)
 for the executable qualified by the package-organization checkpoint below.
 The harness checks production source bytes, executable hashes, selected effective
-INI settings and exact workload outputs before accepting timings. Its seven
+INI settings and exact workload outputs before accepting timings. Its ten
 focused tests pass, including failed-child and incorrect-checksum rejection.
 The simplification pass removed one duplicated condition and retained the proof
 tests. PHP syntax, Python parsing and whitespace checks pass.
@@ -30,6 +30,14 @@ p95, observed ranges, process CPU and peak resident memory, plus the shared-host
 and extension-linkage limits. These results establish neither HTTP nor worker
 throughput. The calibration pilot is retained separately and excluded from the
 published tables. No application optimization or deployment is part of this work.
+
+Review reproduced an untracked-source acceptance gap in the runner. Its CLI
+regression failed before the correction and passes afterward; the runner now
+checks application paths against the named source commit, allowing generated
+vendor files. Three source-provenance cases bring the harness suite from seven
+to ten tests. A [recheck](tools/typephp/benchmarks/results/2026-11-20/source-validation.json)
+confirms no unexpected application files in the measured snapshot. The timing
+collector and workload are unchanged, so the original measurements are retained.
 
 ## Internal capability packages
 

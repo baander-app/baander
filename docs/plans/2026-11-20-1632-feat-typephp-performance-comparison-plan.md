@@ -75,6 +75,12 @@ although the package-organization checkpoint in `ROADMAP.md` records a later
 verified build. Preserve that historical qualification evidence and name its
 checkpoint explicitly when adding the performance-report link.
 
+Review reproduced a source-provenance gap: an untracked application file could
+pass the initial checkout comparison. Reject application paths absent from the
+named source commit while allowing generated production vendor files. Add the
+CLI regression in `tools/typephp/benchmarks/test_run.py` and recheck the measured
+snapshot; this preflight correction does not change the timed workloads.
+
 **Verification:** run small equivalence probes before timing: both commands exit successfully, console/operator outputs match after any explicitly documented nondeterministic fields, and the sustained workload has the same operation count and checksum. Test a deliberately failed child and incorrect checksum: neither may yield an accepted result or ratio. Exercise both runtime selections and confirm the timed child uses the expected executable. Preserve the successful harness command and exact workload settings in the report. Use focused harness checks rather than rerunning application qualification for benchmark-only changes.
 
 ### U2. Actual measurements and durable report

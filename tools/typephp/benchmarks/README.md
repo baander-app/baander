@@ -67,6 +67,10 @@ The manifest records both immutable image IDs, the ordinary executable hash,
 lockfile and source-tree hashes, and the exact harness file hashes. The harness
 was committed as `861ba672`; the pending documentation and site edits listed in
 the manifest do not change the measured application inputs.
+Review subsequently tightened the runner's preflight to reject untracked
+application files. A [source recheck](results/2026-11-20/source-validation.json)
+found none in the measured snapshot. The timing collector and workload are
+unchanged; the manifest retains the hashes of the exact measured harness.
 
 Both runtimes report PHP 8.5.12 ZTS, non-debug builds, and Swoole 6.2.4. The host
 has an AMD Ryzen 7 5800X3D, 16 logical CPUs and Linux 7.3.4-1-default on x86_64.

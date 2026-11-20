@@ -66,11 +66,13 @@ def main():
         parser.error("--source must contain production-only Composer dependencies")
     subprocess.run(["git", "diff", "--quiet", args.source_commit, "--", *ROOTS], cwd=repo, check=True)
     hashes = tree_hashes(source)
-    tracked = command("git", "ls-files", "--", *ROOTS, cwd=repo).splitlines()
+    tracked = set(command("git", "ls-tree", "-r", "--name-only", args.source_commit,
+                          "--", *ROOTS, cwd=repo).splitlines())
     mismatches = [p for p in tracked if p in hashes and digest(repo / p) != hashes[p]]
     missing = [p for p in tracked if p not in hashes and not p.startswith("config/secrets/")]
-    if mismatches or missing:
-        raise RuntimeError(f"Source differs from checkout: {mismatches + missing}")
+    extra = [p for p in hashes if p not in tracked and not p.startswith("vendor/")]
+    if mismatches or missing or extra:
+        raise RuntimeError(f"Source differs from commit: {sorted(mismatches + missing + extra)}")
     images = {label: command("docker", "image", "inspect", image, "--format", "{{.Id}}")
               for label, image in [("ordinary", args.ordinary_image), ("typephp", args.typephp_image)]}
     manifest = {
