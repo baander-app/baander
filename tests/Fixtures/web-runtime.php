@@ -6,7 +6,7 @@ declare(strict_types=1);
  * Steps of scripts/test-web-runtime-container.sh. Runs in the app container, next to
  * app:serve, against the real Swoole server on 127.0.0.1:9501.
  *
- *   prepare  a generated source track in a library, for the stream steps
+ *   prepare <listener-email>  a generated source track and library access for that listener
  *   mail     password-reset email for a user whose saved language is Danish
  *   stream   progressive streaming while a rendition is written; byte ranges once complete
  *   safari   Safari's opening requests against an in-progress rendition; prints the
@@ -16,9 +16,11 @@ declare(strict_types=1);
  *            the server's workers and started PostgreSQL again; "wait" first waits for the alerts
  */
 
+use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
+use App\Library\Infrastructure\Doctrine\Entity\UserLibraryAccessEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\WebRuntime\HeldRendition;
@@ -82,6 +84,11 @@ $track = static function (): string {
 };
 
 if ($mode === 'prepare') {
+    $listenerEmail = $argv[2] ?? '';
+    $listener = $manager->getRepository(UserEntity::class)->findOneBy(['email' => $listenerEmail]);
+    if (!$listener instanceof UserEntity) {
+        throw new RuntimeException('No stream listener ' . $listenerEmail);
+    }
     check(is_dir(dirname($sourceFile)) || mkdir(dirname($sourceFile), 0755, true), 'Cannot create the library directory.');
     exec(sprintf(
         'ffmpeg -nostdin -hide_banner -loglevel error -y -f lavfi -i %s -ac 2 -ar 44100 -c:a flac %s 2>&1',
@@ -93,7 +100,8 @@ if ($mode === 'prepare') {
     $library = new LibraryEntity('Web runtime', 'web-runtime', dirname($sourceFile), 'music', 'local');
     $album = new AlbumEntity(new PublicId(), $library, 'Web runtime album', 'album');
     $song = new SongEntity(new PublicId(), $album, 'Web runtime song', $sourceFile, (int) filesize($sourceFile), 'audio/flac');
-    foreach ([$library, $album, $song] as $entity) {
+    $membership = new UserLibraryAccessEntity($listener->getId(), $library, new DateTimeImmutable());
+    foreach ([$library, $album, $song, $membership] as $entity) {
         $manager->persist($entity);
     }
     $manager->flush();

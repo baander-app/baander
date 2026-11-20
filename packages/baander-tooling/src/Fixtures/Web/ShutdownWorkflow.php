@@ -394,7 +394,7 @@ final class ShutdownWorkflow
             'client',
             ['php', 'bin/console', 'app:settings:set', 'transcode.enabled', 'true', '--no-interaction'],
         );
-        $this->exec('client', ['php', 'tests/Fixtures/web-runtime.php', 'prepare']);
+        $this->exec('client', ['php', 'tests/Fixtures/web-runtime.php', 'prepare', self::LISTENER]);
         $prepared = $this->exec('client', ['cat', '/tmp/baander-web-runtime.json'])->stdout
             |> (static fn(string $json): array => json_decode($json, true, flags: JSON_THROW_ON_ERROR));
         $this->container('web', [

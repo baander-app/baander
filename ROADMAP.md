@@ -90,8 +90,16 @@ retaining their public issuer. Both targeted regression checks fail without that
 setting and pass with it in the CI image: 2 tests and 21 assertions. Scoped
 tooling PHPStan and formatting pass. The packaged drills remain in progress. The correction changes only physical test tooling, and its focused
 code review has no findings. The refreshed fixture image is
-`sha256:b619de7ea1b7c8811fab80bc675bd73106f5a84d7cc9473e26b6274c4631cb9b`;
-its executable hash is identical to the fully tested binary above.
+`sha256:2eb04ccea8ca2022eec22d35055f9a6646205ca9ff34826989d1ab393371f063`;
+its executable hash is identical to the fully tested binary above. A second
+probe confirmed that the fixture's delegated token also lacked library membership.
+Shared preparation now accepts the intended listener and grants only that user's
+access to the generated library. Both workflow callers pass their listener;
+application authorization and delegated-token behavior stay unchanged. The
+membership correction's command regression fails before the fix and passes in the
+CI image afterward: 1 test and 11 assertions. Scoped application and tooling
+PHPStan pass, and its focused code review has no findings. Packaged web and
+shutdown drills remain in progress.
 
 ## TypePHP application packaging
 

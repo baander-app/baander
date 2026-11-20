@@ -394,7 +394,7 @@ final class RuntimeWorkflow
         }
         $this->app(['php', 'bin/console', 'app:settings:set', 'transcode.enabled', 'true', '--no-interaction']);
         $this->app(['php', 'bin/console', 'app:auth:setup-clients', '--no-interaction']);
-        $this->fixture(['php', 'tests/Fixtures/web-runtime.php', 'prepare']);
+        $this->fixture(['php', 'tests/Fixtures/web-runtime.php', 'prepare', 'web-runtime-admin@baander.app']);
     }
 
     private function scenarios(): void
