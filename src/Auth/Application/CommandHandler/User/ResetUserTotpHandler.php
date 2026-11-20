@@ -16,9 +16,12 @@ use App\Shared\Application\Port\TransactionPortInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
- * Turns off a user's TOTP, forgets its last spent time step and ends every session the user
- * has, in one transaction, so the user signs in again with their password alone. The stored secret is dropped unread: a secret the
- * configured key cannot open is the case this reset exists for.
+ * Turns off a user's TOTP, forgets its last spent time step, advances the credential epoch
+ * and ends every session the user has, in one transaction, so the user signs in again with
+ * their password alone. A TOTP reset is a credential change: a login that checked the
+ * password and code before the reset and waits on the account's row is refused, as after a
+ * password change. The stored secret is dropped unread: a secret the configured key cannot
+ * open is the case this reset exists for.
  */
 final readonly class ResetUserTotpHandler
 {
@@ -49,6 +52,7 @@ final readonly class ResetUserTotpHandler
         }
 
         $this->transaction->run(function () use ($user): void {
+            $this->userRepository->advanceCredentialEpoch($user->getId());
             $user->disableTotp();
             $this->userRepository->save($user);
             $this->userRepository->clearTotpStep($user->getId());

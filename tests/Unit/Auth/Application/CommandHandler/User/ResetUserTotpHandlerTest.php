@@ -20,7 +20,10 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\TestCase;
 
-/** An operator's TOTP reset turns TOTP off and ends every session in one transaction. */
+/**
+ * An operator's TOTP reset turns TOTP off, advances the credential epoch and ends every
+ * session in one transaction.
+ */
 final class ResetUserTotpHandlerTest extends TestCase
 {
     private User $user;
@@ -34,14 +37,18 @@ final class ResetUserTotpHandlerTest extends TestCase
         $this->user->enableTotp('ciphertext the configured key cannot open');
     }
 
-    public function testTheResetTurnsTotpOffAndRevokesEveryTokenInOneTransaction(): void
+    /**
+     * The reset is a credential change: a login that checked the password and code before it
+     * and waits on the account's row is refused by the advanced epoch, as after a password change.
+     */
+    public function testTheResetTurnsTotpOffAdvancesTheCredentialEpochAndRevokesEveryTokenInOneTransaction(): void
     {
         $returned = $this->handler()(new ResetUserTotpCommand($this->user->getPublicId()->toString()));
 
         self::assertSame($this->user, $returned, 'The admin API renders the returned user.');
         self::assertFalse($this->user->hasTotp());
         self::assertNull($this->user->getTotpSecretCiphertext());
-        self::assertSame(['begin', '+save', '+clear TOTP step', '+revoke access tokens', '+revoke refresh tokens', 'commit'], $this->log);
+        self::assertSame(['begin', '+advance credential epoch', '+save', '+clear TOTP step', '+revoke access tokens', '+revoke refresh tokens', 'commit'], $this->log);
     }
 
     public function testAUserWithoutTotpIsAConflictAndNothingChanges(): void
@@ -70,6 +77,12 @@ final class ResetUserTotpHandlerTest extends TestCase
         $users = $this->createStub(UserRepositoryInterface::class);
         $users->method('findByPublicId')->willReturnCallback(fn (PublicId $id): ?User => $id->equals($this->user->getPublicId()) ? $this->user : null);
         $users->method('findByEmail')->willReturnCallback(fn (Email $email): ?User => $email->toString() === $this->user->getEmail() ? $this->user : null);
+        $users->method('advanceCredentialEpoch')->willReturnCallback(function (Uuid $userId): int {
+            self::assertTrue($this->user->getId()->equals($userId));
+            $this->record('advance credential epoch');
+
+            return 1;
+        });
         $users->method('save')->willReturnCallback(function (User $user): void {
             self::assertSame($this->user, $user);
             $this->record('save');
