@@ -9,8 +9,26 @@
       <sourceFolder url="file://$MODULE_DIR$/packages/tsduck-php-ffi/src" isTestSource="false" packagePrefix="Tsduck\" />
       <sourceFolder url="file://$MODULE_DIR$/packages/tsduck-php-ffi/tests" isTestSource="true" packagePrefix="Tsduck\Tests\" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" packagePrefix="App\" />
+      <sourceFolder url="file://$MODULE_DIR$/packages/baander-http-client/tests" isTestSource="true" packagePrefix="Baander\HttpClient\Tests\" />
+      <sourceFolder url="file://$MODULE_DIR$/packages/baander-image-processing/tests" isTestSource="true" packagePrefix="Baander\ImageProcessing\Tests\" />
+      <sourceFolder url="file://$MODULE_DIR$/packages/baander-media-metadata/tests" isTestSource="true" packagePrefix="Baander\MediaMetadata\Tests\" />
+      <sourceFolder url="file://$MODULE_DIR$/packages/baander-redis-rate-limiter/tests" isTestSource="true" packagePrefix="Baander\RedisRateLimiter\Tests\" />
+      <sourceFolder url="file://$MODULE_DIR$/packages/baander-configuration/tests" isTestSource="true" packagePrefix="Baander\Configuration\Tests\" />
+      <sourceFolder url="file://$MODULE_DIR$/packages/baander-containers/tests" isTestSource="true" packagePrefix="Baander\Containers\Tests\" />
+      <sourceFolder url="file://$MODULE_DIR$/packages/baander-deployment/tests" isTestSource="true" packagePrefix="Baander\Deployment\Tests\" />
+      <sourceFolder url="file://$MODULE_DIR$/packages/baander-dev-ci/tests" isTestSource="true" packagePrefix="Baander\DevCi\Tests\" />
+      <sourceFolder url="file://$MODULE_DIR$/packages/baander-dev-dependencies/tests" isTestSource="true" packagePrefix="Baander\DevDependencies\Tests\" />
+      <sourceFolder url="file://$MODULE_DIR$/packages/baander-dev-environment/tests" isTestSource="true" packagePrefix="Baander\DevEnvironment\Tests\" />
+      <sourceFolder url="file://$MODULE_DIR$/packages/baander-dev-qualification/tests" isTestSource="true" packagePrefix="Baander\DevQualification\Tests\" />
+      <sourceFolder url="file://$MODULE_DIR$/packages/baander-dev-registry/tests" isTestSource="true" packagePrefix="Baander\DevRegistry\Tests\" />
+      <sourceFolder url="file://$MODULE_DIR$/packages/baander-dev-website/tests" isTestSource="true" packagePrefix="Baander\DevWebsite\Tests\" />
+      <sourceFolder url="file://$MODULE_DIR$/packages/baander-filesystem/tests" isTestSource="true" packagePrefix="Baander\Filesystem\Tests\" />
+      <sourceFolder url="file://$MODULE_DIR$/packages/baander-images/tests" isTestSource="true" packagePrefix="Baander\Images\Tests\" />
+      <sourceFolder url="file://$MODULE_DIR$/packages/baander-process/tests" isTestSource="true" packagePrefix="Baander\Process\Tests\" />
       <sourceFolder url="file://$MODULE_DIR$/tests" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/tests" isTestSource="true" packagePrefix="App\Tests\" />
+      <sourceFolder url="file://$MODULE_DIR$/tests/Support/Tooling" isTestSource="true" packagePrefix="Baander\Tests\Tooling\Support\" />
+      <sourceFolder url="file://$MODULE_DIR$/tests/Tooling" isTestSource="true" packagePrefix="Baander\Tests\Tooling\" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/amphp/amp" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/amphp/byte-stream" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/amphp/cache" />
@@ -228,7 +246,6 @@
       <excludeFolder url="file://$MODULE_DIR$/var" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/dragonmantank/cron-expression" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/sebastian/file-filter" />
-      <excludeFolder url="file://$MODULE_DIR$/vendor/baander/tooling" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/php-cs-fixer/shim" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/ergebnis/composer-normalize" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/ergebnis/json" />
@@ -248,6 +265,23 @@
       <excludeFolder url="file://$MODULE_DIR$/vendor/php-http/promise" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/symfony/polyfill-deepclone" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/symfony/polyfill-php86" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/baander/http-client" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/baander/image-processing" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/baander/media-metadata" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/baander/redis-rate-limiter" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/baander/configuration" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/baander/containers" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/baander/core" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/baander/deployment" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/baander/dev-ci" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/baander/dev-dependencies" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/baander/dev-environment" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/baander/dev-qualification" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/baander/dev-registry" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/baander/dev-website" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/baander/filesystem" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/baander/images" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/baander/process" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
