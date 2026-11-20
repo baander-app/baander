@@ -190,6 +190,12 @@
     }
   },
   "scripts": {
+    "post-install-cmd": [
+      "@auto-scripts"
+    ],
+    "post-update-cmd": [
+      "@auto-scripts"
+    ],
     "analyse:tooling": [
       "@tooling:autoload",
       "@php vendor/bin/phpstan analyse --configuration phpstan-tooling.neon --memory-limit=1G"
@@ -214,12 +220,6 @@
     "deptrac:tooling": "@php vendor/bin/deptrac analyse --config-file=deptrac-tooling.yaml --no-cache --no-progress",
     "format:tooling": "@php vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.tooling.php",
     "openapi": "./bin/console app:export-openapi-spec  --format=json --output=openapi.json",
-    "post-install-cmd": [
-      "@auto-scripts"
-    ],
-    "post-update-cmd": [
-      "@auto-scripts"
-    ],
     "test:registry-subjects": [
       "@tooling:autoload",
       "@php vendor/bin/phpunit --configuration phpunit-tooling.xml.dist --group registry-python-subject"
