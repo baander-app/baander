@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode, useState } from 'react'
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import { AxiosError } from 'axios'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { parseApiError } from '@/features/auth/lib/parse-api-error'
@@ -94,21 +94,37 @@ export function StepUpDialog({
   const [loading, setLoading] = useState(false)
   const [refusal, setRefusal] = useState<Refusal | null>(null)
 
+  // Bumped whenever a submit starts or the dialog closes; a result from an older submit is dropped.
+  const submitToken = useRef(0)
+
   const clearCredentials = () => {
     setCurrentPassword('')
     setTotpCode('')
   }
 
-  const handleOpenChange = (next: boolean) => {
-    if (!next) {
+  useEffect(() => {
+    if (!open) submitToken.current += 1
+  }, [open])
+
+  // Closing, by the user or by the parent, drops whatever the dialog was holding.
+  const [wasOpen, setWasOpen] = useState(open)
+  if (wasOpen !== open) {
+    setWasOpen(open)
+    if (!open) {
       clearCredentials()
       setRefusal(null)
+      setLoading(false)
     }
+  }
+
+  const handleOpenChange = (next: boolean) => {
+    if (!next && loading) return
     onOpenChange(next)
   }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
+    const token = ++submitToken.current
     setRefusal(null)
     setLoading(true)
 
@@ -117,14 +133,16 @@ export function StepUpDialog({
         currentPassword,
         ...(totpEnabled ? { totpCode } : {}),
       })
+      if (token !== submitToken.current) return
       // A confirmed or abandoned attempt has used the code; the next one starts over.
       clearCredentials()
-      if (done) handleOpenChange(false)
-    } catch (err: unknown) {
-      clearCredentials()
-      setRefusal(refusalOf(err, fallbackError))
-    } finally {
       setLoading(false)
+      if (done) onOpenChange(false)
+    } catch (err: unknown) {
+      if (token !== submitToken.current) return
+      clearCredentials()
+      setLoading(false)
+      setRefusal(refusalOf(err, fallbackError))
     }
   }
 
@@ -187,7 +205,7 @@ export function StepUpDialog({
               </div>
             )}
             <DialogFooter>
-              <Button variant="outline" type="button" onClick={() => handleOpenChange(false)}>
+              <Button variant="outline" type="button" disabled={loading} onClick={() => handleOpenChange(false)}>
                 {t('common.cancel')}
               </Button>
               <Button type="submit" disabled={loading || refusal?.kind === 'limited'}>
