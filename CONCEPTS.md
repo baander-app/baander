@@ -102,6 +102,12 @@ A new address a user asked for in a self-service email change that is not yet co
 The sequence of refresh tokens one sign-in produces through rotation. Each rotation consumes the presented token and issues a replacement that links back to it; every token in the chain is bound to the same DPoP key. Revoking the chain ends that sign-in everywhere it was in use and closes the WebSocket connections it opened; it is what logout and reuse detection do.
 *Avoid: token family (the vendor term).*
 
+### Credential epoch
+
+A per-user counter that every change to the user's credentials advances, such as a password change or an operator's TOTP reset, and that each sign-in, authorization code, device approval and refresh token chain records from the moment its credential was verified.
+
+Tokens are issued only while the recorded epoch matches the user's current one, so nothing verified before a credential change can produce a session after it. A password change that keeps the requesting session moves that session's chain to the new epoch.
+
 ### Consumed refresh token
 
 A refresh token that a rotation has already used. It stays stored, marked with the instant it was consumed, so a later presentation can be judged: a lost-response grace or a reuse.
