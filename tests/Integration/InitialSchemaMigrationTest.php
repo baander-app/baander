@@ -125,7 +125,7 @@ final class InitialSchemaMigrationTest extends TestCase
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         $failure = $this->refused($this->factory(), '0');
-        self::assertStringContainsString('Dropping the authentication method would leave clients that sign their own assertions without the keys they authenticate with.', $failure);
+        self::assertStringContainsString('The deleted sessions and authorization codes cannot be restored, and removing the epoch would let sessions outlive a password change.', $failure);
         self::assertSame($catalog, $this->catalog('public'));
         self::assertSame($seeds, $this->connection->fetchAllAssociative('SELECT * FROM scheduled_jobs ORDER BY id'));
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
