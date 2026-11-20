@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Auth\Interface\Console;
 
 use App\Auth\Application\Command\OAuth\ReplaceClientKeysCommand;
-use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Interface\Resource\AdminOAuthClientResource;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -50,7 +49,6 @@ final class OAuthClientReplaceKeysCommand extends Command
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
         }
-        assert($replaced instanceof Client);
         $client = AdminOAuthClientResource::from($replaced);
 
         if (AdminCommandSupport::wantsJson($input)) {

@@ -10,7 +10,6 @@ use App\Auth\Application\Command\OAuth\RevokeRegisteredClientCommand;
 use App\Auth\Application\Command\OAuth\RotateClientSecretCommand;
 use App\Auth\Application\DTO\RegisteredClientDTO;
 use App\Auth\Application\Query\OAuth\ListRegisteredClientsQuery;
-use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Interface\Request\Admin\AdminCreateOAuthClientRequest;
 use App\Auth\Interface\Request\Admin\AdminReplaceOAuthClientKeysRequest;
 use App\Auth\Interface\Resource\AdminOAuthClientCredentialsResource;
@@ -168,7 +167,6 @@ final class AdminOAuthClientController
         }
 
         $client = $this->dispatch(new ReplaceClientKeysCommand($publicId, $payload->jwks, $payload->jwksUri));
-        assert($client instanceof Client);
 
         return self::noStore($this->successResponse(AdminOAuthClientResource::from($client)));
     }
