@@ -64,10 +64,11 @@ final class AccessTokenSigningKey implements AccessTokenSigningKeyInterface
             throw new RuntimeException('The access token signing key is not an RSA key.');
         }
 
+        $encoder = new JoseEncoder();
         $members = [
             'kty' => 'RSA',
-            'n' => self::base64UrlEncode($details['rsa']['n']),
-            'e' => self::base64UrlEncode($details['rsa']['e']),
+            'n' => $encoder->base64UrlEncode($details['rsa']['n']),
+            'e' => $encoder->base64UrlEncode($details['rsa']['e']),
         ];
 
         return [
@@ -96,10 +97,5 @@ final class AccessTokenSigningKey implements AccessTokenSigningKeyInterface
     private static function openPublicKey(string $pem): OpenSSLAsymmetricKey
     {
         return openssl_pkey_get_public($pem) ?: throw new RuntimeException('Failed to parse the access token public key.');
-    }
-
-    private static function base64UrlEncode(string $data): string
-    {
-        return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
     }
 }
