@@ -395,6 +395,12 @@ final class OAuthController
             new OA\Response(response: '200', description: 'Device code issued (RFC 8628 section 3.2)', content: new OA\JsonContent(ref: new Model(type: DeviceAuthorizationResource::class))),
             new OA\Response(response: '400', description: 'Missing client_id, the client may not use the device flow, or no requested scope can be granted (invalid_scope)', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
             new OA\Response(response: '401', description: 'Unknown or revoked client, or client authentication failed', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
+            new OA\Response(
+                response: '503',
+                description: 'The client assertion could not be judged because the client assertion jti store is unavailable or the client\'s jwks_uri key set cannot be fetched; retry after the Retry-After delay with a newly signed client assertion.',
+                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 5))],
+                content: new OA\JsonContent(ref: new Model(type: ApiError::class)),
+            ),
         ],
     )]
     #[Route('/device/authorize', name: 'device_authorize', methods: ['POST'])]

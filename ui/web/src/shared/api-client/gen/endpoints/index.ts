@@ -12724,7 +12724,7 @@ return customInstance<DeviceAuthorizationResource>(getPostOauthDeviceAuthorizeUr
 
 export const getPostOauthDeviceAuthorizeMutationKey = () => ['postOauthDeviceAuthorize'] as const;
 
-export const getPostOauthDeviceAuthorizeMutationOptions = <TError = ErrorType<OAuthError>,
+export const getPostOauthDeviceAuthorizeMutationOptions = <TError = ErrorType<OAuthError | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postOauthDeviceAuthorize>>, TError,PostOauthDeviceAuthorizeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postOauthDeviceAuthorize>>, TError,PostOauthDeviceAuthorizeMutationVariables, TContext> => {
 
@@ -12753,13 +12753,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostOauthDeviceAuthorizeMutationResult = NonNullable<Awaited<ReturnType<typeof postOauthDeviceAuthorize>>>
     export type PostOauthDeviceAuthorizeMutationBody = BodyType<PostOauthDeviceAuthorizeBody>
-    export type PostOauthDeviceAuthorizeMutationError = ErrorType<OAuthError>
+    export type PostOauthDeviceAuthorizeMutationError = ErrorType<OAuthError | ApiError>
     export type PostOauthDeviceAuthorizeMutationVariables = {data: BodyType<PostOauthDeviceAuthorizeBody>}
 
     /**
  * @summary Device authorization request (RFC 8628 section 3.1)
  */
-export const usePostOauthDeviceAuthorize = <TError = ErrorType<OAuthError>,
+export const usePostOauthDeviceAuthorize = <TError = ErrorType<OAuthError | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postOauthDeviceAuthorize>>, TError,PostOauthDeviceAuthorizeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postOauthDeviceAuthorize>>,

@@ -9,6 +9,7 @@ use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\Exception\RateLimiterUnavailableException;
+use App\Shared\Application\Exception\RetryableFault;
 use App\Shared\Application\Exception\ServiceUnavailableException;
 use App\Shared\Application\Http\RequestLocale;
 use App\Shared\Interface\DTO\ApiError;
@@ -41,7 +42,7 @@ final class ExceptionSubscriber
             $event->setThrowable($exception);
         }
 
-        if ($this->respondWithOutcome($event, $exception) || $this->respondToRefusal($event, $exception)) {
+        if ($this->respondWithOutcome($event, $exception) || $this->respondWithRetryAfter($event, $exception) || $this->respondToRefusal($event, $exception)) {
             return;
         }
 
@@ -108,6 +109,30 @@ final class ExceptionSubscriber
             ? ['Retry-After' => '1', 'Cache-Control' => 'no-store']
             : [];
         $event->setResponse(new JsonResponse($error->toArray(), $status, $headers));
+
+        return true;
+    }
+
+    /**
+     * 503 with Retry-After for a fault that decided nothing about the request, so the client
+     * retries it with the same credentials. The fault is logged; its message is not shown.
+     */
+    private function respondWithRetryAfter(ExceptionEvent $event, Throwable $exception): bool
+    {
+        if (!$exception instanceof RetryableFault) {
+            return false;
+        }
+
+        $this->logger->error('{exception_class}: {message}', [
+            'exception_class' => $exception::class,
+            'message'         => $exception->getMessage(),
+            'exception'       => $exception,
+        ]);
+        $error = new ApiError('The server is temporarily unavailable; retry after the Retry-After delay.', Response::HTTP_SERVICE_UNAVAILABLE);
+        $event->setResponse(new JsonResponse($error->toArray(), Response::HTTP_SERVICE_UNAVAILABLE, [
+            'Retry-After' => (string) RetryableFault::RETRY_AFTER_SECONDS,
+            'Cache-Control' => 'no-store',
+        ]));
 
         return true;
     }

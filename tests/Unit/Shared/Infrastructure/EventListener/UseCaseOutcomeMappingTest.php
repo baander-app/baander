@@ -8,6 +8,7 @@ use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\Exception\RateLimiterUnavailableException;
+use App\Shared\Application\Exception\RetryableFault;
 use App\Shared\Application\Exception\ServiceUnavailableException;
 use App\Shared\Application\Http\RequestLocale;
 use App\Shared\Infrastructure\EventListener\ExceptionSubscriber;
@@ -159,6 +160,22 @@ final class UseCaseOutcomeMappingTest extends TestCase
         $this->assertSame([
             'error' => ['message' => (new RateLimiterUnavailableException())->getMessage(), 'code' => 503],
         ], $this->body($response));
+    }
+
+    /** A store outage behind the bus is a 503 the client retries, not a 500, and its message stays in the log. */
+    public function testARetryableFaultFromAHandlerIsA503WithRetryAfterAndNoStore(): void
+    {
+        $response = $this->handle($this->dispatching($this->bus(static function (): never {
+            throw new class ('The client assertion jti store is unavailable.') extends \RuntimeException implements RetryableFault {};
+        })));
+
+        $this->assertSame(Response::HTTP_SERVICE_UNAVAILABLE, $response->getStatusCode());
+        $this->assertSame((string) RetryableFault::RETRY_AFTER_SECONDS, $response->headers->get('Retry-After'));
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+        $this->assertSame(
+            ['error' => ['message' => 'The server is temporarily unavailable; retry after the Retry-After delay.', 'code' => 503]],
+            $this->body($response),
+        );
     }
 
     public function testAnHttpExceptionFromAHandlerIsPassedOnUnwrappedForTheFrameworkToRender(): void

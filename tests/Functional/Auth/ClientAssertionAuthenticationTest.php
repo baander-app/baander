@@ -6,6 +6,8 @@ namespace App\Tests\Functional\Auth;
 
 use App\Auth\Application\Command\OAuth\IssueTokenCommand;
 use App\Auth\Application\DTO\TokenResponseDTO;
+use App\Auth\Application\Exception\DpopStoreUnavailableException;
+use App\Auth\Application\Port\ClientAssertionJtiStoreInterface;
 use App\Auth\Application\Port\ClientKeySetProviderInterface;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientKeySource;
@@ -185,6 +187,29 @@ final class ClientAssertionAuthenticationTest extends TestCase
         self::assertSame(503, $response->getStatusCode(), (string) $response->getContent());
         self::assertSame('5', $response->headers->get('Retry-After'));
         self::assertSame(1, $this->fetches);
+    }
+
+    /** The device endpoint authenticates the client as the token endpoint does, and answers a store outage the same way. */
+    public function testADeviceAuthorizationWhileTheAssertionJtiStoreIsDownIsAnsweredWith503AndRetryAfter(): void
+    {
+        static::getContainer()->set(ClientAssertionJtiStoreInterface::class, new class implements ClientAssertionJtiStoreInterface {
+            public function isReplay(string $clientId, string $jti, int $ttlSeconds): bool
+            {
+                throw DpopStoreUnavailableException::assertionJtiStore(new \RuntimeException('Connection refused'));
+            }
+        });
+
+        $this->client->request('POST', '/api/oauth/device/authorize', [
+            'client_id' => $this->keyClient->getPublicId()->toString(),
+            'client_assertion' => $this->assertion(),
+            'client_assertion_type' => SignedClientAssertion::TYPE,
+            'scope' => 'profile',
+        ]);
+        $response = $this->client->getResponse();
+
+        self::assertSame(503, $response->getStatusCode(), (string) $response->getContent());
+        self::assertSame('5', $response->headers->get('Retry-After'));
+        self::assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
     }
 
     /** @param array<string, mixed> $claims */

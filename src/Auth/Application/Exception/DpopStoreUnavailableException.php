@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Application\Exception;
 
+use App\Shared\Application\Exception\RetryableFault;
 use RuntimeException;
 use Throwable;
 
@@ -15,14 +16,12 @@ use Throwable;
  * connection, a read that timed out, an exhausted connection pool, or a key set fetch
  * that failed or was refused. A nonce that is missing, a jti that was seen before and
  * a key set without the assertion's key are verdicts and keep their boolean answers.
- * The endpoints answer this exception with 503 and `Retry-After`; the checks stay
- * fail-closed, since no proof is accepted without the replay check.
+ * Every endpoint answers this exception with 503 and `Retry-After`, after
+ * RETRY_AFTER_SECONDS; the checks stay fail-closed, since no proof is accepted without
+ * the replay check.
  */
-final class DpopStoreUnavailableException extends RuntimeException
+final class DpopStoreUnavailableException extends RuntimeException implements RetryableFault
 {
-    /** The Retry-After every edge answers with: how long a client waits before presenting the same request again. */
-    public const int RETRY_AFTER_SECONDS = 5;
-
     /** The message of the 503 body at the edges that render their own error envelope. */
     public const string CLIENT_MESSAGE = 'The authorization server is temporarily unavailable; retry after the Retry-After delay.';
 

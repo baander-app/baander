@@ -2829,6 +2829,25 @@
                                 }
                             }
                         }
+                    },
+                    "503": {
+                        "description": "The client assertion could not be judged because the client assertion jti store is unavailable or the client's jwks_uri key set cannot be fetched; retry after the Retry-After delay with a newly signed client assertion.",
+                        "headers": {
+                            "Retry-After": {
+                                "description": "Seconds to wait before retrying",
+                                "schema": {
+                                    "type": "integer",
+                                    "example": 5
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": []
