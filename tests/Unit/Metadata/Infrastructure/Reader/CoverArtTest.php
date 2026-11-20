@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Infrastructure\Reader;
 
-use App\Metadata\Domain\Model\CoverArt;
+use Baander\MediaMetadata\CoverArt;
 use PHPUnit\Framework\TestCase;
 
 final class CoverArtTest extends TestCase

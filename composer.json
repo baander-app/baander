@@ -19,6 +19,7 @@
     "ext-sockets": "*",
     "ext-sodium": "*",
     "ext-swoole": "*",
+    "baander/media-metadata": "dev-main",
     "cweagans/composer-patches": "^2.0",
     "defuse/php-encryption": "^2.4",
     "doctrine/doctrine-bundle": "^3.3.4",
@@ -142,6 +143,17 @@
       "url": "./packages/tsduck-php-ffi",
       "options": {
         "symlink": true
+      }
+    },
+    {
+      "type": "path",
+      "url": "./packages/baander-media-metadata",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/media-metadata": "dev-main"
+        }
       }
     }
   ],

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Metadata\Infrastructure\Reader;
+namespace Baander\MediaMetadata;
 
 /**
  * Reads fields from parsed Vorbis comments, which FLAC and Ogg files share: each upper-case field

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Infrastructure\Reader;
 
-use App\Metadata\Infrastructure\Reader\OggParser;
 use App\Tests\Support\Metadata\TaggedMediaFiles;
+use Baander\MediaMetadata\OggParser;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 

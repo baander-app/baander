@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Infrastructure\Reader;
 
-use App\Metadata\Domain\Model\CoverArt;
-use App\Metadata\Domain\Model\ExtractedMetadata;
-use App\Metadata\Infrastructure\Reader\Id3Reader;
+use Baander\MediaMetadata\CoverArt;
+use Baander\MediaMetadata\ExtractedMetadata;
+use Baander\MediaMetadata\Id3Reader;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 

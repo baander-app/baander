@@ -8,13 +8,14 @@ use App\Metadata\Infrastructure\Matching\MatchingStrategy;
 use App\Metadata\Infrastructure\Matching\Validator\AlbumValidator;
 use App\Metadata\Infrastructure\Matching\Validator\ArtistValidator;
 use App\Metadata\Infrastructure\Matching\Validator\SongValidator;
-use App\Metadata\Infrastructure\Reader\FlacReader;
-use App\Metadata\Infrastructure\Reader\FormatDetector;
-use App\Metadata\Infrastructure\Reader\Id3Reader;
 use App\Metadata\Infrastructure\Reader\MediaFileMetadata;
 use App\Metadata\Infrastructure\Reader\MetadataContentReader;
-use App\Metadata\Infrastructure\Reader\OggReader;
-use App\Metadata\Infrastructure\Reader\WavReader;
+use Baander\MediaMetadata\FlacReader;
+use Baander\MediaMetadata\FormatDetector;
+use Baander\MediaMetadata\Id3Reader;
+use Baander\MediaMetadata\MetadataContentReader as PackageMetadataContentReader;
+use Baander\MediaMetadata\OggReader;
+use Baander\MediaMetadata\WavReader;
 use Psr\Log\NullLogger;
 
 /**
@@ -42,7 +43,7 @@ final class TaggedMediaFiles
 
         return new MediaFileMetadata(
             $formats,
-            new MetadataContentReader($formats, new Id3Reader($logger), new FlacReader($logger), new OggReader($logger), new WavReader($logger)),
+            new MetadataContentReader(new PackageMetadataContentReader($formats, new Id3Reader($logger), new FlacReader($logger), new OggReader($logger), new WavReader($logger))),
             new MatchingStrategy(new ArtistValidator(), new AlbumValidator(), new SongValidator()),
         );
     }

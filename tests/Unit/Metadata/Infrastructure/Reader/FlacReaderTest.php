@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Infrastructure\Reader;
 
-use App\Metadata\Domain\Model\CoverArt;
-use App\Metadata\Domain\Model\ExtractedMetadata;
-use App\Metadata\Infrastructure\Reader\FlacReader;
+use Baander\MediaMetadata\CoverArt;
+use Baander\MediaMetadata\ExtractedMetadata;
+use Baander\MediaMetadata\FlacReader;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;

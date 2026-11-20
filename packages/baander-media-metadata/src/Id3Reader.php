@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-namespace App\Metadata\Infrastructure\Reader;
+namespace Baander\MediaMetadata;
 
-use App\Metadata\Domain\Model\CoverArt;
-use App\Metadata\Domain\Model\ExtractedMetadata;
 use Psr\Log\LoggerInterface;
 
 /**

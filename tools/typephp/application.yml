@@ -48,6 +48,7 @@ embedded-files:
   - ../../bin/console
   - ../../bin/worker-deployment.php
   - ../../src
+  - ../../packages/baander-media-metadata/src
   - ../../vendor
   - ../../packages/swoole-bundle/src
   - ../../packages/tsduck-php-ffi/src

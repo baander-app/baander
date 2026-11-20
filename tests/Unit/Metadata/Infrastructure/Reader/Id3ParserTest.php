@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Infrastructure\Reader;
 
-use App\Metadata\Infrastructure\Reader\Id3Parser;
+use Baander\MediaMetadata\Id3Parser;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 

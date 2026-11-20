@@ -50,6 +50,13 @@ services:
                 json_encode_options: 4194304
                 json_decode_options: 4194304
 
+    Baander\MediaMetadata\FormatDetector: ~
+    Baander\MediaMetadata\Id3Reader: ~
+    Baander\MediaMetadata\FlacReader: ~
+    Baander\MediaMetadata\OggReader: ~
+    Baander\MediaMetadata\WavReader: ~
+    Baander\MediaMetadata\MetadataContentReader: ~
+
     # Register all classes in src/ as services
     App\:
         resource: '../src/'

@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Metadata\Infrastructure\Matching;
 
-use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Metadata\Domain\Model\MetadataMatch;
 use App\Metadata\Infrastructure\Matching\Validator\AlbumValidator;
 use App\Metadata\Infrastructure\Matching\Validator\ArtistValidator;
 use App\Metadata\Infrastructure\Matching\Validator\SongValidator;
+use Baander\MediaMetadata\ExtractedMetadata;
 
 /**
  * Orchestrates matching of extracted file metadata against a set of external candidates.

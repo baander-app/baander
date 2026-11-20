@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Metadata\Infrastructure\Reader;
+namespace Baander\MediaMetadata;
 
 /**
  * Detects the audio format of a file by reading magic bytes from its header.

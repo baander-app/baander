@@ -61,8 +61,6 @@ deptrac:
       - App\Metadata\Application\Command\ExtractAlbumCoverCommand
     App\Catalog\Application\CommandHandler\FilesDiscoveredHandler:
       - App\Metadata\Application\Command\ExtractAlbumCoverCommand
-    App\Catalog\Application\Port\MetadataContentReaderPortInterface:
-      - App\Metadata\Domain\Model\ExtractedMetadata
     App\Catalog\Infrastructure\AlbumDuplicateService:
       - App\Catalog\Interface\Resource\AlbumResource
       - App\Media\Application\Port\ImagePortInterface

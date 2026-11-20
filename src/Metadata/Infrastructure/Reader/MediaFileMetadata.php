@@ -6,9 +6,10 @@ namespace App\Metadata\Infrastructure\Reader;
 
 use App\Metadata\Application\Exception\UnreadableMediaFileException;
 use App\Metadata\Application\Port\MediaFileMetadataInterface;
-use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Metadata\Domain\Model\MetadataMatch;
 use App\Metadata\Infrastructure\Matching\MatchingStrategy;
+use Baander\MediaMetadata\ExtractedMetadata;
+use Baander\MediaMetadata\FormatDetector;
 
 /**
  * Reads a file's tags with the readers the library scan uses, so every format the scan reads

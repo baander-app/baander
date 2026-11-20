@@ -4,6 +4,19 @@ Updated: 2026-11-19. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
+## Internal capability packages
+
+The [package extraction plan](docs/plans/2026-11-20-1148-refactor-internal-capability-packages-plan.md)
+keeps application policy in `src/` and moves four reusable mechanisms into local
+Composer packages. Its document review has no open findings.
+
+File metadata readers and their values now live in `baander/media-metadata`.
+The Catalog reader port retains an application adapter; matching and enrichment
+remain in Metadata. The CI-image focused reader, value and matching checks pass:
+151 tests and 431 assertions on PHP 8.5.12 using `baander-ci:local`.
+Image processing, rate limiting, safe HTTP and final packaged verification remain
+in this plan's scope.
+
 ## TypePHP application packaging
 
 The [TypePHP setup plan](docs/plans/2026-11-19-1159-feat-typephp-setup-plan.md) targets the main PHP application as one packaged CLI executable using ZendVM.

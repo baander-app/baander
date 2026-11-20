@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Metadata\Domain\Model;
+namespace Baander\MediaMetadata;
 
 final readonly class CoverArt
 {

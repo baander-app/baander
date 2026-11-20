@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Domain\Model;
 
-use App\Metadata\Domain\Model\CoverArt;
-use App\Metadata\Domain\Model\ExtractedMetadata;
+use Baander\MediaMetadata\CoverArt;
+use Baander\MediaMetadata\ExtractedMetadata;
 use PHPUnit\Framework\TestCase;
 
 final class ExtractedMetadataTest extends TestCase

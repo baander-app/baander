@@ -4,8 +4,36 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a7f9f9ab12d8c89421b11643db82f4f8",
+    "content-hash": "07b8eb14ef185ef5f9d6a50788324cde",
     "packages": [
+        {
+            "name": "baander/media-metadata",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "./packages/baander-media-metadata",
+                "reference": "c8bcb2cf5f9f91dceaf7aa055ba72930dbc02377"
+            },
+            "require": {
+                "ext-mbstring": "*",
+                "php": ">=8.5",
+                "psr/log": "^3.0.2"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Baander\\MediaMetadata\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Audio file format detection, metadata parsing and cover extraction",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
         {
             "name": "beberlei/assert",
             "version": "v3.3.4",
@@ -17918,6 +17946,7 @@
     "aliases": [],
     "minimum-stability": "dev",
     "stability-flags": {
+        "baander/media-metadata": 20,
         "baander/phpstan-rules": 20,
         "baander/tooling": 20,
         "swoole-bundle/swoole-bundle": 20,
@@ -17939,11 +17968,12 @@
         "ext-posix": "*",
         "ext-redis": "*",
         "ext-sockets": "*",
+        "ext-sodium": "*",
         "ext-swoole": "*"
     },
     "platform-dev": {},
     "platform-overrides": {
         "ext-swoole": "6.2.4"
     },
-    "plugin-api-version": "2.11.0"
+    "plugin-api-version": "2.9.0"
 }

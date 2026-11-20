@@ -1,0 +1,16 @@
+{
+  "name": "baander/media-metadata",
+  "description": "Audio file format detection, metadata parsing and cover extraction",
+  "type": "library",
+  "license": "Apache-2.0",
+  "require": {
+    "php": ">=8.5",
+    "ext-mbstring": "*",
+    "psr/log": "^3.0.2"
+  },
+  "autoload": {
+    "psr-4": {
+      "Baander\\MediaMetadata\\": "src/"
+    }
+  }
+}

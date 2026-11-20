@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Infrastructure\Matching;
 
-use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Metadata\Infrastructure\Matching\MatchingStrategy;
 use App\Metadata\Infrastructure\Matching\Validator\AlbumValidator;
 use App\Metadata\Infrastructure\Matching\Validator\ArtistValidator;
 use App\Metadata\Infrastructure\Matching\Validator\SongValidator;
+use Baander\MediaMetadata\ExtractedMetadata;
 use PHPUnit\Framework\TestCase;
 
 final class MatchingStrategyTest extends TestCase

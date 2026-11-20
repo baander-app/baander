@@ -14,6 +14,7 @@ imports:
 deptrac:
   paths:
     - src/
+    - packages/baander-media-metadata/src/
 
   exclude_files:
     - '#.*vendor/.*#'
@@ -52,6 +53,19 @@ deptrac:
         Command: ['Command Utility']
 
   layers:
+    - name: 'Media Metadata Values'
+      collectors:
+        - type: classLike
+          value: '^Baander\\MediaMetadata\\(ExtractedMetadata|CoverArt)$'
+    - name: 'Media Metadata Readers'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^Baander\\MediaMetadata\\'
+          must_not:
+            - type: classLike
+              value: '^Baander\\MediaMetadata\\(ExtractedMetadata|CoverArt)$'
     # =============================================
     # Shared kernel
     # =============================================
@@ -1079,6 +1093,9 @@ deptrac:
           value: '^App\\Filesystem\\Infrastructure\\'
 
   ruleset:
+    'Media Metadata Values': []
+    'Media Metadata Readers':
+      - 'Media Metadata Values'
     # =============================================
     # IDEAL RULES — these define the target architecture.
     # Existing violations are baselined in deptrac.baseline.yaml.
@@ -1205,6 +1222,7 @@ deptrac:
     'Catalog Domain':
       - 'Shared Domain'
     'Catalog Application':
+      - 'Media Metadata Values'
       - 'Transcode Probe Contract'
       - 'Catalog Video Contract'
       - 'Media Image Contract'
@@ -1396,12 +1414,15 @@ deptrac:
       - 'Shared Application'
     'Metadata MusicBrainz Lookup Contract': []
     'Metadata Application':
+      - 'Media Metadata Values'
       - 'Metadata Sync Contract'
       - 'Metadata MusicBrainz Lookup Contract'
       - 'Metadata Domain'
       - 'Shared Domain'
       - 'Shared Application'
     'Metadata Infrastructure':
+      - 'Media Metadata Readers'
+      - 'Media Metadata Values'
       - 'Shared Application'
       - 'Metadata Domain'
       - 'Metadata Application'

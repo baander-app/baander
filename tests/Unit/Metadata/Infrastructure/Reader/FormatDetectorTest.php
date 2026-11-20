@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Infrastructure\Reader;
 
-use App\Metadata\Infrastructure\Reader\FormatDetector;
+use Baander\MediaMetadata\FormatDetector;
 use PHPUnit\Framework\TestCase;
 
 final class FormatDetectorTest extends TestCase

@@ -15,25 +15,25 @@ use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
+use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Application\Port\LibraryMediaFilesInterface;
-use App\Library\Application\Message\DiscoveredFile;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
-use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Shared\Domain\Model\Uuid;
-use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
-use App\Tests\Fixtures\Catalog\PassThroughTransaction;
 use App\Tests\Fixtures\Catalog\DiscoveredFileObservations;
+use App\Tests\Fixtures\Catalog\PassThroughTransaction;
+use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
+use Baander\MediaMetadata\ExtractedMetadata;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
-use Psr\Log\NullLogger;
 use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use RuntimeException;
-use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 /**
  * Confirms that FilesDiscoveredHandler collects per-file failures and reports
