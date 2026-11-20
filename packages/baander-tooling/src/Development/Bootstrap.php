@@ -34,6 +34,11 @@ class Bootstrap
             if ($environment !== null && $saved != $environment) {
                 throw new WorkflowError('Saved instance identity differs; reconcile configuration explicitly.');
             }
+            if (!isset($saved['AUTH_TOTP_ENCRYPTION_KEY'])) {
+                // An instance configured before TOTP secrets were encrypted has no key, and production
+                // refuses to boot without one. Adding it changes nothing else in the saved identity.
+                AtomicFile::writeJson($directory . '/env.json', [...$saved, 'AUTH_TOTP_ENCRYPTION_KEY' => self::totpEncryptionKey()]);
+            }
             return $instance;
         }
         if ($adoption !== null) {
@@ -54,7 +59,7 @@ class Bootstrap
                 'DB_PASSWORD' => bin2hex(random_bytes(32)),
                 'REDIS_PASSWORD' => bin2hex(random_bytes(32)),
                 'STREAM_URL_HMAC_SECRET' => bin2hex(random_bytes(32)),
-                'AUTH_TOTP_ENCRYPTION_KEY' => base64_encode(random_bytes(32)),
+                'AUTH_TOTP_ENCRYPTION_KEY' => self::totpEncryptionKey(),
                 'AUTH_SPA_CLIENT_ID' => 'baander_dev_spa_00001',
             ], $environment ?? [], $this->vapid());
             $values['DATABASE_URL'] = 'postgresql://' . rawurlencode($values['DB_USERNAME'])
@@ -69,6 +74,11 @@ class Bootstrap
         PrivateDirectory::prepare($directory);
         AtomicFile::writeJson($directory . '/env.json', $values);
         return $instance;
+    }
+
+    private static function totpEncryptionKey(): string
+    {
+        return base64_encode(random_bytes(32));
     }
 
     /** @return array<string,string> */

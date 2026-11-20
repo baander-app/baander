@@ -135,6 +135,27 @@ final class DevelopmentBootstrapTest extends DevDataTestCase
         self::assertSame(0600, fileperms($path) & 0777);
     }
 
+    public function testSavedIdentityWithoutTotpKeyGainsOneAndKeepsEveryOtherValue(): void
+    {
+        $path = $this->store->directory('persistent') . '/env.json';
+        $saved = ['APP_ENV' => 'prod', 'APP_SECRET' => 'original', 'DB_PASSWORD' => 'kept'];
+        AtomicFile::writeJson($path, $saved);
+        $bootstrap = new Bootstrap($this->store, new DevelopmentCommandExecutor());
+
+        $bootstrap->configure($this->instance);
+
+        $environment = AtomicFile::readJson($path);
+        $key = $environment['AUTH_TOTP_ENCRYPTION_KEY'];
+        unset($environment['AUTH_TOTP_ENCRYPTION_KEY']);
+        self::assertSame($saved, $environment);
+        self::assertSame(32, strlen(base64_decode($key, true)));
+        self::assertSame(0600, fileperms($path) & 0777);
+
+        $before = file_get_contents($path);
+        $bootstrap->configure($this->instance);
+        self::assertSame($before, file_get_contents($path));
+    }
+
     public function testSavedIdentityRejectsDifferentExplicitEnvironment(): void
     {
         AtomicFile::writeJson($this->store->directory('persistent') . '/env.json', ['APP_SECRET' => 'original']);
