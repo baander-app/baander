@@ -6,7 +6,7 @@ milestones and their verification evidence remain in Git history.
 
 ## Admin and terminal log viewers
 
-The [log-viewer plan](docs/plans/2026-11-20-1745-feat-admin-terminal-log-viewers-plan.md)
+The log-viewer plan
 adds **Admin → Logs** and the `app:log:sources`, `app:log:view` and `app:log:query`
 commands. Both interfaces share source discovery, filters, literal search,
 snapshots and coverage reporting. Channel selection lists every retained channel
@@ -98,7 +98,7 @@ workers loaded the verified watchdog source.
 
 ## HTTP worker idle memory and span capture
 
-The [memory plan](docs/plans/2026-11-20-1702-perf-http-worker-idle-memory-plan.md)
+The memory plan
 adds `diagnostics.spans_enabled` to the existing admin settings panel and settings
 commands. Capture defaults to enabled only in development. The persistent instance
 already runs with `APP_ENV=prod` and is treated as staging, so its default is off.
@@ -136,7 +136,7 @@ The persistent checkout and deployment remain unchanged; delivery is local only.
 
 ## TypePHP retirement
 
-The [removal plan](docs/plans/2026-11-20-1652-feat-remove-typephp-plan.md)
+The removal plan
 retires the optional TypePHP runtime at the user's request after its measured
 comparison. Ordinary PHP remains the application runtime. The dedicated compiler
 dependencies, build and qualification images, patches, entry adapters, test loader,
@@ -169,7 +169,7 @@ checkpoints remain open.
 
 ### Historical performance checkpoint
 
-The [comparison plan](docs/plans/2026-11-20-1632-feat-typephp-performance-comparison-plan.md)
+The comparison plan
 recorded a reproducible benchmark and a [measured report](docs/benchmarks/2026-11-20-typephp/README.md)
 for the executable qualified by the package-organization checkpoint below.
 The harness checks production source bytes, executable hashes, selected effective
@@ -224,7 +224,7 @@ no push or deployment is included. No verification checkpoints remain open.
 
 ## Internal capability packages
 
-The [package extraction plan](docs/plans/2026-11-20-1148-refactor-internal-capability-packages-plan.md)
+The package extraction plan
 keeps application policy in `src/` and moves four reusable mechanisms into local
 Composer packages. Its document review has no open findings.
 
@@ -462,7 +462,7 @@ The results below record the retired 2026-11-19 runtime setup. The package
 extraction above records the later application build. TypePHP support has since
 been removed; these are historical qualification results.
 
-The [TypePHP setup plan](docs/plans/2026-11-19-1159-feat-typephp-setup-plan.md) targets the main PHP application as one packaged CLI executable using ZendVM.
+The retired TypePHP setup plan targeted the main PHP application as one packaged CLI executable using ZendVM.
 The [historical setup guide](https://github.com/baander-app/baander/blob/104f48fc82deb49996d5da91e2013eb1d4df8c46/tools/typephp/README.md) covers the console used by the HTTP server and workers, and the independent deployment operator.
 The user selected one binary on 2026-11-19: `baander console ...` and `baander operator ...` choose the existing composition roots. The reviewed implementation consolidates the project and build target, embeds both scripts, preserves CLI metadata for Symfony re-entry, and reserves those exact selector tokens ahead of same-named files. The qualification image uses a direct `php` symlink and contains no second application binary or retained ordinary PHP copy.
 
@@ -1129,7 +1129,7 @@ subsequent real scan pass are the recorded qualification.
 
 Delivered on `master` on 2026-11-16, merged from `feat/quiet-live-update-status`:
 all six units of
-`docs/plans/2026-11-16-1823-feat-quiet-live-update-status-plan.md`
+the retired quiet live-update status plan
 (`702a825ce`, `46cb8ae33`, `bb1d47485`, `3d20b4230`, `b9f52afa9`, `bf2c45323`), the
 code review's fix (`db640bf0b`), two follow-ups from the browser runs
 (`aa3aab712`, `9d8f0da36`), and the targeted review's fixes (`34a06d68c`). The web shell no longer shows "Connecting…",
@@ -1344,7 +1344,7 @@ Still to do:
 ## Compact website navigation and footer
 
 Delivered locally on 2026-11-19 from
-`docs/plans/2026-11-19-1833-fix-compact-site-navigation-footer-plan.md`.
+the retired compact navigation and footer plan.
 Product places its feature links in three audience columns, with descriptions
 retained on the overview and other entries. Every Product link fits without
 scrolling at 1024×768 and 1440×900; the panel measures 353px high at 1440×900.
@@ -1377,7 +1377,7 @@ Verification on 2026-11-19:
 
 Delivered on `master` on 2026-11-18, fast-forwarded from
 `feat/site-reference-pages-and-menu` and pushed, from
-`docs/plans/2026-11-18-1647-feat-site-reference-pages-and-menu-plan.md`. The public website publishes four repository documents as reference pages:
+the retired site reference pages and menu plan. The public website publishes four repository documents as reference pages:
 `STRATEGY.md` at `/strategy/`, `CONCEPTS.md` at `/concepts/`, `THIRD_PARTY.md` at
 `/licensing/` and `deploy/preset/README.md` at `/deploy/`. Each opens with a short
 website introduction kept in `ui/site/reference/`, and the deploy page adds a table of
@@ -1452,7 +1452,7 @@ Open items:
 
 Delivered on `master` on 2026-11-16, fast-forwarded from
 `feat/prose-fix-presentation-register`: all four units of
-`docs/plans/2026-11-16-2100-feat-prose-fix-presentation-register-plan.md`
+the retired prose-fix presentation register plan
 (`37ec73ce1`, `6cf261d39`, `c8843d801`, `b7f7f3f7d`) and the code review's fixes
 (`7fe638cec`). prose-fix has a fourth register, Jobs, built from the 2001 iPod, 2007
 iPhone and 2008 MacBook Air introductions. It presents a feature in the opening of a
@@ -1551,8 +1551,7 @@ open:
 ## docs-book rewrite follow-ups
 
 Delivered on `master` on 2026-11-17, fast-forwarded from `fix/docs-rewrite-follow-ups`
-(`9b72c2185` to this record) from the plan
-`docs/plans/2026-11-17-0817-fix-docs-rewrite-follow-ups-plan.md`. It fixes the code and
+(`9b72c2185` to this record) from the retired docs-book rewrite follow-ups plan. It fixes the code and
 configuration items the docs-book rewrite left open:
 
 - Watch parties are invite-only, as the user decided on 2026-11-17. The session list,
@@ -1627,8 +1626,7 @@ here on 2026-11-17 is fixed by the party invitations work below.
 ## Party invitations
 
 Delivered on `master` on 2026-11-17, fast-forwarded from `feat/party-invitations`
-(`3a666d381` to this record) from the plan
-`docs/plans/2026-11-17-1229-feat-party-invitations-plan.md`. The user decided on
+(`3a666d381` to this record) from the retired party invitations plan. The user decided on
 2026-11-17 that the host invites specific users, over a secret invite link.
 
 - Invitations (`e2a7dd773`, `fbe662ed4`). `party_invitations` holds one row per
@@ -1750,8 +1748,7 @@ Open:
 ## Notification pane well
 
 Delivered on `master` on 2026-11-17, fast-forwarded from `feat/notification-pane-well`
-(`182ea0948` to this record) from the plan
-`docs/plans/2026-11-17-1705-feat-notification-pane-well-plan.md`. The user chose the
+(`182ea0948` to this record) from the retired notification pane well plan. The user chose the
 fast-forward on 2026-11-17; nothing is pushed.
 
 - The handoff (`7f357281a`, `02292d5f7`). While the sidebar notification pane is open
@@ -1852,8 +1849,7 @@ Open:
 
 Delivered on `master` on 2026-11-18, rebased onto the website feature pages and
 fast-forwarded from `fix/styling-specs-and-login-settings-conflict` (`ecf82e931` to this
-record) from the plan
-`docs/plans/2026-11-18-0004-fix-styling-specs-and-login-settings-conflict-plan.md`, and
+record) from the retired styling specs and login settings conflict plan, and
 pushed. The user asked on 2026-11-17 to repair the playback specs and close the test
 gaps the notification pane well left, and decided on 2026-11-18 to fix the volume path
 in this branch, to run the sidebar notification spec as a fixture user, and to merge and
@@ -2127,6 +2123,26 @@ remains deferred at the user's request (2026-10-05). The separate `ui/android`
 application was removed at the user's request on 2026-10-26. Resume feature, API
 and tooling reconciliation for `ui/rn` only when the user resumes that work.
 Historical mobile failures do not select a task or a new CI lane.
+
+## Implemented-plan retirement
+
+Retired 17 implemented plans on 2026-11-20: matching follow-ups and leftovers,
+PGroonga cleanup, quiet live-update status, the presentation register, documentation
+rewrite follow-ups, party invitations, the notification pane, styling and sign-in
+conflicts, website reference pages and compact navigation, internal capability
+packages, TypePHP setup/comparison/removal, HTTP worker memory, and log viewers.
+The roadmap retains the delivery checkpoints and their verification limitations.
+
+The deleted files remain recoverable at `7491ddcecfa546a1845ff79f85878649e6f79560`.
+List them with `git ls-tree -r --name-only 7491ddcec docs/plans/`, then read a
+plan with `git show 7491ddcec:docs/plans/<file>`. The twelve older plans retained
+by this cleanup contain unfinished scope or required acceptance checks; retaining
+them does not resume deferred work. The new tooling-context plan tracks the current
+package split separately.
+
+Verification: each deletion was checked against its implementation commits and
+roadmap checkpoint; incoming local plan links were audited. No application code
+changed for this cleanup.
 
 ## Completed work and evidence
 
@@ -2619,7 +2635,7 @@ and [Matching leftovers](#matching-leftovers).
 ### Matching follow-ups
 
 Delivered from
-[the matching follow-ups plan](docs/plans/2026-11-15-1038-fix-matching-follow-ups-plan.md)
+the matching follow-ups plan
 and on `master` since 2026-11-15 (`a7d1c7466` to `6991a9f9a` and this record, on top
 of `23f899976`):
 
@@ -2730,12 +2746,12 @@ Open:
   from the admin sync, since automatic matching is off by default. An album the queue
   leaves for review keeps the count below 100 until the two-hour maintenance deadline,
   and that failure names no album.
-- The plan file stays until the next cleanup retires it.
+- The implemented plan was retired on 2026-11-20; see [plan recovery](#implemented-plan-retirement).
 
 ### Matching leftovers
 
 Delivered from
-[the matching leftovers plan](docs/plans/2026-11-15-1624-fix-matching-leftovers-plan.md)
+the matching leftovers plan
 and on `master` since 2026-11-16 (`a822bf362` to `0405c6142` and this record, on top
 of `8d119f5df`). The user chose this scope on 2026-11-15 and answered the
 plan's questions the same day: plays as well as favorites follow a merged album, a
@@ -2873,12 +2889,12 @@ Open:
   cites the removed assigner; it is due at the next learnings refresh.
 - `dev-docs/worker-runtime-inventory.md` holds 15 links that were broken before this
   branch.
-- The plan file stays until the next cleanup retires it.
+- The implemented plan was retired on 2026-11-20; see [plan recovery](#implemented-plan-retirement).
 
 ### PGroonga cleanup race
 
 Delivered from
-[the PGroonga cleanup race plan](docs/plans/2026-11-16-0919-fix-pgroonga-cleanup-race-plan.md)
+the PGroonga cleanup race plan
 and on `master` since 2026-11-16 (`8a3cd708b` to this record, on top of `44e315ee3`).
 `7c2deaa24` went first, so that GitHub published the 4.1.0 image as
 `ghcr.io/baander-app/baander-postgres:latest` (16:36 UTC) before the CI run that
@@ -3019,7 +3035,7 @@ Open:
   `docker/postgres/conf/postgresql.conf`; nothing checks that the local default test
   image `baander-database:latest` is current, and on the development host it was a
   Debian 12 build until 2026-11-16; an upstream report of the cleanup collision.
-- The plan file stays until the next cleanup retires it.
+- The implemented plan was retired on 2026-11-20; see [plan recovery](#implemented-plan-retirement).
 
 ### Lyrics effect toggle and song browser panes
 
