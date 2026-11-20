@@ -1201,6 +1201,31 @@ export interface OverridePlaybackRequest {
   incarnationId: string;
 }
 
+export interface LogFilterRequest {
+  sources?: string[];
+  search?: string;
+  levels?: string[];
+  /** @nullable */
+  channel?: string | null;
+  /** @nullable */
+  correlationId?: string | null;
+  /** @nullable */
+  since?: string | null;
+  /** @nullable */
+  until?: string | null;
+  limit?: number;
+  /** @nullable */
+  cursor?: string | null;
+  order?: string;
+}
+
+export interface LogSqlRequest {
+  /** @maxLength 65536 */
+  sql: string;
+  allowPartial?: boolean;
+  filter?: LogFilterRequest;
+}
+
 /**
  * Setting key to new value
  */
@@ -3913,6 +3938,111 @@ export interface PlaybackSnapshotResource {
   transferResult?: PlaybackSnapshotResourceTransferResult;
   /** @nullable */
   requestResult?: PlaybackSnapshotResourceRequestResult;
+}
+
+export interface LogSourceResource {
+  id: string;
+  node: string;
+  name: string;
+  /** @nullable */
+  service: string | null;
+  kind: string;
+  format: string;
+  size: number;
+  status: string;
+  available: boolean;
+  /** @nullable */
+  lastCollectedAt: string | null;
+  /** @nullable */
+  retainedFrom: string | null;
+  issues: string[];
+  /** @nullable */
+  stream?: string | null;
+  /** @nullable */
+  archive?: string | null;
+  /** @nullable */
+  member?: string | null;
+  /** @nullable */
+  container?: string | null;
+  /** @nullable */
+  error?: string | null;
+}
+
+export type LogNodeResourceStatus = typeof LogNodeResourceStatus[keyof typeof LogNodeResourceStatus];
+
+
+export const LogNodeResourceStatus = {
+  healthy: 'healthy',
+  unreachable: 'unreachable',
+} as const;
+
+export interface LogNodeResource {
+  id: string;
+  status: LogNodeResourceStatus;
+}
+
+export interface LogCoverageResource {
+  complete: boolean;
+  reasons: string[];
+}
+
+export interface LogSourcesResource {
+  items: LogSourceResource[];
+  nodes: LogNodeResource[];
+  channels: string[];
+  coverage: LogCoverageResource;
+}
+
+export type LogRecordResourceContext = { [key: string]: unknown } | unknown[];
+
+export type LogRecordResourceExtra = { [key: string]: unknown } | unknown[];
+
+export interface LogRecordResource {
+  id: string;
+  sourceId: string;
+  timestamp: string;
+  level: string;
+  /** @nullable */
+  channel: string | null;
+  message: string;
+  context: LogRecordResourceContext;
+  extra: LogRecordResourceExtra;
+  raw: string;
+  /** @nullable */
+  correlationId: string | null;
+  node: string;
+  /** @nullable */
+  service: string | null;
+  /** @nullable */
+  stream: string | null;
+  truncated: boolean;
+  format: string;
+}
+
+export type LogSnapshotResourceNodeSnapshots = { [key: string]: unknown };
+
+export interface LogSnapshotResource {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  filters: string;
+  nodeSnapshots: LogSnapshotResourceNodeSnapshots;
+}
+
+export interface LogEntriesResource {
+  items: LogRecordResource[];
+  /** @nullable */
+  nextCursor: string | null;
+  snapshot: LogSnapshotResource;
+  coverage: LogCoverageResource;
+}
+
+export interface LogSqlResource {
+  columns: string[];
+  rows: ((string | null | number | boolean)[])[];
+  truncated: boolean;
+  snapshot: LogSnapshotResource;
+  coverage: LogCoverageResource;
 }
 
 export interface SystemSettingResource {
@@ -7709,6 +7839,47 @@ export type GetPlaybackSnapshotParams = {
 
 export type GetPlaybackSnapshot200 = {
   data: PlaybackSnapshotResource;
+};
+
+export type GetAdminLogsSources200 = {
+  data?: LogSourcesResource;
+};
+
+export type GetAdminLogsEntriesParams = {
+  sources?: string;
+  levels?: string;
+  search?: string;
+  'channels[]'?: string[];
+  correlationId?: string;
+  since?: string;
+  until?: string;
+  /**
+   * @minimum 1
+   * @maximum 500
+   */
+  limit?: number;
+  cursor?: string;
+  order?: GetAdminLogsEntriesOrder;
+};
+
+export type GetAdminLogsEntriesOrder = typeof GetAdminLogsEntriesOrder[keyof typeof GetAdminLogsEntriesOrder];
+
+
+export const GetAdminLogsEntriesOrder = {
+  asc: 'asc',
+  desc: 'desc',
+} as const;
+
+export type GetAdminLogsEntries200 = {
+  data?: LogEntriesResource;
+};
+
+export type GetAdminLogsDetail200 = {
+  data?: LogRecordResource;
+};
+
+export type PostAdminLogsQuery200 = {
+  data?: LogSqlResource;
 };
 
 export type GetDebugConfigCheck200DataResultsItem = { [key: string]: unknown };
@@ -32554,6 +32725,412 @@ export function useGetPlaybackSnapshot<TData = Awaited<ReturnType<typeof getPlay
 
 
 
+
+export const getGetAdminLogsSourcesUrl = () => {
+
+
+
+
+  return `/api/admin/logs/sources`
+}
+
+/**
+ * @summary List configured log sources and host coverage
+ */
+export const getAdminLogsSources = async ( options?: Parameters<typeof customInstance>[1]): Promise<GetAdminLogsSources200> => {
+
+  return customInstance<GetAdminLogsSources200>(getGetAdminLogsSourcesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminLogsSourcesQueryKey = () => {
+    return [
+    `/api/admin/logs/sources`
+    ] as const;
+    }
+
+
+export const getGetAdminLogsSourcesQueryOptions = <TData = Awaited<ReturnType<typeof getAdminLogsSources>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsSources>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminLogsSourcesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminLogsSources>>> = ({ signal }) => getAdminLogsSources({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsSources>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAdminLogsSourcesQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminLogsSources>>>
+export type GetAdminLogsSourcesQueryError = ErrorType<unknown>
+
+
+export function useGetAdminLogsSources<TData = Awaited<ReturnType<typeof getAdminLogsSources>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsSources>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminLogsSources>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminLogsSources>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminLogsSources<TData = Awaited<ReturnType<typeof getAdminLogsSources>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsSources>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminLogsSources>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminLogsSources>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminLogsSources<TData = Awaited<ReturnType<typeof getAdminLogsSources>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsSources>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List configured log sources and host coverage
+ */
+
+export function useGetAdminLogsSources<TData = Awaited<ReturnType<typeof getAdminLogsSources>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsSources>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAdminLogsSourcesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetAdminLogsEntriesUrl = (params?: GetAdminLogsEntriesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ["channels[]"];
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : String(v));
+      });
+      return;
+    }
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/logs/entries?${stringifiedParams}` : `/api/admin/logs/entries`
+}
+
+/**
+ * @summary Browse a bounded frozen log snapshot
+ */
+export const getAdminLogsEntries = async (params?: GetAdminLogsEntriesParams, options?: Parameters<typeof customInstance>[1]): Promise<GetAdminLogsEntries200> => {
+
+  return customInstance<GetAdminLogsEntries200>(getGetAdminLogsEntriesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminLogsEntriesQueryKey = (params?: GetAdminLogsEntriesParams,) => {
+    return [
+    `/api/admin/logs/entries`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAdminLogsEntriesQueryOptions = <TData = Awaited<ReturnType<typeof getAdminLogsEntries>>, TError = ErrorType<unknown>>(params?: GetAdminLogsEntriesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsEntries>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminLogsEntriesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminLogsEntries>>> = ({ signal }) => getAdminLogsEntries(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsEntries>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAdminLogsEntriesQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminLogsEntries>>>
+export type GetAdminLogsEntriesQueryError = ErrorType<unknown>
+
+
+export function useGetAdminLogsEntries<TData = Awaited<ReturnType<typeof getAdminLogsEntries>>, TError = ErrorType<unknown>>(
+ params: undefined |  GetAdminLogsEntriesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsEntries>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminLogsEntries>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminLogsEntries>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminLogsEntries<TData = Awaited<ReturnType<typeof getAdminLogsEntries>>, TError = ErrorType<unknown>>(
+ params?: GetAdminLogsEntriesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsEntries>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminLogsEntries>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminLogsEntries>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminLogsEntries<TData = Awaited<ReturnType<typeof getAdminLogsEntries>>, TError = ErrorType<unknown>>(
+ params?: GetAdminLogsEntriesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsEntries>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Browse a bounded frozen log snapshot
+ */
+
+export function useGetAdminLogsEntries<TData = Awaited<ReturnType<typeof getAdminLogsEntries>>, TError = ErrorType<unknown>>(
+ params?: GetAdminLogsEntriesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsEntries>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAdminLogsEntriesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetAdminLogsDetailUrl = (id: string,) => {
+
+
+
+
+  return `/api/admin/logs/entries/${id}`
+}
+
+/**
+ * @summary Inspect a retained log record
+ */
+export const getAdminLogsDetail = async (id: string, options?: Parameters<typeof customInstance>[1]): Promise<GetAdminLogsDetail200> => {
+
+  return customInstance<GetAdminLogsDetail200>(getGetAdminLogsDetailUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminLogsDetailQueryKey = (id: string,) => {
+    return [
+    `/api/admin/logs/entries/${id}`
+    ] as const;
+    }
+
+
+export const getGetAdminLogsDetailQueryOptions = <TData = Awaited<ReturnType<typeof getAdminLogsDetail>>, TError = ErrorType<unknown>>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminLogsDetailQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminLogsDetail>>> = ({ signal }) => getAdminLogsDetail(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAdminLogsDetailQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminLogsDetail>>>
+export type GetAdminLogsDetailQueryError = ErrorType<unknown>
+
+
+export function useGetAdminLogsDetail<TData = Awaited<ReturnType<typeof getAdminLogsDetail>>, TError = ErrorType<unknown>>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsDetail>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminLogsDetail>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminLogsDetail>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminLogsDetail<TData = Awaited<ReturnType<typeof getAdminLogsDetail>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsDetail>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminLogsDetail>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminLogsDetail>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminLogsDetail<TData = Awaited<ReturnType<typeof getAdminLogsDetail>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Inspect a retained log record
+ */
+
+export function useGetAdminLogsDetail<TData = Awaited<ReturnType<typeof getAdminLogsDetail>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAdminLogsDetailQueryOptions(id,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPostAdminLogsQueryUrl = () => {
+
+
+
+
+  return `/api/admin/logs/query`
+}
+
+/**
+ * @summary Execute read-only SQL against a frozen log snapshot
+ */
+export const postAdminLogsQuery = async (logSqlRequest: LogSqlRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostAdminLogsQuery200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<PostAdminLogsQuery200>(getPostAdminLogsQueryUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(logSqlRequest)
+  }
+);}
+
+
+
+
+
+export const getPostAdminLogsQueryMutationKey = () => ['postAdminLogsQuery'] as const;
+
+export const getPostAdminLogsQueryMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminLogsQuery>>, TError,PostAdminLogsQueryMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAdminLogsQuery>>, TError,PostAdminLogsQueryMutationVariables, TContext> => {
+
+const mutationKey = getPostAdminLogsQueryMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAdminLogsQuery>>, PostAdminLogsQueryMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  postAdminLogsQuery(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostAdminLogsQueryMutationResult = NonNullable<Awaited<ReturnType<typeof postAdminLogsQuery>>>
+    export type PostAdminLogsQueryMutationBody = BodyType<LogSqlRequest>
+    export type PostAdminLogsQueryMutationError = ErrorType<unknown>
+    export type PostAdminLogsQueryMutationVariables = {data: BodyType<LogSqlRequest>}
+
+    /**
+ * @summary Execute read-only SQL against a frozen log snapshot
+ */
+export const usePostAdminLogsQuery = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminLogsQuery>>, TError,PostAdminLogsQueryMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postAdminLogsQuery>>,
+        TError,
+        PostAdminLogsQueryMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostAdminLogsQueryMutationOptions(options), queryClient);
+    }
 
 export const getGetDebugConfigCheckUrl = () => {
 

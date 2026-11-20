@@ -113,6 +113,7 @@ class Workers
                 $this->connections->environment(),
                 $cleanupSeconds,
             );
+            $logVolume = $configuration['volumes']['logs']['name'];
             $configuration = new WorkerConfiguration(
                 namespace: $instance['project'],
                 target: $instance['docker'],
@@ -126,6 +127,7 @@ class Workers
                 resourceLabels: ['app.baander.development.owner' => $instance['id']],
                 profile: $profile,
                 cleanupSeconds: $cleanupSeconds,
+                logVolume: $logVolume,
             );
             $record = WorkerStateStore::hydrate($instance);
             try {

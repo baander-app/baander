@@ -27,11 +27,17 @@ services:
             - ./:${APP_HOME:?Use the generated build --compose-env file}:ro,cached
         depends_on:
             - app
+            - log-agent
 
     app:
         image: ${BAANDER_APPLICATION_IMAGE:?Build with php scripts/build-application.php --target dev --tag baander:local --compose-env .env.compose.local and pass --env-file .env.compose.local}
         privileged: true
+        depends_on:
+            - log-agent
         container_name: baander-app
+        environment:
+            BAANDER_LOG_DIR: /var/log/baander/web/${BAANDER_LOG_BOOT_ID:?Set a fresh boot ID for retained web logs}
+            BAANDER_LOG_NODES: ${BAANDER_LOG_NODES:?Configure deployment log nodes}
         # The web server drains within WEB_DRAIN_SECONDS (default 30); Docker must wait a
         # little longer before it sends SIGKILL.
         stop_grace_period: 35s
@@ -64,6 +70,8 @@ services:
         volumes:
             - /home/martin/dev/baander-musik:/home/martin/dev/baander-musik:ro
             - ./:${APP_HOME:?Use the generated build --compose-env file}:cached
+            - baander_logs:/var/log/baander
+            - ${BAANDER_LOG_QUERY_TOKEN_FILE:?Provide query token file}:/run/baander-log-query/token:ro
             - ./docker/dev/php.ini:/usr/local/etc/php/php.ini:ro
             - ./docker/dev/swoole.ini:/usr/local/etc/php/conf.d/docker-php-ext-swoole.ini:ro
             - /home/martin/Music:/home/martin/Music
@@ -77,8 +85,36 @@ services:
         networks:
             - baander-backtier
 
+    log-agent:
+        image: ${BAANDER_LOG_AGENT_IMAGE:?Select the built application or operator image with the log agent runtime}
+        user: "0:0"
+        restart: unless-stopped
+        init: true
+        entrypoint: ["sh", "-ec"]
+        command:
+            - 'export BAANDER_LOG_AGENT_CONFIG="$$(cat /etc/baander-log-agent/config.json)"; exec php "$$APP_HOME/bin/log-agent.php"'
+        environment:
+            APP_HOME: ${APP_HOME:?Use the generated build --compose-env file}
+        labels:
+            io.baander.log-agent: "true"
+            io.baander.log-namespace: ${COMPOSE_PROJECT_NAME:?Set the owner project matching agent inventory}
+        cap_drop: [ALL]
+        cap_add: [DAC_OVERRIDE]
+        security_opt: [no-new-privileges:true, label=disable]
+        volumes:
+            - ${BAANDER_LOG_DOCKER_SOCKET:?Provide the captured daemon socket}:/run/baander-log-docker.sock:ro
+            - ${BAANDER_LOG_AGENT_CONFIG_FILE:?Provide daemon-pinned agent JSON}:/etc/baander-log-agent/config.json:ro
+            - ${BAANDER_LOG_QUERY_TOKEN_FILE:?Provide query token file}:/run/baander-log-agent/query-token:ro
+            - ${BAANDER_LOG_CHECKPOINT_TOKEN_FILE:?Provide checkpoint token file}:/run/baander-log-agent/checkpoint-token:ro
+            - baander_logs:/var/log/baander:ro
+            - baander_log_index:/var/lib/baander-log-index
+        networks:
+            - baander-backtier
+
     database:
         container_name: baander-postgres
+        depends_on:
+            - log-agent
         image: baander-database:latest
         build: *database-build
         restart: unless-stopped
@@ -99,9 +135,8 @@ services:
         command: >
             postgres
             -c config_file=/etc/baander/postgresql.conf
-            -c logging_collector=on
-            -c log_directory=/var/log/postgresql
-            -c log_filename=postgresql-%Y-%m-%d_%H%M%S.log
+            -c logging_collector=off
+            -c log_destination=stderr
             -c log_statement=mod
             -c log_min_duration_statement=1000
             -c log_line_prefix='%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
@@ -169,6 +204,8 @@ services:
     redis:
         image: redis/redis-stack-server:edge
         container_name: baander-redis
+        depends_on:
+            - log-agent
         restart: unless-stopped
         # noeviction is required by RedisTagAwareAdapter (tag-aware cache pool).
         # Do not change to allkeys-lru or Redis tag invalidation will silently stop working.
@@ -200,6 +237,8 @@ services:
             - profiling
 
 volumes:
+    baander_logs:
+    baander_log_index:
     postgres_data:
     pooler_credentials:
 

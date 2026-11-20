@@ -41,9 +41,10 @@ final class PresetRenderer
     }
 
     /** @param array<string,array<string,mixed>> $images
+     * @param array{target:array<string,mixed>,credentials:string,boot:string}|null $logging
      * @return array<string,mixed>
      */
-    public static function render(PresetConfiguration $configuration, array $images, ApplicationLayout $layout, ImageProfile $profile, string $postgresConfiguration, string $owner): array
+    public static function render(PresetConfiguration $configuration, array $images, ApplicationLayout $layout, ImageProfile $profile, string $postgresConfiguration, string $owner, ?array $logging = null): array
     {
         if (($profile->deployment['capability'] ?? null) !== $configuration->capability) {
             throw new \InvalidArgumentException('Configured and resolved deployment capabilities disagree.');
@@ -54,11 +55,19 @@ final class PresetRenderer
             }
         }
         $environment = self::environment($configuration, $profile);
+        $environment['BAANDER_LOG_DIR'] = LogCollection::ROOT . '/web/' . ($logging['boot'] ?? $owner);
+        if ($logging !== null) {
+            $environment['BAANDER_LOG_NODES'] = LogCollection::nodes($configuration->name, $environment['BAANDER_LOG_NODES'] ?? '[]');
+        }
         $labels = ['org.baander.preset' => $configuration->name, 'org.baander.preset.owner' => $owner, 'org.baander.deployment.capability' => $configuration->capability, 'org.baander.deployment.fingerprint' => $profile->fingerprint()];
         $common = ['restart' => 'unless-stopped', 'labels' => $labels, 'networks' => ['private'], 'security_opt' => ['no-new-privileges:true']];
         $webMounts = self::mediaMounts($configuration, $layout);
         $webMounts = array_map(static fn(array $mount): array => ['type' => 'volume', 'source' => array_search($mount['volume'], $configuration->volumes, true), 'target' => $mount['target'], 'read_only' => $mount['readOnly']], $webMounts);
         $webMounts[] = ['type' => 'volume', 'source' => 'secrets', 'target' => $layout->path('config/secrets'), 'read_only' => true];
+        $webMounts[] = ['type' => 'volume', 'source' => 'logs', 'target' => LogCollection::ROOT];
+        if ($logging !== null) {
+            $webMounts[] = ['type' => 'bind', 'source' => $logging['credentials'] . '/query-token', 'target' => LogCollection::QUERY_TOKEN, 'read_only' => true, 'bind' => ['create_host_path' => false]];
+        }
         $services = [
             'web' => $common + [
                 'image' => $images['application']['id'], 'environment' => $environment,
@@ -95,7 +104,20 @@ final class PresetRenderer
                 'oom_score_adj' => KillOrder::GATEWAY,
             ],
         ];
-        $volumes = [];
+        if ($logging !== null) {
+            $target = \Baander\Tooling\Docker\Target::fromArray($logging['target']);
+            $groups = [['labels' => ['org.baander.preset' => $configuration->name, 'org.baander.preset.owner' => $owner]], ['labels' => ['app.baander.worker.namespace' => $configuration->name], 'serviceLabel' => 'app.baander.worker.role']];
+            $services['log-agent'] = LogCollection::service($images['operator']['id'], $layout->root, $target, $logging['credentials'], LogCollection::configuration($configuration->name, $target, $groups));
+            $services['log-agent']['networks'] = ['private'];
+            $services['log-agent']['labels'] += $labels;
+            foreach ($services as $name => &$service) {
+                if ($name !== 'log-agent') {
+                    $service['depends_on']['log-agent'] = ['condition' => 'service_started'];
+                }
+            }
+            unset($service);
+        }
+        $volumes = ['logs' => ['name' => $configuration->name . '-logs', 'external' => true], 'log_index' => ['name' => $configuration->name . '-log-index', 'external' => true]];
         foreach ($configuration->volumes as $role => $name) {
             $volumes[$role] = ['name' => $name, 'external' => true];
         }
@@ -150,13 +172,25 @@ map $http_x_forwarded_proto $forwarded_proto {
     default $http_x_forwarded_proto;
     '' $scheme;
 }
-log_format preset '$remote_addr $request_method $uri $status $body_bytes_sent';
+log_format preset escape=json '{"host":"$host","method":"$request_method","uri":"$uri","status":$status,"bytes":$body_bytes_sent}';
 server {
     listen 80;
     server_name _;
     server_tokens off;
     access_log /dev/stdout preset;
     client_max_body_size 0;
+    location = /api/ws {
+        error_log /dev/null;
+        proxy_pass http://web:9501;
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $forwarded_proto;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_buffering off;
+        proxy_read_timeout 3600s;
+    }
     location / {
         proxy_pass http://web:9501;
         proxy_http_version 1.1;

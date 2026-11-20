@@ -37,6 +37,9 @@ class WorkerLifecycle
         $cleanupSeconds = $configuration->cleanupSeconds;
         $environment = $configuration->runtimeEnvironment;
         $sharedVolumes = array_values(array_unique(array_column($configuration->mediaMounts, 'volume')));
+        if ($configuration->logVolume !== null) {
+            $sharedVolumes[] = $configuration->logVolume;
+        }
         $ipc = $configuration->namespace . '-ipc-' . $boot;
         $manifest = [
             'version' => 9,
@@ -54,6 +57,7 @@ class WorkerLifecycle
             'scheduledConsoleMiB' => $configuration->profile->scheduledConsoleMiB,
             'ipcVolume' => $ipc,
             'mediaMounts' => $configuration->mediaMounts,
+            'logVolume' => $configuration->logVolume,
         ];
         $credentials = [
             'controllerDatabaseUrl' => $environment['DATABASE_URL'],
@@ -311,6 +315,9 @@ CODE;
             array_push($arguments, '--read-only', ...self::retirementMountArguments($manifest, ApplicationLayout::fromArray($layout)->root));
         } else {
             array_push($arguments, ...self::sourceMountArguments($manifest));
+        }
+        if (($manifest['logVolume'] ?? null) !== null) {
+            array_push($arguments, '--cap-add', 'DAC_OVERRIDE', '--mount', 'type=volume,src=' . $manifest['logVolume'] . ',dst=/var/log/baander,volume-nocopy');
         }
         $measurement = $this->operatorMeasurement($record, $action, $record['operator_image']);
         $decoder = <<<'CODE'

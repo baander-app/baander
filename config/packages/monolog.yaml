@@ -42,7 +42,7 @@ when@dev:
             stdout:
                 type: stream
                 path: php://stderr
-                level: warning
+                level: debug
                 channels: [ '!events' ]
                 formatter: monolog.formatter.line
             console:
@@ -54,18 +54,6 @@ when@dev:
                 type: stream
                 channels: [ deprecation ]
                 path: "%kernel.logs_dir%/deprecation.log"
-                formatter: monolog.formatter.line
-            security:
-                type: stream
-                path: php://stderr
-                level: warning
-                channels: [ security ]
-                formatter: monolog.formatter.line
-            messenger:
-                type: stream
-                path: php://stderr
-                level: info
-                channels: [ messenger ]
                 formatter: monolog.formatter.line
 
 
@@ -98,7 +86,7 @@ when@prod:
             stdout:
                 type: stream
                 path: php://stderr
-                level: warning
+                level: debug
                 channels: [ '!events' ]
                 formatter: monolog.formatter.json
             console:
@@ -110,16 +98,4 @@ when@prod:
                 type: stream
                 channels: [ deprecation ]
                 path: "%kernel.logs_dir%/deprecation.log"
-                formatter: monolog.formatter.json
-            security:
-                type: stream
-                path: php://stderr
-                level: warning
-                channels: [ security ]
-                formatter: monolog.formatter.json
-            messenger:
-                type: stream
-                path: php://stderr
-                level: info
-                channels: [ messenger ]
                 formatter: monolog.formatter.json

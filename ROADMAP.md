@@ -4,6 +4,84 @@ Updated: 2026-11-20. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
+## Admin and terminal log viewers
+
+The [log-viewer plan](docs/plans/2026-11-20-1745-feat-admin-terminal-log-viewers-plan.md)
+adds **Admin → Logs** and the `app:log:sources`, `app:log:view` and `app:log:query`
+commands. Both interfaces share source discovery, filters, literal search,
+snapshots and coverage reporting. Channel selection lists every retained channel
+and supports multiple choices with match-any behavior. The browser has a source
+list, virtualized message rows and an inspector; the terminal adds keyboard navigation, live follow
+and read-only SQL. The [operator guide](docs-book/part-1-operator-guide/operations/log-viewer.md)
+describes gzip and ZIP support, query limits and partial coverage.
+
+Per-host agents collect deployment-owned web, worker, gateway, PostgreSQL, Redis
+and pooler logs. Application files survive worker-container removal in retained
+service and boot directories. The registry is a separate system and is excluded.
+Composer declares all extension requirements found in application code, first-party
+runtime packages and the locked dependency graph: 37 runtime requirements and
+four development requirements. PDO SQLite, Phar, XMLWriter and YAML belong to
+development tooling. The CI image supplies all 41 declared extensions. Package
+versions are unchanged. Formatter caches and Playwright reports are ignored; the
+previously tracked web report is removed from Git tracking.
+
+Verification checkpoints: the backend run passes 272 tests and 904 assertions.
+After the below-budget storage correction, the collector/index run passes another
+29 tests and 219 assertions. The later source-availability unit checkpoint passes
+30 tests and 190 assertions; the agent integration checkpoint passes 12 tests and
+104 assertions. The final availability and bounded-reclamation run passes 45 tests
+and 333 assertions. The HTTP/SQL coroutine run passes two tests and
+12 assertions; compiled HTTP-worker configuration passes one test and 59 assertions.
+Backend PHPStan passes across 4,011 files. Backend and tooling Deptrac report zero
+violations, warnings or errors; tooling PHPStan and source-policy checks pass.
+The 144-case tooling run had six gated skips and one outdated manifest-key
+expectation; the corrected expectation and collector configuration checks pass
+four tests and 57 assertions. Formatting passes for all 13 changed tooling files.
+Composer validation and normalization pass.
+
+Web typechecks and production build pass. Full lint reports zero errors and
+11 warnings; final scoped lint reports only the existing virtualizer compiler
+warning. Nine focused suites pass 57 tests, including automatic filters, time
+ranges, source availability and live sampling. Four browser cases pass: desktop and mobile
+interactions, authenticated multi-channel GET and SQL, and severity tints in light
+and dark themes. Message text retains at least 4.5:1 contrast, including selected
+rows. The running preview shows 105 collection issues in a collapsed notice about
+47 pixels high. Browser checks also confirm usable inspector height, bounded
+expanded issue lists and no horizontal overflow. Eight PTY cases cover
+quit, interruption, EOF, exception cleanup, resize, SQL after paging and multiple
+channels. Real development and production commands preserve JSON stdout while
+the terminal guard suppresses terminal logging and retains file logging.
+
+The live drill on 2026-11-20 passed all 17 checks: web, control and execution
+workers, PostgreSQL, Redis, pooler, frontend nginx and shared gateway ingestion;
+live channels; unrelated-container and foreign-host exclusions; the five-second
+final checkpoint; retained worker files and gzip after removal and agent restart.
+A separate eight-check drill verified two logical nodes, authentication, partial
+coverage during an outage and recovery. These nodes ran on one Docker host;
+physical remote-host TLS deployment was not exercised.
+
+The shutdown correction avoids compaction when the physical index is below
+its budget. With an active reader, the measured call fell from 6,004.9 ms plus an
+error to 0.0064 ms with no deletion. Over-budget reclamation remains enforced.
+The live five-second checkpoint now completes. Over-budget cleanup uses bounded
+FTS merges, deletion batches and vacuum steps. A disposable 18.36 MB fixture reduced
+one cleanup pass from 457.4 ms to 43.6 ms; repeated blocked appends returned in
+0.046 ms. Ingestion stays suspended until physical storage is within its cap.
+The final preview check found 88 sources with explicit availability: 53 available
+and 35 unavailable. Readable files and archive members remained available during
+cleanup. Source queries took 12–52 ms while collection advanced; physical storage
+reclaimed 12,320,128 bytes and returned below the 1 GiB cap.
+
+The presentation checks cover collapsible coverage warnings, automatic
+filters with debounced text, relative time shortcuts including All time, service
+groups with descriptive titles, and subtle severity tints. Unavailable origins stay
+collapsed; one Collection issues disclosure identifies affected sources and hosts.
+Selecting a row opens its full message immediately in a bounded, resizable pane
+below the list; the selected snapshot survives live-window eviction. Initial
+history resumes after live-read readiness without a source toggle. Rapid
+channel choices survive pending URL navigation, and history retries keep their
+original time bounds. Delivery is local only; the persistent instance is unchanged.
+
 ## HTTP worker idle memory and span capture
 
 The [memory plan](docs/plans/2026-11-20-1702-perf-http-worker-idle-memory-plan.md)

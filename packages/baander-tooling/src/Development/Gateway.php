@@ -181,7 +181,9 @@ final class Gateway
             $location = $route['maintenance'] ? 'return 503;' : 'set $backend http://' . $upstream . ':80; proxy_pass $backend;';
             $servers[] = str_replace(['${SERVER_NAME}', '${LOCATION}'], [$hostname, $location], $template);
         }
-        return "map \$http_upgrade \$connection_upgrade { default upgrade; '' close; }\n"
+        return 'log_format baander_json escape=json \'{"host":"$host","method":"$request_method","uri":"$uri","status":$status,"bytes":$body_bytes_sent}\';' . "\n"
+            . "access_log /dev/stdout baander_json;\nerror_log /dev/stderr warn;\n"
+            . "map \$http_upgrade \$connection_upgrade { default upgrade; '' close; }\n"
             . "resolver 127.0.0.11 valid=5s;\n"
             . 'server { listen 443 ssl default_server; server_name _; ssl_certificate /etc/nginx/certificates/cert.pem; '
             . "ssl_certificate_key /etc/nginx/certificates/key.pem; return 404; }\n" . implode("\n", $servers);

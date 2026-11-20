@@ -91,7 +91,7 @@ final class WorkerLifecycleTest extends TestCase
             return '';
         });
         $record = null;
-        $configuration = $this->configuration();
+        $configuration = $this->configuration(['logVolume' => 'preset-retained-logs']);
         $lifecycle = new WorkerLifecycle($this->store, $runner, getenv());
         $lifecycle->prepare($record, $configuration);
         self::assertSame('prepared', $record['phase']);
@@ -101,12 +101,13 @@ final class WorkerLifecycleTest extends TestCase
         self::assertArrayNotHasKey('operator_memory_mib', $record);
         $manifest = AtomicFile::readJson($record['directory'] . '/manifest.json');
         $fields = ['version', 'sourceMountPolicy', 'namespace', 'bootId', 'daemonId', 'imageId', 'network', 'dockerBinary', 'dockerEndpoint',
-            'autoscaling', 'deploymentProfile', 'deviceGroup', 'scheduledConsoleMiB', 'ipcVolume', 'mediaMounts'];
+            'autoscaling', 'deploymentProfile', 'deviceGroup', 'scheduledConsoleMiB', 'ipcVolume', 'mediaMounts', 'logVolume'];
         $saved = array_keys($manifest);
         sort($fields);
         sort($saved);
         self::assertSame($fields, $saved);
         self::assertSame(9, $manifest['version']);
+        self::assertSame('preset-retained-logs', $manifest['logVolume']);
         self::assertNull($manifest['deviceGroup']);
         self::assertSame('production', $manifest['sourceMountPolicy']);
         self::assertSame(320, $manifest['scheduledConsoleMiB']);

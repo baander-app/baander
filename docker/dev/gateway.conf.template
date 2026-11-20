@@ -4,8 +4,8 @@ server {
     ssl_certificate /etc/nginx/certificates/cert.pem;
     ssl_certificate_key /etc/nginx/certificates/key.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
-    access_log off;
-    error_log /dev/null;
+    access_log /dev/stdout baander_json;
+    error_log /dev/stderr warn;
     client_max_body_size 100m;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
@@ -15,5 +15,7 @@ server {
     proxy_set_header Connection $connection_upgrade;
     proxy_buffering off;
     proxy_read_timeout 86400s;
+    # Raw WebSocket upstream errors include URL credentials.
+    location = /api/ws { error_log /dev/null; ${LOCATION} }
     location / { ${LOCATION} }
 }

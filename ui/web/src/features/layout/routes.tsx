@@ -39,6 +39,7 @@ import { AdminSecurityPage } from '../admin/pages/AdminSecurityPage'
 import { AdminMediaPage } from '../admin/pages/AdminMediaPage'
 import { RadioAdminPage } from '../admin/pages/RadioAdminPage'
 import { AdminAnalyticsPage } from '../admin/pages/AdminAnalyticsPage'
+import { LogsPage } from '../admin/pages/LogsPage'
 import { AdminSettingsPage } from '../admin/pages/AdminSettingsPage'
 
 export const publicRoutes: RouteObject[] = [
@@ -131,6 +132,7 @@ export const protectedRoutes: RouteObject[] = [
               { path: '/admin/radio', element: <RadioAdminPage /> },
               { path: '/admin/analytics', element: <AdminAnalyticsPage /> },
               { path: '/admin/settings', element: <AdminSettingsPage /> },
+              { path: '/admin/logs', element: <LogsPage /> },
 
               // Backward-compat redirects
               { path: '/admin/monitor', element: <Navigate to="/admin?tab=jobs" replace /> },

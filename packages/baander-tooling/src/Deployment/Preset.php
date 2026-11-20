@@ -118,7 +118,8 @@ final readonly class Preset
         }
         $postgres = PostgresConfiguration::render($configuration->size['sharedBuffersMiB'], $configuration->size['workMemMiB'], Pooler::pools($profile->deployment));
         new PostgresSettings($postgres);
-        $compose = PresetRenderer::render($configuration, $images, $layout, $profile, $postgres, $owner);
+        LogCollection::credentials($this->store->directory . '/log-credentials');
+        $compose = PresetRenderer::render($configuration, $images, $layout, $profile, $postgres, $owner, ['target' => $this->docker->target->toArray(), 'credentials' => $this->store->directory . '/log-credentials', 'boot' => bin2hex(random_bytes(16))]);
         $content = json_encode($compose, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
         $state = ['version' => 1, 'phase' => 'prepared', 'owner' => $owner, 'configuration' => $configuration->toArray(),
             'target' => $this->docker->target->toArray(), 'images' => $images, 'layout' => $layout->toArray(),
@@ -154,7 +155,7 @@ final readonly class Preset
         $this->migrate($configuration, $state, $layout, $profile);
         $this->initializeSecrets($configuration, $state, $layout, $profile);
         $this->verifyPostgres($configuration, $state);
-        $this->docker->compose($configuration->name, $this->composeFile(), ['up', '-d', '--wait', 'web', 'gateway'], timeout: 180);
+        $this->docker->compose($configuration->name, $this->composeFile(), ['up', '-d', '--wait', 'log-agent', 'web', 'gateway'], timeout: 180);
         $workers = $this->store->workers();
         $record = $workers->load();
         $lifecycle = new WorkerLifecycle($workers, $this->executor, $this->environment);
@@ -172,6 +173,7 @@ final readonly class Preset
             profile: $profile,
             cleanupSeconds: $this->cleanupSeconds,
             deviceGroup: $configuration->hardwareGroup(),
+            logVolume: $configuration->name . '-logs',
         ));
         $lifecycle->start($record);
         $lifecycle->ready($record);
@@ -268,7 +270,7 @@ final readonly class Preset
     private function prepareVolumes(PresetConfiguration $configuration, array $state): void
     {
         $files = PresetRenderer::configurationFiles($configuration, $state['postgresConfiguration']);
-        $volumes = $configuration->volumes + array_map(static fn(array $file): string => $file['volume'], $files);
+        $volumes = $configuration->volumes + ['logs' => $configuration->name . '-logs', 'log_index' => $configuration->name . '-log-index'] + array_map(static fn(array $file): string => $file['volume'], $files);
         foreach ($volumes as $role => $name) {
             $inspection = $this->docker->run(['volume', 'inspect', $name], check: false);
             if ($inspection->exitCode === 0) {
@@ -283,7 +285,7 @@ final readonly class Preset
                 $this->seedVolume($configuration, $state, $role, $name, '$path = "/seed/" . $argv[1]; if (file_put_contents($path, stream_get_contents(STDIN)) === false || !chmod($path, 0644)) { exit(1); }', [$files[$role]['name']], $files[$role]['content']);
                 continue;
             }
-            if (in_array($role, ['postgres', 'redis', 'pooler_credentials'], true)) {
+            if (in_array($role, ['postgres', 'redis', 'pooler_credentials', 'log_index'], true)) {
                 continue;
             }
             $this->seedVolume($configuration, $state, $role, $name, 'if (!chown("/seed", "www-data") || !chgrp("/seed", "www-data")) { exit(1); }');
@@ -388,7 +390,7 @@ PHP;
         return ['profile-application' => 'application', 'profile-worker' => 'worker', 'profile-operator' => 'operator',
             'verify-wrappers-application' => 'application', 'verify-wrappers-worker' => 'worker', 'verify-wrappers-operator' => 'operator',
             'seed-media' => 'application', 'seed-storage' => 'application', 'seed-conversions' => 'application',
-            'seed-transcode-state' => 'application', 'seed-secrets' => 'application', 'seed-postgres-configuration' => 'application',
+            'seed-transcode-state' => 'application', 'seed-logs' => 'application', 'seed-secrets' => 'application', 'seed-postgres-configuration' => 'application',
             'seed-gateway-configuration' => 'application', 'migration' => 'application', 'secrets-bootstrap' => 'application'];
     }
 

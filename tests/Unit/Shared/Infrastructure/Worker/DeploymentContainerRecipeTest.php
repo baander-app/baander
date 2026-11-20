@@ -18,6 +18,26 @@ final class DeploymentContainerRecipeTest extends TestCase
     private const string BOOT = '0123456789abcdef0123456789abcdef';
     private const string IMAGE = 'sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
+    public function testDedicatedLogVolumePinsServiceAndBootWithoutAliasingMediaOrIpc(): void
+    {
+        $recipe = $this->recipe(['logVolume' => 'retained-worker-logs']);
+        $arguments = $recipe->createArguments();
+        self::assertContains('type=volume,src=retained-worker-logs,dst=/var/log/baander,volume-nocopy', $arguments);
+        self::assertContains('BAANDER_LOG_DIR=/var/log/baander/control/' . self::BOOT, $arguments);
+        self::assertSame([], $recipe->mediaMounts);
+        self::assertNotSame($this->recipe()->fingerprint(), $recipe->fingerprint());
+        $this->expectException(InvalidArgumentException::class);
+        $this->recipe(['logVolume' => 'worker-ipc']);
+    }
+
+    public function testMediaCannotMountOverRetainedLogStorage(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->recipe(['logVolume' => 'retained-worker-logs', 'mediaMounts' => [
+            ['volume' => 'media', 'target' => '/var/log/baander/web', 'role' => 'derived', 'readOnly' => false],
+        ]]);
+    }
+
     public function testRelocatedApplicationCodeAndAncestorsCannotBeMountedOver(): void
     {
         foreach (['/opt', '/opt/baander', '/opt/baander/bin', '/opt/baander/vendor', '/opt/baander/var'] as $target) {

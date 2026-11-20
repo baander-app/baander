@@ -52,6 +52,26 @@ final class PresetDeploymentTest extends TestCase
             'size' => [...['webWorkers' => 4, 'databaseSlots' => 10, 'ordinaryConsumers' => 4, 'sharedBuffersMiB' => 256, 'workMemMiB' => 16], ...$size]]);
     }
 
+    public function testManagedLoggingUsesPinnedCollectorAndRetainedDedicatedVolumes(): void
+    {
+        $configuration = PresetConfiguration::fromArray(self::configuration());
+        $target = new Target('/usr/bin/docker', 'unix:///run/owner/docker.sock', 'captured-daemon', null, null);
+        $compose = PresetRenderer::render($configuration, $this->images(), ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']), $this->profile(), 'max_connections = 21', 'owner', [
+            'target' => $target->toArray(), 'credentials' => '/private/log-credentials', 'boot' => 'fresh-web-boot',
+        ]);
+        $agent = $compose['services']['log-agent'];
+        $config = json_decode($agent['environment']['BAANDER_LOG_AGENT_CONFIG'], true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('captured-daemon', $config['expectedDaemonId']);
+        self::assertSame('owner', $config['containerGroups'][0]['labels']['org.baander.preset.owner']);
+        self::assertSame('owner', $agent['labels']['org.baander.preset.owner']);
+        self::assertSame('/run/owner/docker.sock', $agent['volumes'][0]['source']);
+        self::assertTrue($agent['volumes'][2]['read_only']);
+        self::assertSame('/var/log/baander/web/fresh-web-boot', $compose['services']['web']['environment']['BAANDER_LOG_DIR']);
+        self::assertTrue($compose['volumes']['logs']['external']);
+        self::assertTrue($compose['volumes']['log_index']['external']);
+        self::assertNotContains('/run/baander-log-docker.sock', array_column($compose['services']['web']['volumes'], 'target'));
+    }
+
     public function testRenderedServicesCarryNoContainerLimitsAndRenderTheKillOrder(): void
     {
         $remux = PresetConfiguration::fromArray(self::configuration());

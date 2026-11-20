@@ -6,6 +6,7 @@ imports:
 
 parameters:
     env(BAANDER_DEPLOYMENT_PROFILE): ''
+    env(BAANDER_LOG_NODES): '[]'
     env(WEBHOOK_LAN_ALLOWLIST): ''
     app.domain: '%env(APP_DOMAIN)%'
     app.name: 'Bånder'
@@ -61,6 +62,37 @@ services:
             - '../src/Transcode/Infrastructure/Swoole/TranscodeLoopOwnership.php'
             - '../src/**/Entity/'
             - '../src/**/ValueObject/'
+            - '../src/Shared/Infrastructure/LogViewer/Agent/'
+            - '../src/Shared/Infrastructure/LogViewer/LogIndex.php'
+            - '../src/Shared/Application/LogViewer/LogQuery.php'
+            - '../src/Shared/Application/LogViewer/LogSqlQuery.php'
+
+    App\Shared\Application\LogViewer\TerminalLogGuardInterface:
+        alias: App\Shared\Infrastructure\Logging\TerminalLogGuard
+
+    App\Shared\Infrastructure\Logging\TerminalLogGuard:
+        arguments:
+            $loggers: !tagged_iterator app.log_viewer.logger
+
+    App\Shared\Application\LogViewer\LogViewerInterface:
+        alias: App\Shared\Application\LogViewer\Service\FederatedLogViewer
+
+    App\Shared\Application\LogViewer\Service\LogNodeClientInterface:
+        alias: App\Shared\Infrastructure\LogViewer\Http\ConfiguredLogNodeClient
+
+    App\Shared\Infrastructure\LogViewer\Http\ConfiguredLogNodeClient:
+        arguments:
+            $nodesJson: '%env(BAANDER_LOG_NODES)%'
+
+    App\Shared\Application\LogViewer\Service\LogSnapshotStoreInterface:
+        alias: App\Shared\Infrastructure\LogViewer\Http\FileLogSnapshotStore
+
+    App\Shared\Infrastructure\LogViewer\Http\FileLogSnapshotStore:
+        arguments:
+            $directory: '%kernel.project_dir%/var/log-viewer/snapshots'
+
+    App\Shared\Application\LogViewer\Service\LogSqlExecutorInterface:
+        alias: App\Shared\Infrastructure\LogViewer\Sql\CoroutineSqlExecutor
 
     App\Shared\Application\DTO\DeploymentProfile:
         factory: ['App\Shared\Application\DTO\DeploymentProfile', 'resolve']

@@ -37,6 +37,7 @@ final readonly class DeploymentOperatorManifest
         public string $sourceMountPolicy,
         public DeploymentProfile $deploymentProfile,
         public ?int $deviceGroup,
+        public ?string $logVolume = null,
     ) {
         if (($deploymentProfile->hardware?->device === null) !== ($deviceGroup === null)) {
             throw new InvalidArgumentException('Operator manifest requires a device group exactly when the deployment profile names a hardware encoder device.');
@@ -76,7 +77,8 @@ final readonly class DeploymentOperatorManifest
             throw new InvalidArgumentException('Operator manifest must be a JSON object.');
         }
         $fields = get_object_vars($decoded);
-        $expected = [...self::STRING_FIELDS, ...self::INTEGER_FIELDS, 'mediaMounts', 'autoscaling', 'deploymentProfile', 'deviceGroup'];
+        $fields['logVolume'] ??= null;
+        $expected = [...self::STRING_FIELDS, ...self::INTEGER_FIELDS, 'mediaMounts', 'autoscaling', 'deploymentProfile', 'deviceGroup', 'logVolume'];
         if (array_diff(array_keys($fields), $expected) !== [] || array_diff($expected, array_keys($fields)) !== []) {
             throw new InvalidArgumentException('Operator manifest has unknown or missing fields.');
         }
@@ -93,6 +95,9 @@ final readonly class DeploymentOperatorManifest
             }
             $mounts[] = get_object_vars($mount);
         }
+        if ($fields['logVolume'] !== null && !is_string($fields['logVolume'])) {
+            throw new InvalidArgumentException('Worker log volume requires a name or null.');
+        }
         $profile = json_encode($fields['deploymentProfile'], JSON_THROW_ON_ERROR) |> DeploymentProfile::fromJson(...);
         $deviceGroup = $fields['deviceGroup'];
         if ($deviceGroup !== null && !is_int($deviceGroup)) {
@@ -106,7 +111,7 @@ final readonly class DeploymentOperatorManifest
             self::string($fields, 'imageId'), $appHome, self::string($fields, 'network'), self::string($fields, 'dockerBinary'), self::string($fields, 'dockerEndpoint'),
             self::bytes($fields, 'scheduledConsoleMiB'), self::string($fields, 'ipcVolume'), $mounts,
             WorkerAutoscalingProfile::fromJson(json_encode($fields['autoscaling'], JSON_THROW_ON_ERROR)), self::string($fields, 'sourceMountPolicy'),
-            $profile, $deviceGroup);
+            $profile, $deviceGroup, $fields['logVolume']);
     }
 
     /** The group that owns a device node on this host, for a manifest that leaves it to the host. */
@@ -132,7 +137,7 @@ final readonly class DeploymentOperatorManifest
                 '--autoscaling-profile=' . $this->autoscaling->toJson(),
                 '--deployment-profile=' . $this->deploymentProfile->toJson(),
                 '--lock-dir=/tmp/baander-worker-locks', '--ipc-dir=/run/baander-worker'],
-            $this->network, $unit, $this->ipcVolume, $this->appHome, $this->deploymentProfile, $environment, $this->mediaMounts, $this->sourceMountPolicy, $this->deviceGroup);
+            $this->network, $unit, $this->ipcVolume, $this->appHome, $this->deploymentProfile, $environment, $this->mediaMounts, $this->sourceMountPolicy, $this->deviceGroup, $this->logVolume);
         if (!in_array('source', array_column($recipe->mediaMounts, 'role'), true)) {
             throw new InvalidArgumentException('Operator media topology requires an explicitly authorized source storage.');
         }

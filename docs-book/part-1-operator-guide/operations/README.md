@@ -15,6 +15,7 @@ slash. The client must trust its certificate.
 |-------|-------|
 | [Health Checks, Metrics, and Logs](health-and-metrics.md) | HTTP `/health`, `/ready`, and `/live` probes, `app:health:check`, Swoole server stats, Prometheus metrics, rate limiter inspection, configuration validation, and container logs |
 | [Job and Transport Monitoring](job-monitoring.md) | Job monitor status, filtering, cooperative cancellation, retry vs failure-transport redelivery, Redis transport depth, failed messages, and job analytics |
+| [Investigating Logs](log-viewer.md) | Source discovery, literal search, archived files, live follow and read-only SQL in the admin dashboard and terminal |
 | [Troubleshooting](troubleshooting.md) | Symptom-by-symptom diagnostics for scans, transcoding, database/Redis connectivity, permissions, and authentication |
 
 | Component or stage | First signal | What it establishes |

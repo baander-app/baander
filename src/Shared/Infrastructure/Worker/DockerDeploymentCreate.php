@@ -77,7 +77,8 @@ FORMAT;
             throw new \RuntimeException('Created container does not match the deployment recipe.');
         }
         $expected = ['BAANDER_WORKER_NAMESPACE' => $recipe->namespace, 'BAANDER_WORKER_BOOT_ID' => $recipe->bootId, 'BAANDER_WORKER_UNIT' => $recipe->unit->value,
-            ...$recipe->runtimeEnvironment->variables];
+            ...$recipe->runtimeEnvironment->variables,
+            ...($recipe->logVolume === null ? [] : ['BAANDER_LOG_DIR' => $recipe->logDirectory()])];
         foreach ($state['env'] as $item) {
             if (!is_string($item) || !str_contains($item, '=')) {
                 throw new \RuntimeException('Created container has invalid environment metadata.');

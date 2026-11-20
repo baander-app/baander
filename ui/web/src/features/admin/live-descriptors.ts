@@ -2,6 +2,21 @@ import { firstKeyMatches, keyStartsWith, type LiveQueryDescriptor } from '@/shar
 
 export const adminLiveDescriptors: readonly LiveQueryDescriptor[] = [
   {
+    family: 'admin-runtime',
+    sampleIntervalMs: 5000,
+    matches: key => keyStartsWith(key, 'admin', 'logs') && ['tail', 'sources-live'].includes(String(key[2])),
+  },
+  {
+    family: 'admin-runtime',
+    refreshPolicy: 'stored',
+    matches: key => keyStartsWith(key, 'admin', 'logs', 'history'),
+  },
+  {
+    family: 'admin-runtime',
+    refreshPolicy: 'demand',
+    matches: key => keyStartsWith(key, 'admin', 'logs') && !['tail', 'sources-live', 'history'].includes(String(key[2])),
+  },
+  {
     family: 'activity',
     sampleIntervalMs: 30000,
     matches: key => keyStartsWith(key, 'admin', 'activity')

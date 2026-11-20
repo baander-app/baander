@@ -2,6 +2,31 @@ import type { LiveCoverageDescriptor } from '@/shared/live/coverage-types'
 
 export const adminLiveCoverage = [
   {
+    id: 'admin.logs',
+    family: 'admin-runtime',
+    policy: { kind: 'sampled', intervalMs: 5000, reason: 'Visible log tails and source inventory sample while following; historical reads participate in recovery until their first snapshot, while detail and SQL are demand reads.' },
+    audiences: ['admin'],
+    sourceTables: [],
+    deploymentTables: [],
+    sources: ['admitted per-host log indexes'],
+    keyVariants: ["['admin','logs','sources-live']", "['admin','logs','history',filter,historyRevision]", "tailKey=['admin','logs','tail',filter]asconst", "['admin','logs','detail',id]", "['admin','logs','sql',filter,request]"],
+    dependentFamilies: [],
+    mirrors: [],
+    responseCaches: ['authoritative-read'],
+    consumers: [
+      "src/features/admin/api/logs-api.ts#AXIOS_INSTANCE.get:'/api/admin/logs/sources'",
+      "src/features/admin/api/logs-api.ts#AXIOS_INSTANCE.get:'/api/admin/logs/entries'",
+      "src/features/admin/api/logs-api.ts#AXIOS_INSTANCE.get:`/api/admin/logs/entries/${encodeURIComponent(id)}`",
+      "src/features/admin/hooks/use-logs.ts#useQuery:['admin','logs','sources-live']",
+      "src/features/admin/hooks/use-logs.ts#useInfiniteQuery:['admin','logs','history',filter,historyRevision]",
+      "src/features/admin/hooks/use-logs.ts#useQuery:tailKey=['admin','logs','tail',filter]asconst",
+      "src/features/admin/hooks/use-logs.ts#useQuery:['admin','logs','detail',id]",
+      "src/features/admin/components/logs/LogSqlPanel.tsx#useQuery:['admin','logs','sql',filter,request]",
+    ],
+    coverageVerification: ['tests/live-updates/coverage.test.ts'],
+    behaviorVerification: { unitProofs: ['src/features/admin/components/logs/__tests__/LogsPage.test.tsx'] },
+  },
+  {
     id: "admin.admin-activity",
     family: "activity",
     policy: {

@@ -54,11 +54,15 @@ final readonly class DeploymentContainerRecipe
         array $mediaMounts = [],
         public string $sourceMountPolicy = 'production',
         ?int $deviceGroup = null,
+        public ?string $logVolume = null,
     ) {
         DeploymentLease::validateIdentity($namespace, $bootId);
         if (strlen($appHome) > 4096 || preg_match('~\A/(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\z~D', $appHome) !== 1
             || preg_match('~(?:^|/)\.\.?(?:/|$)~', $appHome) !== 0) {
             throw new InvalidArgumentException('Observed application home requires a canonical absolute path.');
+        }
+        if ($logVolume !== null && (preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\z/D', $logVolume) !== 1 || $logVolume === $ipcVolume)) {
+            throw new InvalidArgumentException('Worker logs require a dedicated named volume.');
         }
         $this->oomScoreAdj = OutOfMemoryKillOrder::unit($unit);
         // Only execution runs FFmpeg, so only execution receives the hardware encoder.
@@ -99,6 +103,9 @@ final readonly class DeploymentContainerRecipe
             throw new InvalidArgumentException('Unknown source mount policy.');
         }
         $this->mediaMounts = $this->validateMounts($mediaMounts);
+        if ($logVolume !== null && in_array($logVolume, array_column($this->mediaMounts, 'volume'), true)) {
+            throw new InvalidArgumentException('Worker logs cannot alias shared media storage.');
+        }
         if (in_array($ipcVolume, array_column($this->mediaMounts, 'volume'), true)) {
             throw new InvalidArgumentException('Worker IPC volume cannot alias media storage.');
         }
@@ -113,7 +120,7 @@ final readonly class DeploymentContainerRecipe
             'oomScoreAdj' => $this->oomScoreAdj, 'unit' => $this->unit->value, 'ipcVolume' => $this->ipcVolume,
             'sourceMountPolicy' => $this->sourceMountPolicy, 'deploymentProfile' => $this->deploymentProfile->toJson(),
             'runtimeEnvironment' => $this->runtimeEnvironment->variables, 'mediaMounts' => $this->mediaMounts,
-            'devices' => $this->devices, 'groups' => $this->groups, 'nvidiaGpus' => $this->nvidiaGpus,
+            'devices' => $this->devices, 'groups' => $this->groups, 'nvidiaGpus' => $this->nvidiaGpus, 'logVolume' => $this->logVolume,
         ], JSON_THROW_ON_ERROR));
     }
 
@@ -189,12 +196,18 @@ final readonly class DeploymentContainerRecipe
             '--label', 'app.baander.worker.boot-id=' . $this->bootId, '--label', 'app.baander.worker.role=' . $this->unit->value,
             '--env', 'BAANDER_WORKER_NAMESPACE=' . $this->namespace, '--env', 'BAANDER_WORKER_BOOT_ID=' . $this->bootId,
             '--env', 'BAANDER_WORKER_UNIT=' . $this->unit->value,
+            ...($this->logVolume === null ? [] : ['--env', 'BAANDER_LOG_DIR=' . $this->logDirectory()]),
             ...$profileArguments,
             ...($environmentFile === null ? [] : ['--env-file', $environmentFile]),
             ...$this->mountArguments(),
             '--mount', 'type=volume,src=' . $this->ipcVolume . ',dst=/run/baander-worker,volume-nocopy',
             '--entrypoint', $this->command[0], $this->imageId, ...array_slice($this->command, 1),
         ];
+    }
+
+    public function logDirectory(): string
+    {
+        return '/var/log/baander/' . $this->unit->value . '/' . $this->bootId;
     }
 
     /** @return list<string> */
@@ -217,6 +230,9 @@ final readonly class DeploymentContainerRecipe
     private function mountArguments(): array
     {
         $arguments = [];
+        if ($this->logVolume !== null) {
+            array_push($arguments, '--mount', 'type=volume,src=' . $this->logVolume . ',dst=/var/log/baander,volume-nocopy');
+        }
         foreach ($this->mediaMounts as $mount) {
             $arguments[] = '--mount';
             if (isset($mount['source'])) {
@@ -262,7 +278,7 @@ final readonly class DeploymentContainerRecipe
                 throw new InvalidArgumentException('Media mounts require admitted storage, canonical targets and read-only source or writable derived access.');
             }
             $target = $mount['target'];
-            foreach (['/bin', '/sbin', '/usr', '/etc', '/dev', '/proc', '/sys', '/run', '/var/run', '/tmp', '/root', '/home'] as $forbidden) {
+            foreach (['/bin', '/sbin', '/usr', '/etc', '/dev', '/proc', '/sys', '/run', '/var/run', '/var/log/baander', '/tmp', '/root', '/home'] as $forbidden) {
                 if ($target === $forbidden || str_starts_with($target, $forbidden . '/') || str_starts_with($forbidden, $target . '/')) {
                     throw new InvalidArgumentException('Media mounts cannot expose operating-system or private worker paths.');
                 }

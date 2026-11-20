@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Baander\Tooling\Tests;
 
 use Baander\Tooling\Tests\DevelopmentCommandExecutor;
+use Baander\Tooling\Configuration\ApplicationLayout;
 use Baander\Tooling\Development\Runtime;
 use Baander\Tooling\Development\StateStore;
 use Baander\Tooling\Development\WorkflowError;
@@ -59,6 +60,57 @@ final class DevelopmentRuntimeTest extends TestCase
         new DevelopmentCommandExecutor()->execute(['rm', '-rf', '--', $this->root]);
     }
 
+    public function testPreviewCollectorKeepsCurrentSourceAndPreparedRuntimeDuringPriorReleasePreflight(): void
+    {
+        $instance = array_replace($this->instance, [
+            'kind' => 'preview', 'worktree' => $this->release['source'],
+            'prepared_release' => ['images' => ['operator_image' => ['resolvedId' => 'sha256:fresh-collector-runtime']]],
+        ]);
+        $config = $this->runtime->config($instance, $this->release);
+        $collector = $config['services']['log-agent'];
+        self::assertSame('sha256:fresh-collector-runtime', $collector['image']);
+        $home = ApplicationLayout::fromArray($this->release['layout'])->root;
+        $source = array_find($collector['volumes'], static fn(array $mount): bool => $mount['target'] === $home);
+        self::assertSame($this->release['source'], $source['source']);
+        self::assertTrue($source['read_only']);
+        $vendor = array_find($collector['volumes'], static fn(array $mount): bool => $mount['target'] === $home . '/vendor');
+        self::assertSame('vendor', $vendor['source']);
+        self::assertTrue($vendor['read_only']);
+    }
+
+    public function testWritingSavedTopologyInstallsCollectorBeforeReadinessSelection(): void
+    {
+        $instance = $this->instance;
+        $instance['compose_file'] = $this->store->directory($instance['id']) . '/compose.json';
+        file_put_contents($instance['compose_file'], '{"services":{"app":{"image":"retained-application"}}}');
+        self::assertFalse($this->runtime->running($instance));
+        $instance = $this->runtime->write($instance, $this->release);
+        $compose = json_decode(file_get_contents($instance['compose_file']), true, flags: JSON_THROW_ON_ERROR);
+        self::assertArrayHasKey('log-agent', $compose['services']);
+        self::assertSame('/var/log/baander/web/' . $instance['log_boot_id'], $compose['services']['app']['environment']['BAANDER_LOG_DIR']);
+        $directory = $this->store->directory($instance['id']) . '/log-credentials';
+        self::assertSame(0444, fileperms($directory . '/query-token') & 0777);
+        self::assertSame(0600, fileperms($directory . '/checkpoint-token') & 0777);
+    }
+
+    public function testLogAgentAdmitsOnlyOwnedDeploymentAndGatewayHostAndWebReceivesQueryCredential(): void
+    {
+        $config = $this->runtime->config($this->instance, $this->release);
+        $agent = $config['services']['log-agent'];
+        $collection = json_decode($agent['environment']['BAANDER_LOG_AGENT_CONFIG'], true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('daemon', $collection['expectedDaemonId']);
+        self::assertSame($this->instance['project'], $collection['containerGroups'][0]['labels']['com.docker.compose.project']);
+        self::assertSame($this->instance['hostname'], $collection['containerGroups'][2]['requestHost']);
+        self::assertTrue($agent['volumes'][2]['read_only']);
+        $web = $config['services']['app'];
+        self::assertStringStartsWith('/var/log/baander/web/', $web['environment']['BAANDER_LOG_DIR']);
+        self::assertContains('/run/baander-log-query/token', array_column($web['volumes'], 'target'));
+        self::assertNotContains('/run/baander-log-docker.sock', array_column($web['volumes'], 'target'));
+        self::assertNotContains('/run/baander-log-agent', array_column($web['volumes'], 'target'));
+        self::assertArrayHasKey('logs', $config['volumes']);
+        self::assertArrayHasKey('log_index', $config['volumes']);
+    }
+
     public function testComposePreservesStorageNetworkMapsAndEscapedEnvironment(): void
     {
         $config = $this->runtime->config($this->instance, $this->release);
@@ -81,7 +133,7 @@ final class DevelopmentRuntimeTest extends TestCase
         $config = $this->runtime->config($this->instance, $this->release);
         $pooler = $config['services']['pooler'];
         self::assertSame($this->release['images']['pooler_image']['resolvedId'], $pooler['image']);
-        self::assertSame(['postgres' => ['condition' => 'service_healthy'], 'pooler-credentials' => ['condition' => 'service_completed_successfully']], $pooler['depends_on']);
+        self::assertSame(['postgres' => ['condition' => 'service_healthy'], 'pooler-credentials' => ['condition' => 'service_completed_successfully'], 'log-agent' => ['condition' => 'service_started']], $pooler['depends_on']);
         self::assertSame(['database', '20', '8'], [$pooler['environment']['BAANDER_POOLER_SERVER_HOST'], $pooler['environment']['BAANDER_POOLER_APPLICATION_POOL_SIZE'], $pooler['environment']['BAANDER_POOLER_CONTROL_POOL_SIZE']]);
         self::assertSame([['type' => 'volume', 'source' => 'pooler_credentials', 'target' => '/etc/baander-pooler/credentials', 'read_only' => true]], $pooler['volumes']);
         $credentials = $config['services']['pooler-credentials'];

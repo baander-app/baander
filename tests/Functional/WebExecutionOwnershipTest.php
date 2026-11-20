@@ -68,6 +68,9 @@ final class WebExecutionOwnershipTest extends TestCase
 
             $configuration = $container->get('web.ownership.configuration');
             self::assertInstanceOf(HttpServerConfiguration::class, $configuration);
+            $hooks = $configuration->getSwooleSettings()['hook_flags'] ?? 0;
+            self::assertSame(SWOOLE_HOOK_NATIVE_CURL, $hooks & SWOOLE_HOOK_NATIVE_CURL);
+            self::assertSame(SWOOLE_HOOK_PROC, $hooks & SWOOLE_HOOK_PROC);
             self::assertSame(0, $configuration->getTaskWorkerCount());
             self::assertInstanceOf(DrainCoordinator::class, $container->get('web.ownership.before_shutdown'));
             self::assertInstanceOf(DrainShutdownHandler::class, $container->get('web.ownership.shutdown'));

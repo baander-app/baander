@@ -312,6 +312,10 @@ final readonly class Configuration implements ConfigurationInterface
                                     ->defaultValue(1024)
                                 ->end()
                                 // Swoole 6.x settings
+                                ->integerNode('hook_flags')
+                                    ->info('Coroutine runtime hooks enabled in HTTP workers.')
+                                    ->min(0)
+                                ->end()
                                 ->integerNode('dispatch_mode')
                                     ->defaultValue(2) // SWOOLE_DISPATCH_FIXED
                                 ->end()

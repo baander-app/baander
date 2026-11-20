@@ -27,6 +27,7 @@ final readonly class WorkerConfiguration
         public ImageProfile $profile,
         public float $cleanupSeconds = 120.0,
         private ?int $deviceGroup = null,
+        public ?string $logVolume = null,
     ) {
         if (!in_array($sourceMountPolicy, ['production', 'local-development'], true)) {
             throw new \InvalidArgumentException('Unknown worker source mount policy.');

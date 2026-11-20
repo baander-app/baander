@@ -18,6 +18,39 @@ final class DockerWorkerContainmentTest extends TestCase
     private const string ID = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
     private const string BOOT = '0123456789abcdef0123456789abcdef';
 
+    public function testRetirementStopsAndCheckpointsTheExactContainerBeforeRemoval(): void
+    {
+        $recipe = new \App\Shared\Infrastructure\Worker\DeploymentContainerRecipe(
+            namespace: 'worker.baander.app', bootId: self::BOOT, daemonId: 'daemon', imageId: 'sha256:' . str_repeat('a', 64),
+            command: ['/usr/local/bin/php', '/app/bin/console', 'app:worker'], network: 'private', unit: DeploymentUnit::Control,
+            ipcVolume: 'private-ipc', appHome: '/app', deploymentProfile: new \App\Shared\Application\DTO\DeploymentProfile(), logVolume: 'retained-logs',
+        );
+        $inspection = self::inspection();
+        $inspection['mounts'] = array_map(static fn(array $item): array => [
+            'Type' => 'volume', 'Name' => $item[0], 'Driver' => 'local', 'Source' => '/volumes/' . $item[0], 'Destination' => $item[1], 'RW' => true,
+        ], [['private-ipc', '/run/baander-worker'], ['retained-logs', '/var/log/baander']]);
+        $calls = [];
+        $agentId = str_repeat('f', 64);
+        $containment = new DockerWorkerContainment(static function (array $arguments) use (&$calls, $inspection, $agentId): string {
+            $calls[] = $arguments;
+            if ($arguments[0] === 'volume') {
+                $name = $arguments[4];
+                return json_encode(['name' => $name, 'driver' => 'local', 'options' => null, 'scope' => 'local', 'mountpoint' => '/volumes/' . $name], JSON_THROW_ON_ERROR);
+            }
+            return match ($arguments[1]) {
+                'inspect' => json_encode($inspection, JSON_THROW_ON_ERROR),
+                'ls' => $agentId,
+                'exec' => '{"complete":true}',
+                default => self::ID,
+            };
+        }, $recipe);
+        $containment->retire(self::ID, $this->lease(), DeploymentUnit::Control);
+        $containerCalls = array_values(array_filter($calls, static fn(array $arguments): bool => $arguments[0] === 'container'));
+        self::assertSame(['inspect', 'stop', 'ls', 'exec', 'rm'], array_column($containerCalls, 1));
+        self::assertSame(['container', 'exec', $agentId, 'php', '/app/bin/log-agent.php', '--checkpoint', self::ID, '--timeout=5'], $containerCalls[3]);
+        self::assertContains('label=io.baander.log-namespace=worker.baander.app', $containerCalls[2]);
+    }
+
     public function testMatchingSafeDeploymentRequiresSuccessfulExactIdRemoval(): void
     {
         $calls = [];

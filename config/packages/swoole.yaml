@@ -44,6 +44,8 @@ swoole:
                 monolog_formatter_service_name: null
                 monolog_formatter_format: null
         settings:
+            # Agent HTTP and isolated log SQL must yield while waiting for I/O.
+            hook_flags: !php/const App\Kernel::LOG_QUERY_HOOKS
             log_file: '%kernel.logs_dir%/swoole_%kernel.environment%.log'
             log_level: warning
             # No pid file: one left by an unclean exit (the drain watchdog, SIGKILL) names PID 1, and

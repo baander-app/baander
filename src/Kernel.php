@@ -6,6 +6,7 @@ use App\Shared\Domain\Event\Outbox\OutboxSubscriberPass;
 use App\Shared\Infrastructure\Doctrine\Type\CustomTypesRegistrar;
 use App\Shared\Infrastructure\Logging\BoundedContextLoggerPass;
 use App\Shared\Infrastructure\Logging\MonologHandlerResetterPass;
+use App\Shared\Infrastructure\Logging\TerminalLogGuardPass;
 use App\Shared\Infrastructure\Security\ProductionSecrets;
 use App\Shared\Infrastructure\Swoole\DBAL\DBALAliveKeeperCompilerPass;
 use App\Shared\Infrastructure\Swoole\ServeCommandPass;
@@ -17,6 +18,8 @@ use Symfony\Component\HttpKernel\Kernel as BaseKernel;
 
 class Kernel extends BaseKernel
 {
+    public const int LOG_QUERY_HOOKS = SWOOLE_HOOK_NATIVE_CURL | SWOOLE_HOOK_PROC;
+
     use CoroutinesSupportingKernel, MicroKernelTrait {
         CoroutinesSupportingKernel::initializeContainer insteadof MicroKernelTrait;
         CoroutinesSupportingKernel::getContainerBaseClass insteadof MicroKernelTrait;
@@ -44,12 +47,27 @@ class Kernel extends BaseKernel
         parent::boot();
     }
 
+    public function getLogDir(): string
+    {
+        $directory = ProductionSecrets::environmentValue('BAANDER_LOG_DIR');
+        if ($directory === null || $directory === '') {
+            return parent::getLogDir();
+        }
+        if (!str_starts_with($directory, '/') || str_contains($directory, "\0")
+            || preg_match('~(?:^|/)\.\.?(?:/|$)~', $directory) === 1) {
+            throw new \LogicException('BAANDER_LOG_DIR must be an absolute directory without traversal segments.');
+        }
+
+        return rtrim($directory, '/') ?: '/';
+    }
+
     protected function build(ContainerBuilder $container): void
     {
         parent::build($container);
         $container->addCompilerPass(new BoundedContextLoggerPass());
         $container->addCompilerPass(new DBALAliveKeeperCompilerPass());
         $container->addCompilerPass(new MonologHandlerResetterPass());
+        $container->addCompilerPass(new TerminalLogGuardPass());
         $container->addCompilerPass(new OutboxSubscriberPass());
         $container->addCompilerPass(new \App\Shared\Infrastructure\Messaging\AsyncWorkloadCompilerPass(), PassConfig::TYPE_BEFORE_REMOVING, 10);
         $container->addCompilerPass(new ServeCommandPass(), PassConfig::TYPE_BEFORE_REMOVING, 10);

@@ -6,7 +6,8 @@ namespace Baander\Tooling\Development;
 
 use Baander\Tooling\Process\{CommandExecutor, ProcessSpec, CompletionPolicy};
 use Baander\Tooling\Configuration\ApplicationLayout;
-use Baander\Tooling\Deployment\Pooler;
+use Baander\Tooling\Deployment\{Pooler, LogCollection};
+use Baander\Tooling\Docker\Target;
 use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Filesystem\PrivateDirectory;
 use Baander\Tooling\Resources\DisposableContainer;
@@ -96,9 +97,12 @@ class Runtime
             'DEFAULT_URI' => $origin,
             'APP_DOMAIN' => $instance['hostname'],
             'TRUSTED_PROXIES' => $instance['proxy_ip'] ?? '',
+            'BAANDER_LOG_DIR' => LogCollection::ROOT . '/web/' . ($instance['log_boot_id'] ?? $instance['id']),
+            'BAANDER_LOG_NODES' => LogCollection::nodes($project, $environment['BAANDER_LOG_NODES'] ?? '[]'),
         ]);
         $mounts = [
             self::volume('var', $home . '/var'),
+            self::volume('logs', LogCollection::ROOT),
             self::volume('secrets', $home . '/config/secrets'),
             self::volume('media', $environment['MEDIA_STORAGE_PATH'] ?? '/storage/media'),
             self::volume('storage', $home . '/storage'),
@@ -266,6 +270,31 @@ class Runtime
                     ? [...self::volume($key, $saved['target']), 'read_only' => true]
                     : self::volume($key, $saved['target']));
         }
+        $credentials = LogCollection::credentials($this->store->directory($instance['id']) . '/log-credentials');
+        $services['app']['volumes'][] = self::bind($credentials['query'], LogCollection::QUERY_TOKEN);
+        $groups = [
+            ['labels' => ['com.docker.compose.project' => $project]],
+            ['labels' => ['app.baander.worker.namespace' => $project], 'serviceLabel' => 'app.baander.worker.role'],
+            ['labels' => ['com.docker.compose.project' => 'baander-development-gateway-' . $this->store->scope()], 'requestHost' => $instance['hostname']],
+        ];
+        $target = Target::fromArray($instance['docker']);
+        $collectorImage = $instance['kind'] === 'preview'
+            ? ($instance['prepared_release']['images']['operator_image']['resolvedId'] ?? $release['images']['operator_image']['resolvedId'])
+            : $release['images']['operator_image']['resolvedId'];
+        $services['log-agent'] = LogCollection::service($collectorImage, $home, $target, dirname($credentials['query']), LogCollection::configuration($project, $target, $groups));
+        if ($instance['kind'] === 'preview') {
+            // Checkpoint preflight temporarily renders the prior release; collection still uses
+            // the current preview source and its prepared standalone PHP runtime.
+            $services['log-agent']['volumes'][] = self::bind(\Baander\Tooling\Filesystem\Paths::resolvedPath($instance['worktree']), $home);
+            $services['log-agent']['volumes'][] = [...self::volume('vendor', $home . '/vendor'), 'read_only' => true];
+        }
+        $services['log-agent']['networks'] = ['private' => new \stdClass()];
+        foreach ($services as $name => &$service) {
+            if ($name !== 'log-agent') {
+                $service['depends_on']['log-agent'] = ['condition' => 'service_started'];
+            }
+        }
+        unset($service);
         foreach ($services as &$service) {
             $service['environment'] = array_map(
                 static fn(string $value): string => str_replace('$', '$$', $value),
@@ -287,6 +316,8 @@ class Runtime
             'vendor',
             'node_modules',
             'pooler_credentials',
+            'logs',
+            'log_index',
         ] as $key) {
             $volumes[$key] = ['name' => $instance['volumes'][$key] ?? $project . '-' . $key];
             if (isset($instance['volumes'][$key])) {
@@ -333,10 +364,16 @@ class Runtime
      */
     public static function hasPooler(array $instance): bool
     {
+        return self::hasService($instance, Pooler::SERVICE);
+    }
+
+    /** @param array<string,mixed> $instance */
+    private static function hasService(array $instance, string $service): bool
+    {
         $content = is_string($instance['compose_file'] ?? null) ? @file_get_contents($instance['compose_file']) : false;
         $compose = $content === false ? null : json_decode($content, true);
 
-        return isset($compose['services'][Pooler::SERVICE]);
+        return isset($compose['services'][$service]);
     }
 
     /** @param array<string,mixed> $instance */
@@ -469,6 +506,7 @@ class Runtime
             $directory . '/frontend.conf.template',
             str_replace('include /etc/nginx/preview.conf;', $preview, $content),
         );
+        $instance['log_boot_id'] = bin2hex(random_bytes(16));
         AtomicFile::writeJson($directory . '/compose.json', $this->config($instance, $release));
         $files = [];
         foreach ([$directory . '/compose.json', $directory . '/frontend.conf.template'] as $path) {
@@ -489,7 +527,14 @@ class Runtime
     {
         $docker = $this->connections->client($instance['docker']);
         $docker->validateIdentity();
-        $services = ['app', 'nginx', 'postgres', 'redis'];
+        // A generated topology change needs reactivation before selecting its new services.
+        if (!self::hasService($instance, 'log-agent')) {
+            return false;
+        }
+        $services = ['app', 'nginx', 'postgres', 'redis', 'log-agent'];
+        if (self::hasPooler($instance)) {
+            $services[] = Pooler::SERVICE;
+        }
         if ($instance['kind'] === 'preview') {
             $services[] = 'vite';
         }
@@ -587,6 +632,7 @@ class Runtime
         }
         $destinations = [
             'public' => $home . '/public',
+            'logs' => LogCollection::ROOT,
             'var' => $home . '/var',
             'storage' => $home . '/storage',
             'conversions' => '/storage/conversions',
@@ -673,7 +719,7 @@ class Runtime
         $docker->compose(
             $instance['project'],
             $instance['compose_file'],
-            ['up', '-d', '--no-deps', 'app', ...($instance['kind'] === 'preview' ? ['vite'] : [])],
+            ['up', '-d', '--no-deps', 'log-agent', 'app', ...($instance['kind'] === 'preview' ? ['vite'] : [])],
         );
     }
 

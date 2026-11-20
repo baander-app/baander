@@ -1050,3 +1050,17 @@ A page of the public website that publishes a tracked repository document as it 
 ### Capture record
 
 The tracked entry for one website picture: the capture scene that took it, the application commit it shows, the date, and a checksum of its dark and light files. The site build refuses a feature page that shows a picture without a matching record, and the site's script tests refuse any picture file without one.
+
+## Log investigation
+
+### Log source
+
+An admitted container stream, application file or archive member collected by a deployment's log agent. Its identity includes the origin and generation, so a replacement worker's records remain distinguishable from its predecessor's. See [log investigation](docs-book/part-1-operator-guide/operations/log-viewer.md).
+
+### Log snapshot
+
+The fixed source boundaries and filters used by a log query. Paging keeps those boundaries while live follow starts a new snapshot. A SQL result describes the snapshot it queried and whether the selected sources were complete.
+
+### Collection gap
+
+A known interval or source for which log collection cannot establish completeness, including unavailable hosts, expired history and ambiguous Docker replay. A gap remains visible alongside the records that are available; accepting a partial SQL result does not remove it.

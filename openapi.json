@@ -18708,6 +18708,215 @@
                 }
             }
         },
+        "/api/admin/logs/sources": {
+            "get": {
+                "tags": [
+                    "System"
+                ],
+                "summary": "List configured log sources and host coverage",
+                "operationId": "get_admin_logs_sources",
+                "responses": {
+                    "200": {
+                        "description": "Source inventory",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/LogSourcesResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/logs/entries": {
+            "get": {
+                "tags": [
+                    "System"
+                ],
+                "summary": "Browse a bounded frozen log snapshot",
+                "operationId": "get_admin_logs_entries",
+                "parameters": [
+                    {
+                        "name": "sources",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "levels",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "channels[]",
+                        "in": "query",
+                        "style": "form",
+                        "explode": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    {
+                        "name": "correlationId",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "since",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        }
+                    },
+                    {
+                        "name": "until",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 500,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "order",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "asc",
+                                "desc"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Log snapshot page",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/LogEntriesResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/logs/entries/{id}": {
+            "get": {
+                "tags": [
+                    "System"
+                ],
+                "summary": "Inspect a retained log record",
+                "operationId": "get_admin_logs_detail",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Retained log record",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/LogRecordResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/logs/query": {
+            "post": {
+                "tags": [
+                    "System"
+                ],
+                "summary": "Execute read-only SQL against a frozen log snapshot",
+                "operationId": "post_admin_logs_query",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/LogSqlRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "SQL rows and snapshot coverage",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/LogSqlResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/debug/config-check": {
             "get": {
                 "tags": [
@@ -26682,6 +26891,80 @@
                 },
                 "type": "object"
             },
+            "LogFilterRequest": {
+                "properties": {
+                    "sources": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": []
+                    },
+                    "search": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "levels": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": []
+                    },
+                    "channel": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "correlationId": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null
+                    },
+                    "since": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null
+                    },
+                    "until": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 200
+                    },
+                    "cursor": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null
+                    },
+                    "order": {
+                        "type": "string",
+                        "default": "desc"
+                    }
+                },
+                "type": "object"
+            },
+            "LogSqlRequest": {
+                "required": [
+                    "sql"
+                ],
+                "properties": {
+                    "sql": {
+                        "type": "string",
+                        "maxLength": 65536
+                    },
+                    "allowPartial": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "filter": {
+                        "$ref": "#/components/schemas/LogFilterRequest"
+                    }
+                },
+                "type": "object"
+            },
             "UpdateSystemSettingsRequest": {
                 "required": [
                     "settings"
@@ -30997,6 +31280,349 @@
                         },
                         "type": "object",
                         "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "LogSourceResource": {
+                "required": [
+                    "id",
+                    "node",
+                    "name",
+                    "service",
+                    "kind",
+                    "format",
+                    "size",
+                    "status",
+                    "available",
+                    "lastCollectedAt",
+                    "retainedFrom",
+                    "issues"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "node": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "service": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "kind": {
+                        "type": "string"
+                    },
+                    "format": {
+                        "type": "string"
+                    },
+                    "size": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "available": {
+                        "type": "boolean"
+                    },
+                    "lastCollectedAt": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "retainedFrom": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "issues": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "stream": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "archive": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "member": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "container": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "error": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "LogNodeResource": {
+                "required": [
+                    "id",
+                    "status"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "healthy",
+                            "unreachable"
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "LogCoverageResource": {
+                "required": [
+                    "complete",
+                    "reasons"
+                ],
+                "properties": {
+                    "complete": {
+                        "type": "boolean"
+                    },
+                    "reasons": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "LogSourcesResource": {
+                "required": [
+                    "items",
+                    "nodes",
+                    "channels",
+                    "coverage"
+                ],
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/LogSourceResource"
+                        }
+                    },
+                    "nodes": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/LogNodeResource"
+                        }
+                    },
+                    "channels": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "coverage": {
+                        "$ref": "#/components/schemas/LogCoverageResource"
+                    }
+                },
+                "type": "object"
+            },
+            "LogRecordResource": {
+                "required": [
+                    "id",
+                    "sourceId",
+                    "timestamp",
+                    "level",
+                    "channel",
+                    "message",
+                    "context",
+                    "extra",
+                    "raw",
+                    "correlationId",
+                    "node",
+                    "service",
+                    "stream",
+                    "truncated",
+                    "format"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "sourceId": {
+                        "type": "string"
+                    },
+                    "timestamp": {
+                        "type": "string"
+                    },
+                    "level": {
+                        "type": "string"
+                    },
+                    "channel": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "context": {
+                        "oneOf": [
+                            {
+                                "type": "object",
+                                "additionalProperties": true
+                            },
+                            {
+                                "type": "array",
+                                "items": {}
+                            }
+                        ]
+                    },
+                    "extra": {
+                        "oneOf": [
+                            {
+                                "type": "object",
+                                "additionalProperties": true
+                            },
+                            {
+                                "type": "array",
+                                "items": {}
+                            }
+                        ]
+                    },
+                    "raw": {
+                        "type": "string"
+                    },
+                    "correlationId": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "node": {
+                        "type": "string"
+                    },
+                    "service": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "stream": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "truncated": {
+                        "type": "boolean"
+                    },
+                    "format": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "LogSnapshotResource": {
+                "required": [
+                    "id",
+                    "createdAt",
+                    "expiresAt",
+                    "filters",
+                    "nodeSnapshots"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "expiresAt": {
+                        "type": "string"
+                    },
+                    "filters": {
+                        "type": "string"
+                    },
+                    "nodeSnapshots": {
+                        "type": "object",
+                        "additionalProperties": true
+                    }
+                },
+                "type": "object"
+            },
+            "LogEntriesResource": {
+                "required": [
+                    "items",
+                    "nextCursor",
+                    "snapshot",
+                    "coverage"
+                ],
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/LogRecordResource"
+                        }
+                    },
+                    "nextCursor": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "snapshot": {
+                        "$ref": "#/components/schemas/LogSnapshotResource"
+                    },
+                    "coverage": {
+                        "$ref": "#/components/schemas/LogCoverageResource"
+                    }
+                },
+                "type": "object"
+            },
+            "LogSqlResource": {
+                "required": [
+                    "columns",
+                    "rows",
+                    "truncated",
+                    "snapshot",
+                    "coverage"
+                ],
+                "properties": {
+                    "columns": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "rows": {
+                        "type": "array",
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    {
+                                        "type": "number",
+                                        "nullable": true
+                                    },
+                                    {
+                                        "type": "boolean",
+                                        "nullable": true
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "truncated": {
+                        "type": "boolean"
+                    },
+                    "snapshot": {
+                        "$ref": "#/components/schemas/LogSnapshotResource"
+                    },
+                    "coverage": {
+                        "$ref": "#/components/schemas/LogCoverageResource"
                     }
                 },
                 "type": "object"

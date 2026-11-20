@@ -264,3 +264,11 @@ Symfony's built-in commands handle one message by ID. Pass `--force` to skip the
 | [app:e2e:ingest-video](app-e2e-ingest-video.md) | Ingest a directory of video files as a movie library, without workers |
 | [app:export-openapi-spec](app-export-openapi-spec.md) | Export the OpenAPI spec to a file |
 | [app:generate-docs](app-generate-docs.md) | Generate the documentation site from source code and docs-book/ |
+
+## Logs
+
+| Command | Description |
+|---------|-------------|
+| [app:log:query](app-log-query.md) | Run read-only SQL against a log snapshot |
+| [app:log:sources](app-log-sources.md) | List admitted sources and collection coverage |
+| [app:log:view](app-log-view.md) | Browse current and archived logs in a terminal |

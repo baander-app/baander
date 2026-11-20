@@ -35,6 +35,7 @@ FORMAT;
     public function retire(string $containerId, DeploymentLease $lease, DeploymentUnit $unit): void
     {
         $this->verifyIsolation($containerId, $lease->namespace, $lease->bootId, $unit);
+        $this->checkpointLogs($containerId);
         $removed = ($this->execute)(['container', 'rm', '--force', $containerId]);
         if (trim($removed) !== $containerId) {
             throw new RuntimeException('Immutable container removal was not confirmed.');
@@ -64,9 +65,38 @@ FORMAT;
             throw new RuntimeException('Container listing did not confirm the exact immutable ID.');
         }
         $this->verifyIsolation($containerId, $namespace, $bootId, $unit);
+        $this->checkpointLogs($containerId);
         $removed = ($this->execute)(['container', 'rm', '--force', $containerId]);
         if (trim($removed) !== $containerId) {
             throw new RuntimeException('Immutable container removal was not confirmed.');
+        }
+    }
+
+    /** A bounded checkpoint follows stop, while the immutable container still owns its stream. */
+    private function checkpointLogs(string $containerId): void
+    {
+        if ($this->recipe?->logVolume === null) {
+            return;
+        }
+        try {
+            ($this->execute)(['container', 'stop', '--time', '5', $containerId]);
+            $agent = trim(($this->execute)([
+                'container', 'ls', '--no-trunc', '--filter', 'label=io.baander.log-agent=true',
+                '--filter', 'label=io.baander.log-namespace=' . $this->recipe->namespace, '--format', '{{.ID}}',
+            ]));
+            if (preg_match('/\A[0-9a-f]{64}\z/D', $agent) !== 1) {
+                throw new RuntimeException('No unique collection agent is running.');
+            }
+            ($this->execute)(['container', 'exec', $agent, 'php', $this->recipe->appHome . '/bin/log-agent.php', '--checkpoint', $containerId, '--timeout=5']);
+        } catch (\Throwable) {
+            $directory = $this->recipe->logDirectory();
+            if (!is_dir($directory) && !@mkdir($directory, 0770, true) && !is_dir($directory)) {
+                throw new RuntimeException('Cannot retain the failed final log collection checkpoint.');
+            }
+            $gap = json_encode(['timestamp' => gmdate('c'), 'level' => 'warning', 'message' => 'Final container log collection checkpoint was not confirmed.', 'containerId' => $containerId, 'coverage' => 'gap'], JSON_THROW_ON_ERROR) . "\n";
+            if (@file_put_contents($directory . '/collection-gaps.jsonl', $gap, FILE_APPEND | LOCK_EX) !== strlen($gap)) {
+                throw new RuntimeException('Cannot retain the failed final log collection checkpoint.');
+            }
         }
     }
 
@@ -130,6 +160,9 @@ FORMAT;
     private function verifyMounts(mixed $mounts): void
     {
         $expected = $this->recipe->mediaMounts ?? [];
+        if ($this->recipe?->logVolume !== null) {
+            $expected[] = ['volume' => $this->recipe->logVolume, 'target' => '/var/log/baander', 'readOnly' => false, 'role' => 'logs'];
+        }
         if ($this->recipe !== null) {
             $expected[] = ['volume' => $this->recipe->ipcVolume, 'target' => '/run/baander-worker', 'readOnly' => false, 'role' => 'ipc'];
         }
