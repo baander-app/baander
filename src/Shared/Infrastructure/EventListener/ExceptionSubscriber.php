@@ -13,6 +13,7 @@ use App\Shared\Application\Exception\RetryableFault;
 use App\Shared\Application\Exception\ServiceUnavailableException;
 use App\Shared\Application\Http\RequestLocale;
 use App\Shared\Interface\DTO\ApiError;
+use Doctrine\DBAL\Exception\DriverException;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -27,6 +28,9 @@ use Throwable;
 #[AsEventListener(event: KernelEvents::EXCEPTION, priority: 0)]
 final class ExceptionSubscriber
 {
+    /** PostgreSQL's lock_not_available: a lock wait passed the transaction's lock_timeout. */
+    private const string LOCK_NOT_AVAILABLE = '55P03';
+
     public function __construct(
         private readonly LoggerInterface $logger,
         private readonly TranslatorInterface $translator,
@@ -115,11 +119,13 @@ final class ExceptionSubscriber
 
     /**
      * 503 with Retry-After for a fault that decided nothing about the request, so the client
-     * retries it with the same credentials. The fault is logged; its message is not shown.
+     * retries it with the same credentials: a RetryableFault, or a lock wait that passed the
+     * transaction's lock timeout and rolled the transaction back. The fault is logged; its
+     * message is not shown.
      */
     private function respondWithRetryAfter(ExceptionEvent $event, Throwable $exception): bool
     {
-        if (!$exception instanceof RetryableFault) {
+        if (!$exception instanceof RetryableFault && !self::isLockTimeout($exception)) {
             return false;
         }
 
@@ -135,6 +141,11 @@ final class ExceptionSubscriber
         ]));
 
         return true;
+    }
+
+    private static function isLockTimeout(Throwable $exception): bool
+    {
+        return $exception instanceof DriverException && $exception->getSQLState() === self::LOCK_NOT_AVAILABLE;
     }
 
     /**

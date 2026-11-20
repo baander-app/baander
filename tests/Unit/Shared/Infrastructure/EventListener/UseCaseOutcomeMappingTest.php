@@ -12,6 +12,8 @@ use App\Shared\Application\Exception\RetryableFault;
 use App\Shared\Application\Exception\ServiceUnavailableException;
 use App\Shared\Application\Http\RequestLocale;
 use App\Shared\Infrastructure\EventListener\ExceptionSubscriber;
+use Doctrine\DBAL\Driver\AbstractException;
+use Doctrine\DBAL\Exception\DriverException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -176,6 +178,35 @@ final class UseCaseOutcomeMappingTest extends TestCase
             ['error' => ['message' => 'The server is temporarily unavailable; retry after the Retry-After delay.', 'code' => 503]],
             $this->body($response),
         );
+    }
+
+    /**
+     * A transaction whose lock wait passed its lock timeout decided nothing, so its handler's
+     * failure is a 503 the client retries; PostgreSQL reports it only by SQLSTATE.
+     */
+    public function testALockTimeoutFromAHandlerIsA503WithRetryAfterAndNoStore(): void
+    {
+        $response = $this->handle($this->dispatching($this->bus(static function (): never {
+            throw new DriverException(new class ('SQLSTATE[55P03]: Lock not available: canceling statement due to lock timeout', '55P03') extends AbstractException {}, null);
+        })));
+
+        $this->assertSame(Response::HTTP_SERVICE_UNAVAILABLE, $response->getStatusCode());
+        $this->assertSame((string) RetryableFault::RETRY_AFTER_SECONDS, $response->headers->get('Retry-After'));
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+        $this->assertSame(
+            ['error' => ['message' => 'The server is temporarily unavailable; retry after the Retry-After delay.', 'code' => 503]],
+            $this->body($response),
+        );
+    }
+
+    public function testAnotherDatabaseErrorFromAHandlerStaysA500(): void
+    {
+        $response = $this->handle($this->dispatching($this->bus(static function (): never {
+            throw new DriverException(new class ('SQLSTATE[42P01]: Undefined table', '42P01') extends AbstractException {}, null);
+        })));
+
+        $this->assertSame(Response::HTTP_INTERNAL_SERVER_ERROR, $response->getStatusCode());
+        $this->assertFalse($response->headers->has('Retry-After'));
     }
 
     public function testAnHttpExceptionFromAHandlerIsPassedOnUnwrappedForTheFrameworkToRender(): void

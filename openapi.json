@@ -3585,7 +3585,7 @@
                         }
                     },
                     "503": {
-                        "description": "The DPoP nonce store or the passkey challenge store is unavailable; retry after the Retry-After delay. When the nonce store is down, the proof could not be checked and the answer carries no DPoP-Nonce header.",
+                        "description": "The DPoP nonce store or the passkey challenge store is unavailable, or issuing the session waited too long on a database lock; retry after the Retry-After delay. When the nonce store is down, the proof could not be checked and the answer carries no DPoP-Nonce header.",
                         "headers": {
                             "Retry-After": {
                                 "description": "Seconds to wait before retrying",
@@ -4710,7 +4710,7 @@
                         }
                     },
                     "503": {
-                        "description": "The DPoP nonce store is unavailable, so the proof could not be checked; retry after the Retry-After delay. Carries no DPoP-Nonce header.",
+                        "description": "The DPoP nonce store is unavailable, so the proof could not be checked, or issuing the session waited too long on a database lock; retry after the Retry-After delay. Carries no DPoP-Nonce header.",
                         "headers": {
                             "Retry-After": {
                                 "description": "Seconds to wait before retrying",

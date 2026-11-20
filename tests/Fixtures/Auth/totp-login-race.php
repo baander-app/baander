@@ -10,7 +10,8 @@ declare(strict_types=1);
  * Arguments: the shared directory (JWT keys and logs of the kernel), the application name
  * to report in pg_stat_activity, the client IP, the email, the password and the code. The
  * issuance faults of this process are controlled through IssuanceFaults' environment
- * variable. Prints the status and the decoded body of the answer as JSON.
+ * variable. Prints the status, the Retry-After header and the decoded body of the answer as
+ * JSON.
  */
 
 use App\Tests\Fixtures\Auth\ProductionOAuthKernel;
@@ -74,5 +75,6 @@ $response = $send('/api/auth/login', $credentials, ['DPoP' => $key->createWithNo
 
 echo json_encode([
     'status' => $response->getStatusCode(),
+    'retryAfter' => $response->headers->get('Retry-After'),
     'body' => json_decode((string) $response->getContent(), true),
 ], JSON_THROW_ON_ERROR);

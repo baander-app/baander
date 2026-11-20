@@ -273,6 +273,27 @@ final class PasswordChangeSessionRevocationTest extends TestCase
         $this->assertSignedOut($session, $key);
     }
 
+    /**
+     * A login whose issuance waits on the account's row past the issuance lock timeout is
+     * answered with 503 and Retry-After, so the client retries, and issues no session.
+     */
+    public function testALoginWhoseIssuanceTimesOutOnTheAccountsRowAnswers503WithRetryAfter(): void
+    {
+        $this->connection->beginTransaction();
+        try {
+            $this->connection->executeQuery('SELECT 1 FROM users WHERE id = ? FOR UPDATE', [$this->user->getId()->toString()])->free();
+            $login = $this->startLogin(self::PASSWORD);
+            $this->awaitWaitOnThisSession($login);
+            $answer = $this->finish($login);
+        } finally {
+            $this->connection->rollBack();
+        }
+
+        self::assertSame(503, $answer['status'], json_encode($answer, JSON_THROW_ON_ERROR));
+        self::assertSame('5', $answer['retryAfter'] ?? null);
+        self::assertSame(0, $this->liveAccessTokens(), 'The login issued no session.');
+    }
+
     private function assertReadCommitted(): void
     {
         // The fence re-reads the account's epoch in a statement of its own after the lock.
@@ -350,7 +371,7 @@ final class PasswordChangeSessionRevocationTest extends TestCase
     /**
      * @param array{process: resource, output: resource, application: string} $child
      *
-     * @return array{status: int, body: mixed}
+     * @return array{status: int, retryAfter?: string|null, body: mixed}
      */
     private function finish(array $child): array
     {
@@ -370,7 +391,7 @@ final class PasswordChangeSessionRevocationTest extends TestCase
         self::assertIsArray($decoded);
         self::assertIsInt($decoded['status'] ?? null, $result);
 
-        /** @var array{status: int, body: mixed} $decoded */
+        /** @var array{status: int, retryAfter?: string|null, body: mixed} $decoded */
         return $decoded;
     }
 

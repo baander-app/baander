@@ -62,7 +62,7 @@ final class PasskeyLoginController
             new OA\Response(response: '401', description: 'Invalid passkey or verification failed', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(
                 response: '503',
-                description: 'The DPoP nonce store or the passkey challenge store is unavailable; retry after the Retry-After delay. When the nonce store is down, the proof could not be checked and the answer carries no DPoP-Nonce header.',
+                description: 'The DPoP nonce store or the passkey challenge store is unavailable, or issuing the session waited too long on a database lock; retry after the Retry-After delay. When the nonce store is down, the proof could not be checked and the answer carries no DPoP-Nonce header.',
                 headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 5))],
                 content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
             ),

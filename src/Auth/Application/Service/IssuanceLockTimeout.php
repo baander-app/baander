@@ -13,8 +13,9 @@ use Doctrine\ORM\EntityManagerInterface;
  * successors and the access rows in one order, and a password change locks the user row
  * before any token row, so they never deadlock; what remains is a lock a
  * stuck transaction holds. Past this bound the issuing transaction fails as a server
- * fault, which the token endpoints answer with 503 and Retry-After inside the client's
- * attempt timeout, instead of holding the request until the client gives up.
+ * fault, which every endpoint that issues or refreshes tokens, the logins included,
+ * answers with 503 and Retry-After inside the client's attempt timeout, instead of
+ * holding the request until the client gives up.
  *
  * The setting is transaction-local: it applies only to the transaction that set it.
  */

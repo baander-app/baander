@@ -59,7 +59,7 @@ final class LoginController
             new OA\Response(response: '401', description: 'Invalid credentials', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(
                 response: '503',
-                description: 'The DPoP nonce store is unavailable, so the proof could not be checked; retry after the Retry-After delay. Carries no DPoP-Nonce header.',
+                description: 'The DPoP nonce store is unavailable, so the proof could not be checked, or issuing the session waited too long on a database lock; retry after the Retry-After delay. Carries no DPoP-Nonce header.',
                 headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 5))],
                 content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
             ),
