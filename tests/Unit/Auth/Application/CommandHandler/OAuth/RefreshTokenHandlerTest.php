@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Auth\Application\CommandHandler;
 use App\Auth\Application\Command\OAuth\RefreshTokenCommand;
 use App\Auth\Application\CommandHandler\OAuth\RefreshTokenHandler;
 use App\Auth\Application\Service\ChainConnectionCloser;
+use App\Auth\Application\Service\TokenChainRevoker;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Exception\RefreshTokenRejectedException;
 use App\Auth\Application\Port\JwtGeneratorInterface;
@@ -1112,7 +1113,7 @@ final class RefreshTokenHandlerTest extends TestCase
             $this->users(),
             $transaction,
             $this->logger(),
-            new ChainConnectionCloser($this->liveConnections, $this->logger()),
+            new TokenChainRevoker($refreshTokenRepo, $accessTokenRepo, $transaction, new ChainConnectionCloser($this->liveConnections, $this->logger())),
             accessTokenTtl: 3600,
             refreshTokenTtl: 2592000,
             reuseGraceSeconds: 60,
@@ -1144,7 +1145,7 @@ final class RefreshTokenHandlerTest extends TestCase
             $this->users(),
             $this->transaction,
             $this->logger(),
-            new ChainConnectionCloser($this->liveConnections, $this->logger()),
+            new TokenChainRevoker($this->refreshTokenRepository, $this->accessTokenRepository, $this->transaction, new ChainConnectionCloser($this->liveConnections, $this->logger())),
             accessTokenTtl: 3600,
             refreshTokenTtl: 2592000,
             reuseGraceSeconds: $reuseGraceSeconds,

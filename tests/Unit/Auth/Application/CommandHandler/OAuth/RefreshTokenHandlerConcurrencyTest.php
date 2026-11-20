@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Auth\Application\CommandHandler\OAuth;
 
 use App\Auth\Application\CommandHandler\OAuth\RefreshTokenHandler;
 use App\Auth\Application\Service\ChainConnectionCloser;
+use App\Auth\Application\Service\TokenChainRevoker;
 use App\Auth\Application\Command\OAuth\RefreshTokenCommand;
 use App\Auth\Application\Exception\RefreshTokenRejectedException;
 use App\Auth\Application\Port\JwtGeneratorInterface;
@@ -132,7 +133,7 @@ final class RefreshTokenHandlerConcurrencyTest extends TestCase
             $this->users(),
             $transaction,
             new NullLogger(),
-            new ChainConnectionCloser($this->createStub(LiveConnectionsPortInterface::class), new NullLogger()),
+            new TokenChainRevoker($this->refreshTokenRepository, $this->accessTokenRepository, $transaction, new ChainConnectionCloser($this->createStub(LiveConnectionsPortInterface::class), new NullLogger())),
             accessTokenTtl: 3600,
             refreshTokenTtl: 2592000,
             reuseGraceSeconds: 60,

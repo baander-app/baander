@@ -9,8 +9,8 @@ use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Exception\RefreshTokenRejectedException;
 use App\Auth\Application\Port\JwtGeneratorInterface;
-use App\Auth\Application\Service\ChainConnectionCloser;
 use App\Auth\Application\Service\IssuanceLockTimeout;
+use App\Auth\Application\Service\TokenChainRevoker;
 use App\Auth\Domain\Exception\TokenChainViolationException;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
@@ -89,7 +89,7 @@ final class RefreshTokenHandler
         private readonly UserRepositoryInterface $userRepository,
         private readonly TransactionPortInterface $transaction,
         private readonly LoggerInterface $logger,
-        private readonly ChainConnectionCloser $connectionCloser,
+        private readonly TokenChainRevoker $chainRevoker,
         int $accessTokenTtl,
         int $refreshTokenTtl,
         #[Autowire(param: 'auth.refresh.reuse_grace_seconds')]
@@ -373,27 +373,17 @@ final class RefreshTokenHandler
     }
 
     /**
-     * A reuse verdict ends the chain: refresh rows before access rows, each in id order,
-     * in a transaction of its own that commits before the rejection is answered.
-     * The chain's WebSocket connections are closed afterwards, as a logout closes them:
-     * whoever presented the replayed token must not keep a live socket either.
+     * A reuse verdict ends the chain, committed before the rejection is answered, and closes
+     * its WebSocket connections: whoever presented the replayed token must not keep a live
+     * socket either.
      */
     private function revokeChain(ChainId $chainId, string $reason): void
     {
-        $accessTokenIds = $this->transaction->run(function () use ($chainId): array {
-            $this->refreshTokenRepository->revokeByChainId($chainId);
-            // Listed under the refresh-row locks, so a rotation that committed a replacement
-            // before this verdict took them is in the list the web server closes.
-            $accessTokenIds = $this->accessTokenRepository->findTokenIdsByChainId($chainId);
-            $this->accessTokenRepository->revokeByChainId($chainId);
-
-            return $accessTokenIds;
-        });
+        $this->chainRevoker->revoke($chainId);
         $this->logger->warning('Refresh token reuse: {reason}; the chain is revoked.', [
             'chain_id' => $chainId->toString(),
             'reason' => $reason,
         ]);
-        $this->connectionCloser->close($accessTokenIds, $chainId);
     }
 
     /**
