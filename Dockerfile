@@ -472,6 +472,9 @@ COPY --from=builder /usr/bin/ts* /usr/bin/
 # Update linker cache for copied libraries
 RUN ldconfig
 
+# The log agent indexes retained records and reads gzip/ZIP archives.
+RUN php -r 'foreach (["curl", "mbstring", "sqlite3", "xml", "zip", "zlib"] as $name) { if (!extension_loaded($name)) { throw new RuntimeException("Missing log viewer extension: " . $name); } } $db = new SQLite3(":memory:"); $db->exec("CREATE VIRTUAL TABLE logs USING fts5(message, tokenize=trigram)");'
+
 # Set up user permissions
 RUN set -xe && \
     mkdir -p ${APP_HOME}/public && \

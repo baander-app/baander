@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "c648f8a70f29b0783bd5136eee5cfbf2",
+    "content-hash": "1616ee2053df7967a90d2278964b6918",
     "packages": [
         {
             "name": "baander/http-client",
@@ -18068,21 +18068,49 @@
     "platform": {
         "php": ">=8.5",
         "ext-ctype": "*",
+        "ext-curl": "*",
+        "ext-date": "*",
+        "ext-dom": "*",
+        "ext-ffi": "*",
         "ext-fileinfo": "*",
+        "ext-filter": "*",
         "ext-gd": "*",
+        "ext-hash": "*",
         "ext-iconv": "*",
         "ext-inotify": "*",
+        "ext-intl": "*",
+        "ext-json": "*",
+        "ext-libxml": "*",
+        "ext-mbstring": "*",
         "ext-openssl": "*",
         "ext-pcntl": "*",
+        "ext-pcre": "*",
         "ext-pdo": "*",
+        "ext-pdo_pgsql": "*",
         "ext-pgsql": "*",
         "ext-posix": "*",
+        "ext-random": "*",
         "ext-redis": "*",
+        "ext-reflection": "*",
+        "ext-session": "*",
+        "ext-simplexml": "*",
         "ext-sockets": "*",
         "ext-sodium": "*",
-        "ext-swoole": "*"
+        "ext-spl": "*",
+        "ext-sqlite3": "*",
+        "ext-swoole": "*",
+        "ext-tokenizer": "*",
+        "ext-uri": "*",
+        "ext-xml": "*",
+        "ext-zip": "*",
+        "ext-zlib": "*"
     },
-    "platform-dev": {},
+    "platform-dev": {
+        "ext-pdo_sqlite": "*",
+        "ext-phar": "*",
+        "ext-xmlwriter": "*",
+        "ext-yaml": "*"
+    },
     "platform-overrides": {
         "ext-swoole": "6.2.4"
     },

@@ -54,7 +54,6 @@ Thumbs.db
 /ui/site/node_modules/
 /ui/site/.yarn/install-state.gz
 /ui/site/test-results/
-/ui/site/playwright-report/
 /ui/site/.vercel/
 ###< Docker ###
 
@@ -95,12 +94,13 @@ public/dsp/
 /public/.vite/
 /.idea/prettier.xml
 .deptrac.cache
+.php-cs-fixer.cache
 
 ###> rpiv ###
 .rpiv/
 ###< rpiv ###
 
-ui/web/playwright-report
+playwright-report/
 ui/web/tests/e2e/__screenshots__
 .context/compound-engineering/
 /build

@@ -69,7 +69,7 @@ COPY --from=composer:2.11.1@sha256:537fb03057ed901ae06bde7ef25af348903485ae1acc7
 ENV PATH="/opt/php/bin:${PATH}"
 
 RUN php -v && php --ri swoole && php --ri yaml \
-    && php -r 'foreach (["dom", "ffi", "mbstring", "openssl", "pdo_sqlite", "sockets", "sqlite3", "tokenizer", "xml", "xmlwriter", "zip"] as $extension) { if (!extension_loaded($extension)) { throw new RuntimeException("Missing extension: " . $extension); } }'
+    && php -r 'foreach (["dom", "ffi", "mbstring", "openssl", "pdo_sqlite", "sockets", "sqlite3", "tokenizer", "xml", "xmlwriter", "zip", "zlib"] as $extension) { if (!extension_loaded($extension)) { throw new RuntimeException("Missing extension: " . $extension); } } $db = new SQLite3(":memory:"); $db->exec("CREATE VIRTUAL TABLE logs USING fts5(message, tokenize=trigram)");'
 
 FROM tooling AS runner
 
