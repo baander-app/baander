@@ -160,6 +160,12 @@ their runtime and lock match; their identity must be recorded with results.
 
 - Goal: Prove that both ordinary PHP and the shipping executable load and use all four packages.
 - Files: Root Composer lock/manifests, `config/services.yaml`, `deptrac.yaml`, `phpstan.dist.neon`, `phpunit.xml.dist`, `tools/typephp/application.yml`, relevant build/test source-discovery configuration, package README files and `ROADMAP.md`.
+- WebSocket fixture identity correction: the shutdown ticket request returns `insufficient_scope` because `StreamClient` creates a delegated client and ticket issuance is intentionally first-party-only. Allow the fixture to accept a concrete configured first-party client for ticket scenarios, preserve delegated streaming defaults, audit ticket callers, and verify the shutdown flow.
+- Runtime fixture membership correction: after the origin fix, the stream probe returns library-scope HTTP 403 and the fixture has no `user_library_access` rows. `tests/Fixtures/web-runtime.php` must grant its generated library to an explicitly supplied listener. Pass the intended listener from both web workflow callers, preserve delegated tokens, and verify the real web and shutdown drills.
+- Runtime qualification correction: `packages/baander-tooling/src/Fixtures/Web/RuntimeWorkflow.php` configures a public issuer but its clients sign loopback DPoP proofs. The web drill returns HTTP 403 under the existing explicit-origin validator. The same configuration omission exists in `packages/baander-tooling/src/Fixtures/Web/ShutdownWorkflow.php`. Add the loopback origin to both disposable fixtures' `AUTH_DPOP_EXTRA_ORIGINS`, cover their container environments in `scripts/tests/php/WebRuntimeWorkflowTest.php` and `scripts/tests/php/WebWorkflowTest.php`, and rerun the packaged web and shutdown drills. Keep production origin validation unchanged.
+- Review correction: the qualification image service override and its tooling tests still referenced the old HTTP classes. Update those consumers in `packages/baander-tooling/src/Fixtures/Qualification/Images.php`, `scripts/tests/php/QualificationImagesTest.php` and `scripts/tests/php/QualificationMetadataTransportTest.php`, then run their focused tooling checks.
+- Static-check corrections: update the inherited store constructor in `tests/Fixtures/RateLimiter/consume.php` to pass the borrowing closure, and remove the obsolete ImageController-to-BlurHash entry in `deptrac.baseline.yaml` now covered by the package boundary.
+- Verified integration defect: `src/Shared/Infrastructure/Logging/BoundedContextLoggerPass.php` assigns channels only to `App\` classes. Bind package reader loggers to `monolog.logger.metadata` and the BlurHash logger to `monolog.logger.media` in `config/services.yaml`; verify the compiled service arguments.
 - Approach: Complete KTD4–KTD5 integration. Include source/resources through their real local-package paths and avoid duplicate application compatibility aliases. Keep current dependency direction enforced rather than baselining new package violations.
 - Tests: Run Composer validation/normalization, PHPStan, Deptrac and focused package/adapter tests in ordinary PHP. Rebuild TypePHP, then run the full backend coordinator once in the rebuilt qualification image with coverage disabled, plus packaged focused checks and console/operator boot. Repeat affected runtime drills when the extraction changes their wiring. Covers AE5.
 
@@ -189,3 +195,7 @@ ports, policies and resource ownership remain intact. Shared discovery, analysis
 test and embedding configuration includes the new code. The verification contract
 has recorded results, justified review findings are fixed, and delivered scope is
 recorded in `ROADMAP.md`. All work is committed locally on the implementation branch.
+
+Completed on 2026-11-20. [The roadmap](../../ROADMAP.md#internal-capability-packages)
+records the five delivered units, their verification and the fixture corrections
+found during runtime qualification.
