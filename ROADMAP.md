@@ -583,21 +583,24 @@ Verification on 2026-11-20:
 - `make ci` at `e7ec54519` in the local CI image: composer normalize, PHPStan (no
   errors in 3,928 files) and Deptrac (no violations) passed. Of the backend lanes, the
   ordinary lane (8,896 tests), the native lane (953) and the second stack lane (1,662)
-  passed without failures, errors or skips. The first stack lane ran one process for
-  its 174 files and hit the runner's one-hour limit with tests still running. Its files,
-  rerun through `scripts/test-functional-container.sh` in two lanes, gave 2,288 tests
+  passed without failures, errors or skips. The first stack lane (174 files) hit the
+  runner's one-hour budget with tests still running; `make ci` measures coverage, which
+  runs the lanes under Xdebug. Its files, rerun without coverage through
+  `scripts/test-functional-container.sh` in two lanes, gave 2,288 tests
   and one failure: `TranscodeCleanupConsoleOutputTest` started a production console
   with the committed default secrets, which production now refuses. `26a7fd0cb` gives
   that process private secrets, and both cases of the test pass.
 - On the merge with Forgejo's `master` (`3473a20c3`), `make ci` passed PHPStan,
   Deptrac, the ordinary lane (8,905 tests) and the native lane (954). Both stack lanes
-  hit the one-hour limit with one process each. Their 347 files, rerun through
-  `scripts/test-functional-container.sh`, failed four `ApiRateLimitTest` cases:
+  hit the one-hour budget under coverage. Their 347 files, rerun without coverage
+  through `scripts/test-functional-container.sh`, failed four `ApiRateLimitTest` cases:
   `LoginAccountThrottleTest` charged the anonymous API limiter for addresses that test
   expects unused. `233446bc5` moves the throttle test to `198.18.10.x`, and the rerun
   then passed 3,950 tests (2,288 and 1,662) with both tests in one lane. The OpenAPI,
   generated-client and typecheck checks and `DevelopmentBootstrapTest` (17 tests)
-  passed on the merge.
+  passed on the merge. Coverage was not measured for the stack-lane files, and whether
+  CI's coverage step still fits its 3,600 seconds is open; see
+  `docs/solutions/developer-experience/coverage-runs-push-the-stack-lanes-past-the-backend-budget.md`.
 - Web: 3,661 tests in 293 files passed; the typecheck passed. The OpenAPI document
   and the generated client match the code (`app:export-openapi-spec --check`,
   `generate:check`).
