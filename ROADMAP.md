@@ -17,8 +17,11 @@ remain in Metadata. The CI-image focused reader, value and matching checks pass:
 GD conversion and BlurHash now live in `baander/image-processing`. The application
 keeps image presets, filenames and authorization. CI-image converter tests pass
 with 28 tests and 69 assertions, including dimensions, transparency, no upscaling
-and atomic publishing. Rate limiting, safe HTTP and final packaged verification
-remain in this plan's scope.
+and atomic publishing. Atomic Redis rate limiting now lives in
+`baander/redis-rate-limiter`, with its compiler pass registered by a bundle.
+The application owns Redis borrowing and pool failure translation. Its focused
+CI-image checks pass: 73 tests and 319 assertions. Safe HTTP and final packaged
+verification remain in this plan's scope.
 
 ## TypePHP application packaging
 

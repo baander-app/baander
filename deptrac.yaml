@@ -14,6 +14,7 @@ imports:
 deptrac:
   paths:
     - src/
+    - packages/baander-redis-rate-limiter/src/
     - packages/baander-image-processing/src/
     - packages/baander-media-metadata/src/
 
@@ -54,6 +55,19 @@ deptrac:
         Command: ['Command Utility']
 
   layers:
+    - name: 'Rate Limiter Contracts'
+      collectors:
+        - type: classLike
+          value: '^Baander\\RedisRateLimiter\\(RateLimiterDefinition|RateLimiterAdministrationInterface|RateLimiterUnavailableException|RateLimiterClearFailedException|UnknownRateLimiterException)$'
+    - name: 'Rate Limiter Implementation'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^Baander\\RedisRateLimiter\\'
+          must_not:
+            - type: classLike
+              value: '^Baander\\RedisRateLimiter\\(RateLimiterDefinition|RateLimiterAdministrationInterface|RateLimiterUnavailableException|RateLimiterClearFailedException|UnknownRateLimiterException)$'
     - name: 'Image Processing'
       collectors:
         - type: classLike
@@ -1098,6 +1112,9 @@ deptrac:
           value: '^App\\Filesystem\\Infrastructure\\'
 
   ruleset:
+    'Rate Limiter Contracts': []
+    'Rate Limiter Implementation':
+      - 'Rate Limiter Contracts'
     'Image Processing': []
     'Media Metadata Values': []
     'Media Metadata Readers':
@@ -1124,10 +1141,13 @@ deptrac:
     'Shared Application':
       - 'Shared Domain'
     'Shared Infrastructure':
+      - 'Rate Limiter Implementation'
+      - 'Rate Limiter Contracts'
       - 'Auth WebSocket Contract'
       - 'Shared Domain'
       - 'Shared Application'
     'Shared Interface':
+      - 'Rate Limiter Contracts'
       - 'Shared Domain'
       - 'Shared Application'
       - 'Shared Infrastructure'
@@ -1180,6 +1200,7 @@ deptrac:
     'Auth Domain':
       - 'Shared Domain'
     'Auth Application':
+      - 'Rate Limiter Contracts'
       - 'Auth WebSocket Contract'
       - 'UserPreference Settings Contract'
       - 'Auth Identity Contract'
@@ -1190,6 +1211,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Auth Infrastructure':
+      - 'Rate Limiter Contracts'
       - 'Auth Live Authority Contract'
       - 'Auth WebSocket Contract'
       - 'UserPreference Settings Contract'
@@ -1207,6 +1229,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Auth Interface':
+      - 'Rate Limiter Contracts'
       - 'Auth WebSocket Contract'
       - 'UserPreference Settings Contract'
       - 'Auth Resources'
@@ -1357,6 +1380,7 @@ deptrac:
     'Lyrics Domain':
       - 'Shared Domain'
     'Lyrics Infrastructure':
+      - 'Rate Limiter Contracts'
       - 'Lyrics Album Merge Contract'
       - 'Catalog Song Lookup Contract'
       - 'Shared Application'
@@ -1429,6 +1453,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Metadata Infrastructure':
+      - 'Rate Limiter Contracts'
       - 'Media Metadata Readers'
       - 'Media Metadata Values'
       - 'Shared Application'

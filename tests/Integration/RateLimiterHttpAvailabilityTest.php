@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
-use App\Shared\Application\Exception\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\RateLimiterUnavailableException;
 use App\Tests\Functional\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\RateLimiter\LimiterInterface;

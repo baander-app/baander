@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Shared\Interface\Controller;
 
-use App\Shared\Application\Exception\RateLimiterClearFailedException;
-use App\Shared\Application\Exception\UnknownRateLimiterException;
-use App\Shared\Application\Port\RateLimiterAdministrationInterface;
+use Baander\RedisRateLimiter\RateLimiterClearFailedException;
+use Baander\RedisRateLimiter\UnknownRateLimiterException;
+use Baander\RedisRateLimiter\RateLimiterAdministrationInterface;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use OpenApi\Attributes as OA;
 use Nelmio\ApiDocBundle\Attribute\Model;

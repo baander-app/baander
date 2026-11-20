@@ -7,7 +7,7 @@ namespace App\Tests\Unit\Shared\Infrastructure\EventListener;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
-use App\Shared\Application\Exception\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\RateLimiterUnavailableException;
 use App\Shared\Application\Exception\RetryableFault;
 use App\Shared\Application\Exception\ServiceUnavailableException;
 use App\Shared\Application\Http\RequestLocale;

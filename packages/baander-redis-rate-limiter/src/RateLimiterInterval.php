@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Shared\Infrastructure\RateLimiter;
+namespace Baander\RedisRateLimiter;
 
 /** How the atomic rate limiters read a configured interval such as `1 second` or `15 minutes`. */
 final class RateLimiterInterval

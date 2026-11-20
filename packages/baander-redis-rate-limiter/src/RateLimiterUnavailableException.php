@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Shared\Application\Exception;
+namespace Baander\RedisRateLimiter;
+
+use RuntimeException;
 
 /** No limiter verdict is available; storage failure must not grant a fresh budget. */
-final class RateLimiterUnavailableException extends ServiceUnavailableException
+final class RateLimiterUnavailableException extends RuntimeException
 {
     public function __construct()
     {

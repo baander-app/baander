@@ -2,13 +2,8 @@
 
 declare(strict_types=1);
 
-namespace App\Shared\Infrastructure\RateLimiter;
+namespace Baander\RedisRateLimiter;
 
-use App\Shared\Application\DTO\RateLimiterDefinition;
-use App\Shared\Application\Exception\RateLimiterClearFailedException;
-use App\Shared\Application\Exception\RateLimiterUnavailableException;
-use App\Shared\Application\Exception\UnknownRateLimiterException;
-use App\Shared\Application\Port\RateLimiterAdministrationInterface;
 
 /** Resets the same Redis generations used by request consumption. */
 final readonly class RedisRateLimiterAdministration implements RateLimiterAdministrationInterface

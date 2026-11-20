@@ -17,7 +17,7 @@ use App\Auth\Interface\Request\Totp\DisableTotpRequest;
 use App\Auth\Interface\Request\Totp\EnableTotpRequest;
 use App\Auth\Interface\Request\Totp\StartTotpSetupRequest;
 use App\Shared\Application\Exception\HandlerFailure;
-use App\Shared\Application\Exception\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\RateLimiterUnavailableException;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;

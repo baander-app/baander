@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\RateLimiter;
 
-use App\Shared\Infrastructure\RateLimiter\RedisRateLimiterAdministration;
-use App\Shared\Infrastructure\RateLimiter\RedisRateLimiterFactory;
-use App\Shared\Infrastructure\RateLimiter\RedisRateLimiterStore;
-use App\Shared\Infrastructure\RateLimiter\RateLimiterCatalogPass;
+use Baander\RedisRateLimiter\BaanderRedisRateLimiterBundle;
+use Baander\RedisRateLimiter\RedisRateLimiterAdministration;
+use Baander\RedisRateLimiter\RedisRateLimiterFactory;
+use Baander\RedisRateLimiter\RedisRateLimiterStore;
+use Baander\RedisRateLimiter\RateLimiterCatalogPass;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -16,6 +17,17 @@ use Symfony\Component\DependencyInjection\Reference;
 
 final class RateLimiterCatalogPassTest extends TestCase
 {
+    public function testBundleRegistersTheCatalogCompilerPass(): void
+    {
+        $container = new ContainerBuilder();
+        new BaanderRedisRateLimiterBundle()->build($container);
+
+        self::assertCount(1, array_filter(
+            $container->getCompilerPassConfig()->getBeforeOptimizationPasses(),
+            static fn(object $pass): bool => $pass instanceof RateLimiterCatalogPass,
+        ));
+    }
+
     public function testCatalogAndConsumersShareTheAtomicStoreAndEffectiveConfiguration(): void
     {
         $container = $this->container();

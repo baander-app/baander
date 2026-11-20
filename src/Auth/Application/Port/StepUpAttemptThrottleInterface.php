@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Application\Port;
 
 use App\Auth\Application\Exception\StepUpRateLimitedException;
-use App\Shared\Application\Exception\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\RateLimiterUnavailableException;
 use App\Shared\Domain\Model\Uuid;
 
 /** Limits step-up attempts per account, whichever address they come from. */

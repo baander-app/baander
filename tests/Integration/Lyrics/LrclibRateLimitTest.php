@@ -8,9 +8,9 @@ use App\Lyrics\Application\DTO\LrclibResult;
 use App\Lyrics\Application\DTO\LrclibWait;
 use App\Lyrics\Infrastructure\Api\LrclibClient;
 use App\Lyrics\Infrastructure\Redis\RedisLrclibPause;
-use App\Shared\Application\Exception\RateLimiterUnavailableException;
-use App\Shared\Infrastructure\RateLimiter\RedisRateLimiterFactory;
-use App\Shared\Infrastructure\RateLimiter\RedisRateLimiterStore;
+use Baander\RedisRateLimiter\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\RedisRateLimiterFactory;
+use Baander\RedisRateLimiter\RedisRateLimiterStore;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -180,7 +180,7 @@ final class LrclibRateLimitTest extends TestCase
         $sends = [];
         try {
             $limiter = self::recording(
-                new RedisRateLimiterFactory(self::shippedConfig($name), new RedisRateLimiterStore($pool)),
+                new RedisRateLimiterFactory(self::shippedConfig($name), new RedisRateLimiterStore($pool->borrow(...))),
                 static function (string $subject, float $turn) use (&$subjects, &$turns): void {
                     $subjects[] = $subject;
                     $turns[] = $turn;

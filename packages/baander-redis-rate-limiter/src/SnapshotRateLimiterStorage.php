@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Shared\Infrastructure\RateLimiter;
+namespace Baander\RedisRateLimiter;
 
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 use Symfony\Component\RateLimiter\LimiterStateInterface;

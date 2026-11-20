@@ -402,10 +402,17 @@ services:
             $failureSender: '@messenger.transport.failed'
             $failureTransportName: failed
 
+    Baander\RedisRateLimiter\RedisRateLimiterStore:
+        factory: ['@App\Shared\Infrastructure\Redis\RedisRateLimiterStoreFactory', 'create']
+
+    Baander\RedisRateLimiter\RedisRateLimiterAdministration:
+        arguments:
+            $limiters: []
+
     # --- Rate Limiter Administration ---
     # Arguments are filled from framework.rate_limiter by RateLimiterCatalogPass.
-    App\Shared\Application\Port\RateLimiterAdministrationInterface:
-        alias: App\Shared\Infrastructure\RateLimiter\RedisRateLimiterAdministration
+    Baander\RedisRateLimiter\RateLimiterAdministrationInterface:
+        alias: Baander\RedisRateLimiter\RedisRateLimiterAdministration
 
     # --- TOTP ---
     App\Auth\Infrastructure\Security\Totp\TotpService:

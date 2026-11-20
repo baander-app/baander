@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\RateLimiter;
 
-use App\Shared\Application\Exception\RateLimiterUnavailableException;
-use App\Shared\Infrastructure\RateLimiter\ContinuousTokenBucket;
-use App\Shared\Infrastructure\RateLimiter\RateLimiterStateCodec;
+use Baander\RedisRateLimiter\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\ContinuousTokenBucket;
+use Baander\RedisRateLimiter\RateLimiterStateCodec;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\RateLimiter\Policy\SlidingWindow;

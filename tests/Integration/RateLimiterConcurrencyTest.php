@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
-use App\Shared\Application\Exception\RateLimiterUnavailableException;
-use App\Shared\Infrastructure\RateLimiter\RedisRateLimiterStore;
+use Baander\RedisRateLimiter\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\RedisRateLimiterStore;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Tests\Fixtures\RateLimiter\RateLimiterFixture;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -136,7 +136,7 @@ final class RateLimiterConcurrencyTest extends TestCase
     public function testRedisRejectsWritersThatPrecedeAResetOrNamedClear(): void
     {
         $pool = new RedisClientFactory($this->dsn);
-        $store = new RedisRateLimiterStore($pool);
+        $store = new RedisRateLimiterStore($pool->borrow(...));
         $subject = hash('sha256', 'subject');
         try {
             $beforeReset = $store->read($this->name, $subject);
@@ -189,7 +189,7 @@ final class RateLimiterConcurrencyTest extends TestCase
     public function testAnExpiredEmptyTombstoneCannotAcceptAnOldWriter(): void
     {
         $pool = new RedisClientFactory($this->dsn);
-        $store = new RedisRateLimiterStore($pool);
+        $store = new RedisRateLimiterStore($pool->borrow(...));
         $subject = hash('sha256', 'subject');
         try {
             $old = $store->read($this->name, $subject);

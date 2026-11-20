@@ -1,4 +1,7 @@
 {
+    "baander/redis-rate-limiter": {
+        "version": "dev-main"
+    },
     "dama/doctrine-test-bundle": {
         "version": "8.9999999",
         "recipe": {

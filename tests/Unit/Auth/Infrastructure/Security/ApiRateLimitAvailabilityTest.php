@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Auth\Infrastructure\Security;
 
 use App\Auth\Infrastructure\Security\ApiRateLimitListener;
-use App\Shared\Application\Exception\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\RateLimiterUnavailableException;
 use App\Shared\Infrastructure\EventListener\ExceptionSubscriber;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;

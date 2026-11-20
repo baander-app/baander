@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\RateLimiter;
 
-use App\Shared\Application\Exception\RateLimiterClearFailedException;
-use App\Shared\Application\Exception\UnknownRateLimiterException;
-use App\Shared\Infrastructure\RateLimiter\RedisRateLimiterAdministration;
-use App\Shared\Infrastructure\RateLimiter\RedisRateLimiterStore;
+use Baander\RedisRateLimiter\RateLimiterClearFailedException;
+use Baander\RedisRateLimiter\UnknownRateLimiterException;
+use Baander\RedisRateLimiter\RedisRateLimiterAdministration;
+use Baander\RedisRateLimiter\RedisRateLimiterStore;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Shared\Interface\Console\RateLimiterClearCommand;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -82,6 +82,6 @@ final class RedisRateLimiterAdministrationTest extends TestCase
         foreach (['broken', 'healthy'] as $name) {
             $definitions[$name] = ['policy' => 'fixed_window', 'limit' => 10, 'interval' => '60 seconds', 'description' => null, 'storageNamespace' => RedisRateLimiterStore::namespace($name)];
         }
-        return new RedisRateLimiterAdministration($definitions, new RedisRateLimiterStore($factory));
+        return new RedisRateLimiterAdministration($definitions, new RedisRateLimiterStore($factory->borrow(...)));
     }
 }

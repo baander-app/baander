@@ -2,11 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Shared\Infrastructure\RateLimiter;
+namespace Baander\RedisRateLimiter;
 
-use App\Shared\Application\Exception\RateLimiterUnavailableException;
-use App\Shared\Infrastructure\Redis\RedisClientFactory;
-use App\Shared\Infrastructure\Redis\RedisPoolExhaustedException;
+use Closure;
 use RedisException;
 
 /** Redis scripts establish the snapshot and commit boundaries across workers. */
@@ -72,7 +70,8 @@ end
 return 1
 LUA;
 
-    public function __construct(private readonly RedisClientFactory $redis) {}
+    /** @param Closure(callable(\Redis): mixed): mixed $borrow */
+    public function __construct(private readonly Closure $borrow) {}
 
     public static function namespace(string $name): string
     {
@@ -121,8 +120,8 @@ LUA;
     public function clear(string $name): void
     {
         try {
-            $cleared = $this->redis->borrow(static fn(\Redis $redis): bool => $redis->set(self::namespace($name) . ':generation', self::revision()) === true);
-        } catch (RedisException | RedisPoolExhaustedException) {
+            $cleared = ($this->borrow)(static fn(\Redis $redis): bool => $redis->set(self::namespace($name) . ':generation', self::revision()) === true);
+        } catch (RedisException) {
             // The original error can contain endpoints or command arguments.
             throw new RateLimiterUnavailableException();
         }
@@ -137,8 +136,8 @@ LUA;
     private function evaluate(string $script, array $keys, array $arguments): mixed
     {
         try {
-            return $this->redis->borrow(static fn(\Redis $redis): mixed => $redis->eval($script, [...$keys, ...$arguments], count($keys)));
-        } catch (RedisException | RedisPoolExhaustedException) {
+            return ($this->borrow)(static fn(\Redis $redis): mixed => $redis->eval($script, [...$keys, ...$arguments], count($keys)));
+        } catch (RedisException) {
             throw new RateLimiterUnavailableException();
         }
     }

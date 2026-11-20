@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Controller;
 
-use App\Shared\Application\Exception\RateLimiterClearFailedException;
-use App\Shared\Application\Port\RateLimiterAdministrationInterface;
+use Baander\RedisRateLimiter\RateLimiterClearFailedException;
+use Baander\RedisRateLimiter\RateLimiterAdministrationInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use App\Tests\Functional\TestCase;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;

@@ -3,7 +3,7 @@ parameters:
     env(TRUSTED_PROXIES): ''
     # Shown by the admin panel and app:rate-limiter:list next to each limiter
     # configured under framework.rate_limiter below.
-    app.rate_limiter.descriptions:
+    baander.rate_limiter.descriptions:
         anonymous_api: 'Unauthenticated /api requests per client IP'
         authenticated_api: 'Authenticated /api requests per user'
         auth_login_ip: 'Login attempts per IP (brute-force protection)'

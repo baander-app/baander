@@ -2,11 +2,8 @@
 
 declare(strict_types=1);
 
-namespace App\Shared\Application\Port;
+namespace Baander\RedisRateLimiter;
 
-use App\Shared\Application\DTO\RateLimiterDefinition;
-use App\Shared\Application\Exception\RateLimiterClearFailedException;
-use App\Shared\Application\Exception\UnknownRateLimiterException;
 
 /**
  * Lists the configured rate limiters and resets their stored state.

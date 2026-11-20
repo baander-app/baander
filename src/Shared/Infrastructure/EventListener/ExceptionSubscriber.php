@@ -8,7 +8,7 @@ use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
-use App\Shared\Application\Exception\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\RateLimiterUnavailableException;
 use App\Shared\Application\Exception\RetryableFault;
 use App\Shared\Application\Exception\ServiceUnavailableException;
 use App\Shared\Application\Http\RequestLocale;
@@ -98,6 +98,7 @@ final class ExceptionSubscriber
             $exception instanceof NotFoundException => [Response::HTTP_NOT_FOUND, $exception->details],
             $exception instanceof ConflictException => [Response::HTTP_CONFLICT, $exception->details],
             $exception instanceof InvalidInputException => [Response::HTTP_UNPROCESSABLE_ENTITY, $exception->details],
+            $exception instanceof RateLimiterUnavailableException => [Response::HTTP_SERVICE_UNAVAILABLE, []],
             $exception instanceof ServiceUnavailableException => [Response::HTTP_SERVICE_UNAVAILABLE, $exception->details],
             default => [null, []],
         };

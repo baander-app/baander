@@ -40,7 +40,7 @@ use App\Auth\Interface\Request\User\VerifyEmailRequest;
 use App\Auth\Interface\Resource\TokenResource;
 use App\Auth\Interface\Resource\UserResource;
 use App\Shared\Application\Exception\HandlerFailure;
-use App\Shared\Application\Exception\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\RateLimiterUnavailableException;
 use App\Shared\Application\Http\AcceptLanguageMatcher;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;

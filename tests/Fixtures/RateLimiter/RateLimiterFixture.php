@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Fixtures\RateLimiter;
 
-use App\Shared\Infrastructure\RateLimiter\RedisRateLimiterStore;
+use Baander\RedisRateLimiter\RedisRateLimiterStore;
 
 final class RateLimiterFixture
 {

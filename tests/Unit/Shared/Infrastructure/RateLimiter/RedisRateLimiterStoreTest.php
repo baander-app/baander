@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\RateLimiter;
 
-use App\Shared\Application\Exception\RateLimiterUnavailableException;
-use App\Shared\Infrastructure\RateLimiter\RateLimiterSnapshot;
-use App\Shared\Infrastructure\RateLimiter\RedisRateLimiterStore;
+use Baander\RedisRateLimiter\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\RateLimiterSnapshot;
+use Baander\RedisRateLimiter\RedisRateLimiterStore;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -26,7 +26,7 @@ final class RedisRateLimiterStoreTest extends TestCase
     {
         $redis = $this->createMock(RedisClientFactory::class);
         $redis->expects($this->once())->method('borrow')->willThrowException(new \RedisException('private redis.baander.app subject marker'));
-        $store = new RedisRateLimiterStore($redis);
+        $store = new RedisRateLimiterStore($redis->borrow(...));
         try {
             match ($operation) {
                 'read' => $store->read('test', 'subject'),
@@ -69,7 +69,7 @@ final class RedisRateLimiterStoreTest extends TestCase
         $factory = $this->createStub(RedisClientFactory::class);
         $factory->method('borrow')->willReturnCallback(static fn(callable $callback): mixed => $callback($redis));
         $this->expectException(RateLimiterUnavailableException::class);
-        (new RedisRateLimiterStore($factory))->clear('test');
+        (new RedisRateLimiterStore($factory->borrow(...)))->clear('test');
     }
 
     public function testSnapshotReplyAndCommitRetainRelativePolicyExpiry(): void
@@ -91,7 +91,7 @@ final class RedisRateLimiterStoreTest extends TestCase
         );
         $factory = $this->createStub(RedisClientFactory::class);
         $factory->method('borrow')->willReturnCallback(static fn(callable $callback): mixed => $callback($redis));
-        $store = new RedisRateLimiterStore($factory);
+        $store = new RedisRateLimiterStore($factory->borrow(...));
         $snapshot = $store->read('test', 'subject');
         self::assertSame('', $snapshot->payload);
         self::assertTrue($store->commit($snapshot, 'payload', 120));
@@ -109,6 +109,6 @@ final class RedisRateLimiterStoreTest extends TestCase
         $factory = $this->createStub(RedisClientFactory::class);
         $factory->method('borrow')->willReturnCallback(static fn(callable $callback): mixed => $callback($redis));
 
-        return new RedisRateLimiterStore($factory);
+        return new RedisRateLimiterStore($factory->borrow(...));
     }
 }

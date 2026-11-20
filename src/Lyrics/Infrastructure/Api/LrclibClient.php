@@ -10,7 +10,7 @@ use App\Lyrics\Application\DTO\LrclibSearchResult;
 use App\Lyrics\Application\DTO\LrclibUnavailable;
 use App\Lyrics\Application\DTO\LrclibWait;
 use App\Lyrics\Application\Port\LrclibClientInterface;
-use App\Shared\Application\Exception\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\RateLimiterUnavailableException;
 use App\Shared\Infrastructure\Swoole\Async;
 use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "08226dacc40d85775faa7db2c6730abb",
+    "content-hash": "15054aa7749eea47878743ec75729734",
     "packages": [
         {
             "name": "baander/image-processing",
@@ -12,7 +12,7 @@
             "dist": {
                 "type": "path",
                 "url": "./packages/baander-image-processing",
-                "reference": "cd74b25e767bc0107991fb5a173d38c52e1de5ba"
+                "reference": "ec9ecc36394e58e702fec0d70efae3334fc28763"
             },
             "require": {
                 "ext-gd": "*",
@@ -40,7 +40,7 @@
             "dist": {
                 "type": "path",
                 "url": "./packages/baander-media-metadata",
-                "reference": "c8bcb2cf5f9f91dceaf7aa055ba72930dbc02377"
+                "reference": "c0df093e77106fb8e235f9524492540ebf7e33a4"
             },
             "require": {
                 "ext-mbstring": "*",
@@ -57,6 +57,36 @@
                 "Apache-2.0"
             ],
             "description": "Audio file format detection, metadata parsing and cover extraction",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "baander/redis-rate-limiter",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "./packages/baander-redis-rate-limiter",
+                "reference": "1dbb4f4ec276d12c7713f9a27b6be2373a924f08"
+            },
+            "require": {
+                "ext-redis": "*",
+                "php": ">=8.5",
+                "symfony/dependency-injection": "~8.1.10",
+                "symfony/http-kernel": "~8.1.10",
+                "symfony/rate-limiter": "~8.1.10"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Baander\\RedisRateLimiter\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Atomic Redis rate limiting and administration",
             "transport-options": {
                 "symlink": true,
                 "relative": true
@@ -17977,6 +18007,7 @@
         "baander/image-processing": 20,
         "baander/media-metadata": 20,
         "baander/phpstan-rules": 20,
+        "baander/redis-rate-limiter": 20,
         "baander/tooling": 20,
         "swoole-bundle/swoole-bundle": 20,
         "tsduck/php": 20

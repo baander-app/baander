@@ -11,7 +11,7 @@ use App\Auth\Application\Port\PasswordHasherInterface;
 use App\Auth\Application\Port\StepUpAttemptThrottleInterface;
 use App\Auth\Application\Port\TotpVerifierInterface;
 use App\Auth\Domain\Model\User;
-use App\Shared\Application\Exception\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\RateLimiterUnavailableException;
 use Psr\Log\LoggerInterface;
 
 /**

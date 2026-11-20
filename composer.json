@@ -21,6 +21,7 @@
     "ext-swoole": "*",
     "baander/image-processing": "dev-main",
     "baander/media-metadata": "dev-main",
+    "baander/redis-rate-limiter": "dev-main",
     "cweagans/composer-patches": "^2.0",
     "defuse/php-encryption": "^2.4",
     "doctrine/doctrine-bundle": "^3.3.4",
@@ -165,6 +166,17 @@
         "symlink": true,
         "versions": {
           "baander/image-processing": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "./packages/baander-redis-rate-limiter",
+      "options": {
+        "reference": "config",
+        "symlink": true,
+        "versions": {
+          "baander/redis-rate-limiter": "dev-main"
         }
       }
     }

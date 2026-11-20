@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Shared\Infrastructure\RateLimiter;
+namespace Baander\RedisRateLimiter;
 
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -13,7 +13,7 @@ use Symfony\Component\DependencyInjection\Reference;
 /** Wires every configured limiter and its administration to the same atomic Redis store. */
 final class RateLimiterCatalogPass implements CompilerPassInterface
 {
-    public const string DESCRIPTIONS_PARAMETER = 'app.rate_limiter.descriptions';
+    public const string DESCRIPTIONS_PARAMETER = 'baander.rate_limiter.descriptions';
 
     public function process(ContainerBuilder $container): void
     {

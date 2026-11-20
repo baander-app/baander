@@ -11,8 +11,8 @@ use App\Metadata\Infrastructure\Api\CoverArtArchive\CoverArtArchiveAdapter;
 use App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter;
 use App\Shared\Infrastructure\Http\PublicDestinationPolicy;
 use App\Shared\Infrastructure\Http\PublicHttpClient;
-use App\Shared\Infrastructure\RateLimiter\RedisRateLimiterFactory;
-use App\Shared\Infrastructure\RateLimiter\RedisRateLimiterStore;
+use Baander\RedisRateLimiter\RedisRateLimiterFactory;
+use Baander\RedisRateLimiter\RedisRateLimiterStore;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -109,7 +109,7 @@ final class MusicBrainzRateLimitTest extends TestCase
         $this->subjects = ['bounded'];
         $pool = new RedisClientFactory($this->dsn);
         try {
-            $shared = new RedisRateLimiterFactory(self::shippedConfig($this->name), new RedisRateLimiterStore($pool));
+            $shared = new RedisRateLimiterFactory(self::shippedConfig($this->name), new RedisRateLimiterStore($pool->borrow(...)));
             // Other processes have taken the next eleven turns.
             for ($turn = 0; $turn < 11; ++$turn) {
                 $shared->create('bounded')->reserve();
@@ -143,7 +143,7 @@ final class MusicBrainzRateLimitTest extends TestCase
         $pool = new RedisClientFactory($dsn);
         $turns = [];
         try {
-            $shared = new RedisRateLimiterFactory(self::shippedConfig($name), new RedisRateLimiterStore($pool));
+            $shared = new RedisRateLimiterFactory(self::shippedConfig($name), new RedisRateLimiterStore($pool->borrow(...)));
             $recorded = self::recording($shared, static function (string $subject, float $turn) use (&$turns): void {
                 $turns[] = [$subject, $turn];
             });

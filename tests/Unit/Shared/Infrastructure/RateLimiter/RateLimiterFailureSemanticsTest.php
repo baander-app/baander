@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\RateLimiter;
 
-use App\Shared\Application\Exception\RateLimiterUnavailableException;
-use App\Shared\Infrastructure\RateLimiter\RateLimiterSnapshot;
-use App\Shared\Infrastructure\RateLimiter\RateLimiterStateCodec;
-use App\Shared\Infrastructure\RateLimiter\RedisRateLimiterFactory;
-use App\Shared\Infrastructure\RateLimiter\RedisRateLimiterStore;
+use Baander\RedisRateLimiter\RateLimiterUnavailableException;
+use Baander\RedisRateLimiter\RateLimiterSnapshot;
+use Baander\RedisRateLimiter\RateLimiterStateCodec;
+use Baander\RedisRateLimiter\RedisRateLimiterFactory;
+use Baander\RedisRateLimiter\RedisRateLimiterStore;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\RateLimiter\Policy\Window;
 
