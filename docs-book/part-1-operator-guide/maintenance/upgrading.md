@@ -15,19 +15,9 @@ lease expiry is insufficient. Resolve these through the old controller while its
 schema is still installed. Preserve the database, pending work and media; no reset
 is required or authorized by this upgrade.
 
-Version 9 manifests require `sourceMountPolicy`, the complete startup
-`deploymentProfile`, the ordinary autoscaling profile and `deviceGroup`. They carry
-no per-unit memory, CPU, PID or CPU-set fields. The profile names its `capability`,
-`transcode` or `remux`, in place of the former profile identifier. The selected
-startup profile must agree with web and the worker runtime environment, which
-carry it as JSON in the single `BAANDER_DEPLOYMENT_PROFILE` variable. The new controller refuses
-earlier manifest versions, including recovery actions. Keep the old checkout,
-controller, manifest and credentials to retire an existing pair before switching
-code. Confirm both units' retirement and the joint reservation release, then create
-a version 9 manifest with a fresh boot ID, the new image and
-`sourceMountPolicy: production` for the named-volume recipe. Lease expiry or a
-stopped container is insufficient. Preserve the database, pending work and media.
-This manifest change requires no data reset and provides no compatibility path.
+Version 9 manifests require `sourceMountPolicy`, the complete startup `deploymentProfile`, the ordinary autoscaling profile and `deviceGroup`. They carry no per-unit memory, CPU, PID or CPU-set fields. The profile names its `capability`, `transcode` or `remux`, in place of the former profile identifier. The selected startup profile must agree with web and the worker runtime environment, which carry it as JSON in the single `BAANDER_DEPLOYMENT_PROFILE` variable. The new controller refuses earlier manifest versions, including recovery actions.
+
+Keep the old checkout, controller, manifest and credentials to retire an existing pair before switching code. Confirm both units' retirement and the joint reservation release, then create a version 9 manifest with a fresh boot ID, the new image and `sourceMountPolicy: production` for the named-volume recipe. Lease expiry or a stopped container is insufficient. Preserve the database, pending work and media. This manifest change requires no data reset and provides no compatibility path.
 
 The source-installation procedure below uses the `dc` shell function. For the
 managed complete-stack preset, keep its private state directory and use
@@ -142,22 +132,9 @@ pending migrations on the configured main database. Run it after pulling new cod
 migrations may contain data transformations or index additions. Test databases
 belong to the separate disposable test coordinator.
 
-Fresh databases start with the transactional migration `Version20261017000000`,
-then apply the forward migrations that follow it in `migrations/`. The initial
-migration creates the schema, including microsecond `timestamptz` columns, and
-cannot be downgraded. The first forward migrations add playlist persistence versions
-and video/audio execution authority. `Version20261017160000` preserves durable
-session/request control receipts; `Version20261017170000` scopes video jobs to
-playback owners without rewriting the initial migration or existing histories.
-`Version20261018130000` imports confirmed singleton retirement history and adds
-the control/execution journals and joint retirement barrier. It is irreversible.
-`Version20261021120000` retains the last observed availability of indexed source
-files and is also irreversible, as are most of the forward migrations after it.
-New deployments require a version 9 manifest with a private IPC volume and
-complete deployment and autoscaling profiles, and with no unit limits or CPU sets;
-earlier manifest versions are refused. Every profile field is fingerprinted in
-both recipes. Changing thresholds, concurrency or the startup profile requires
-retirement and a fresh boot, with matching web and worker runtime settings.
+Fresh databases start with the transactional migration `Version20261017000000`, then apply the forward migrations that follow it in `migrations/`. The initial migration creates the schema, including microsecond `timestamptz` columns, and cannot be downgraded. The first forward migrations add playlist persistence versions and video/audio execution authority. `Version20261017160000` preserves durable session/request control receipts; `Version20261017170000` scopes video jobs to playback owners without rewriting the initial migration or existing histories. `Version20261018130000` imports confirmed singleton retirement history and adds the control/execution journals and joint retirement barrier. It is irreversible.
+
+`Version20261021120000` retains the last observed availability of indexed source files and is also irreversible, as are most of the forward migrations after it. New deployments require a version 9 manifest with a private IPC volume and complete deployment and autoscaling profiles, and with no unit limits or CPU sets; earlier manifest versions are refused. Every profile field is fingerprinted in both recipes. Changing thresholds, concurrency or the startup profile requires retirement and a fresh boot, with matching web and worker runtime settings.
 
 Ownership is derived from the recorded runtime session or an unambiguous session
 owner. Ambiguous or unattached historical jobs retain a null owner. Existing
@@ -228,32 +205,7 @@ those checks do not replace application startup, delivery or drain qualification
 
 ## Moving to the Debian 13 images
 
-The application, worker and database images build on Debian 13 (trixie), which
-moves glibc from 2.36 to 2.41. PostgreSQL in the Bånder database image takes its
-default collation from glibc, so an index on text built under the old version may
-not match the new ordering. A fresh install initializes its data volume under the
-new version and needs no action. An existing PostgreSQL data volume, created by a
-Debian 12 database image, reports a collation version mismatch once the Debian 13
-image starts on it. Rebuild its indexes before writers return:
-
-1. **Stop the writers.** Stop web and retire the worker pair as in the
-   [standard update](#standard-update). Keep PostgreSQL running on the new image.
-2. **Rebuild the indexes and record the new version.** Connect to PostgreSQL
-   directly as the database owner, not through the pooler. For the source
-   installation:
-
-   ```bash
-   dc exec database sh -ec 'psql -v ON_ERROR_STOP=1 --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" -c "REINDEX DATABASE" -c "ALTER DATABASE \"$POSTGRES_DB\" REFRESH COLLATION VERSION"'
-   ```
-
-   For the managed preset, run the same `psql` command in its `postgres` service
-   container. `REINDEX DATABASE` rebuilds every index of the current database and
-   takes longer on a larger library; `REFRESH COLLATION VERSION` then records the
-   new glibc version so the mismatch warning stops.
-3. **Repeat for other databases.** Run both statements in any other database of
-   the same volume that reports the mismatch.
-4. **Return the writers.** Start web and a fresh worker pair, then observe them as
-   described above.
+See [Moving to the Debian 13 images](debian-13-upgrade.md#moving-to-the-debian-13-images).
 
 ## Docker Compose Changes
 
@@ -267,58 +219,7 @@ lose unpersisted Redis state; preserve that state before the change. Never use
 
 ## Stopping and Restarting the Web Server
 
-An update that replaces the app container stops the web server in it, and so do `dc stop`, `dc restart`, `docker stop` and `docker compose restart app`. Docker sends `SIGTERM` to `app:serve`, and the server drains: it finishes what it can, tells clients to come back, and exits on its own. `SIGINT`, `swoole:server:stop` and `DELETE /api/server` on the internal API server start the same drain. A second stop request during a drain changes nothing, and a worker reload (`PATCH /api/server`) never starts one.
-
-### What the drain does
-
-The drain ends within the drain deadline `WEB_DRAIN_SECONDS` (D, 30 seconds by default; see [Configuration](../configuration/deployment-profiles.md#server)):
-
-1. The server accepts no new connections. Connections already open keep working. Requests that still arrive on them are answered with `Connection: close`, `/ready` answers `503`, and `/live` answers `200` with `"draining": true`.
-2. Every WebSocket receives a close frame with code `1012` ("service restart"). Session-sync clients reconnect once the server is back, with a current access token.
-3. Requests in progress finish with complete responses. Background commands use Redis `async`; web has no task workers, CPU pool or media executor. The worker deployment keeps its consumers and encoders while web drains.
-4. When the drain window ends (13 seconds at the default), the server closes every response it is still sending, such as an audio stream, without finishing it. The client sees a transfer error, not the end of the track. The server then resets every connection still open.
-5. Swoole stops the HTTP workers. Video and audio execution remain in the independent worker deployment; reconnecting clients read the persisted media state and current generation.
-6. The server exits with status `0`. A drain that had nothing to wait for takes under a second.
-
-If the server's manager process is still running at the deadline, the drain watchdog, [`app:server:drain:watch`](../commands/app-server-drain-watch.md), kills it with `SIGKILL`, and the server exits with status `1`. The server logs a line when the drain starts, with the deadline, the window and Swoole's `max_wait_time`, and another when the window closes. A planned stop sends no [health alert](../operations/health-and-metrics.md#what-is-checked).
-
-### Stop timeout
-
-Give the container a stop timeout of at least D + 5 seconds, 35 seconds at the default, before the runtime sends `SIGKILL`:
-
-- Docker Compose: `stop_grace_period: 35s` on the app service. The development `docker-compose.yml` sets this.
-- `docker run --stop-timeout 35`, or `docker stop -t 35` for one stop.
-- Kubernetes: `terminationGracePeriodSeconds: 35`. On other orchestrators, set the equivalent grace period or kill timeout.
-
-When you change `WEB_DRAIN_SECONDS`, change the stop timeout with it.
-
-Docker's default stop timeout is 10 seconds, shorter than even the smallest drain deadline needs (8 + 5 seconds). With it, Docker kills the container 10 seconds into the drain, before the drain window ends. Requests still running then fail, and streams end when their processes die. The web player resumes those streams too, but slow requests lose their responses.
-
-### Listeners during a restart
-
-When its stream fails, or stalls for 10 seconds, the web player asks the server's `/live` endpoint whether the server answers. No answer, a timeout, an answer other than `2xx` or an answer with `"draining": true` means the server is unreachable; nginx answers `502` while the app container restarts, and a draining server can still answer on a connection nginx kept alive. The player then:
-
-- shows "Reconnecting…" in place of the time and keeps the position it had reached;
-- retries with a growing, randomised delay, from 1 second up to 15 seconds, and honours a `Retry-After` header on a `503`;
-- once `/live` answers, requests the same track again and continues at that position. The resume records no second play.
-
-A transcoded track resumes once its accepted rendition is complete; until then the player shows "Reconnecting…". When the browser will not start playback without a user gesture, the player shows a "Tap to resume" button. After about two minutes without success, the player pauses with its usual failure notice and keeps the position, so pressing play tries again.
-
-A token refresh that fails because the server is restarting, with a network error or a `5xx` answer, keeps the user signed in. Only a `401`, or a `400` with the error `invalid_grant`, from the refresh signs the user out. Video execution stays with the worker during a web restart; see [Transcoding](../media/transcoding.md#restarts).
-
-### nginx and a replaced app container
-
-The bundled nginx resolves the `app` host name once, when it starts. A restarted container normally keeps its address. A recreated container can come back with a new one. nginx then keeps sending requests to the old address and answers `502`, and the player gives up after two minutes. After the app container has been replaced, reload nginx so it resolves `app` again:
-
-```bash
-dc exec nginx nginx -s reload
-```
-
-### A proxy in front of nginx
-
-The production nginx expects a reverse proxy in front of it to terminate TLS. When the web server cuts a stream, that proxy must pass the cut on to the client as an error. Over HTTP/2 a proxy can answer an upstream reset by ending the client's stream normally. The player then takes the cut for the end of the track and skips to the next one.
-
-To check your proxy, copy a stream request from the browser's network tab as a curl command and run it through the proxy with `--limit-rate 32k`, so that it is still downloading when you restart the app container. curl must fail with exit code `18` over HTTP/1.1 or `92` over HTTP/2. Exit code `0` means the proxy ended the stream cleanly.
+See [Stopping and Restarting the Web Server](web-server-restarts.md#stopping-and-restarting-the-web-server).
 
 ## FFmpeg Updates
 
