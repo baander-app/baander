@@ -52,18 +52,21 @@ The normal tooling run exercised 1,716 tests and 15,930 assertions in 43 minutes
 and 50 seconds. It reported two errors, four failures, two associated warnings
 and seven skips. The six failing conditions were corrected and verified in the
 focused runs below. Six skips require an explicit operator image and disposable
-database; the seventh requires `clang-tidy-19`. The corrected-tree lean suite and
-registry subject checks are in progress.
+database; the seventh requires `clang-tidy-19`.
+
 The normal run exposed an old qualification assertion expecting 15 helper receipts;
 log seeding had increased the count to 16. The corrected report suite passes
 28 tests and 90 assertions, including rejection of helper out-of-memory failures.
+
 The current-checkout archive expectation now includes `scripts/vendor` and
 `scripts/bootstrap.php`, which supply independent package loading. Both checkout
 modes pass after the correction: 2 tests and 15 assertions.
+
 Three moved fixture roots lacked trailing path separators. The corrected worker
 fixture and sampler suites pass 189 tests and 623 assertions; the DSP developer
 helper suite passes 3 tests and 79 assertions. A broader audit of direct and stored
 path concatenation finds no further confirmed defects.
+
 The Python boundary check found the existing terminal PTY driver. Its PHP
 replacement preserves all eight terminal scenarios, which pass in the CI image.
 The boundary suite passes 8 tests and 8 assertions in both CI and lean images.
@@ -74,6 +77,18 @@ precise local callable types without suppressions or exclusions. The final tooli
 formatter check passes all 529 configured files, and the standalone driver passes
 its own formatting and syntax checks.
 
+The lean run exercised 1,716 tests and 15,823 assertions in 37 minutes and
+38 seconds. During the run, the checkout briefly switched to the old `master`
+at `7491ddcec`, then fast-forwarded to `37f196ab3` and returned to the feature
+branch. The Git reflog records this at 20:37:51–20:37:56 +01:00 on 2026-11-20.
+The temporarily absent package files caused 18 errors, two failures and 15 warnings
+in the runtime, state and supervisor test classes. Those three classes pass on the
+restored checkout: 40 tests and 189 assertions. The rest of the run reported no
+failures. Its 16 skips comprise six operator-image cases, seven cases requiring
+curl, two credential-parser cases requiring POSIX, and one requiring
+`clang-tidy-19`. The separate registry-subject gate passes in CI: 2 tests and
+2 assertions.
+
 Live preview startup exposed a collector source/dependency mismatch before vendor
 refresh. The collector now uses the prepared operator image's matching source and
 dependencies. Its regression fails before the correction; the focused CI class
@@ -82,6 +97,11 @@ its configured 1 GiB cap, so collection remains suspended under the existing lim
 the diagnosis used a temporary database snapshot and preserved live data.
 Recovery completes with web and workers ready, and
 `https://preview-fd790a887b6899cb.baander.test` returns HTTP 200.
+
+The package changes and their corrections have no remaining code-review findings.
+PHP syntax checks cover all 677 changed PHP files; all 70 added local Markdown
+links resolve, and whitespace checks pass. The branch was synchronized with
+`origin/master` at `37f196ab3`. The existing IDE edit remains outside this work.
 
 Separate open item: the local PHP dependency audit reports seven existing Swoole
 fork-review inventory discrepancies, covering server execution, configuration,
