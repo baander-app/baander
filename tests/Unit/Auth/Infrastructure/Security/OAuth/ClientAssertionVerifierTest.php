@@ -84,14 +84,13 @@ final class ClientAssertionVerifierTest extends TestCase
         yield 'the issuer with a trailing slash' => [self::ISSUER . '/'];
     }
 
-    /** Covers AE9: the issuer is the sole accepted audience, compared without normalization. */
+    /** The issuer is the sole accepted audience, compared without normalization. */
     #[DataProvider('foreignAudiences')]
     public function testAnyOtherAudienceFails(mixed $audience): void
     {
         self::assertFalse($this->verify($this->assertion(['aud' => $audience])));
     }
 
-    /** Covers AE10. */
     public function testTheSameAssertionFailsTheSecondTimeWithinItsLifetime(): void
     {
         $assertion = $this->assertion();
@@ -150,7 +149,7 @@ final class ClientAssertionVerifierTest extends TestCase
     /** @return iterable<string, array{array<string, mixed>, bool}> */
     public static function types(): iterable
     {
-        yield 'no typ (AE11)' => [['typ' => null], true];
+        yield 'no typ' => [['typ' => null], true];
         yield 'client-authentication+jwt' => [['typ' => 'client-authentication+jwt'], true];
         yield 'application/client-authentication+jwt' => [['typ' => 'application/client-authentication+jwt'], true];
         yield 'the explicit type in other case' => [['typ' => 'Application/Client-Authentication+JWT'], true];
@@ -159,7 +158,7 @@ final class ClientAssertionVerifierTest extends TestCase
     }
 
     /**
-     * Covers AE11: the explicit type is accepted, and so is its absence; any other type is not.
+     * The explicit type is accepted, and so is its absence; any other type is not.
      *
      * @param array<string, mixed> $headers
      */

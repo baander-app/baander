@@ -81,7 +81,6 @@ final class OAuthClientAuthenticatorTest extends TestCase
         yield 'a public client sending HTTP Basic' => ['public', ['basicSecret' => '']];
         yield 'a key client sending HTTP Basic' => ['keys', ['basicSecret' => self::SECRET]];
         yield 'a key client sending HTTP Basic and an assertion' => ['keys', ['basicSecret' => self::SECRET, 'assertion' => self::ASSERTION, 'assertionType' => self::JWT_BEARER]];
-        // Covers AE12.
         yield 'a key client sending a secret' => ['keys', ['secret' => self::SECRET]];
         yield 'a key client sending a secret and an assertion' => ['keys', ['secret' => self::SECRET, 'assertion' => self::ASSERTION, 'assertionType' => self::JWT_BEARER]];
         yield 'a key client sending nothing' => ['keys', []];

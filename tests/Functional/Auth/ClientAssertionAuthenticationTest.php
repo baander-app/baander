@@ -112,13 +112,11 @@ final class ClientAssertionAuthenticationTest extends TestCase
         self::assertIsString($tokens['refresh_token']);
         $this->refreshToken = $tokens['refresh_token'];
 
-        // Covers AE10.
         $replayed = $this->tokenRequest($this->proof($refreshed), $assertion);
         self::assertSame(401, $replayed->getStatusCode(), (string) $replayed->getContent());
         self::assertSame('invalid_client', $this->body($replayed)['error']);
     }
 
-    /** Covers AE9. */
     public function testAnAssertionForTheTokenEndpointUrlFails(): void
     {
         $response = $this->tokenRequest($this->proof($this->nonceChallenge()), $this->assertion(['aud' => $this->issuer . '/api/oauth/token']));
@@ -127,7 +125,6 @@ final class ClientAssertionAuthenticationTest extends TestCase
         self::assertSame('invalid_client', $this->body($response)['error']);
     }
 
-    /** Covers AE12. */
     public function testAKeyClientSendingASecretFails(): void
     {
         $response = $this->send($this->proof($this->nonceChallenge()), ['client_secret' => 'a-guessed-secret']);
