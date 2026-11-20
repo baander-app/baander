@@ -882,6 +882,38 @@ Still to do:
   - The homepage's fourth equalizer slide speaks of device profiles, which its new
     picture does not show; the first slide's picture shows them.
 
+## Compact website navigation and footer
+
+Delivered locally on 2026-11-19 from
+`docs/plans/2026-11-19-1833-fix-compact-site-navigation-footer-plan.md`.
+Product places its feature links in three audience columns, with descriptions
+retained on the overview and other entries. Every Product link fits without
+scrolling at 1024×768 and 1440×900; the panel measures 353px high at 1440×900.
+The footer aligns the brand, Product and Resources, with attribution and Source
+on a separate bottom row. Every existing destination remains available. Phone
+layouts stack the sections and retain scrolling for the menu.
+
+Verification on 2026-11-19:
+
+- `make website-build` built 243 manual pages. `corepack yarn typecheck`, PHP
+  syntax checks for both templates and `git diff --check` passed.
+- `corepack yarn test:browser tests/menu.spec.ts` passed all 12 tests, covering
+  desktop fit, footer alignment, shared destinations, keyboard navigation,
+  current-page markers, 320px and 390px layouts, short screens and no JavaScript.
+- The full site browser suite passed 219 of 221 initially. One test still looked
+  for Source inside the footer columns; its locator now follows the bottom-row
+  placement, retaining the exact link and destination assertions. The other test
+  encountered `net::ERR_NETWORK_CHANGED` on both Geist font requests before it
+  could check layout stability. Both tests passed with `--last-failed` afterward.
+- In `ghcr.io/baander-app/baander-runner:latest`, a fresh build produced 243
+  manual pages, TypeScript and both PHP syntax checks passed, and all 13 menu
+  and source-installation browser checks passed. The container used disposable
+  build output and the browser dependencies installed by the website CI job.
+- Desktop and phone screenshots were inspected in light and dark themes.
+- Plan review found no blocking issues. Simplification found no changes to make;
+  code review's sole finding was resolved by updating the static website contract
+  in `ui/DESIGN.md` to describe compact feature links and the footer layout.
+
 ## Website reference pages and fold-out menu
 
 Delivered on `master` on 2026-11-18, fast-forwarded from

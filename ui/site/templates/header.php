@@ -2,19 +2,26 @@
 $markCurrent = static fn (?string $mark): string => $mark === null ? '' : ' aria-current="' . $mark . '"';
 $menuColumns = static function (array $columns) use ($escape, $markCurrent): void {
     foreach ($columns as $column): ?>
-      <div class="menu-column">
+      <div class="menu-column<?= count($column['groups']) > 1 ? ' menu-column-grouped' : '' ?>">
         <?php if ($column['title'] !== null): ?>
           <p class="menu-column-title"><?= $escape($column['title']) ?></p>
         <?php endif; ?>
         <?php foreach ($column['groups'] as $group): ?>
-          <?php if ($group['title'] !== null): ?>
-            <p class="menu-group-title"><?= $escape($group['title']) ?></p>
-          <?php endif; ?>
-          <ul class="menu-group">
-            <?php foreach ($group['entries'] as $entry): ?>
-              <li class="menu-entry"><a href="<?= $escape($entry['url']) ?>"<?= $markCurrent($entry['current']) ?>><?= $escape($entry['title']) ?></a><span class="menu-entry-description"><?= $escape($entry['description']) ?></span></li>
-            <?php endforeach; ?>
-          </ul>
+          <div class="menu-subgroup<?= $group['title'] !== null ? ' menu-subgroup-compact' : '' ?>">
+            <?php if ($group['title'] !== null): ?>
+              <p class="menu-group-title"><?= $escape($group['title']) ?></p>
+            <?php endif; ?>
+            <ul class="menu-group">
+              <?php foreach ($group['entries'] as $entry): ?>
+                <li class="menu-entry">
+                  <a href="<?= $escape($entry['url']) ?>"<?= $markCurrent($entry['current']) ?>><?= $escape($entry['title']) ?></a>
+                  <?php if ($group['title'] === null): ?>
+                    <span class="menu-entry-description"><?= $escape($entry['description']) ?></span>
+                  <?php endif; ?>
+                </li>
+              <?php endforeach; ?>
+            </ul>
+          </div>
         <?php endforeach; ?>
       </div>
     <?php endforeach;
