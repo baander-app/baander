@@ -113,8 +113,6 @@ deptrac:
     App\Media\Infrastructure\Service\StreamService:
       - App\Catalog\Domain\Model\Song
       - App\Catalog\Domain\Repository\SongRepositoryInterface
-    App\Media\Interface\Controller\ImageController:
-      - App\Media\Infrastructure\Converter\BlurHashGenerator
     App\Metadata\Application\CommandHandler\ExtractAlbumCoverHandler:
       - App\Catalog\Application\Port\AlbumPortInterface
       - App\Catalog\Application\Port\MetadataContentReaderPortInterface

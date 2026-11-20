@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Metadata\Infrastructure\Api\Spotify;
 
 use App\Shared\Infrastructure\Swoole\Async;
-use App\Shared\Infrastructure\Http\PublicHttpClient;
+use Baander\HttpClient\PublicHttpClient;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 

@@ -6,7 +6,7 @@ namespace App\Tests\Unit\Notification\Infrastructure\Push;
 
 use App\Notification\Infrastructure\Push\PushTransport;
 use App\Notification\Infrastructure\Push\WebPushFactory;
-use App\Shared\Infrastructure\Http\PublicDestinationPolicy;
+use Baander\HttpClient\PublicDestinationPolicy;
 use App\Tests\Support\Outbound\ExpectedWebPushConstruction;
 use GuzzleHttp\Handler\CurlFactory;
 use GuzzleHttp\Handler\CurlFactoryInterface;

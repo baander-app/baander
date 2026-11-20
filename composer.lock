@@ -4,8 +4,38 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "15054aa7749eea47878743ec75729734",
+    "content-hash": "c648f8a70f29b0783bd5136eee5cfbf2",
     "packages": [
+        {
+            "name": "baander/http-client",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "./packages/baander-http-client",
+                "reference": "fdcebae4937ce7a72682bb607aa2889cf81d39ce"
+            },
+            "require": {
+                "ext-curl": "*",
+                "guzzlehttp/psr7": "^3.2.0",
+                "php": ">=8.5",
+                "symfony/http-client-contracts": "^3.7.3",
+                "symfony/http-foundation": "^8.1.10"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Baander\\HttpClient\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Safe outbound HTTP destination validation and transport for Baander",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
         {
             "name": "baander/image-processing",
             "version": "dev-main",
@@ -18004,6 +18034,7 @@
     "aliases": [],
     "minimum-stability": "dev",
     "stability-flags": {
+        "baander/http-client": 20,
         "baander/image-processing": 20,
         "baander/media-metadata": 20,
         "baander/phpstan-rules": 20,

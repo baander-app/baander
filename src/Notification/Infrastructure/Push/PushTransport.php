@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Notification\Infrastructure\Push;
 
-use App\Shared\Infrastructure\Http\PublicDestinationPolicy;
+use Baander\HttpClient\PublicDestinationPolicy;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Handler\CurlMultiHandler;
 use GuzzleHttp\Promise\PromiseInterface;

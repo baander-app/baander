@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-11-19. This roadmap selects future work and records unresolved
+Updated: 2026-11-20. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
@@ -20,8 +20,23 @@ with 28 tests and 69 assertions, including dimensions, transparency, no upscalin
 and atomic publishing. Atomic Redis rate limiting now lives in
 `baander/redis-rate-limiter`, with its compiler pass registered by a bundle.
 The application owns Redis borrowing and pool failure translation. Its focused
-CI-image checks pass: 73 tests and 319 assertions. Safe HTTP and final packaged
-verification remain in this plan's scope.
+CI-image checks pass: 73 tests and 319 assertions. HTTP exception mapping adds
+14 passing tests and 50 assertions.
+
+Public destination validation and pinned HTTP transport now live in
+`baander/http-client`. Native DNS process ownership, provider credentials and
+allowlists stay in the application. Focused HTTP, provider, push, radio and OAuth
+checks pass: 448 tests and 1,722 assertions. Qualification fixture checks pass:
+19 tests and 193 assertions. All counts use PHP 8.5.12 in `baander-ci:local`.
+
+Application and tooling PHPStan pass. Application Deptrac reports zero violations
+and errors with 444 existing skipped violations; tooling Deptrac reports zero
+violations, errors and skipped violations, and its source-policy check passes.
+The Symfony container lint and OpenAPI drift check pass. Compiled service inspection
+confirms the metadata and media logger channels for the moved readers and BlurHash
+generator. Root Composer validation passes with existing constraint warnings;
+all four new manifests pass strict validation, and all changed manifests pass
+normalization. Final packaged verification remains in this plan's scope.
 
 ## TypePHP application packaging
 

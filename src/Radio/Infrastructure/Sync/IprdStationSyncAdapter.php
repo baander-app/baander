@@ -6,7 +6,7 @@ namespace App\Radio\Infrastructure\Sync;
 
 use App\Radio\Application\Port\StationSyncPortInterface;
 use RuntimeException;
-use App\Shared\Infrastructure\Http\PublicHttpClient;
+use Baander\HttpClient\PublicHttpClient;
 
 final class IprdStationSyncAdapter implements StationSyncPortInterface
 {

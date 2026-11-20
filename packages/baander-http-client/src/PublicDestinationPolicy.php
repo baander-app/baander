@@ -2,16 +2,15 @@
 
 declare(strict_types=1);
 
-namespace App\Shared\Infrastructure\Http;
+namespace Baander\HttpClient;
 
 use Symfony\Component\HttpFoundation\IpUtils;
 
 final class PublicDestinationPolicy
 {
-    /** @param ?\Closure(string, float): list<string> $dnsResolver */
+    /** @param \Closure(string, float): list<string> $dnsResolver */
     public function __construct(
-        private readonly ?\Closure $dnsResolver = null,
-        private readonly NativeDnsResolver $nativeResolver = new NativeDnsResolver(),
+        private readonly \Closure $dnsResolver,
     ) {
     }
 
@@ -41,9 +40,7 @@ final class PublicDestinationPolicy
             throw new UnsafeDestinationException();
         }
         try {
-            $ips = $this->dnsResolver !== null
-                ? ($this->dnsResolver)($host, $deadline)
-                : $this->nativeResolver->resolve($host, $deadline);
+            $ips = ($this->dnsResolver)($host, $deadline);
         } catch (\Throwable) {
             throw new UnsafeDestinationException();
         }

@@ -59,7 +59,7 @@ final class QualificationImagesTest extends TestCase
         self::assertStringContainsString('composer dump-autoload --no-dev --optimize --no-interaction --no-scripts', $dockerfile);
         self::assertStringNotContainsString('BAANDER_DEPLOYMENT_PROFILE', $dockerfile);
         $services = Yaml::parseFile($prepared['context'] . '/files/config/services_prod.yaml', Yaml::PARSE_CUSTOM_TAGS)['services'];
-        self::assertSame(['baander.provider_http_transport', 'App\\Shared\\Infrastructure\\Http\\PublicDestinationPolicy'], array_keys($services));
+        self::assertSame(['baander.provider_http_transport', 'Baander\\HttpClient\\PublicDestinationPolicy'], array_keys($services));
         self::assertSame($this->layout->path('var/qualification/dataset.json'), $prepared['metadataManifestPath']);
         self::assertSame($this->layout->path('storage/qualification-audit/native.jsonl'), $prepared['nativeAuditPath']);
         foreach (['ffmpeg', 'ffprobe'] as $executable) {

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Http;
 
-use App\Shared\Infrastructure\Http\PublicDestinationPolicy;
-use App\Shared\Infrastructure\Http\UnsafeDestinationException;
+use Baander\HttpClient\PublicDestinationPolicy;
+use Baander\HttpClient\UnsafeDestinationException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 

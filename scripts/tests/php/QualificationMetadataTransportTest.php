@@ -8,8 +8,8 @@ use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtist;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Infrastructure\Api\CoverArtArchive\CoverArtArchiveAdapter;
 use App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter;
-use App\Shared\Infrastructure\Http\PublicDestinationPolicy;
-use App\Shared\Infrastructure\Http\PublicHttpClient;
+use Baander\HttpClient\PublicDestinationPolicy;
+use Baander\HttpClient\PublicHttpClient;
 use Baander\Tooling\Fixtures\Qualification\Dataset;
 use Baander\Tooling\Fixtures\Qualification\MetadataTransport;
 use PHPUnit\Framework\Attributes\RequiresPhpExtension;
@@ -54,7 +54,7 @@ final class QualificationMetadataTransportTest extends TestCase
         self::assertSame($song['metadata']['id'], $body['recordings'][0]['id']);
         self::assertSame(100, $body['recordings'][0]['score']);
         self::assertSame('matched', json_decode(trim(file_get_contents($this->directory . '/audit.jsonl')), true, flags: JSON_THROW_ON_ERROR)['outcome']);
-        $this->expectException(\App\Shared\Infrastructure\Http\UnsafeDestinationException::class);
+        $this->expectException(\Baander\HttpClient\UnsafeDestinationException::class);
         $client->request('GET', 'https://127.0.0.1/ws/2/recording', ['musicbrainz.org']);
     }
 

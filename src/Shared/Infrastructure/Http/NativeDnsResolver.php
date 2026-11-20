@@ -27,6 +27,12 @@ final class NativeDnsResolver
     {
     }
 
+    /** @return \Closure(string, float): list<string> */
+    public function resolver(): \Closure
+    {
+        return $this->resolve(...);
+    }
+
     /** @return list<string> Complete A and AAAA addresses; classification belongs to the caller. */
     public function resolve(string $hostname, float $deadline): array
     {

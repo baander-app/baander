@@ -2,11 +2,8 @@
 
 declare(strict_types=1);
 
-namespace App\Shared\Infrastructure\Http;
+namespace Baander\HttpClient;
 
-use Symfony\Component\DependencyInjection\Attribute\Exclude;
-
-#[Exclude]
 final class UnsafeDestinationException extends \RuntimeException
 {
     public function __construct()

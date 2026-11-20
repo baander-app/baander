@@ -14,6 +14,7 @@ imports:
 deptrac:
   paths:
     - src/
+    - packages/baander-http-client/src/
     - packages/baander-redis-rate-limiter/src/
     - packages/baander-image-processing/src/
     - packages/baander-media-metadata/src/
@@ -55,6 +56,10 @@ deptrac:
         Command: ['Command Utility']
 
   layers:
+    - name: 'Public HTTP Client'
+      collectors:
+        - type: classLike
+          value: '^Baander\\HttpClient\\'
     - name: 'Rate Limiter Contracts'
       collectors:
         - type: classLike
@@ -1112,6 +1117,7 @@ deptrac:
           value: '^App\\Filesystem\\Infrastructure\\'
 
   ruleset:
+    'Public HTTP Client': []
     'Rate Limiter Contracts': []
     'Rate Limiter Implementation':
       - 'Rate Limiter Contracts'
@@ -1141,6 +1147,7 @@ deptrac:
     'Shared Application':
       - 'Shared Domain'
     'Shared Infrastructure':
+      - 'Public HTTP Client'
       - 'Rate Limiter Implementation'
       - 'Rate Limiter Contracts'
       - 'Auth WebSocket Contract'
@@ -1211,6 +1218,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Auth Infrastructure':
+      - 'Public HTTP Client'
       - 'Rate Limiter Contracts'
       - 'Auth Live Authority Contract'
       - 'Auth WebSocket Contract'
@@ -1453,6 +1461,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Metadata Infrastructure':
+      - 'Public HTTP Client'
       - 'Rate Limiter Contracts'
       - 'Media Metadata Readers'
       - 'Media Metadata Values'
@@ -1481,6 +1490,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Notification Infrastructure':
+      - 'Public HTTP Client'
       - 'Shared Application'
       - 'Notification Domain'
       - 'Notification Application'
@@ -1761,6 +1771,7 @@ deptrac:
       - 'Shared Application'
 
     'Radio Infrastructure':
+      - 'Public HTTP Client'
       - 'Radio Domain'
       - 'Radio Application'
       - 'Shared Domain'

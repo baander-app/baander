@@ -6,7 +6,7 @@ namespace App\Auth\Infrastructure\Security\OAuth;
 
 use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientKeySource;
-use App\Shared\Infrastructure\Http\PublicHttpClient;
+use Baander\HttpClient\PublicHttpClient;
 use InvalidArgumentException;
 use JsonException;
 use Psr\Log\LoggerInterface;

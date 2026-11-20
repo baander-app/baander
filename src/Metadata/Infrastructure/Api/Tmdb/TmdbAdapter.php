@@ -9,7 +9,7 @@ use App\Metadata\Infrastructure\Api\Tmdb\DTO\TmdbGenreDto;
 use App\Metadata\Infrastructure\Api\Tmdb\DTO\TmdbMovieDto;
 use App\Metadata\Infrastructure\Api\Tmdb\DTO\TmdbSearchResultDto;
 use App\Shared\Infrastructure\Swoole\Async;
-use App\Shared\Infrastructure\Http\PublicHttpClient;
+use Baander\HttpClient\PublicHttpClient;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 

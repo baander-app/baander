@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 use App\Shared\Infrastructure\Http\NativeDnsResolver;
-use App\Shared\Infrastructure\Http\PublicDestinationPolicy;
-use App\Shared\Infrastructure\Http\PublicHttpClient;
-use App\Shared\Infrastructure\Http\UnsafeDestinationException;
+use Baander\HttpClient\PublicDestinationPolicy;
+use Baander\HttpClient\PublicHttpClient;
+use Baander\HttpClient\UnsafeDestinationException;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
@@ -59,7 +59,7 @@ try {
 }
 $many = $resolver->resolve('many.baander.app', hrtime(true) / 1e9 + 2);
 check(count($many) === 101 && end($many) === '10.0.0.1', 'Native TCP fallback must retain the late private answer.');
-$policy = new PublicDestinationPolicy();
+$policy = new PublicDestinationPolicy((new NativeDnsResolver())->resolver());
 $refused = [];
 foreach (['private6.baander.app', 'many.baander.app', 'family-error.baander.app'] as $host) {
     try {
@@ -92,7 +92,7 @@ foreach ([0, SWOOLE_HOOK_ALL] as $hooks) {
             });
             $start = hrtime(true) / 1e9;
             try {
-                (new PublicHttpClient($transport, new PublicDestinationPolicy()))->request(
+                (new PublicHttpClient($transport, new PublicDestinationPolicy((new NativeDnsResolver())->resolver())))->request(
                     'GET',
                     'https://stall.baander.app/',
                     ['stall.baander.app'],

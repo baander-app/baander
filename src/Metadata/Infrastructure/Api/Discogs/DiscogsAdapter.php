@@ -9,7 +9,7 @@ use App\Metadata\Infrastructure\Api\Discogs\DTO\DiscogsMasterDto;
 use App\Metadata\Infrastructure\Api\Discogs\DTO\DiscogsReleaseDto;
 use App\Metadata\Infrastructure\Api\Discogs\DTO\DiscogsSearchResultDto;
 use App\Shared\Infrastructure\Swoole\Async;
-use App\Shared\Infrastructure\Http\PublicHttpClient;
+use Baander\HttpClient\PublicHttpClient;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 

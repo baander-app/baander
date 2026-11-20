@@ -6,8 +6,8 @@ namespace App\Tests\Unit\Metadata\Infrastructure\Api;
 
 use App\Metadata\Infrastructure\Api\Discogs\DiscogsAdapter;
 use App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter;
-use App\Shared\Infrastructure\Http\PublicDestinationPolicy;
-use App\Shared\Infrastructure\Http\PublicHttpClient;
+use Baander\HttpClient\PublicDestinationPolicy;
+use Baander\HttpClient\PublicHttpClient;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;

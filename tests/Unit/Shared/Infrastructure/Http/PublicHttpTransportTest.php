@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Http;
 
-use App\Shared\Infrastructure\Http\PublicDestinationPolicy;
-use App\Shared\Infrastructure\Http\PublicHttpClient;
-use App\Shared\Infrastructure\Http\UnsafeDestinationException;
+use Baander\HttpClient\PublicDestinationPolicy;
+use Baander\HttpClient\PublicHttpClient;
+use Baander\HttpClient\UnsafeDestinationException;
 use App\Tests\Support\Outbound\LocalTlsServer;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpClient\CurlHttpClient;

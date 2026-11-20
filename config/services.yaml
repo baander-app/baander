@@ -51,14 +51,24 @@ services:
                 json_decode_options: 4194304
 
     Baander\MediaMetadata\FormatDetector: ~
-    Baander\MediaMetadata\Id3Reader: ~
-    Baander\MediaMetadata\FlacReader: ~
-    Baander\MediaMetadata\OggReader: ~
-    Baander\MediaMetadata\WavReader: ~
+    Baander\MediaMetadata\Id3Reader:
+        arguments:
+            $logger: '@monolog.logger.metadata'
+    Baander\MediaMetadata\FlacReader:
+        arguments:
+            $logger: '@monolog.logger.metadata'
+    Baander\MediaMetadata\OggReader:
+        arguments:
+            $logger: '@monolog.logger.metadata'
+    Baander\MediaMetadata\WavReader:
+        arguments:
+            $logger: '@monolog.logger.metadata'
     Baander\MediaMetadata\MetadataContentReader: ~
 
     Baander\ImageProcessing\GdImageConverter: ~
-    Baander\ImageProcessing\BlurHashGenerator: ~
+    Baander\ImageProcessing\BlurHashGenerator:
+        arguments:
+            $logger: '@monolog.logger.media'
 
     # Register all classes in src/ as services
     App\:
@@ -88,7 +98,17 @@ services:
         autowire: false
         autoconfigure: false
 
-    App\Shared\Infrastructure\Http\PublicHttpClient:
+    baander.provider_dns_resolver:
+        class: Closure
+        factory: ['@App\Shared\Infrastructure\Http\NativeDnsResolver', 'resolver']
+        autowire: false
+        autoconfigure: false
+
+    Baander\HttpClient\PublicDestinationPolicy:
+        arguments:
+            $dnsResolver: '@baander.provider_dns_resolver'
+
+    Baander\HttpClient\PublicHttpClient:
         arguments:
             $httpClient: '@baander.provider_http_transport'
 

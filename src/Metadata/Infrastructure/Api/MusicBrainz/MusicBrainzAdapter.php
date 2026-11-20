@@ -29,7 +29,7 @@ use App\Metadata\Infrastructure\Api\MusicBrainz\DTO\MusicBrainzReleaseGroupDto;
 use App\Metadata\Infrastructure\Api\MusicBrainz\DTO\MusicBrainzSearchResultDto;
 use Baander\RedisRateLimiter\RateLimiterUnavailableException;
 use App\Shared\Application\Exception\ServiceUnavailableException;
-use App\Shared\Infrastructure\Http\PublicHttpClient;
+use Baander\HttpClient\PublicHttpClient;
 use App\Shared\Infrastructure\Swoole\Async;
 use GuzzleHttp\Psr7\Uri;
 use GuzzleHttp\Psr7\UriResolver;

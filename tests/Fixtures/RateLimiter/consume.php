@@ -25,7 +25,7 @@ $store = new class($pool, $barrier, $participant) extends RedisRateLimiterStore 
 
     public function __construct(RedisClientFactory $pool, private readonly string $barrier, private readonly string $participant)
     {
-        parent::__construct($pool);
+        parent::__construct($pool->borrow(...));
     }
 
     public function read(string $name, string $subject): RateLimiterSnapshot

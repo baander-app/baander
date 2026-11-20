@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Radio\Infrastructure\Sync;
 
 use App\Radio\Infrastructure\Sync\IprdStationSyncAdapter;
-use App\Shared\Infrastructure\Http\PublicDestinationPolicy;
-use App\Shared\Infrastructure\Http\PublicHttpClient;
-use App\Shared\Infrastructure\Http\UnsafeDestinationException;
+use Baander\HttpClient\PublicDestinationPolicy;
+use Baander\HttpClient\PublicHttpClient;
+use Baander\HttpClient\UnsafeDestinationException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Contracts\HttpClient\HttpClientInterface;

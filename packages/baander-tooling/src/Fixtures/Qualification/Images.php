@@ -185,7 +185,7 @@ services:
         arguments:
             - '%kernel.project_dir%/var/qualification/dataset.json'
             - '%kernel.project_dir%/storage/qualification-audit/metadata.jsonl'
-    App\Shared\Infrastructure\Http\PublicDestinationPolicy:
+    Baander\HttpClient\PublicDestinationPolicy:
         arguments:
             $dnsResolver: !service
                 class: Closure

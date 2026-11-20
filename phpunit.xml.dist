@@ -44,6 +44,7 @@
     <source>
         <include>
             <directory>src</directory>
+            <directory>packages/baander-http-client/src</directory>
             <directory>packages/baander-redis-rate-limiter/src</directory>
             <directory>packages/baander-image-processing/src</directory>
             <directory>packages/baander-media-metadata/src</directory>
