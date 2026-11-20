@@ -36,9 +36,67 @@ The Symfony container lint and OpenAPI drift check pass. Compiled service inspec
 confirms the metadata and media logger channels for the moved readers and BlurHash
 generator. Root Composer validation passes with existing constraint warnings;
 all four new manifests pass strict validation, and all changed manifests pass
-normalization. Final packaged verification remains in this plan's scope.
+normalization. The six-lens code review retained no findings after the qualification
+fixture fix. Simplification review retained the concrete types and callable seams.
+
+The fresh TypePHP build succeeds with 13,305 embedded files and 12,274 opcode blobs.
+Its nine skipped files are IDE-helper declarations and library copies; no application
+or package PHP is skipped. The 319,621,784-byte executable has SHA-256
+`64e4392aa8724668f1236ea64254bc819c80a2e6edbaad7f5262c249e64a426e`.
+The qualification image is
+`sha256:54021cdeeeef2be39bf4631c0a274331116b648e6281e383ec740131cd1aa61a`.
+Package-load smoke checks resolve all four namespaces through that executable.
+The full packaged backend gate passes in 3,420.5 seconds with four workers and
+coverage disabled: 13,817 tests and 148,851 assertions. All discovered test identities
+match the completed results, and owned-resource cleanup passes. The focused
+capability, native DNS, image-worker and limiter files also match individually.
+Observed PHP processes in all six lanes execute the fresh binary.
+
+| Packaged lane | Tests | Assertions |
+| --- | ---: | ---: |
+| Ordinary | 8,913 | 51,217 |
+| Native | 954 | 30,622 |
+| Database stack 1 | 1,197 | 20,774 |
+| Database stack 2 | 935 | 12,959 |
+| Database stack 3 | 1,091 | 24,683 |
+| Database stack 4 | 727 | 8,596 |
+
+The packaged gate command is:
+
+```bash
+BAANDER_TEST_IMAGE=baander-capability-qualification:ul6pde \
+BAANDER_TEST_CHECKOUT_IN_IMAGE=1 BAANDER_TEST_PROCESSES=4 \
+BAANDER_TEST_POSTGRES_IMAGE=baander-database:latest \
+bash scripts/test-backend-container.sh --no-coverage
+```
+
+Ordinary PHP checks run through `php scripts/check-backend-container.php --image baander-ci:local --`.
+They cover the focused PHPUnit scopes described above,
+`php vendor/bin/phpstan analyse --memory-limit=1G --no-progress`,
+`php vendor/bin/deptrac analyse --no-cache --no-progress`,
+`php bin/console lint:container --env=test --no-debug` and
+`php bin/console app:export-openapi-spec --env=test --no-debug --check`.
+Tooling checks use `phpunit-tooling.xml.dist`, `phpstan-tooling.neon` and
+`composer check:tooling-architecture`.
+
+Packaged interpreter checks, 11 bootstrap cases and 106 entry-point assertions pass.
+Production console listing, operator help and cache warmup pass with `APP_ENV=prod`,
+`APP_DEBUG=0` and the external test loader disabled.
+
+The first web-runtime drill exposed stale fixture configuration: its loopback
+DPoP proof was rejected by the existing explicit-origin validator. Runtime and
+shutdown fixtures now set `AUTH_DPOP_EXTRA_ORIGINS=http://127.0.0.1:9501` while
+retaining their public issuer. Both targeted regression checks fail without that
+setting and pass with it in the CI image: 2 tests and 21 assertions. Scoped
+tooling PHPStan and formatting pass. The packaged drills remain in progress. The correction changes only physical test tooling, and its focused
+code review has no findings. The refreshed fixture image is
+`sha256:b619de7ea1b7c8811fab80bc675bd73106f5a84d7cc9473e26b6274c4631cb9b`;
+its executable hash is identical to the fully tested binary above.
 
 ## TypePHP application packaging
+
+The results below record the 2026-11-19 runtime setup. The package extraction above
+records the newer application build.
 
 The [TypePHP setup plan](docs/plans/2026-11-19-1159-feat-typephp-setup-plan.md) targets the main PHP application as one packaged CLI executable using ZendVM.
 The [setup guide](tools/typephp/README.md) covers the console used by the HTTP server and workers, and the independent deployment operator.

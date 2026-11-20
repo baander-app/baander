@@ -172,6 +172,12 @@ final class WebRuntimeWorkflowTest extends TestCase
         self::assertSame(0, $status, $output);
         self::assertStringContainsString('Each administrator has one Redis alert', $output);
         $commands = self::dockerCalls($calls);
+        $application = array_values(array_filter($commands, static fn(array $command): bool => $command[0] === 'create' && in_array('APP_DOMAIN=http://127.0.0.1:9501', $command, true)));
+        self::assertCount(1, $application);
+        self::assertSame(
+            ['APP_URL=https://baander.app', 'DEFAULT_URI=https://baander.app', 'APP_DOMAIN=http://127.0.0.1:9501', 'AUTH_DPOP_EXTRA_ORIGINS=http://127.0.0.1:9501'],
+            array_values(array_filter($application[0], static fn(string $argument): bool => preg_match('/^(APP_URL|DEFAULT_URI|APP_DOMAIN|AUTH_DPOP_EXTRA_ORIGINS)=/', $argument) === 1)),
+        );
         $alerts = array_values(array_filter($commands, static fn(array $command): bool => in_array('alert', $command, true)));
         self::assertCount(2, $alerts);
         self::assertSame('wait', end($alerts[0]));

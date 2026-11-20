@@ -261,6 +261,7 @@ final class RuntimeWorkflow
             'APP_URL=https://baander.app',
             'DEFAULT_URI=https://baander.app',
             'APP_DOMAIN=http://127.0.0.1:9501',
+            'AUTH_DPOP_EXTRA_ORIGINS=http://127.0.0.1:9501',
             'HEALTH_MONITOR_INTERVAL_SECONDS=2',
             'MAILER_DSN=smtp://mailpit:1025',
             'MAIL_FROM_ADDRESS=noreply@baander.app',
