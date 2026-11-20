@@ -13,7 +13,9 @@ declare(strict_types=1);
 require dirname(__DIR__, 5) . '/vendor/autoload.php';
 
 use App\Shared\Application\Port\ServerNotRunningException;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Infrastructure\OpenTelemetry\HttpServerSpanSubscriber;
+use App\Shared\Infrastructure\OpenTelemetry\HttpSpanCapturePolicy;
 use App\Shared\Infrastructure\OpenTelemetry\InMemorySpanProcessor;
 use App\Shared\Infrastructure\OpenTelemetry\SpanBridge;
 use App\Shared\Infrastructure\OpenTelemetry\TracerProviderFactory;
@@ -108,6 +110,8 @@ $port = (int) substr(strrchr((string) stream_socket_get_name($probe, false), ':'
 fclose($probe);
 
 $bridge = new SpanBridge();
+$captureEnabled = new Swoole\Atomic(1);
+$captureClock = new Swoole\Atomic(1);
 $workers = new SwooleServerWorkers();
 $registry = new ServerControlOperationRegistry([new DebugSpansOperation($bridge), new DebugSpansClearOperation($bridge)]);
 $coordinator = new ServerControlCoordinator($registry, $workers, 1.0);
@@ -198,6 +202,28 @@ if ($child === 0) {
     probeRequest($port);
     probeSpans($serverControl, 1);
 
+    $captureEnabled->set(0);
+    $captureClock->add(6);
+    $disabledWorkers = [];
+    for ($attempt = 0; $attempt < 9; $attempt++) {
+        [$disabledWorkers[]] = probeRequest($port);
+    }
+    if (count(array_unique($disabledWorkers)) !== WORKERS) {
+        probeFail('disabled capture was not exercised on every worker');
+    }
+    probeSpans($serverControl, 1);
+
+    $captureEnabled->set(1);
+    $captureClock->add(6);
+    $enabledWorkers = [];
+    for ($attempt = 0; $attempt < 9; $attempt++) {
+        [$enabledWorkers[]] = probeRequest($port);
+    }
+    if (count(array_unique($enabledWorkers)) !== WORKERS) {
+        probeFail('enabled capture was not exercised on every worker');
+    }
+    probeSpans($serverControl, 10);
+
     Swoole\Process::kill($master, SIGTERM);
     exit(0);
 }
@@ -206,6 +232,13 @@ if ($child === 0) {
 $bridge->boot();
 $subscriber = new HttpServerSpanSubscriber(
     (new TracerProviderFactory(new InMemorySpanProcessor($bridge), false, '', 'baander'))->create(),
+    new HttpSpanCapturePolicy(
+        new class ($captureEnabled) implements SystemSettingsPortInterface {
+            public function __construct(private Swoole\Atomic $enabled) {}
+            public function get(string $key): bool { return $this->enabled->get() === 1; }
+        },
+        static fn (): float => (float) $captureClock->get(),
+    ),
 );
 $kernel = new class implements HttpKernelInterface {
     public function handle(SymfonyRequest $request, int $type = self::MAIN_REQUEST, bool $catch = true): SymfonyResponse
