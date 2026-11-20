@@ -259,6 +259,12 @@ that limitation is recorded for follow-up, with no runtime change in the 2026-10
 
 ### State on 2026-11-17
 
+Not pushed: `fix/auth-security-hardening` in the worktree `baander-par` carries the
+OAuth pushed authorization requests and the auth hardening; see
+[OAuth pushed authorization requests and auth hardening](#oauth-pushed-authorization-requests-and-auth-hardening).
+Every user signs in again and re-enrols TOTP after its migrations, and an existing
+instance needs `AUTH_TOTP_ENCRYPTION_KEY` in its `env.json` before it runs that branch.
+
 `master` on GitHub and Forgejo carries, on top of `6912eaaf6`, the work pushed on
 2026-11-15: the CI fixes (`d1504daa3` to `77bb3c8e4`), two web fixes (`9ecf84a3d`,
 `052e8684d`) and the roadmap cleanup with its plan retirement. Landed on 2026-11-14:
@@ -392,6 +398,100 @@ Read [AGENTS.md](AGENTS.md) for workflow, [CONCEPTS.md](CONCEPTS.md) for shared 
 and the [testing guide](docs-book/part-2-developer-guide/testing/README.md) for current
 runners and verification boundaries. Historical suite counts apply to their own
 trees; they are not acceptance evidence for a new change.
+
+## OAuth pushed authorization requests and auth hardening
+
+Delivered on `fix/auth-security-hardening` on 2026-11-20, not yet pushed. The branch
+implements two plans:
+`docs/plans/2026-11-19-1148-feat-oauth-pushed-authorization-requests-plan.md`
+(`ea416708d` to `9cf1c6499`) and
+`docs/plans/2026-11-19-2119-fix-auth-security-hardening-plan.md` (`5a80d108c` to
+this record). The hardening plan fixes every confirmed finding of a five-reviewer
+security review of the auth and OAuth code, which the user asked for on 2026-11-19.
+
+Pushed authorization requests and `private_key_jwt`:
+
+- Each OAuth client stores its authentication method and key source (`6b6b6c013`).
+  Confidential clients authenticate with `client_secret_basic` or with
+  `private_key_jwt` client assertions (`9f61ef0be`), whose keys come from the client
+  record or from a `jwks_uri` (`689f64161`).
+- Third-party authorization starts with a pushed authorization request bound to a
+  DPoP key (`7f891d6b9`, `12b95f0d1`). The authorization code carries that key, and
+  the consent page reads the pushed request (`1ef91019b`).
+- Operators register key clients and replace their keys from the admin API, the
+  console and the admin UI (`4bd74c926`).
+
+Hardening, by area:
+
+- Delegated tokens. A token from any client other than the first-party web client
+  holds `ROLE_USER` only. Its scopes (`profile`, `email`, `library`, `playlist`) map to
+  the routes it may call; any other route answers 403 `insufficient_scope`
+  (`d790a24e2`, `248996846`). A delegated grant with nothing grantable is refused,
+  and the consent page describes each scope (`1857be595`, `07ed9a4e6`).
+  `/api/auth/refresh` refreshes only first-party tokens (`a2217a9bc`).
+- Code and client flows. DPoP `htu` is checked against the deployment's public
+  origins (`0a9e00aaf`). PS256 is accepted for client assertions and DPoP proofs
+  (`7024b7ae4`). The pushed `state` is bounded, a replayed code ends its token chain,
+  and access tokens carry `iss`, `typ` and `kid` and are revoked by `jti`
+  (`f62c4a42d`, `6fad7f748`). Loopback redirect URIs are matched the way a browser
+  parses them (`65694a2e6`).
+- Credentials. Each TOTP code works once, and TOTP secrets are encrypted with
+  `AUTH_TOTP_ENCRYPTION_KEY` (`05952b12c`). Passkey challenges live only in Redis and
+  are used once; accounts with TOTP need user verification on their passkeys
+  (`bad685a59`). Login hides which accounts exist and limits failures per account,
+  and registration answers the same whether or not the address is taken
+  (`ff52e2985`, `6572b588b`).
+- Sessions. Each user has a credential epoch, which a password change or an operator
+  TOTP reset advances. Codes, device approvals and refresh chains from an older epoch
+  issue no more tokens; a password change keeps the session that made it. Refresh
+  tokens are stored hashed, and a refresh chain lives at most 90 days (`63d24010e`,
+  `75159b020`, `168747cc3`).
+- Account changes. Changing the email, registering a passkey and starting TOTP setup
+  need step-up re-authentication: the password, plus a TOTP code when TOTP is on
+  (`88ce25f7d`, `91577b07e`). A new email address stays pending
+  until it is verified, and authenticators need a verified address (`7d4655782`).
+  Operators can reset a user's TOTP (`55b53e63c`).
+- Production. The application refuses to boot in production with public or weak
+  secrets (`a55efcb07`). Signed stream URLs expire at most 24 hours ahead
+  (`d36bbe151`). Responses carry a nonce-based CSP, HSTS and static-file headers
+  (`00ca99c0a`). Health probes no longer show exception text (`0c06c1985`).
+- WebSocket frames are capped, and abusive sockets and those of disabled accounts are
+  closed (`1b595b256`). Voters decide admin access through the role hierarchy
+  (`0ee9794df`).
+- A `ce-code-review` run on 2026-11-20 found seven issues to fix, all applied
+  (`b361cd908` to `e7ec54519`). A Redis outage at device authorization and a
+  timed-out issuance lock now answer 503. `GET /api/auth/me` documents the delegated
+  profile. A reused refresh chain ends through the shared chain revoker.
+
+After these migrations every user signs in again: `Version20261120110000` deletes all
+sessions. `Version20261119220000` drops the plaintext TOTP secret, so every user
+re-enrols TOTP. Device codes approved before the migration are refused.
+
+Open:
+
+- An existing instance's `env.json` lacks `AUTH_TOTP_ENCRYPTION_KEY`.
+  `Bootstrap::configure` generates the key only for a new instance, and a production
+  instance refuses to boot without it. This includes the persistent instance. The key
+  has to be added before such an instance runs this branch.
+- The CSP, step-up passkey registration and web TOTP login were not checked in a
+  browser: the preview could not start from this worktree.
+- `/oauth/revoke` is a first-party route, so a delegated token cannot revoke itself;
+  RFC 7009 revocation for third-party clients is separate work.
+
+Verification on 2026-11-20:
+
+- `make ci` at `e7ec54519` in the local CI image: composer normalize, PHPStan (no
+  errors in 3,928 files) and Deptrac (no violations) passed. Of the backend lanes, the
+  ordinary lane (8,896 tests), the native lane (953) and the second stack lane (1,662)
+  passed without failures, errors or skips. The first stack lane ran one process for
+  its 174 files and hit the runner's one-hour limit with tests still running. Its files,
+  rerun through `scripts/test-functional-container.sh` in two lanes, gave 2,288 tests
+  and one failure: `TranscodeCleanupConsoleOutputTest` started a production console
+  with the committed default secrets, which production now refuses. `26a7fd0cb` gives
+  that process private secrets, and both cases of the test pass.
+- Web: 3,661 tests in 293 files passed; the typecheck passed. The OpenAPI document
+  and the generated client match the code (`app:export-openapi-spec --check`,
+  `generate:check`).
 
 ## Web dependency refresh
 
