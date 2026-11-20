@@ -87,7 +87,7 @@ final class PublicPasskeyAuthenticationTest extends TestCase
             return;
         }
         self::assertTrue($accepted, 'A legacy or foreign handle must not authenticate.');
-        self::assertSame($user->getId()->toString(), $id, 'Only the internal command result retains the internal identity.');
+        self::assertSame($user->getId()->toString(), $id->userId->toString(), 'Only the internal command result retains the internal identity.');
         self::assertSame(1, $passkey->getCounter());
     }
 }

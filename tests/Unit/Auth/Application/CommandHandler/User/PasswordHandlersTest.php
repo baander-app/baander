@@ -292,6 +292,7 @@ final class PasswordHandlersTest extends TestCase
             $this->createStub(RefreshTokenRepositoryInterface::class),
             $transaction,
             $this->createStub(EventDispatcherInterface::class),
+            $this->createStub(PasswordResetTokenRepositoryInterface::class),
         );
     }
 }

@@ -126,7 +126,7 @@ final class PasskeyLoginCeremonyTest extends TestCase
         $users = $this->createStub(UserRepositoryInterface::class);
         $users->method('findByUuid')->willReturn($this->user);
 
-        return new AuthenticatePasskeyHandler($passkeys, $service, $users)(new AuthenticatePasskeyCommand(null, $challengeKey, $assertion));
+        return new AuthenticatePasskeyHandler($passkeys, $service, $users)(new AuthenticatePasskeyCommand(null, $challengeKey, $assertion))->userId->toString();
     }
 
     /** One worker's service; every instance shares the test's challenge store, as workers share Redis. */

@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Auth\Application\Service;
 
 use App\Auth\Application\Exception\PasswordPolicyException;
 use App\Auth\Application\Port\PasswordHasherInterface;
+use App\Auth\Application\Port\PasswordResetTokenRepositoryInterface;
 use App\Auth\Application\Service\PasswordChanger;
 use App\Auth\Domain\Event\PasswordChanged;
 use App\Auth\Domain\Model\OAuth\AccessToken;
@@ -37,6 +38,8 @@ final class PasswordChangerTest extends TestCase
         self::assertSame('hashed:new-password', $user->getPassword());
         self::assertSame([
             'hash',
+            // The reset token row before the user's row, in the order a reset redemption locks them.
+            'revoke reset token of ' . $user->getId()->toString(),
             'advance epoch of ' . $user->getId()->toString(),
             'save:hashed:new-password',
             'revoke access for ' . $user->getId()->toString() . ' keeping none',
@@ -150,7 +153,13 @@ final class PasswordChangerTest extends TestCase
             }
         });
 
-        return new PasswordChanger($hasher, $users, $accessTokens, $refreshTokens, $transaction, $events);
+        $resetTokens = $this->createStub(PasswordResetTokenRepositoryInterface::class);
+        $resetTokens->method('revokeForUser')->willReturnCallback(function (Uuid $userId): void {
+            $this->assertTransaction();
+            $this->calls[] = 'revoke reset token of ' . $userId->toString();
+        });
+
+        return new PasswordChanger($hasher, $users, $accessTokens, $refreshTokens, $transaction, $events, $resetTokens);
     }
 
     private function assertTransaction(): void

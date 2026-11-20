@@ -7,6 +7,7 @@ namespace App\Auth\Application\Service;
 use App\Auth\Application\DTO\HashedPassword;
 use App\Auth\Application\Exception\PasswordPolicyException;
 use App\Auth\Application\Port\PasswordHasherInterface;
+use App\Auth\Application\Port\PasswordResetTokenRepositoryInterface;
 use App\Auth\Domain\Event\PasswordChanged;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\User;
@@ -24,7 +25,9 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
  * the user's own change. The caller hashes the new password first (hash()), outside any
  * transaction, and passes it to change().
  *
- * change() first increments the user's credential epoch, which locks the user's row until
+ * change() first removes any outstanding reset token, in the order a reset redemption takes
+ * that row and then the user's, so a change racing a redemption waits instead of deadlocking.
+ * It then increments the user's credential epoch, which locks the user's row until
  * the transaction ends. Issuance and refresh lock that row and compare epochs, so a login
  * or grant whose credential was proved before the change either committed before it, and
  * the revocation below catches its tokens, or waits for it and is refused. Saving the user
@@ -41,6 +44,7 @@ final readonly class PasswordChanger
         private RefreshTokenRepositoryInterface $refreshTokenRepository,
         private TransactionPortInterface $transaction,
         private EventDispatcherInterface $eventDispatcher,
+        private PasswordResetTokenRepositoryInterface $passwordResetTokens,
     ) {
     }
 
@@ -65,6 +69,7 @@ final readonly class PasswordChanger
     public function change(User $user, HashedPassword $password, ?AccessToken $keep = null): void
     {
         $this->transaction->run(function () use ($user, $password, $keep): void {
+            $this->passwordResetTokens->revokeForUser($user->getId());
             $credentialEpoch = $this->userRepository->advanceCredentialEpoch($user->getId());
             $user->changePassword($password->hash);
             $this->userRepository->save($user);
