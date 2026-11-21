@@ -9,6 +9,7 @@ use Baander\Containers\Resources\ResourceLedger;
 use Baander\Containers\Resources\ResourceKind;
 use Baander\DevQualification\Fixtures\FixtureSecrets;
 use Baander\DevQualification\Fixtures\Runtime;
+use Baander\DevQualification\Fixtures\CheckoutArchive;
 use Baander\Process\Execution\ProcessResult;
 use Throwable;
 
@@ -134,7 +135,7 @@ final class ShutdownWorkflow
     {
         $archive = $this->temporary . '/checkout.tar';
         try {
-            $this->runtime->run(['tar', '-cf', $archive, ...$paths]);
+            CheckoutArchive::create($this->runtime, $archive, $paths);
             if ($container === 'probe') {
                 $this->copyArchive($archive, $this->id . '-probe:' . $destination);
                 return;
@@ -257,7 +258,7 @@ final class ShutdownWorkflow
                     'docker/general',
                     'templates',
                     'public',
-                    '.env',
+                    '.env.example',
                     'composer.json',
                     'composer.lock',
                     'translations',

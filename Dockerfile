@@ -597,6 +597,7 @@ COPY --from=application-evidence /usr/share/baander-build-evidence /usr/share/ba
 # Path repositories, patches and application classes must exist before Composer
 # resolves local packages and generates the optimized application autoloader.
 COPY --chown=www-data:www-data . ${APP_HOME}/
+COPY --chown=www-data:www-data .env.example ${APP_HOME}/.env
 
 # Standalone production must not inherit development error-display settings.
 # Never ship a cache generated in the build context's environment.
@@ -655,6 +656,7 @@ COPY ./docker/dev/php.ini /usr/local/etc/php/conf.d/zzz-baander.ini
 
 # Copy full source tree
 COPY --chown=www-data:www-data . ${APP_HOME}/
+COPY --chown=www-data:www-data .env.example ${APP_HOME}/.env
 
 # Generate stub OAuth keys so PHPStan's Symfony extension can boot the kernel
 RUN umask 077 && mkdir -p ${APP_HOME}/config/secrets/oauth \
@@ -681,6 +683,7 @@ FROM dev AS dev-runtime
 USER root
 RUN printf 'memory_limit=512M\n' > /usr/local/etc/php/conf.d/zz-baander-development-memory.ini
 COPY --chown=www-data:www-data . ${APP_HOME}/
+COPY --chown=www-data:www-data .env.example ${APP_HOME}/.env
 USER www-data
 RUN COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interaction --no-progress --no-scripts && \
     composer dump-autoload --optimize --no-interaction && \

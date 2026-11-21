@@ -16,6 +16,7 @@ final class MessagingWorkflowTest extends TestCase
         $this->root = sys_get_temp_dir() . '/baander-messaging-contract-' . bin2hex(random_bytes(8));
         mkdir($this->root . '/bin', 0700, true);
         mkdir($this->root . '/vendor', 0700);
+        file_put_contents($this->root . '/.env.example', "FIXTURE=default-marker\n");
         mkdir($this->root . '/tests/Fixtures', 0700, true);
         file_put_contents($this->root . '/vendor/autoload.php', '<?php');
         file_put_contents($this->root . '/tests/Fixtures/postgres-extensions.sql', 'CREATE EXTENSION fixture;');

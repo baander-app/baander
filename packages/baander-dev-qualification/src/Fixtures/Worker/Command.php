@@ -223,7 +223,7 @@ final class Command
                     'docker/general',
                     'templates',
                     'public',
-                    '.env',
+                    '.env.example',
                     '.env.test',
                     'composer.json',
                     'composer.lock',

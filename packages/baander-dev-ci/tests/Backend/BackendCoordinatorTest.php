@@ -485,6 +485,7 @@ final class BackendCoordinatorTest extends TestCase
             self::assertContains('sha256:' . str_repeat('a', 64), $creation);
             $provision = current(array_filter($commands, static fn(array $args): bool => array_any($args, static fn(string $arg): bool => str_contains($arg, 'tar -xf'))));
             self::assertStringContainsString("tar -xf /tmp/checkout.tar -C '/srv/baander'", $provision[array_key_last($provision)]);
+            self::assertStringContainsString("cp '/srv/baander'/.env.example '/srv/baander'/.env", $provision[array_key_last($provision)]);
             self::assertStringNotContainsString('/var/www/html', $provision[array_key_last($provision)]);
             $lanes = Coordinator::partition(['/srv/baander/tests/Unit/NativeTest.php'], ['tests/Unit/NativeTest.php' => 'native'], 2, $runtime->layout->root);
             self::assertArrayHasKey('native', $lanes);

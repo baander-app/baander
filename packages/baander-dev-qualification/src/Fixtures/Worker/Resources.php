@@ -6,6 +6,7 @@ namespace Baander\DevQualification\Fixtures\Worker;
 
 use Baander\Containers\Docker\Client;
 use Baander\DevQualification\Fixtures\Runtime;
+use Baander\DevQualification\Fixtures\CheckoutArchive;
 use Throwable;
 use Baander\Containers\Resources\DisposableContainer;
 use Baander\Containers\Resources\ResourceKind;
@@ -34,7 +35,7 @@ final class Resources
     {
         $archive = $this->artifacts . '/checkout.tar';
         try {
-            $this->runtime->run(['tar', '-cf', $archive, ...$paths]);
+            CheckoutArchive::create($this->runtime, $archive, $paths);
             $this->docker->run(['cp', $archive, $container . ':/tmp/fixture-checkout.tar']);
             $this->docker->run([
                 'exec',

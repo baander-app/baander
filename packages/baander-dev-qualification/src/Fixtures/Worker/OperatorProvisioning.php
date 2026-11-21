@@ -6,6 +6,7 @@ namespace Baander\DevQualification\Fixtures\Worker;
 
 use Baander\Deployment\Database\Pooler;
 use Baander\DevQualification\Fixtures\Failure;
+use Baander\DevQualification\Fixtures\CheckoutArchive;
 use Baander\DevQualification\Fixtures\FixtureSecrets;
 use Baander\DevQualification\Fixtures\Runtime as FixtureRuntime;
 use Throwable;
@@ -304,11 +305,7 @@ final readonly class OperatorProvisioning
             unlink($tooling);
         } else {
             $archive = $this->qualification->work('checkout.tar');
-            $this->qualification->commands->run([
-                'tar',
-                '--exclude=config/secrets',
-                '-cf',
-                $archive,
+            $paths = [
                 'vendor',
                 'scripts/vendor',
                 'scripts/composer.json',
@@ -323,12 +320,13 @@ final readonly class OperatorProvisioning
                 'docker/general',
                 'templates',
                 'public',
-                '.env',
+                '.env.example',
                 '.env.test',
                 'composer.json',
                 'composer.lock',
                 'translations',
-            ]);
+            ];
+            CheckoutArchive::create($this->qualification->commands->runtime, $archive, $paths, ['config/secrets']);
             $this->qualification->commands->run(['tar', '-xf', $archive, '-C', $checkout]);
             unlink($archive);
         }

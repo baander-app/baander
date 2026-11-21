@@ -87,9 +87,13 @@ cd baander
 cp .env.example .env
 ```
 
-Keep `.env` free of deployment secrets: the production and worker image builds copy
-it into the image. In `.env`, set the media paths and the executables supplied by the
-image's Debian packages:
+The tracked `.env.example` supplies build defaults. Your local `.env` is ignored
+by Git and excluded from image contexts, source snapshots and qualification
+archives; image builds create their runtime `.env` from `.env.example`. Private
+deployment settings remain separate from those defaults.
+
+In the local `.env` used by the checkout-mounted web process, set the media paths
+and executables supplied by the image's Debian packages:
 
 ```env
 MEDIA_STORAGE_PATH=/media/library
@@ -101,11 +105,11 @@ HW_ACCEL_DEVICE=
 HW_BITRATE_MULTIPLIER=1.0
 ```
 
-The encoder settings above select CPU encoding. Set them before building the
-worker image: its media process requires all three. The worker credentials file
-can override `VIDEO_ENCODER` through its `runtimeEnvironment`, but it does not
-accept `HW_ACCEL_DEVICE` or `HW_BITRATE_MULTIPLIER`; those two come from the image's
-`.env`. A hardware encoder is configured in the deployment profile instead;
+The encoder settings above select CPU encoding and match the safe defaults in
+`.env.example`. Editing the local `.env` does not change worker-image defaults.
+Worker credentials can override `VIDEO_ENCODER` through `runtimeEnvironment`, but
+do not accept `HW_ACCEL_DEVICE` or `HW_BITRATE_MULTIPLIER`; those two use the image's
+template defaults. Configure a hardware encoder in the deployment profile instead;
 see [Transcoding](../media/hardware-acceleration.md#hardware-acceleration).
 
 Create `.env.dev.local` with mode `0600`. Put the following settings in it, replacing
@@ -144,7 +148,7 @@ credentials as the services. Both database URLs reach PostgreSQL through the
 [connection pooler](../configuration/deployment-profiles.md#connection-pooler) on port 6432.
 `DATABASE_URL` uses its application alias. `DATABASE_CONTROL_URL` uses its control
 alias and role, whose names are `DB_DATABASE` and `DB_USERNAME` with `_control`
-appended. The tracked `.env` defaults both URLs to the password `baander`, so a
+appended. The `.env.example` defaults both URLs to the password `baander`, so a
 custom password must appear in both URLs; otherwise the control connections fail
 to authenticate.
 
@@ -351,7 +355,10 @@ export APP_HOME="$(sed -n 's/^APP_HOME=//p' .env.compose.local)"
 The current layout is `/var/www/html`. Use the network and media volumes prepared above;
 the host and worker database URLs must reach the same migrated database. Supply the
 same `APP_SECRET`, `STREAM_URL_HMAC_SECRET`, `AUTH_TOTP_ENCRYPTION_KEY` and Redis
-credentials through the worker credentials file.
+credentials through the worker credentials file. Its `runtimeEnvironment` must
+also set `MEDIA_STORAGE_PATH=/media/library` and
+`CONVERT_STORAGE_PATH=/storage/conversions` for the mounts prepared above; local
+`.env` edits are not worker configuration.
 Worker runtime uses `APP_ENV=prod` and does not load the web's `.env.dev.local`; it
 refuses to boot while one of the three secrets is missing or still a committed default.
 

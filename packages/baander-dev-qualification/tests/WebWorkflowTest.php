@@ -269,12 +269,12 @@ LOG;
                         'docker/general',
                         'templates',
                         'public',
-                        '.env',
+                        '.env.example',
                         'composer.json',
                         'composer.lock',
                         'translations',
                     ],
-                    array_slice($archives[0], 2),
+                    array_slice($archives[0], 2, -3),
                 );
             }
             $commands = file($trace, FILE_IGNORE_NEW_LINES)

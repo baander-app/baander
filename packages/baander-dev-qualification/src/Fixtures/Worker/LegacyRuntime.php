@@ -139,7 +139,7 @@ final class LegacyRuntime
                         'templates',
                         'public',
                         'phpunit.xml.dist',
-                        '.env',
+                        '.env.example',
                         '.env.test',
                         'composer.json',
                         'composer.lock',

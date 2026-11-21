@@ -9,6 +9,7 @@ use Baander\Containers\Resources\ResourceLedger;
 use Baander\Containers\Resources\ResourceKind;
 use Baander\DevQualification\Fixtures\FixtureSecrets;
 use Baander\DevQualification\Fixtures\Runtime;
+use Baander\DevQualification\Fixtures\CheckoutArchive;
 use Baander\Process\Execution\ProcessResult;
 use Throwable;
 
@@ -343,19 +344,18 @@ final class RuntimeWorkflow
             'public',
             ...$this->security ? [] : ['scripts/web-runtime'],
             'phpunit.xml.dist',
-            '.env',
+            '.env.example',
             '.env.test',
             'composer.json',
             'composer.lock',
             'translations',
         ];
-        $this->runtime->run([
-            'tar',
-            ...$this->security ? ['--exclude=config/secrets/oauth', '--exclude=config/secrets/*.decrypt.private.php'] : [],
-            '-cf',
+        CheckoutArchive::create(
+            $this->runtime,
             $this->archive,
-            ...$paths,
-        ]);
+            $paths,
+            $this->security ? ['config/secrets/oauth', 'config/secrets/*.decrypt.private.php'] : [],
+        );
         Runtime::require(chmod($this->archive, 0644), 'Cannot make copied checkout readable in the app container.');
         $destination = '/tmp/baander-runtime-checkout.tar';
         $this->docker(['cp', $this->archive, $this->id . '-app:' . $destination]);

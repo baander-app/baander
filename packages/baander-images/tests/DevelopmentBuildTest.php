@@ -27,8 +27,8 @@ final class DevelopmentBuildTest extends TestCase
         $this->git(['config', 'user.email', 'dev@baander.app']);
         $this->git(['config', 'user.name', 'Development fixture']);
         file_put_contents($this->repo . '/src/code.php', 'original');
-        file_put_contents($this->repo . '/.env', 'APP_SECRET=template');
-        file_put_contents($this->repo . '/.gitignore', ".env.local\nvar/\n");
+        file_put_contents($this->repo . '/.env.example', 'APP_SECRET=template');
+        file_put_contents($this->repo . '/.gitignore', "/.env\n.env.local\nvar/\n");
         file_put_contents($this->repo . '/execute', '#!/bin/sh');
         chmod($this->repo . '/execute', 0755);
         symlink('src/code.php', $this->repo . '/linked');
@@ -57,15 +57,42 @@ final class DevelopmentBuildTest extends TestCase
         file_put_contents($this->repo . '/var/state', 'state');
         $first = Source::snapshotWorktree($this->runner, $this->repo, $this->root . '/snapshot');
         self::assertSame('edited', file_get_contents($this->root . '/snapshot/src/code.php'));
-        self::assertSame('APP_SECRET=template', file_get_contents($this->root . '/snapshot/.env'));
+        self::assertFileDoesNotExist($this->root . '/snapshot/.env');
+        self::assertSame('APP_SECRET=template', file_get_contents($this->root . '/snapshot/.env.example'));
         self::assertFileDoesNotExist($this->root . '/snapshot/.env.local');
         self::assertDirectoryDoesNotExist($this->root . '/snapshot/var');
         self::assertDirectoryDoesNotExist($this->root . '/snapshot/.git');
         self::assertSame('src/code.php', readlink($this->root . '/snapshot/linked'));
         self::assertSame(0755, fileperms($this->root . '/snapshot/execute') & 0777);
+        file_put_contents($this->repo . '/.env', 'APP_SECRET=changed-private-value');
         self::assertSame($first, Source::snapshotWorktree($this->runner, $this->repo, null));
         file_put_contents($this->repo . '/src/code.php', 'newer');
         self::assertNotSame($first, Source::snapshotWorktree($this->runner, $this->repo, null));
+    }
+
+    public function testSnapshotExcludesRootEnvironmentEvenWhenStillIndexed(): void
+    {
+        file_put_contents($this->repo . '/.env', 'APP_SECRET=private-indexed-value');
+        $this->git(['add', '--force', '.env']);
+        $this->git(['commit', '-m', 'indexed environment fixture']);
+
+        $digest = Source::snapshotWorktree($this->runner, $this->repo, $this->root . '/snapshot');
+
+        self::assertFileDoesNotExist($this->root . '/snapshot/.env');
+        self::assertSame('APP_SECRET=private-indexed-value', file_get_contents($this->repo . '/.env'));
+        file_put_contents($this->repo . '/.env', 'APP_SECRET=another-private-value');
+        self::assertSame($digest, Source::snapshotWorktree($this->runner, $this->repo, null));
+    }
+
+    public function testFreshCheckoutSnapshotUsesTheExampleWithoutALocalEnvironment(): void
+    {
+        self::assertFileDoesNotExist($this->repo . '/.env');
+        $digest = Source::snapshotWorktree($this->runner, $this->repo, $this->root . '/snapshot');
+
+        self::assertFileDoesNotExist($this->root . '/snapshot/.env');
+        self::assertSame('APP_SECRET=template', file_get_contents($this->root . '/snapshot/.env.example'));
+        file_put_contents($this->repo . '/.env.example', 'APP_SECRET=changed-template');
+        self::assertNotSame($digest, Source::snapshotWorktree($this->runner, $this->repo, null));
     }
 
     public function testSnapshotExcludesTrackedLocalConfigurationWithoutChangingItsDigest(): void

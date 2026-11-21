@@ -282,6 +282,7 @@ class Runtime
                 mkdir -p APPLICATION_ROOT
                 tar -xf /tmp/checkout.tar -C APPLICATION_ROOT
                 rm /tmp/checkout.tar
+                cp APPLICATION_ROOT/.env.example APPLICATION_ROOT/.env
                 chown -R www-data:www-data APPLICATION_ROOT
                 SH)]);
         }

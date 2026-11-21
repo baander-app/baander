@@ -31,6 +31,7 @@ final class DockerContext
         'docker/dev/juul.localdomain.key',
         'auth.json',
         'dev.local.json',
+        '.env',
         '.env.local',
         '.env.prod.local',
         '.env.local.php',
@@ -67,7 +68,7 @@ final class DockerContext
         'ui/rn/android/gradle/wrapper/gradle-wrapper.jar',
         'ui/rn/ios/Baander/sentinel.swift',
         'ui/rn/.yarn/patches/sentinel.patch',
-        '.env',
+        '.env.example',
         '.env.test',
         'docker/general/start-web.sh',
         'docker/general/start-worker.sh',
@@ -87,7 +88,7 @@ final class DockerContext
         mkdir($work . '/context', 0700, true);
         try {
             copy($root . '/.dockerignore', $work . '/context/.dockerignore');
-            file_put_contents($work . '/context/Dockerfile', "FROM scratch\nCOPY . /context/\n");
+            file_put_contents($work . '/context/Dockerfile', "FROM scratch\nCOPY . /context/\nCOPY .env.example /application/.env\n");
             foreach ([...self::EXCLUDED, ...self::INCLUDED] as $name) {
                 $path = $work . '/context/' . $name;
                 if (!is_dir(dirname($path))) {
@@ -95,6 +96,8 @@ final class DockerContext
                 }
                 file_put_contents($path, "synthetic context marker\n");
             }
+            file_put_contents($work . '/context/.env', "PRIVATE_CHECKOUT_VALUE=private-marker\n");
+            file_put_contents($work . '/context/.env.example', "PUBLIC_TEMPLATE_VALUE=example-marker\n");
             $runtime->docker()->run(
                 [
                     'buildx',
@@ -120,6 +123,10 @@ final class DockerContext
                     'Required source or asset excluded: ' . $name,
                 );
             }
+            Runtime::require(
+                file_get_contents($work . '/export/application/.env') === "PUBLIC_TEMPLATE_VALUE=example-marker\n",
+                'The image environment must come from the example template.',
+            );
             printf(
                 "PASS: %d host artifacts excluded; %d source, asset and license markers preserved.\n",
                 count(self::EXCLUDED),

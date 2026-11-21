@@ -35,6 +35,7 @@ vendor
 **/vendor
 !relay/third_party/inventory/go/licenses/**
 var/
+.env
 .env.local
 .env.*.local
 .env.local.php

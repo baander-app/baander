@@ -6,6 +6,7 @@ namespace Baander\DevQualification\Fixtures\Messaging;
 
 use Baander\DevQualification\Fixtures\FixtureSecrets;
 use Baander\DevQualification\Fixtures\Runtime;
+use Baander\DevQualification\Fixtures\CheckoutArchive;
 use Baander\Containers\Docker\Client;
 use Baander\Containers\Resources\ResourceKind;
 
@@ -177,7 +178,7 @@ final class Qualification
             if (!$inImage) {
                 $paths = [
                     'vendor', 'scripts/vendor', 'scripts/bootstrap.php', 'src', 'tests', 'config', 'packages', 'migrations', 'bin',
-                    'phpunit.xml.dist', '.env', '.env.test', 'composer.json', 'composer.lock',
+                    'phpunit.xml.dist', '.env.example', '.env.test', 'composer.json', 'composer.lock',
                 ];
                 if ($mode !== 'messaging') {
                     array_push($paths, 'docker/general', 'templates', 'public', 'translations');
@@ -204,7 +205,7 @@ final class Qualification
     ): void {
         $archive = $artifacts . '/checkout.tar';
         try {
-            $runtime->run(['tar', '-cf', $archive, ...$paths], timeout: null);
+            CheckoutArchive::create($runtime, $archive, $paths);
             // The parent directory is private. Let the image's default user read
             // the copied archive and own the extracted checkout, as in the stream.
             Runtime::require(chmod($archive, 0644), 'Cannot prepare the private checkout archive.');

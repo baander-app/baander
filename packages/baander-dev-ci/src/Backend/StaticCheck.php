@@ -120,6 +120,7 @@ final class StaticCheck
                 mkdir -p APPLICATION_ROOT
                 tar -xf /tmp/checkout.tar -C APPLICATION_ROOT
                 rm /tmp/checkout.tar
+                cp APPLICATION_ROOT/.env.example APPLICATION_ROOT/.env
                 mkdir -p APPLICATION_ROOT/config/secrets/oauth APPLICATION_ROOT/var
                 openssl genrsa -out APPLICATION_ROOT/config/secrets/oauth/private.key 2048 2>/dev/null
                 openssl rsa -in APPLICATION_ROOT/config/secrets/oauth/private.key -pubout -out APPLICATION_ROOT/config/secrets/oauth/public.key 2>/dev/null

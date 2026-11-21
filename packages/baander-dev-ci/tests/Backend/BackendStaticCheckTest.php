@@ -236,6 +236,8 @@ final class BackendStaticCheckTest extends TestCase
         self::assertStringEndsWith(':/tmp/checkout.tar', $copy[2]);
         $exec = array_values(array_filter($calls, static fn(array $call): bool => $call[0] === 'exec'));
         self::assertStringContainsString('tar -xf /tmp/checkout.tar', end($exec[0]));
+        $applicationRoot = escapeshellarg(\Baander\Configuration\ApplicationLayout::load()->root);
+        self::assertStringContainsString("cp {$applicationRoot}/.env.example {$applicationRoot}/.env", end($exec[0]));
         self::assertSame(['php', 'current.php', 'literal $x; space'], array_slice($exec[1], -3));
     }
 
