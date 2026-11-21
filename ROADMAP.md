@@ -7,18 +7,27 @@ milestones and their verification evidence remain in Git history.
 ## Admin span inspection
 
 The [span inspector plan](docs/plans/2026-11-21-1002-feat-admin-span-inspector-plan.md)
-adds search across the retained span buffer, service/error/duration filters,
-newest and slowest ordering, a trace waterfall, and complete span details to
-**Admin → Diagnostics → Recent spans**. Results and trace rows support keyboard
-navigation and virtualize large collections. Refresh preserves selection by ID;
-eviction and failed reads remain visible, and successful clear dismisses details.
+adds a full-width span timeline to **Admin → Diagnostics → Recent spans**.
+Search, service/error/duration filters, and newest or slowest ordering narrow
+the retained buffer. **All spans** compares independent requests on one time
+axis; opening a result shows its trace summary, overview strip and collapsible
+service tree. Fixed operation labels, vertical gridlines, duration bars and
+Fit/2×/4×/8× zoom keep timing visible. Selecting a trace row or bar expands
+attributes and metadata directly beneath that row. Both views support keyboard
+navigation and virtualize large collections, including expanded details.
+
+The displayed snapshot starts paused so new spans do not move rows while an
+operator reads them. **Refresh** accepts the latest snapshot; **Live** opts into
+updates and **Pause** freezes it again. Updates preserve zoom and scroll position.
+Eviction returns to search results with a notice, failed reads preserve the
+snapshot, and successful clear dismisses details and empties the displayed rows.
 
 Search covers the current instance's last 500 completed spans. The current HTTP
 capture records independent root spans; the viewer shows related spans only when
 the returned data contains them. The [operator guide](docs-book/part-1-operator-guide/commands/app-server-spans.md#inspecting-spans-in-the-admin-panel)
 describes retention, capture and refresh behavior.
 
-Verification on 2026-11-21: the frontend CI image passes all 3,712 web tests in
+Initial inspector verification on 2026-11-21: the frontend CI image passes all 3,712 web tests in
 302 files and lint with no errors. After correcting three test-selector type
 errors, the 27 focused model, inspector and diagnostics-page tests pass, and the
 production build passes both TypeScript configurations. Simplification removed
@@ -31,7 +40,27 @@ and mobile widths, covering light/dark selection, inert diagnostic text,
 refresh/clear failures, eviction and keyboard navigation through 500-row results
 and waterfalls. Documentation prose audits and `git diff --check` pass; added
 audit tokens describe the new controls, retention limits and verified design
-requirements. No acceptance items remain open for this plan.
+requirements.
+
+Timeline verification on 2026-11-21: the CI image passes 3,720 web tests in
+303 files. After review corrections, all 27 focused snapshot, inspector and
+diagnostics-page tests pass, including two new regressions for cleared cache
+restoration. Lint reports no errors and 12 warnings; the production build and
+both TypeScript configurations pass. Simplification found no further changes.
+
+The browser suite in `ui/web/tests/e2e/admin/spans.spec.ts` verifies proportional
+span offsets and widths, aligned axes and gridlines, fixed labels, every zoom
+scale, the retained summary and overview, collapsed branches and inline details
+at desktop and narrow widths in both themes. It also checks instantaneous spans,
+independent roots, measured expansion and keyboard navigation through 500 rows,
+frozen background arrivals, explicit Refresh, Live/Pause and scroll anchors.
+All six authenticated preview browser scenarios pass after the final fixes.
+Six independent review lenses completed; both confirmed findings are fixed:
+clear now resets the cached snapshot as well as the display, and tree controls
+have tooltips. Focused follow-up review found no further defect. The clear/Live
+regression failed before the fix and passes afterward; remount and late-response
+cases also pass. Documentation prose audits and `git diff --check` pass; added
+audit tokens record the new controls, test counts and reviewed corrections.
 
 ## Audio metadata import
 

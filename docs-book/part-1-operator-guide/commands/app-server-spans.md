@@ -43,11 +43,15 @@ A span records the method, route name, status and duration only. It never holds 
 
 Open **Admin → Diagnostics → Recent spans** to search the retained buffer. Search matches operation names, services, trace and span IDs, and attribute names or values. Combine it with service, error and duration filters, or sort by the slowest requests. Duration filters use milliseconds; an error means a telemetry error or an HTTP response of 400 or higher.
 
-Select a result to inspect its IDs, timing, status and attributes. The trace waterfall shows retained spans with the same trace ID; select a row to inspect that span. Source locations appear when a span supplies them. The current HTTP capture produces one independent root span per request, so ordinary requests have a one-span waterfall.
+**All spans** shows matching spans on a shared timeline immediately. Operation, service and trace labels stay fixed while duration bars show when requests started and how long they ran. The axis measures elapsed milliseconds from the displayed origin. Sharing this axis does not make independent requests part of one trace.
+
+Open a result to enter its focused trace. The header summarizes the retained start, duration, services, depth and span count; an overview strip shows the whole retained trace. The service and operation tree includes members hidden by search filters. Expand or collapse parent branches, and select a row or bar to open its attributes and metadata inline. **Back to results** restores the search. Source locations appear when a span supplies them. The current HTTP capture produces one independent root span per request, so ordinary requests have a one-span trace.
+
+Use **Timeline zoom** to switch between **Fit**, **2×**, **4×** and **8×**. Scroll horizontally to see the rest of a zoomed timeline; the operation labels stay fixed. **Fit** returns to the beginning at the original scale. Narrow screens also scroll horizontally. Very short spans retain a visible marker, with their recorded duration shown beside it.
 
 Search covers at most 500 completed spans from this server instance. New traffic overwrites older spans, and restarting the server loses the buffer. Missing parents are identified in the waterfall; a retained trace may be incomplete. This view does not provide historical search or reconstruct unrecorded child spans, events or logs.
 
-The page samples spans every ten seconds while it is active. **Refresh** requests a new snapshot immediately. A selected span keeps its identity across refreshes; the inspector reports when it is no longer retained. **Clear** empties the shared buffer and dismisses the selected details after the request succeeds. Diagnostic requests can themselves produce new spans, so clearing need not leave the list empty.
+The displayed snapshot starts paused. Background sampling runs every ten seconds while the page is active, but new arrivals do not change the paused rows, zoom or selection. **Refresh** explicitly replaces the displayed snapshot. **Live** accepts subsequent arrivals; **Pause** freezes the current display again. Accepted updates preserve zoom and the visible row's position while that row remains retained. If the selected span is evicted, the view returns to results with a notice. **Clear** empties the shared buffer and display and closes the trace after success; failure preserves inspection. Diagnostic requests can themselves produce new spans, which can appear on a later Refresh or Live update.
 
 ### Enabling capture
 
