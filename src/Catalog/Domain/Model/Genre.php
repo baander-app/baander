@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace App\Catalog\Domain\Model;
 
-use App\Shared\Domain\Model\Uuid;
+use App\Catalog\Domain\ValueObject\MusicbrainzId;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use InvalidArgumentException;
 
 final class Genre
 {
-    private const MBID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
-
     private function __construct(
         private GenreState $state,
     ) {
@@ -177,6 +176,6 @@ final class Genre
 
     private static function isValidMbid(string $mbid): bool
     {
-        return (bool) preg_match(self::MBID_PATTERN, $mbid);
+        return preg_match(MusicbrainzId::REGEX, $mbid) === 1;
     }
 }

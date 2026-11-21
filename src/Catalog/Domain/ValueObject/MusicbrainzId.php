@@ -16,7 +16,7 @@ use Stringable;
  */
 final readonly class MusicbrainzId implements Stringable
 {
-    private const UUID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
+    public const string REGEX = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
 
     private string $id;
 
@@ -37,7 +37,7 @@ final readonly class MusicbrainzId implements Stringable
             ));
         }
 
-        if (preg_match(self::UUID_PATTERN, $trimmed) !== 1) {
+        if (preg_match(self::REGEX, $trimmed) !== 1) {
             throw new InvalidArgumentException(sprintf(
                 'MusicBrainz ID "%s" is not a valid UUID format.',
                 $trimmed,

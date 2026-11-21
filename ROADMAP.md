@@ -4,6 +4,18 @@ Updated: 2026-11-21. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
+## Shared identifier patterns
+
+`PublicId` now supplies the length and patterns used by PHP validators, route
+requirements, and OpenAPI declarations. PHP validation rejects IDs with a
+trailing newline. The OpenAPI export changes only the character order in
+two equivalent character classes. `Genre` uses the same MusicBrainz ID regex as
+the Catalog value type. [Identifier validation plan](docs/plans/2026-11-21-refactor-identifier-validation-patterns-plan.md)
+
+Verification on 2026-11-21: the CI image passed 324 tests with 4,252 assertions
+across identifiers, routes, request validation, and OpenAPI. PHPStan, container
+lint, and the OpenAPI export check passed. Deptrac reported zero violations.
+
 ## Password rehash and emergency OAuth rotation
 
 The [authentication plan](docs/plans/2026-11-21-feat-password-rehash-and-emergency-oauth-rotation-plan.md)
