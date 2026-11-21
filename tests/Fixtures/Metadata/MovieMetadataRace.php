@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Fixtures\Metadata;
 
-use App\Catalog\Infrastructure\DirectorService;
-use App\Catalog\Infrastructure\Doctrine\Repository\DirectorRepository;
+use App\Catalog\Infrastructure\Doctrine\Repository\PersonCreditRepository;
+use App\Catalog\Infrastructure\Doctrine\Repository\PersonIdentityRepository;
 use App\Catalog\Infrastructure\Doctrine\Repository\GenreMovieRepository;
 use App\Catalog\Infrastructure\Doctrine\Repository\GenreRepository;
 use App\Catalog\Infrastructure\Doctrine\Repository\MovieRepository;
@@ -70,13 +70,15 @@ final class MovieMetadataRace
             new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1']),
         ));
 
+        $transaction = new DoctrineTransaction($registry, new Swoole());
+
         return new MovieMetadataEnricher(
             $adapter,
             new MovieService($movies),
             new GenreService(new GenreRepository($manager), new GenreMovieRepository($manager)),
             $logger,
-            new DirectorService(new DirectorRepository($manager), $movies),
-            new DoctrineTransaction($registry, new Swoole()),
+            new PersonCreditRepository($manager->getConnection(), new PersonIdentityRepository($manager->getConnection(), $transaction, $manager)),
+            $transaction,
         )->enrich($movie, true);
     }
 

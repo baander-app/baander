@@ -15,6 +15,8 @@ final readonly class MusicBrainzArtist
      * @param string|null $country an ISO 3166-1 code
      * @param string|null $lifeSpanBegin when the artist was born or began (YYYY, YYYY-MM or YYYY-MM-DD)
      * @param string|null $lifeSpanEnd when the artist died or ended
+     * @param list<string> $aliases
+     * @param array<string, string> $personIdentifiers
      * @param bool $ended whether the artist has ended, even when the end date is unknown
      */
     public function __construct(
@@ -28,6 +30,10 @@ final readonly class MusicBrainzArtist
         public ?string $lifeSpanBegin,
         public ?string $lifeSpanEnd,
         public bool $ended,
+        public ?string $gender = null,
+        public ?string $birthplace = null,
+        public array $aliases = [],
+        public array $personIdentifiers = [],
     ) {
     }
 }

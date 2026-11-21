@@ -6,8 +6,8 @@ use App\Catalog\Application\Dto\VideoSourceMetadata;
 use App\Catalog\Application\Port\DirectorCredit;
 use App\Catalog\Domain\ReadModel\DirectorReadView;
 use App\Catalog\Infrastructure\DirectorService;
-use App\Catalog\Infrastructure\Doctrine\Entity\MovieDirectorEntity;
 use App\Catalog\Infrastructure\Doctrine\ImportIdentity\ImportIdentityLock;
+use App\Catalog\Infrastructure\Doctrine\ImportIdentity\PersonWriteLock;
 use App\Catalog\Infrastructure\Doctrine\Repository\DirectorRepository;
 use App\Catalog\Infrastructure\Doctrine\Repository\MovieRepository;
 use App\Kernel;
@@ -175,15 +175,21 @@ final class PlaybackVideoFixture
             ), $manifest['directors']);
             $manager->getConnection()->transactional(static function () use ($manager, $directors, $manifest, $credits): void {
                 $movieId = Uuid::fromString($manifest['movie']['id']);
-                $keys = ['movie-director-movie:' . $movieId->toString()];
+                $connection = $manager->getConnection();
+                PersonWriteLock::shared($connection);
+                $keys = ['person-work:movie:' . $movieId->toString()];
                 $personIds = [];
                 foreach ($credits as $credit) {
-                    $keys[] = 'movie-director-person:' . $credit->tmdbId;
-                    $personIds[] = $credit->tmdbId;
+                    $keys[] = 'person-external:tmdb_person:' . $credit->tmdbId;
+                    $personIds[] = (string) $credit->tmdbId;
                 }
-                ImportIdentityLock::acquire($manager->getConnection(), $keys);
-                $existing = $manager->getRepository(MovieDirectorEntity::class)->findOneBy(['tmdbId' => $personIds]);
-                if ($existing !== null) {
+                ImportIdentityLock::acquire($connection, $keys);
+                $existing = $connection->fetchOne(
+                    "SELECT 1 FROM person_external_ids WHERE namespace = 'tmdb_person' AND external_id IN (:ids) LIMIT 1",
+                    ['ids' => $personIds],
+                    ['ids' => \Doctrine\DBAL\ArrayParameterType::STRING],
+                );
+                if ($existing !== false) {
                     throw new RuntimeException('Director fixture identity collision; existing identities were not changed.');
                 }
                 $directors->syncMovieDirectors($movieId, $credits, true);
@@ -382,7 +388,17 @@ SQL, ['video' => $videoId]);
                 $this->connection->delete('movie_video', ['id' => $manifest['movieVideoId']]);
                 $this->connection->delete('movies', ['id' => $manifest['movie']['id']]);
                 foreach ($manifest['directors'] ?? [] as $director) {
-                    $this->connection->delete('movie_directors', ['tmdb_id' => $director['tmdbId'], 'name' => $director['name']]);
+                    $this->connection->executeStatement(
+                        <<<'SQL'
+                            DELETE FROM people
+                            WHERE public_id = :id AND name = :name
+                              AND NOT EXISTS (SELECT 1 FROM movie_person_credits WHERE person_id = people.id)
+                              AND NOT EXISTS (SELECT 1 FROM series_person_credits WHERE person_id = people.id)
+                              AND NOT EXISTS (SELECT 1 FROM episode_person_credits WHERE person_id = people.id)
+                              AND NOT EXISTS (SELECT 1 FROM person_artist_links WHERE person_id = people.id)
+                            SQL,
+                        ['id' => $director['publicId'], 'name' => $director['name']],
+                    );
                 }
                 $this->connection->delete('videos', ['id' => $videoId]);
             });

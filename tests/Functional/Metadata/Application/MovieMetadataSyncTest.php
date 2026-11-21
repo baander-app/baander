@@ -59,7 +59,7 @@ final class MovieMetadataSyncTest extends TestCase
             $movies,
         );
         $libraryHandler(new SyncLibraryMessage($library->getId()));
-        self::assertCount(1, $messages);
+        self::assertCount(2, $messages);
         self::assertInstanceOf(SyncMovieMessage::class, $messages[0]);
         self::assertFalse($messages[0]->forceUpdate);
         $codec = new MetadataMessagePayloadCodec();
@@ -90,7 +90,7 @@ final class MovieMetadataSyncTest extends TestCase
             $movies,
             $container->get(GenrePortInterface::class),
             new NullLogger(),
-            $directors,
+            $container->get(\App\Catalog\Application\Port\PersonCreditPortInterface::class),
             $container->get(TransactionPortInterface::class),
         );
         $consumer = new SyncMovieHandler($movies, $enricher);

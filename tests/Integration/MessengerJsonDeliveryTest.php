@@ -285,7 +285,7 @@ final class MessengerJsonDeliveryTest extends TestCase
                 $movies,
                 $genres,
                 $logger,
-                $this->createStub(DirectorPortInterface::class),
+                $this->createStub(\App\Catalog\Application\Port\PersonCreditPortInterface::class),
                 new PassThroughTransaction(),
             );
             $handler = new SyncMovieHandler($movies, $enricher);

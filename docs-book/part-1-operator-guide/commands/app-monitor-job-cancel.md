@@ -42,6 +42,8 @@ These jobs have checkpoints:
 | Job (monitor name) | Started by | Stops before |
 |--------------------|------------|--------------|
 | `SyncLibraryMessage` | A metadata sync, one job per library | Its next album |
+| `SyncTvLibraryMessage` | A metadata sync for a TV show library | Its next registered series or episode. [TV sync handler](../../../src/Metadata/Application/MessageHandler/SyncTvLibraryHandler.php) |
+| `SyncPeopleMessage` | A TMDB profile metadata sync | Its next Person profile. [Person sync handler](../../../src/Metadata/Application/MessageHandler/SyncPeopleHandler.php) |
 | `SyncMetadataCommand` | [app:metadata:sync](app-metadata-sync.md) with `--source genres` | Its next album |
 | `SyncArtistsMessage` | A metadata sync without a source, one job | Its next artist. The fills it already queued end without a request when they come due, also when the job is cancelled after it finished |
 | `BulkFetchLyricsCommand` | The admin **Fetch Missing Lyrics** button or [app:lyrics:fetch](app-lyrics-fetch.md) | Its next song. The fetches it already queued are skipped when they come due, also when the job is cancelled after it finished |

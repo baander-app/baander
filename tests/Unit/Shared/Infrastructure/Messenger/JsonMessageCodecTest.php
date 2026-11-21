@@ -65,6 +65,9 @@ final class JsonMessageCodecTest extends TestCase
         yield [new FetchLyricsCommand($id)];
         yield [new SyncSongMessage($id, true)];
         yield [new SyncMovieMessage($id, true)];
+        yield [new \App\Metadata\Application\Message\SyncPeopleMessage()];
+        yield [new \App\Metadata\Application\Message\SyncPeopleMessage('42')];
+        yield [new \App\Metadata\Application\Message\SyncTvLibraryMessage($id, true)];
         yield [new SyncAlbumMessage($id)];
         yield [new SyncLibraryMessage($id, true, true)];
         yield [new SyncArtistsMessage()];

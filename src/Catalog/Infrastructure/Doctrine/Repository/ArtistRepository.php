@@ -224,7 +224,11 @@ final class ArtistRepository implements ArtistRepositoryInterface
             ->where('artist.mbid IS NOT NULL')
             ->andWhere(
                 'artist.sortName IS NULL OR artist.type IS NULL OR artist.country IS NULL'
-                . ' OR artist.disambiguation IS NULL OR artist.lifeSpanBegin IS NULL OR artist.lifeSpanEnd IS NULL',
+                . ' OR artist.disambiguation IS NULL OR artist.lifeSpanBegin IS NULL OR artist.lifeSpanEnd IS NULL'
+                . " OR (LOWER(artist.type) = 'person' AND NOT EXISTS (SELECT personLink.artist FROM "
+                . \App\Catalog\Infrastructure\Doctrine\Entity\PersonArtistLinkEntity::class
+                . ' personLink WHERE personLink.artist = artist.id'
+                . ' AND (personLink.managedByOperator = true OR personLink.artistMbid = LOWER(artist.mbid))))',
             )
             ->orderBy('artist.id')
             ->setMaxResults($limit);

@@ -38,7 +38,7 @@ final class MovieMetadataPersistenceTest extends TestCase
         self::assertSame('read committed', $this->observer->fetchOne('SHOW default_transaction_isolation'));
         $this->observer->executeStatement('CREATE SCHEMA ' . $this->schema);
         $this->observer->executeStatement('SET search_path TO ' . $this->schema . ', public');
-        foreach (['libraries', 'movies', 'videos', 'movie_video', 'genres', 'genre_movie', 'movie_directors', 'movie_director_credits'] as $table) {
+        foreach (['libraries', 'movies', 'videos', 'movie_video', 'genres', 'genre_movie', 'people', 'person_external_ids', 'person_identifier_blocks', 'movie_person_credits', 'movie_person_credit_state'] as $table) {
             ArtistImportIdentityRace::copyTableWithoutPgroonga($this->observer, $table);
         }
         $this->writer = ArtistImportIdentityRace::connect($this->schema);
@@ -94,7 +94,7 @@ final class MovieMetadataPersistenceTest extends TestCase
             'overview' => 'Provider overview',
         ], $this->observer->fetchAssociative('SELECT title, year, summary, overview FROM movies WHERE id = ?', [$this->movieId->toString()]));
         self::assertSame([$this->videoId->toString(), $newVideoId], $this->observer->fetchFirstColumn('SELECT video_id::text FROM movie_video ORDER BY sort_order'));
-        self::assertSame(1, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM movie_director_credits'));
+        self::assertSame(1, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM movie_person_credits'));
     }
 
     public function testEnrichmentAndConcurrentImportShareOneGenre(): void
@@ -113,7 +113,7 @@ final class MovieMetadataPersistenceTest extends TestCase
         self::assertSame([$genreId->toString()], $this->observer->fetchFirstColumn('SELECT id::text FROM genres'));
         self::assertSame([$genreId->toString()], $this->observer->fetchFirstColumn('SELECT genre_id::text FROM genre_movie'));
         self::assertSame('Provider overview', $this->observer->fetchOne('SELECT overview FROM movies'));
-        self::assertSame(1, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM movie_director_credits'));
+        self::assertSame(1, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM movie_person_credits'));
     }
 
     public function testEnrichmentResolvesAllGenreIdentitiesInSortedOrder(): void
@@ -143,7 +143,7 @@ final class MovieMetadataPersistenceTest extends TestCase
 
     public function testDirectorWriteFailureRollsBackMetadataAndGenres(): void
     {
-        $this->observer->executeStatement("ALTER TABLE movie_directors ADD CONSTRAINT reject_provider_director CHECK (name <> 'Provider Director')");
+        $this->observer->executeStatement("ALTER TABLE people ADD CONSTRAINT reject_provider_director CHECK (name <> 'Provider Director')");
 
         $result = MovieMetadataRace::enrich($this->manager, $this->movieId, ['Rollback ' . bin2hex(random_bytes(6))]);
 
@@ -151,8 +151,8 @@ final class MovieMetadataPersistenceTest extends TestCase
         self::assertNull($this->observer->fetchOne('SELECT overview FROM movies'));
         self::assertSame(0, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM genres'));
         self::assertSame(0, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM genre_movie'));
-        self::assertSame(0, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM movie_directors'));
-        self::assertSame(0, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM movie_director_credits'));
+        self::assertSame(0, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM people'));
+        self::assertSame(0, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM movie_person_credits'));
         self::assertSame([$this->videoId->toString()], $this->observer->fetchFirstColumn('SELECT video_id::text FROM movie_video'));
     }
 }

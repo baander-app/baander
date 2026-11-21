@@ -140,7 +140,7 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
         string $artistId,
         MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded,
     ): MusicBrainzArtist|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|null {
-        return $this->lookup('/artist/' . rawurlencode($artistId), null, self::artist(...), $wait, reportsMerges: true);
+        return $this->lookup('/artist/' . rawurlencode($artistId), 'aliases+url-rels', self::artist(...), $wait, reportsMerges: true);
     }
 
     #[\Override]
@@ -622,6 +622,13 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
             lifeSpanBegin: self::text($lifeSpan, 'begin'),
             lifeSpanEnd: self::text($lifeSpan, 'end'),
             ended: ($lifeSpan['ended'] ?? false) === true,
+            gender: self::text($artist, 'gender'),
+            birthplace: is_array($artist['begin-area'] ?? null) ? self::text($artist['begin-area'], 'name') : null,
+            aliases: array_values(array_filter(array_map(
+                static fn (array $alias): ?string => self::text($alias, 'name'),
+                self::objects($artist['aliases'] ?? null),
+            ))),
+            personIdentifiers: MusicBrainzArtistLinks::fromRelationships(self::objects($artist['relations'] ?? null)),
         );
     }
 

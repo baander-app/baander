@@ -35,8 +35,8 @@ final class SyncMetadataHandlerTest extends TestCase
 
         $queued = $this->handler($libraries)(new SyncMetadataCommand());
 
-        self::assertSame(4, $queued, 'One sync per library and one for the artists.');
-        self::assertCount(4, $this->dispatched);
+        self::assertSame(5, $queued, 'One sync per library, one for artists, and one for people.');
+        self::assertCount(5, $this->dispatched);
         $librarySyncs = array_filter($this->dispatched, static fn (object $message): bool => $message instanceof SyncLibraryMessage) |> array_values(...);
         self::assertCount(3, $librarySyncs);
         foreach ($librarySyncs as $index => $message) {
@@ -44,6 +44,7 @@ final class SyncMetadataHandlerTest extends TestCase
             self::assertFalse($message->forceUpdate);
             self::assertTrue($message->includeSongs);
         }
+        self::assertInstanceOf(\App\Metadata\Application\Message\SyncPeopleMessage::class, $this->dispatched[4]);
         self::assertEquals([new SyncArtistsMessage()], array_filter($this->dispatched, static fn (object $message): bool => $message instanceof SyncArtistsMessage) |> array_values(...));
     }
 

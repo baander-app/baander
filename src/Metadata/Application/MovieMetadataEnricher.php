@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Metadata\Application;
 
 use App\Catalog\Application\Port\GenrePortInterface;
-use App\Catalog\Application\Port\DirectorPortInterface;
-use App\Catalog\Application\Port\DirectorCredit;
+use App\Catalog\Application\Port\PersonCreditPortInterface;
+use App\Metadata\Application\Port\PersonProfileSyncRequestInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Domain\Model\Movie;
@@ -22,12 +22,16 @@ final class MovieMetadataEnricher
         private readonly MoviePortInterface $movieService,
         private readonly GenrePortInterface $genreService,
         private readonly LoggerInterface $logger,
-        private readonly DirectorPortInterface $directors,
+        private readonly PersonCreditPortInterface $people,
         private readonly TransactionPortInterface $transaction,
+        private readonly ?PersonProfileSyncRequestInterface $profiles = null,
     ) {}
 
     public function enrich(Movie $movie, bool $forceUpdate = false): EnrichmentResult
     {
+        if (!$this->tmdbAdapter->isConfigured()) {
+            return EnrichmentResult::noMatch('tmdb', 0.0);
+        }
         $this->logger->info('Starting movie enrichment', [
             'movie_id' => $movie->getId()->toString(),
             'title' => $movie->getTitle(),
@@ -177,21 +181,21 @@ final class MovieMetadataEnricher
                 $genreNames[$genre->id] = $genre->name;
             }
         }
-        $credits = array_map(static fn(array $person): DirectorCredit => new DirectorCredit(
-            tmdbId: $person['id'],
-            name: $person['name'],
-            profileUrl: $person['profilePath'] === null ? null : 'https://image.tmdb.org/t/p/w185' . $person['profilePath'],
-        ), $data->crew);
-        $this->transaction->run(function () use ($movie, $data, $forceUpdate, $genreNames, $credits, &$updatedFields): void {
+        $cast = $data->fullCast;
+        $crew = $data->fullCrew;
+        $this->transaction->run(function () use ($movie, $forceUpdate, $genreNames, $cast, $crew, $data, &$updatedFields): void {
             if ($data->genreIds !== []) {
                 $this->syncGenres($movie, $data->genreIds, $genreNames);
                 $updatedFields[] = 'genres';
             }
             $this->movieService->saveMetadata($movie);
-            if ($data->creditsAvailable && $this->directors->syncMovieDirectors($movie->getId(), $credits, $forceUpdate)) {
-                $updatedFields[] = 'directors';
+            if (($cast !== null || $crew !== null) && $this->people->syncMovieCredits($movie->getId(), $cast, $crew, $forceUpdate)) {
+                $updatedFields[] = 'credits';
             }
         });
+        if (in_array('credits', $updatedFields, true)) {
+            $this->profiles?->request();
+        }
 
         return new EnrichmentResult(
             success: true,

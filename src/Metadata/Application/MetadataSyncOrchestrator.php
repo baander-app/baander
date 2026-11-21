@@ -7,6 +7,7 @@ namespace App\Metadata\Application;
 use App\Library\Application\Port\LibraryPortInterface;
 use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\Message\SyncArtistsMessage;
+use App\Metadata\Application\Message\SyncPeopleMessage;
 use App\Metadata\Application\Message\SyncGenresMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
@@ -111,12 +112,20 @@ final class MetadataSyncOrchestrator
      * Queues the fill of every artist that holds a MusicBrainz ID and misses details, which
      * Catalog walks when the message runs.
      *
-     * @return int the one job queued
+     * @return int the artist job queued
      */
     public function syncArtists(): int
     {
         $this->bus->dispatch(new SyncArtistsMessage());
         $this->logger->info('Artist sync dispatched');
+
+        return 1;
+    }
+
+    public function syncPeople(): int
+    {
+        $this->bus->dispatch(new SyncPeopleMessage());
+        $this->logger->info('Person sync dispatched');
 
         return 1;
     }

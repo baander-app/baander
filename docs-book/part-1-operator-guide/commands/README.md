@@ -79,11 +79,14 @@ Application console commands run inside `app`. The control and execution worker 
 | [app:artist:cover:remove](app-artist-cover-remove.md) | Remove an artist cover and delete its image files |
 | [app:artist:cover:set](app-artist-cover-set.md) | Set or replace an artist cover from an image file in the container |
 | [app:artist:create](app-artist-create.md) | Create an artist, such as a performer to credit by hand |
+| [app:tv:series:register](app-tv-series-register.md) | Register a TV series and import its Person credits from TMDB |
+| [app:tv:episode:register](app-tv-episode-register.md) | Register a TV episode and import its Person credits from TMDB |
 | [app:artist:delete](app-artist-delete.md) | Delete an artist, its credits, favorites, recommendations and cover image |
 | [app:artist:song:add](app-artist-song-add.md) | Credit an artist on a song with a role |
 | [app:artist:song:remove](app-artist-song-remove.md) | Remove every one of an artist's credits on a song |
 | [app:artist:song:role](app-artist-song-role.md) | Change the role of an artist's credit on a song |
 | [app:artist:update](app-artist-update.md) | Change an artist's metadata, or lock and unlock its fields |
+| [app:person:manage](app-person-manage.md) | Correct Person profiles and reconcile provider identities |
 | [app:genre:album:add](app-genre-album-add.md) | Assign a genre to an album |
 | [app:genre:album:remove](app-genre-album-remove.md) | Remove a genre from an album |
 | [app:genre:create](app-genre-create.md) | Create a genre, optionally below a parent genre |

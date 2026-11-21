@@ -26,7 +26,11 @@ final class SyncLibraryHandlerTest extends TestCase
         $movies = $this->createMock(\App\Catalog\Application\Port\MoviePortInterface::class);
         $movies->expects(self::once())->method('movieIdsByLibraryAfter')->with($libraryId, null, 100)->willReturn([$movie->getId()]);
         $bus = $this->createMock(MessageBusInterface::class);
-        $bus->expects(self::once())->method('dispatch')->willReturnCallback(static function (object $message) use ($movie): Envelope {
+        $bus->expects(self::exactly(2))->method('dispatch')->willReturnCallback(static function (object $message) use ($movie): Envelope {
+            if ($message instanceof \App\Metadata\Application\Message\SyncTvLibraryMessage) {
+                self::assertTrue($message->forceUpdate);
+                return new Envelope($message);
+            }
             self::assertInstanceOf(\App\Metadata\Application\Message\SyncMovieMessage::class, $message);
             self::assertTrue($movie->getId()->equals($message->movieId));
             self::assertTrue($message->forceUpdate);
@@ -61,6 +65,10 @@ final class SyncLibraryHandlerTest extends TestCase
         $queued = [];
         $bus = $this->createStub(MessageBusInterface::class);
         $bus->method('dispatch')->willReturnCallback(static function (object $message) use (&$queued): Envelope {
+            if ($message instanceof \App\Metadata\Application\Message\SyncTvLibraryMessage) {
+                self::assertTrue($message->forceUpdate);
+                return new Envelope($message);
+            }
             self::assertInstanceOf(\App\Metadata\Application\Message\SyncMovieMessage::class, $message);
             self::assertTrue($message->forceUpdate);
             $queued[] = $message->movieId->toString();

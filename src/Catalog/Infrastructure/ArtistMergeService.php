@@ -12,6 +12,7 @@ use App\Catalog\Infrastructure\Doctrine\Entity\ArtistAlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistSongEntity;
 use App\Catalog\Infrastructure\Doctrine\ManagedHolders;
+use App\Catalog\Infrastructure\Doctrine\Repository\PersonArtistLinkRepository;
 use App\Favorites\Application\Port\ArtistFavoriteMergePortInterface;
 use App\Recommendation\Application\Port\ArtistRecommendationMergePortInterface;
 use App\Shared\Application\Exception\NotFoundException;
@@ -36,6 +37,7 @@ final readonly class ArtistMergeService implements ArtistMergePortInterface
         private ArtistFavoriteMergePortInterface $favorites,
         private ArtistActivityMergePortInterface $activities,
         private ArtistRecommendationMergePortInterface $recommendations,
+        private ?PersonArtistLinkRepository $personLinks = null,
     ) {
     }
 
@@ -72,6 +74,7 @@ final readonly class ArtistMergeService implements ArtistMergePortInterface
         $source = $artists[$sourceId->toString()] ?? throw self::notFound($sourceId);
         $target = $artists[$targetId->toString()] ?? throw self::notFound($targetId);
 
+        $this->personLinks?->beforeArtistMerge($sourceId, $targetId);
         foreach (self::CREDITS as $link => $item) {
             $this->moveCredits($link, $item, $sourceId, $targetId);
         }

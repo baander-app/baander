@@ -7,6 +7,7 @@ namespace App\Catalog\Application\MessageHandler;
 use App\Catalog\Application\CommandHandler\MusicBrainzMatch\MatchTicks;
 use App\Catalog\Application\Port\ArtistMergePortInterface;
 use App\Catalog\Application\Port\ArtistPortInterface;
+use App\Catalog\Application\Port\PersonArtistLinkPortInterface;
 use App\Catalog\Application\Port\QueuedArtistSyncsInterface;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchField;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchFieldRow;
@@ -21,6 +22,7 @@ use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzSlotWait;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
 use App\Metadata\Application\Message\SyncArtistMessage;
+use App\Metadata\Application\Port\ImdbPersonLookupInterface;
 use App\Metadata\Application\Port\MusicBrainzLookupInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Uuid;
@@ -72,6 +74,8 @@ final readonly class SyncArtistHandler
         private ArtistSyncQueue $queue,
         private TransactionPortInterface $transaction,
         private LoggerInterface $logger,
+        private ?PersonArtistLinkPortInterface $personLinks = null,
+        private ?ImdbPersonLookupInterface $imdb = null,
     ) {
     }
 
@@ -93,7 +97,10 @@ final readonly class SyncArtistHandler
         $artistId = $message->artistId;
         $artist = $this->artists->findFreshByUuid($artistId);
         $musicbrainzId = MusicbrainzId::tryFromString($artist?->getMbid())?->toString();
-        if ($artist === null || $musicbrainzId === null || !self::missesDetails($artist) || $this->marks->isAnswered($artistId, $musicbrainzId)) {
+        if ($artist === null || $musicbrainzId === null || $this->marks->isAnswered($artistId, $musicbrainzId)) {
+            return false;
+        }
+        if (!self::missesDetails($artist) && !$this->personLinks?->needsReconciliation($artistId, $musicbrainzId, $artist->getType())) {
             return false;
         }
 
@@ -106,7 +113,7 @@ final readonly class SyncArtistHandler
             $answer === null => $this->notFound($artistId, $musicbrainzId, $context),
             $answer instanceof MusicBrainzMerged => $this->answeredForAnotherId($artistId, $musicbrainzId, $answer->survivingId, $context),
             !self::sameId($answer->id, $musicbrainzId) => $this->answeredForAnotherId($artistId, $musicbrainzId, $answer->id, $context),
-            default => $this->fill($artistId, $musicbrainzId, $answer, $context),
+            default => $this->fill($message, $musicbrainzId, $answer, $context),
         };
     }
 
@@ -116,9 +123,24 @@ final readonly class SyncArtistHandler
      *
      * @param array<string, string> $context
      */
-    private function fill(Uuid $artistId, string $musicbrainzId, MusicBrainzArtist $answer, array $context): bool
+    private function fill(SyncArtistMessage $message, string $musicbrainzId, MusicBrainzArtist $answer, array $context): bool
     {
-        $outcome = $this->transaction->run(function () use ($artistId, $musicbrainzId, $answer): string|array {
+        $artistId = $message->artistId;
+        $bridgeUnavailable = false;
+        $ids = $answer->personIdentifiers;
+        $imdb = $ids['imdb_name'] ?? null;
+        if ($answer->type === 'Person' && $imdb !== null) {
+            try {
+                $tmdb = $this->imdb?->findTmdbPersonId($imdb);
+                if ($tmdb !== null) {
+                    $ids['tmdb_person'] = $tmdb;
+                }
+            } catch (\RuntimeException) {
+                $bridgeUnavailable = true;
+            }
+        }
+
+        $outcome = $this->transaction->run(function () use ($artistId, $musicbrainzId, $answer, $ids, $bridgeUnavailable): string|array {
             if ($this->merges->lock([$artistId]) === []) {
                 return 'gone';
             }
@@ -133,6 +155,19 @@ final readonly class SyncArtistHandler
                 $this->writer->write($artist, $fills);
             }
 
+            if ($answer->type === 'Person' && !$bridgeUnavailable) {
+                $this->personLinks?->reconcile($artistId, $musicbrainzId, $ids, [
+                    'name' => $answer->name,
+                    'aliases' => $answer->aliases,
+                    'biography' => $artist->getBiography(),
+                    'birth_date' => $answer->lifeSpanBegin,
+                    'death_date' => $answer->lifeSpanEnd,
+                    'is_deceased' => $answer->ended,
+                    'birthplace' => $answer->birthplace,
+                    'gender' => $answer->gender,
+                ]);
+            }
+
             return array_map(static fn (MatchFieldRow $row): string => $row->field->value, $fills);
         });
 
@@ -142,6 +177,10 @@ final readonly class SyncArtistHandler
             [] => $this->logger->info('MusicBrainz has none of the details the artist misses.', $context),
             default => $this->logger->info('Filled the artist\'s empty details from MusicBrainz.', $context + ['fields' => $outcome]),
         };
+
+        if ($bridgeUnavailable && is_array($outcome)) {
+            return $this->afterOutage($message, $context + ['reason' => 'tmdb-identity-bridge'], 'TMDB');
+        }
 
         return $this->answered($artistId, $musicbrainzId);
     }
@@ -188,16 +227,16 @@ final readonly class SyncArtistHandler
      *
      * @param array<string, string> $context
      */
-    private function afterOutage(SyncArtistMessage $message, array $context): bool
+    private function afterOutage(SyncArtistMessage $message, array $context, string $provider = 'MusicBrainz'): bool
     {
         $pauseMs = self::OUTAGE_PAUSES_MS[$message->outages] ?? null;
         if ($pauseMs === null) {
-            $this->logger->warning('MusicBrainz was unavailable for the artist\'s lookup again; the fill ends, and the next admin sync asks again.', $context + ['outages' => $message->outages + 1]);
+            $this->logger->warning('{provider} was unavailable for the artist\'s lookup again; the next admin sync asks again.', $context + ['provider' => $provider, 'outages' => $message->outages + 1]);
 
             return false;
         }
         $delayMs = $this->queue->queueAfterOutage($message, $pauseMs);
-        $this->logger->warning('MusicBrainz was unavailable for the artist\'s lookup; the fill is queued again.', $context + ['outages' => $message->outages + 1, 'delay_ms' => $delayMs]);
+        $this->logger->warning('{provider} was unavailable for the artist\'s lookup; the fill is queued again.', $context + ['provider' => $provider, 'outages' => $message->outages + 1, 'delay_ms' => $delayMs]);
 
         return true;
     }

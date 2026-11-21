@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace App\Metadata\Infrastructure\Api\Tmdb\DTO;
 
+use App\Catalog\Application\Port\PersonCreditInput;
+
 final readonly class TmdbMovieDto
 {
     /**
      * @param int[] $genreIds
      * @param array{name: string, character?: string, order?: int}[] $cast
+     * @param list<PersonCreditInput>|null $fullCast
+     * @param list<PersonCreditInput>|null $fullCrew
      * @param list<array{id: int, name: string, job: string, department: string, profilePath: ?string}> $crew
      */
     public function __construct(
@@ -32,6 +36,8 @@ final readonly class TmdbMovieDto
         public array $crew = [],
         public float $popularity = 0.0,
         public bool $creditsAvailable = false,
+        public ?array $fullCast = null,
+        public ?array $fullCrew = null,
     ) {}
 
     /**
@@ -41,24 +47,23 @@ final readonly class TmdbMovieDto
     {
         $collection = $data['belong_to_collection'] ?? $data['belongs_to_collection'] ?? null;
 
-        $cast = [];
-        $crew = [];
-        if (isset($data['credits']['cast'])) {
-            $cast = array_map(fn(array $c) => [
-                'name' => $c['name'] ?? '',
-                'character' => $c['character'] ?? '',
-                'order' => $c['order'] ?? 0,
-            ], array_slice($data['credits']['cast'], 0, 10));
-        }
-        if (isset($data['credits']['crew'])) {
-            $crew = array_values(array_map(fn(array $c) => [
-                'id' => $c['id'] ?? 0,
-                'profilePath' => $c['profile_path'] ?? null,
-                'name' => $c['name'] ?? '',
-                'job' => $c['job'] ?? '',
-                'department' => $c['department'] ?? '',
-            ], array_filter($data['credits']['crew'], fn(array $c) => ($c['job'] ?? '') === 'Director')));
-        }
+        $fullCast = TmdbPersonCreditDto::partition($data['credits']['cast'] ?? null, 'cast');
+        $fullCrew = TmdbPersonCreditDto::partition($data['credits']['crew'] ?? null, 'crew');
+        $summaryCast = $data['credits']['cast'] ?? null;
+        $cast = is_array($summaryCast)
+            ? array_values(array_map(static fn (array $member): array => [
+                'name' => is_string($member['name'] ?? null) ? $member['name'] : '',
+                'character' => is_string($member['character'] ?? null) ? $member['character'] : '',
+                'order' => is_int($member['order'] ?? null) ? $member['order'] : 0,
+            ], array_filter(array_slice($summaryCast, 0, 10), is_array(...))))
+            : [];
+        $crew = array_values(array_map(static fn(PersonCreditInput $credit): array => [
+            'id' => (int) $credit->tmdbId,
+            'profilePath' => $credit->profileUrl === null ? null : substr($credit->profileUrl, strlen('https://image.tmdb.org/t/p/w185')),
+            'name' => $credit->name,
+            'job' => $credit->job,
+            'department' => $credit->department ?? '',
+        ], array_filter($fullCrew ?? [], static fn(PersonCreditInput $credit): bool => $credit->job === 'Director')));
 
         return new self(
             id: $data['id'],
@@ -80,7 +85,9 @@ final readonly class TmdbMovieDto
             cast: $cast,
             crew: $crew,
             popularity: (float) ($data['popularity'] ?? 0.0),
-            creditsAvailable: isset($data['credits']['crew']) && is_array($data['credits']['crew']),
+            creditsAvailable: $fullCrew !== null,
+            fullCast: $fullCast,
+            fullCrew: $fullCrew,
         );
     }
 
