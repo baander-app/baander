@@ -1,10 +1,12 @@
 import { test as base, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { ownBrowserContext } from './helpers/browser-device-lifecycle'
 
 const CREDENTIALS = { email: 'admin@baander.test', password: 'admin' } as const
 
 /** Log in through the real boundary; never manufacture authentication state. */
 export const authenticate = async (page: Page) => {
+  await ownBrowserContext(page.context())
   await page.goto('/login', { waitUntil: 'domcontentloaded' })
   await expect(page.getByRole('heading', { name: 'Bånder', exact: true })).toBeVisible()
   await page.getByLabel(/email/i).fill(CREDENTIALS.email)
@@ -33,7 +35,10 @@ export const spaNavigate = (page: Page) => async (path: string) => {
   await expect(page.locator('main')).toBeVisible()
 }
 
-export const test = base.extend<{ asAdmin: Page }>({
+export const test = base.extend<{ asAdmin: Page; ownedDevice: string }>({
+  ownedDevice: [async ({ context, baseURL }, provideDevice) => {
+    await provideDevice(await ownBrowserContext(context, baseURL))
+  }, { auto: true }],
   asAdmin: async ({ page }, providePage) => {
     await authenticate(page)
     await providePage(page)

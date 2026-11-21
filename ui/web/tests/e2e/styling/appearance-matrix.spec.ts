@@ -1,5 +1,4 @@
-import { test, expect } from '@playwright/test'
-import { authenticate, spaNavigate } from '../fixtures'
+import { test, expect, authenticate, spaNavigate } from '../fixtures'
 import { ACCENTS, MOODS, setTheme } from '../helpers/theme-utils'
 import { expectContained, expectNoPageOverflow, expectReadable } from './helpers'
 

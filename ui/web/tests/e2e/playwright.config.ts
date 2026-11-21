@@ -15,6 +15,8 @@ console.warn('WARNING: Playback tests can produce audible tones or media through
 
 export default defineConfig({
   testDir: '.',
+  globalSetup: './browser-device-setup.ts',
+  globalTeardown: './browser-device-teardown.ts',
   timeout: 45_000,
   expect: { timeout: 8_000, toHaveScreenshot: { maxDiffPixels: 100 } },
   fullyParallel: false,

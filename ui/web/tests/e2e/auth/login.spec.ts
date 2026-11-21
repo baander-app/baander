@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, spaNavigate } from '../fixtures'
 
 test.describe('Login', () => {
   test('renders form with email, password, and submit', async ({ page }) => {
@@ -15,10 +15,10 @@ test.describe('Login', () => {
     await page.waitForSelector('form')
 
     await page.getByLabel(/email/i).fill('admin@baander.test')
-    await page.getByLabel(/password/i).fill('password')
+    await page.getByLabel(/password/i).fill('admin')
     await page.getByRole('button', { name: /log in/i }).click()
 
-    await expect(page).toHaveURL('/', { timeout: 10_000 })
+    await expect(page).toHaveURL(/\/music$/, { timeout: 10_000 })
   })
 
   test('shows error on invalid credentials', async ({ page }) => {
@@ -72,15 +72,14 @@ test.describe('Logout', () => {
     await page.goto('/login')
     await page.waitForSelector('form')
     await page.getByLabel(/email/i).fill('admin@baander.test')
-    await page.getByLabel(/password/i).fill('password')
+    await page.getByLabel(/password/i).fill('admin')
     await page.getByRole('button', { name: /log in/i }).click()
-    await expect(page).toHaveURL('/', { timeout: 10_000 })
+    await expect(page).toHaveURL(/\/music$/, { timeout: 10_000 })
 
-    // Find and click logout
+    await spaNavigate(page)('/settings')
     const logoutBtn = page.getByRole('button', { name: /log out|logout|sign out/i })
-    if (await logoutBtn.isVisible().catch(() => false)) {
-      await logoutBtn.click()
-      await expect(page).toHaveURL(/\/login/, { timeout: 5_000 })
-    }
+    await expect(logoutBtn).toBeVisible()
+    await logoutBtn.click()
+    await expect(page).toHaveURL(/\/login/, { timeout: 5_000 })
   })
 })
