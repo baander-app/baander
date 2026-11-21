@@ -8,6 +8,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Transcode\Application\DTO\TranscodeRenditionSet;
+use App\Transcode\Application\DTO\RequestedQuality;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use App\Transcode\Application\Port\PlaybackPortInterface;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
@@ -32,8 +33,7 @@ final class StreamSigningController
         private readonly PlaybackPortInterface $playback,
         private readonly TranscodePublicViewInterface $publicView,
         private readonly TranscodeStreamingPortInterface $streaming,
-    ) {
-    }
+    ) {}
 
     #[OA\Post(
         path: '/api/stream/sign',
@@ -68,6 +68,12 @@ final class StreamSigningController
                         maximum: 10000,
                         minimum: -10000,
                         default: 0,
+                    ),
+                    new OA\Property(
+                        property: 'qualityTier',
+                        type: 'string',
+                        enum: ['360p', '480p', '720p', '1080p', '1440p', '4K'],
+                        nullable: true,
                     ),
                     new OA\Property(
                         property: 'requestId',
@@ -195,6 +201,15 @@ final class StreamSigningController
         ) {
             return $this->errorResponse('Invalid source audio selection.', 400);
         }
+        try {
+            $requestedQuality = $data['qualityTier'] ?? null;
+            if ($requestedQuality !== null && !is_string($requestedQuality)) {
+                throw new \InvalidArgumentException('Quality tier must be a string.');
+            }
+            $qualityTier = $requestedQuality === null ? null : RequestedQuality::fromString($requestedQuality)->id;
+        } catch (\InvalidArgumentException $error) {
+            return $this->errorResponse($error->getMessage(), 400);
+        }
         $path = $data['path'] ?? null;
         $requestId = $data['requestId'] ?? null;
         $jobIdentifiers = array_key_exists('jobIds', $data) ? $data['jobIds'] : [];
@@ -252,7 +267,13 @@ final class StreamSigningController
                 ], 410, ['Cache-Control' => 'no-store']);
             }
         } else {
-            $sessions = $this->playback->start($videoId, $requestId, $audioStreamIndex, $audioOffsetMs);
+            $sessions = $this->playback->start(
+                $videoId,
+                $requestId,
+                $audioStreamIndex,
+                $audioOffsetMs,
+                $qualityTier,
+            );
         }
         if ($sessions === []) {
             return new JsonResponse(['error' => 'Owned media execution is unavailable'], 503, ['Retry-After' => '2']);

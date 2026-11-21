@@ -11,8 +11,10 @@ use App\Media\Application\DTO\DeliveryKind;
 use App\Media\Application\Port\MediaReadScopeProviderInterface;
 use App\Media\Application\Port\PlaybackMediaAccessInterface;
 use App\Media\Application\Port\StreamPortInterface;
+use App\Media\Application\Port\VideoQualityChoicesPortInterface;
 use App\Media\Application\Service\DeliveryCompatibility;
 use App\Media\Application\Service\DeliveryDecisionService;
+use App\Media\Interface\Resource\DeliveryResource;
 use App\Media\Domain\Model\TrackStreamMetadata;
 use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\Exception\ConflictException;
@@ -31,6 +33,7 @@ use App\Transcode\Application\Port\AudioRenditionPortInterface;
 use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 final class DeliveryDecisionServiceTest extends TestCase
 {
@@ -73,6 +76,11 @@ final class DeliveryDecisionServiceTest extends TestCase
         self::assertSame('/api/transcode/' . $videoId->toString() . '/manifest.mpd', $decision->url);
         self::assertSame($requestId, $decision->requestId);
         self::assertSame($presentation->jobId->toString(), $decision->jobId);
+        self::assertSame($presentation->sessionId->toString(), $decision->sessionId);
+        self::assertSame(
+            $presentation->sessionId->toString(),
+            DeliveryResource::from($decision->withUrl('/signed')->withRequestId($requestId))['sessionId'],
+        );
     }
 
     public function testFailedNativeSourceCanOnlyFallBackToPermittedEncoding(): void
@@ -536,6 +544,135 @@ final class DeliveryDecisionServiceTest extends TestCase
         self::assertSame('/accepted', $result->url);
     }
 
+    #[DataProvider('manualPresentations')]
+    public function testManualQualityReusesOnlyTheExactCompletedTierWithoutProducerSlots(
+        int $audioOffsetMs,
+        bool $sourcePlaybackFailed,
+        bool $qualityAllowed,
+        bool $sourceCopy,
+        int $sourceWidth = 1920,
+    ): void {
+        $videos = $this->createStub(VideoPortInterface::class);
+        $videos->method('getSourceMetadata')->willReturn(new VideoSourceMetadata(
+            new Uuid(),
+            (new PublicId())->toString(),
+            '/library/movie.mkv',
+            'movie.mkv',
+            100,
+            'video/x-matroska',
+            'hash',
+            'matroska',
+            'h264',
+            3,
+            [['codec' => 'aac', 'channels' => 2, 'streamIndex' => 8, 'isDefault' => true]],
+            $sourceWidth,
+            1080,
+            24.0,
+            100.0,
+            pixFmt: 'yuv420p',
+            colorSpace: ['transfer' => 'bt709'],
+        ));
+        $artifacts = $this->createStub(CompletedVideoArtifactPort::class);
+        $artifacts->method('findComplete')->willReturn([
+            new CompletedVideoArtifact(
+                '/wrong-tier',
+                'mp4',
+                'h264',
+                'aac',
+                1280,
+                720,
+                2,
+                3,
+                8,
+                8,
+                false,
+                'hls',
+                'yuv420p',
+                new PublicId(),
+                1,
+                $sourceCopy ? 'copy' : '1080p',
+                $audioOffsetMs,
+                $sourceCopy,
+            ),
+            new CompletedVideoArtifact(
+                '/wrong-bit-depth',
+                'mp4',
+                'h264',
+                'aac',
+                $sourceWidth,
+                1080,
+                2,
+                3,
+                8,
+                10,
+                false,
+                'hls',
+                'yuv420p',
+                new PublicId(),
+                1,
+                $sourceCopy ? 'copy' : '1080p',
+                $audioOffsetMs,
+                $sourceCopy,
+            ),
+            new CompletedVideoArtifact(
+                '/accepted',
+                'mp4',
+                'h264',
+                'aac',
+                $sourceWidth,
+                1080,
+                2,
+                3,
+                8,
+                8,
+                false,
+                'hls',
+                'yuv420p',
+                new PublicId(),
+                1,
+                $sourceCopy ? 'copy' : '1080p',
+                $audioOffsetMs,
+                $sourceCopy,
+            ),
+        ]);
+        $service = $this->service(
+            videos: $videos,
+            artifacts: $artifacts,
+            profile: new DeploymentProfile(videoEncoderSlots: 0),
+            qualityAllowed: $qualityAllowed,
+        );
+        $result = $service->video(
+            new Uuid(),
+            new PublicId(),
+            new DeliveryDestination(
+                ['mp4'],
+                ['h264'],
+                ['aac'],
+                transports: ['hls'],
+                qualityTier: '1080p',
+                audioOffsetMs: $audioOffsetMs,
+                sourcePlaybackFailed: $sourcePlaybackFailed,
+            ),
+        );
+        if (!$qualityAllowed) {
+            self::assertSame(DeliveryKind::Incompatible, $result->kind);
+            self::assertSame('requested_quality_unavailable', $result->reason);
+            return;
+        }
+        self::assertSame(DeliveryKind::Cached, $result->kind);
+        self::assertSame('/accepted', $result->url);
+    }
+
+    /** @return iterable<string, array{int, bool, bool, bool, int}> */
+    public static function manualPresentations(): iterable
+    {
+        yield 'uncorrected source' => [0, false, true, false, 1920];
+        yield 'corrected audio after source failure' => [-750, true, true, false, 1920];
+        yield 'policy denied cached tier' => [0, false, false, false, 1920];
+        yield 'completed source copy without a producer' => [0, false, true, true, 1920];
+        yield 'source copy keeps source aspect dimensions' => [0, false, true, true, 2048];
+    }
+
     private function service(
         ?PlaybackMediaAccessInterface $access = null,
         ?VideoPortInterface $videos = null,
@@ -545,6 +682,7 @@ final class DeliveryDecisionServiceTest extends TestCase
         ?CompletedVideoArtifactPort $artifacts = null,
         ?TrackStreamMetadata $metadata = null,
         ?CopyPresentationPortInterface $copies = null,
+        bool $qualityAllowed = true,
     ): DeliveryDecisionService {
         $profile ??= new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2);
         $scopes = $this->createStub(MediaReadScopeProviderInterface::class);
@@ -568,6 +706,10 @@ final class DeliveryDecisionServiceTest extends TestCase
         $streams->method('resolveTrackPath')->willReturn($metadata->filePath ?? '/library/song.flac');
         $settings = $this->createStub(SystemSettingsPortInterface::class);
         $settings->method('get')->willReturnCallback(static fn(string $key): mixed => $key === TranscodeSettingDefinitions::ENABLED ? $enabled : 192);
+        $qualityChoices = $this->createStub(VideoQualityChoicesPortInterface::class);
+        $qualityChoices->method('choices')->willReturn($qualityAllowed ? [
+            ['id' => '1080p', 'label' => '1080p', 'width' => 1920, 'height' => 1080],
+        ] : []);
         return new DeliveryDecisionService(
             $access ?? $this->createStub(PlaybackMediaAccessInterface::class),
             $scopes,
@@ -579,6 +721,7 @@ final class DeliveryDecisionServiceTest extends TestCase
             $settings,
             $artifacts ?? $this->createStub(CompletedVideoArtifactPort::class),
             $copies ?? $this->createStub(CopyPresentationPortInterface::class),
+            $qualityChoices,
         );
     }
 }

@@ -170,7 +170,7 @@ final class StreamSigningSecurityTest extends TestCase
         $video = Video::create('/video.mp4', 'hash');
         $playback = $this->createMock(PlaybackPortInterface::class);
         $playback->expects(self::once())->method('start')
-            ->with($video->getId(), self::REQUEST_ID, 7, -750)
+            ->with($video->getId(), self::REQUEST_ID, 7, -750, '4K')
             ->willReturn(['0123456789abABCD_-xyz' => new PublicId()]);
         $auth = $this->createStub(StreamAuthPortInterface::class);
         $auth->method('signUrl')->willReturn([
@@ -189,8 +189,28 @@ final class StreamSigningSecurityTest extends TestCase
             'requestId' => self::REQUEST_ID,
             'audioStreamIndex' => 7,
             'audioOffsetMs' => -750,
+            'qualityTier' => '2160p',
         ], JSON_THROW_ON_ERROR)));
         self::assertSame(200, $response->getStatusCode());
+    }
+
+    public function testSigningRejectsAnUnknownQualityBeforeAdmittingPlayback(): void
+    {
+        $playback = $this->createMock(PlaybackPortInterface::class);
+        $playback->expects(self::never())->method('start');
+        $controller = new StreamSigningController(
+            $this->createStub(StreamAuthPortInterface::class),
+            $playback,
+            $this->createStub(TranscodePublicViewInterface::class),
+            $this->createStub(TranscodeStreamingPortInterface::class),
+        );
+        $response = $controller->sign(Request::create('/', 'POST', content: json_encode([
+            'path' => '/api/transcode/0123456789abABCD_-xyz/master.m3u8',
+            'requestId' => self::REQUEST_ID,
+            'qualityTier' => '800p',
+        ], JSON_THROW_ON_ERROR)));
+
+        self::assertSame(400, $response->getStatusCode());
     }
 
     public function testRefreshChecksAccessWithoutAdmittingAgain(): void

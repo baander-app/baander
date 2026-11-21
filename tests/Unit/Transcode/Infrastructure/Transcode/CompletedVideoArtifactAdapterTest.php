@@ -20,11 +20,15 @@ use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
 use App\Transcode\Infrastructure\Storage\TranscodeFileStorage;
 use App\Transcode\Infrastructure\Transcode\CompletedVideoArtifactAdapter;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 final class CompletedVideoArtifactAdapterTest extends TestCase
 {
-    public function testCorrectedAudioArtifactCannotReplaceUncorrectedPlayback(): void
-    {
+    #[DataProvider('audioCorrections')]
+    public function testCompletedAudioCorrectionMustMatchTheRequestedPresentation(
+        int $requestedOffset,
+        bool $matches,
+    ): void {
         $video = Video::create('/media/source.mkv', 'source-hash');
         $video->updateProbe(['subtitleStreams' => []]);
         $owner = Uuid::generate();
@@ -49,7 +53,7 @@ final class CompletedVideoArtifactAdapterTest extends TestCase
         $jobs = $this->createStub(TranscodeJobRepositoryInterface::class);
         $jobs->method('findActiveByOwnerAndVideo')->willReturn([$job]);
         $runtime = $this->createMock(TranscodeExecutionOwnershipPort::class);
-        $runtime->expects(self::never())->method('find');
+        $runtime->expects($matches ? self::once() : self::never())->method('find')->willReturn(null);
         $lookup = new CompletedVideoArtifactAdapter(
             $jobs,
             $videos,
@@ -57,7 +61,15 @@ final class CompletedVideoArtifactAdapterTest extends TestCase
             new TranscodeFileStorage(new SegmentFileResolver('/cache')),
             new PublishedPresentationReader(),
         );
-        self::assertSame([], $lookup->findComplete($owner, $video->getId(), 'source-hash', 3, 7));
+        self::assertSame([], $lookup->findComplete($owner, $video->getId(), 'source-hash', 3, 7, $requestedOffset));
+    }
+
+    /** @return iterable<string, array{int, bool}> */
+    public static function audioCorrections(): iterable
+    {
+        yield 'uncorrected playback excludes corrected artifact' => [0, false];
+        yield 'different correction excludes artifact' => [-750, false];
+        yield 'matching correction may reuse artifact' => [750, true];
     }
 
     public function testOnlyCompleteCurrentSourceGenerationsCanBeReused(): void
@@ -108,6 +120,8 @@ final class CompletedVideoArtifactAdapterTest extends TestCase
             $complete = $lookup->findComplete($owner, $video->getId(), 'source-hash', 3, null);
             self::assertCount(1, $complete);
             self::assertSame('hls', $complete[0]->transport);
+            self::assertTrue($complete[0]->sourceCopy);
+            self::assertSame('copy', $complete[0]->qualityTier);
             self::assertSame([], $lookup->findComplete($owner, $video->getId(), 'changed', 3, null));
             self::assertSame([], $lookup->findComplete($owner, $video->getId(), 'source-hash', 4, null));
             $video->updateProbe(['subtitleStreams' => [['codec' => 'subrip']]]);

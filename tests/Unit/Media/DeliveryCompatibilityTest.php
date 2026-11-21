@@ -96,6 +96,63 @@ final class DeliveryCompatibilityTest extends TestCase
         self::assertSame(DeliveryKind::Copy, $this->service()->decide($this->source('matroska'), new DeliveryDestination(['mp4'], ['h264'], ['aac'], transports: ['hls']))->kind);
     }
 
+    public function testManualQualityEncodesTheRequestedResolutionInsteadOfReturningTheOriginal(): void
+    {
+        $decision = $this->service(new DeploymentProfile())->decide(
+            $this->source(),
+            new DeliveryDestination(['mp4'], ['h264'], ['aac'], qualityTier: '480p'),
+        );
+
+        self::assertSame(DeliveryKind::Encoded, $decision->kind);
+        self::assertSame('requested_quality_requires_encoding', $decision->reason);
+    }
+
+    public function testManualQualityAllowsTheExactSourceHeightWithoutEncoding(): void
+    {
+        $decision = $this->service()->decide(
+            $this->source(),
+            new DeliveryDestination(['mp4'], ['h264'], ['aac'], qualityTier: '1080p'),
+        );
+
+        self::assertSame(DeliveryKind::Original, $decision->kind);
+    }
+
+    public function testManualQualityRejectsUpscalingAndDestinationLimits(): void
+    {
+        foreach ([
+            new DeliveryDestination(['mp4'], ['h264'], ['aac'], qualityTier: '1440p'),
+            new DeliveryDestination(['mp4'], ['h264'], ['aac'], maxHeight: 360, qualityTier: '720p'),
+        ] as $destination) {
+            $decision = $this->service(new DeploymentProfile())->decide($this->source(), $destination);
+            self::assertSame(DeliveryKind::Incompatible, $decision->kind);
+            self::assertSame('requested_quality_unavailable', $decision->reason);
+        }
+    }
+
+    public function testManualQualityRequiresKnownDimensionsAndSufficientSourceWidth(): void
+    {
+        foreach ([null, 1000] as $width) {
+            $source = new DeliverySource(
+                'mp4',
+                'h264',
+                4,
+                'aac',
+                7,
+                2,
+                $width,
+                1080,
+                bitDepth: 8,
+                hdr: false,
+                pixelFormat: 'yuv420p',
+            );
+            $decision = $this->service(new DeploymentProfile())->decide(
+                $source,
+                new DeliveryDestination(['mp4'], ['h264'], ['aac'], qualityTier: '1080p'),
+            );
+            self::assertSame(DeliveryKind::Incompatible, $decision->kind);
+        }
+    }
+
     private function service(?DeploymentProfile $profile = null): DeliveryCompatibility
     {
         return new DeliveryCompatibility(new MediaExecutionPolicy($profile ?? new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)));

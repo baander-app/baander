@@ -40,13 +40,13 @@ deptrac:
         Filesystem: ['Filesystem Infrastructure', 'Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
         Library: ['Library Live Audience Contract', 'Library File Availability Contract', 'Library Read Scope Contract', 'Library Content Stats Contract', 'Library Files Discovered Contract', 'Library Provisioning Contract', 'Library Media Files Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
         Lyrics: ['Lyrics Fetch Request Contract', 'Lyrics Album Merge Contract', 'Lyrics Domain', 'Lyrics Application', 'Lyrics Infrastructure', 'Lyrics Resources', 'Lyrics Interface']
-        Media: ['Media Playback Access Contract', 'Media Image Contract', 'Media Domain', 'Media Application', 'Media Infrastructure', 'Media Resources', 'Media Interface']
+        Media: ['Media Video Quality Contract', 'Media Playback Access Contract', 'Media Image Contract', 'Media Domain', 'Media Application', 'Media Infrastructure', 'Media Resources', 'Media Interface']
         Metadata: ['Metadata Sync Contract', 'Metadata MusicBrainz Lookup Contract', 'Metadata Domain', 'Metadata Application', 'Metadata Infrastructure', 'Metadata Interface']
         Notification: ['Notification Domain', 'Notification Application', 'Notification Infrastructure', 'Notification Resources', 'Notification Interface']
         Party: ['Party Domain', 'Party Application', 'Party Infrastructure', 'Party Resources', 'Party Interface']
         Playlist: ['Playlist Live Audience Contract', 'Playlist Deletion Preview Contract', 'Playlist Album Merge Contract', 'Playlist Domain', 'Playlist Application', 'Playlist Infrastructure', 'Playlist Resources', 'Playlist Interface']
         Recommendation: ['Recommendation Artist Merge Contract', 'Recommendation Domain', 'Recommendation Application', 'Recommendation Infrastructure', 'Recommendation Resources', 'Recommendation Interface']
-        Transcode: ['Transcode Timeline Preview Contract', 'Transcode Playback Access Contract', 'Transcode Audio Rendition Contract', 'Transcode Delivery Contract', 'Transcode Probe Contract', 'Transcode Domain', 'Transcode Application', 'Transcode Infrastructure', 'Transcode Resources', 'Transcode Interface']
+        Transcode: ['Transcode Quality Contract', 'Transcode Timeline Preview Contract', 'Transcode Playback Access Contract', 'Transcode Audio Rendition Contract', 'Transcode Delivery Contract', 'Transcode Probe Contract', 'Transcode Domain', 'Transcode Application', 'Transcode Infrastructure', 'Transcode Resources', 'Transcode Interface']
         UserPreference: ['UserPreference Settings Contract', 'UserPreference Domain', 'UserPreference Application', 'UserPreference Infrastructure', 'UserPreference Resources', 'UserPreference Interface']
         Discovery: ['Discovery Domain', 'Discovery Application', 'Discovery Infrastructure', 'Discovery Resources', 'Discovery Interface']
         Favorites: ['Favorites Artist Merge Contract', 'Favorites Album Merge Contract', 'Favorites Domain', 'Favorites Application', 'Favorites Infrastructure', 'Favorites Resources', 'Favorites Interface']
@@ -468,6 +468,11 @@ deptrac:
         - type: classLike
           value: '^App\\Media\\Application\\Port\\PlaybackMediaAccessInterface$'
 
+    - name: 'Media Video Quality Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Media\\Application\\Port\\VideoQualityChoicesPortInterface$'
+
     - name: 'Media Application'
       collectors:
         - type: bool
@@ -475,6 +480,8 @@ deptrac:
             - type: classLike
               value: '^App\\Media\\Application\\'
           must_not:
+            - type: classLike
+              value: '^App\\Media\\Application\\Port\\VideoQualityChoicesPortInterface$'
             - type: classLike
               value: '^App\\Media\\Application\\Port\\PlaybackMediaAccessInterface$'
             - type: classLike
@@ -743,6 +750,11 @@ deptrac:
         - type: classLike
           value: '^App\\Transcode\\Application\\(Port\\VideoTimelinePreviewPort|Command\\PrepareTimelinePreview)$'
 
+    - name: 'Transcode Quality Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Transcode\\Application\\DTO\\RequestedQuality$'
+
     - name: 'Transcode Application'
       collectors:
         - type: bool
@@ -750,6 +762,8 @@ deptrac:
             - type: classLike
               value: '^App\\Transcode\\Application\\'
           must_not:
+            - type: classLike
+              value: '^App\\Transcode\\Application\\DTO\\RequestedQuality$'
             - type: classLike
               value: '^App\\Transcode\\Application\\Port\\PlaybackAccessInterface$'
             - type: classLike
@@ -1316,6 +1330,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Catalog Infrastructure':
+      - 'Media Video Quality Contract'
       - Core
       - 'Transcode Timeline Preview Contract'
       - 'Activity Artist Merge Contract'
@@ -1461,6 +1476,7 @@ deptrac:
       - 'Shared Infrastructure'
 
     # --- Media ---
+    'Media Video Quality Contract': []
     'Media Playback Access Contract':
       - Core
       - 'Shared Domain'
@@ -1472,6 +1488,8 @@ deptrac:
       - 'Media Image Contract'
       - 'Shared Domain'
     'Media Application':
+      - 'Transcode Quality Contract'
+      - 'Media Video Quality Contract'
       - Core
       - 'Media Playback Access Contract'
       - 'Catalog Video Contract'
@@ -1503,6 +1521,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Media Interface':
+      - 'Transcode Quality Contract'
       - Core
       - 'Image Processing'
       - 'Media Image Contract'
@@ -1729,10 +1748,13 @@ deptrac:
     'Transcode Domain':
       - Core
       - 'Shared Domain'
+    'Transcode Quality Contract':
+      - 'Transcode Domain'
     'Transcode Timeline Preview Contract':
       - Core
       - 'Catalog Video Contract'
     'Transcode Application':
+      - 'Transcode Quality Contract'
       - Core
       - 'Transcode Timeline Preview Contract'
       - 'Transcode Probe Contract'
@@ -1744,6 +1766,8 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Transcode Infrastructure':
+      - 'Transcode Quality Contract'
+      - 'Media Video Quality Contract'
       - Core
       - 'Transcode Timeline Preview Contract'
       - 'Catalog Video Contract'
@@ -1769,6 +1793,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Transcode Interface':
+      - 'Transcode Quality Contract'
       - Core
       - 'Transcode Playback Access Contract'
       - 'Transcode Delivery Contract'

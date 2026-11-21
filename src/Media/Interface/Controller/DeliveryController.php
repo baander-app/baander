@@ -33,8 +33,7 @@ final readonly class DeliveryController
         private MediaReadScopeProviderInterface $scopes,
         private StreamAuthPortInterface $signing,
         private CompletedVideoDeliveryPort $completed,
-    ) {
-    }
+    ) {}
 
     #[OA\Post(
         path: '/api/stream/delivery',
@@ -80,6 +79,7 @@ final readonly class DeliveryController
                 $request->pixelFormats,
                 $request->sourcePlaybackFailed,
                 $request->audioOffsetMs,
+                $request->qualityTier,
             );
         } catch (\InvalidArgumentException $error) {
             return $this->errorResponse($error->getMessage());

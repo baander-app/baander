@@ -14,11 +14,14 @@ use App\Media\Application\Port\DeliveryDecisionPortInterface;
 use App\Media\Application\Port\MediaReadScopeProviderInterface;
 use App\Media\Application\Port\PlaybackMediaAccessInterface;
 use App\Media\Application\Port\StreamPortInterface;
+use App\Media\Application\Port\VideoQualityChoicesPortInterface;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\DTO\MediaOperation;
+use App\Transcode\Application\DTO\RequestedQuality;
+use App\Transcode\Application\DTO\CompletedVideoArtifact;
 use App\Transcode\Application\Port\MediaExecutionPolicyInterface;
 use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Transcode\Application\Port\AudioRenditionPortInterface;
@@ -40,8 +43,8 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
         private SystemSettingsPortInterface $settings,
         private CompletedVideoArtifactPort $videoArtifacts,
         private CopyPresentationPortInterface $copyPresentations,
-    ) {
-    }
+        private VideoQualityChoicesPortInterface $qualityChoices,
+    ) {}
 
     public function video(Uuid $owner, PublicId $id, DeliveryDestination $destination, ?string $requestId = null): DeliveryDecision
     {
@@ -82,13 +85,25 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
             audioSelectionRequiresRemux: $destination->audioStreamIndex !== null && $destination->audioStreamIndex !== ($defaultAudio['streamIndex'] ?? null),
             hasSubtitles: $source->hasSubtitles,
         );
+        if (
+            $destination->qualityTier !== null
+            && !array_any(
+                $this->qualityChoices->choices($source->width, $source->height),
+                static fn(array $choice): bool => $choice['id'] === $destination->qualityTier,
+            )
+        ) {
+            return new DeliveryDecision(DeliveryKind::Incompatible, 'requested_quality_unavailable');
+        }
         $decision = $this->compatibility->decide($media, $destination);
         if (
             $decision->kind === DeliveryKind::Original
             || $destination->subtitleBurnIn
-            || $destination->sourcePlaybackFailed
-            || $destination->audioOffsetMs !== 0
+            || ($destination->qualityTier === null
+                && ($destination->sourcePlaybackFailed || $destination->audioOffsetMs !== 0))
         ) {
+            return $decision;
+        }
+        if ($decision->reason === 'requested_quality_unavailable') {
             return $decision;
         }
         $artifacts = $media->videoStreamIndex === null ? [] : $this->videoArtifacts->findComplete(
@@ -97,10 +112,17 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
             $source->hash,
             $media->videoStreamIndex,
             $media->audioStreamIndex,
+            $destination->audioOffsetMs,
         );
+        $requestedQuality = $destination->qualityTier === null
+            ? null
+            : RequestedQuality::fromString($destination->qualityTier);
         foreach ($artifacts as $artifact) {
             if (
-                $artifact->sourceVideoStreamIndex !== $media->videoStreamIndex || $artifact->sourceAudioStreamIndex !== $media->audioStreamIndex
+                !$this->matchesRequestedQuality($artifact, $requestedQuality, $media)
+                || $artifact->audioOffsetMs !== $destination->audioOffsetMs
+                || $artifact->sourceVideoStreamIndex !== $media->videoStreamIndex
+                || $artifact->sourceAudioStreamIndex !== $media->audioStreamIndex
                 || !in_array($artifact->transport, $destination->transports, true)
             ) {
                 continue;
@@ -151,9 +173,30 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
                 url: '/api/transcode/' . $id->toString() . '/' . $manifest,
                 requestId: $requestId,
                 jobId: $presentation->jobId->toString(),
+                sessionId: $presentation->sessionId->toString(),
             );
         }
         return $decision;
+    }
+
+    private function matchesRequestedQuality(
+        CompletedVideoArtifact $artifact,
+        ?RequestedQuality $quality,
+        DeliverySource $source,
+    ): bool {
+        if ($quality === null) {
+            return true;
+        }
+        if ($artifact->sourceCopy) {
+            return $artifact->qualityTier === 'copy'
+                && $artifact->height === $quality->height
+                && $artifact->height === $source->height
+                && $artifact->width === $source->width;
+        }
+
+        return $artifact->qualityTier === $quality->id
+            && $artifact->width === $quality->width
+            && $artifact->height === $quality->height;
     }
 
     private function container(?string $format, string $mime): ?string

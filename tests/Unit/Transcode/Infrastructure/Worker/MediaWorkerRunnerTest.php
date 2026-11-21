@@ -54,18 +54,20 @@ final class MediaWorkerRunnerTest extends TestCase
                     }
                     return ($fullAt !== null && microtime(true) - $fullAt >= 0.15) || microtime(true) >= $deadline;
                 },
-                static function () use (&$ready): void { $ready = true; },
+                static function () use (&$ready): void {
+                    $ready = true;
+                },
             );
             self::assertTrue($ready);
-            $launches = array_map(static fn (string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), file($log));
+            $launches = array_map(static fn(string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), file($log));
             self::assertCount($count, $launches);
             $clientIds = array_column($launches, 3);
             sort($clientIds);
             self::assertSame($expectedIds, $clientIds);
             self::assertSame(['1'], array_values(array_unique(array_column($launches, 4))));
             self::assertCount($count, array_unique(array_column($launches, 1)));
-            self::assertSame($videoCount, count(array_filter($launches, static fn (array $launch): bool => $launch[0] === 'video')));
-            self::assertSame(1, count(array_filter($launches, static fn (array $launch): bool => $launch[0] === 'audio')));
+            self::assertSame($videoCount, count(array_filter($launches, static fn(array $launch): bool => $launch[0] === 'video')));
+            self::assertSame(1, count(array_filter($launches, static fn(array $launch): bool => $launch[0] === 'audio')));
             foreach ($launches as $launch) {
                 self::assertDirectoryDoesNotExist('/proc/' . $launch[2], 'A drained child must be reaped.');
             }
@@ -110,12 +112,90 @@ final class MediaWorkerRunnerTest extends TestCase
                     return ($fullAt !== null && microtime(true) - $fullAt >= 0.2) || microtime(true) >= $deadline;
                 },
             );
-            $launches = array_map(static fn (string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), file($log));
+            $launches = array_map(static fn(string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), file($log));
             $clientIds = array_column($launches, 1);
             sort($clientIds, SORT_NATURAL);
-            self::assertSame(array_map(static fn (int $index): string => 'media-video-' . $index, range(0, 7)), $clientIds);
+            self::assertSame(array_map(static fn(int $index): string => 'media-video-' . $index, range(0, 7)), $clientIds);
             self::assertSame(['video'], array_values(array_unique(array_column($launches, 0))));
         } finally {
+            @unlink($log);
+            unlink($script);
+            rmdir($directory);
+        }
+    }
+
+    public function testOneVideoSlotWaitsForThePreviousChildToReleaseBeforeStartingItsReplacement(): void
+    {
+        $directory = sys_get_temp_dir() . '/baander-video-handoff-' . bin2hex(random_bytes(8));
+        mkdir($directory);
+        $script = $directory . '/child.php';
+        $log = $directory . '/events';
+        $release = $directory . '/release';
+        file_put_contents($script, <<<'PHP'
+<?php
+$event = [$argv[2], 'start', getenv('BAANDER_NATIVE_CLIENT_ID'), getenv('BAANDER_NATIVE_CLIENT_GENERATION')];
+file_put_contents(__DIR__ . '/events', json_encode($event) . "\n", FILE_APPEND | LOCK_EX);
+while (!is_file(__DIR__ . '/release')) {
+    usleep(10000);
+}
+file_put_contents(__DIR__ . '/events', json_encode([$argv[2], 'exit']) . "\n", FILE_APPEND | LOCK_EX);
+PHP);
+        $jobs = [];
+        for ($index = 0; $index < 2; ++$index) {
+            $jobs[] = new TranscodeRuntimeSnapshot(
+                Uuid::generate(),
+                Uuid::generate(),
+                'request',
+                new DesiredTranscodeState(\App\Transcode\Domain\ValueObject\AudioProfile::streamingStereo()),
+                1,
+                0,
+                0,
+                'pending',
+                null,
+                null,
+            );
+        }
+        $video = $this->createStub(TranscodeExecutionOwnershipPort::class);
+        $video->method('pending')->willReturnCallback(static function () use ($log, $jobs): array {
+            return is_file($log) ? [$jobs[1]] : $jobs;
+        });
+        $audio = $this->createStub(AudioRenditionRuntimePort::class);
+        $audio->method('pending')->willReturn([]);
+        $authority = $this->createStub(MediaWorkerAuthorityInterface::class);
+        $deadline = microtime(true) + 5;
+        $startedAt = null;
+        try {
+            $runner = new MediaWorkerRunner(
+                $video,
+                $audio,
+                $authority,
+                new \App\Shared\Application\DTO\DeploymentProfile(videoEncoderSlots: 1, audioEncoderSlots: 0),
+                $script,
+            );
+            $runner->run(static function () use ($log, $release, $deadline, &$startedAt): bool {
+                $events = is_file($log) ? file($log) : [];
+                if (count($events) === 1) {
+                    $startedAt ??= microtime(true);
+                    if (microtime(true) - $startedAt >= 0.2) {
+                        file_put_contents($release, 'release');
+                    }
+                }
+                return count($events) >= 3 || microtime(true) >= $deadline;
+            });
+            $events = array_map(
+                static fn(string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR),
+                file($log),
+            );
+            self::assertSame(
+                [
+                    [$jobs[0]->jobId->toString(), 'start', 'media-video-0', '1'],
+                    [$jobs[0]->jobId->toString(), 'exit'],
+                    [$jobs[1]->jobId->toString(), 'start', 'media-video-0', '2'],
+                ],
+                array_slice($events, 0, 3),
+            );
+        } finally {
+            @unlink($release);
             @unlink($log);
             unlink($script);
             rmdir($directory);
@@ -131,7 +211,7 @@ final class MediaWorkerRunnerTest extends TestCase
         file_put_contents($script, '<?php file_put_contents(__DIR__."/launches", json_encode([$argv[1], getenv("BAANDER_NATIVE_CLIENT_ID"), getenv("BAANDER_NATIVE_CLIENT_GENERATION"), getmypid()])."\n", FILE_APPEND | LOCK_EX);');
         $runtime = new TranscodeRuntimeSnapshot(Uuid::generate(), Uuid::generate(), 'request', new DesiredTranscodeState(\App\Transcode\Domain\ValueObject\AudioProfile::streamingStereo()), 1, 0, 0, 'pending', null, null);
         $video = $this->createStub(TranscodeExecutionOwnershipPort::class);
-        $video->method('pending')->willReturnCallback(static fn (): array => is_file($log) ? [] : [$runtime]);
+        $video->method('pending')->willReturnCallback(static fn(): array => is_file($log) ? [] : [$runtime]);
         $input = new AudioRenditionInput('track', 'source.flac', '/media/source.flac', \App\Transcode\Application\Port\AudioRenditionFormat::Opus, 128000, '/media/derived');
         $audioRuntime = new AudioRenditionRuntimeSnapshot($input->key(), $input, 'pending', 0, null, null, null);
         $audio = $this->createStub(AudioRenditionRuntimePort::class);
@@ -146,10 +226,10 @@ final class MediaWorkerRunnerTest extends TestCase
         $deadline = hrtime(true) + 3_000_000_000;
         try {
             (new MediaWorkerRunner($video, $audio, $authority, new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2), $script))->run(
-                static fn (): bool => (is_file($log) && count(file($log)) >= 2) || hrtime(true) >= $deadline,
+                static fn(): bool => (is_file($log) && count(file($log)) >= 2) || hrtime(true) >= $deadline,
             );
-            $launches = array_map(static fn (string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), file($log));
-            self::assertSame([['video', 'media-copy-0', '1'], ['audio', 'media-copy-0', '2']], array_map(static fn (array $launch): array => array_slice($launch, 0, 3), $launches));
+            $launches = array_map(static fn(string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), file($log));
+            self::assertSame([['video', 'media-copy-0', '1'], ['audio', 'media-copy-0', '2']], array_map(static fn(array $launch): array => array_slice($launch, 0, 3), $launches));
         } finally {
             @unlink($log);
             unlink($script);
@@ -208,7 +288,7 @@ final class MediaWorkerRunnerTest extends TestCase
         $deadline = microtime(true) + 3;
         try {
             try {
-                (new MediaWorkerRunner($video, $audio, $authority, new \App\Shared\Application\DTO\DeploymentProfile(), $script))->run(static fn (): bool => microtime(true) >= $deadline);
+                (new MediaWorkerRunner($video, $audio, $authority, new \App\Shared\Application\DTO\DeploymentProfile(), $script))->run(static fn(): bool => microtime(true) >= $deadline);
                 self::fail('Role continued after execution authority became uncertain.');
             } catch (\RuntimeException $error) {
                 self::assertStringContainsString($loseAuthority ? 'authority lost' : 'exited unexpectedly', $error->getMessage());
@@ -238,6 +318,8 @@ final class MediaWorkerRunnerTest extends TestCase
         $audio->expects(self::never())->method('pending');
         $authority->expects(self::once())->method('assertActive')->willThrowException(new \RuntimeException('authority lost'));
         $this->expectExceptionMessage('authority lost');
-        (new MediaWorkerRunner($video, $audio, $authority, new \App\Shared\Application\DTO\DeploymentProfile()))->run(static fn (): bool => false, static function (): void { self::fail('Uninitialized role reported readiness.'); });
+        (new MediaWorkerRunner($video, $audio, $authority, new \App\Shared\Application\DTO\DeploymentProfile()))->run(static fn(): bool => false, static function (): void {
+            self::fail('Uninitialized role reported readiness.');
+        });
     }
 }

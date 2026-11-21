@@ -159,6 +159,37 @@ final class StreamAdmissionServiceTest extends TestCase
         self::assertSame('1080p', $decisions[1]['context']['allowedTier']);
     }
 
+    public function testAdmissionRejectsAnOfferedLowerTierWithoutAllocatingTheFixedPresentation(): void
+    {
+        $logger = new AdmissionRecordingLogger();
+        $ladder = $this->createStub(QualityLadderPortInterface::class);
+        $ladder->method('defaultTiers')->willReturn([
+            ['name' => '360p', 'videoBitrate' => 800_000],
+            ['name' => '1080p', 'videoBitrate' => 5_000_000],
+        ]);
+        [$service, $governor] = $this->service($logger, $ladder);
+        $this->learn($service, $governor, false, 1.0);
+        $governor->activate();
+        $existing = new Uuid();
+        $governor->allocateStream($existing, '1080p', 72.0);
+        $jobId = new Uuid();
+        self::assertSame('360p', $governor->evaluateBudget(1080, 5_000_000, false, '1080p'));
+
+        try {
+            $service->admit($jobId, '1080p', 5_000_000, 1080, false);
+            self::fail('The fixed presentation must not start on a lower tier allocation.');
+        } catch (StreamBudgetExhausted $exception) {
+            self::assertSame('1080p', $exception->requestedTier);
+            self::assertSame(1, $exception->activeStreams);
+            self::assertSame(0.72, $exception->budgetUsed);
+        }
+
+        self::assertSame(1, $governor->getActiveStreamCount());
+        self::assertSame($existing->toString(), $governor->getActiveStreams()[0]->jobId->toString());
+        $vetoes = array_values(array_filter($logger->records, static fn (array $record): bool => $record['message'] === 'StreamAdmission: vetoed stream'));
+        self::assertCount(1, $vetoes);
+    }
+
     public function testVetoIsRecordedWithTheGovernorStateAndRethrown(): void
     {
         $logger = new AdmissionRecordingLogger();
@@ -201,9 +232,9 @@ final class StreamAdmissionServiceTest extends TestCase
     }
 
     /** @return array{StreamAdmissionService, StreamGovernor} */
-    private function service(LoggerInterface $logger = new NullLogger()): array
+    private function service(LoggerInterface $logger = new NullLogger(), ?QualityLadderPortInterface $ladder = null): array
     {
-        $governor = new StreamGovernor(new LearningModel(), $this->createStub(QualityLadderPortInterface::class), new InMemoryAlgorithmProfileStore());
+        $governor = new StreamGovernor(new LearningModel(), $ladder ?? $this->createStub(QualityLadderPortInterface::class), new InMemoryAlgorithmProfileStore());
         $fingerprint = $this->createStub(EncoderProfileFingerprintPortInterface::class);
         $fingerprint->method('getName')->willReturn('none/libx265');
         $persister = new LearningDataPersister($governor, $fingerprint, new NullLogger(), $this->directory, new JsonEncoder());

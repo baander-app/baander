@@ -14,6 +14,11 @@ final readonly class AllowedQualityTiersService implements AllowedQualityTiersPo
     {
     }
 
+    public function qualifiedTierNames(): array
+    {
+        return $this->governor->getQualifiedTiers();
+    }
+
     public function allowedTierNames(): array
     {
         return $this->governor->getAllowedTiers();

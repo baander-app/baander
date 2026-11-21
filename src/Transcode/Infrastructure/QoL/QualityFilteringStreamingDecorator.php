@@ -27,9 +27,7 @@ final readonly class QualityFilteringStreamingDecorator implements TranscodeStre
         private TranscodeStreamingPortInterface  $inner,
         private AllowedQualityTiersPortInterface $allowedTiers,
         private LoggerInterface                  $logger,
-    )
-    {
-    }
+    ) {}
 
     public function getPlaybackState(Uuid $videoId, array $allowedJobPublicIds, array $attachedRenditions = []): ?array
     {
@@ -40,7 +38,7 @@ final readonly class QualityFilteringStreamingDecorator implements TranscodeStre
     {
         $manifest = $this->inner->getMasterManifest($videoId, $renditions, $expiresAt);
 
-        return $this->filterHlsManifest($manifest);
+        return $this->filterHlsManifest($manifest, count($renditions) === 1);
     }
 
     /**
@@ -53,8 +51,12 @@ final readonly class QualityFilteringStreamingDecorator implements TranscodeStre
      * We strip the STREAM-INF + URL line pair when the URL's tier parameter
      * is not in the allowed set.
      */
-    private function filterHlsManifest(string $manifest): string
+    private function filterHlsManifest(string $manifest, bool $soleAdmittedRendition): string
     {
+        // Admission already budgeted this execution; its own allocation must not hide it.
+        if ($soleAdmittedRendition && substr_count($manifest, '#EXT-X-STREAM-INF:') === 1) {
+            return $manifest;
+        }
         $allowed = $this->allowedTiers->allowedTierNames();
 
         // During learning, all tiers are allowed — no filtering needed
@@ -132,11 +134,11 @@ final readonly class QualityFilteringStreamingDecorator implements TranscodeStre
     {
         $manifest = $this->inner->getDashManifest($videoId, $renditions, $expiresAt);
 
-        return $this->filterDashManifest($manifest);
+        return $this->filterDashManifest($manifest, count($renditions) === 1);
     }
 
     /** Remove disallowed video tiers while preserving the canonical audio adaptation. */
-    private function filterDashManifest(string $manifest): string
+    private function filterDashManifest(string $manifest, bool $soleAdmittedRendition): string
     {
         $allowed = array_flip($this->allowedTiers->allowedTierNames());
         $xml = new \DOMDocument();
@@ -146,6 +148,10 @@ final readonly class QualityFilteringStreamingDecorator implements TranscodeStre
         $xpath = new \DOMXPath($xml);
         $xpath->registerNamespace('mpd', 'urn:mpeg:dash:schema:mpd:2011');
         $videos = $xpath->query('//mpd:AdaptationSet[@contentType="video"]/mpd:Representation');
+        // The inner service resolved the signed job and generation before producing this representation.
+        if ($soleAdmittedRendition && $videos !== false && $videos->length === 1) {
+            return $manifest;
+        }
         if ($videos !== false) {
             foreach ($videos as $representation) {
                 if ($representation instanceof \DOMElement && !isset($allowed[$representation->getAttribute('id')])) {

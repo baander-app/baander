@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Transcode\Infrastructure\Auth;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\QoL\Application\Port\AllowedQualityTiersPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\DTO\PlaybackEndReason;
@@ -38,8 +40,9 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         private Connection $connection,
         private MessageBusInterface $commandBus,
         private ClockInterface $clock,
-    ) {
-    }
+        private AllowedQualityTiersPortInterface $qualityTiers,
+        private DeploymentProfile $deploymentProfile = new DeploymentProfile(),
+    ) {}
 
     public function assertAccess(Uuid $videoId): void
     {
@@ -177,27 +180,19 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         );
     }
 
-    public function start(Uuid $videoId, string $requestId, ?int $audioStreamIndex = null, int $audioOffsetMs = 0): array
-    {
+    public function start(
+        Uuid $videoId,
+        string $requestId,
+        ?int $audioStreamIndex = null,
+        int $audioOffsetMs = 0,
+        ?string $qualityTier = null,
+    ): array {
         $this->assertAccess($videoId);
         $user = $this->security->getUser();
         if ($user === null || !method_exists($user, 'getId')) {
             throw new AccessDeniedException('Authentication required.');
         }
-        $sourceHeight = $this->connection->fetchOne(
-            'SELECT height FROM videos WHERE id = :videoId',
-            ['videoId' => $videoId->toString()],
-        );
-        if ($sourceHeight === false) {
-            throw new TranscodeStartupUnavailableException();
-        }
-        $tiers = array_filter(
-            [QualityTier::p360(), QualityTier::p720(), QualityTier::p1080()],
-            static fn(QualityTier $tier): bool => $tier->height <= (int) $sourceHeight,
-        );
-        if ($tiers === []) {
-            $tiers = [QualityTier::p360()];
-        }
+        $tiers = $qualityTier === null ? $this->automaticTiers($videoId) : [$this->manualTier($videoId, $qualityTier)];
         $jobIds = [];
         foreach ($tiers as $tier) {
             $envelope = $this->commandBus->dispatch(new CreateTranscodeSessionCommand(
@@ -218,5 +213,41 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
             $jobIds[] = $session->getJobId()->toString();
         }
         return $this->sessionsForJobs($videoId, $requestId, $jobIds, true);
+    }
+
+    /** @return list<QualityTier> */
+    private function automaticTiers(Uuid $videoId): array
+    {
+        $sourceHeight = $this->connection->fetchOne(
+            'SELECT height FROM videos WHERE id = :videoId',
+            ['videoId' => $videoId->toString()],
+        );
+        if ($sourceHeight === false) {
+            throw new TranscodeStartupUnavailableException();
+        }
+        $tiers = array_values(array_filter(
+            [QualityTier::p360(), QualityTier::p720(), QualityTier::p1080()],
+            static fn(QualityTier $tier): bool => $tier->height <= (int) $sourceHeight,
+        ));
+        if ($tiers === []) {
+            $tiers = [QualityTier::p360()];
+        }
+        return array_slice($tiers, 0, max(1, $this->deploymentProfile->videoEncoderSlots));
+    }
+
+    private function manualTier(Uuid $videoId, string $qualityTier): QualityTier
+    {
+        $tier = QualityTier::fromString($qualityTier);
+        if (!in_array($tier->name, $this->qualityTiers->qualifiedTierNames(), true)) {
+            throw new TranscodeStartupUnavailableException();
+        }
+        $source = $this->connection->fetchAssociative(
+            'SELECT width, height FROM videos WHERE id = :videoId',
+            ['videoId' => $videoId->toString()],
+        );
+        if ($source === false || (int) $source['width'] < $tier->width || (int) $source['height'] < $tier->height) {
+            throw new TranscodeStartupUnavailableException();
+        }
+        return $tier;
     }
 }

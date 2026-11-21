@@ -16,5 +16,12 @@ interface CompletedVideoArtifactPort
      *
      * @return list<CompletedVideoArtifact>
      */
-    public function findComplete(Uuid $owner, Uuid $video, string $sourceHash, int $videoStreamIndex, ?int $audioStreamIndex): array;
+    public function findComplete(
+        Uuid $owner,
+        Uuid $video,
+        string $sourceHash,
+        int $videoStreamIndex,
+        ?int $audioStreamIndex,
+        int $audioOffsetMs = 0,
+    ): array;
 }

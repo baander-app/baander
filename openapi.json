@@ -21855,6 +21855,18 @@
                                         "maximum": 10000,
                                         "minimum": -10000
                                     },
+                                    "qualityTier": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "enum": [
+                                            "360p",
+                                            "480p",
+                                            "720p",
+                                            "1080p",
+                                            "1440p",
+                                            "4K"
+                                        ]
+                                    },
                                     "requestId": {
                                         "description": "Stable playback client session identifier, retained across reloads and reconnects",
                                         "type": "string",
@@ -26155,6 +26167,19 @@
                         "default": 0,
                         "maximum": 10000,
                         "minimum": -10000
+                    },
+                    "qualityTier": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "enum": [
+                            "360p",
+                            "480p",
+                            "720p",
+                            "1080p",
+                            "1440p",
+                            "4K"
+                        ]
                     }
                 },
                 "type": "object"
@@ -29914,12 +29939,32 @@
             },
             "VideoPlaybackInformationResource": {
                 "required": [
+                    "qualityChoices",
                     "audioTracks",
                     "subtitleTracks",
                     "chapters",
                     "preview"
                 ],
                 "properties": {
+                    "qualityChoices": {
+                        "type": "array",
+                        "items": {
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "label": {
+                                    "type": "string"
+                                },
+                                "width": {
+                                    "type": "integer"
+                                },
+                                "height": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    },
                     "audioTracks": {
                         "type": "array",
                         "items": {
@@ -30404,6 +30449,10 @@
                         "nullable": true
                     },
                     "jobId": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "sessionId": {
                         "type": "string",
                         "nullable": true
                     },

@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace App\Media\Application\DTO;
 
+use App\Transcode\Application\DTO\RequestedQuality;
+
 #[\Symfony\Component\DependencyInjection\Attribute\Exclude]
 final readonly class DeliveryDestination
 {
+    public ?string $qualityTier;
+
     /**
      * @param list<string> $containers
      * @param list<string> $videoCodecs
@@ -29,7 +33,10 @@ final readonly class DeliveryDestination
         public array $pixelFormats = ['yuv420p', 'yuvj420p', 'nv12'],
         public bool $sourcePlaybackFailed = false,
         public int $audioOffsetMs = 0,
+        ?string $qualityTier = null,
     ) {
+        $this->qualityTier = $qualityTier === null ? null : RequestedQuality::fromString($qualityTier)->id;
+
         if ($audioOffsetMs < -10000 || $audioOffsetMs > 10000) {
             throw new \InvalidArgumentException('Audio offset must be between -10000 and 10000 milliseconds.');
         }

@@ -23,8 +23,7 @@ final readonly class CompletedVideoArtifactAdapter implements CompletedVideoArti
         private TranscodeExecutionOwnershipPort $ownership,
         private TranscodeStoragePortInterface $storage,
         private PublishedPresentationReader $presentations,
-    ) {
-    }
+    ) {}
 
     public function findComplete(
         Uuid $owner,
@@ -32,6 +31,7 @@ final readonly class CompletedVideoArtifactAdapter implements CompletedVideoArti
         string $sourceHash,
         int $videoStreamIndex,
         ?int $audioStreamIndex,
+        int $audioOffsetMs = 0,
     ): array {
         $source = $this->videos->findByUuid($video);
         if (
@@ -45,7 +45,7 @@ final readonly class CompletedVideoArtifactAdapter implements CompletedVideoArti
             $selection = $job->getPresentationSelection();
             if (
                 $selection === null || $selection->sourceHash !== $sourceHash || $selection->videoStreamIndex !== $videoStreamIndex
-                || $selection->audioStreamIndex !== $audioStreamIndex || $selection->audioOffsetMs !== 0 || $selection->outputContainer !== 'mp4'
+                || $selection->audioStreamIndex !== $audioStreamIndex || $selection->audioOffsetMs !== $audioOffsetMs || $selection->outputContainer !== 'mp4'
             ) {
                 continue;
             }
@@ -124,6 +124,9 @@ final readonly class CompletedVideoArtifactAdapter implements CompletedVideoArti
                     $metadata['pixelFormat'],
                     $job->getPublicId(),
                     $runtime->generation,
+                    $job->getQualityTierName(),
+                    $selection->audioOffsetMs,
+                    $selection->mode === 'copy',
                 );
             } catch (Throwable) {
                 continue;

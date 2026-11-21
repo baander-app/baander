@@ -47,6 +47,10 @@ final readonly class DeliveryRequest
         public bool $sourcePlaybackFailed = false,
         #[Assert\Range(min: -10000, max: 10000)]
         public int $audioOffsetMs = 0,
-    ) {
-    }
+        #[\OpenApi\Attributes\Property(
+            enum: ['360p', '480p', '720p', '1080p', '1440p', '4K'],
+            nullable: true,
+        )]
+        public ?string $qualityTier = null,
+    ) {}
 }

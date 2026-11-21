@@ -29,7 +29,7 @@ final class DeliveryControllerTest extends TestCase
         $track = new PublicId();
         $delivery = $this->createMock(DeliveryDecisionPortInterface::class);
         $delivery->expects(self::once())->method('track')
-            ->with($owner, $track, self::callback(static fn (DeliveryDestination $destination): bool => $destination->sourcePlaybackFailed))
+            ->with($owner, $track, self::callback(static fn(DeliveryDestination $destination): bool => $destination->sourcePlaybackFailed))
             ->willReturn(new DeliveryDecision(DeliveryKind::Incompatible, 'browser_rejected_source'));
         $scopes = $this->createStub(MediaReadScopeProviderInterface::class);
         $scopes->method('current')->willReturn(MediaReadScope::authenticated($owner, LibraryReadScope::unrestricted()));
@@ -99,6 +99,44 @@ final class DeliveryControllerTest extends TestCase
         self::assertSame(200, $response->getStatusCode());
         self::assertSame($requestId, $body['requestId']);
         self::assertStringContainsString('&sig=', $body['url']);
+    }
+
+    public function testManualQualityAliasesAreNormalizedBeforeNegotiatingWithAudioSelection(): void
+    {
+        $owner = new Uuid();
+        $video = new PublicId();
+        $requestId = new Uuid()->toString();
+        $delivery = $this->createMock(DeliveryDecisionPortInterface::class);
+        $delivery->expects(self::once())->method('video')->with(
+            $owner,
+            $video,
+            self::callback(static function (DeliveryDestination $destination): bool {
+                return $destination->qualityTier === '4K'
+                    && $destination->audioStreamIndex === 7
+                    && $destination->audioOffsetMs === -750;
+            }),
+            $requestId,
+        )->willReturn(new DeliveryDecision(DeliveryKind::Encoded));
+        $scopes = $this->createStub(MediaReadScopeProviderInterface::class);
+        $scopes->method('current')->willReturn(MediaReadScope::authenticated($owner, LibraryReadScope::unrestricted()));
+        $controller = new DeliveryController(
+            $delivery,
+            $scopes,
+            new HmacStreamAuthAdapter('delivery-test-secret'),
+            $this->createStub(CompletedVideoDeliveryPort::class),
+        );
+
+        $response = $controller->decide(new DeliveryRequest(
+            'video',
+            $video->toString(),
+            ['mp4'],
+            audioStreamIndex: 7,
+            requestId: $requestId,
+            audioOffsetMs: -750,
+            qualityTier: '2160p',
+        ));
+
+        self::assertSame(200, $response->getStatusCode());
     }
 
     public function testVideoDeliveryCannotAdmitAnUnidentifiedClient(): void

@@ -878,6 +878,9 @@ services:
     App\Media\Application\Port\DeliveryDecisionPortInterface:
         alias: App\Media\Application\Service\DeliveryDecisionService
 
+    App\Media\Application\Port\VideoQualityChoicesPortInterface:
+        alias: App\Transcode\Infrastructure\VideoQualityChoices
+
     App\Transcode\Application\Port\CopyPresentationPortInterface:
         alias: App\Transcode\Application\Service\CopyPresentationService
 

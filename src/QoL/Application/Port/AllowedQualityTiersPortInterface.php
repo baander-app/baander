@@ -15,4 +15,11 @@ interface AllowedQualityTiersPortInterface
      * @return list<string>
      */
     public function allowedTierNames(): array;
+
+    /**
+     * Tiers qualified against the full profile budget, independent of active streams.
+     *
+     * @return list<string>
+     */
+    public function qualifiedTierNames(): array;
 }

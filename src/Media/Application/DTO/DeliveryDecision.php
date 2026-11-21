@@ -17,16 +17,34 @@ final readonly class DeliveryDecision
         public ?string $requestId = null,
         public ?string $jobId = null,
         public ?CompletedVideoArtifact $artifact = null,
-    ) {
-    }
+        public ?string $sessionId = null,
+    ) {}
 
     public function withUrl(string $url): self
     {
-        return new self($this->kind, $this->reason, $this->selection, $url, $this->requestId, $this->jobId, $this->artifact);
+        return new self(
+            $this->kind,
+            $this->reason,
+            $this->selection,
+            $url,
+            $this->requestId,
+            $this->jobId,
+            $this->artifact,
+            $this->sessionId,
+        );
     }
 
     public function withRequestId(string $requestId): self
     {
-        return new self($this->kind, $this->reason, $this->selection, $this->url, $requestId, $this->jobId, $this->artifact);
+        return new self(
+            $this->kind,
+            $this->reason,
+            $this->selection,
+            $this->url,
+            $requestId,
+            $this->jobId,
+            $this->artifact,
+            $this->sessionId,
+        );
     }
 }

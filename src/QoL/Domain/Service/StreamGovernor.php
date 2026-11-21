@@ -168,6 +168,30 @@ final class StreamGovernor
     }
 
     /**
+     * Qualify tiers against an otherwise idle deployment's full profile budget.
+     *
+     * @return list<string>
+     */
+    public function getQualifiedTiers(): array
+    {
+        $tiers = $this->qualityLadderPort->defaultTierNames();
+        if ($this->state === GovernorState::Learning) {
+            return $tiers;
+        }
+
+        $budget = $this->profiles->get()->budgetCap() * 100.0;
+        $qualified = [];
+        foreach ($tiers as $tier) {
+            $cost = $this->model->averageCostForTier($tier);
+            if ($cost === null || $cost <= $budget) {
+                $qualified[] = $tier;
+            }
+        }
+
+        return $qualified;
+    }
+
+    /**
      * Get the allowed tiers for manifest filtering.
      *
      * Uses per-tier average cost from training data to determine which tiers

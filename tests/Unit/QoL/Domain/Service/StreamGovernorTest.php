@@ -19,6 +19,33 @@ use PHPUnit\Framework\TestCase;
 
 class StreamGovernorTest extends TestCase
 {
+    public function testQualifiedTiersIgnoreActiveStreamsAndRespectFullProfileBudget(): void
+    {
+        $governor = new StreamGovernor($this->createReadyModel(), $this->qualityLadderPort(), new InMemoryAlgorithmProfileStore());
+        $governor->activate();
+        $before = $governor->getQualifiedTiers();
+        self::assertContains('1080p', $before);
+        $governor->allocateStream(new Uuid(), '1080p', 79.0);
+        self::assertSame($before, $governor->getQualifiedTiers());
+        self::assertNotContains('1080p', $governor->getAllowedTiers());
+        $governor->recordSample(new UtilizationSample(
+            cpuPercent: 95.0,
+            encodeFps: 30.0,
+            sourceHeight: 2160,
+            sourceCodec: 'hevc',
+            hardwareAccelerated: false,
+            targetBitrate: 20_000_000,
+            qualityTier: '4K',
+            activeStreams: 1,
+        ));
+        self::assertNotContains('4K', $governor->getQualifiedTiers());
+    }
+
+    public function testQualifiedTiersRemainPermissiveDuringLearning(): void
+    {
+        self::assertSame($this->qualityLadderPort()->defaultTierNames(), $this->createGovernor()->getQualifiedTiers());
+    }
+
     public function testInitialStateIsLearning(): void
     {
         $governor = $this->createGovernor();

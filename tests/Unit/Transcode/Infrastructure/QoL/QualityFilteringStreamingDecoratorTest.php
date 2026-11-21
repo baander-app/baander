@@ -49,12 +49,12 @@ final class QualityFilteringStreamingDecoratorTest extends TestCase
         self::assertSame(1, $xpath->query('//mpd:AdaptationSet[@contentType="audio"]/mpd:Representation[@id="audio"]')->length);
     }
 
-    public function testDashWithoutAnAllowedVideoTierDoesNotExposeAudioOnlyPlayback(): void
+    public function testDashWithoutAllowedVideoTiersDoesNotExposeAudioOnlyPlayback(): void
     {
         $inner = $this->createStub(TranscodeStreamingPortInterface::class);
         $inner->method('getDashManifest')->willReturn(
             '<MPD xmlns="urn:mpeg:dash:schema:mpd:2011"><Period>'
-            . '<AdaptationSet contentType="video"><Representation id="1080p"/></AdaptationSet>'
+            . '<AdaptationSet contentType="video"><Representation id="1080p"/><Representation id="4K"/></AdaptationSet>'
             . '<AdaptationSet contentType="audio"><Representation id="audio" codecs="mp4a.40.2"/></AdaptationSet>'
             . '</Period></MPD>',
         );
@@ -66,6 +66,28 @@ final class QualityFilteringStreamingDecoratorTest extends TestCase
 
         self::assertStringNotContainsString('<Representation', $manifest);
         self::assertStringNotContainsString('<AdaptationSet', $manifest);
+    }
+
+    public function testSoleAdmittedRenditionSurvivesCapacityFiltering(): void
+    {
+        $hls = "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=20000000,RESOLUTION=3840x2160\n/api/stream/abc/media.m3u8?tier=4K\n";
+        $dash = '<MPD xmlns="urn:mpeg:dash:schema:mpd:2011"><Period>'
+            . '<AdaptationSet contentType="video"><Representation id="4K"/></AdaptationSet>'
+            . '<AdaptationSet contentType="audio"><Representation id="audio"/></AdaptationSet>'
+            . '</Period></MPD>';
+        $inner = $this->createStub(TranscodeStreamingPortInterface::class);
+        $inner->method('getMasterManifest')->willReturn($hls);
+        $inner->method('getDashManifest')->willReturn($dash);
+        $tiers = $this->createStub(AllowedQualityTiersPortInterface::class);
+        $tiers->method('allowedTierNames')->willReturn([]);
+        $decorator = new QualityFilteringStreamingDecorator($inner, $tiers, new NullLogger());
+        $renditions = [['jobId' => (new PublicId())->toString(), 'generation' => 3]];
+        $video = Uuid::generate();
+
+        self::assertSame($hls, $decorator->getMasterManifest($video, $renditions, 2000000000));
+        self::assertSame($dash, $decorator->getDashManifest($video, $renditions, 2000000000));
+        self::assertStringNotContainsString('#EXT-X-STREAM-INF:', $decorator->getMasterManifest($video, [], 2000000000));
+        self::assertStringNotContainsString('<Representation', $decorator->getDashManifest($video, [], 2000000000));
     }
 
     public function testManifestsAreUnchangedWhenEveryTierIsAllowed(): void

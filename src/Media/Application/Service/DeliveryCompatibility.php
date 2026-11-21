@@ -10,17 +10,39 @@ use App\Media\Application\DTO\DeliveryKind;
 use App\Media\Application\DTO\DeliverySelection;
 use App\Media\Application\DTO\DeliverySource;
 use App\Transcode\Application\DTO\MediaOperation;
+use App\Transcode\Application\DTO\RequestedQuality;
 use App\Transcode\Application\Port\MediaExecutionPolicyInterface;
 
 final readonly class DeliveryCompatibility
 {
     public function __construct(
         private MediaExecutionPolicyInterface $policy,
-    ) {
-    }
+    ) {}
 
     public function decide(DeliverySource $source, DeliveryDestination $destination): DeliveryDecision
     {
+        if ($destination->qualityTier !== null) {
+            $tier = RequestedQuality::fromString($destination->qualityTier);
+            if (
+                !$source->video
+                || $source->width === null
+                || $source->height === null
+                || $source->width < $tier->width
+                || $source->height < $tier->height
+                || ($destination->maxWidth !== null && $tier->width > $destination->maxWidth)
+                || ($destination->maxHeight !== null && $tier->height > $destination->maxHeight)
+            ) {
+                return new DeliveryDecision(DeliveryKind::Incompatible, 'requested_quality_unavailable');
+            }
+            if ($source->height !== $tier->height) {
+                return new DeliveryDecision(
+                    $this->policy->permits(MediaOperation::VideoEncode)
+                        ? DeliveryKind::Encoded
+                        : DeliveryKind::Incompatible,
+                    'requested_quality_requires_encoding',
+                );
+            }
+        }
         if ($destination->audioOffsetMs !== 0) {
             return new DeliveryDecision(
                 $source->video

@@ -22,9 +22,9 @@ use App\Shared\Domain\Model\Uuid;
 interface StreamAdmissionPortInterface
 {
     /**
-     * Admit a stream into the CPU budget and track it as active.
+     * Admit the requested fixed tier into the CPU budget and track it as active.
      *
-     * @throws \RuntimeException QoL's stream-budget exhaustion exception when no tier fits the remaining budget
+     * @throws \RuntimeException QoL's stream-budget exhaustion exception when the requested tier does not fit the remaining budget
      */
     public function admit(
         Uuid   $jobId,

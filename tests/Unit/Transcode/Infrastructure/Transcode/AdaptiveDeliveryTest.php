@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Transcode\Infrastructure\Transcode;
 
 use App\Auth\Infrastructure\Security\SecurityUser;
+use App\QoL\Application\Port\AllowedQualityTiersPortInterface;
 use App\Shared\Application\Port\SleeperInterface;
 use App\Tests\Support\PublishedPresentationFixture;
 use App\Transcode\Infrastructure\Packaging\PublishedPresentationReader;
@@ -18,10 +19,12 @@ use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\Model\TranscodeJob;
+use App\Transcode\Domain\Model\TranscodeJobState;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\Repository\TranscodeJobRepositoryInterface;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
+use App\Transcode\Domain\ValueObject\PresentationSelection;
 use App\Transcode\Infrastructure\Auth\AuthorizedPlayback;
 use App\Transcode\Infrastructure\Auth\HmacStreamAuthAdapter;
 use App\Transcode\Infrastructure\DASH\DashManifestGenerator;
@@ -122,7 +125,13 @@ final class AdaptiveDeliveryTest extends TestCase
             }
             return new Envelope($message, [new HandledStamp($this->sessions[$job->getId()->toString()], 'fixture')]);
         });
-        $playback = new AuthorizedPlayback($security, $this->connection, $bus, new \Symfony\Component\Clock\MockClock());
+        $playback = new AuthorizedPlayback(
+            $security,
+            $this->connection,
+            $bus,
+            new \Symfony\Component\Clock\MockClock(),
+            $this->createStub(AllowedQualityTiersPortInterface::class),
+        );
         $jobs = $this->createMock(TranscodeJobRepositoryInterface::class);
         $jobs->expects(self::never())->method('findActiveByVideo');
         $jobs->method('findByPublicId')->willReturnCallback(fn (PublicId $id) => $this->jobs[$id->toString()] ?? null);
@@ -166,21 +175,36 @@ final class AdaptiveDeliveryTest extends TestCase
         rmdir($this->root);
     }
 
-    public function testBothMovieManifestsDescribeTheDefaultSourceAudioLanguage(): void
+    /** @return iterable<string, array{?int, string}> */
+    public static function sourceAudioSelections(): iterable
     {
-        foreach ($this->jobs as $job) {
+        yield 'declared default audio' => [null, 'dan'];
+        yield 'explicit nondefault audio' => [1, 'eng'];
+    }
+
+    #[DataProvider('sourceAudioSelections')]
+    public function testBothMovieManifestsDescribeTheSelectedSourceAudioLanguage(?int $audioStreamIndex, string $language): void
+    {
+        foreach ($this->jobs as $publicId => $job) {
+            if ($audioStreamIndex !== null) {
+                $job = TranscodeJob::reconstitute(new TranscodeJobState(...[
+                    ...get_object_vars($job->getState()),
+                    'presentationSelection' => new PresentationSelection('encode', 'source-hash', 0, $audioStreamIndex, 'mp4', 'encoding-fingerprint'),
+                ]));
+                $this->jobs[$publicId] = $job;
+            }
             $job->updateProbeData(['audioStreams' => [
-                ['language' => 'eng', 'codec' => 'aac', 'channels' => 1, 'sampleRate' => 44100, 'isDefault' => false],
-                ['language' => 'dan', 'codec' => 'pcm_s16le', 'channels' => 6, 'sampleRate' => 48000, 'isDefault' => true],
+                ['streamIndex' => 1, 'language' => 'eng', 'codec' => 'aac', 'channels' => 1, 'sampleRate' => 44100, 'isDefault' => false],
+                ['streamIndex' => 2, 'language' => 'dan', 'codec' => 'pcm_s16le', 'channels' => 6, 'sampleRate' => 48000, 'isDefault' => true],
             ]]);
         }
         $master = $this->master($this->sign(true)['url']);
-        self::assertStringContainsString('TYPE=AUDIO,GROUP-ID="audio",LANGUAGE="dan"', $master);
+        self::assertStringContainsString('TYPE=AUDIO,GROUP-ID="audio",LANGUAGE="' . $language . '"', $master);
         self::assertSame(1, substr_count($master, 'TYPE=AUDIO,'));
-        self::assertStringNotContainsString('LANGUAGE="eng"', $master);
+        self::assertStringNotContainsString('LANGUAGE="' . ($language === 'dan' ? 'eng' : 'dan') . '"', $master);
         $dash = $this->dash($this->sign(true, 'manifest.mpd')['url']);
-        self::assertStringContainsString('lang="dan"', $dash);
-        self::assertStringNotContainsString('lang="eng"', $dash);
+        self::assertStringContainsString('lang="' . $language . '"', $dash);
+        self::assertStringNotContainsString('lang="' . ($language === 'dan' ? 'eng' : 'dan') . '"', $dash);
     }
 
     public function testEveryManifestDescendantRetainsTheAuthenticatedParentExpiry(): void

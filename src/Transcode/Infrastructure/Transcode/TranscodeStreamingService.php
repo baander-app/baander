@@ -754,8 +754,16 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
 
     private function selectedAudio(TranscodeJob $job): ?AudioStreamInfo
     {
-        $index = $job->getPresentationSelection()?->audioStreamIndex;
-        foreach (VideoProbeResult::fromSerialized($job->getProbeData())->audioStreams as $stream) {
+        $probe = VideoProbeResult::fromSerialized($job->getProbeData());
+        $selection = $job->getPresentationSelection();
+        if ($selection === null) {
+            return $probe->selectedAudioStream();
+        }
+        $index = $selection->audioStreamIndex;
+        if ($index === null) {
+            return null;
+        }
+        foreach ($probe->audioStreams as $stream) {
             if ($stream->streamIndex === $index) {
                 return $stream;
             }

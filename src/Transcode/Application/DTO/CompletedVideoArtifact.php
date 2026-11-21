@@ -25,6 +25,8 @@ final readonly class CompletedVideoArtifact
         public string $pixelFormat,
         public PublicId $jobId,
         public int $generation,
-    ) {
-    }
+        public ?string $qualityTier = null,
+        public int $audioOffsetMs = 0,
+        public bool $sourceCopy = false,
+    ) {}
 }

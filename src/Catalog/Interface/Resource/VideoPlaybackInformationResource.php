@@ -11,6 +11,16 @@ use OpenApi\Attributes as OA;
     schema: 'VideoPlaybackInformationResource',
     properties: [
         new OA\Property(
+            property: 'qualityChoices',
+            type: 'array',
+            items: new OA\Items(properties: [
+                new OA\Property(property: 'id', type: 'string'),
+                new OA\Property(property: 'label', type: 'string'),
+                new OA\Property(property: 'width', type: 'integer'),
+                new OA\Property(property: 'height', type: 'integer'),
+            ]),
+        ),
+        new OA\Property(
             property: 'audioTracks',
             type: 'array',
             items: new OA\Items(properties: [
@@ -69,6 +79,7 @@ final class VideoPlaybackInformationResource extends AbstractResource
         assert(is_array($source));
 
         return [
+            'qualityChoices' => $source['qualityChoices'],
             'audioTracks' => $source['audioTracks'],
             'subtitleTracks' => $source['subtitleTracks'],
             'chapters' => $source['chapters'],

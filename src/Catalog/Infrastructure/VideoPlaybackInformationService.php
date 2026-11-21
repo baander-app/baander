@@ -7,6 +7,7 @@ namespace App\Catalog\Infrastructure;
 use App\Catalog\Application\Port\VideoPlaybackInformationPort;
 use App\Catalog\Application\Port\VideoPortInterface;
 use App\Transcode\Application\Port\VideoTimelinePreviewPort;
+use App\Media\Application\Port\VideoQualityChoicesPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 
@@ -20,6 +21,7 @@ final readonly class VideoPlaybackInformationService implements VideoPlaybackInf
     public function __construct(
         private VideoPortInterface $videos,
         private VideoTimelinePreviewPort $previews,
+        private VideoQualityChoicesPortInterface $qualityChoices,
     ) {
     }
 
@@ -59,6 +61,7 @@ final readonly class VideoPlaybackInformationService implements VideoPlaybackInf
         }
 
         return [
+            'qualityChoices' => $this->qualityChoices->choices($source->width, $source->height),
             'audioTracks' => $audio,
             'subtitleTracks' => $subtitles,
             'chapters' => $probe['chapters'] ?? [],

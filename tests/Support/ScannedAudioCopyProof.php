@@ -10,6 +10,7 @@ use App\Media\Application\DTO\DeliveryKind;
 use App\Media\Application\Port\MediaReadScopeProviderInterface;
 use App\Media\Application\Port\PlaybackMediaAccessInterface;
 use App\Media\Application\Port\StreamPortInterface;
+use App\Media\Application\Port\VideoQualityChoicesPortInterface;
 use App\Media\Application\Service\DeliveryCompatibility;
 use App\Media\Application\Service\DeliveryDecisionService;
 use App\Media\Interface\Controller\OriginalMediaController;
@@ -52,8 +53,19 @@ trait ScannedAudioCopyProof
         $policy = new MediaExecutionPolicy($profile);
         $runtime = new AudioRenditionRuntime($connection);
         $cache = new AudioRenditionCache($policy, new SegmentFileResolver($root . '/copies'), $runtime, new NullLogger(), new FixedAacImplementationSetting(), pollIntervalSeconds: .005, startTimeoutSeconds: 5);
-        $delivery = new DeliveryDecisionService($access, $scopes, $videos, $streams, new DeliveryCompatibility($policy), $policy, $cache, $settings,
-            $this->createStub(CompletedVideoArtifactPort::class), $this->createStub(CopyPresentationPortInterface::class));
+        $delivery = new DeliveryDecisionService(
+            $access,
+            $scopes,
+            $videos,
+            $streams,
+            new DeliveryCompatibility($policy),
+            $policy,
+            $cache,
+            $settings,
+            $this->createStub(CompletedVideoArtifactPort::class),
+            $this->createStub(CopyPresentationPortInterface::class),
+            $this->createStub(VideoQualityChoicesPortInterface::class),
+        );
         $decision = $delivery->track($owner, $track, new DeliveryDestination(['mp4'], audioCodecs: ['aac']));
         self::assertSame(DeliveryKind::Copy, $decision->kind);
         self::assertNotNull($decision->url);

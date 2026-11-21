@@ -36,5 +36,11 @@ interface PlaybackPortInterface extends PlaybackAccessInterface
     public function touchSessions(array $sessionIds): void;
 
     /** @return array<string, PublicId> The admitted jobs mapped to their session public IDs. */
-    public function start(Uuid $videoId, string $requestId, ?int $audioStreamIndex = null, int $audioOffsetMs = 0): array;
+    public function start(
+        Uuid $videoId,
+        string $requestId,
+        ?int $audioStreamIndex = null,
+        int $audioOffsetMs = 0,
+        ?string $qualityTier = null,
+    ): array;
 }

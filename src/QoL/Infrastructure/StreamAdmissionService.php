@@ -52,6 +52,13 @@ final class StreamAdmissionService implements StreamAdmissionPortInterface
                 hardwareAccelerated: $hardwareAccelerated,
                 requestedTier: $qualityTier,
             );
+            if ($allowedTier !== $qualityTier) {
+                throw new StreamBudgetExhausted(
+                    activeStreams: $this->governor->getActiveStreamCount(),
+                    budgetUsed: $this->governor->observedLoad() / 100.0,
+                    requestedTier: $qualityTier,
+                );
+            }
         } catch (StreamBudgetExhausted $veto) {
             $this->logger->warning('StreamAdmission: vetoed stream', [
                 'jobId' => $jobId->toString(),

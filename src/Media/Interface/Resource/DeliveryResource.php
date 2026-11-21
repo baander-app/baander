@@ -14,6 +14,7 @@ use OpenApi\Attributes as OA;
     new OA\Property(property: 'url', type: 'string', nullable: true),
     new OA\Property(property: 'requestId', description: 'The client-generated request identifier, echoed for correlation.', type: 'string', nullable: true),
     new OA\Property(property: 'jobId', type: 'string', nullable: true),
+    new OA\Property(property: 'sessionId', type: 'string', nullable: true),
     new OA\Property(property: 'selection', properties: [
         new OA\Property(property: 'container', type: 'string'),
         new OA\Property(property: 'transport', type: 'string', enum: ['file', 'hls', 'dash']),
@@ -29,12 +30,19 @@ final class DeliveryResource extends AbstractResource
         if (!$source instanceof DeliveryDecision) {
             throw new \InvalidArgumentException('Expected a media delivery decision.');
         }
-        return ['kind' => $source->kind->value, 'reason' => $source->reason, 'url' => $source->url, 'requestId' => $source->requestId, 'jobId' => $source->jobId,
+        return [
+            'kind' => $source->kind->value,
+            'reason' => $source->reason,
+            'url' => $source->url,
+            'requestId' => $source->requestId,
+            'jobId' => $source->jobId,
+            'sessionId' => $source->sessionId,
             'selection' => $source->selection === null ? null : [
                 'container' => $source->selection->container,
                 'transport' => $source->selection->transport,
                 'videoStreamIndex' => $source->selection->videoStreamIndex,
                 'audioStreamIndex' => $source->selection->audioStreamIndex,
-            ]];
+            ],
+        ];
     }
 }
