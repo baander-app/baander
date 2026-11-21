@@ -3428,7 +3428,11 @@
                                     },
                                     "tokenTypeHint": {
                                         "type": "string",
-                                        "description": "Hint for the token type (e.g. \"access_token\" or \"refresh_token\")"
+                                        "description": "Recognized token type hint. Unknown hints are ignored.",
+                                        "enum": [
+                                            "access_token",
+                                            "refresh_token"
+                                        ]
                                     }
                                 },
                                 "required": [
@@ -7114,7 +7118,17 @@
                                         "pattern": "^[0-9a-zA-Z_-]{21}$"
                                     },
                                     "role": {
-                                        "type": "string"
+                                        "type": "string",
+                                        "enum": [
+                                            "primary",
+                                            "featured",
+                                            "producer",
+                                            "composer",
+                                            "conductor",
+                                            "remixer",
+                                            "djmix",
+                                            "other"
+                                        ]
                                     }
                                 }
                             }
@@ -7267,12 +7281,33 @@
                                 "type": "object",
                                 "properties": {
                                     "role": {
-                                        "type": "string"
+                                        "type": "string",
+                                        "enum": [
+                                            "primary",
+                                            "featured",
+                                            "producer",
+                                            "composer",
+                                            "conductor",
+                                            "remixer",
+                                            "djmix",
+                                            "other"
+                                        ]
                                     },
                                     "currentRole": {
                                         "type": "string",
                                         "description": "The role of the credit to change; required when the artist holds several roles on the song",
-                                        "nullable": true
+                                        "nullable": true,
+                                        "enum": [
+                                            "primary",
+                                            "featured",
+                                            "producer",
+                                            "composer",
+                                            "conductor",
+                                            "remixer",
+                                            "djmix",
+                                            "other",
+                                            null
+                                        ]
                                     }
                                 }
                             }
@@ -7351,7 +7386,17 @@
                                         "pattern": "^[0-9a-zA-Z_-]{21}$"
                                     },
                                     "role": {
-                                        "type": "string"
+                                        "type": "string",
+                                        "enum": [
+                                            "primary",
+                                            "featured",
+                                            "producer",
+                                            "composer",
+                                            "conductor",
+                                            "remixer",
+                                            "djmix",
+                                            "other"
+                                        ]
                                     }
                                 }
                             }
@@ -7504,12 +7549,33 @@
                                 "type": "object",
                                 "properties": {
                                     "role": {
-                                        "type": "string"
+                                        "type": "string",
+                                        "enum": [
+                                            "primary",
+                                            "featured",
+                                            "producer",
+                                            "composer",
+                                            "conductor",
+                                            "remixer",
+                                            "djmix",
+                                            "other"
+                                        ]
                                     },
                                     "currentRole": {
                                         "type": "string",
                                         "description": "The role of the credit to change; required when the artist holds several roles on the album",
-                                        "nullable": true
+                                        "nullable": true,
+                                        "enum": [
+                                            "primary",
+                                            "featured",
+                                            "producer",
+                                            "composer",
+                                            "conductor",
+                                            "remixer",
+                                            "djmix",
+                                            "other",
+                                            null
+                                        ]
                                     }
                                 }
                             }
@@ -10286,7 +10352,21 @@
                                         "type": "string"
                                     },
                                     "type": {
-                                        "type": "string"
+                                        "type": "string",
+                                        "enum": [
+                                            "music",
+                                            "podcast",
+                                            "audiobook",
+                                            "movie",
+                                            "tv_show"
+                                        ]
+                                    },
+                                    "filesystemType": {
+                                        "type": "string",
+                                        "enum": [
+                                            "local"
+                                        ],
+                                        "default": "local"
                                     },
                                     "sortOrder": {
                                         "type": "integer"
@@ -24669,7 +24749,13 @@
                                 "type": "object",
                                 "properties": {
                                     "mood": {
-                                        "type": "string"
+                                        "type": "string",
+                                        "enum": [
+                                            "dark",
+                                            "warm",
+                                            "cool",
+                                            "balanced"
+                                        ]
                                     }
                                 },
                                 "required": [
@@ -24981,8 +25067,7 @@
                             "device",
                             "public",
                             "confidential"
-                        ],
-                        "default": ""
+                        ]
                     },
                     "redirectUris": {
                         "type": "array",
@@ -25003,7 +25088,8 @@
                         "nullable": true,
                         "enum": [
                             "client_secret_post",
-                            "private_key_jwt"
+                            "private_key_jwt",
+                            null
                         ],
                         "default": null
                     },
@@ -25210,8 +25296,11 @@
                     },
                     "tokenTypeHint": {
                         "type": "string",
-                        "description": "Hint for the token type (e.g. \"access_token\" or \"refresh_token\")",
-                        "default": ""
+                        "description": "Recognized token type hint. Unknown hints are ignored.",
+                        "enum": [
+                            "access_token",
+                            "refresh_token"
+                        ]
                     }
                 },
                 "required": [
@@ -25233,7 +25322,6 @@
                             "approve",
                             "deny"
                         ],
-                        "default": "",
                         "example": "approve"
                     }
                 },
@@ -25721,7 +25809,17 @@
                     },
                     "role": {
                         "type": "string",
-                        "description": "Artist role (primary, featured, producer, composer, conductor, remixer, djmix, other)"
+                        "description": "Artist role (primary, featured, producer, composer, conductor, remixer, djmix, other)",
+                        "enum": [
+                            "primary",
+                            "featured",
+                            "producer",
+                            "composer",
+                            "conductor",
+                            "remixer",
+                            "djmix",
+                            "other"
+                        ]
                     }
                 },
                 "required": [
@@ -25734,12 +25832,33 @@
                 "properties": {
                     "role": {
                         "type": "string",
-                        "description": "The new artist role (primary, featured, producer, composer, conductor, remixer, djmix, other)"
+                        "description": "The new artist role (primary, featured, producer, composer, conductor, remixer, djmix, other)",
+                        "enum": [
+                            "primary",
+                            "featured",
+                            "producer",
+                            "composer",
+                            "conductor",
+                            "remixer",
+                            "djmix",
+                            "other"
+                        ]
                     },
                     "currentRole": {
                         "type": "string",
                         "description": "The role of the credit to change; required when the artist holds several roles on the song or album",
                         "nullable": true,
+                        "enum": [
+                            "primary",
+                            "featured",
+                            "producer",
+                            "composer",
+                            "conductor",
+                            "remixer",
+                            "djmix",
+                            "other",
+                            null
+                        ],
                         "default": null
                     }
                 },
@@ -25759,7 +25878,17 @@
                     },
                     "role": {
                         "type": "string",
-                        "description": "Artist role (primary, featured, producer, composer, conductor, remixer, djmix, other)"
+                        "description": "Artist role (primary, featured, producer, composer, conductor, remixer, djmix, other)",
+                        "enum": [
+                            "primary",
+                            "featured",
+                            "producer",
+                            "composer",
+                            "conductor",
+                            "remixer",
+                            "djmix",
+                            "other"
+                        ]
                     }
                 },
                 "required": [
@@ -26091,8 +26220,7 @@
                             "qr_code",
                             "email_url",
                             "server_code"
-                        ],
-                        "default": ""
+                        ]
                     }
                 },
                 "required": [
@@ -26161,12 +26289,21 @@
                     },
                     "type": {
                         "type": "string",
-                        "description": "Library type (e.g. music, movies, videos)",
-                        "default": ""
+                        "description": "Library type",
+                        "enum": [
+                            "music",
+                            "podcast",
+                            "audiobook",
+                            "movie",
+                            "tv_show"
+                        ]
                     },
                     "filesystemType": {
                         "type": "string",
-                        "description": "Filesystem backend (e.g. local)",
+                        "description": "Filesystem backend",
+                        "enum": [
+                            "local"
+                        ],
                         "default": "local"
                     },
                     "sortOrder": {
@@ -26358,7 +26495,8 @@
                             "720p",
                             "1080p",
                             "1440p",
-                            "4K"
+                            "4K",
+                            null
                         ],
                         "default": null
                     }
@@ -26819,7 +26957,12 @@
                     "capabilities": {
                         "type": "array",
                         "items": {
-                            "type": "string"
+                            "type": "string",
+                            "enum": [
+                                "song",
+                                "video",
+                                "volume"
+                            ]
                         },
                         "minItems": 1,
                         "maxItems": 3,
@@ -26938,7 +27081,8 @@
                             "destination_media_unsupported",
                             "subtitle_delivery_unsupported",
                             "browser_rejected_source",
-                            "unknown"
+                            "unknown",
+                            null
                         ],
                         "default": null
                     }
@@ -27024,9 +27168,28 @@
                     "media": {
                         "type": "object",
                         "nullable": true,
-                        "additionalProperties": {
-                            "type": "string"
-                        },
+                        "allOf": [
+                            {
+                                "type": "object",
+                                "nullable": true,
+                                "additionalProperties": {
+                                    "type": "string"
+                                }
+                            },
+                            {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                    "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                            "song",
+                                            "video"
+                                        ]
+                                    }
+                                }
+                            }
+                        ],
                         "default": null
                     },
                     "queue": {
@@ -27049,7 +27212,8 @@
                         "enum": [
                             "playing",
                             "paused",
-                            "stopped"
+                            "stopped",
+                            null
                         ],
                         "default": null
                     },
@@ -27098,31 +27262,80 @@
                         "type": "string"
                     },
                     "checkpoint": {
-                        "type": "object",
-                        "additionalProperties": {
-                            "oneOf": [
-                                {
-                                    "type": "object",
-                                    "additionalProperties": {
-                                        "type": "string"
-                                    }
-                                },
-                                {
-                                    "type": "number",
-                                    "format": "float"
-                                },
-                                {
-                                    "type": "integer"
-                                },
-                                {
-                                    "type": "object",
-                                    "nullable": true,
-                                    "enum": [
-                                        null
+                        "allOf": [
+                            {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "oneOf": [
+                                        {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        {
+                                            "type": "number",
+                                            "format": "float"
+                                        },
+                                        {
+                                            "type": "integer"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "nullable": true,
+                                            "enum": [
+                                                null
+                                            ]
+                                        }
                                     ]
                                 }
-                            ]
-                        }
+                            },
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "media": {
+                                        "oneOf": [
+                                            {
+                                                "allOf": [
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "kind": {
+                                                                "type": "string",
+                                                                "enum": [
+                                                                    "song",
+                                                                    "video"
+                                                                ]
+                                                            }
+                                                        }
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "type": "number",
+                                                "format": "float"
+                                            },
+                                            {
+                                                "type": "integer"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "nullable": true,
+                                                "enum": [
+                                                    null
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
                     }
                 },
                 "required": [
@@ -27139,31 +27352,80 @@
                         "type": "string"
                     },
                     "checkpoint": {
-                        "type": "object",
-                        "additionalProperties": {
-                            "oneOf": [
-                                {
-                                    "type": "object",
-                                    "additionalProperties": {
-                                        "type": "string"
-                                    }
-                                },
-                                {
-                                    "type": "number",
-                                    "format": "float"
-                                },
-                                {
-                                    "type": "integer"
-                                },
-                                {
-                                    "type": "object",
-                                    "nullable": true,
-                                    "enum": [
-                                        null
+                        "allOf": [
+                            {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "oneOf": [
+                                        {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        {
+                                            "type": "number",
+                                            "format": "float"
+                                        },
+                                        {
+                                            "type": "integer"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "nullable": true,
+                                            "enum": [
+                                                null
+                                            ]
+                                        }
                                     ]
                                 }
-                            ]
-                        }
+                            },
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "media": {
+                                        "oneOf": [
+                                            {
+                                                "allOf": [
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "kind": {
+                                                                "type": "string",
+                                                                "enum": [
+                                                                    "song",
+                                                                    "video"
+                                                                ]
+                                                            }
+                                                        }
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "type": "number",
+                                                "format": "float"
+                                            },
+                                            {
+                                                "type": "integer"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "nullable": true,
+                                                "enum": [
+                                                    null
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
                     }
                 },
                 "required": [
@@ -27314,7 +27576,8 @@
                             "broadcast_stereo",
                             "broadcast_5.1",
                             "hifi_stereo",
-                            "opus_stereo"
+                            "opus_stereo",
+                            null
                         ],
                         "default": null,
                         "example": "streaming_stereo"

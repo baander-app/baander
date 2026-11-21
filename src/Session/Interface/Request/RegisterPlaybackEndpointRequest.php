@@ -20,7 +20,10 @@ use Symfony\Component\Validator\Constraints as Assert;
         ),
         'capabilities' => new OA\Schema(
             type: 'array',
-            items: new OA\Schema(type: 'string'),
+            items: new OA\Schema(
+                type: 'string',
+                enum: ['song', 'video', 'volume'],
+            ),
             minItems: 1,
             maxItems: 3,
             default: ['song', 'video'],

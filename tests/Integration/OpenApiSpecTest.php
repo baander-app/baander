@@ -147,6 +147,92 @@ final class OpenApiSpecTest extends KernelTestCase
         return $value;
     }
 
+    public function test_request_schemas_expose_supported_choices(): void
+    {
+        $spec = $this->getSpec();
+        $schemas = $spec['components']['schemas'];
+        $hint = $schemas['RevokeTokenRequest']['properties']['tokenTypeHint'];
+        $revoke = $spec['paths']['/api/oauth/revoke']['post']['requestBody']['content']['application/json']['schema'];
+        self::assertSame(['access_token', 'refresh_token'], $hint['enum']);
+        self::assertArrayNotHasKey('default', $hint);
+        self::assertSame($hint, $revoke['properties']['tokenTypeHint']);
+        self::assertNotContains('tokenTypeHint', $revoke['required']);
+
+        $library = $schemas['CreateLibraryRequest']['properties'];
+        self::assertSame(['music', 'podcast', 'audiobook', 'movie', 'tv_show'], $library['type']['enum']);
+        self::assertArrayNotHasKey('default', $library['type']);
+        self::assertSame(['local'], $library['filesystemType']['enum']);
+        self::assertSame('local', $library['filesystemType']['default']);
+
+        $roles = ['primary', 'featured', 'producer', 'composer', 'conductor', 'remixer', 'djmix', 'other'];
+        foreach (['ArtistAlbumRequest', 'ArtistSongRequest', 'UpdateRoleRequest'] as $request) {
+            self::assertSame($roles, $schemas[$request]['properties']['role']['enum']);
+        }
+        $currentRole = $schemas['UpdateRoleRequest']['properties']['currentRole'];
+        self::assertSame([...$roles, null], $currentRole['enum']);
+        self::assertTrue($currentRole['nullable']);
+        self::assertArrayHasKey('default', $currentRole);
+        self::assertNull($currentRole['default']);
+
+        $capabilities = $schemas['RegisterPlaybackEndpointRequest']['properties']['capabilities'];
+        self::assertSame(['song', 'video', 'volume'], $capabilities['items']['enum']);
+        self::assertSame(['song', 'video'], $capabilities['default']);
+
+        foreach ([
+            'AdminCreateOAuthClientRequest' => 'type',
+            'DeviceApproveRequest' => 'decision',
+            'CreatePairingCodeRequest' => 'method',
+        ] as $request => $field) {
+            $property = $schemas[$request]['properties'][$field];
+            self::assertNotEmpty($property['enum'], $request . '.' . $field);
+            self::assertArrayNotHasKey('default', $property, $request . '.' . $field);
+        }
+
+        $themeMood = $spec['paths']['/api/user/theme-mood/']['put']['requestBody']['content']['application/json']['schema'];
+        self::assertSame(['dark', 'warm', 'cool', 'balanced'], $themeMood['properties']['mood']['enum']);
+        self::assertArrayNotHasKey('default', $themeMood['properties']['mood']);
+
+        foreach ([
+            'AdminCreateOAuthClientRequest' => 'authMethod',
+            'DeliveryRequest' => 'qualityTier',
+            'AcknowledgePlaybackRequest' => 'rejectionReason',
+            'ControlPlaybackRequest' => 'desiredState',
+            'UpdateTranscodeSessionRequest' => 'audioProfile',
+        ] as $request => $field) {
+            $property = $schemas[$request]['properties'][$field];
+            self::assertTrue($property['nullable']);
+            self::assertArrayHasKey('default', $property);
+            self::assertNull($property['default']);
+            self::assertContains(null, $property['enum']);
+        }
+
+        $media = $schemas['ControlPlaybackRequest']['properties']['media'];
+        $kind = ['type' => 'string', 'enum' => ['song', 'video']];
+        self::assertTrue($media['nullable']);
+        [$mediaMap, $mediaChoices] = $media['allOf'];
+        self::assertSame(['type' => 'string'], $mediaMap['additionalProperties']);
+        self::assertTrue($mediaMap['nullable']);
+        self::assertTrue($mediaChoices['nullable']);
+        self::assertSame($kind, $mediaChoices['properties']['kind']);
+
+        $checkpointValues = [
+            ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+            ['type' => 'number', 'format' => 'float'],
+            ['type' => 'integer'],
+            ['type' => 'object', 'nullable' => true, 'enum' => [null]],
+        ];
+        foreach (['ClosePlaybackEndpointRequest', 'RecoverLocalPlaybackRequest'] as $request) {
+            $checkpoint = $schemas[$request]['properties']['checkpoint'];
+            [$checkpointMap, $checkpointChoices] = $checkpoint['allOf'];
+            $branches = $checkpointChoices['properties']['media']['oneOf'];
+            [$mediaMap, $mediaChoices] = $branches[0]['allOf'];
+            self::assertSame(['kind' => $kind], $mediaChoices['properties']);
+            $branches[0] = $mediaMap;
+            self::assertSame($checkpointValues, $checkpointMap['additionalProperties']['oneOf']);
+            self::assertSame($checkpointValues, $branches);
+        }
+    }
+
     public function test_song_list_sort_enum_lists_the_supported_fields(): void
     {
         $spec = $this->getSpec();

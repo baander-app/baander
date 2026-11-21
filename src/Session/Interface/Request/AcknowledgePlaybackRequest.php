@@ -61,6 +61,7 @@ use Symfony\Component\Validator\Constraints as Assert;
                 'subtitle_delivery_unsupported',
                 'browser_rejected_source',
                 'unknown',
+                null,
             ],
             default: null,
         ),

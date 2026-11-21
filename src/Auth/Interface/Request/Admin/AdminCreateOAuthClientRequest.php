@@ -19,7 +19,6 @@ use Symfony\Component\Validator\Constraints as Assert;
         'type' => new OA\Schema(
             type: 'string',
             enum: ['device', 'public', 'confidential'],
-            default: '',
         ),
         'redirectUris' => new OA\Schema(
             description: 'Required for public and confidential clients (1 to 10 URIs: https, http on a loopback host, or a private-use scheme in reverse domain form; no fragment). Must be omitted or empty for device clients.',
@@ -33,7 +32,7 @@ use Symfony\Component\Validator\Constraints as Assert;
             description: 'How a confidential client authenticates; client_secret_post when omitted. Omit it for device and public clients.',
             type: 'string',
             nullable: true,
-            enum: ['client_secret_post', 'private_key_jwt'],
+            enum: ['client_secret_post', 'private_key_jwt', null],
             default: null,
         ),
         'jwks' => new OA\Schema(

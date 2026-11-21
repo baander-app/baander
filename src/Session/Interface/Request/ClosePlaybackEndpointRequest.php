@@ -13,22 +13,59 @@ use Symfony\Component\Validator\Constraints as Assert;
     properties: [
         'incarnationId' => new OA\Schema(type: 'string'),
         'checkpoint' => new OA\Schema(
-            type: 'object',
-            additionalProperties: new OA\Schema(
-                oneOf: [
-                    new OA\Schema(
-                        type: 'object',
-                        additionalProperties: new OA\Schema(type: 'string'),
+            allOf: [
+                new OA\Schema(
+                    type: 'object',
+                    additionalProperties: new OA\Schema(
+                        oneOf: [
+                            new OA\Schema(
+                                type: 'object',
+                                additionalProperties: new OA\Schema(type: 'string'),
+                            ),
+                            new OA\Schema(type: 'number', format: 'float'),
+                            new OA\Schema(type: 'integer'),
+                            new OA\Schema(
+                                type: 'object',
+                                nullable: true,
+                                enum: [null],
+                            ),
+                        ],
                     ),
-                    new OA\Schema(type: 'number', format: 'float'),
-                    new OA\Schema(type: 'integer'),
-                    new OA\Schema(
-                        type: 'object',
-                        nullable: true,
-                        enum: [null],
-                    ),
-                ],
-            ),
+                ),
+                new OA\Schema(
+                    type: 'object',
+                    properties: [
+                        'media' => new OA\Schema(
+                            oneOf: [
+                                new OA\Schema(
+                                    allOf: [
+                                        new OA\Schema(
+                                            type: 'object',
+                                            additionalProperties: new OA\Schema(type: 'string'),
+                                        ),
+                                        new OA\Schema(
+                                            type: 'object',
+                                            properties: [
+                                                'kind' => new OA\Schema(
+                                                    type: 'string',
+                                                    enum: ['song', 'video'],
+                                                ),
+                                            ],
+                                        ),
+                                    ],
+                                ),
+                                new OA\Schema(type: 'number', format: 'float'),
+                                new OA\Schema(type: 'integer'),
+                                new OA\Schema(
+                                    type: 'object',
+                                    nullable: true,
+                                    enum: [null],
+                                ),
+                            ],
+                        ),
+                    ],
+                ),
+            ],
         ),
     ],
     required: ['incarnationId', 'checkpoint'],

@@ -119,7 +119,15 @@ final class LibraryController
                     properties: [
                         'name' => new OA\Schema(type: 'string'),
                         'path' => new OA\Schema(type: 'string'),
-                        'type' => new OA\Schema(type: 'string'),
+                        'type' => new OA\Schema(
+                            type: 'string',
+                            enum: [\App\Library\Domain\ValueObject\LibraryType::class],
+                        ),
+                        'filesystemType' => new OA\Schema(
+                            type: 'string',
+                            enum: [\App\Shared\Domain\ValueObject\FilesystemType::class],
+                            default: 'local',
+                        ),
                         'sortOrder' => new OA\Schema(type: 'integer'),
                         'slug' => new OA\Schema(type: 'string', nullable: true),
                     ],

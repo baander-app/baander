@@ -262,8 +262,18 @@ deptrac:
     # =============================================
     - name: 'Catalog Domain'
       collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Catalog\\Domain\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Catalog\\Domain\\ValueObject\\ArtistRole$'
+
+    - name: 'Catalog Artist Role Contract'
+      collectors:
         - type: classLike
-          value: '^App\\Catalog\\Domain\\'
+          value: '^App\\Catalog\\Domain\\ValueObject\\ArtistRole$'
 
     - name: 'Catalog Song Lookup Contract'
       collectors:
@@ -364,8 +374,18 @@ deptrac:
     # =============================================
     - name: 'Library Domain'
       collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Library\\Domain\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Library\\Domain\\ValueObject\\LibraryType$'
+
+    - name: 'Library Type Contract'
+      collectors:
         - type: classLike
-          value: '^App\\Library\\Domain\\'
+          value: '^App\\Library\\Domain\\ValueObject\\LibraryType$'
 
     - name: 'Library Read Scope Contract'
       collectors:
@@ -1333,6 +1353,8 @@ deptrac:
     'Catalog Domain':
       - Core
       - 'Shared Domain'
+      - 'Catalog Artist Role Contract'
+    'Catalog Artist Role Contract': []
     'Catalog Movie Contract':
       - Core
       - 'Catalog Domain'
@@ -1342,6 +1364,7 @@ deptrac:
       - 'Catalog Domain'
       - 'Shared Domain'
     'Catalog Application':
+      - 'Catalog Artist Role Contract'
       - 'Catalog Movie Contract'
       - 'Catalog Director Contract'
       - Core
@@ -1362,6 +1385,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Catalog Infrastructure':
+      - 'Catalog Artist Role Contract'
       - 'Catalog Movie Contract'
       - 'Catalog Director Contract'
       - 'Media Video Quality Contract'
@@ -1394,6 +1418,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Catalog Interface':
+      - 'Catalog Artist Role Contract'
       - 'Catalog Movie Contract'
       - 'Catalog Director Contract'
       - Core
@@ -1450,12 +1475,15 @@ deptrac:
     'Library Domain':
       - Core
       - 'Shared Domain'
+      - 'Library Type Contract'
+    'Library Type Contract': []
     'Library Media Files Contract':
       - Core
       - 'Shared Domain'
       - 'Shared Application'
     'Library Application':
       - Core
+      - 'Library Type Contract'
       - 'Auth User Identifier Contract'
       - 'Library Media Files Contract'
       - 'Library Files Discovered Contract'
@@ -1466,6 +1494,7 @@ deptrac:
       - 'Shared Application'
     'Library Infrastructure':
       - Core
+      - 'Library Type Contract'
       - 'Auth Live Authority Contract'
       - 'Library Live Audience Contract'
       - 'Library File Availability Contract'
@@ -1488,6 +1517,7 @@ deptrac:
       - 'Shared Interface'
     'Library Interface':
       - Core
+      - 'Library Type Contract'
       - 'Library Read Scope Contract'
       - 'Library Resources'
       - 'Auth Identity Contract'

@@ -463,7 +463,10 @@ final class ArtistController
                             maxLength: 21,
                             pattern: '^[0-9a-zA-Z_-]{21}$',
                         ),
-                        'role' => new OA\Schema(type: 'string'),
+                        'role' => new OA\Schema(
+                            type: 'string',
+                            enum: [\App\Catalog\Domain\ValueObject\ArtistRole::class],
+                        ),
                     ],
                 ),
             ),
@@ -610,11 +613,15 @@ final class ArtistController
                 schema: new OA\Schema(
                     type: 'object',
                     properties: [
-                        'role' => new OA\Schema(type: 'string'),
+                        'role' => new OA\Schema(
+                            type: 'string',
+                            enum: [\App\Catalog\Domain\ValueObject\ArtistRole::class],
+                        ),
                         'currentRole' => new OA\Schema(
                             description: 'The role of the credit to change; required when the artist holds several roles on the song',
                             type: 'string',
                             nullable: true,
+                            enum: [\App\Catalog\Domain\ValueObject\ArtistRole::class, null],
                         ),
                     ],
                 ),
@@ -689,7 +696,10 @@ final class ArtistController
                             maxLength: 21,
                             pattern: '^[0-9a-zA-Z_-]{21}$',
                         ),
-                        'role' => new OA\Schema(type: 'string'),
+                        'role' => new OA\Schema(
+                            type: 'string',
+                            enum: [\App\Catalog\Domain\ValueObject\ArtistRole::class],
+                        ),
                     ],
                 ),
             ),
@@ -839,11 +849,15 @@ final class ArtistController
                 schema: new OA\Schema(
                     type: 'object',
                     properties: [
-                        'role' => new OA\Schema(type: 'string'),
+                        'role' => new OA\Schema(
+                            type: 'string',
+                            enum: [\App\Catalog\Domain\ValueObject\ArtistRole::class],
+                        ),
                         'currentRole' => new OA\Schema(
                             description: 'The role of the credit to change; required when the artist holds several roles on the album',
                             type: 'string',
                             nullable: true,
+                            enum: [\App\Catalog\Domain\ValueObject\ArtistRole::class, null],
                         ),
                     ],
                 ),

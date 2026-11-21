@@ -15,7 +15,6 @@ use Symfony\Component\Validator\Constraints as Assert;
             maxLength: 32,
             enum: ['dark', 'warm', 'cool', 'balanced'],
             example: 'dark',
-            default: '',
         ),
     ],
     required: ['mood'],

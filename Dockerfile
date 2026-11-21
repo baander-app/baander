@@ -621,7 +621,7 @@ USER www-data
 RUN COMPOSER_MEMORY_LIMIT=-1 composer install --no-dev --optimize-autoloader --no-interaction --no-progress --no-scripts && \
     COMPOSER_MEMORY_LIMIT=-1 composer dump-autoload --no-dev --optimize --no-interaction && \
     COMPOSER_MEMORY_LIMIT=-1 composer --working-dir=scripts install --no-dev --optimize-autoloader --no-interaction --no-progress --no-scripts --no-plugins && \
-    rm -rf /home/www-data/.cache/composer vendor/nelmio/api-doc-bundle/public packages/baander-dev-* packages/baander-*/tests tests/Support/Tooling tests/Tooling scripts/tests
+    rm -rf /home/www-data/.cache/composer packages/baander-dev-* packages/baander-*/tests tests/Support/Tooling tests/Tooling scripts/tests
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD ["php", "bin/console", "app:health:check"]

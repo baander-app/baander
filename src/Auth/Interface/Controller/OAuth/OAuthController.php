@@ -476,8 +476,9 @@ final class OAuthController
                     properties: [
                         'token' => new OA\Schema(type: 'string', example: 'access-token-to-revoke'),
                         'tokenTypeHint' => new OA\Schema(
-                            description: 'Hint for the token type (e.g. "access_token" or "refresh_token")',
+                            description: 'Recognized token type hint. Unknown hints are ignored.',
                             type: 'string',
+                            enum: ['access_token', 'refresh_token'],
                         ),
                     ],
                     required: ['token'],

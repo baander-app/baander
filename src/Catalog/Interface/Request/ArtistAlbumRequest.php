@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Request;
 
+use App\Catalog\Domain\ValueObject\ArtistRole;
 use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -20,6 +21,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         'role' => new OA\Schema(
             description: 'Artist role (primary, featured, producer, composer, conductor, remixer, djmix, other)',
             type: 'string',
+            enum: [ArtistRole::class],
         ),
     ],
     required: ['albumId', 'role'],

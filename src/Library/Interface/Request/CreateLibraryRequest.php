@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Library\Interface\Request;
 
+use App\Library\Domain\ValueObject\LibraryType;
+use App\Shared\Domain\ValueObject\FilesystemType;
 use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\Length;
@@ -24,13 +26,14 @@ use Symfony\Component\Validator\Constraints\Length;
             default: '',
         ),
         'type' => new OA\Schema(
-            description: 'Library type (e.g. music, movies, videos)',
+            description: 'Library type',
             type: 'string',
-            default: '',
+            enum: [LibraryType::class],
         ),
         'filesystemType' => new OA\Schema(
-            description: 'Filesystem backend (e.g. local)',
+            description: 'Filesystem backend',
             type: 'string',
+            enum: [FilesystemType::class],
             default: 'local',
         ),
         'sortOrder' => new OA\Schema(

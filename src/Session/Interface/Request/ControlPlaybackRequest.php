@@ -26,7 +26,23 @@ use Symfony\Component\Validator\Constraints as Assert;
         'media' => new OA\Schema(
             type: 'object',
             nullable: true,
-            additionalProperties: new OA\Schema(type: 'string'),
+            allOf: [
+                new OA\Schema(
+                    type: 'object',
+                    nullable: true,
+                    additionalProperties: new OA\Schema(type: 'string'),
+                ),
+                new OA\Schema(
+                    type: 'object',
+                    nullable: true,
+                    properties: [
+                        'kind' => new OA\Schema(
+                            type: 'string',
+                            enum: ['song', 'video'],
+                        ),
+                    ],
+                ),
+            ],
             default: null,
         ),
         'queue' => new OA\Schema(
@@ -44,7 +60,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         'desiredState' => new OA\Schema(
             type: 'string',
             nullable: true,
-            enum: ['playing', 'paused', 'stopped'],
+            enum: ['playing', 'paused', 'stopped', null],
             default: null,
         ),
         'volume' => new OA\Schema(

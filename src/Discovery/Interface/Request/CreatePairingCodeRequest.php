@@ -21,7 +21,6 @@ use Symfony\Component\Validator\Constraints\Choice;
         'method' => new OA\Schema(
             type: 'string',
             enum: ['qr_code', 'email_url', 'server_code'],
-            default: '',
         ),
     ],
     required: ['serverPublicId', 'method'],

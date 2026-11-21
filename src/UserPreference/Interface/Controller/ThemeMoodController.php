@@ -83,7 +83,10 @@ final class ThemeMoodController
                 schema: new OA\Schema(
                     type: 'object',
                     properties: [
-                        'mood' => new OA\Schema(type: 'string'),
+                        'mood' => new OA\Schema(
+                            type: 'string',
+                            enum: ['dark', 'warm', 'cool', 'balanced'],
+                        ),
                     ],
                     required: ['mood'],
                 ),

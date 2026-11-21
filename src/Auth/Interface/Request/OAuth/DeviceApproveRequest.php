@@ -22,7 +22,6 @@ use Symfony\Component\Validator\Constraints\Length;
             type: 'string',
             enum: ['approve', 'deny'],
             example: 'approve',
-            default: '',
         ),
     ],
     required: ['userCode', 'decision'],

@@ -16,9 +16,9 @@ use Symfony\Component\Validator\Constraints\NotBlank;
             default: '',
         ),
         'tokenTypeHint' => new OA\Schema(
-            description: 'Hint for the token type (e.g. "access_token" or "refresh_token")',
+            description: 'Recognized token type hint. Unknown hints are ignored.',
             type: 'string',
-            default: '',
+            enum: ['access_token', 'refresh_token'],
         ),
     ],
     required: ['token'],

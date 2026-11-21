@@ -22,6 +22,7 @@ use Symfony\Component\Validator\Constraints\Choice;
                 'broadcast_5.1',
                 'hifi_stereo',
                 'opus_stereo',
+                null,
             ],
             example: 'streaming_stereo',
             default: null,

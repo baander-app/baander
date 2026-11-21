@@ -95,7 +95,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         'qualityTier' => new OA\Schema(
             type: 'string',
             nullable: true,
-            enum: ['360p', '480p', '720p', '1080p', '1440p', '4K'],
+            enum: ['360p', '480p', '720p', '1080p', '1440p', '4K', null],
             default: null,
         ),
     ],

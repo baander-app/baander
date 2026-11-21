@@ -215,10 +215,21 @@ export interface CreateClientRequest {
   name: string;
 }
 
+/**
+ * Recognized token type hint. Unknown hints are ignored.
+ */
+export type RevokeTokenRequestTokenTypeHint = typeof RevokeTokenRequestTokenTypeHint[keyof typeof RevokeTokenRequestTokenTypeHint];
+
+
+export const RevokeTokenRequestTokenTypeHint = {
+  access_token: 'access_token',
+  refresh_token: 'refresh_token',
+} as const;
+
 export interface RevokeTokenRequest {
   token: string;
-  /** Hint for the token type (e.g. "access_token" or "refresh_token") */
-  tokenTypeHint?: string;
+  /** Recognized token type hint. Unknown hints are ignored. */
+  tokenTypeHint?: RevokeTokenRequestTokenTypeHint;
 }
 
 export type DeviceApproveRequestDecision = typeof DeviceApproveRequestDecision[keyof typeof DeviceApproveRequestDecision];
@@ -465,6 +476,23 @@ export interface UpdateArtistRequest {
   lockedFields?: string[] | null;
 }
 
+/**
+ * Artist role (primary, featured, producer, composer, conductor, remixer, djmix, other)
+ */
+export type ArtistSongRequestRole = typeof ArtistSongRequestRole[keyof typeof ArtistSongRequestRole];
+
+
+export const ArtistSongRequestRole = {
+  primary: 'primary',
+  featured: 'featured',
+  producer: 'producer',
+  composer: 'composer',
+  conductor: 'conductor',
+  remixer: 'remixer',
+  djmix: 'djmix',
+  other: 'other',
+} as const;
+
 export interface ArtistSongRequest {
   /**
      * Song public identifier
@@ -474,18 +502,70 @@ export interface ArtistSongRequest {
      */
   songId: string;
   /** Artist role (primary, featured, producer, composer, conductor, remixer, djmix, other) */
-  role: string;
+  role: ArtistSongRequestRole;
 }
+
+/**
+ * The new artist role (primary, featured, producer, composer, conductor, remixer, djmix, other)
+ */
+export type UpdateRoleRequestRole = typeof UpdateRoleRequestRole[keyof typeof UpdateRoleRequestRole];
+
+
+export const UpdateRoleRequestRole = {
+  primary: 'primary',
+  featured: 'featured',
+  producer: 'producer',
+  composer: 'composer',
+  conductor: 'conductor',
+  remixer: 'remixer',
+  djmix: 'djmix',
+  other: 'other',
+} as const;
+
+/**
+ * The role of the credit to change; required when the artist holds several roles on the song or album
+ * @nullable
+ */
+export type UpdateRoleRequestCurrentRole = typeof UpdateRoleRequestCurrentRole[keyof typeof UpdateRoleRequestCurrentRole] | null;
+
+
+export const UpdateRoleRequestCurrentRole = {
+  primary: 'primary',
+  featured: 'featured',
+  producer: 'producer',
+  composer: 'composer',
+  conductor: 'conductor',
+  remixer: 'remixer',
+  djmix: 'djmix',
+  other: 'other',
+} as const;
 
 export interface UpdateRoleRequest {
   /** The new artist role (primary, featured, producer, composer, conductor, remixer, djmix, other) */
-  role: string;
+  role: UpdateRoleRequestRole;
   /**
      * The role of the credit to change; required when the artist holds several roles on the song or album
      * @nullable
      */
-  currentRole?: string | null;
+  currentRole?: UpdateRoleRequestCurrentRole;
 }
+
+/**
+ * Artist role (primary, featured, producer, composer, conductor, remixer, djmix, other)
+ */
+export type ArtistAlbumRequestRole = typeof ArtistAlbumRequestRole[keyof typeof ArtistAlbumRequestRole];
+
+
+export const ArtistAlbumRequestRole = {
+  primary: 'primary',
+  featured: 'featured',
+  producer: 'producer',
+  composer: 'composer',
+  conductor: 'conductor',
+  remixer: 'remixer',
+  djmix: 'djmix',
+  other: 'other',
+} as const;
 
 export interface ArtistAlbumRequest {
   /**
@@ -496,7 +576,7 @@ export interface ArtistAlbumRequest {
      */
   albumId: string;
   /** Artist role (primary, featured, producer, composer, conductor, remixer, djmix, other) */
-  role: string;
+  role: ArtistAlbumRequestRole;
 }
 
 export interface CreateGenreRequest {
@@ -686,15 +766,39 @@ export interface AddFavoriteRequest {
   entityPublicId: string;
 }
 
+/**
+ * Library type
+ */
+export type CreateLibraryRequestType = typeof CreateLibraryRequestType[keyof typeof CreateLibraryRequestType];
+
+
+export const CreateLibraryRequestType = {
+  music: 'music',
+  podcast: 'podcast',
+  audiobook: 'audiobook',
+  movie: 'movie',
+  tv_show: 'tv_show',
+} as const;
+
+/**
+ * Filesystem backend
+ */
+export type CreateLibraryRequestFilesystemType = typeof CreateLibraryRequestFilesystemType[keyof typeof CreateLibraryRequestFilesystemType];
+
+
+export const CreateLibraryRequestFilesystemType = {
+  local: 'local',
+} as const;
+
 export interface CreateLibraryRequest {
   /** @maxLength 255 */
   name: string;
   /** Filesystem path to the library root */
   path: string;
-  /** Library type (e.g. music, movies, videos) */
-  type: string;
-  /** Filesystem backend (e.g. local) */
-  filesystemType?: string;
+  /** Library type */
+  type: CreateLibraryRequestType;
+  /** Filesystem backend */
+  filesystemType?: CreateLibraryRequestFilesystemType;
   sortOrder?: number;
   /**
      * URL-friendly slug
@@ -1018,6 +1122,15 @@ export interface RenameDeviceRequest {
   name: string;
 }
 
+export type RegisterPlaybackEndpointRequestCapabilitiesItem = typeof RegisterPlaybackEndpointRequestCapabilitiesItem[keyof typeof RegisterPlaybackEndpointRequestCapabilitiesItem];
+
+
+export const RegisterPlaybackEndpointRequestCapabilitiesItem = {
+  song: 'song',
+  video: 'video',
+  volume: 'volume',
+} as const;
+
 export interface RegisterPlaybackEndpointRequest {
   deviceId: string;
   endpointId: string;
@@ -1030,7 +1143,7 @@ export interface RegisterPlaybackEndpointRequest {
      * @minItems 1
      * @maxItems 3
      */
-  capabilities?: string[];
+  capabilities?: RegisterPlaybackEndpointRequestCapabilitiesItem[];
   /** @nullable */
   tabId?: string | null;
   localRecoveryEligible?: boolean;
@@ -1151,7 +1264,9 @@ export const ControlPlaybackRequestAction = {
 /**
  * @nullable
  */
-export type ControlPlaybackRequestMedia = {[key: string]: string} | null;
+export type ControlPlaybackRequestMedia = ({[key: string]: string} | null) & ({
+  kind?: 'song' | 'video';
+} | null) | null;
 
 /**
  * @nullable
@@ -1201,7 +1316,13 @@ export interface ReconcilePlaybackRequest {
   expectedRevision: number;
 }
 
-export type RecoverLocalPlaybackRequestCheckpoint = {[key: string]: {[key: string]: string} | number | null};
+export type RecoverLocalPlaybackRequestCheckpointMedia = {[key: string]: string} & ({
+  kind?: 'song' | 'video';
+}) | number | null;
+
+export type RecoverLocalPlaybackRequestCheckpoint = ({[key: string]: {[key: string]: string} | number | null}) & {
+  media?: RecoverLocalPlaybackRequestCheckpointMedia;
+};
 
 export interface RecoverLocalPlaybackRequest {
   incarnationId: string;
@@ -1210,7 +1331,13 @@ export interface RecoverLocalPlaybackRequest {
   checkpoint: RecoverLocalPlaybackRequestCheckpoint;
 }
 
-export type ClosePlaybackEndpointRequestCheckpoint = {[key: string]: {[key: string]: string} | number | null};
+export type ClosePlaybackEndpointRequestCheckpointMedia = {[key: string]: string} & ({
+  kind?: 'song' | 'video';
+}) | number | null;
+
+export type ClosePlaybackEndpointRequestCheckpoint = ({[key: string]: {[key: string]: string} | number | null}) & {
+  media?: ClosePlaybackEndpointRequestCheckpointMedia;
+};
 
 export interface ClosePlaybackEndpointRequest {
   incarnationId: string;
@@ -5277,10 +5404,21 @@ export type PostOauthTokenBody = {
   refresh_token?: string;
 };
 
+/**
+ * Recognized token type hint. Unknown hints are ignored.
+ */
+export type PostOauthRevokeBodyTokenTypeHint = typeof PostOauthRevokeBodyTokenTypeHint[keyof typeof PostOauthRevokeBodyTokenTypeHint];
+
+
+export const PostOauthRevokeBodyTokenTypeHint = {
+  access_token: 'access_token',
+  refresh_token: 'refresh_token',
+} as const;
+
 export type PostOauthRevokeBody = {
   token: string;
-  /** Hint for the token type (e.g. "access_token" or "refresh_token") */
-  tokenTypeHint?: string;
+  /** Recognized token type hint. Unknown hints are ignored. */
+  tokenTypeHint?: PostOauthRevokeBodyTokenTypeHint;
 };
 
 /**
@@ -5890,6 +6028,20 @@ export type DeleteArtistDestroy200 = {
   data?: CatalogDeletionResource;
 };
 
+export type PostArtistAddSongBodyRole = typeof PostArtistAddSongBodyRole[keyof typeof PostArtistAddSongBodyRole];
+
+
+export const PostArtistAddSongBodyRole = {
+  primary: 'primary',
+  featured: 'featured',
+  producer: 'producer',
+  composer: 'composer',
+  conductor: 'conductor',
+  remixer: 'remixer',
+  djmix: 'djmix',
+  other: 'other',
+} as const;
+
 export type PostArtistAddSongBody = {
   /**
      * @minLength 21
@@ -5897,17 +6049,63 @@ export type PostArtistAddSongBody = {
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   songId?: string;
-  role?: string;
+  role?: PostArtistAddSongBodyRole;
 };
 
+export type PatchArtistUpdateSongRoleBodyRole = typeof PatchArtistUpdateSongRoleBodyRole[keyof typeof PatchArtistUpdateSongRoleBodyRole];
+
+
+export const PatchArtistUpdateSongRoleBodyRole = {
+  primary: 'primary',
+  featured: 'featured',
+  producer: 'producer',
+  composer: 'composer',
+  conductor: 'conductor',
+  remixer: 'remixer',
+  djmix: 'djmix',
+  other: 'other',
+} as const;
+
+/**
+ * The role of the credit to change; required when the artist holds several roles on the song
+ * @nullable
+ */
+export type PatchArtistUpdateSongRoleBodyCurrentRole = typeof PatchArtistUpdateSongRoleBodyCurrentRole[keyof typeof PatchArtistUpdateSongRoleBodyCurrentRole] | null;
+
+
+export const PatchArtistUpdateSongRoleBodyCurrentRole = {
+  primary: 'primary',
+  featured: 'featured',
+  producer: 'producer',
+  composer: 'composer',
+  conductor: 'conductor',
+  remixer: 'remixer',
+  djmix: 'djmix',
+  other: 'other',
+} as const;
+
 export type PatchArtistUpdateSongRoleBody = {
-  role?: string;
+  role?: PatchArtistUpdateSongRoleBodyRole;
   /**
      * The role of the credit to change; required when the artist holds several roles on the song
      * @nullable
      */
-  currentRole?: string | null;
+  currentRole?: PatchArtistUpdateSongRoleBodyCurrentRole;
 };
+
+export type PostArtistAddAlbumBodyRole = typeof PostArtistAddAlbumBodyRole[keyof typeof PostArtistAddAlbumBodyRole];
+
+
+export const PostArtistAddAlbumBodyRole = {
+  primary: 'primary',
+  featured: 'featured',
+  producer: 'producer',
+  composer: 'composer',
+  conductor: 'conductor',
+  remixer: 'remixer',
+  djmix: 'djmix',
+  other: 'other',
+} as const;
 
 export type PostArtistAddAlbumBody = {
   /**
@@ -5916,16 +6114,48 @@ export type PostArtistAddAlbumBody = {
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   albumId?: string;
-  role?: string;
+  role?: PostArtistAddAlbumBodyRole;
 };
 
+export type PatchArtistUpdateAlbumRoleBodyRole = typeof PatchArtistUpdateAlbumRoleBodyRole[keyof typeof PatchArtistUpdateAlbumRoleBodyRole];
+
+
+export const PatchArtistUpdateAlbumRoleBodyRole = {
+  primary: 'primary',
+  featured: 'featured',
+  producer: 'producer',
+  composer: 'composer',
+  conductor: 'conductor',
+  remixer: 'remixer',
+  djmix: 'djmix',
+  other: 'other',
+} as const;
+
+/**
+ * The role of the credit to change; required when the artist holds several roles on the album
+ * @nullable
+ */
+export type PatchArtistUpdateAlbumRoleBodyCurrentRole = typeof PatchArtistUpdateAlbumRoleBodyCurrentRole[keyof typeof PatchArtistUpdateAlbumRoleBodyCurrentRole] | null;
+
+
+export const PatchArtistUpdateAlbumRoleBodyCurrentRole = {
+  primary: 'primary',
+  featured: 'featured',
+  producer: 'producer',
+  composer: 'composer',
+  conductor: 'conductor',
+  remixer: 'remixer',
+  djmix: 'djmix',
+  other: 'other',
+} as const;
+
 export type PatchArtistUpdateAlbumRoleBody = {
-  role?: string;
+  role?: PatchArtistUpdateAlbumRoleBodyRole;
   /**
      * The role of the credit to change; required when the artist holds several roles on the album
      * @nullable
      */
-  currentRole?: string | null;
+  currentRole?: PatchArtistUpdateAlbumRoleBodyCurrentRole;
 };
 
 export type PostArtistCoverUploadBody = {
@@ -6406,10 +6636,29 @@ export type GetLibraryIndex200 = {
   data?: LibraryResource[];
 };
 
+export type PostLibraryStoreBodyType = typeof PostLibraryStoreBodyType[keyof typeof PostLibraryStoreBodyType];
+
+
+export const PostLibraryStoreBodyType = {
+  music: 'music',
+  podcast: 'podcast',
+  audiobook: 'audiobook',
+  movie: 'movie',
+  tv_show: 'tv_show',
+} as const;
+
+export type PostLibraryStoreBodyFilesystemType = typeof PostLibraryStoreBodyFilesystemType[keyof typeof PostLibraryStoreBodyFilesystemType];
+
+
+export const PostLibraryStoreBodyFilesystemType = {
+  local: 'local',
+} as const;
+
 export type PostLibraryStoreBody = {
   name: string;
   path: string;
-  type: string;
+  type: PostLibraryStoreBodyType;
+  filesystemType?: PostLibraryStoreBodyFilesystemType;
   sortOrder?: number;
   /** @nullable */
   slug?: string | null;
@@ -9270,8 +9519,18 @@ export type GetThemeMoodIndex200 = {
   mood?: string;
 };
 
+export type PutThemeMoodUpdateBodyMood = typeof PutThemeMoodUpdateBodyMood[keyof typeof PutThemeMoodUpdateBodyMood];
+
+
+export const PutThemeMoodUpdateBodyMood = {
+  dark: 'dark',
+  warm: 'warm',
+  cool: 'cool',
+  balanced: 'balanced',
+} as const;
+
 export type PutThemeMoodUpdateBody = {
-  mood: string;
+  mood: PutThemeMoodUpdateBodyMood;
 };
 
 export type PutThemeMoodUpdate200 = {
