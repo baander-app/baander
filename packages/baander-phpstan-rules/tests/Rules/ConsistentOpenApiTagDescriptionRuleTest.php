@@ -115,7 +115,7 @@ final class ConsistentOpenApiTagDescriptionRuleTest extends TestCase
     {
         return $this->createClassWithName('Controller', [
             new AttributeGroup([
-                new Attribute(new Name('OA\Tag'), [
+                new Attribute(new Name('OpenApi\Spec\Tag'), [
                     new Arg(new String_($name), name: new Identifier('name')),
                     new Arg(new String_($description), name: new Identifier('description')),
                 ]),
@@ -127,7 +127,7 @@ final class ConsistentOpenApiTagDescriptionRuleTest extends TestCase
     {
         return $this->createClassWithName('Controller', [
             new AttributeGroup([
-                new Attribute(new Name('OA\Tag'), [
+                new Attribute(new Name('OpenApi\Spec\Tag'), [
                     new Arg(new String_($name), name: new Identifier('name')),
                 ]),
             ]),

@@ -34,7 +34,7 @@ final class ConsistentOpenApiTagDescriptionRule implements Rule
         foreach ($node->attrGroups as $attrGroup) {
             foreach ($attrGroup->attrs as $attr) {
                 $name = $attr->name->toString();
-                if ($name !== 'OpenApi\Attributes\Tag' && $name !== 'OA\Tag') {
+                if ($name !== 'OpenApi\Spec\Tag' && $name !== 'OA\Tag') {
                     continue;
                 }
 
