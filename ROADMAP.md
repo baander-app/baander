@@ -4,6 +4,48 @@ Updated: 2026-11-21. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
+## Cinema video player
+
+The [cinema player plan](docs/plans/2026-11-21-1146-feat-cinema-video-player-plan.md)
+adds a NowPlaying-style console that fades during playback and stays visible for
+focus, pause, settings and errors. It includes fullscreen, keyboard transport,
+chapter navigation, buffered progress and authenticated timeline previews. Quality,
+subtitle and audio-language menus reflect the current media capabilities.
+Independent audio and subtitle timing controls use 100 ms steps within ±10 seconds,
+with separate resets. Settings survive seeks and attachment renewal for the current
+movie and reset for a different movie. Remote destinations retain transport and
+explain why presentation controls require the playing destination.
+
+Backend delivery carries the selected audio stream and timing correction into
+presentation identity, admission and encoding. Native-media tests measure both
+offset signs after startup and a nonzero seek. Scoped metadata supplies chapters
+and tracks; an admitted media worker prepares bounded thumbnail sheets and checks
+source identity before publication. The [playback controls guide](docs-book/part-2-developer-guide/development/video-playback-controls.md)
+records these contracts and limits.
+
+Verification on 2026-11-21: the CI image passes 146 audio/delivery tests with
+8,128 assertions and 172 metadata/preview tests with 881 assertions. The final
+thumbnail-queue correction passes six tests with 35 assertions in the CI image.
+The full web suite passes all 3,757 tests in 309 files; the subsequent page-focus
+regression suite passes both added tests. PHPStan reports no errors
+and Deptrac reports no violations. Web typecheck and production build pass; lint
+reports no errors and 12 existing warnings. The cinema browser scenario passes
+with real audio/subtitle/quality changes, decoded preview JPEG bytes, measured
+subtitle cue shifts, paused native-source seeks, independent timing resets,
+fullscreen, narrow controls and focus restoration. The final browser regression
+run passes all three original/copy delivery and destination-transfer checks,
+including paused transfer, remote reopen, local return and reload recovery.
+
+The review corrected expired preview claims blocking queue admission and the
+generated preview client's binary response handling. Browser verification also
+exposed ordinary polling being disabled by the live-query coordinator; a dedicated
+sampled policy now refreshes pending previews. Keeping the movie page mounted
+behind the modal preserves its Play button for focus restoration. Regression
+tests cover these fixes. Independent review and both focused follow-up reviews
+report no remaining findings.
+The frontend and backend coding rules retain the user's formatting preference:
+readable multiline code, separate statements and a readability check beyond lint.
+
 ## Browser test devices
 
 The [browser device cleanup plan](docs/plans/2026-11-21-fix-browser-test-device-cleanup-plan.md)

@@ -399,8 +399,16 @@ AXIOS_INSTANCE.interceptors.response.use(undefined, async (error) => {
   return AXIOS_INSTANCE(originalRequest);
 });
 
-export function customInstance<T>(url: string, options: RequestInit): Promise<T>;
-export function customInstance(url: string, options: RequestInit): Promise<unknown> {
+export function customInstance<T>(
+  url: string,
+  options: RequestInit,
+  responseType?: AxiosRequestConfig['responseType'],
+): Promise<T>;
+export function customInstance(
+  url: string,
+  options: RequestInit,
+  responseType?: AxiosRequestConfig['responseType'],
+): Promise<unknown> {
   const {body, signal, headers, ...rest} = options;
   return AXIOS_INSTANCE<unknown>({
     url,
@@ -408,7 +416,12 @@ export function customInstance(url: string, options: RequestInit): Promise<unkno
     data: body as AxiosRequestConfig['data'],
     headers: headers as AxiosRequestConfig['headers'],
     signal: (currentLiveReadSignal() ?? signal) as AxiosRequestConfig['signal'],
+    responseType,
   }).then((response) => response.status === 204 ? undefined : response.data);
+}
+
+export function blobInstance<T>(url: string, options: RequestInit): Promise<T> {
+  return customInstance<T>(url, options, 'blob');
 }
 
 export type ErrorType<Error> = AxiosError<Error>

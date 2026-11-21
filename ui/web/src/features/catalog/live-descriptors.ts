@@ -1,39 +1,60 @@
-import { firstKeyMatches, keyStartsWith, type LiveQueryDescriptor } from '@/shared/live/descriptor-types'
+import {
+  firstKeyMatches,
+  keyStartsWith,
+  type LiveQueryDescriptor
+} from '@/shared/live/descriptor-types'
 
 export const catalogLiveDescriptors: readonly LiveQueryDescriptor[] = [
   {
     family: 'catalog',
-    matches: key => keyStartsWith(key, 'catalog', 'binary-image')
-      || keyStartsWith(key, 'album-duplicates')
-      || keyStartsWith(key, 'catalog', 'timeline')
-      || firstKeyMatches(key, /^\/api\/(albums|artists|songs|movies)\/(?:[^/]+)?$/)
-      || keyStartsWith(key, '/api/genres/'),
+    matches: (key) =>
+      keyStartsWith(key, 'catalog', 'binary-image') ||
+      keyStartsWith(key, 'album-duplicates') ||
+      keyStartsWith(key, 'catalog', 'timeline') ||
+      firstKeyMatches(
+        key,
+        /^\/api\/(albums|artists|songs|movies)\/(?:[^/]+)?$/
+      ) ||
+      keyStartsWith(key, '/api/genres/')
+  },
+  {
+    family: 'catalog',
+    refreshPolicy: 'sampled',
+    sampleIntervalMs: 5000,
+    matches: (key) => keyStartsWith(key, 'catalog', 'video-playback-information')
   },
   {
     family: 'lyrics',
-    matches: key => firstKeyMatches(key, /^\/api\/songs\/[^/]+\/lyrics$/),
+    matches: (key) => firstKeyMatches(key, /^\/api\/songs\/[^/]+\/lyrics$/)
   },
   {
     family: 'lyrics',
     refreshPolicy: 'demand',
-    matches: key => keyStartsWith(key, '/api/lyrics/search'),
+    matches: (key) => keyStartsWith(key, '/api/lyrics/search')
   },
   {
     family: 'admin-metadata',
     refreshPolicy: 'demand',
-    matches: key => firstKeyMatches(key, /^\/api\/admin\/metadata\/match\/[^/]+\/[^/]+\/(?:candidates|comparison)$/),
+    matches: (key) =>
+      firstKeyMatches(
+        key,
+        /^\/api\/admin\/metadata\/match\/[^/]+\/[^/]+\/(?:candidates|comparison)$/
+      )
   },
   {
     family: 'activity',
-    matches: key => keyStartsWith(key, '/api/activity/history') || keyStartsWith(key, '/api/user/recent'),
+    matches: (key) =>
+      keyStartsWith(key, '/api/activity/history') ||
+      keyStartsWith(key, '/api/user/recent')
   },
   {
     family: 'recommendations',
-    matches: key => keyStartsWith(key, '/api/recommendations/')
-      || keyStartsWith(key, '/api/recommendations/for-you'),
+    matches: (key) =>
+      keyStartsWith(key, '/api/recommendations/') ||
+      keyStartsWith(key, '/api/recommendations/for-you')
   },
   {
     family: 'radio',
-    matches: key => keyStartsWith(key, 'catalog', 'starred-stations'),
-  },
+    matches: (key) => keyStartsWith(key, 'catalog', 'starred-stations')
+  }
 ]

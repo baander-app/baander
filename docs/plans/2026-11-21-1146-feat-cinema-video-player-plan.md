@@ -204,6 +204,8 @@ stateDiagram-v2
 
 **Test scenarios:** Real movie with multiple audio tracks, subtitles, chapters and visible timing markers; paused seek after offset changes; quality switch and signed URL renewal; absent metadata; disconnected/remote destination; desktop and narrow viewports; keyboard-only operation.
 
+**Verified integration defects:** Register playback-information queries with a five-second sampled live policy so filesystem preview completion refreshes the UI; expire thumbnail queue claims before checking capacity and preserve the state of existing claims when the queue is full; generate the authorized preview client with binary response handling. The associated descriptor, queue and generated-client tests verify these corrections. The fullscreen browser assertion checks the document element, which contains the dialog and its portaled menus. Keep the movie detail page mounted behind the player so its launching button remains available for focus restoration after close. Browser checks verify the native source cursor after paused seeks.
+
 ---
 
 ## Verification Contract
@@ -220,3 +222,23 @@ stateDiagram-v2
 ## Definition of Done
 
 All requested controls operate on real available media capabilities. Backend/transcoder gaps required by the UI are implemented. Timing corrections remain correct through seeks and attachment changes. Focus, keyboard, narrow-screen and error behavior satisfy the acceptance examples. Relevant checks pass, independent review findings are resolved, and `ROADMAP.md` records delivered items with verification evidence. Work is committed locally on the plan's feature branch without a push.
+
+
+## Implementation evidence
+
+U1–U5 are implemented and verified. The CI image passes 146 audio/delivery tests with 8,128
+assertions and 172 metadata/preview tests with 881 assertions; the final preview
+queue rerun passes six tests with 35 assertions. PHPStan and Deptrac report no
+errors or violations. The full web suite passes 3,757 tests in 309 files, with two
+additional page-focus regressions passing separately. Typecheck, lint and the
+production build pass; lint retains 12 existing warnings.
+
+The real cinema browser scenario verifies selected audio, quality and subtitles,
+preview JPEG decoding, actual cue timing, paused native-source seeks, independent
+resets, fullscreen, narrow layout and returned focus. Review findings for queue
+expiry, binary client handling, live preview refresh and launcher lifetime are
+fixed and covered by regression tests. The completed full review and both focused
+follow-ups have no unresolved findings. The final browser regression run passes
+all three original/copy delivery and destination-transfer checks. Delivery is
+recorded in `ROADMAP.md`; the implementation and formatting rules are saved as
+local commits on `feat/cinema-video-player`, with no push.

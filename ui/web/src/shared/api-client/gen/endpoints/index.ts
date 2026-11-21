@@ -26,6 +26,7 @@ import type {
 
 import { customInstance } from '../../axios-instance';
 import type { ErrorType , BodyType } from '../../axios-instance';
+import { blobInstance } from '../../axios-instance';
 export interface PlayActivityRequest {
   /**
      * Public ID of the song being played
@@ -777,6 +778,11 @@ export interface DeliveryRequest {
   /** @nullable */
   requestId?: string | null;
   sourcePlaybackFailed?: boolean;
+  /**
+     * @minimum -10000
+     * @maximum 10000
+     */
+  audioOffsetMs?: number;
 }
 
 export interface ExtractMetadataRequest {
@@ -1205,8 +1211,7 @@ export interface LogFilterRequest {
   sources?: string[];
   search?: string;
   levels?: string[];
-  /** @nullable */
-  channel?: string | null;
+  channels?: string[];
   /** @nullable */
   correlationId?: string | null;
   /** @nullable */
@@ -1284,6 +1289,18 @@ export interface CreateTranscodeSessionRequest {
   requestId: string;
   qualityTier?: CreateTranscodeSessionRequestQualityTier;
   audioProfile?: CreateTranscodeSessionRequestAudioProfile;
+  /**
+     * Absolute source audio stream index; null selects the source default
+     * @minimum 0
+     * @nullable
+     */
+  audioStreamIndex?: number | null;
+  /**
+     * Source audio correction in milliseconds; positive plays later
+     * @minimum -10000
+     * @maximum 10000
+     */
+  audioOffsetMs?: number;
   priority?: CreateTranscodeSessionRequestPriority;
 }
 
@@ -2943,6 +2960,60 @@ export type CursorPaginatedResponseMeta = {
 export interface CursorPaginatedResponse {
   data: unknown[];
   meta: CursorPaginatedResponseMeta;
+}
+
+export type VideoPlaybackInformationResourceAudioTracksItem = {
+  /** @nullable */
+  index?: number | null;
+  language?: string;
+  title?: string;
+  codec?: string;
+  channels?: number;
+  isDefault?: boolean;
+};
+
+export type VideoPlaybackInformationResourceSubtitleTracksItem = {
+  index?: number;
+  language?: string;
+  title?: string;
+  codec?: string;
+  isDefault?: boolean;
+  isForced?: boolean;
+  isText?: boolean;
+};
+
+export type VideoPlaybackInformationResourceChaptersItem = {
+  start?: number;
+  end?: number;
+  title?: string;
+};
+
+export type VideoPlaybackInformationResourcePreviewState = typeof VideoPlaybackInformationResourcePreviewState[keyof typeof VideoPlaybackInformationResourcePreviewState];
+
+
+export const VideoPlaybackInformationResourcePreviewState = {
+  pending: 'pending',
+  ready: 'ready',
+  failed: 'failed',
+  unavailable: 'unavailable',
+} as const;
+
+export type VideoPlaybackInformationResourcePreview = {
+  state?: VideoPlaybackInformationResourcePreviewState;
+  /** @nullable */
+  url?: string | null;
+  interval?: number;
+  width?: number;
+  height?: number;
+  columns?: number;
+  count?: number;
+};
+
+export interface VideoPlaybackInformationResource {
+  audioTracks: VideoPlaybackInformationResourceAudioTracksItem[];
+  subtitleTracks: VideoPlaybackInformationResourceSubtitleTracksItem[];
+  chapters: VideoPlaybackInformationResourceChaptersItem[];
+  preview: VideoPlaybackInformationResourcePreview;
 }
 
 /**
@@ -5943,6 +6014,10 @@ export type PatchSongUpdate200 = {
   data?: SongResource;
 };
 
+export type GetVideoPlaybackInformation200 = {
+  data?: VideoPlaybackInformationResource;
+};
+
 export type PostDiscoveryRegisterBody = {
   serverUrl: string;
   name: string;
@@ -6631,7 +6706,7 @@ export type PostMetadataExtract200DataMetadata = {
 };
 
 export type PostMetadataExtract200Data = {
-  /** Detected file format (mp3, m4a, flac, ogg, opus or wav) */
+  /** Detected file format (mp3, m4a, flac, ogg, opus, wav, wma, aiff or aac) */
   format?: string;
   metadata?: PostMetadataExtract200DataMetadata;
 };
@@ -8577,6 +8652,18 @@ export type PostStreamSigningSignBody = {
   expiresInSeconds?: number;
   /** Read current playback state without creating another admission */
   refresh?: boolean;
+  /**
+     * Absolute source audio stream index; null selects the source default
+     * @minimum 0
+     * @nullable
+     */
+  audioStreamIndex?: number | null;
+  /**
+     * Source audio correction in milliseconds; positive plays later
+     * @minimum -10000
+     * @maximum 10000
+     */
+  audioOffsetMs?: number;
   /** Stable playback client session identifier, retained across reloads and reconnects */
   requestId: string;
   /**
@@ -19666,6 +19753,208 @@ export const usePatchSongUpdate = <TError = ErrorType<ApiError | ValidationError
       > => {
       return useMutation(getPatchSongUpdateMutationOptions(options), queryClient);
     }
+
+export const getGetVideoPlaybackInformationUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/videos/${publicId}/playback-information`
+}
+
+/**
+ * @summary Get available video tracks, chapters and timeline previews
+ */
+export const getVideoPlaybackInformation = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetVideoPlaybackInformation200> => {
+
+  return customInstance<GetVideoPlaybackInformation200>(getGetVideoPlaybackInformationUrl(publicId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVideoPlaybackInformationQueryKey = (publicId: string,) => {
+    return [
+    `/api/videos/${publicId}/playback-information`
+    ] as const;
+    }
+
+
+export const getGetVideoPlaybackInformationQueryOptions = <TData = Awaited<ReturnType<typeof getVideoPlaybackInformation>>, TError = ErrorType<void>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVideoPlaybackInformation>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVideoPlaybackInformationQueryKey(publicId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVideoPlaybackInformation>>> = ({ signal }) => getVideoPlaybackInformation(publicId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVideoPlaybackInformation>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetVideoPlaybackInformationQueryResult = NonNullable<Awaited<ReturnType<typeof getVideoPlaybackInformation>>>
+export type GetVideoPlaybackInformationQueryError = ErrorType<void>
+
+
+export function useGetVideoPlaybackInformation<TData = Awaited<ReturnType<typeof getVideoPlaybackInformation>>, TError = ErrorType<void>>(
+ publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVideoPlaybackInformation>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getVideoPlaybackInformation>>,
+          TError,
+          Awaited<ReturnType<typeof getVideoPlaybackInformation>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetVideoPlaybackInformation<TData = Awaited<ReturnType<typeof getVideoPlaybackInformation>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVideoPlaybackInformation>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getVideoPlaybackInformation>>,
+          TError,
+          Awaited<ReturnType<typeof getVideoPlaybackInformation>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetVideoPlaybackInformation<TData = Awaited<ReturnType<typeof getVideoPlaybackInformation>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVideoPlaybackInformation>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get available video tracks, chapters and timeline previews
+ */
+
+export function useGetVideoPlaybackInformation<TData = Awaited<ReturnType<typeof getVideoPlaybackInformation>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVideoPlaybackInformation>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetVideoPlaybackInformationQueryOptions(publicId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetVideoPlaybackPreviewUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/videos/${publicId}/timeline-preview`
+}
+
+/**
+ * @summary Get an authorized video timeline contact sheet
+ */
+export const getVideoPlaybackPreview = async (publicId: string, options?: Parameters<typeof blobInstance>[1]): Promise<Blob> => {
+
+  return blobInstance<Blob>(getGetVideoPlaybackPreviewUrl(publicId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVideoPlaybackPreviewQueryKey = (publicId: string,) => {
+    return [
+    `/api/videos/${publicId}/timeline-preview`
+    ] as const;
+    }
+
+
+export const getGetVideoPlaybackPreviewQueryOptions = <TData = Awaited<ReturnType<typeof getVideoPlaybackPreview>>, TError = ErrorType<void>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVideoPlaybackPreview>>, TError, TData>>, request?: SecondParameter<typeof blobInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVideoPlaybackPreviewQueryKey(publicId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVideoPlaybackPreview>>> = ({ signal }) => getVideoPlaybackPreview(publicId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVideoPlaybackPreview>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetVideoPlaybackPreviewQueryResult = NonNullable<Awaited<ReturnType<typeof getVideoPlaybackPreview>>>
+export type GetVideoPlaybackPreviewQueryError = ErrorType<void>
+
+
+export function useGetVideoPlaybackPreview<TData = Awaited<ReturnType<typeof getVideoPlaybackPreview>>, TError = ErrorType<void>>(
+ publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVideoPlaybackPreview>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getVideoPlaybackPreview>>,
+          TError,
+          Awaited<ReturnType<typeof getVideoPlaybackPreview>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof blobInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetVideoPlaybackPreview<TData = Awaited<ReturnType<typeof getVideoPlaybackPreview>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVideoPlaybackPreview>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getVideoPlaybackPreview>>,
+          TError,
+          Awaited<ReturnType<typeof getVideoPlaybackPreview>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof blobInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetVideoPlaybackPreview<TData = Awaited<ReturnType<typeof getVideoPlaybackPreview>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVideoPlaybackPreview>>, TError, TData>>, request?: SecondParameter<typeof blobInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get an authorized video timeline contact sheet
+ */
+
+export function useGetVideoPlaybackPreview<TData = Awaited<ReturnType<typeof getVideoPlaybackPreview>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVideoPlaybackPreview>>, TError, TData>>, request?: SecondParameter<typeof blobInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetVideoPlaybackPreviewQueryOptions(publicId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getPostDiscoveryRegisterUrl = () => {
 

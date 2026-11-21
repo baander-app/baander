@@ -71,3 +71,58 @@ A refresh that names only ended sessions receives `410 Gone` with the reason. Se
 Only when new sessions are reported ended before they answered a refresh or accepted a seek does the player show an error, so sessions that are gone at once cannot make it start in a loop. Sessions end as `failed` when an encode failed and as `cancelled` when they were cancelled on purpose. The player shows the error for both and starts nothing, so one failing encode is not restarted by every open tab and a cancellation is not undone.
 
 A start that finds no capacity still receives `503` with `Retry-After`.
+
+## Cinema controls and presentation choices
+
+`MoviePlayerOverlay` presents a themed cinema console over the persistent
+`VideoPlaybackRuntime`. Opening settings or chapters does not create another media
+element. The console remains visible while paused, focused, showing a panel or
+reporting an error; uninterrupted playback hides it after inactivity. Shared
+controls retain keyboard labels and focus behavior. Fullscreen includes the
+application document so portalled menus remain visible.
+
+Quality selection belongs to the active attachment. The HLS adapter exposes Auto
+and the published renditions, retaining a manual preference across rendition-set
+changes. When that rendition disappears, playback falls back to automatic
+selection. Native playback exposes only its actual capabilities. Transport and
+volume commands continue through the listening session; presentation settings
+require the matching local video owner.
+
+The playback-information API supplies scoped audio tracks, subtitle descriptions,
+source chapters and preview state. The live-query coordinator samples this
+information every five seconds while the player is visible; its dedicated sampled
+descriptor covers preview changes that do not update catalog rows. Preview
+preparation is queued through the
+admitted media consumer. `VideoTimelinePreview` publishes a contact sheet only
+after successful generation and source-identity verification; the HTTP image route
+checks library scope again. A missing or failed preview leaves the seek slider
+usable. The cache lives beneath `CONVERT_STORAGE_PATH`, shared by HTTP and workers.
+`VideoTimelinePreview` limits each sheet to 100 frames of 160×90 pixels, ten
+columns and 4 MB; generation has a 120-second timeout. It retains at most 64
+sheets and removes cached files older than one day. Preparation claims expire
+after ten minutes, failed generation can retry after five minutes, and the queue
+accepts at most 256 outstanding claims. Existing claims remain visible as pending
+when that limit is reached.
+
+### Audio tracks and timing
+
+Audio choices use absolute source stream indexes. `DeliveryRequest` and signed
+transcode admission carry the selected index and `audioOffsetMs`. A nonzero audio
+offset selects encoded delivery. `PresentationSelection` and the encoding
+fingerprint include that offset, preventing reuse of a differently corrected
+presentation. Worker encoding attributes and manifest language come from the
+selected source track.
+
+Both timing controls accept integer milliseconds from −10000 to +10000. Earlier
+and Later change the offset by 100 ms; Reset changes only that control to zero.
+Positive values mean later audio or subtitles, and negative values mean earlier.
+`SegmentEncoder` applies audio correction against the source clock, including
+preceding audio needed after a seek, and retains endpoint padding and trimming.
+The subtitle adapter applies each correction to saved original cue times and
+reconciles cues that arrive later.
+
+The runtime keeps the source cursor and play/pause intent while replacing an
+audio presentation. The UI distinguishes pending and accepted settings. Settings
+survive seeks and attachment renewal for the same movie and reset when a different
+movie is selected. Remote destinations keep transport controls; presentation
+settings explain that they must be changed on the playing destination.

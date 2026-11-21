@@ -13,10 +13,21 @@ const hls = vi.hoisted(() => {
       ERROR: 'error',
       MEDIA_ATTACHED: 'mediaAttached',
       MANIFEST_PARSED: 'manifestParsed',
+      LEVELS_UPDATED: 'levelsUpdated',
+      LEVEL_SWITCHED: 'levelSwitched'
     }
     static readonly ErrorTypes = { NETWORK_ERROR: 'networkError' }
 
+    levels = [
+      { width: 1280, height: 720, bitrate: 2000000 },
+      { width: 1920, height: 1080, bitrate: 4000000 }
+    ]
+    currentLevel = 0
+    nextLevel = -1
+    static latest: FakeHlsPlayer
+
     constructor(config: Record<string, unknown>) {
+      FakeHlsPlayer.latest = this
       constructorConfigs.push(config)
     }
 
@@ -25,7 +36,7 @@ const hls = vi.hoisted(() => {
     }
 
     attachMedia() {
-      listeners.get('mediaAttached')?.forEach(handler => handler())
+      listeners.get('mediaAttached')?.forEach((handler) => handler())
     }
 
     loadSource(url: string) {
@@ -40,17 +51,28 @@ const hls = vi.hoisted(() => {
       destroyed.push(destroyed.length + 1)
     }
   }
-  return { FakeHlsPlayer, constructorConfigs, destroyed, started, loaded, listeners }
+  return {
+    FakeHlsPlayer,
+    constructorConfigs,
+    destroyed,
+    started,
+    loaded,
+    listeners
+  }
 })
 
 vi.mock('hls.js', () => ({ default: hls.FakeHlsPlayer }))
 
-const stubVideo = () => ({
-  addEventListener: vi.fn(),
-  removeEventListener: vi.fn(),
-}) as unknown as HTMLVideoElement
+const stubVideo = () =>
+  ({
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn()
+  }) as unknown as HTMLVideoElement
 
-const settled = () => new Promise(resolve => { setTimeout(resolve, 0) })
+const settled = () =>
+  new Promise((resolve) => {
+    setTimeout(resolve, 0)
+  })
 
 describe('attachHlsPlayback', () => {
   beforeEach(() => {
@@ -67,7 +89,7 @@ describe('attachHlsPlayback', () => {
       url: 'https://media.example/master.m3u8',
       position: 42,
       onError: () => {},
-      onReady: () => {},
+      onReady: () => {}
     })
     await settled()
 
@@ -89,16 +111,53 @@ describe('attachHlsPlayback', () => {
       url: 'https://media.example/master.m3u8',
       position: 7,
       onError: () => {},
-      onReady: () => { ready = true },
+      onReady: () => {
+        ready = true
+      }
     })
     await settled()
 
-    hls.listeners.get('manifestParsed')?.forEach(handler => handler())
+    hls.listeners.get('manifestParsed')?.forEach((handler) => handler())
     expect(ready).toBe(true)
     expect(hls.loaded).toEqual(['https://media.example/master.m3u8'])
     expect(hls.started.at(-1)).toBe(7)
 
     dispose()
     expect(hls.destroyed).toHaveLength(1)
+  })
+})
+
+describe('rendition preferences', () => {
+  it('resolves a manual choice by rendition identity as levels disappear and reorder', async () => {
+    let preference = '1920x1080:4000000'
+    const choices = vi.fn()
+    const dispose = attachHlsPlayback({
+      video: stubVideo(),
+      url: 'https://media.baander.app/master.m3u8',
+      position: 0,
+      onError: vi.fn(),
+      onReady: vi.fn(),
+      getQualityPreference: () => preference,
+      onQualityChoices: choices
+    })
+    await settled()
+    hls.listeners.get('manifestParsed')?.forEach((handler) => handler())
+    const instance = hls.FakeHlsPlayer.latest
+    expect(instance.nextLevel).toBe(1)
+    const preferred = instance.levels[1]!
+    instance.levels = [instance.levels[0]!]
+    hls.listeners.get('levelsUpdated')?.forEach((handler) => handler())
+    expect(instance.nextLevel).toBe(-1)
+    instance.levels = [preferred, ...instance.levels]
+    hls.listeners.get('levelsUpdated')?.forEach((handler) => handler())
+    expect(instance.nextLevel).toBe(0)
+    preference = 'auto'
+    hls.listeners.get('levelsUpdated')?.forEach((handler) => handler())
+    expect(instance.nextLevel).toBe(-1)
+    expect(choices).toHaveBeenCalledWith(expect.any(Array), '1080p')
+    dispose()
+    choices.mockClear()
+    hls.listeners.get('levelsUpdated')?.forEach((handler) => handler())
+    expect(choices).not.toHaveBeenCalled()
   })
 })

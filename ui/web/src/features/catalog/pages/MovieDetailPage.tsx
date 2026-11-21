@@ -53,7 +53,9 @@ export function MovieDetailPage() {
     return (
       <CenterMessage>
         <ErrorText>Failed to load movie</ErrorText>
-        <Button variant="ghost" size="sm" onClick={() => refetch()}>Retry</Button>
+        <Button variant="ghost" size="sm" onClick={() => refetch()}>
+          Retry
+        </Button>
       </CenterMessage>
     )
   }
@@ -63,7 +65,9 @@ export function MovieDetailPage() {
   if (isLoading || !data?.data || !movie) {
     return (
       <LoadingContainer>
-        <Skeleton style={{ height: '16rem', width: '100%', borderRadius: '0.5rem' }} />
+        <Skeleton
+          style={{ height: '16rem', width: '100%', borderRadius: '0.5rem' }}
+        />
         <Skeleton style={{ height: '2rem', width: '16rem' }} />
         <Skeleton style={{ height: '1rem', width: '12rem' }} />
         <Skeleton style={{ height: '8rem', width: '100%' }} />
@@ -72,30 +76,41 @@ export function MovieDetailPage() {
   }
 
   const video = movie.videos?.[0]
-  if (isPlaying && video) {
-    return (
-      <MoviePlayerOverlay
-        title={movie.title}
-        videoId={video.publicId}
-        sourceDuration={video.duration}
-        onClose={() => setIsPlaying(false)}
-      />
-    )
-  }
 
   return (
-    <PageContainer>
-      <MovieHeader movie={movie} onPlay={() => {
-        if (!video) return
-        if (snapshot?.media?.kind === 'video' && snapshot.media.publicId === video.publicId) {
-          setIsPlaying(true)
-          return
-        }
-        requestPlayback({ action: 'load', media: { kind: 'video', publicId: video.publicId }, desiredState: 'playing' })
-          .then(() => setIsPlaying(true)).catch(useVideoPresentation.getState().reportError)
-      }} />
-      {error ? <ErrorText role="alert">{error}</ErrorText> : null}
-      <MovieMetadata movie={movie} />
-    </PageContainer>
+    <>
+      <PageContainer>
+        <MovieHeader
+          movie={movie}
+          onPlay={() => {
+            if (!video) return
+            if (
+              snapshot?.media?.kind === 'video' &&
+              snapshot.media.publicId === video.publicId
+            ) {
+              setIsPlaying(true)
+              return
+            }
+            requestPlayback({
+              action: 'load',
+              media: { kind: 'video', publicId: video.publicId },
+              desiredState: 'playing'
+            })
+              .then(() => setIsPlaying(true))
+              .catch(useVideoPresentation.getState().reportError)
+          }}
+        />
+        {error ? <ErrorText role="alert">{error}</ErrorText> : null}
+        <MovieMetadata movie={movie} />
+      </PageContainer>
+      {isPlaying && video ? (
+        <MoviePlayerOverlay
+          title={movie.title}
+          videoId={video.publicId}
+          sourceDuration={video.duration}
+          onClose={() => setIsPlaying(false)}
+        />
+      ) : null}
+    </>
   )
 }

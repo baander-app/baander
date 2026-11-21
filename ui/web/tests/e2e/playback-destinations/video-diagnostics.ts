@@ -16,7 +16,9 @@ export class VideoDiagnostics {
 
   observe(page: Page, name: string) {
     this.pages.push({ page, name })
-    const relevant = (path: string) => /^\/(?:api\/(?:session\/|stream\/|transcode\/|movies\/)|src\/|node_modules\/|@)/.test(path) || /\.(?:js|m3u8|m4s|ts)$/.test(path)
+    const relevant = (path: string) =>
+      /^\/(?:api\/(?:session\/|stream\/|transcode\/|movies\/|videos\/)|src\/|node_modules\/|@)/.test(path)
+      || /\.(?:js|m3u8|m4s|ts)$/.test(path)
     const record = (event: Omit<DiagnosticEvent, 'at' | 'browser'>) => {
       this.http.push({ at: Date.now(), browser: name, ...event } as DiagnosticEvent)
       if (this.http.length > 2000) this.http.shift()

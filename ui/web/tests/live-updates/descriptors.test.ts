@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import * as generated from '@/shared/api-client/gen/endpoints'
 import { LIVE_COVERAGE } from '@/shared/live/coverage'
-import { expandLiveFamilies, LIVE_FAMILY_DEPENDENCIES, LIVE_QUERY_DESCRIPTORS } from '@/shared/live/descriptors'
+import {
+  expandLiveFamilies,
+  LIVE_FAMILY_DEPENDENCIES,
+  LIVE_QUERY_DESCRIPTORS
+} from '@/shared/live/descriptors'
 import type { LiveFamily } from '@/shared/live/protocol'
 
 function matches(key: readonly unknown[]) {
-  return LIVE_QUERY_DESCRIPTORS.filter(descriptor => descriptor.matches(key))
+  return LIVE_QUERY_DESCRIPTORS.filter((descriptor) => descriptor.matches(key))
 }
 
 const handwrittenVariants: readonly [LiveFamily, readonly unknown[]][] = [
@@ -53,8 +57,15 @@ const handwrittenVariants: readonly [LiveFamily, readonly unknown[]][] = [
   ['admin-alerts', ['admin-notifications']],
   ['account', ['oauth-authorize', { client_id: 'client-a' }]],
   ['catalog', ['album-duplicates', 'album-a']],
-  ['catalog', [...generated.getGetSongIndexQueryKey({ limit: 20 }), 'infinite']],
-  ['activity', [...generated.getGetActivityHistoryQueryKey({ limit: 20 }), 'infinite']],
+  ['catalog', ['catalog', 'video-playback-information', 'video-a']],
+  [
+    'catalog',
+    [...generated.getGetSongIndexQueryKey({ limit: 20 }), 'infinite']
+  ],
+  [
+    'activity',
+    [...generated.getGetActivityHistoryQueryKey({ limit: 20 }), 'infinite']
+  ],
   ['radio', ['catalog', 'starred-stations']],
   ['libraries', ['libraries', 'list', 'music']],
   ['libraries', ['libraries', 'detail', 'library-a']],
@@ -68,13 +79,18 @@ const handwrittenVariants: readonly [LiveFamily, readonly unknown[]][] = [
   ['devices', ['/api/devices']],
   ['sessions', ['session', 'current']],
   ['preferences', ['preference-history', 'audio']],
-  ['account', ['passkeys']],
+  ['account', ['passkeys']]
 ]
 
 describe('feature query descriptors', () => {
-  it.each(handwrittenVariants)('matches the %s query key %j exactly once', (family, key) => {
-    expect(matches(key).map(descriptor => descriptor.family)).toEqual([family])
-  })
+  it.each(handwrittenVariants)(
+    'matches the %s query key %j exactly once',
+    (family, key) => {
+      expect(matches(key).map((descriptor) => descriptor.family)).toEqual([
+        family
+      ])
+    }
+  )
 
   it('matches actual generated builders for every currently consumed generated hook', () => {
     let checked = 0
@@ -83,14 +99,17 @@ describe('feature query descriptors', () => {
         const hook = consumer.match(/#(useGet\w+):generated$/)?.[1]
         if (!hook) continue
         const builderName = `get${hook.slice(3)}QueryKey`
-        const candidate: unknown = generated[builderName as keyof typeof generated]
+        const candidate: unknown =
+          generated[builderName as keyof typeof generated]
         expect(typeof candidate, builderName).toBe('function')
-        const builder = candidate as (...arguments_: unknown[]) => readonly unknown[]
+        const builder = candidate as (
+          ...arguments_: unknown[]
+        ) => readonly unknown[]
         for (const parameter of [undefined, { limit: 20 }, 'resource-a']) {
           const key = builder(parameter)
           expect(
-            matches(key).map(descriptor => descriptor.family),
-            `${consumer}: ${JSON.stringify(key)}`,
+            matches(key).map((descriptor) => descriptor.family),
+            `${consumer}: ${JSON.stringify(key)}`
           ).toEqual([row.family])
         }
         checked++
@@ -111,21 +130,29 @@ describe('feature query descriptors', () => {
       ['debug', 'unknown'],
       ['admin', 'recommendations', 'unknown'],
       ['admin', 'radio', 'unknown'],
-      ['radio', 'unknown'],
+      ['radio', 'unknown']
     ]) {
       expect(matches(key), JSON.stringify(key)).toEqual([])
     }
   })
 
   it('keeps deployment and demand policies separate from ordinary stored refreshes', () => {
-    expect(matches(generated.getGetAdminSettingsDefinitionsQueryKey())[0].deploymentFixed).toBe(true)
+    expect(
+      matches(generated.getGetAdminSettingsDefinitionsQueryKey())[0]
+        .deploymentFixed
+    ).toBe(true)
     expect(matches(['/api/admin/settings'])[0].family).toBe('admin-settings')
     for (const key of [
       ['oauth-authorize'],
       ['/api/lyrics/search'],
       ['admin-media-missing-check'],
-      generated.getGetAdminMetadataMatchCandidatesQueryKey('album', 'album-a', { title: 'Long Bed', artist: '' }),
-      generated.getGetAdminMetadataMatchComparisonQueryKey('song', 'song-a', { candidate: 'recording-a' }),
+      generated.getGetAdminMetadataMatchCandidatesQueryKey('album', 'album-a', {
+        title: 'Long Bed',
+        artist: ''
+      }),
+      generated.getGetAdminMetadataMatchComparisonQueryKey('song', 'song-a', {
+        candidate: 'recording-a'
+      })
     ]) {
       expect(matches(key)[0].refreshPolicy).toBe('demand')
     }
@@ -141,7 +168,7 @@ describe('feature query descriptors', () => {
       [['debug', 'spans', 20], 10000],
       [['analytics-summary'], 30000],
       [['job-list'], 5000],
-      [['admin', 'activity', 'summary'], 30000],
+      [['admin', 'activity', 'summary'], 30000]
     ]
     for (const [key, interval] of samples) {
       expect(matches(key)[0].sampleIntervalMs).toBe(interval)
@@ -160,22 +187,43 @@ describe('query family dependencies', () => {
       }
       expected.set(row.family, dependents)
     }
-    expect(Object.keys(LIVE_FAMILY_DEPENDENCIES).sort()).toEqual([...expected.keys()].sort())
+    expect(Object.keys(LIVE_FAMILY_DEPENDENCIES).sort()).toEqual(
+      [...expected.keys()].sort()
+    )
     for (const [family, dependents] of expected) {
-      expect([...(LIVE_FAMILY_DEPENDENCIES[family] ?? [])].sort(), family).toEqual([...dependents].sort())
+      expect(
+        [...(LIVE_FAMILY_DEPENDENCIES[family] ?? [])].sort(),
+        family
+      ).toEqual([...dependents].sort())
     }
   })
 
   it('expands downstream families transitively and terminates cyclic dependencies', () => {
-    expect(new Set(expandLiveFamilies(['catalog']))).toEqual(new Set([
-      'catalog', 'activity', 'playlists', 'libraries', 'recommendations', 'lyrics',
-    ]))
-    expect(new Set(expandLiveFamilies(['account']))).toEqual(new Set([
-      'account', 'admin-users', 'libraries', 'catalog', 'activity', 'playlists', 'recommendations', 'lyrics',
-    ]))
-    expect(expandLiveFamilies(['notifications', 'notifications', 'admin-alerts'])).toEqual([
-      'notifications', 'admin-alerts',
-    ])
+    expect(new Set(expandLiveFamilies(['catalog']))).toEqual(
+      new Set([
+        'catalog',
+        'activity',
+        'playlists',
+        'libraries',
+        'recommendations',
+        'lyrics'
+      ])
+    )
+    expect(new Set(expandLiveFamilies(['account']))).toEqual(
+      new Set([
+        'account',
+        'admin-users',
+        'libraries',
+        'catalog',
+        'activity',
+        'playlists',
+        'recommendations',
+        'lyrics'
+      ])
+    )
+    expect(
+      expandLiveFamilies(['notifications', 'notifications', 'admin-alerts'])
+    ).toEqual(['notifications', 'admin-alerts'])
     expect(expandLiveFamilies(['devices'])).toEqual(['devices'])
     expect(expandLiveFamilies([])).toEqual([])
   })

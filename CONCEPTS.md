@@ -520,9 +520,25 @@ A source without audio has no canonical audio track.
 
 ### Source audio selection
 
-The source audio chosen for movie encoding: the first track marked default in discovery order, or the first audio track when none is marked.
+The source audio chosen for movie playback by its absolute source stream index. Without an explicit choice, encoding uses the first track marked default in discovery order, or the first audio track when none is marked.
 
-No audio means no selection. Its position among audio streams is separate from its position among all source streams. The same choice supplies encoding attributes and manifest language without reordering discovered tracks. It is independent of the selected video's Source timestamp origin and does not add interactive track controls.
+No audio means no selection. Its position among audio streams is separate from its position among all source streams. The same choice supplies encoding attributes and manifest language without reordering discovered tracks. It is independent of the selected video's Source timestamp origin. The player exposes available tracks through the scoped playback-information resource.
+
+### Audio timing correction
+
+A viewer-selected offset in milliseconds between source audio and video. Positive
+values play audio later; negative values play it earlier. The correction belongs
+to the encoded presentation identity and uses Source position, so seeking does
+not restart the delay. `PresentationSelection` records the correction and
+`SegmentEncoder` applies it.
+
+### Subtitle timing correction
+
+A viewer-selected offset in milliseconds applied to the original subtitle cue
+times. Positive values show subtitles later; negative values show them earlier.
+The web player retains it across attachment changes for one movie and resets it
+when another movie is selected. The `subtitle-offset` adapter applies each change
+from the original cue times, without accumulating previous corrections.
 
 ### Selected video endpoint
 

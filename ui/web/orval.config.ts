@@ -21,6 +21,14 @@ export default defineConfig({
           path: './src/shared/api-client/axios-instance.ts',
           name: 'customInstance',
         },
+        operations: {
+          get_video_playback_preview: {
+            mutator: {
+              path: './src/shared/api-client/axios-instance.ts',
+              name: 'blobInstance',
+            },
+          },
+        },
       },
     },
   },

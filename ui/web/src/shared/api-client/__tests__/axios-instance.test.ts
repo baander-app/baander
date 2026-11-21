@@ -18,6 +18,7 @@ vi.mock('@/shared/crypto/dpop-proof', () => ({
 
 import { buildHtu, customInstance, AXIOS_INSTANCE } from '../axios-instance';
 import MockAdapter from 'axios-mock-adapter';
+import { getVideoPlaybackPreview } from '../gen/endpoints';
 import { getDpopKeyPair } from '@/shared/crypto/dpop-store';
 import { createDpopProof } from '@/shared/crypto/dpop-proof';
 import { advanceAuthorization, bindOwnershipToSignal, captureOwnership, setAuthorityPending, synchronizeOwnership } from '@/shared/live/ownership';
@@ -51,6 +52,21 @@ describe('customInstance', () => {
   });
 
   afterEach(() => mock.restore());
+
+  it('requests generated timeline previews as authenticated binary data', async () => {
+    const image = new Blob(['preview'], { type: 'image/jpeg' });
+    const controller = new AbortController();
+    mock.onGet('/api/videos/movie/timeline-preview').reply(config => {
+      expect(config.responseType).toBe('blob');
+      expect(config.signal).toBe(controller.signal);
+      return [200, image, { 'Content-Type': 'image/jpeg' }];
+    });
+
+    const result = await getVideoPlaybackPreview('movie', { signal: controller.signal });
+
+    expect(result).toBe(image);
+    expect(result.type).toBe('image/jpeg');
+  });
 
   it('returns body data without transport metadata', async () => {
     const body = { data: { name: 'test', value: 42 } };
