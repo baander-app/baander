@@ -202,9 +202,9 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
                 audioProfile: AudioProfile::streamingStereo(),
                 priority: SessionPriority::Normal,
                 audioLanguages: [],
+                requestId: $requestId,
                 audioStreamIndex: $audioStreamIndex,
                 audioOffsetMs: $audioOffsetMs,
-                requestId: $requestId,
             ));
             $session = $envelope->last(HandledStamp::class)?->getResult();
             if (!$session instanceof TranscodeSession) {

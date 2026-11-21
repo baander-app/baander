@@ -637,8 +637,8 @@ final class DeliveryDecisionServiceTest extends TestCase
         ]);
         $service = $this->service(
             videos: $videos,
-            artifacts: $artifacts,
             profile: new DeploymentProfile(videoEncoderSlots: 0),
+            artifacts: $artifacts,
             qualityAllowed: $qualityAllowed,
         );
         $result = $service->video(
@@ -649,9 +649,9 @@ final class DeliveryDecisionServiceTest extends TestCase
                 ['h264'],
                 ['aac'],
                 transports: ['hls'],
-                qualityTier: '1080p',
-                audioOffsetMs: $audioOffsetMs,
                 sourcePlaybackFailed: $sourcePlaybackFailed,
+                audioOffsetMs: $audioOffsetMs,
+                qualityTier: '1080p',
             ),
         );
         if (!$qualityAllowed) {
