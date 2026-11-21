@@ -6,26 +6,66 @@ namespace App\Transcode\Interface\Resource;
 
 use App\Shared\Interface\Resource\AbstractResource;
 use App\Transcode\Application\DTO\TranscodeJobDto;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'TranscodeJobResource',
     properties: [
-        new OA\Property(property: 'publicId', description: 'Public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'videoId', description: 'Video public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'qualityTier', description: 'Quality tier name', type: 'string'),
-        new OA\Property(property: 'status', description: 'Job status', type: 'string', enum: ['pending', 'in_progress', 'completed', 'failed', 'cancelled']),
-        new OA\Property(property: 'referenceCount', description: 'Number of references', type: 'integer'),
-        new OA\Property(property: 'totalSegments', description: 'Total segments to transcode', type: 'integer'),
-        new OA\Property(property: 'completedSegments', description: 'Completed segments', type: 'integer'),
-        new OA\Property(property: 'progress', description: 'Progress from 0 to 1', type: 'number'),
-        new OA\Property(property: 'videoCodec', description: 'Video codec', type: 'string', nullable: true),
-        new OA\Property(property: 'audioCodec', description: 'Audio codec', type: 'string', nullable: true),
-        new OA\Property(property: 'width', description: 'Video width in pixels', type: 'integer', nullable: true),
-        new OA\Property(property: 'height', description: 'Video height in pixels', type: 'integer', nullable: true),
-        new OA\Property(property: 'createdAt', description: 'Creation timestamp', type: 'string', format: 'date-time'),
-        new OA\Property(property: 'updatedAt', description: 'Last update timestamp', type: 'string', format: 'date-time'),
+        'publicId' => new OA\Schema(
+            description: 'Public identifier',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'videoId' => new OA\Schema(
+            description: 'Video public identifier',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'qualityTier' => new OA\Schema(description: 'Quality tier name', type: 'string'),
+        'status' => new OA\Schema(
+            description: 'Job status',
+            type: 'string',
+            enum: ['pending', 'in_progress', 'completed', 'failed', 'cancelled'],
+        ),
+        'referenceCount' => new OA\Schema(description: 'Number of references', type: 'integer'),
+        'totalSegments' => new OA\Schema(description: 'Total segments to transcode', type: 'integer'),
+        'completedSegments' => new OA\Schema(description: 'Completed segments', type: 'integer'),
+        'progress' => new OA\Schema(description: 'Progress from 0 to 1', type: 'number'),
+        'videoCodec' => new OA\Schema(
+            description: 'Video codec',
+            type: 'string',
+            nullable: true,
+        ),
+        'audioCodec' => new OA\Schema(
+            description: 'Audio codec',
+            type: 'string',
+            nullable: true,
+        ),
+        'width' => new OA\Schema(
+            description: 'Video width in pixels',
+            type: 'integer',
+            nullable: true,
+        ),
+        'height' => new OA\Schema(
+            description: 'Video height in pixels',
+            type: 'integer',
+            nullable: true,
+        ),
+        'createdAt' => new OA\Schema(
+            description: 'Creation timestamp',
+            type: 'string',
+            format: 'date-time',
+        ),
+        'updatedAt' => new OA\Schema(
+            description: 'Last update timestamp',
+            type: 'string',
+            format: 'date-time',
+        ),
     ],
+    component: 'TranscodeJobResource',
 )]
 final class TranscodeJobResource extends AbstractResource
 {

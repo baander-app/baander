@@ -6,14 +6,26 @@ namespace App\Party\Interface\Resource;
 
 use App\Party\Application\DTO\PartyInvitationView;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'PartyInvitationResource',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'userId', description: 'Invited user public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'invitedAt', description: 'Invitation timestamp', type: 'string', format: 'date-time'),
+        'userId' => new OA\Schema(
+            description: 'Invited user public ID',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'invitedAt' => new OA\Schema(
+            description: 'Invitation timestamp',
+            type: 'string',
+            format: 'date-time',
+        ),
     ],
+    required: ['userId', 'invitedAt'],
+    component: 'PartyInvitationResource',
 )]
 final class PartyInvitationResource extends AbstractResource
 {

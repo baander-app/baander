@@ -18,7 +18,7 @@ use App\Playlist\Interface\Request\ReorderSongsRequest;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Interface\Resource as Transcode;
-use OpenApi\Attributes\Schema;
+use OpenApi\Spec\Schema;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
@@ -35,6 +35,7 @@ final class PublicIdSchemaTest extends TestCase
                 continue;
             }
 
+            $property = $property->schema;
             self::assertSame('string', $property->type);
             self::assertNotSame('uuid', $property->format);
             self::assertSame(21, $property->minLength);
@@ -56,7 +57,7 @@ final class PublicIdSchemaTest extends TestCase
     public function test_song_album_identifier_uses_the_serialized_public_id(): void
     {
         $schema = (new ReflectionClass(SongResource::class))->getAttributes(Schema::class)[0]->newInstance();
-        $properties = array_column($schema->properties, null, 'property');
+        $properties = array_column($schema->properties, 'schema', 'property');
         self::assertSame('string', $properties['albumId']->type);
         self::assertNotSame('uuid', $properties['albumId']->format);
 
@@ -76,14 +77,14 @@ final class PublicIdSchemaTest extends TestCase
     public function test_request_identifier_examples_match_their_runtime_types(): void
     {
         $lyrics = (new ReflectionClass(ApplyLyricsRequest::class))->getAttributes(Schema::class)[0]->newInstance();
-        $example = $lyrics->properties[0]->example;
+        $example = $lyrics->properties[0]->schema->example;
         self::assertSame($example, PublicId::fromString($example)->toString());
 
         $add = (new ReflectionClass(AddSongRequest::class))->getAttributes(Schema::class)[0]->newInstance();
-        self::assertNotSame('uuid', $add->properties[0]->format);
-        self::assertSame($add->properties[0]->example, PublicId::fromString($add->properties[0]->example)->toString());
+        self::assertNotSame('uuid', $add->properties[0]->schema->format);
+        self::assertSame($add->properties[0]->schema->example, PublicId::fromString($add->properties[0]->schema->example)->toString());
         $reorder = (new ReflectionClass(ReorderSongsRequest::class))->getAttributes(Schema::class)[0]->newInstance();
-        $reorderProperties = array_column($reorder->properties, null, 'property');
+        $reorderProperties = array_column($reorder->properties, 'schema', 'property');
         self::assertNotSame('uuid', $reorderProperties['songIds']->items->format);
         foreach ($reorderProperties['songIds']->example as $uuid) {
             self::assertSame($uuid, PublicId::fromString($uuid)->toString());

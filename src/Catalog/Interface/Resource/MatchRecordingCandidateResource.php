@@ -7,33 +7,69 @@ namespace App\Catalog\Interface\Resource;
 use App\Catalog\Application\Query\MusicBrainzMatch\RecordingCandidate;
 use App\Catalog\Application\Query\MusicBrainzMatch\RecordingCandidateRelease;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 /** A MusicBrainz recording a song may match, as the candidates route lists it. */
 #[OA\Schema(
-    schema: 'MatchRecordingCandidateResource',
     description: 'A MusicBrainz recording a song may match, with the releases it appears on',
-    required: ['id', 'score', 'title', 'artistCredit', 'lengthMs', 'disambiguation', 'releases'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'id', description: 'The recording\'s MusicBrainz ID, which the comparison takes as its candidate', type: 'string'),
-        new OA\Property(property: 'score', description: 'How well the recording fits the song, by title, artist and length', type: 'integer', maximum: 100, minimum: 0),
-        new OA\Property(property: 'title', type: 'string'),
-        new OA\Property(property: 'artistCredit', description: 'The recording\'s artist credit as printed, such as "Post Malone feat. Luke Combs"', type: 'string'),
-        new OA\Property(property: 'lengthMs', description: 'The length in milliseconds; null when MusicBrainz does not know it', type: 'integer', nullable: true),
-        new OA\Property(property: 'disambiguation', type: 'string', nullable: true),
-        new OA\Property(property: 'releases', description: 'The releases the recording appears on, at most 25', type: 'array', items: new OA\Items(
-            required: ['id', 'title', 'date', 'country', 'status', 'trackCount'],
-            properties: [
-                new OA\Property(property: 'id', description: 'The release\'s MusicBrainz ID', type: 'string'),
-                new OA\Property(property: 'title', type: 'string'),
-                new OA\Property(property: 'date', description: 'The release date: YYYY, YYYY-MM or YYYY-MM-DD', type: 'string', nullable: true),
-                new OA\Property(property: 'country', description: 'An ISO 3166-1 code, or XW for worldwide', type: 'string', nullable: true),
-                new OA\Property(property: 'status', description: 'Such as Official or Promotion', type: 'string', nullable: true),
-                new OA\Property(property: 'trackCount', description: 'The tracks on the whole release, when MusicBrainz lists them', type: 'integer', nullable: true),
-            ],
-            type: 'object',
-        )),
+        'id' => new OA\Schema(
+            description: 'The recording\'s MusicBrainz ID, which the comparison takes as its candidate',
+            type: 'string',
+        ),
+        'score' => new OA\Schema(
+            description: 'How well the recording fits the song, by title, artist and length',
+            type: 'integer',
+            minimum: 0,
+            maximum: 100,
+        ),
+        'title' => new OA\Schema(type: 'string'),
+        'artistCredit' => new OA\Schema(
+            description: 'The recording\'s artist credit as printed, such as "Post Malone feat. Luke Combs"',
+            type: 'string',
+        ),
+        'lengthMs' => new OA\Schema(
+            description: 'The length in milliseconds; null when MusicBrainz does not know it',
+            type: 'integer',
+            nullable: true,
+        ),
+        'disambiguation' => new OA\Schema(type: 'string', nullable: true),
+        'releases' => new OA\Schema(
+            description: 'The releases the recording appears on, at most 25',
+            type: 'array',
+            items: new OA\Schema(
+                type: 'object',
+                properties: [
+                    'id' => new OA\Schema(description: 'The release\'s MusicBrainz ID', type: 'string'),
+                    'title' => new OA\Schema(type: 'string'),
+                    'date' => new OA\Schema(
+                        description: 'The release date: YYYY, YYYY-MM or YYYY-MM-DD',
+                        type: 'string',
+                        nullable: true,
+                    ),
+                    'country' => new OA\Schema(
+                        description: 'An ISO 3166-1 code, or XW for worldwide',
+                        type: 'string',
+                        nullable: true,
+                    ),
+                    'status' => new OA\Schema(
+                        description: 'Such as Official or Promotion',
+                        type: 'string',
+                        nullable: true,
+                    ),
+                    'trackCount' => new OA\Schema(
+                        description: 'The tracks on the whole release, when MusicBrainz lists them',
+                        type: 'integer',
+                        nullable: true,
+                    ),
+                ],
+                required: ['id', 'title', 'date', 'country', 'status', 'trackCount'],
+            ),
+        ),
     ],
+    required: ['id', 'score', 'title', 'artistCredit', 'lengthMs', 'disambiguation', 'releases'],
+    component: 'MatchRecordingCandidateResource',
 )]
 final class MatchRecordingCandidateResource extends AbstractResource
 {

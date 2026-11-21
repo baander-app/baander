@@ -6,16 +6,25 @@ namespace App\Auth\Interface\Resource;
 
 use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'TokenResource',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'accessToken', description: 'OAuth 2.0 access token', type: 'string'),
-        new OA\Property(property: 'tokenType', description: 'Token type, always DPoP: the access token is bound to the client\'s DPoP key (RFC 9449)', type: 'string'),
-        new OA\Property(property: 'expiresIn', description: 'Seconds until token expiry', type: 'integer'),
-        new OA\Property(property: 'refreshToken', description: 'OAuth 2.0 refresh token', type: 'string', nullable: true),
+        'accessToken' => new OA\Schema(description: 'OAuth 2.0 access token', type: 'string'),
+        'tokenType' => new OA\Schema(
+            description: 'Token type, always DPoP: the access token is bound to the client\'s DPoP key (RFC 9449)',
+            type: 'string',
+        ),
+        'expiresIn' => new OA\Schema(description: 'Seconds until token expiry', type: 'integer'),
+        'refreshToken' => new OA\Schema(
+            description: 'OAuth 2.0 refresh token',
+            type: 'string',
+            nullable: true,
+        ),
     ],
+    required: ['accessToken', 'tokenType', 'expiresIn'],
+    component: 'TokenResource',
 )]
 final class TokenResource extends AbstractResource
 {

@@ -6,36 +6,64 @@ namespace App\Catalog\Interface\Resource;
 
 use App\Catalog\Application\Query\Album\AlbumDeletePreview;
 use App\Shared\Interface\Resource\AbstractResource;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 /** The `data` of GET /api/admin/albums/{publicId}/delete-preview, and of `app:album:delete --dry-run --json`. */
 #[OA\Schema(
-    schema: 'AlbumDeletePreviewResource',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'album', properties: [
-            new OA\Property(property: 'id', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-            new OA\Property(property: 'title', type: 'string'),
-            new OA\Property(property: 'songCount', type: 'integer'),
-        ], type: 'object'),
-        new OA\Property(property: 'files', properties: [
-            new OA\Property(property: 'count', type: 'integer'),
-            new OA\Property(property: 'totalSize', type: 'integer'),
-        ], type: 'object'),
-        new OA\Property(property: 'coverImage', properties: [
-            new OA\Property(property: 'id', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        ], type: 'object', nullable: true),
-        new OA\Property(property: 'affected', properties: [
-            new OA\Property(property: 'playlists', type: 'integer'),
-            new OA\Property(property: 'playlistNames', type: 'array', items: new OA\Items(type: 'string')),
-        ], type: 'object'),
-        new OA\Property(
-            property: 'fileDeletion',
+        'album' => new OA\Schema(
+            type: 'object',
+            properties: [
+                'id' => new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+                'title' => new OA\Schema(type: 'string'),
+                'songCount' => new OA\Schema(type: 'integer'),
+            ],
+        ),
+        'files' => new OA\Schema(
+            type: 'object',
+            properties: [
+                'count' => new OA\Schema(type: 'integer'),
+                'totalSize' => new OA\Schema(type: 'integer'),
+            ],
+        ),
+        'coverImage' => new OA\Schema(
+            type: 'object',
+            nullable: true,
+            properties: [
+                'id' => new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ],
+        ),
+        'affected' => new OA\Schema(
+            type: 'object',
+            properties: [
+                'playlists' => new OA\Schema(type: 'integer'),
+                'playlistNames' => new OA\Schema(
+                    type: 'array',
+                    items: new OA\Schema(type: 'string'),
+                ),
+            ],
+        ),
+        'fileDeletion' => new OA\Schema(
             description: 'The check of every song file, when deleteFiles is true',
             nullable: true,
-            oneOf: [new OA\Schema(ref: new Model(type: FileDeletionPreviewResource::class))],
+            oneOf: [
+                new OA\Schema(ref: FileDeletionPreviewResource::class),
+            ],
         ),
     ],
+    required: ['album', 'files', 'affected'],
+    component: 'AlbumDeletePreviewResource',
 )]
 final class AlbumDeletePreviewResource extends AbstractResource
 {

@@ -6,33 +6,123 @@ namespace App\Catalog\Interface\Resource;
 
 use App\Catalog\Domain\Model\Movie;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'MovieResource',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'publicId', description: 'Public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'title', description: 'Movie title', type: 'string'),
-        new OA\Property(property: 'year', description: 'Release year', type: 'integer', nullable: true),
-        new OA\Property(property: 'summary', description: 'Plot summary', type: 'string', nullable: true),
-        new OA\Property(property: 'overview', description: 'TMDB overview', type: 'string', nullable: true),
-        new OA\Property(property: 'tagline', description: 'Movie tagline', type: 'string', nullable: true),
-        new OA\Property(property: 'posterUrl', description: 'Poster image URL', type: 'string', nullable: true),
-        new OA\Property(property: 'backdropUrl', description: 'Backdrop image URL', type: 'string', nullable: true),
-        new OA\Property(property: 'runtime', description: 'Runtime in minutes', type: 'integer', nullable: true),
-        new OA\Property(property: 'rating', description: 'TMDB vote average', type: 'number', format: 'float', nullable: true),
-        new OA\Property(property: 'originalLanguage', description: 'Original language code', type: 'string', nullable: true),
-        new OA\Property(property: 'tmdbId', description: 'TMDB ID', type: 'integer', nullable: true),
-        new OA\Property(property: 'imdbId', description: 'IMDB ID', type: 'string', nullable: true),
-        new OA\Property(property: 'tmdbCollectionId', description: 'TMDB collection ID', type: 'integer', nullable: true),
-        new OA\Property(property: 'collectionName', description: 'Collection name', type: 'string', nullable: true),
-        new OA\Property(property: 'videoIds', description: 'Video public identifiers', type: 'array', items: new OA\Items(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
-        new OA\Property(property: 'posterImage', description: 'Poster image data', type: 'object', nullable: true),
-        new OA\Property(property: 'genres', description: 'Genre list', type: 'array', items: new OA\Items(type: 'object')),
-        new OA\Property(property: 'videos', description: 'Video variants', type: 'array', items: new OA\Items(type: 'object')),
-        new OA\Property(property: 'createdAt', description: 'Creation timestamp', type: 'string', format: 'date-time'),
-        new OA\Property(property: 'updatedAt', description: 'Update timestamp', type: 'string', format: 'date-time'),
+        'publicId' => new OA\Schema(
+            description: 'Public identifier',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'title' => new OA\Schema(description: 'Movie title', type: 'string'),
+        'year' => new OA\Schema(
+            description: 'Release year',
+            type: 'integer',
+            nullable: true,
+        ),
+        'summary' => new OA\Schema(
+            description: 'Plot summary',
+            type: 'string',
+            nullable: true,
+        ),
+        'overview' => new OA\Schema(
+            description: 'TMDB overview',
+            type: 'string',
+            nullable: true,
+        ),
+        'tagline' => new OA\Schema(
+            description: 'Movie tagline',
+            type: 'string',
+            nullable: true,
+        ),
+        'posterUrl' => new OA\Schema(
+            description: 'Poster image URL',
+            type: 'string',
+            nullable: true,
+        ),
+        'backdropUrl' => new OA\Schema(
+            description: 'Backdrop image URL',
+            type: 'string',
+            nullable: true,
+        ),
+        'runtime' => new OA\Schema(
+            description: 'Runtime in minutes',
+            type: 'integer',
+            nullable: true,
+        ),
+        'rating' => new OA\Schema(
+            description: 'TMDB vote average',
+            type: 'number',
+            format: 'float',
+            nullable: true,
+        ),
+        'originalLanguage' => new OA\Schema(
+            description: 'Original language code',
+            type: 'string',
+            nullable: true,
+        ),
+        'tmdbId' => new OA\Schema(
+            description: 'TMDB ID',
+            type: 'integer',
+            nullable: true,
+        ),
+        'imdbId' => new OA\Schema(
+            description: 'IMDB ID',
+            type: 'string',
+            nullable: true,
+        ),
+        'tmdbCollectionId' => new OA\Schema(
+            description: 'TMDB collection ID',
+            type: 'integer',
+            nullable: true,
+        ),
+        'collectionName' => new OA\Schema(
+            description: 'Collection name',
+            type: 'string',
+            nullable: true,
+        ),
+        'videoIds' => new OA\Schema(
+            description: 'Video public identifiers',
+            type: 'array',
+            items: new OA\Schema(
+                type: 'string',
+                minLength: 21,
+                maxLength: 21,
+                pattern: '^[0-9a-zA-Z_-]{21}$',
+            ),
+        ),
+        'posterImage' => new OA\Schema(
+            description: 'Poster image data',
+            type: 'object',
+            nullable: true,
+        ),
+        'genres' => new OA\Schema(
+            description: 'Genre list',
+            type: 'array',
+            items: new OA\Schema(type: 'object'),
+        ),
+        'videos' => new OA\Schema(
+            description: 'Video variants',
+            type: 'array',
+            items: new OA\Schema(type: 'object'),
+        ),
+        'createdAt' => new OA\Schema(
+            description: 'Creation timestamp',
+            type: 'string',
+            format: 'date-time',
+        ),
+        'updatedAt' => new OA\Schema(
+            description: 'Update timestamp',
+            type: 'string',
+            format: 'date-time',
+        ),
     ],
+    required: ['publicId', 'title', 'videoIds', 'genres', 'videos', 'createdAt', 'updatedAt'],
+    component: 'MovieResource',
 )]
 final class MovieResource extends AbstractResource
 {

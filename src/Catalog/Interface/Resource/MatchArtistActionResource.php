@@ -6,8 +6,7 @@ namespace App\Catalog\Interface\Resource;
 
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchArtistAction;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchComparison;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 /**
  * An artist a MusicBrainz match would merge or remove, with the credits rows it stands on.
@@ -17,17 +16,38 @@ use OpenApi\Attributes as OA;
  * @phpstan-type ArtistActionData array{kind: string, artistPublicId: string, artistName: string, target: PredictedArtistData|null, requiredRows: list<string>, ticked: bool}
  */
 #[OA\Schema(
-    schema: 'MatchArtistActionResource',
     description: 'An artist a match would merge into another artist or remove. It stands only while every row in requiredRows is ticked; unticking it keeps the artist as it is.',
-    required: ['kind', 'artistPublicId', 'artistName', 'target', 'requiredRows', 'ticked'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'kind', description: 'merge moves the artist\'s credits, favorites and play history to the target and removes it; remove deletes it with its favorites', type: 'string', enum: ['merge', 'remove']),
-        new OA\Property(property: 'artistPublicId', description: 'The artist merged or removed, which an apply names the action by', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'artistName', type: 'string'),
-        new OA\Property(property: 'target', description: 'The artist a merge goes into, which may be one the match creates; null for a removal', nullable: true, oneOf: [new OA\Schema(ref: new Model(type: MatchPredictedArtistResource::class))]),
-        new OA\Property(property: 'requiredRows', description: 'The keys of the credits rows that must all be ticked for the action to stand; empty for the merge an artist comparison applies its ID by', type: 'array', items: new OA\Items(type: 'string')),
-        new OA\Property(property: 'ticked', description: 'Whether the action is ticked by default', type: 'boolean'),
+        'kind' => new OA\Schema(
+            description: 'merge moves the artist\'s credits, favorites and play history to the target and removes it; remove deletes it with its favorites',
+            type: 'string',
+            enum: ['merge', 'remove'],
+        ),
+        'artistPublicId' => new OA\Schema(
+            description: 'The artist merged or removed, which an apply names the action by',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'artistName' => new OA\Schema(type: 'string'),
+        'target' => new OA\Schema(
+            description: 'The artist a merge goes into, which may be one the match creates; null for a removal',
+            nullable: true,
+            oneOf: [
+                new OA\Schema(ref: MatchPredictedArtistResource::class),
+            ],
+        ),
+        'requiredRows' => new OA\Schema(
+            description: 'The keys of the credits rows that must all be ticked for the action to stand; empty for the merge an artist comparison applies its ID by',
+            type: 'array',
+            items: new OA\Schema(type: 'string'),
+        ),
+        'ticked' => new OA\Schema(description: 'Whether the action is ticked by default', type: 'boolean'),
     ],
+    required: ['kind', 'artistPublicId', 'artistName', 'target', 'requiredRows', 'ticked'],
+    component: 'MatchArtistActionResource',
 )]
 final class MatchArtistActionResource
 {

@@ -5,17 +5,20 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Resource\Log;
 
 use App\Shared\Interface\Resource\AbstractResource;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    required: ['items', 'nextCursor', 'snapshot', 'coverage'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'items', type: 'array', items: new OA\Items(ref: new Model(type: LogRecordResource::class))),
-        new OA\Property(property: 'nextCursor', type: 'string', nullable: true),
-        new OA\Property(property: 'snapshot', ref: new Model(type: LogSnapshotResource::class)),
-        new OA\Property(property: 'coverage', ref: new Model(type: LogCoverageResource::class)),
+        'items' => new OA\Schema(
+            type: 'array',
+            items: new OA\Schema(ref: LogRecordResource::class),
+        ),
+        'nextCursor' => new OA\Schema(type: 'string', nullable: true),
+        'snapshot' => new OA\Schema(ref: LogSnapshotResource::class),
+        'coverage' => new OA\Schema(ref: LogCoverageResource::class),
     ],
+    required: ['items', 'nextCursor', 'snapshot', 'coverage'],
 )]
 final class LogEntriesResource extends AbstractResource
 {

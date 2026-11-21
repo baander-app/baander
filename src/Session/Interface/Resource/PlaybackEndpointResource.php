@@ -5,20 +5,40 @@ declare(strict_types=1);
 namespace App\Session\Interface\Resource;
 
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'PlaybackEndpointResource',
-    required: ['destinationId', 'incarnationId', 'epoch'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'destinationId', type: 'string'),
-        new OA\Property(property: 'incarnationId', description: 'Endpoint incarnation identifier, issued by the server when the endpoint registers.', type: 'string'),
-        new OA\Property(property: 'epoch', type: 'integer', minimum: 1),
-        new OA\Property(property: 'recoveryCredential', description: 'Private stop-only recovery credential for durable local storage.', type: 'string', nullable: true),
-        new OA\Property(property: 'recoveryExpiresAt', type: 'string', format: 'date-time', nullable: true),
-        new OA\Property(property: 'recoveryTabId', description: 'Client-generated tab identifier that names the recovery record.', type: 'string', nullable: true),
-        new OA\Property(property: 'capability', description: 'Returned only to the HTTP registration caller; keep in tab memory.', type: 'string', nullable: true),
+        'destinationId' => new OA\Schema(type: 'string'),
+        'incarnationId' => new OA\Schema(
+            description: 'Endpoint incarnation identifier, issued by the server when the endpoint registers.',
+            type: 'string',
+        ),
+        'epoch' => new OA\Schema(type: 'integer', minimum: 1),
+        'recoveryCredential' => new OA\Schema(
+            description: 'Private stop-only recovery credential for durable local storage.',
+            type: 'string',
+            nullable: true,
+        ),
+        'recoveryExpiresAt' => new OA\Schema(
+            type: 'string',
+            format: 'date-time',
+            nullable: true,
+        ),
+        'recoveryTabId' => new OA\Schema(
+            description: 'Client-generated tab identifier that names the recovery record.',
+            type: 'string',
+            nullable: true,
+        ),
+        'capability' => new OA\Schema(
+            description: 'Returned only to the HTTP registration caller; keep in tab memory.',
+            type: 'string',
+            nullable: true,
+        ),
     ],
+    required: ['destinationId', 'incarnationId', 'epoch'],
+    component: 'PlaybackEndpointResource',
 )]
 final class PlaybackEndpointResource extends AbstractResource
 {

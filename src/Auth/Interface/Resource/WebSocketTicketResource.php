@@ -6,12 +6,22 @@ namespace App\Auth\Interface\Resource;
 
 use App\Auth\Application\DTO\WebSocketTicket;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
-#[OA\Schema(schema: 'WebSocketTicketResource', required: ['ticket', 'expiresAt'], properties: [
-    new OA\Property(property: 'ticket', type: 'string', pattern: '^[0-9a-f]{64}$', maxLength: 64, minLength: 64),
-    new OA\Property(property: 'expiresAt', type: 'string', format: 'date-time'),
-])]
+#[OA\Schema(
+    type: 'object',
+    properties: [
+        'ticket' => new OA\Schema(
+            type: 'string',
+            minLength: 64,
+            maxLength: 64,
+            pattern: '^[0-9a-f]{64}$',
+        ),
+        'expiresAt' => new OA\Schema(type: 'string', format: 'date-time'),
+    ],
+    required: ['ticket', 'expiresAt'],
+    component: 'WebSocketTicketResource',
+)]
 final class WebSocketTicketResource extends AbstractResource
 {
     public static function from(mixed $source): array

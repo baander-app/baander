@@ -6,19 +6,31 @@ namespace App\Auth\Interface\Resource\OAuth;
 
 use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'OAuthTokenResource',
     description: 'Successful token response (RFC 6749 section 5.1) with a DPoP-bound access token (RFC 9449).',
-    required: ['access_token', 'token_type', 'expires_in', 'refresh_token', 'scope'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'access_token', type: 'string'),
-        new OA\Property(property: 'token_type', type: 'string', enum: ['DPoP']),
-        new OA\Property(property: 'expires_in', description: 'Seconds until the access token expires', type: 'integer', example: 3600),
-        new OA\Property(property: 'refresh_token', type: 'string'),
-        new OA\Property(property: 'scope', description: 'Space-separated scopes the access token carries', type: 'string', example: 'library playlist'),
+        'access_token' => new OA\Schema(type: 'string'),
+        'token_type' => new OA\Schema(
+            type: 'string',
+            enum: ['DPoP'],
+        ),
+        'expires_in' => new OA\Schema(
+            description: 'Seconds until the access token expires',
+            type: 'integer',
+            example: 3600,
+        ),
+        'refresh_token' => new OA\Schema(type: 'string'),
+        'scope' => new OA\Schema(
+            description: 'Space-separated scopes the access token carries',
+            type: 'string',
+            example: 'library playlist',
+        ),
     ],
+    required: ['access_token', 'token_type', 'expires_in', 'refresh_token', 'scope'],
+    component: 'OAuthTokenResource',
 )]
 final class OAuthTokenResource extends AbstractResource
 {

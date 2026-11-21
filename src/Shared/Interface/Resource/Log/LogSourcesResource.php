@@ -5,17 +5,26 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Resource\Log;
 
 use App\Shared\Interface\Resource\AbstractResource;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    required: ['items', 'nodes', 'channels', 'coverage'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'items', type: 'array', items: new OA\Items(ref: new Model(type: LogSourceResource::class))),
-        new OA\Property(property: 'nodes', type: 'array', items: new OA\Items(ref: new Model(type: LogNodeResource::class))),
-        new OA\Property(property: 'channels', type: 'array', items: new OA\Items(type: 'string')),
-        new OA\Property(property: 'coverage', ref: new Model(type: LogCoverageResource::class)),
+        'items' => new OA\Schema(
+            type: 'array',
+            items: new OA\Schema(ref: LogSourceResource::class),
+        ),
+        'nodes' => new OA\Schema(
+            type: 'array',
+            items: new OA\Schema(ref: LogNodeResource::class),
+        ),
+        'channels' => new OA\Schema(
+            type: 'array',
+            items: new OA\Schema(type: 'string'),
+        ),
+        'coverage' => new OA\Schema(ref: LogCoverageResource::class),
     ],
+    required: ['items', 'nodes', 'channels', 'coverage'],
 )]
 final class LogSourcesResource extends AbstractResource
 {

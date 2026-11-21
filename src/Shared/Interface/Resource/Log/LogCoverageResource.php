@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Resource\Log;
 
 use App\Shared\Interface\Resource\AbstractResource;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    required: ['complete', 'reasons'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'complete', type: 'boolean'),
-        new OA\Property(property: 'reasons', type: 'array', items: new OA\Items(type: 'string')),
+        'complete' => new OA\Schema(type: 'boolean'),
+        'reasons' => new OA\Schema(
+            type: 'array',
+            items: new OA\Schema(type: 'string'),
+        ),
     ],
+    required: ['complete', 'reasons'],
 )]
 final class LogCoverageResource extends AbstractResource
 {

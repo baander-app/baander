@@ -4,18 +4,23 @@ declare(strict_types=1);
 
 namespace App\Shared\Interface\DTO;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'ValidationError',
     description: 'Validation error response',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'error', properties: [
-            new OA\Property(property: 'message', type: 'string', example: 'Validation failed'),
-            new OA\Property(property: 'code', type: 'integer', example: 422),
-            new OA\Property(property: 'details', description: 'Field-level validation errors', type: 'object'),
-        ], type: 'object'),
+        'error' => new OA\Schema(
+            type: 'object',
+            properties: [
+                'message' => new OA\Schema(type: 'string', example: 'Validation failed'),
+                'code' => new OA\Schema(type: 'integer', example: 422),
+                'details' => new OA\Schema(description: 'Field-level validation errors', type: 'object'),
+            ],
+        ),
     ],
+    required: ['error'],
+    component: 'ValidationError',
 )]
 final readonly class ValidationError
 {

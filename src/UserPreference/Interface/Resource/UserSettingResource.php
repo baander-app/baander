@@ -7,33 +7,46 @@ namespace App\UserPreference\Interface\Resource;
 use App\Shared\Interface\Resource\AbstractResource;
 use App\Shared\Interface\Resource\SettingDefinitionResource;
 use App\UserPreference\Application\DTO\UserSettingEntry;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'UserSettingResource',
-    required: ['key', 'choice', 'value', 'resetValue', 'source', 'editable', 'definition'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'key', type: 'string', example: 'language'),
-        new OA\Property(property: 'choice', description: "The user's explicit choice; null when they have none", nullable: true, oneOf: [
-            new OA\Schema(type: 'boolean'),
-            new OA\Schema(type: 'integer'),
-            new OA\Schema(type: 'string'),
-        ]),
-        new OA\Property(property: 'value', description: 'Effective value', oneOf: [
-            new OA\Schema(type: 'boolean'),
-            new OA\Schema(type: 'integer'),
-            new OA\Schema(type: 'string'),
-        ]),
-        new OA\Property(property: 'resetValue', description: 'The value the setting would have after a reset', oneOf: [
-            new OA\Schema(type: 'boolean'),
-            new OA\Schema(type: 'integer'),
-            new OA\Schema(type: 'string'),
-        ]),
-        new OA\Property(property: 'source', type: 'string', enum: ['user', 'server_default', 'default']),
-        new OA\Property(property: 'editable', description: 'Whether the user may change the setting themselves', type: 'boolean'),
-        new OA\Property(property: 'definition', ref: new Model(type: SettingDefinitionResource::class)),
+        'key' => new OA\Schema(type: 'string', example: 'language'),
+        'choice' => new OA\Schema(
+            description: "The user's explicit choice; null when they have none",
+            nullable: true,
+            oneOf: [
+                new OA\Schema(type: 'boolean'),
+                new OA\Schema(type: 'integer'),
+                new OA\Schema(type: 'string'),
+            ],
+        ),
+        'value' => new OA\Schema(
+            description: 'Effective value',
+            oneOf: [
+                new OA\Schema(type: 'boolean'),
+                new OA\Schema(type: 'integer'),
+                new OA\Schema(type: 'string'),
+            ],
+        ),
+        'resetValue' => new OA\Schema(
+            description: 'The value the setting would have after a reset',
+            oneOf: [
+                new OA\Schema(type: 'boolean'),
+                new OA\Schema(type: 'integer'),
+                new OA\Schema(type: 'string'),
+            ],
+        ),
+        'source' => new OA\Schema(
+            type: 'string',
+            enum: ['user', 'server_default', 'default'],
+        ),
+        'editable' => new OA\Schema(description: 'Whether the user may change the setting themselves', type: 'boolean'),
+        'definition' => new OA\Schema(ref: SettingDefinitionResource::class),
     ],
+    required: ['key', 'choice', 'value', 'resetValue', 'source', 'editable', 'definition'],
+    component: 'UserSettingResource',
 )]
 final class UserSettingResource extends AbstractResource
 {

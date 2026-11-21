@@ -6,21 +6,38 @@ namespace App\Shared\Interface\Resource;
 
 use App\Shared\Application\LiveUpdates\LiveFamily;
 use App\Shared\Application\LiveUpdates\LiveSnapshot;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'LiveRecoveryResource',
-    required: ['version', 'families', 'authorizationFingerprint', 'health'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'version', type: 'integer', enum: [1]),
-        new OA\Property(property: 'families', type: 'array', items: new OA\Items(ref: new Model(type: LiveFamily::class))),
-        new OA\Property(property: 'authorizationFingerprint', type: 'string', pattern: '^[0-9a-f]{64}$'),
-        new OA\Property(property: 'health', required: ['state', 'oldestPendingAgeMs'], properties: [
-            new OA\Property(property: 'state', type: 'string', enum: ['current', 'degraded']),
-            new OA\Property(property: 'oldestPendingAgeMs', type: 'integer', nullable: true, minimum: 0),
-        ], type: 'object'),
+        'version' => new OA\Schema(
+            type: 'integer',
+            enum: [1],
+        ),
+        'families' => new OA\Schema(
+            type: 'array',
+            items: new OA\Schema(ref: LiveFamily::class),
+        ),
+        'authorizationFingerprint' => new OA\Schema(type: 'string', pattern: '^[0-9a-f]{64}$'),
+        'health' => new OA\Schema(
+            type: 'object',
+            properties: [
+                'state' => new OA\Schema(
+                    type: 'string',
+                    enum: ['current', 'degraded'],
+                ),
+                'oldestPendingAgeMs' => new OA\Schema(
+                    type: 'integer',
+                    nullable: true,
+                    minimum: 0,
+                ),
+            ],
+            required: ['state', 'oldestPendingAgeMs'],
+        ),
     ],
+    required: ['version', 'families', 'authorizationFingerprint', 'health'],
+    component: 'LiveRecoveryResource',
 )]
 final class LiveRecoveryResource extends AbstractResource
 {

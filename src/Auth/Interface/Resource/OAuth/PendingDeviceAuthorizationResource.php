@@ -6,18 +6,31 @@ namespace App\Auth\Interface\Resource\OAuth;
 
 use App\Auth\Application\DTO\PendingDeviceAuthorizationDTO;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'PendingDeviceAuthorizationResource',
-    required: ['userCode', 'clientId', 'clientName', 'scopes', 'expiresAt'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'userCode', description: 'The normalized user code', type: 'string', example: 'BCDF-GHJK'),
-        new OA\Property(property: 'clientId', type: 'string'),
-        new OA\Property(property: 'clientName', type: 'string', example: 'Living room TV'),
-        new OA\Property(property: 'scopes', description: 'The scopes an approval grants', type: 'array', items: new OA\Items(type: 'string')),
-        new OA\Property(property: 'expiresAt', type: 'string', format: 'date-time', nullable: true),
+        'userCode' => new OA\Schema(
+            description: 'The normalized user code',
+            type: 'string',
+            example: 'BCDF-GHJK',
+        ),
+        'clientId' => new OA\Schema(type: 'string'),
+        'clientName' => new OA\Schema(type: 'string', example: 'Living room TV'),
+        'scopes' => new OA\Schema(
+            description: 'The scopes an approval grants',
+            type: 'array',
+            items: new OA\Schema(type: 'string'),
+        ),
+        'expiresAt' => new OA\Schema(
+            type: 'string',
+            format: 'date-time',
+            nullable: true,
+        ),
     ],
+    required: ['userCode', 'clientId', 'clientName', 'scopes', 'expiresAt'],
+    component: 'PendingDeviceAuthorizationResource',
 )]
 final class PendingDeviceAuthorizationResource extends AbstractResource
 {

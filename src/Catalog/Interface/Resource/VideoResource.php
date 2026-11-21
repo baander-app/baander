@@ -6,19 +6,45 @@ namespace App\Catalog\Interface\Resource;
 
 use App\Catalog\Domain\Model\Video;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'VideoResource',
     properties: [
-        new OA\Property(property: 'publicId', description: 'Public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'path', description: 'File path', type: 'string'),
-        new OA\Property(property: 'duration', description: 'Duration in seconds', type: 'number', nullable: true),
-        new OA\Property(property: 'height', description: 'Video height in pixels', type: 'integer', nullable: true),
-        new OA\Property(property: 'width', description: 'Video width in pixels', type: 'integer', nullable: true),
-        new OA\Property(property: 'videoBitrate', description: 'Video bitrate in bps', type: 'integer', nullable: true),
-        new OA\Property(property: 'createdAt', description: 'Creation timestamp', type: 'string', format: 'date-time'),
+        'publicId' => new OA\Schema(
+            description: 'Public identifier',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'path' => new OA\Schema(description: 'File path', type: 'string'),
+        'duration' => new OA\Schema(
+            description: 'Duration in seconds',
+            type: 'number',
+            nullable: true,
+        ),
+        'height' => new OA\Schema(
+            description: 'Video height in pixels',
+            type: 'integer',
+            nullable: true,
+        ),
+        'width' => new OA\Schema(
+            description: 'Video width in pixels',
+            type: 'integer',
+            nullable: true,
+        ),
+        'videoBitrate' => new OA\Schema(
+            description: 'Video bitrate in bps',
+            type: 'integer',
+            nullable: true,
+        ),
+        'createdAt' => new OA\Schema(
+            description: 'Creation timestamp',
+            type: 'string',
+            format: 'date-time',
+        ),
     ],
+    component: 'VideoResource',
 )]
 final class VideoResource extends AbstractResource
 {

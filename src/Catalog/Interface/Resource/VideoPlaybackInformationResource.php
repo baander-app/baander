@@ -5,72 +5,76 @@ declare(strict_types=1);
 namespace App\Catalog\Interface\Resource;
 
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'VideoPlaybackInformationResource',
+    type: 'object',
     properties: [
-        new OA\Property(
-            property: 'qualityChoices',
+        'qualityChoices' => new OA\Schema(
             type: 'array',
-            items: new OA\Items(properties: [
-                new OA\Property(property: 'id', type: 'string'),
-                new OA\Property(property: 'label', type: 'string'),
-                new OA\Property(property: 'width', type: 'integer'),
-                new OA\Property(property: 'height', type: 'integer'),
-            ]),
+            items: new OA\Schema(
+                properties: [
+                    'id' => new OA\Schema(type: 'string'),
+                    'label' => new OA\Schema(type: 'string'),
+                    'width' => new OA\Schema(type: 'integer'),
+                    'height' => new OA\Schema(type: 'integer'),
+                ],
+            ),
         ),
-        new OA\Property(
-            property: 'audioTracks',
+        'audioTracks' => new OA\Schema(
             type: 'array',
-            items: new OA\Items(properties: [
-                new OA\Property(property: 'index', type: 'integer', nullable: true),
-                new OA\Property(property: 'language', type: 'string'),
-                new OA\Property(property: 'title', type: 'string'),
-                new OA\Property(property: 'codec', type: 'string'),
-                new OA\Property(property: 'channels', type: 'integer'),
-                new OA\Property(property: 'isDefault', type: 'boolean'),
-            ]),
+            items: new OA\Schema(
+                properties: [
+                    'index' => new OA\Schema(type: 'integer', nullable: true),
+                    'language' => new OA\Schema(type: 'string'),
+                    'title' => new OA\Schema(type: 'string'),
+                    'codec' => new OA\Schema(type: 'string'),
+                    'channels' => new OA\Schema(type: 'integer'),
+                    'isDefault' => new OA\Schema(type: 'boolean'),
+                ],
+            ),
         ),
-        new OA\Property(
-            property: 'subtitleTracks',
+        'subtitleTracks' => new OA\Schema(
             type: 'array',
-            items: new OA\Items(properties: [
-                new OA\Property(property: 'index', type: 'integer'),
-                new OA\Property(property: 'language', type: 'string'),
-                new OA\Property(property: 'title', type: 'string'),
-                new OA\Property(property: 'codec', type: 'string'),
-                new OA\Property(property: 'isDefault', type: 'boolean'),
-                new OA\Property(property: 'isForced', type: 'boolean'),
-                new OA\Property(property: 'isText', type: 'boolean'),
-            ]),
+            items: new OA\Schema(
+                properties: [
+                    'index' => new OA\Schema(type: 'integer'),
+                    'language' => new OA\Schema(type: 'string'),
+                    'title' => new OA\Schema(type: 'string'),
+                    'codec' => new OA\Schema(type: 'string'),
+                    'isDefault' => new OA\Schema(type: 'boolean'),
+                    'isForced' => new OA\Schema(type: 'boolean'),
+                    'isText' => new OA\Schema(type: 'boolean'),
+                ],
+            ),
         ),
-        new OA\Property(
-            property: 'chapters',
+        'chapters' => new OA\Schema(
             type: 'array',
-            items: new OA\Items(properties: [
-                new OA\Property(property: 'start', type: 'number'),
-                new OA\Property(property: 'end', type: 'number'),
-                new OA\Property(property: 'title', type: 'string'),
-            ]),
+            items: new OA\Schema(
+                properties: [
+                    'start' => new OA\Schema(type: 'number'),
+                    'end' => new OA\Schema(type: 'number'),
+                    'title' => new OA\Schema(type: 'string'),
+                ],
+            ),
         ),
-        new OA\Property(
-            property: 'preview',
+        'preview' => new OA\Schema(
             properties: [
-                new OA\Property(
-                    property: 'state',
+                'state' => new OA\Schema(
                     type: 'string',
                     enum: ['pending', 'ready', 'failed', 'unavailable'],
                 ),
-                new OA\Property(property: 'url', type: 'string', nullable: true),
-                new OA\Property(property: 'interval', type: 'number'),
-                new OA\Property(property: 'width', type: 'integer'),
-                new OA\Property(property: 'height', type: 'integer'),
-                new OA\Property(property: 'columns', type: 'integer'),
-                new OA\Property(property: 'count', type: 'integer'),
+                'url' => new OA\Schema(type: 'string', nullable: true),
+                'interval' => new OA\Schema(type: 'number'),
+                'width' => new OA\Schema(type: 'integer'),
+                'height' => new OA\Schema(type: 'integer'),
+                'columns' => new OA\Schema(type: 'integer'),
+                'count' => new OA\Schema(type: 'integer'),
             ],
         ),
     ],
+    required: ['qualityChoices', 'audioTracks', 'subtitleTracks', 'chapters', 'preview'],
+    component: 'VideoPlaybackInformationResource',
 )]
 final class VideoPlaybackInformationResource extends AbstractResource
 {

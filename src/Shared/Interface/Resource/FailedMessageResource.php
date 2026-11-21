@@ -6,20 +6,46 @@ namespace App\Shared\Interface\Resource;
 
 use App\Shared\Application\DTO\FailedMessage;
 use App\Shared\Application\PublicDiagnosticText;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'FailedMessageResource',
-    required: ['id', 'messageClass', 'originalTransport', 'errorClass', 'errorMessage', 'failedAt', 'retryCount'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'id', description: 'Failure transport message id', type: 'string', pattern: '^[1-9][0-9]{0,17}$'),
-        new OA\Property(property: 'messageClass', description: 'Message class name', type: 'string'),
-        new OA\Property(property: 'originalTransport', description: 'Transport the message failed on', type: 'string', nullable: true),
-        new OA\Property(property: 'errorClass', description: 'Exception class of the last failure', type: 'string', nullable: true),
-        new OA\Property(property: 'errorMessage', description: 'Exception message of the last failure', type: 'string', nullable: true),
-        new OA\Property(property: 'failedAt', description: 'Time of the last failure', type: 'string', format: 'date-time', nullable: true),
-        new OA\Property(property: 'retryCount', description: 'Retries from the failure transport that failed again', type: 'integer', minimum: 0),
+        'id' => new OA\Schema(
+            description: 'Failure transport message id',
+            type: 'string',
+            pattern: '^[1-9][0-9]{0,17}$',
+        ),
+        'messageClass' => new OA\Schema(description: 'Message class name', type: 'string'),
+        'originalTransport' => new OA\Schema(
+            description: 'Transport the message failed on',
+            type: 'string',
+            nullable: true,
+        ),
+        'errorClass' => new OA\Schema(
+            description: 'Exception class of the last failure',
+            type: 'string',
+            nullable: true,
+        ),
+        'errorMessage' => new OA\Schema(
+            description: 'Exception message of the last failure',
+            type: 'string',
+            nullable: true,
+        ),
+        'failedAt' => new OA\Schema(
+            description: 'Time of the last failure',
+            type: 'string',
+            format: 'date-time',
+            nullable: true,
+        ),
+        'retryCount' => new OA\Schema(
+            description: 'Retries from the failure transport that failed again',
+            type: 'integer',
+            minimum: 0,
+        ),
     ],
+    required: ['id', 'messageClass', 'originalTransport', 'errorClass', 'errorMessage', 'failedAt', 'retryCount'],
+    component: 'FailedMessageResource',
 )]
 final class FailedMessageResource extends AbstractResource
 {

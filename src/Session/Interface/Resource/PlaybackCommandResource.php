@@ -5,29 +5,50 @@ declare(strict_types=1);
 namespace App\Session\Interface\Resource;
 
 use App\Shared\Interface\Resource\AbstractResource;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'PlaybackCommandResource',
-    required: ['id', 'attemptId', 'revision', 'incarnationId', 'epoch', 'type', 'payload', 'expiresAt'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'id', description: 'Command identifier.', type: 'string'),
-        new OA\Property(property: 'attemptId', description: 'Transfer attempt identifier.', type: 'string'),
-        new OA\Property(property: 'revision', type: 'integer', minimum: 0),
-        new OA\Property(property: 'incarnationId', description: 'Incarnation identifier of the endpoint the command is for, issued by the server when that endpoint registered.', type: 'string'),
-        new OA\Property(property: 'epoch', type: 'integer', minimum: 1),
-        new OA\Property(property: 'type', type: 'string', enum: ['prepare', 'quiesce', 'start', 'stop', 'play', 'pause', 'seek', 'load', 'observe', 'volume', 'queue']),
-        new OA\Property(property: 'payload', required: ['media', 'queue', 'currentTrackIndex', 'position', 'desiredState'], properties: [
-            new OA\Property(property: 'media', ref: new Model(type: PlaybackMediaResource::class), nullable: true),
-            new OA\Property(property: 'queue', type: 'array', items: new OA\Items(type: 'string')),
-            new OA\Property(property: 'currentTrackIndex', type: 'integer', minimum: 0),
-            new OA\Property(property: 'position', type: 'number', minimum: 0),
-            new OA\Property(property: 'desiredState', type: 'string', enum: ['playing', 'paused', 'stopped']),
-            new OA\Property(property: 'volume', type: 'number', nullable: true, maximum: 1, minimum: 0),
-        ], type: 'object'),
-        new OA\Property(property: 'expiresAt', type: 'string', format: 'date-time'),
+        'id' => new OA\Schema(description: 'Command identifier.', type: 'string'),
+        'attemptId' => new OA\Schema(description: 'Transfer attempt identifier.', type: 'string'),
+        'revision' => new OA\Schema(type: 'integer', minimum: 0),
+        'incarnationId' => new OA\Schema(
+            description: 'Incarnation identifier of the endpoint the command is for, issued by the server when that endpoint registered.',
+            type: 'string',
+        ),
+        'epoch' => new OA\Schema(type: 'integer', minimum: 1),
+        'type' => new OA\Schema(
+            type: 'string',
+            enum: ['prepare', 'quiesce', 'start', 'stop', 'play', 'pause', 'seek', 'load', 'observe', 'volume', 'queue'],
+        ),
+        'payload' => new OA\Schema(
+            type: 'object',
+            properties: [
+                'media' => new OA\Schema(ref: PlaybackMediaResource::class, nullable: true),
+                'queue' => new OA\Schema(
+                    type: 'array',
+                    items: new OA\Schema(type: 'string'),
+                ),
+                'currentTrackIndex' => new OA\Schema(type: 'integer', minimum: 0),
+                'position' => new OA\Schema(type: 'number', minimum: 0),
+                'desiredState' => new OA\Schema(
+                    type: 'string',
+                    enum: ['playing', 'paused', 'stopped'],
+                ),
+                'volume' => new OA\Schema(
+                    type: 'number',
+                    nullable: true,
+                    minimum: 0,
+                    maximum: 1,
+                ),
+            ],
+            required: ['media', 'queue', 'currentTrackIndex', 'position', 'desiredState'],
+        ),
+        'expiresAt' => new OA\Schema(type: 'string', format: 'date-time'),
     ],
+    required: ['id', 'attemptId', 'revision', 'incarnationId', 'epoch', 'type', 'payload', 'expiresAt'],
+    component: 'PlaybackCommandResource',
 )]
 final class PlaybackCommandResource extends AbstractResource
 {

@@ -6,25 +6,76 @@ namespace App\Media\Interface\Resource;
 
 use App\Media\Domain\ReadModel\ImageReadView;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'ImageResource',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'publicId', description: 'Public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'extension', description: 'File extension', type: 'string'),
-        new OA\Property(property: 'mimeType', description: 'MIME type', type: 'string'),
-        new OA\Property(property: 'blurhash', description: 'BlurHash representation', type: 'string', nullable: true),
-        new OA\Property(property: 'size', description: 'File size in bytes', type: 'integer'),
-        new OA\Property(property: 'width', description: 'Image width in pixels', type: 'integer'),
-        new OA\Property(property: 'height', description: 'Image height in pixels', type: 'integer'),
-        new OA\Property(property: 'imageableType', description: 'Parent entity type', type: 'string'),
-        new OA\Property(property: 'albumId', description: 'Associated album public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
-        new OA\Property(property: 'artistId', description: 'Associated artist public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
-        new OA\Property(property: 'playlistId', description: 'Associated playlist public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
-        new OA\Property(property: 'createdAt', description: 'Creation timestamp', type: 'string', format: 'date-time'),
-        new OA\Property(property: 'updatedAt', description: 'Last update timestamp', type: 'string', format: 'date-time'),
+        'publicId' => new OA\Schema(
+            description: 'Public identifier',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'extension' => new OA\Schema(description: 'File extension', type: 'string'),
+        'mimeType' => new OA\Schema(description: 'MIME type', type: 'string'),
+        'blurhash' => new OA\Schema(
+            description: 'BlurHash representation',
+            type: 'string',
+            nullable: true,
+        ),
+        'size' => new OA\Schema(description: 'File size in bytes', type: 'integer'),
+        'width' => new OA\Schema(description: 'Image width in pixels', type: 'integer'),
+        'height' => new OA\Schema(description: 'Image height in pixels', type: 'integer'),
+        'imageableType' => new OA\Schema(description: 'Parent entity type', type: 'string'),
+        'albumId' => new OA\Schema(
+            description: 'Associated album public ID',
+            type: 'string',
+            nullable: true,
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'artistId' => new OA\Schema(
+            description: 'Associated artist public ID',
+            type: 'string',
+            nullable: true,
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'playlistId' => new OA\Schema(
+            description: 'Associated playlist public ID',
+            type: 'string',
+            nullable: true,
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'createdAt' => new OA\Schema(
+            description: 'Creation timestamp',
+            type: 'string',
+            format: 'date-time',
+        ),
+        'updatedAt' => new OA\Schema(
+            description: 'Last update timestamp',
+            type: 'string',
+            format: 'date-time',
+        ),
     ],
+    required: [
+        'publicId',
+        'extension',
+        'mimeType',
+        'size',
+        'width',
+        'height',
+        'imageableType',
+        'createdAt',
+        'updatedAt',
+    ],
+    component: 'ImageResource',
 )]
 final class ImageResource extends AbstractResource
 {

@@ -6,18 +6,26 @@ namespace App\Auth\Interface\Resource;
 
 use App\Auth\Domain\Model\LoginBlock;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'LoginBlockResource',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'publicId', description: 'Block public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'ipAddress', description: 'Blocked IP address', type: 'string'),
-        new OA\Property(property: 'email', description: 'Email used in the blocked attempt', type: 'string'),
-        new OA\Property(property: 'fieldValue', description: 'Form field value that triggered the block', type: 'string'),
-        new OA\Property(property: 'userAgent', description: 'User agent of the blocked request', type: 'string'),
-        new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
+        'publicId' => new OA\Schema(
+            description: 'Block public ID',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'ipAddress' => new OA\Schema(description: 'Blocked IP address', type: 'string'),
+        'email' => new OA\Schema(description: 'Email used in the blocked attempt', type: 'string'),
+        'fieldValue' => new OA\Schema(description: 'Form field value that triggered the block', type: 'string'),
+        'userAgent' => new OA\Schema(description: 'User agent of the blocked request', type: 'string'),
+        'createdAt' => new OA\Schema(type: 'string', format: 'date-time'),
     ],
+    required: ['publicId', 'ipAddress', 'email', 'fieldValue', 'userAgent', 'createdAt'],
+    component: 'LoginBlockResource',
 )]
 final class LoginBlockResource extends AbstractResource
 {

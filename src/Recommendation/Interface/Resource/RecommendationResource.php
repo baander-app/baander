@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Recommendation\Interface\Resource;
 
 use App\Recommendation\Domain\Model\Recommendation;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 /**
  * @phpstan-type RecommendationData array{
@@ -15,20 +15,50 @@ use OpenApi\Attributes as OA;
  * }
  */
 #[OA\Schema(
-    schema: 'RecommendationResource',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'public_id', description: 'Public recommendation identity', type: 'string'),
-        new OA\Property(property: 'name', description: 'Recommendation name', type: 'string'),
-        new OA\Property(property: 'source_type', description: 'Source entity type', type: 'string'),
-        new OA\Property(property: 'source_id', description: 'Source entity ID', type: 'string', nullable: true),
-        new OA\Property(property: 'target_type', description: 'Target entity type', type: 'string'),
-        new OA\Property(property: 'target_id', description: 'Target entity ID', type: 'string', nullable: true),
-        new OA\Property(property: 'score', description: 'Relevance score', type: 'number', nullable: true),
-        new OA\Property(property: 'position', description: 'Recommendation position', type: 'integer', nullable: true),
-        new OA\Property(property: 'user_id', description: 'Public user identity', type: 'string', nullable: true),
-        new OA\Property(property: 'created_at', description: 'Creation timestamp', type: 'string', format: 'date-time'),
-        new OA\Property(property: 'updated_at', description: 'Last update timestamp', type: 'string', format: 'date-time'),
+        'public_id' => new OA\Schema(description: 'Public recommendation identity', type: 'string'),
+        'name' => new OA\Schema(description: 'Recommendation name', type: 'string'),
+        'source_type' => new OA\Schema(description: 'Source entity type', type: 'string'),
+        'source_id' => new OA\Schema(
+            description: 'Source entity ID',
+            type: 'string',
+            nullable: true,
+        ),
+        'target_type' => new OA\Schema(description: 'Target entity type', type: 'string'),
+        'target_id' => new OA\Schema(
+            description: 'Target entity ID',
+            type: 'string',
+            nullable: true,
+        ),
+        'score' => new OA\Schema(
+            description: 'Relevance score',
+            type: 'number',
+            nullable: true,
+        ),
+        'position' => new OA\Schema(
+            description: 'Recommendation position',
+            type: 'integer',
+            nullable: true,
+        ),
+        'user_id' => new OA\Schema(
+            description: 'Public user identity',
+            type: 'string',
+            nullable: true,
+        ),
+        'created_at' => new OA\Schema(
+            description: 'Creation timestamp',
+            type: 'string',
+            format: 'date-time',
+        ),
+        'updated_at' => new OA\Schema(
+            description: 'Last update timestamp',
+            type: 'string',
+            format: 'date-time',
+        ),
     ],
+    required: ['public_id', 'name', 'source_type', 'target_type', 'created_at', 'updated_at'],
+    component: 'RecommendationResource',
 )]
 final class RecommendationResource
 {

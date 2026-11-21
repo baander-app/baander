@@ -5,22 +5,35 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Resource;
 
 use App\Shared\Application\DTO\SystemSettingEntry;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'SystemSettingResource',
-    required: ['key', 'value', 'storedValue', 'isExplicit', 'storedValueValid'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'key', type: 'string', example: 'transcode.max_bitrate'),
-        new OA\Property(property: 'value', description: 'Effective value', oneOf: [
-            new OA\Schema(type: 'boolean'),
-            new OA\Schema(type: 'integer'),
-            new OA\Schema(type: 'string'),
-        ]),
-        new OA\Property(property: 'storedValue', description: 'Raw stored value, also when it is no longer allowed; null when unset', nullable: true),
-        new OA\Property(property: 'isExplicit', description: 'Whether a value is stored rather than the default applying', type: 'boolean'),
-        new OA\Property(property: 'storedValueValid', description: 'False when the stored value is no longer allowed and the default applies', type: 'boolean'),
+        'key' => new OA\Schema(type: 'string', example: 'transcode.max_bitrate'),
+        'value' => new OA\Schema(
+            description: 'Effective value',
+            oneOf: [
+                new OA\Schema(type: 'boolean'),
+                new OA\Schema(type: 'integer'),
+                new OA\Schema(type: 'string'),
+            ],
+        ),
+        'storedValue' => new OA\Schema(
+            description: 'Raw stored value, also when it is no longer allowed; null when unset',
+            nullable: true,
+        ),
+        'isExplicit' => new OA\Schema(
+            description: 'Whether a value is stored rather than the default applying',
+            type: 'boolean',
+        ),
+        'storedValueValid' => new OA\Schema(
+            description: 'False when the stored value is no longer allowed and the default applies',
+            type: 'boolean',
+        ),
     ],
+    required: ['key', 'value', 'storedValue', 'isExplicit', 'storedValueValid'],
+    component: 'SystemSettingResource',
 )]
 final class SystemSettingResource extends AbstractResource
 {

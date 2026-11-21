@@ -22,7 +22,7 @@ use App\Catalog\Interface\Resource\MatchArtistActionResource;
 use App\Catalog\Interface\Resource\MatchComparisonResource;
 use App\Catalog\Interface\Resource\MatchFieldRowResource;
 use App\Shared\Domain\Model\Uuid;
-use OpenApi\Attributes\Schema;
+use OpenApi\Spec\Schema;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 
@@ -201,7 +201,7 @@ final class MatchComparisonResourceTest extends TestCase
     private static function enum(string $resource, string $property): array
     {
         $schema = new ReflectionClass($resource)->getAttributes(Schema::class)[0]->newInstance();
-        $enum = array_find($schema->properties, static fn (object $candidate): bool => $candidate->property === $property)?->enum;
+        $enum = array_find($schema->properties, static fn (object $candidate): bool => $candidate->property === $property)?->schema?->enum;
         self::assertIsArray($enum, sprintf('%s lists the values of %s.', $resource, $property));
 
         return $enum;

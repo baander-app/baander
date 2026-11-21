@@ -6,18 +6,26 @@ namespace App\Auth\Interface\Resource;
 
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'ClientResource',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'publicId', description: 'Public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'name', description: 'Client name', type: 'string'),
-        new OA\Property(property: 'redirect', description: 'JSON-encoded array of redirect URIs', type: 'string'),
-        new OA\Property(property: 'personalAccessClient', description: 'Whether this is a personal access client', type: 'boolean'),
-        new OA\Property(property: 'confidential', description: 'Whether the client is confidential', type: 'boolean'),
-        new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
+        'publicId' => new OA\Schema(
+            description: 'Public identifier',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'name' => new OA\Schema(description: 'Client name', type: 'string'),
+        'redirect' => new OA\Schema(description: 'JSON-encoded array of redirect URIs', type: 'string'),
+        'personalAccessClient' => new OA\Schema(description: 'Whether this is a personal access client', type: 'boolean'),
+        'confidential' => new OA\Schema(description: 'Whether the client is confidential', type: 'boolean'),
+        'createdAt' => new OA\Schema(type: 'string', format: 'date-time'),
     ],
+    required: ['publicId', 'name', 'redirect', 'personalAccessClient', 'confidential', 'createdAt'],
+    component: 'ClientResource',
 )]
 final class ClientResource extends AbstractResource
 {

@@ -5,24 +5,39 @@ declare(strict_types=1);
 namespace App\Shared\Interface\DTO;
 
 use App\Shared\Domain\Model\CursorPage;
-use Nelmio\ApiDocBundle\Attribute\Ignore;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'CursorPaginatedResponse',
-    required: ['data', 'meta'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'data', type: 'array', items: new OA\Items(nullable: true)),
-        new OA\Property(property: 'meta', required: ['next_cursor', 'prev_cursor', 'has_next_page', 'has_previous_page', 'total', 'per_page', 'stale_cursor'], properties: [
-            new OA\Property(property: 'next_cursor', type: 'string', nullable: true),
-            new OA\Property(property: 'prev_cursor', type: 'string', nullable: true),
-            new OA\Property(property: 'has_next_page', type: 'boolean'),
-            new OA\Property(property: 'has_previous_page', type: 'boolean'),
-            new OA\Property(property: 'total', type: 'integer'),
-            new OA\Property(property: 'per_page', type: 'integer'),
-            new OA\Property(property: 'stale_cursor', type: 'boolean'),
-        ], type: 'object'),
+        'data' => new OA\Schema(
+            type: 'array',
+            items: new OA\Schema(nullable: true),
+        ),
+        'meta' => new OA\Schema(
+            type: 'object',
+            properties: [
+                'next_cursor' => new OA\Schema(type: 'string', nullable: true),
+                'prev_cursor' => new OA\Schema(type: 'string', nullable: true),
+                'has_next_page' => new OA\Schema(type: 'boolean'),
+                'has_previous_page' => new OA\Schema(type: 'boolean'),
+                'total' => new OA\Schema(type: 'integer'),
+                'per_page' => new OA\Schema(type: 'integer'),
+                'stale_cursor' => new OA\Schema(type: 'boolean'),
+            ],
+            required: [
+                'next_cursor',
+                'prev_cursor',
+                'has_next_page',
+                'has_previous_page',
+                'total',
+                'per_page',
+                'stale_cursor',
+            ],
+        ),
     ],
+    required: ['data', 'meta'],
+    component: 'CursorPaginatedResponse',
 )]
 final readonly class CursorPaginatedResponse
 {
@@ -31,21 +46,13 @@ final readonly class CursorPaginatedResponse
      */
     public function __construct(
         // Document the toArray() envelope rather than these constructor fields.
-        #[Ignore]
         public array $data,
-        #[Ignore]
         public ?string $nextCursor,
-        #[Ignore]
         public ?string $prevCursor,
-        #[Ignore]
         public bool $hasNextPage,
-        #[Ignore]
         public bool $hasPreviousPage,
-        #[Ignore]
         public int $total,
-        #[Ignore]
         public bool $staleCursor,
-        #[Ignore]
         public int $perPage,
     ) {
     }

@@ -5,22 +5,42 @@ declare(strict_types=1);
 namespace App\UserPreference\Interface\Resource;
 
 use App\UserPreference\Domain\Model\EqDeviceProfile;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'EqDeviceProfileResource',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'publicId', description: 'Profile public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'name', description: 'Profile name', type: 'string'),
-        new OA\Property(property: 'icon', description: 'Icon identifier', type: 'string'),
-        new OA\Property(property: 'deviceId', description: 'Client audio-output token, independent of database identity', type: 'string', nullable: true),
-        new OA\Property(property: 'payload', description: 'EQ configuration payload', type: 'object'),
-        new OA\Property(property: 'isDefault', description: 'Whether this is the default profile', type: 'boolean'),
-        new OA\Property(property: 'sortOrder', description: 'Sort order', type: 'integer'),
-        new OA\Property(property: 'version', description: 'Profile version', type: 'integer'),
-        new OA\Property(property: 'createdAt', description: 'Creation timestamp', type: 'string', format: 'date-time'),
-        new OA\Property(property: 'updatedAt', description: 'Last update timestamp', type: 'string', format: 'date-time'),
+        'publicId' => new OA\Schema(
+            description: 'Profile public identifier',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'name' => new OA\Schema(description: 'Profile name', type: 'string'),
+        'icon' => new OA\Schema(description: 'Icon identifier', type: 'string'),
+        'deviceId' => new OA\Schema(
+            description: 'Client audio-output token, independent of database identity',
+            type: 'string',
+            nullable: true,
+        ),
+        'payload' => new OA\Schema(description: 'EQ configuration payload', type: 'object'),
+        'isDefault' => new OA\Schema(description: 'Whether this is the default profile', type: 'boolean'),
+        'sortOrder' => new OA\Schema(description: 'Sort order', type: 'integer'),
+        'version' => new OA\Schema(description: 'Profile version', type: 'integer'),
+        'createdAt' => new OA\Schema(
+            description: 'Creation timestamp',
+            type: 'string',
+            format: 'date-time',
+        ),
+        'updatedAt' => new OA\Schema(
+            description: 'Last update timestamp',
+            type: 'string',
+            format: 'date-time',
+        ),
     ],
+    required: ['publicId', 'name', 'icon', 'payload', 'isDefault', 'sortOrder', 'version', 'createdAt', 'updatedAt'],
+    component: 'EqDeviceProfileResource',
 )]
 final class EqDeviceProfileResource
 {

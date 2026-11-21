@@ -6,23 +6,79 @@ namespace App\Party\Interface\Resource;
 
 use App\Party\Application\DTO\PartySessionView;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'PartySessionResource',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'publicId', description: 'Public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'hostUserId', description: 'Host user public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'videoId', description: 'Video public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'transcodeJobId', description: 'Transcode job that the host\'s playback steers; null when none was named or the job has been deleted', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
-        new OA\Property(property: 'maxMembers', description: 'Maximum members allowed', type: 'integer'),
-        new OA\Property(property: 'playbackState', description: 'Playback state', type: 'string', enum: ['playing', 'paused', 'stopped']),
-        new OA\Property(property: 'wallClockPosition', description: 'Wall clock position', type: 'number', nullable: true),
-        new OA\Property(property: 'currentPosition', description: 'Current playback position', type: 'number', nullable: true),
-        new OA\Property(property: 'isActive', description: 'Whether the session is active', type: 'boolean'),
-        new OA\Property(property: 'createdAt', description: 'Creation timestamp', type: 'string', format: 'date-time'),
-        new OA\Property(property: 'updatedAt', description: 'Last update timestamp', type: 'string', format: 'date-time'),
+        'publicId' => new OA\Schema(
+            description: 'Public identifier',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'hostUserId' => new OA\Schema(
+            description: 'Host user public ID',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'videoId' => new OA\Schema(
+            description: 'Video public ID',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'transcodeJobId' => new OA\Schema(
+            description: 'Transcode job that the host\'s playback steers; null when none was named or the job has been deleted',
+            type: 'string',
+            nullable: true,
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'maxMembers' => new OA\Schema(description: 'Maximum members allowed', type: 'integer'),
+        'playbackState' => new OA\Schema(
+            description: 'Playback state',
+            type: 'string',
+            enum: ['playing', 'paused', 'stopped'],
+        ),
+        'wallClockPosition' => new OA\Schema(
+            description: 'Wall clock position',
+            type: 'number',
+            nullable: true,
+        ),
+        'currentPosition' => new OA\Schema(
+            description: 'Current playback position',
+            type: 'number',
+            nullable: true,
+        ),
+        'isActive' => new OA\Schema(description: 'Whether the session is active', type: 'boolean'),
+        'createdAt' => new OA\Schema(
+            description: 'Creation timestamp',
+            type: 'string',
+            format: 'date-time',
+        ),
+        'updatedAt' => new OA\Schema(
+            description: 'Last update timestamp',
+            type: 'string',
+            format: 'date-time',
+        ),
     ],
+    required: [
+        'publicId',
+        'hostUserId',
+        'videoId',
+        'maxMembers',
+        'playbackState',
+        'isActive',
+        'createdAt',
+        'updatedAt',
+    ],
+    component: 'PartySessionResource',
 )]
 final class PartySessionResource extends AbstractResource
 {

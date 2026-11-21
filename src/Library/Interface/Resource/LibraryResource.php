@@ -6,23 +6,56 @@ namespace App\Library\Interface\Resource;
 
 use App\Library\Domain\Model\Library;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'LibraryResource',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'publicId', description: 'Library public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'name', description: 'Library name', type: 'string'),
-        new OA\Property(property: 'slug', description: 'URL-friendly slug', type: 'string'),
-        new OA\Property(property: 'path', description: 'Filesystem path', type: 'string'),
-        new OA\Property(property: 'type', description: 'Library type', type: 'string', enum: ['music', 'podcast', 'audiobook', 'movie', 'tv_show']),
-        new OA\Property(property: 'filesystemType', description: 'Filesystem type', type: 'string', enum: ['local']),
-        new OA\Property(property: 'sortOrder', description: 'Sort order', type: 'integer'),
-        new OA\Property(property: 'lastScan', description: 'Last scan timestamp', type: 'string', format: 'date-time', nullable: true),
-        new OA\Property(property: 'scanStatus', description: 'Current scan status', type: 'string', nullable: true),
-        new OA\Property(property: 'createdAt', description: 'Creation timestamp', type: 'string', format: 'date-time'),
-        new OA\Property(property: 'updatedAt', description: 'Last update timestamp', type: 'string', format: 'date-time'),
+        'publicId' => new OA\Schema(
+            description: 'Library public ID',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'name' => new OA\Schema(description: 'Library name', type: 'string'),
+        'slug' => new OA\Schema(description: 'URL-friendly slug', type: 'string'),
+        'path' => new OA\Schema(description: 'Filesystem path', type: 'string'),
+        'type' => new OA\Schema(
+            description: 'Library type',
+            type: 'string',
+            enum: ['music', 'podcast', 'audiobook', 'movie', 'tv_show'],
+        ),
+        'filesystemType' => new OA\Schema(
+            description: 'Filesystem type',
+            type: 'string',
+            enum: ['local'],
+        ),
+        'sortOrder' => new OA\Schema(description: 'Sort order', type: 'integer'),
+        'lastScan' => new OA\Schema(
+            description: 'Last scan timestamp',
+            type: 'string',
+            format: 'date-time',
+            nullable: true,
+        ),
+        'scanStatus' => new OA\Schema(
+            description: 'Current scan status',
+            type: 'string',
+            nullable: true,
+        ),
+        'createdAt' => new OA\Schema(
+            description: 'Creation timestamp',
+            type: 'string',
+            format: 'date-time',
+        ),
+        'updatedAt' => new OA\Schema(
+            description: 'Last update timestamp',
+            type: 'string',
+            format: 'date-time',
+        ),
     ],
+    required: ['publicId', 'name', 'slug', 'path', 'type', 'filesystemType', 'sortOrder', 'createdAt', 'updatedAt'],
+    component: 'LibraryResource',
 )]
 final class LibraryResource extends AbstractResource
 {

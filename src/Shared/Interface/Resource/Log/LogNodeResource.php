@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Resource\Log;
 
 use App\Shared\Interface\Resource\AbstractResource;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    required: ['id', 'status'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'id', type: 'string'),
-        new OA\Property(property: 'status', type: 'string', enum: ['healthy', 'unreachable']),
+        'id' => new OA\Schema(type: 'string'),
+        'status' => new OA\Schema(
+            type: 'string',
+            enum: ['healthy', 'unreachable'],
+        ),
     ],
+    required: ['id', 'status'],
 )]
 final class LogNodeResource extends AbstractResource
 {

@@ -5,37 +5,85 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Resource;
 
 use App\Shared\Domain\Model\Setting\SettingDefinition;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'SettingDefinitionResource',
-    required: ['key', 'type', 'scope', 'label', 'description', 'group', 'default', 'options', 'min', 'max', 'editRole', 'userVisible', 'enforced', 'fallbackKey'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'key', type: 'string', example: 'transcode.max_bitrate'),
-        new OA\Property(property: 'type', type: 'string', enum: ['boolean', 'integer', 'enum', 'string']),
-        new OA\Property(property: 'scope', type: 'string', enum: ['system', 'user']),
-        new OA\Property(property: 'label', type: 'string'),
-        new OA\Property(property: 'description', type: 'string'),
-        new OA\Property(property: 'group', description: 'Group label the settings page shows the setting under', type: 'string'),
-        new OA\Property(property: 'default', description: 'Default value; null when the setting follows fallbackKey', nullable: true, oneOf: [
-            new OA\Schema(type: 'boolean'),
-            new OA\Schema(type: 'integer'),
-            new OA\Schema(type: 'string'),
-        ]),
-        new OA\Property(property: 'options', description: 'Allowed values of an enum setting, with their labels', type: 'array', items: new OA\Items(
-            required: ['value', 'label'],
-            properties: [
-                new OA\Property(property: 'value', oneOf: [new OA\Schema(type: 'integer'), new OA\Schema(type: 'string')]),
-                new OA\Property(property: 'label', type: 'string'),
+        'key' => new OA\Schema(type: 'string', example: 'transcode.max_bitrate'),
+        'type' => new OA\Schema(
+            type: 'string',
+            enum: ['boolean', 'integer', 'enum', 'string'],
+        ),
+        'scope' => new OA\Schema(
+            type: 'string',
+            enum: ['system', 'user'],
+        ),
+        'label' => new OA\Schema(type: 'string'),
+        'description' => new OA\Schema(type: 'string'),
+        'group' => new OA\Schema(description: 'Group label the settings page shows the setting under', type: 'string'),
+        'default' => new OA\Schema(
+            description: 'Default value; null when the setting follows fallbackKey',
+            nullable: true,
+            oneOf: [
+                new OA\Schema(type: 'boolean'),
+                new OA\Schema(type: 'integer'),
+                new OA\Schema(type: 'string'),
             ],
-        )),
-        new OA\Property(property: 'min', type: 'integer', nullable: true),
-        new OA\Property(property: 'max', type: 'integer', nullable: true),
-        new OA\Property(property: 'editRole', type: 'string', enum: ['ROLE_USER', 'ROLE_SUPER_ADMIN']),
-        new OA\Property(property: 'userVisible', description: 'Whether user settings may follow this system setting, which shows its value to signed-in users as their default', type: 'boolean'),
-        new OA\Property(property: 'enforced', description: 'False while the backend does not yet honour the setting', type: 'boolean'),
-        new OA\Property(property: 'fallbackKey', description: 'System setting a user setting follows when unset', type: 'string', nullable: true),
+        ),
+        'options' => new OA\Schema(
+            description: 'Allowed values of an enum setting, with their labels',
+            type: 'array',
+            items: new OA\Schema(
+                properties: [
+                    'value' => new OA\Schema(
+                        oneOf: [
+                            new OA\Schema(type: 'integer'),
+                            new OA\Schema(type: 'string'),
+                        ],
+                    ),
+                    'label' => new OA\Schema(type: 'string'),
+                ],
+                required: ['value', 'label'],
+            ),
+        ),
+        'min' => new OA\Schema(type: 'integer', nullable: true),
+        'max' => new OA\Schema(type: 'integer', nullable: true),
+        'editRole' => new OA\Schema(
+            type: 'string',
+            enum: ['ROLE_USER', 'ROLE_SUPER_ADMIN'],
+        ),
+        'userVisible' => new OA\Schema(
+            description: 'Whether user settings may follow this system setting, which shows its value to signed-in users as their default',
+            type: 'boolean',
+        ),
+        'enforced' => new OA\Schema(
+            description: 'False while the backend does not yet honour the setting',
+            type: 'boolean',
+        ),
+        'fallbackKey' => new OA\Schema(
+            description: 'System setting a user setting follows when unset',
+            type: 'string',
+            nullable: true,
+        ),
     ],
+    required: [
+        'key',
+        'type',
+        'scope',
+        'label',
+        'description',
+        'group',
+        'default',
+        'options',
+        'min',
+        'max',
+        'editRole',
+        'userVisible',
+        'enforced',
+        'fallbackKey',
+    ],
+    component: 'SettingDefinitionResource',
 )]
 final class SettingDefinitionResource extends AbstractResource
 {

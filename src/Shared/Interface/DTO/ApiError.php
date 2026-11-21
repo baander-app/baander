@@ -5,19 +5,23 @@ declare(strict_types=1);
 namespace App\Shared\Interface\DTO;
 
 use App\Shared\Application\PublicDiagnosticText;
-use Nelmio\ApiDocBundle\Attribute\Ignore;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'ApiError',
-    required: ['error'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'error', required: ['message', 'code'], properties: [
-            new OA\Property(property: 'message', type: 'string'),
-            new OA\Property(property: 'code', type: 'integer'),
-            new OA\Property(property: 'details', description: 'Additional error details, omitted when empty', type: 'object'),
-        ], type: 'object'),
+        'error' => new OA\Schema(
+            type: 'object',
+            properties: [
+                'message' => new OA\Schema(type: 'string'),
+                'code' => new OA\Schema(type: 'integer'),
+                'details' => new OA\Schema(description: 'Additional error details, omitted when empty', type: 'object'),
+            ],
+            required: ['message', 'code'],
+        ),
     ],
+    required: ['error'],
+    component: 'ApiError',
 )]
 final readonly class ApiError
 {
@@ -26,11 +30,8 @@ final readonly class ApiError
      */
     public function __construct(
         // The HTTP contract is the envelope from toArray(), not these fields.
-        #[Ignore]
         public string $message,
-        #[Ignore]
         public int $code,
-        #[Ignore]
         public array $details = [],
     ) {
     }

@@ -5,18 +5,18 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Resource\Log;
 
 use App\Shared\Interface\Resource\AbstractResource;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    required: ['id', 'createdAt', 'expiresAt', 'filters', 'nodeSnapshots'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'id', type: 'string'),
-        new OA\Property(property: 'createdAt', type: 'string'),
-        new OA\Property(property: 'expiresAt', type: 'string'),
-        new OA\Property(property: 'filters', type: 'string'),
-        new OA\Property(property: 'nodeSnapshots', type: 'object', additionalProperties: true),
+        'id' => new OA\Schema(type: 'string'),
+        'createdAt' => new OA\Schema(type: 'string'),
+        'expiresAt' => new OA\Schema(type: 'string'),
+        'filters' => new OA\Schema(type: 'string'),
+        'nodeSnapshots' => new OA\Schema(type: 'object', additionalProperties: true),
     ],
+    required: ['id', 'createdAt', 'expiresAt', 'filters', 'nodeSnapshots'],
 )]
 final class LogSnapshotResource extends AbstractResource
 {

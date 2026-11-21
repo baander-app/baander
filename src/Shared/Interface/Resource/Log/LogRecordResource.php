@@ -5,27 +5,59 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Resource\Log;
 
 use App\Shared\Interface\Resource\AbstractResource;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    required: ['id', 'sourceId', 'timestamp', 'level', 'channel', 'message', 'context', 'extra', 'raw', 'correlationId', 'node', 'service', 'stream', 'truncated', 'format'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'id', type: 'string'),
-        new OA\Property(property: 'sourceId', type: 'string'),
-        new OA\Property(property: 'timestamp', type: 'string'),
-        new OA\Property(property: 'level', type: 'string'),
-        new OA\Property(property: 'channel', type: 'string', nullable: true),
-        new OA\Property(property: 'message', type: 'string'),
-        new OA\Property(property: 'context', oneOf: [new OA\Schema(type: 'object', additionalProperties: true), new OA\Schema(type: 'array', items: new OA\Items())]),
-        new OA\Property(property: 'extra', oneOf: [new OA\Schema(type: 'object', additionalProperties: true), new OA\Schema(type: 'array', items: new OA\Items())]),
-        new OA\Property(property: 'raw', type: 'string'),
-        new OA\Property(property: 'correlationId', type: 'string', nullable: true),
-        new OA\Property(property: 'node', type: 'string'),
-        new OA\Property(property: 'service', type: 'string', nullable: true),
-        new OA\Property(property: 'stream', type: 'string', nullable: true),
-        new OA\Property(property: 'truncated', type: 'boolean'),
-        new OA\Property(property: 'format', type: 'string'),
+        'id' => new OA\Schema(type: 'string'),
+        'sourceId' => new OA\Schema(type: 'string'),
+        'timestamp' => new OA\Schema(type: 'string'),
+        'level' => new OA\Schema(type: 'string'),
+        'channel' => new OA\Schema(type: 'string', nullable: true),
+        'message' => new OA\Schema(type: 'string'),
+        'context' => new OA\Schema(
+            oneOf: [
+                new OA\Schema(type: 'object', additionalProperties: true),
+                new OA\Schema(
+                    type: 'array',
+                    items: new OA\Schema(),
+                ),
+            ],
+        ),
+        'extra' => new OA\Schema(
+            oneOf: [
+                new OA\Schema(type: 'object', additionalProperties: true),
+                new OA\Schema(
+                    type: 'array',
+                    items: new OA\Schema(),
+                ),
+            ],
+        ),
+        'raw' => new OA\Schema(type: 'string'),
+        'correlationId' => new OA\Schema(type: 'string', nullable: true),
+        'node' => new OA\Schema(type: 'string'),
+        'service' => new OA\Schema(type: 'string', nullable: true),
+        'stream' => new OA\Schema(type: 'string', nullable: true),
+        'truncated' => new OA\Schema(type: 'boolean'),
+        'format' => new OA\Schema(type: 'string'),
+    ],
+    required: [
+        'id',
+        'sourceId',
+        'timestamp',
+        'level',
+        'channel',
+        'message',
+        'context',
+        'extra',
+        'raw',
+        'correlationId',
+        'node',
+        'service',
+        'stream',
+        'truncated',
+        'format',
     ],
 )]
 final class LogRecordResource extends AbstractResource

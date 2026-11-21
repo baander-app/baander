@@ -9,27 +9,88 @@ use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Media\Domain\Model\Image;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'ActivityResource',
-    required: ['songAvailable'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'publicId', description: 'Public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'userId', description: 'User public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'activityType', description: 'Type of activity', type: 'string'),
-        new OA\Property(property: 'songAvailable', description: 'Whether the latest scan or ingestion observation marked the song source available', type: 'boolean'),
-        new OA\Property(property: 'songId', description: 'Song public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
-        new OA\Property(property: 'albumId', description: 'Album public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
-        new OA\Property(property: 'artistId', description: 'Artist public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
-        new OA\Property(property: 'movieId', description: 'Movie public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
-        new OA\Property(property: 'playCount', description: 'Number of plays', type: 'integer'),
-        new OA\Property(property: 'love', description: 'Whether the user loves this item', type: 'boolean'),
-        new OA\Property(property: 'lastPlayedAt', description: 'Last play timestamp', type: 'string', format: 'date-time', nullable: true),
-        new OA\Property(property: 'lastPlatform', description: 'Last platform used', type: 'string', nullable: true),
-        new OA\Property(property: 'lastPlayer', description: 'Last player used', type: 'string', nullable: true),
-        new OA\Property(property: 'createdAt', description: 'Creation timestamp', type: 'string', format: 'date-time'),
+        'publicId' => new OA\Schema(
+            description: 'Public identifier',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'userId' => new OA\Schema(
+            description: 'User public ID',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'activityType' => new OA\Schema(description: 'Type of activity', type: 'string'),
+        'songAvailable' => new OA\Schema(
+            description: 'Whether the latest scan or ingestion observation marked the song source available',
+            type: 'boolean',
+        ),
+        'songId' => new OA\Schema(
+            description: 'Song public ID',
+            type: 'string',
+            nullable: true,
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'albumId' => new OA\Schema(
+            description: 'Album public ID',
+            type: 'string',
+            nullable: true,
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'artistId' => new OA\Schema(
+            description: 'Artist public ID',
+            type: 'string',
+            nullable: true,
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'movieId' => new OA\Schema(
+            description: 'Movie public ID',
+            type: 'string',
+            nullable: true,
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'playCount' => new OA\Schema(description: 'Number of plays', type: 'integer'),
+        'love' => new OA\Schema(description: 'Whether the user loves this item', type: 'boolean'),
+        'lastPlayedAt' => new OA\Schema(
+            description: 'Last play timestamp',
+            type: 'string',
+            format: 'date-time',
+            nullable: true,
+        ),
+        'lastPlatform' => new OA\Schema(
+            description: 'Last platform used',
+            type: 'string',
+            nullable: true,
+        ),
+        'lastPlayer' => new OA\Schema(
+            description: 'Last player used',
+            type: 'string',
+            nullable: true,
+        ),
+        'createdAt' => new OA\Schema(
+            description: 'Creation timestamp',
+            type: 'string',
+            format: 'date-time',
+        ),
     ],
+    required: ['publicId', 'userId', 'activityType', 'songAvailable', 'playCount', 'love', 'createdAt'],
+    component: 'ActivityResource',
 )]
 final class ActivityResource extends AbstractResource
 {

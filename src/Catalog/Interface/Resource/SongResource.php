@@ -6,30 +6,94 @@ namespace App\Catalog\Interface\Resource;
 
 use App\Catalog\Domain\Model\Song;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'SongResource',
-    required: ['available'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'publicId', description: 'Public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'albumId', description: 'Album public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'available', description: 'Whether the latest scan or ingestion observation marked the source available', type: 'boolean'),
-        new OA\Property(property: 'title', description: 'Song title', type: 'string'),
-        new OA\Property(property: 'artistName', description: 'Primary artist name', type: 'string', nullable: true),
-        new OA\Property(property: 'albumName', description: 'Album title', type: 'string', nullable: true),
-        new OA\Property(property: 'albumLanguage', description: 'Release language stored on the album, unchanged; usually a language code, but tag readers may store free text', type: 'string', nullable: true),
-        new OA\Property(property: 'year', description: 'Release year', type: 'integer', nullable: true),
-        new OA\Property(property: 'path', description: 'File path', type: 'string', nullable: true),
-        new OA\Property(property: 'length', description: 'Duration in seconds', type: 'number', nullable: true),
-        new OA\Property(property: 'track', description: 'Track number', type: 'integer', nullable: true),
-        new OA\Property(property: 'disc', description: 'Disc number', type: 'integer', nullable: true),
-        new OA\Property(property: 'bitrate', description: 'Bitrate in bps', type: 'integer', nullable: true),
-        new OA\Property(property: 'explicit', description: 'Whether the song is explicit', type: 'boolean'),
-        new OA\Property(property: 'mbid', description: 'MusicBrainz recording ID', type: 'string', nullable: true),
-        new OA\Property(property: 'lockedFields', description: 'Fields locked from automatic updates', type: 'array', items: new OA\Items(type: 'string')),
-        new OA\Property(property: 'createdAt', description: 'Creation timestamp', type: 'string', format: 'date-time'),
+        'publicId' => new OA\Schema(
+            description: 'Public identifier',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'albumId' => new OA\Schema(
+            description: 'Album public identifier',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'available' => new OA\Schema(
+            description: 'Whether the latest scan or ingestion observation marked the source available',
+            type: 'boolean',
+        ),
+        'title' => new OA\Schema(description: 'Song title', type: 'string'),
+        'artistName' => new OA\Schema(
+            description: 'Primary artist name',
+            type: 'string',
+            nullable: true,
+        ),
+        'albumName' => new OA\Schema(
+            description: 'Album title',
+            type: 'string',
+            nullable: true,
+        ),
+        'albumLanguage' => new OA\Schema(
+            description: 'Release language stored on the album, unchanged; usually a language code, but tag readers may store free text',
+            type: 'string',
+            nullable: true,
+        ),
+        'year' => new OA\Schema(
+            description: 'Release year',
+            type: 'integer',
+            nullable: true,
+        ),
+        'path' => new OA\Schema(
+            description: 'File path',
+            type: 'string',
+            nullable: true,
+        ),
+        'length' => new OA\Schema(
+            description: 'Duration in seconds',
+            type: 'number',
+            nullable: true,
+        ),
+        'track' => new OA\Schema(
+            description: 'Track number',
+            type: 'integer',
+            nullable: true,
+        ),
+        'disc' => new OA\Schema(
+            description: 'Disc number',
+            type: 'integer',
+            nullable: true,
+        ),
+        'bitrate' => new OA\Schema(
+            description: 'Bitrate in bps',
+            type: 'integer',
+            nullable: true,
+        ),
+        'explicit' => new OA\Schema(description: 'Whether the song is explicit', type: 'boolean'),
+        'mbid' => new OA\Schema(
+            description: 'MusicBrainz recording ID',
+            type: 'string',
+            nullable: true,
+        ),
+        'lockedFields' => new OA\Schema(
+            description: 'Fields locked from automatic updates',
+            type: 'array',
+            items: new OA\Schema(type: 'string'),
+        ),
+        'createdAt' => new OA\Schema(
+            description: 'Creation timestamp',
+            type: 'string',
+            format: 'date-time',
+        ),
     ],
+    required: ['publicId', 'albumId', 'available', 'title', 'explicit', 'lockedFields', 'createdAt'],
+    component: 'SongResource',
 )]
 final class SongResource extends AbstractResource
 {

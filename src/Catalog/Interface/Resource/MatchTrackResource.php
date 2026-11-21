@@ -9,8 +9,7 @@ use App\Catalog\Application\Query\MusicBrainzMatch\ComparedSong;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchFieldRow;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchTrack;
 use App\Shared\Interface\Resource\AbstractResource;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 /**
  * One line of an album's MusicBrainz match comparison: a song paired with a release track, or either left unpaired.
@@ -23,29 +22,80 @@ use OpenApi\Attributes as OA;
  * @phpstan-type TrackData array{song: ComparedSongData|null, release: ReleaseTrackData|null, fields: list<FieldRowData>, credits: CreditsRowData|null}
  */
 #[OA\Schema(
-    schema: 'MatchTrackResource',
     description: 'A local song paired with a track of the release, with the song\'s rows, or a track or song no pair was found for. An apply writes paired songs only.',
-    required: ['song', 'release', 'fields', 'credits'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'song', description: 'The local song; null for a release track no song pairs with', required: ['publicId', 'title', 'disc', 'track', 'lengthSeconds'], properties: [
-            new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-            new OA\Property(property: 'title', type: 'string'),
-            new OA\Property(property: 'disc', description: 'The tagged disc number', type: 'integer', nullable: true),
-            new OA\Property(property: 'track', description: 'The tagged track number', type: 'integer', nullable: true),
-            new OA\Property(property: 'lengthSeconds', description: 'The length measured from the audio', type: 'number', nullable: true),
-        ], type: 'object', nullable: true),
-        new OA\Property(property: 'release', description: 'The release track; null for a song that pairs with no track', required: ['disc', 'position', 'number', 'title', 'lengthMs', 'artistCredit', 'recordingId'], properties: [
-            new OA\Property(property: 'disc', description: 'The position of the track\'s medium in the release, from 1', type: 'integer'),
-            new OA\Property(property: 'position', description: 'The track\'s position on its medium, from 1', type: 'integer'),
-            new OA\Property(property: 'number', description: 'The track number as printed, such as "A2"', type: 'string'),
-            new OA\Property(property: 'title', type: 'string'),
-            new OA\Property(property: 'lengthMs', description: 'The length in milliseconds; null when MusicBrainz knows none', type: 'integer', nullable: true),
-            new OA\Property(property: 'artistCredit', description: 'The track\'s artist credit as printed', type: 'string'),
-            new OA\Property(property: 'recordingId', description: 'The recording on the track; null when the editions the candidate stands for disagree on it', type: 'string', nullable: true),
-        ], type: 'object', nullable: true),
-        new OA\Property(property: 'fields', description: 'The paired song\'s field rows; empty unless paired', type: 'array', items: new OA\Items(ref: new Model(type: MatchFieldRowResource::class))),
-        new OA\Property(property: 'credits', description: 'The paired song\'s credits row; null unless paired', nullable: true, oneOf: [new OA\Schema(ref: new Model(type: MatchCreditsRowResource::class))]),
+        'song' => new OA\Schema(
+            description: 'The local song; null for a release track no song pairs with',
+            type: 'object',
+            nullable: true,
+            properties: [
+                'publicId' => new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+                'title' => new OA\Schema(type: 'string'),
+                'disc' => new OA\Schema(
+                    description: 'The tagged disc number',
+                    type: 'integer',
+                    nullable: true,
+                ),
+                'track' => new OA\Schema(
+                    description: 'The tagged track number',
+                    type: 'integer',
+                    nullable: true,
+                ),
+                'lengthSeconds' => new OA\Schema(
+                    description: 'The length measured from the audio',
+                    type: 'number',
+                    nullable: true,
+                ),
+            ],
+            required: ['publicId', 'title', 'disc', 'track', 'lengthSeconds'],
+        ),
+        'release' => new OA\Schema(
+            description: 'The release track; null for a song that pairs with no track',
+            type: 'object',
+            nullable: true,
+            properties: [
+                'disc' => new OA\Schema(
+                    description: 'The position of the track\'s medium in the release, from 1',
+                    type: 'integer',
+                ),
+                'position' => new OA\Schema(description: 'The track\'s position on its medium, from 1', type: 'integer'),
+                'number' => new OA\Schema(description: 'The track number as printed, such as "A2"', type: 'string'),
+                'title' => new OA\Schema(type: 'string'),
+                'lengthMs' => new OA\Schema(
+                    description: 'The length in milliseconds; null when MusicBrainz knows none',
+                    type: 'integer',
+                    nullable: true,
+                ),
+                'artistCredit' => new OA\Schema(description: 'The track\'s artist credit as printed', type: 'string'),
+                'recordingId' => new OA\Schema(
+                    description: 'The recording on the track; null when the editions the candidate stands for disagree on it',
+                    type: 'string',
+                    nullable: true,
+                ),
+            ],
+            required: ['disc', 'position', 'number', 'title', 'lengthMs', 'artistCredit', 'recordingId'],
+        ),
+        'fields' => new OA\Schema(
+            description: 'The paired song\'s field rows; empty unless paired',
+            type: 'array',
+            items: new OA\Schema(ref: MatchFieldRowResource::class),
+        ),
+        'credits' => new OA\Schema(
+            description: 'The paired song\'s credits row; null unless paired',
+            nullable: true,
+            oneOf: [
+                new OA\Schema(ref: MatchCreditsRowResource::class),
+            ],
+        ),
     ],
+    required: ['song', 'release', 'fields', 'credits'],
+    component: 'MatchTrackResource',
 )]
 final class MatchTrackResource extends AbstractResource
 {

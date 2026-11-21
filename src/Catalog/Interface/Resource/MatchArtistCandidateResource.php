@@ -6,25 +6,68 @@ namespace App\Catalog\Interface\Resource;
 
 use App\Catalog\Application\Query\MusicBrainzMatch\ArtistCandidate;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 /** A MusicBrainz artist a library artist may match, as the candidates route lists it. */
 #[OA\Schema(
-    schema: 'MatchArtistCandidateResource',
     description: 'A MusicBrainz artist a library artist may match',
-    required: ['id', 'score', 'name', 'sortName', 'disambiguation', 'type', 'country', 'lifeSpanBegin', 'lifeSpanEnd', 'ended'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'id', description: 'The artist\'s MusicBrainz ID, which the comparison takes as its candidate', type: 'string'),
-        new OA\Property(property: 'score', description: 'How well the artist fits, by name and, when the library artist has one, disambiguation', type: 'integer', maximum: 100, minimum: 0),
-        new OA\Property(property: 'name', type: 'string'),
-        new OA\Property(property: 'sortName', type: 'string', nullable: true),
-        new OA\Property(property: 'disambiguation', description: 'MusicBrainz\'s comment that tells the artist apart, such as "Dutch hardstyle DJ"', type: 'string', nullable: true),
-        new OA\Property(property: 'type', description: 'Such as Person or Group', type: 'string', nullable: true),
-        new OA\Property(property: 'country', description: 'An ISO 3166-1 code', type: 'string', nullable: true),
-        new OA\Property(property: 'lifeSpanBegin', description: 'When the artist was born or began: YYYY, YYYY-MM or YYYY-MM-DD', type: 'string', nullable: true),
-        new OA\Property(property: 'lifeSpanEnd', description: 'When the artist died or ended: YYYY, YYYY-MM or YYYY-MM-DD', type: 'string', nullable: true),
-        new OA\Property(property: 'ended', description: 'Whether the artist has ended, even when the end date is unknown', type: 'boolean'),
+        'id' => new OA\Schema(
+            description: 'The artist\'s MusicBrainz ID, which the comparison takes as its candidate',
+            type: 'string',
+        ),
+        'score' => new OA\Schema(
+            description: 'How well the artist fits, by name and, when the library artist has one, disambiguation',
+            type: 'integer',
+            minimum: 0,
+            maximum: 100,
+        ),
+        'name' => new OA\Schema(type: 'string'),
+        'sortName' => new OA\Schema(type: 'string', nullable: true),
+        'disambiguation' => new OA\Schema(
+            description: 'MusicBrainz\'s comment that tells the artist apart, such as "Dutch hardstyle DJ"',
+            type: 'string',
+            nullable: true,
+        ),
+        'type' => new OA\Schema(
+            description: 'Such as Person or Group',
+            type: 'string',
+            nullable: true,
+        ),
+        'country' => new OA\Schema(
+            description: 'An ISO 3166-1 code',
+            type: 'string',
+            nullable: true,
+        ),
+        'lifeSpanBegin' => new OA\Schema(
+            description: 'When the artist was born or began: YYYY, YYYY-MM or YYYY-MM-DD',
+            type: 'string',
+            nullable: true,
+        ),
+        'lifeSpanEnd' => new OA\Schema(
+            description: 'When the artist died or ended: YYYY, YYYY-MM or YYYY-MM-DD',
+            type: 'string',
+            nullable: true,
+        ),
+        'ended' => new OA\Schema(
+            description: 'Whether the artist has ended, even when the end date is unknown',
+            type: 'boolean',
+        ),
     ],
+    required: [
+        'id',
+        'score',
+        'name',
+        'sortName',
+        'disambiguation',
+        'type',
+        'country',
+        'lifeSpanBegin',
+        'lifeSpanEnd',
+        'ended',
+    ],
+    component: 'MatchArtistCandidateResource',
 )]
 final class MatchArtistCandidateResource extends AbstractResource
 {

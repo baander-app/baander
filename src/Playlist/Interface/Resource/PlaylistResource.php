@@ -6,22 +6,63 @@ namespace App\Playlist\Interface\Resource;
 
 use App\Playlist\Domain\ReadModel\PlaylistReadView;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'PlaylistResource',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'publicId', description: 'Public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'ownerPublicId', description: "The owner's public id", type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'collaboratorPublicIds', description: 'The public ids of the collaborators, oldest first', type: 'array', items: new OA\Items(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
-        new OA\Property(property: 'name', description: 'Playlist name', type: 'string'),
-        new OA\Property(property: 'description', description: 'Playlist description', type: 'string', nullable: true),
-        new OA\Property(property: 'isPublic', description: 'Whether the playlist is public', type: 'boolean'),
-        new OA\Property(property: 'isCollaborative', description: 'Whether collaborators may change the songs', type: 'boolean'),
-        new OA\Property(property: 'isSmart', description: 'Whether the playlist is auto-generated', type: 'boolean'),
-        new OA\Property(property: 'songCount', description: 'Number of songs the viewer can see', type: 'integer'),
-        new OA\Property(property: 'createdAt', description: 'Creation timestamp', type: 'string', format: 'date-time'),
+        'publicId' => new OA\Schema(
+            description: 'Public identifier',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'ownerPublicId' => new OA\Schema(
+            description: "The owner's public id",
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'collaboratorPublicIds' => new OA\Schema(
+            description: 'The public ids of the collaborators, oldest first',
+            type: 'array',
+            items: new OA\Schema(
+                type: 'string',
+                minLength: 21,
+                maxLength: 21,
+                pattern: '^[0-9a-zA-Z_-]{21}$',
+            ),
+        ),
+        'name' => new OA\Schema(description: 'Playlist name', type: 'string'),
+        'description' => new OA\Schema(
+            description: 'Playlist description',
+            type: 'string',
+            nullable: true,
+        ),
+        'isPublic' => new OA\Schema(description: 'Whether the playlist is public', type: 'boolean'),
+        'isCollaborative' => new OA\Schema(description: 'Whether collaborators may change the songs', type: 'boolean'),
+        'isSmart' => new OA\Schema(description: 'Whether the playlist is auto-generated', type: 'boolean'),
+        'songCount' => new OA\Schema(description: 'Number of songs the viewer can see', type: 'integer'),
+        'createdAt' => new OA\Schema(
+            description: 'Creation timestamp',
+            type: 'string',
+            format: 'date-time',
+        ),
     ],
+    required: [
+        'publicId',
+        'ownerPublicId',
+        'collaboratorPublicIds',
+        'name',
+        'isPublic',
+        'isCollaborative',
+        'isSmart',
+        'songCount',
+        'createdAt',
+    ],
+    component: 'PlaylistResource',
 )]
 final class PlaylistResource extends AbstractResource
 {

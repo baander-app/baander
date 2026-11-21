@@ -6,37 +6,76 @@ namespace App\Auth\Interface\Resource;
 
 use App\Shared\Interface\Resource\AbstractResource;
 use App\UserPreference\Application\Port\UserSettingView;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'AdminUserSettingResource',
-    required: ['key', 'label', 'type', 'options', 'userEditable', 'storedValue', 'storedValueValid', 'value', 'resetValue', 'source'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'key', type: 'string', example: 'language'),
-        new OA\Property(property: 'label', type: 'string', example: 'Language'),
-        new OA\Property(property: 'type', type: 'string', enum: ['boolean', 'integer', 'enum', 'string']),
-        new OA\Property(property: 'options', description: 'Allowed values of an enum setting, with their labels', type: 'array', items: new OA\Items(
-            required: ['value', 'label'],
-            properties: [
-                new OA\Property(property: 'value', oneOf: [new OA\Schema(type: 'integer'), new OA\Schema(type: 'string')]),
-                new OA\Property(property: 'label', type: 'string'),
+        'key' => new OA\Schema(type: 'string', example: 'language'),
+        'label' => new OA\Schema(type: 'string', example: 'Language'),
+        'type' => new OA\Schema(
+            type: 'string',
+            enum: ['boolean', 'integer', 'enum', 'string'],
+        ),
+        'options' => new OA\Schema(
+            description: 'Allowed values of an enum setting, with their labels',
+            type: 'array',
+            items: new OA\Schema(
+                properties: [
+                    'value' => new OA\Schema(
+                        oneOf: [
+                            new OA\Schema(type: 'integer'),
+                            new OA\Schema(type: 'string'),
+                        ],
+                    ),
+                    'label' => new OA\Schema(type: 'string'),
+                ],
+                required: ['value', 'label'],
+            ),
+        ),
+        'userEditable' => new OA\Schema(description: 'Whether the user may change the setting themselves', type: 'boolean'),
+        'storedValue' => new OA\Schema(
+            description: "The user's choice as stored, also when it is no longer allowed; null when they have none",
+            nullable: true,
+        ),
+        'storedValueValid' => new OA\Schema(
+            description: 'False when the stored choice is no longer allowed, so the user gets the value after a reset',
+            type: 'boolean',
+        ),
+        'value' => new OA\Schema(
+            description: 'Effective value',
+            oneOf: [
+                new OA\Schema(type: 'boolean'),
+                new OA\Schema(type: 'integer'),
+                new OA\Schema(type: 'string'),
             ],
-        )),
-        new OA\Property(property: 'userEditable', description: 'Whether the user may change the setting themselves', type: 'boolean'),
-        new OA\Property(property: 'storedValue', description: "The user's choice as stored, also when it is no longer allowed; null when they have none", nullable: true),
-        new OA\Property(property: 'storedValueValid', description: 'False when the stored choice is no longer allowed, so the user gets the value after a reset', type: 'boolean'),
-        new OA\Property(property: 'value', description: 'Effective value', oneOf: [
-            new OA\Schema(type: 'boolean'),
-            new OA\Schema(type: 'integer'),
-            new OA\Schema(type: 'string'),
-        ]),
-        new OA\Property(property: 'resetValue', description: 'The value the setting would have after a reset', oneOf: [
-            new OA\Schema(type: 'boolean'),
-            new OA\Schema(type: 'integer'),
-            new OA\Schema(type: 'string'),
-        ]),
-        new OA\Property(property: 'source', type: 'string', enum: ['user', 'server_default', 'default']),
+        ),
+        'resetValue' => new OA\Schema(
+            description: 'The value the setting would have after a reset',
+            oneOf: [
+                new OA\Schema(type: 'boolean'),
+                new OA\Schema(type: 'integer'),
+                new OA\Schema(type: 'string'),
+            ],
+        ),
+        'source' => new OA\Schema(
+            type: 'string',
+            enum: ['user', 'server_default', 'default'],
+        ),
     ],
+    required: [
+        'key',
+        'label',
+        'type',
+        'options',
+        'userEditable',
+        'storedValue',
+        'storedValueValid',
+        'value',
+        'resetValue',
+        'source',
+    ],
+    component: 'AdminUserSettingResource',
 )]
 final class AdminUserSettingResource extends AbstractResource
 {

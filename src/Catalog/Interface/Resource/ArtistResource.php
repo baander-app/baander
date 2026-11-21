@@ -7,21 +7,57 @@ namespace App\Catalog\Interface\Resource;
 use App\Catalog\Domain\Model\Artist;
 use App\Media\Domain\Model\Image;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'ArtistResource',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'publicId', description: 'Public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'name', description: 'Artist name', type: 'string'),
-        new OA\Property(property: 'country', description: 'Country code', type: 'string', nullable: true),
-        new OA\Property(property: 'type', description: 'Artist type', type: 'string', nullable: true),
-        new OA\Property(property: 'disambiguation', description: 'Disambiguation text', type: 'string', nullable: true),
-        new OA\Property(property: 'sortName', description: 'Sort name', type: 'string', nullable: true),
-        new OA\Property(property: 'mbid', description: 'MusicBrainz artist ID', type: 'string', nullable: true),
-        new OA\Property(property: 'lockedFields', description: 'Fields locked from automatic updates', type: 'array', items: new OA\Items(type: 'string')),
-        new OA\Property(property: 'createdAt', description: 'Creation timestamp', type: 'string', format: 'date-time'),
+        'publicId' => new OA\Schema(
+            description: 'Public identifier',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'name' => new OA\Schema(description: 'Artist name', type: 'string'),
+        'country' => new OA\Schema(
+            description: 'Country code',
+            type: 'string',
+            nullable: true,
+        ),
+        'type' => new OA\Schema(
+            description: 'Artist type',
+            type: 'string',
+            nullable: true,
+        ),
+        'disambiguation' => new OA\Schema(
+            description: 'Disambiguation text',
+            type: 'string',
+            nullable: true,
+        ),
+        'sortName' => new OA\Schema(
+            description: 'Sort name',
+            type: 'string',
+            nullable: true,
+        ),
+        'mbid' => new OA\Schema(
+            description: 'MusicBrainz artist ID',
+            type: 'string',
+            nullable: true,
+        ),
+        'lockedFields' => new OA\Schema(
+            description: 'Fields locked from automatic updates',
+            type: 'array',
+            items: new OA\Schema(type: 'string'),
+        ),
+        'createdAt' => new OA\Schema(
+            description: 'Creation timestamp',
+            type: 'string',
+            format: 'date-time',
+        ),
     ],
+    required: ['publicId', 'name', 'lockedFields', 'createdAt'],
+    component: 'ArtistResource',
 )]
 final class ArtistResource extends AbstractResource
 {

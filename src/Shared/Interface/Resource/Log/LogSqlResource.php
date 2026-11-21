@@ -5,18 +5,33 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Resource\Log;
 
 use App\Shared\Interface\Resource\AbstractResource;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    required: ['columns', 'rows', 'truncated', 'snapshot', 'coverage'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'columns', type: 'array', items: new OA\Items(type: 'string')),
-        new OA\Property(property: 'rows', type: 'array', items: new OA\Items(type: 'array', items: new OA\Items(anyOf: [new OA\Schema(type: 'string', nullable: true), new OA\Schema(type: 'number', nullable: true), new OA\Schema(type: 'boolean', nullable: true)]))),
-        new OA\Property(property: 'truncated', type: 'boolean'),
-        new OA\Property(property: 'snapshot', ref: new Model(type: LogSnapshotResource::class)),
-        new OA\Property(property: 'coverage', ref: new Model(type: LogCoverageResource::class)),
+        'columns' => new OA\Schema(
+            type: 'array',
+            items: new OA\Schema(type: 'string'),
+        ),
+        'rows' => new OA\Schema(
+            type: 'array',
+            items: new OA\Schema(
+                type: 'array',
+                items: new OA\Schema(
+                    anyOf: [
+                        new OA\Schema(type: 'string', nullable: true),
+                        new OA\Schema(type: 'number', nullable: true),
+                        new OA\Schema(type: 'boolean', nullable: true),
+                    ],
+                ),
+            ),
+        ),
+        'truncated' => new OA\Schema(type: 'boolean'),
+        'snapshot' => new OA\Schema(ref: LogSnapshotResource::class),
+        'coverage' => new OA\Schema(ref: LogCoverageResource::class),
     ],
+    required: ['columns', 'rows', 'truncated', 'snapshot', 'coverage'],
 )]
 final class LogSqlResource extends AbstractResource
 {

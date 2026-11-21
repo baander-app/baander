@@ -10,7 +10,7 @@ use App\Catalog\Interface\Resource\MovieResource;
 use App\Catalog\Interface\Resource\SongResource;
 use App\Catalog\Interface\Resource\VideoResource;
 use App\Shared\Domain\Model\PublicId;
-use OpenApi\Attributes\Schema;
+use OpenApi\Spec\Schema;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
@@ -27,6 +27,7 @@ final class PublicIdSchemaTest extends TestCase
                 continue;
             }
 
+            $property = $property->schema;
             self::assertSame('string', $property->type);
             self::assertNotSame('uuid', $property->format);
             self::assertSame(21, $property->minLength);
@@ -48,7 +49,7 @@ final class PublicIdSchemaTest extends TestCase
             if ($property->property !== $field) {
                 continue;
             }
-            $identity = $array ? $property->items : $property;
+            $identity = $array ? $property->schema->items : $property->schema;
             self::assertSame('string', $identity->type);
             self::assertSame(21, $identity->minLength);
             self::assertSame(21, $identity->maxLength);

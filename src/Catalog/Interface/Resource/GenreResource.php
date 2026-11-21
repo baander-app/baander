@@ -7,17 +7,36 @@ namespace App\Catalog\Interface\Resource;
 use App\Catalog\Domain\Model\Genre;
 use App\Catalog\Domain\ReadModel\GenreReadView;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'GenreResource',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'publicId', description: 'Genre public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'name', description: 'Genre name', type: 'string'),
-        new OA\Property(property: 'slug', description: 'URL-safe slug', type: 'string'),
-        new OA\Property(property: 'parentId', description: 'Parent genre public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
-        new OA\Property(property: 'mbid', description: 'MusicBrainz ID', type: 'string', nullable: true),
+        'publicId' => new OA\Schema(
+            description: 'Genre public ID',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'name' => new OA\Schema(description: 'Genre name', type: 'string'),
+        'slug' => new OA\Schema(description: 'URL-safe slug', type: 'string'),
+        'parentId' => new OA\Schema(
+            description: 'Parent genre public ID',
+            type: 'string',
+            nullable: true,
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'mbid' => new OA\Schema(
+            description: 'MusicBrainz ID',
+            type: 'string',
+            nullable: true,
+        ),
     ],
+    required: ['publicId', 'name', 'slug'],
+    component: 'GenreResource',
 )]
 final class GenreResource extends AbstractResource
 {

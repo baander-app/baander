@@ -8,8 +8,7 @@ use App\Catalog\Application\Query\MusicBrainzMatch\MatchArtistAction;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchComparison;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchFieldRow;
 use App\Shared\Interface\Resource\AbstractResource;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 /**
  * The `data` of GET /api/admin/metadata/match/{type}/{publicId}/comparison, and of
@@ -28,17 +27,49 @@ use OpenApi\Attributes as OA;
  * @phpstan-type ComparisonData array{type: string, publicId: string, candidateId: string, fields: list<FieldRowData>, credits: CreditsRowData|null, tracks: list<TrackData>, artistActions: list<ArtistActionData>}
  */
 #[OA\Schema(
-    schema: 'MatchComparisonResource',
-    required: ['type', 'publicId', 'candidateId', 'fields', 'credits', 'tracks', 'artistActions'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'type', description: 'What is compared: an album with a release, a song with a recording, an artist with an artist', type: 'string', enum: ['album', 'song', 'artist']),
-        new OA\Property(property: 'publicId', description: 'The album\'s, song\'s or artist\'s public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'candidateId', description: 'The MusicBrainz ID compared: a release, recording or artist', type: 'string'),
-        new OA\Property(property: 'fields', description: 'The item\'s own field rows; a field MusicBrainz gives no value for has no row', type: 'array', items: new OA\Items(ref: new Model(type: MatchFieldRowResource::class))),
-        new OA\Property(property: 'credits', description: 'The album\'s or song\'s own credits row; null for an artist, or when MusicBrainz credits no artist', nullable: true, oneOf: [new OA\Schema(ref: new Model(type: MatchCreditsRowResource::class))]),
-        new OA\Property(property: 'tracks', description: 'For an album, its songs and the release\'s tracks: in release order, then the songs that pair with no track; empty for a song or artist', type: 'array', items: new OA\Items(ref: new Model(type: MatchTrackResource::class))),
-        new OA\Property(property: 'artistActions', description: 'The artists the match would merge or remove', type: 'array', items: new OA\Items(ref: new Model(type: MatchArtistActionResource::class))),
+        'type' => new OA\Schema(
+            description: 'What is compared: an album with a release, a song with a recording, an artist with an artist',
+            type: 'string',
+            enum: ['album', 'song', 'artist'],
+        ),
+        'publicId' => new OA\Schema(
+            description: 'The album\'s, song\'s or artist\'s public ID',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'candidateId' => new OA\Schema(
+            description: 'The MusicBrainz ID compared: a release, recording or artist',
+            type: 'string',
+        ),
+        'fields' => new OA\Schema(
+            description: 'The item\'s own field rows; a field MusicBrainz gives no value for has no row',
+            type: 'array',
+            items: new OA\Schema(ref: MatchFieldRowResource::class),
+        ),
+        'credits' => new OA\Schema(
+            description: 'The album\'s or song\'s own credits row; null for an artist, or when MusicBrainz credits no artist',
+            nullable: true,
+            oneOf: [
+                new OA\Schema(ref: MatchCreditsRowResource::class),
+            ],
+        ),
+        'tracks' => new OA\Schema(
+            description: 'For an album, its songs and the release\'s tracks: in release order, then the songs that pair with no track; empty for a song or artist',
+            type: 'array',
+            items: new OA\Schema(ref: MatchTrackResource::class),
+        ),
+        'artistActions' => new OA\Schema(
+            description: 'The artists the match would merge or remove',
+            type: 'array',
+            items: new OA\Schema(ref: MatchArtistActionResource::class),
+        ),
     ],
+    required: ['type', 'publicId', 'candidateId', 'fields', 'credits', 'tracks', 'artistActions'],
+    component: 'MatchComparisonResource',
 )]
 final class MatchComparisonResource extends AbstractResource
 {

@@ -5,53 +5,120 @@ declare(strict_types=1);
 namespace App\Session\Interface\Resource;
 
 use App\Shared\Interface\Resource\AbstractResource;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'PlaybackSnapshotResource',
-    required: [
-        'schemaVersion', 'publicId', 'revision', 'media', 'queue', 'currentTrackIndex',
-        'position', 'playbackState', 'desiredState', 'observedState',
-        'selectedDestinationId', 'activeDestinationId', 'activeIncarnationId',
-        'transfer', 'destinations', 'commands',
-    ],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'schemaVersion', type: 'integer', enum: [1]),
-        new OA\Property(property: 'publicId', type: 'string'),
-        new OA\Property(property: 'revision', type: 'integer', minimum: 0),
-        new OA\Property(property: 'media', ref: new Model(type: PlaybackMediaResource::class), nullable: true),
-        new OA\Property(property: 'queue', type: 'array', items: new OA\Items(type: 'string')),
-        new OA\Property(property: 'currentTrackIndex', type: 'integer', minimum: 0),
-        new OA\Property(property: 'position', type: 'number', minimum: 0),
-        new OA\Property(property: 'playbackState', type: 'string', enum: ['playing', 'paused', 'stopped']),
-        new OA\Property(property: 'desiredState', type: 'string', enum: ['playing', 'paused', 'stopped']),
-        new OA\Property(property: 'observedState', type: 'string', enum: ['playing', 'paused', 'stopped', 'unknown']),
-        new OA\Property(property: 'selectedDestinationId', type: 'string', nullable: true),
-        new OA\Property(property: 'activeDestinationId', type: 'string', nullable: true),
-        new OA\Property(property: 'activeIncarnationId', description: 'Incarnation identifier of the endpoint that currently executes playback.', type: 'string', nullable: true),
-        new OA\Property(property: 'transfer', ref: new Model(type: PlaybackTransferResource::class), nullable: true),
-        new OA\Property(property: 'destinations', type: 'array', items: new OA\Items(ref: new Model(type: PlaybackDestinationResource::class))),
-        new OA\Property(property: 'commands', type: 'array', items: new OA\Items(ref: new Model(type: PlaybackCommandResource::class))),
-        new OA\Property(property: 'endpoint', ref: new Model(type: PlaybackEndpointResource::class), nullable: true),
-        new OA\Property(property: 'recoveryResult', required: ['incarnationId', 'outcome', 'revision'], properties: [
-            new OA\Property(property: 'incarnationId', description: 'The recovered endpoint incarnation, as the recovery request named it; the server issued it when that endpoint registered.', type: 'string'),
-            new OA\Property(property: 'outcome', type: 'string', enum: ['recovered']),
-            new OA\Property(property: 'revision', type: 'integer', minimum: 0),
-        ], type: 'object', nullable: true),
-        new OA\Property(property: 'transferResult', required: ['requestId', 'attemptId', 'state', 'rejectionReason'], properties: [
-            new OA\Property(property: 'requestId', description: 'The client-generated request identifier, echoed for correlation.', type: 'string'),
-            new OA\Property(property: 'attemptId', description: 'Transfer attempt identifier.', type: 'string'),
-            new OA\Property(property: 'state', type: 'string', enum: ['preparing', 'quiescing', 'starting', 'committed', 'failed', 'uncertain']),
-            new OA\Property(property: 'rejectionReason', type: 'string', nullable: true),
-        ], type: 'object', nullable: true),
-        new OA\Property(property: 'requestResult', required: ['requestId', 'commandId', 'outcome', 'rejectionReason'], properties: [
-            new OA\Property(property: 'requestId', description: 'The client-generated request identifier, echoed for correlation.', type: 'string'),
-            new OA\Property(property: 'commandId', description: 'Identifier of the command the request produced.', type: 'string'),
-            new OA\Property(property: 'outcome', type: 'string', nullable: true),
-            new OA\Property(property: 'rejectionReason', type: 'string', nullable: true),
-        ], type: 'object', nullable: true),
+        'schemaVersion' => new OA\Schema(
+            type: 'integer',
+            enum: [1],
+        ),
+        'publicId' => new OA\Schema(type: 'string'),
+        'revision' => new OA\Schema(type: 'integer', minimum: 0),
+        'media' => new OA\Schema(ref: PlaybackMediaResource::class, nullable: true),
+        'queue' => new OA\Schema(
+            type: 'array',
+            items: new OA\Schema(type: 'string'),
+        ),
+        'currentTrackIndex' => new OA\Schema(type: 'integer', minimum: 0),
+        'position' => new OA\Schema(type: 'number', minimum: 0),
+        'playbackState' => new OA\Schema(
+            type: 'string',
+            enum: ['playing', 'paused', 'stopped'],
+        ),
+        'desiredState' => new OA\Schema(
+            type: 'string',
+            enum: ['playing', 'paused', 'stopped'],
+        ),
+        'observedState' => new OA\Schema(
+            type: 'string',
+            enum: ['playing', 'paused', 'stopped', 'unknown'],
+        ),
+        'selectedDestinationId' => new OA\Schema(type: 'string', nullable: true),
+        'activeDestinationId' => new OA\Schema(type: 'string', nullable: true),
+        'activeIncarnationId' => new OA\Schema(
+            description: 'Incarnation identifier of the endpoint that currently executes playback.',
+            type: 'string',
+            nullable: true,
+        ),
+        'transfer' => new OA\Schema(ref: PlaybackTransferResource::class, nullable: true),
+        'destinations' => new OA\Schema(
+            type: 'array',
+            items: new OA\Schema(ref: PlaybackDestinationResource::class),
+        ),
+        'commands' => new OA\Schema(
+            type: 'array',
+            items: new OA\Schema(ref: PlaybackCommandResource::class),
+        ),
+        'endpoint' => new OA\Schema(ref: PlaybackEndpointResource::class, nullable: true),
+        'recoveryResult' => new OA\Schema(
+            type: 'object',
+            nullable: true,
+            properties: [
+                'incarnationId' => new OA\Schema(
+                    description: 'The recovered endpoint incarnation, as the recovery request named it; the server issued it when that endpoint registered.',
+                    type: 'string',
+                ),
+                'outcome' => new OA\Schema(
+                    type: 'string',
+                    enum: ['recovered'],
+                ),
+                'revision' => new OA\Schema(type: 'integer', minimum: 0),
+            ],
+            required: ['incarnationId', 'outcome', 'revision'],
+        ),
+        'transferResult' => new OA\Schema(
+            type: 'object',
+            nullable: true,
+            properties: [
+                'requestId' => new OA\Schema(
+                    description: 'The client-generated request identifier, echoed for correlation.',
+                    type: 'string',
+                ),
+                'attemptId' => new OA\Schema(description: 'Transfer attempt identifier.', type: 'string'),
+                'state' => new OA\Schema(
+                    type: 'string',
+                    enum: ['preparing', 'quiescing', 'starting', 'committed', 'failed', 'uncertain'],
+                ),
+                'rejectionReason' => new OA\Schema(type: 'string', nullable: true),
+            ],
+            required: ['requestId', 'attemptId', 'state', 'rejectionReason'],
+        ),
+        'requestResult' => new OA\Schema(
+            type: 'object',
+            nullable: true,
+            properties: [
+                'requestId' => new OA\Schema(
+                    description: 'The client-generated request identifier, echoed for correlation.',
+                    type: 'string',
+                ),
+                'commandId' => new OA\Schema(description: 'Identifier of the command the request produced.', type: 'string'),
+                'outcome' => new OA\Schema(type: 'string', nullable: true),
+                'rejectionReason' => new OA\Schema(type: 'string', nullable: true),
+            ],
+            required: ['requestId', 'commandId', 'outcome', 'rejectionReason'],
+        ),
     ],
+    required: [
+        'schemaVersion',
+        'publicId',
+        'revision',
+        'media',
+        'queue',
+        'currentTrackIndex',
+        'position',
+        'playbackState',
+        'desiredState',
+        'observedState',
+        'selectedDestinationId',
+        'activeDestinationId',
+        'activeIncarnationId',
+        'transfer',
+        'destinations',
+        'commands',
+    ],
+    component: 'PlaybackSnapshotResource',
 )]
 final class PlaybackSnapshotResource extends AbstractResource
 {

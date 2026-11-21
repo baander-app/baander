@@ -5,15 +5,19 @@ declare(strict_types=1);
 namespace App\Session\Interface\Resource;
 
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'PlaybackMediaResource',
-    required: ['kind', 'publicId'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'kind', type: 'string', enum: ['song', 'video']),
-        new OA\Property(property: 'publicId', type: 'string'),
+        'kind' => new OA\Schema(
+            type: 'string',
+            enum: ['song', 'video'],
+        ),
+        'publicId' => new OA\Schema(type: 'string'),
     ],
+    required: ['kind', 'publicId'],
+    component: 'PlaybackMediaResource',
 )]
 final class PlaybackMediaResource extends AbstractResource
 {

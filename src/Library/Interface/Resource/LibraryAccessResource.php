@@ -6,17 +6,29 @@ namespace App\Library\Interface\Resource;
 
 use App\Library\Application\DTO\LibraryAccess;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'LibraryAccessResource',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'libraryId', description: 'Library public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'name', description: 'Library name', type: 'string'),
-        new OA\Property(property: 'slug', description: 'URL-friendly slug', type: 'string'),
-        new OA\Property(property: 'type', description: 'Library type', type: 'string', enum: ['music', 'podcast', 'audiobook', 'movie', 'tv_show']),
-        new OA\Property(property: 'granted', description: 'Whether the user may see the library', type: 'boolean'),
+        'libraryId' => new OA\Schema(
+            description: 'Library public ID',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'name' => new OA\Schema(description: 'Library name', type: 'string'),
+        'slug' => new OA\Schema(description: 'URL-friendly slug', type: 'string'),
+        'type' => new OA\Schema(
+            description: 'Library type',
+            type: 'string',
+            enum: ['music', 'podcast', 'audiobook', 'movie', 'tv_show'],
+        ),
+        'granted' => new OA\Schema(description: 'Whether the user may see the library', type: 'boolean'),
     ],
+    required: ['libraryId', 'name', 'slug', 'type', 'granted'],
+    component: 'LibraryAccessResource',
 )]
 final class LibraryAccessResource extends AbstractResource
 {

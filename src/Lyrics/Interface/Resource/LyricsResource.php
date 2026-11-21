@@ -6,16 +6,30 @@ namespace App\Lyrics\Interface\Resource;
 
 use App\Lyrics\Domain\Model\Lyrics;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'LyricsResource',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'plainLyrics', description: 'Plain text lyrics', type: 'string', nullable: true),
-        new OA\Property(property: 'syncedLyrics', description: 'Synced (LRC) lyrics', type: 'string', nullable: true),
-        new OA\Property(property: 'source', description: 'Lyrics source', type: 'string', nullable: true),
-        new OA\Property(property: 'isInstrumental', description: 'Whether the track is instrumental', type: 'boolean'),
+        'plainLyrics' => new OA\Schema(
+            description: 'Plain text lyrics',
+            type: 'string',
+            nullable: true,
+        ),
+        'syncedLyrics' => new OA\Schema(
+            description: 'Synced (LRC) lyrics',
+            type: 'string',
+            nullable: true,
+        ),
+        'source' => new OA\Schema(
+            description: 'Lyrics source',
+            type: 'string',
+            nullable: true,
+        ),
+        'isInstrumental' => new OA\Schema(description: 'Whether the track is instrumental', type: 'boolean'),
     ],
+    required: ['isInstrumental'],
+    component: 'LyricsResource',
 )]
 final class LyricsResource extends AbstractResource
 {

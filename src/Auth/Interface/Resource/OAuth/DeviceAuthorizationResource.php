@@ -6,20 +6,42 @@ namespace App\Auth\Interface\Resource\OAuth;
 
 use App\Auth\Application\DTO\DeviceAuthorizationDTO;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'DeviceAuthorizationResource',
     description: 'Device authorization response (RFC 8628 section 3.2).',
-    required: ['device_code', 'user_code', 'verification_uri', 'verification_uri_complete', 'expires_in', 'interval'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'device_code', type: 'string'),
-        new OA\Property(property: 'user_code', type: 'string', example: 'BCDF-GHJK'),
-        new OA\Property(property: 'verification_uri', description: 'The web app page where the user enters the code (APP_URL/device)', type: 'string', format: 'uri', example: 'https://baander.app/device'),
-        new OA\Property(property: 'verification_uri_complete', description: 'verification_uri with the user code as user_code', type: 'string', format: 'uri', example: 'https://baander.app/device?user_code=BCDF-GHJK'),
-        new OA\Property(property: 'expires_in', type: 'integer', example: 900),
-        new OA\Property(property: 'interval', description: 'Minimum seconds between token polls', type: 'integer', example: 5),
+        'device_code' => new OA\Schema(type: 'string'),
+        'user_code' => new OA\Schema(type: 'string', example: 'BCDF-GHJK'),
+        'verification_uri' => new OA\Schema(
+            description: 'The web app page where the user enters the code (APP_URL/device)',
+            type: 'string',
+            format: 'uri',
+            example: 'https://baander.app/device',
+        ),
+        'verification_uri_complete' => new OA\Schema(
+            description: 'verification_uri with the user code as user_code',
+            type: 'string',
+            format: 'uri',
+            example: 'https://baander.app/device?user_code=BCDF-GHJK',
+        ),
+        'expires_in' => new OA\Schema(type: 'integer', example: 900),
+        'interval' => new OA\Schema(
+            description: 'Minimum seconds between token polls',
+            type: 'integer',
+            example: 5,
+        ),
     ],
+    required: [
+        'device_code',
+        'user_code',
+        'verification_uri',
+        'verification_uri_complete',
+        'expires_in',
+        'interval',
+    ],
+    component: 'DeviceAuthorizationResource',
 )]
 final class DeviceAuthorizationResource extends AbstractResource
 {

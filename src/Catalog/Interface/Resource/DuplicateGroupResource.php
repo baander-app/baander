@@ -6,19 +6,34 @@ namespace App\Catalog\Interface\Resource;
 
 use App\Catalog\Domain\ValueObject\DuplicateGroup;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 /**
  * Transforms DuplicateGroup value object to API response.
  */
 #[OA\Schema(
-    schema: 'DuplicateGroupResource',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'albumIds', description: 'List of album public identifiers in this duplicate group', type: 'array', items: new OA\Items(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
-        new OA\Property(property: 'confidence', description: 'Confidence score between 0 and 1', type: 'number'),
-        new OA\Property(property: 'albumCount', description: 'Number of albums in the group', type: 'integer'),
-        new OA\Property(property: 'albums', description: 'Album data for each duplicate', type: 'array', items: new OA\Items(type: 'object')),
+        'albumIds' => new OA\Schema(
+            description: 'List of album public identifiers in this duplicate group',
+            type: 'array',
+            items: new OA\Schema(
+                type: 'string',
+                minLength: 21,
+                maxLength: 21,
+                pattern: '^[0-9a-zA-Z_-]{21}$',
+            ),
+        ),
+        'confidence' => new OA\Schema(description: 'Confidence score between 0 and 1', type: 'number'),
+        'albumCount' => new OA\Schema(description: 'Number of albums in the group', type: 'integer'),
+        'albums' => new OA\Schema(
+            description: 'Album data for each duplicate',
+            type: 'array',
+            items: new OA\Schema(type: 'object'),
+        ),
     ],
+    required: ['albumIds', 'confidence', 'albumCount', 'albums'],
+    component: 'DuplicateGroupResource',
 )]
 final class DuplicateGroupResource extends AbstractResource
 {

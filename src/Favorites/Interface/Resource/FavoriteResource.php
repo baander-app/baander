@@ -6,16 +6,32 @@ namespace App\Favorites\Interface\Resource;
 
 use App\Favorites\Domain\Model\UserFavorite;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'FavoriteResource',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'publicId', description: 'Public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'entityType', description: 'Entity type', type: 'string', enum: ['song', 'album', 'artist']),
-        new OA\Property(property: 'entityPublicId', description: 'Entity public ID', type: 'string'),
-        new OA\Property(property: 'createdAt', description: 'Creation timestamp', type: 'string', format: 'date-time'),
+        'publicId' => new OA\Schema(
+            description: 'Public identifier',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'entityType' => new OA\Schema(
+            description: 'Entity type',
+            type: 'string',
+            enum: ['song', 'album', 'artist'],
+        ),
+        'entityPublicId' => new OA\Schema(description: 'Entity public ID', type: 'string'),
+        'createdAt' => new OA\Schema(
+            description: 'Creation timestamp',
+            type: 'string',
+            format: 'date-time',
+        ),
     ],
+    required: ['publicId', 'entityType', 'entityPublicId', 'createdAt'],
+    component: 'FavoriteResource',
 )]
 final class FavoriteResource extends AbstractResource
 {

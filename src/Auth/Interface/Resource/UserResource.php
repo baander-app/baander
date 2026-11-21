@@ -6,21 +6,50 @@ namespace App\Auth\Interface\Resource;
 
 use App\Auth\Domain\Model\User;
 use App\Shared\Interface\Resource\AbstractResource;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'UserResource',
     description: 'The full profile of the account; GET /api/auth/me answers a delegated token with a narrower profile',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'publicId', description: 'Public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'name', description: 'Display name', type: 'string'),
-        new OA\Property(property: 'email', description: 'Email address', type: 'string', format: 'email'),
-        new OA\Property(property: 'emailVerifiedAt', description: 'When the email was verified', type: 'string', format: 'date-time', nullable: true),
-        new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
-        new OA\Property(property: 'roles', description: 'Assigned roles', type: 'array', items: new OA\Items(type: 'string')),
-        new OA\Property(property: 'totpEnabled', description: 'Whether TOTP is on, so a sensitive change needs a code', type: 'boolean'),
-        new OA\Property(property: 'pendingEmail', description: 'The address an email change waits to confirm through the link sent to it', type: 'string', format: 'email', nullable: true),
+        'publicId' => new OA\Schema(
+            description: 'Public identifier',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'name' => new OA\Schema(description: 'Display name', type: 'string'),
+        'email' => new OA\Schema(
+            description: 'Email address',
+            type: 'string',
+            format: 'email',
+        ),
+        'emailVerifiedAt' => new OA\Schema(
+            description: 'When the email was verified',
+            type: 'string',
+            format: 'date-time',
+            nullable: true,
+        ),
+        'createdAt' => new OA\Schema(type: 'string', format: 'date-time'),
+        'roles' => new OA\Schema(
+            description: 'Assigned roles',
+            type: 'array',
+            items: new OA\Schema(type: 'string'),
+        ),
+        'totpEnabled' => new OA\Schema(
+            description: 'Whether TOTP is on, so a sensitive change needs a code',
+            type: 'boolean',
+        ),
+        'pendingEmail' => new OA\Schema(
+            description: 'The address an email change waits to confirm through the link sent to it',
+            type: 'string',
+            format: 'email',
+            nullable: true,
+        ),
     ],
+    required: ['publicId', 'name', 'email', 'createdAt', 'roles', 'totpEnabled'],
+    component: 'UserResource',
 )]
 final class UserResource extends AbstractResource
 {
