@@ -12,7 +12,7 @@ interface DirectorManifest extends FixtureManifest {
   }[]
 }
 
-test('directors browse real credits, paginate and open their movies', async ({ browser, baseURL }, testInfo) => {
+test('directors paginate and open a shared profile with movie, TV and music credits', async ({ browser, baseURL }, testInfo) => {
   test.setTimeout(180_000)
   if (!baseURL) throw new Error('An explicit isolated preview URL is required.')
   const fixture = FixtureClient.start('tests/Fixtures/Playback/video-fixture.php')
@@ -35,6 +35,7 @@ test('directors browse real credits, paginate and open their movies', async ({ b
       .toBeVisible()
     await page.getByRole('textbox', { name: 'Search directors' }).fill(run)
     await page.getByRole('button', { name: 'Search', exact: true }).click()
+    await expect(page).toHaveURL(new RegExp(`q=${run}$`))
     await expect(page.getByRole('link', { name: /Owned director.*1 movie/ })).toHaveCount(50)
     await page.getByRole('button', { name: 'Next', exact: true }).click()
     await expect(page).toHaveURL(new RegExp(`q=${run}.*page=2`))
@@ -57,6 +58,23 @@ test('directors browse real credits, paginate and open their movies', async ({ b
     await expect(page).toHaveURL(new RegExp(`/movies/${manifest.movie.publicId}$`))
     await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible()
+
+    await page.goto(`/people/${director.publicId}`)
+    for (const [filter, work, path, role] of [
+      ['Movies', title, '/movies/', 'Director'],
+      ['TV series', `Owned series ${run}`, '/tv/series/', 'Actor as Guest'],
+      ['Episodes', `Owned episode ${run}`, '/tv/episodes/', 'Actor as Guest'],
+      ['Songs', 'Live song 00000', '/music/songs/', 'composer (credited as Owned stage name)'],
+      ['Albums', 'Live album 00000', '/music/albums/', 'primary (credited as Owned stage name)'],
+    ]) {
+      await page.getByRole('button', { name: `${filter} (1)`, exact: true }).click()
+      await expect(page.getByText(role, { exact: true })).toBeVisible()
+      await page.getByRole('link', { name: work, exact: true }).click()
+      await expect(page).toHaveURL(url => url.pathname.startsWith(path))
+      await expect(page.getByRole('main').getByText(work, { exact: true })).toBeVisible()
+      await page.goBack()
+      await expect(page.getByRole('heading', { name: director.name, exact: true })).toBeVisible()
+    }
   } catch (error) {
     failures.push(error)
   } finally {

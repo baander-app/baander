@@ -193,6 +193,8 @@ erDiagram
 
 **Verification** Cover movie, TV and music in one profile, multiple roles, keyboard access, bookmarks, missing profile fields, and loading, error and access loss. Verify that TV navigation opens a registered title with empty or unavailable credits. Exercise account changes and live refresh through generated hooks and verify the full path in the isolated preview.
 
+The [Director browser test](../../ui/web/tests/e2e/playback-destinations/directors.spec.ts) waits for the search to appear in the URL before paging. The initial result set can already contain 50 directors, so a row count alone can let the test page through unfiltered results. The test opens the Person profile and follows its movie, series, episode, song and album credits.
+
 ## Verification Contract
 
 - Run the affected PHP unit, Functional and Integration selections in the CI image. Include fresh and upgrade migrations and deterministic concurrent import and merge cases using real PostgreSQL. Mock provider HTTP and use disposable services. Record schema, counts and representative query plans. [Testing guide](../../docs-book/part-2-developer-guide/testing/README.md), [Database naming](../../docs-book/part-2-developer-guide/development/database-naming.md), [PostgreSQL remediation skill](../../.agents/skills/postgres-remediation/SKILL.md), [PostgreSQL guidance](https://wiki.postgresql.org/wiki/Don%27t_Do_This).

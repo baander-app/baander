@@ -143,7 +143,59 @@ final class PlaybackVideoFixture
         });
         if ($directors) {
             $manifest = $this->seedDirectors($run, $manifest);
+            $manifest = $this->seedCrossMediaCredits($run, $manifest);
         }
+        return $manifest;
+    }
+
+    /** @param array<string, mixed> $manifest
+     * @return array<string, mixed>
+     */
+    private function seedCrossMediaCredits(string $run, array $manifest): array
+    {
+        $credits = [];
+        foreach (['series', 'season', 'episode', 'artist'] as $kind) {
+            $credits[$kind] = ['id' => (string) new Uuid(), 'public_id' => (string) new PublicId()];
+        }
+        $manifest['crossMediaCredits'] = $credits;
+        $this->save($run, $manifest);
+
+        $this->connection->transactional(function () use ($credits, $manifest, $run): void {
+            $person = $this->connection->fetchOne('SELECT id FROM people WHERE public_id = ?', [$manifest['directors'][50]['publicId']]);
+            if (!is_string($person)) {
+                throw new RuntimeException('The director for the cross-media fixture is missing.');
+            }
+            $this->connection->insert('tv_series', $credits['series'] + [
+                'library_id' => $manifest['library']['id'], 'tmdb_id' => 1, 'name' => 'Owned series ' . $run,
+            ]);
+            $this->connection->insert('tv_seasons', $credits['season'] + [
+                'series_id' => $credits['series']['id'], 'season_number' => 1,
+            ]);
+            $this->connection->insert('tv_episodes', $credits['episode'] + [
+                'season_id' => $credits['season']['id'], 'episode_number' => 1, 'tmdb_id' => 2, 'name' => 'Owned episode ' . $run,
+            ]);
+            foreach (['series', 'episode'] as $kind) {
+                $this->connection->insert($kind . '_person_credits', [
+                    'id' => (string) new Uuid(), $kind . '_id' => $credits[$kind]['id'], 'person_id' => $person,
+                    'category' => 'cast', 'role' => 'actor', 'job' => 'Actor', 'character_name' => 'Guest', 'credit_key' => 'owned-guest',
+                ]);
+            }
+            $mbid = (string) new Uuid();
+            $now = (new DateTimeImmutable())->format('Y-m-d H:i:s.uP');
+            $this->connection->insert('artists', $credits['artist'] + [
+                'name' => 'Owned artist ' . $run, 'type' => 'Person', 'mbid' => $mbid, 'created_at' => $now, 'updated_at' => $now,
+            ]);
+            $this->connection->insert('person_artist_links', [
+                'artist_id' => $credits['artist']['id'], 'person_id' => $person, 'artist_mbid' => $mbid,
+            ]);
+            foreach (['song' => 'composer', 'album' => 'primary'] as $kind => $role) {
+                $this->connection->insert('artist_' . $kind, [
+                    'id' => (string) new Uuid(), $kind . '_id' => $manifest[$kind]['id'], 'artist_id' => $credits['artist']['id'],
+                    'role' => $role, 'credited_name' => 'Owned stage name',
+                ]);
+            }
+        });
+
         return $manifest;
     }
 
@@ -387,6 +439,10 @@ SQL, ['video' => $videoId]);
                 }
                 $this->connection->delete('movie_video', ['id' => $manifest['movieVideoId']]);
                 $this->connection->delete('movies', ['id' => $manifest['movie']['id']]);
+                if (isset($manifest['crossMediaCredits'])) {
+                    $this->connection->delete('tv_series', ['id' => $manifest['crossMediaCredits']['series']['id']]);
+                    $this->connection->delete('artists', ['id' => $manifest['crossMediaCredits']['artist']['id']]);
+                }
                 foreach ($manifest['directors'] ?? [] as $director) {
                     $this->connection->executeStatement(
                         <<<'SQL'

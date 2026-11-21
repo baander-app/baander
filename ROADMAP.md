@@ -23,9 +23,17 @@ after a cached details-only answer. The full web suite passed 3,844 tests in
 export and generated client checks passed. Symfony container lint and Deptrac
 passed, with zero dependency violations.
 
+The isolated preview passed one Playwright test with a real catalog. It paged
+through filtered Directors, opened the Person profile from the Director page,
+and displayed its movie credit at desktop and mobile widths. It followed the
+Person's movie, series, episode, song and album credits to their detail pages
+and checked the TV character and music credited name.
+[Director and Person browser check](ui/web/tests/e2e/playback-destinations/directors.spec.ts).
+
 `make ci` stopped at Composer normalization. The manifest and lockfile are
 identical to the base commit. The broader backend selection also reproduced
-the existing unclassified video and admin log routes recorded below. The focused CI-image run passed its 273-test unit lane with 1,302 assertions and
+the existing unclassified video and admin log routes recorded below. The
+focused CI-image run passed its 273-test unit lane with 1,302 assertions and
 its 21-test deployed-stack lane with 139 assertions. A Director state lookup
 failed in the other lane. The corrected Director and Redis selection passed
 14 tests with 189 assertions. PHPStan passed in the CI image.
