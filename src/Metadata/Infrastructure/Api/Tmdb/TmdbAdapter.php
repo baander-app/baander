@@ -100,7 +100,7 @@ final class TmdbAdapter
             } catch (\Throwable) {
                 $this->logger->error('TMDB API request failed', ['service' => 'tmdb']);
 
-                return [];
+                throw new \RuntimeException('TMDB API request failed.');
             } finally {
                 $response?->cancel();
             }
@@ -111,19 +111,26 @@ final class TmdbAdapter
                 $retried = true;
                 continue;
             }
+            if ($status === 404) {
+                return [];
+            }
             if ($status >= 300) {
                 $this->logger->warning('TMDB API error response', ['service' => 'tmdb', 'status' => $status]);
 
-                return [];
+                throw new \RuntimeException('TMDB API returned an unsuccessful response.');
             }
             try {
                 $data = $this->jsonEncoder->decode($body, 'json');
 
-                return is_array($data) ? $data : [];
+                if (!is_array($data)) {
+                    throw new \RuntimeException('TMDB API returned invalid JSON.');
+                }
+
+                return $data;
             } catch (\Throwable) {
                 $this->logger->error('TMDB API JSON decode failed', ['service' => 'tmdb']);
 
-                return [];
+                throw new \RuntimeException('TMDB API returned invalid JSON.');
             }
         }
     }

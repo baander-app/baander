@@ -105,6 +105,42 @@ export const catalogLiveCoverage = [
     }
   },
   {
+    id: 'catalog.directors',
+    family: 'catalog',
+    policy: {
+      kind: 'sampled',
+      intervalMs: 30000,
+      reason:
+        'Director identities and movie credits are stored without a live capture producer; visible director views refresh every thirty seconds and after catalog hints.'
+    },
+    audiences: ['library'],
+    sourceTables: ['movies', 'movie_video', 'user_library_access'],
+    deploymentTables: [],
+    sources: [
+      'movie_directors and movie_director_credits with accessible movies',
+      '/api/movies/directors',
+      '/api/movies/directors/{publicId}',
+      '/api/movies/directors/{publicId}/movies'
+    ],
+    keyVariants: [
+      '[ `/api/movies/directors`, ...(params ? [params] : []) ]',
+      '[ `/api/movies/directors/${publicId}` ]',
+      '[ `/api/movies/directors/${publicId}/movies`, ...(params ? [params] : []) ]'
+    ],
+    dependentFamilies: [],
+    mirrors: [],
+    responseCaches: ['authoritative-read'],
+    consumers: [
+      'src/features/catalog/pages/DirectorsPage.tsx#useGetMovieDirectorIndex:generated',
+      'src/features/catalog/pages/DirectorDetailPage.tsx#useGetMovieDirectorShow:generated',
+      'src/features/catalog/pages/DirectorDetailPage.tsx#useGetMovieDirectorMovies:generated'
+    ],
+    coverageVerification: ['tests/live-updates/coverage.test.ts'],
+    behaviorVerification: {
+      unitProofs: ['tests/live-updates/directors.test.tsx']
+    }
+  },
+  {
     id: 'catalog.video-playback-information',
     family: 'catalog',
     policy: {

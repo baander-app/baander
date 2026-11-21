@@ -15,12 +15,17 @@ final readonly class EnrichmentResult
         private float $qualityScore,
         private array $updatedFields = [],
         private bool $identifiersUpdated = false,
-    ) {
-    }
+        private bool $failed = false,
+    ) {}
 
     public function isSuccess(): bool
     {
         return $this->success;
+    }
+
+    public function isFailure(): bool
+    {
+        return $this->failed;
     }
 
     public function getSource(): string
@@ -53,6 +58,6 @@ final readonly class EnrichmentResult
 
     public static function failure(string $source, float $qualityScore = 0.0): self
     {
-        return new self(false, $source, $qualityScore);
+        return new self(false, $source, $qualityScore, failed: true);
     }
 }

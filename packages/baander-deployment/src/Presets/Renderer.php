@@ -42,6 +42,7 @@ final class Renderer
             EnvironmentVariable::CONVERT_STORAGE_PATH, EnvironmentVariable::MEDIA_STORAGE_PATH, EnvironmentVariable::MAIL_FROM_ADDRESS, EnvironmentVariable::VIDEO_ENCODER,
             EnvironmentVariable::VAPID_PRIVATE_KEY, EnvironmentVariable::VAPID_PUBLIC_KEY, EnvironmentVariable::STREAM_URL_HMAC_SECRET, EnvironmentVariable::AUTH_TOTP_ENCRYPTION_KEY, EnvironmentVariable::APP_URL, EnvironmentVariable::DEFAULT_URI,
             EnvironmentVariable::BAANDER_DEPLOYMENT_PROFILE, EnvironmentVariable::OTEL_ENABLED, EnvironmentVariable::OTEL_EXPORTER_OTLP_ENDPOINT,
+            EnvironmentVariable::TMDB_BEARER_TOKEN,
         ]));
     }
 

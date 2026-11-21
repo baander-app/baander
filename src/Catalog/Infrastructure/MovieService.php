@@ -17,8 +17,7 @@ final class MovieService implements MoviePortInterface
 {
     public function __construct(
         private readonly MovieRepositoryInterface $movieRepository,
-    ) {
-    }
+    ) {}
 
     public function findVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): ?Movie
     {
@@ -38,6 +37,11 @@ final class MovieService implements MoviePortInterface
     public function countVisible(LibraryReadScope $scope): int
     {
         return $this->movieRepository->countVisible($scope);
+    }
+
+    public function movieIdsByLibraryAfter(Uuid $libraryId, ?Uuid $after = null, int $limit = 100): array
+    {
+        return $this->movieRepository->movieIdsByLibraryAfter($libraryId, $after, $limit);
     }
 
     public function findByPublicId(PublicId $publicId): ?Movie
@@ -81,6 +85,11 @@ final class MovieService implements MoviePortInterface
     public function save(Movie $movie): void
     {
         $this->movieRepository->save($movie);
+    }
+
+    public function saveMetadata(Movie $movie): void
+    {
+        $this->movieRepository->saveMetadata($movie);
     }
 
     public function persist(Movie $movie): void

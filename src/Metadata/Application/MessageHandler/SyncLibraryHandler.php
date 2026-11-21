@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Metadata\Application\MessageHandler;
 
 use App\Catalog\Application\Port\AlbumPortInterface;
+use App\Catalog\Application\Port\MoviePortInterface;
+use App\Metadata\Application\Message\SyncMovieMessage;
 use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
@@ -20,8 +22,8 @@ final class SyncLibraryHandler
         private readonly MessageBusInterface $bus,
         private readonly LoggerInterface $logger,
         private readonly JobCancellationCheckpointInterface $cancellation,
-    ) {
-    }
+        private readonly MoviePortInterface $movieService,
+    ) {}
 
     #[AsMessageHandler(fromTransport: 'async')]
     public function __invoke(SyncLibraryMessage $message): void
@@ -58,5 +60,14 @@ final class SyncLibraryHandler
                 }
             }
         }
+        $after = null;
+        do {
+            $movieIds = $this->movieService->movieIdsByLibraryAfter($libraryId, $after, 100);
+            foreach ($movieIds as $movieId) {
+                $this->cancellation->check();
+                $this->bus->dispatch(new SyncMovieMessage($movieId, $message->forceUpdate));
+                $after = $movieId;
+            }
+        } while (count($movieIds) === 100);
     }
 }

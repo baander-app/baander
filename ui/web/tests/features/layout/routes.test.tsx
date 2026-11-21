@@ -6,6 +6,29 @@ import { SpansPage } from '@/features/admin/pages/SpansPage'
 import { protectedRoutes } from '@/features/layout/routes'
 
 describe('route structure', () => {
+  it.each([
+    {
+      url: '/movies/directors',
+      path: '/movies/directors',
+      params: {},
+    },
+    {
+      url: '/movies/directors/abcdefghijklmnopqrstu',
+      path: '/movies/directors/:publicId',
+      params: { publicId: 'abcdefghijklmnopqrstu' },
+    },
+    {
+      url: '/movies/abcdefghijklmnopqrstu',
+      path: '/movies/:publicId',
+      params: { publicId: 'abcdefghijklmnopqrstu' },
+    },
+  ])('routes $url to its catalog page', ({ url, path, params }) => {
+    const match = matchRoutes(protectedRoutes, url)?.at(-1)
+
+    expect(match?.route.path).toBe(path)
+    expect(match?.params).toEqual(params)
+  })
+
   it('serves the dedicated spans workspace inside the guarded admin shell', () => {
     const matches = matchRoutes(protectedRoutes, '/admin/spans')
     const elements = matches?.map(match => match.route.element)

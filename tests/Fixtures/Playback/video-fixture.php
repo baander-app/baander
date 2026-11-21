@@ -3,6 +3,16 @@
 declare(strict_types=1);
 
 use App\Catalog\Application\Dto\VideoSourceMetadata;
+use App\Catalog\Application\Port\DirectorCredit;
+use App\Catalog\Domain\ReadModel\DirectorReadView;
+use App\Catalog\Infrastructure\DirectorService;
+use App\Catalog\Infrastructure\Doctrine\Entity\MovieDirectorEntity;
+use App\Catalog\Infrastructure\Doctrine\ImportIdentity\ImportIdentityLock;
+use App\Catalog\Infrastructure\Doctrine\Repository\DirectorRepository;
+use App\Catalog\Infrastructure\Doctrine\Repository\MovieRepository;
+use App\Kernel;
+use App\Shared\Domain\Model\SearchOptions;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
@@ -25,8 +35,7 @@ final class PlaybackVideoFixture
         private readonly string $root,
         private readonly string $mediaRoot,
         private readonly string $convertRoot,
-    ) {
-    }
+    ) {}
 
     /** @param array<string, mixed> $command
      * @return array<string, mixed>
@@ -38,7 +47,13 @@ final class PlaybackVideoFixture
             throw new InvalidArgumentException('Invalid video fixture run.');
         }
         return match ($command['op'] ?? '') {
-            'create' => $this->create($run, $command['delivery'] ?? 'encoded', ($command['cinema'] ?? false) === true),
+            'create' => $this->create(
+                $run,
+                $command['delivery'] ?? 'encoded',
+                ($command['cinema'] ?? false) === true,
+                ($command['quality'] ?? false) === true,
+                ($command['directors'] ?? false) === true,
+            ),
             'cleanup' => $this->cleanup($run),
             'inspect' => $this->inspect($run),
             default => throw new InvalidArgumentException('Unknown video fixture operation.'),
@@ -46,7 +61,7 @@ final class PlaybackVideoFixture
     }
 
     /** @return array<string, mixed> */
-    private function create(string $run, string $delivery, bool $cinema): array
+    private function create(string $run, string $delivery, bool $cinema, bool $quality, bool $directors): array
     {
         if (!in_array($delivery, ['encoded', 'original', 'copy'], true)) {
             throw new InvalidArgumentException('Unknown fixture delivery mode.');
@@ -66,9 +81,9 @@ final class PlaybackVideoFixture
         // Persist exact ownership before creating files or rows, including failed runs.
         $this->save($run, $manifest);
         if ($cinema) {
-            $this->generateCinemaSource($run, $manifest['video']['path']);
+            $this->generateCinemaSource($run, $manifest['video']['path'], $quality);
         } else {
-            $this->generateSource($run, $manifest['video']['path'], $delivery, $extension);
+            $this->generateSource($run, $manifest['video']['path'], $delivery, $extension, $quality);
         }
         if (!chmod($manifest['video']['path'], 0644)) {
             throw new RuntimeException('Cannot publish the owned video to source workers.');
@@ -126,14 +141,74 @@ final class PlaybackVideoFixture
                 'video_id' => $manifest['video']['id'], 'sort_order' => 0,
             ]);
         });
+        if ($directors) {
+            $manifest = $this->seedDirectors($run, $manifest);
+        }
         return $manifest;
     }
 
-    private function generateSource(string $run, string $path, string $delivery, string $extension): void
+    /** @param array<string, mixed> $manifest
+     * @return array<string, mixed>
+     */
+    private function seedDirectors(string $run, array $manifest): array
+    {
+        $manifest['directors'] = [];
+        $firstPersonId = random_int(1_500_000_000, 1_899_999_949);
+        for ($number = 1; $number <= 51; ++$number) {
+            $manifest['directors'][] = [
+                'tmdbId' => $firstPersonId + $number,
+                'name' => sprintf('Owned director %02d %s', $number, $run),
+            ];
+        }
+        $this->save($run, $manifest);
+        $kernel = new Kernel($_SERVER['APP_ENV'] ?? 'dev', false);
+        $kernel->boot();
+        try {
+            $manager = $kernel->getContainer()->get('doctrine')->getManager();
+            $directors = new DirectorService(
+                new DirectorRepository($manager),
+                new MovieRepository($manager),
+            );
+            $credits = array_map(static fn(array $person): DirectorCredit => new DirectorCredit(
+                $person['tmdbId'],
+                $person['name'],
+            ), $manifest['directors']);
+            $manager->getConnection()->transactional(static function () use ($manager, $directors, $manifest, $credits): void {
+                $movieId = Uuid::fromString($manifest['movie']['id']);
+                $keys = ['movie-director-movie:' . $movieId->toString()];
+                $personIds = [];
+                foreach ($credits as $credit) {
+                    $keys[] = 'movie-director-person:' . $credit->tmdbId;
+                    $personIds[] = $credit->tmdbId;
+                }
+                ImportIdentityLock::acquire($manager->getConnection(), $keys);
+                $existing = $manager->getRepository(MovieDirectorEntity::class)->findOneBy(['tmdbId' => $personIds]);
+                if ($existing !== null) {
+                    throw new RuntimeException('Director fixture identity collision; existing identities were not changed.');
+                }
+                $directors->syncMovieDirectors($movieId, $credits, true);
+            });
+            $result = $directors->searchVisible(
+                SearchOptions::create($run, 100),
+                LibraryReadScope::unrestricted(),
+            );
+            $manifest['directors'] = array_map(static fn(DirectorReadView $person): array => [
+                'publicId' => $person->publicId->toString(),
+                'tmdbId' => $person->tmdbId,
+                'name' => $person->name,
+            ], $result->getItems());
+            $this->save($run, $manifest);
+        } finally {
+            $kernel->shutdown();
+        }
+        return $manifest;
+    }
+
+    private function generateSource(string $run, string $path, string $delivery, string $extension, bool $quality): void
     {
         $process = new Process([
             '/usr/bin/ffmpeg', '-nostdin', '-v', 'error', '-y', '-filter_threads', '1',
-            '-f', 'lavfi', '-i', 'color=c=black:size=320x180:rate=24',
+            '-f', 'lavfi', '-i', 'color=c=black:size=' . ($quality ? '1280x720' : '320x180') . ':rate=24',
             '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo', '-t', '30',
             '-c:v', $delivery === 'encoded' ? 'mpeg4' : 'libx264', '-threads', '1',
             ...($delivery === 'encoded' ? [] : ['-preset', 'ultrafast']),
@@ -151,7 +226,7 @@ final class PlaybackVideoFixture
         $process->mustRun();
     }
 
-    private function generateCinemaSource(string $run, string $path): void
+    private function generateCinemaSource(string $run, string $path, bool $quality): void
     {
         $subtitles = $this->root . '/' . $run . '/cinema.srt';
         $chapters = $this->root . '/' . $run . '/cinema.ffmetadata';
@@ -193,7 +268,7 @@ final class PlaybackVideoFixture
 
             $process = new Process([
                 '/usr/bin/ffmpeg', '-nostdin', '-v', 'error', '-y', '-filter_threads', '1',
-                '-f', 'lavfi', '-i', 'testsrc2=size=320x180:rate=24',
+                '-f', 'lavfi', '-i', 'testsrc2=size=' . ($quality ? '1280x720' : '320x180') . ':rate=24',
                 '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000',
                 '-f', 'lavfi', '-i', 'sine=frequency=880:sample_rate=48000',
                 '-i', $subtitles, '-f', 'ffmetadata', '-i', $chapters,
@@ -306,6 +381,9 @@ SQL, ['video' => $videoId]);
                 }
                 $this->connection->delete('movie_video', ['id' => $manifest['movieVideoId']]);
                 $this->connection->delete('movies', ['id' => $manifest['movie']['id']]);
+                foreach ($manifest['directors'] ?? [] as $director) {
+                    $this->connection->delete('movie_directors', ['tmdb_id' => $director['tmdbId'], 'name' => $director['name']]);
+                }
                 $this->connection->delete('videos', ['id' => $videoId]);
             });
             if (is_file($path) && !unlink($path)) {

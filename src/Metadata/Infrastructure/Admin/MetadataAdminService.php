@@ -11,6 +11,7 @@ use App\Metadata\Application\Message\SyncArtistsMessage;
 use App\Metadata\Application\Message\SyncGenresMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
+use App\Metadata\Application\Message\SyncMovieMessage;
 use App\Metadata\Application\Port\MetadataAdminPortInterface;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
@@ -26,6 +27,7 @@ final class MetadataAdminService implements MetadataAdminPortInterface
         SyncGenresMessage::class,
         SyncAlbumMessage::class,
         SyncSongMessage::class,
+        SyncMovieMessage::class,
         SyncArtistsMessage::class,
         SyncArtistMessage::class,
     ];
@@ -37,8 +39,7 @@ final class MetadataAdminService implements MetadataAdminPortInterface
         private readonly string $spotifyClientId = '',
         private readonly string $spotifyClientSecret = '',
         private readonly string $tasteDiveApiKey = '',
-    ) {
-    }
+    ) {}
 
     public function getSyncStatus(): array
     {
@@ -130,7 +131,7 @@ final class MetadataAdminService implements MetadataAdminPortInterface
     private static function jobNames(): array
     {
         return array_map(
-            static fn (string $class): string => substr($class, (int) strrpos($class, '\\') + 1),
+            static fn(string $class): string => substr($class, (int) strrpos($class, '\\') + 1),
             self::JOB_CLASSES,
         );
     }

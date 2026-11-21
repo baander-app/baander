@@ -66,6 +66,39 @@ final class OpenApiSpecTest extends KernelTestCase
         }
     }
 
+    public function test_movie_spec_parameters_preserve_the_complete_published_contract(): void
+    {
+        $spec = $this->getSpec();
+        $operations = [
+            ['/api/movies/', 'get', ['page', 'limit', 'q']],
+            ['/api/movies/{publicId}', 'get', ['publicId']],
+            ['/api/movies/{publicId}', 'patch', ['publicId']],
+            ['/api/movies/{publicId}', 'delete', ['publicId']],
+            ['/api/movies/directors', 'get', ['page', 'limit', 'q']],
+            ['/api/movies/directors/{publicId}', 'get', ['publicId']],
+            ['/api/movies/directors/{publicId}/movies', 'get', ['publicId', 'page', 'limit', 'q']],
+        ];
+        foreach ($operations as [$path, $method, $names]) {
+            $parameters = $spec['paths'][$path][$method]['parameters'];
+            self::assertSame($names, array_column($parameters, 'name'), $method . ' ' . $path);
+        }
+        $published = json_decode(file_get_contents(dirname(__DIR__, 2) . '/openapi.json'), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(self::normalizedContract($published), self::normalizedContract($spec));
+    }
+
+    private static function normalizedContract(mixed $value): mixed
+    {
+        if (!is_array($value)) {
+            return $value;
+        }
+        $value = array_map(self::normalizedContract(...), $value);
+        if (!array_is_list($value)) {
+            ksort($value);
+        }
+
+        return $value;
+    }
+
     public function test_song_list_sort_enum_lists_the_supported_fields(): void
     {
         $spec = $this->getSpec();
@@ -389,7 +422,7 @@ final class OpenApiSpecTest extends KernelTestCase
 
         $missing = array_diff($required, $schemas);
         implode(', ', $missing)
-            |> (fn($x) => sprintf('Missing schemas: %s', $x,))
+            |> (fn($x) => sprintf('Missing schemas: %s', $x, ))
             |> (fn($x) => $this->assertEmpty($missing, $x));
     }
 
@@ -457,6 +490,7 @@ final class OpenApiSpecTest extends KernelTestCase
         // Endpoints that legitimately return no JSON schema (streaming, SSE, 204)
         $skipPaths = [
             'GET /api/images/{publicId}/file',  // Binary file response
+            'GET /api/videos/{publicId}/timeline-preview',  // JPEG contact sheet
             // Streaming/binary endpoints
             'GET /api/stream/track',            // Binary audio stream
             'GET /api/stream/{videoId}/master.m3u8',  // HLS manifest
@@ -523,7 +557,7 @@ final class OpenApiSpecTest extends KernelTestCase
         }
 
         implode(', ', $failures)
-            |> (fn($x) => sprintf('Paths without schema in any response: %s', $x,))
+            |> (fn($x) => sprintf('Paths without schema in any response: %s', $x, ))
             |> (fn($x) => $this->assertEmpty($failures, $x));
     }
 

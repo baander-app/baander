@@ -4,18 +4,28 @@ import {
   type LiveQueryDescriptor
 } from '@/shared/live/descriptor-types'
 
+const directorQueryPath = /^\/api\/movies\/directors(?:\/[^/]+(?:\/movies)?)?$/
+
 export const catalogLiveDescriptors: readonly LiveQueryDescriptor[] = [
   {
     family: 'catalog',
     matches: (key) =>
-      keyStartsWith(key, 'catalog', 'binary-image') ||
-      keyStartsWith(key, 'album-duplicates') ||
-      keyStartsWith(key, 'catalog', 'timeline') ||
-      firstKeyMatches(
-        key,
-        /^\/api\/(albums|artists|songs|movies)\/(?:[^/]+)?$/
-      ) ||
-      keyStartsWith(key, '/api/genres/')
+      !firstKeyMatches(key, directorQueryPath) && (
+        keyStartsWith(key, 'catalog', 'binary-image') ||
+        keyStartsWith(key, 'album-duplicates') ||
+        keyStartsWith(key, 'catalog', 'timeline') ||
+        firstKeyMatches(
+          key,
+          /^\/api\/(albums|artists|songs|movies)\/(?:[^/]+)?$/
+        ) ||
+        keyStartsWith(key, '/api/genres/')
+      )
+  },
+  {
+    family: 'catalog',
+    refreshPolicy: 'sampled',
+    sampleIntervalMs: 30000,
+    matches: (key) => firstKeyMatches(key, directorQueryPath)
   },
   {
     family: 'catalog',

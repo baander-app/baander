@@ -22,6 +22,8 @@ import { HomePage } from '../catalog/pages/HomePage'
 import { MoviesHomePage } from '../movies/pages/MoviesHomePage'
 import { MoviesBrowsePage } from '../catalog/pages/MoviesBrowsePage'
 import { MovieDetailPage } from '../catalog/pages/MovieDetailPage'
+import { DirectorsPage } from '../catalog/pages/DirectorsPage'
+import { DirectorDetailPage } from '../catalog/pages/DirectorDetailPage'
 import { TVHomePage } from '../tv/pages/TVHomePage'
 import { PodcastsHomePage } from '../podcasts/pages/PodcastsHomePage'
 import { ConcertsHomePage } from '../concerts/pages/ConcertsHomePage'
@@ -77,6 +79,8 @@ export const protectedRoutes: RouteObject[] = [
           // -- Movies routes --
           { path: '/movies', element: <MoviesHomePage /> },
           { path: '/movies/browse', element: <MoviesBrowsePage /> },
+          { path: '/movies/directors', element: <DirectorsPage /> },
+          { path: '/movies/directors/:publicId', element: <DirectorDetailPage /> },
           { path: '/movies/:publicId', element: <MovieDetailPage /> },
 
           // -- TV routes --

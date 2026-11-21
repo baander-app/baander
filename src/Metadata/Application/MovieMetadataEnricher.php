@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Metadata\Application;
 
 use App\Catalog\Application\Port\GenrePortInterface;
+use App\Catalog\Application\Port\DirectorPortInterface;
+use App\Catalog\Application\Port\DirectorCredit;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Domain\Model\Movie;
 use App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter;
@@ -12,7 +15,6 @@ use Psr\Log\LoggerInterface;
 
 final class MovieMetadataEnricher
 {
-    private const QUALITY_THRESHOLD_WITH_ID = 0.3;
     private const QUALITY_THRESHOLD_WITHOUT_ID = 0.5;
 
     public function __construct(
@@ -20,8 +22,9 @@ final class MovieMetadataEnricher
         private readonly MoviePortInterface $movieService,
         private readonly GenrePortInterface $genreService,
         private readonly LoggerInterface $logger,
-    ) {
-    }
+        private readonly DirectorPortInterface $directors,
+        private readonly TransactionPortInterface $transaction,
+    ) {}
 
     public function enrich(Movie $movie, bool $forceUpdate = false): EnrichmentResult
     {
@@ -44,7 +47,7 @@ final class MovieMetadataEnricher
                         'tmdb_id' => $data->id,
                         'existing_movie_id' => $existingByTmdbId->getId()->toString(),
                     ]);
-                    $movie = $existingByTmdbId;
+                    return EnrichmentResult::noMatch('tmdb', 0.0);
                 }
             }
 
@@ -61,6 +64,10 @@ final class MovieMetadataEnricher
 
     private function searchTmdb(Movie $movie): ?\App\Metadata\Infrastructure\Api\Tmdb\DTO\TmdbMovieDto
     {
+        if ($movie->getTmdbId() !== null) {
+            return $this->tmdbAdapter->lookupMovie($movie->getTmdbId());
+        }
+
         $searchResult = $this->tmdbAdapter->searchMovie(
             query: $movie->getTitle(),
             year: $movie->getYear(),
@@ -72,7 +79,7 @@ final class MovieMetadataEnricher
         }
 
         $firstResult = $searchResult->first();
-        $threshold = $movie->getTmdbId() !== null ? self::QUALITY_THRESHOLD_WITH_ID : self::QUALITY_THRESHOLD_WITHOUT_ID;
+        $threshold = self::QUALITY_THRESHOLD_WITHOUT_ID;
         $qualityScore = min($firstResult->popularity / 100.0, 1.0);
 
         if ($qualityScore < $threshold && ($firstResult->voteCount ?? 0) < 10) {
@@ -135,22 +142,56 @@ final class MovieMetadataEnricher
             collectionName: $collectionName,
         );
 
-        if ($overview !== null) { $updatedFields[] = 'overview'; }
-        if ($tagline !== null) { $updatedFields[] = 'tagline'; }
-        if ($posterUrl !== null) { $updatedFields[] = 'posterUrl'; }
-        if ($backdropUrl !== null) { $updatedFields[] = 'backdropUrl'; }
-        if ($runtime !== null) { $updatedFields[] = 'runtime'; }
-        if ($rating !== null) { $updatedFields[] = 'rating'; }
-        if ($originalLanguage !== null) { $updatedFields[] = 'originalLanguage'; }
-        if ($tmdbCollectionId !== null) { $updatedFields[] = 'tmdbCollectionId'; }
-        if ($collectionName !== null) { $updatedFields[] = 'collectionName'; }
-
-        if (!empty($data->genreIds)) {
-            $this->syncGenres($movie, $data->genreIds);
-            $updatedFields[] = 'genres';
+        if ($overview !== null) {
+            $updatedFields[] = 'overview';
+        }
+        if ($tagline !== null) {
+            $updatedFields[] = 'tagline';
+        }
+        if ($posterUrl !== null) {
+            $updatedFields[] = 'posterUrl';
+        }
+        if ($backdropUrl !== null) {
+            $updatedFields[] = 'backdropUrl';
+        }
+        if ($runtime !== null) {
+            $updatedFields[] = 'runtime';
+        }
+        if ($rating !== null) {
+            $updatedFields[] = 'rating';
+        }
+        if ($originalLanguage !== null) {
+            $updatedFields[] = 'originalLanguage';
+        }
+        if ($tmdbCollectionId !== null) {
+            $updatedFields[] = 'tmdbCollectionId';
+        }
+        if ($collectionName !== null) {
+            $updatedFields[] = 'collectionName';
         }
 
-        $this->movieService->save($movie);
+        // Fetch provider data before the database transaction and its identity locks.
+        $genreNames = [];
+        if ($data->genreIds !== []) {
+            foreach ($this->tmdbAdapter->getGenreList() as $genre) {
+                $genreNames[$genre->id] = $genre->name;
+            }
+        }
+        $credits = array_map(static fn(array $person): DirectorCredit => new DirectorCredit(
+            tmdbId: $person['id'],
+            name: $person['name'],
+            profileUrl: $person['profilePath'] === null ? null : 'https://image.tmdb.org/t/p/w185' . $person['profilePath'],
+        ), $data->crew);
+        $this->transaction->run(function () use ($movie, $data, $forceUpdate, $genreNames, $credits, &$updatedFields): void {
+            if ($data->genreIds !== []) {
+                $this->syncGenres($movie, $data->genreIds, $genreNames);
+                $updatedFields[] = 'genres';
+            }
+            $this->movieService->saveMetadata($movie);
+            if ($data->creditsAvailable && $this->directors->syncMovieDirectors($movie->getId(), $credits, $forceUpdate)) {
+                $updatedFields[] = 'directors';
+            }
+        });
 
         return new EnrichmentResult(
             success: true,
@@ -163,23 +204,21 @@ final class MovieMetadataEnricher
 
     /**
      * @param int[] $tmdbGenreIds
+     * @param array<int, string> $genreNames
      */
-    private function syncGenres(Movie $movie, array $tmdbGenreIds): void
+    private function syncGenres(Movie $movie, array $tmdbGenreIds, array $genreNames): void
     {
-        $tmdbGenres = $this->tmdbAdapter->getGenreList();
-        $genreMap = [];
-        foreach ($tmdbGenres as $genre) {
-            $genreMap[$genre->id] = $genre->name;
+        $names = [];
+        foreach ($tmdbGenreIds as $tmdbGenreId) {
+            $genreName = $genreNames[$tmdbGenreId] ?? null;
+            if ($genreName !== null) {
+                $names[] = $genreName;
+            }
         }
 
-        foreach ($tmdbGenreIds as $tmdbGenreId) {
-            $genreName = $genreMap[$tmdbGenreId] ?? null;
-            if ($genreName === null) {
-                continue;
-            }
-
-            $genre = $this->genreService->findOrCreateByName($genreName);
-            $this->genreService->addMovieToGenre($genre->getId(), $movie->getId());
+        $genres = $this->genreService->findOrCreateForImport($names);
+        foreach ($genres as $genreId) {
+            $this->genreService->addMovieToGenre($genreId, $movie->getId());
         }
     }
 }

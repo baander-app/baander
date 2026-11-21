@@ -49,6 +49,11 @@ return static function (ContainerConfigurator $container): void {
             'resource_class' => 'io',
             'default' => true,
         ],
+        \App\Metadata\Application\Message\SyncMovieMessage::class => [
+            'transport' => 'async',
+            'resource_class' => 'io',
+            'default' => true,
+        ],
         \App\Metadata\Application\Message\SyncLibraryMessage::class => [
             'transport' => 'async',
             'resource_class' => 'coordination',

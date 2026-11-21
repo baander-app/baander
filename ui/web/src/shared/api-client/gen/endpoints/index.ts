@@ -733,6 +733,21 @@ export const DeliveryRequestKind = {
   video: 'video',
 } as const;
 
+/**
+ * @nullable
+ */
+export type DeliveryRequestQualityTier = typeof DeliveryRequestQualityTier[keyof typeof DeliveryRequestQualityTier] | null;
+
+
+export const DeliveryRequestQualityTier = {
+  '360p': '360p',
+  '480p': '480p',
+  '720p': '720p',
+  '1080p': '1080p',
+  '1440p': '1440p',
+  '4K': '4K',
+} as const;
+
 export interface DeliveryRequest {
   kind: DeliveryRequestKind;
   id: string;
@@ -783,6 +798,8 @@ export interface DeliveryRequest {
      * @maximum 10000
      */
   audioOffsetMs?: number;
+  /** @nullable */
+  qualityTier?: DeliveryRequestQualityTier;
 }
 
 export interface ExtractMetadataRequest {
@@ -2439,6 +2456,20 @@ export interface MovieResource {
   updatedAt: string;
 }
 
+export interface DirectorResource {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId: string;
+  name: string;
+  tmdbId: number;
+  /** @nullable */
+  profileUrl: string | null;
+  movieCount: number;
+}
+
 /**
  * A MusicBrainz release (one edition of an album) an album may match
  */
@@ -2962,6 +2993,13 @@ export interface CursorPaginatedResponse {
   meta: CursorPaginatedResponseMeta;
 }
 
+export type VideoPlaybackInformationResourceQualityChoicesItem = {
+  id?: string;
+  label?: string;
+  width?: number;
+  height?: number;
+};
+
 export type VideoPlaybackInformationResourceAudioTracksItem = {
   /** @nullable */
   index?: number | null;
@@ -3010,6 +3048,7 @@ export type VideoPlaybackInformationResourcePreview = {
 };
 
 export interface VideoPlaybackInformationResource {
+  qualityChoices: VideoPlaybackInformationResourceQualityChoicesItem[];
   audioTracks: VideoPlaybackInformationResourceAudioTracksItem[];
   subtitleTracks: VideoPlaybackInformationResourceSubtitleTracksItem[];
   chapters: VideoPlaybackInformationResourceChaptersItem[];
@@ -3324,6 +3363,8 @@ export interface DeliveryResource {
   requestId?: string | null;
   /** @nullable */
   jobId?: string | null;
+  /** @nullable */
+  sessionId?: string | null;
   selection?: DeliveryResourceSelection;
 }
 
@@ -5849,6 +5890,32 @@ export type PatchMovieUpdateBody = {
 
 export type PatchMovieUpdate200 = {
   data?: MovieResource;
+};
+
+export type GetMovieDirectorIndexParams = {
+  page?: number;
+  /** @maximum 100 */
+  limit?: number;
+  q?: string;
+};
+
+export type GetMovieDirectorIndex200 = PaginatedResponse & {
+  data: DirectorResource[];
+};
+
+export type GetMovieDirectorShow200 = {
+  data: DirectorResource;
+};
+
+export type GetMovieDirectorMoviesParams = {
+  page?: number;
+  /** @maximum 100 */
+  limit?: number;
+  q?: string;
+};
+
+export type GetMovieDirectorMovies200 = PaginatedResponse & {
+  data: MovieResource[];
 };
 
 export type GetAdminMetadataMatchReviewsParams = {
@@ -8647,6 +8714,21 @@ export type GetStreamSegmentSubtitleSegmentParams = {
   exp: number;
 };
 
+/**
+ * @nullable
+ */
+export type PostStreamSigningSignBodyQualityTier = typeof PostStreamSigningSignBodyQualityTier[keyof typeof PostStreamSigningSignBodyQualityTier] | null;
+
+
+export const PostStreamSigningSignBodyQualityTier = {
+  '360p': '360p',
+  '480p': '480p',
+  '720p': '720p',
+  '1080p': '1080p',
+  '1440p': '1440p',
+  '4K': '4K',
+} as const;
+
 export type PostStreamSigningSignBody = {
   path: string;
   expiresInSeconds?: number;
@@ -8664,6 +8746,8 @@ export type PostStreamSigningSignBody = {
      * @maximum 10000
      */
   audioOffsetMs?: number;
+  /** @nullable */
+  qualityTier?: PostStreamSigningSignBodyQualityTier;
   /** Stable playback client session identifier, retained across reloads and reconnects */
   requestId: string;
   /**
@@ -18930,6 +19014,331 @@ export const usePatchMovieUpdate = <TError = ErrorType<ApiError | ValidationErro
       > => {
       return useMutation(getPatchMovieUpdateMutationOptions(options), queryClient);
     }
+
+export const getGetMovieDirectorIndexUrl = (params?: GetMovieDirectorIndexParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/movies/directors?${stringifiedParams}` : `/api/movies/directors`
+}
+
+/**
+ * @summary List directors of accessible movies
+ */
+export const getMovieDirectorIndex = async (params?: GetMovieDirectorIndexParams, options?: Parameters<typeof customInstance>[1]): Promise<GetMovieDirectorIndex200> => {
+
+  return customInstance<GetMovieDirectorIndex200>(getGetMovieDirectorIndexUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMovieDirectorIndexQueryKey = (params?: GetMovieDirectorIndexParams,) => {
+    return [
+    `/api/movies/directors`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMovieDirectorIndexQueryOptions = <TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(params?: GetMovieDirectorIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMovieDirectorIndexQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMovieDirectorIndex>>> = ({ signal }) => getMovieDirectorIndex(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetMovieDirectorIndexQueryResult = NonNullable<Awaited<ReturnType<typeof getMovieDirectorIndex>>>
+export type GetMovieDirectorIndexQueryError = ErrorType<unknown>
+
+
+export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(
+ params: undefined |  GetMovieDirectorIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMovieDirectorIndex>>,
+          TError,
+          Awaited<ReturnType<typeof getMovieDirectorIndex>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(
+ params?: GetMovieDirectorIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMovieDirectorIndex>>,
+          TError,
+          Awaited<ReturnType<typeof getMovieDirectorIndex>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(
+ params?: GetMovieDirectorIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List directors of accessible movies
+ */
+
+export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(
+ params?: GetMovieDirectorIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetMovieDirectorIndexQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetMovieDirectorShowUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/movies/directors/${publicId}`
+}
+
+/**
+ * @summary Get a director of accessible movies
+ */
+export const getMovieDirectorShow = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetMovieDirectorShow200> => {
+
+  return customInstance<GetMovieDirectorShow200>(getGetMovieDirectorShowUrl(publicId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMovieDirectorShowQueryKey = (publicId: string,) => {
+    return [
+    `/api/movies/directors/${publicId}`
+    ] as const;
+    }
+
+
+export const getGetMovieDirectorShowQueryOptions = <TData = Awaited<ReturnType<typeof getMovieDirectorShow>>, TError = ErrorType<void>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMovieDirectorShowQueryKey(publicId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMovieDirectorShow>>> = ({ signal }) => getMovieDirectorShow(publicId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorShow>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetMovieDirectorShowQueryResult = NonNullable<Awaited<ReturnType<typeof getMovieDirectorShow>>>
+export type GetMovieDirectorShowQueryError = ErrorType<void>
+
+
+export function useGetMovieDirectorShow<TData = Awaited<ReturnType<typeof getMovieDirectorShow>>, TError = ErrorType<void>>(
+ publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorShow>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMovieDirectorShow>>,
+          TError,
+          Awaited<ReturnType<typeof getMovieDirectorShow>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMovieDirectorShow<TData = Awaited<ReturnType<typeof getMovieDirectorShow>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorShow>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMovieDirectorShow>>,
+          TError,
+          Awaited<ReturnType<typeof getMovieDirectorShow>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMovieDirectorShow<TData = Awaited<ReturnType<typeof getMovieDirectorShow>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get a director of accessible movies
+ */
+
+export function useGetMovieDirectorShow<TData = Awaited<ReturnType<typeof getMovieDirectorShow>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetMovieDirectorShowQueryOptions(publicId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetMovieDirectorMoviesUrl = (publicId: string,
+    params?: GetMovieDirectorMoviesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/movies/directors/${publicId}/movies?${stringifiedParams}` : `/api/movies/directors/${publicId}/movies`
+}
+
+/**
+ * @summary List accessible movies by a director
+ */
+export const getMovieDirectorMovies = async (publicId: string,
+    params?: GetMovieDirectorMoviesParams, options?: Parameters<typeof customInstance>[1]): Promise<GetMovieDirectorMovies200> => {
+
+  return customInstance<GetMovieDirectorMovies200>(getGetMovieDirectorMoviesUrl(publicId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMovieDirectorMoviesQueryKey = (publicId: string,
+    params?: GetMovieDirectorMoviesParams,) => {
+    return [
+    `/api/movies/directors/${publicId}/movies`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMovieDirectorMoviesQueryOptions = <TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(publicId: string,
+    params?: GetMovieDirectorMoviesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMovieDirectorMoviesQueryKey(publicId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMovieDirectorMovies>>> = ({ signal }) => getMovieDirectorMovies(publicId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetMovieDirectorMoviesQueryResult = NonNullable<Awaited<ReturnType<typeof getMovieDirectorMovies>>>
+export type GetMovieDirectorMoviesQueryError = ErrorType<void>
+
+
+export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(
+ publicId: string,
+    params: undefined |  GetMovieDirectorMoviesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMovieDirectorMovies>>,
+          TError,
+          Awaited<ReturnType<typeof getMovieDirectorMovies>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(
+ publicId: string,
+    params?: GetMovieDirectorMoviesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMovieDirectorMovies>>,
+          TError,
+          Awaited<ReturnType<typeof getMovieDirectorMovies>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(
+ publicId: string,
+    params?: GetMovieDirectorMoviesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List accessible movies by a director
+ */
+
+export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(
+ publicId: string,
+    params?: GetMovieDirectorMoviesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetMovieDirectorMoviesQueryOptions(publicId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetAdminMetadataMatchReviewsUrl = (params?: GetAdminMetadataMatchReviewsParams,) => {
   const normalizedParams = new URLSearchParams();

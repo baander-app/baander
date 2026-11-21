@@ -125,6 +125,18 @@ final class DeploymentRuntimeEnvironmentTest extends TestCase
         });
     }
 
+    public function testPassesTheMovieMetadataTokenWithoutExposingItInDiagnostics(): void
+    {
+        $environment = new DeploymentRuntimeEnvironment([
+            'TMDB_BEARER_TOKEN' => 'fixture-tmdb-token',
+        ]);
+
+        $environment->withFile(static function (string $path): void {
+            self::assertSame("TMDB_BEARER_TOKEN=fixture-tmdb-token\n", file_get_contents($path));
+        });
+        self::assertStringNotContainsString('fixture-tmdb-token', json_encode($environment, JSON_THROW_ON_ERROR));
+    }
+
     public function testPreservesApplicationSigningIdentityAndOriginWithRedaction(): void
     {
         $variables = ['VAPID_PRIVATE_KEY' => 'private-vapid', 'VAPID_PUBLIC_KEY' => 'public-vapid',
@@ -135,7 +147,7 @@ final class DeploymentRuntimeEnvironmentTest extends TestCase
         self::assertSame($variables, $environment->variables);
         self::assertSame(['variables' => array_fill_keys(array_keys($variables), '[redacted]')], $environment->jsonSerialize());
         $environment->withFile(static function (string $path) use ($variables): void {
-            $lines = array_map(static fn (string $key, string $value): string => $key . '=' . $value . "\n", array_keys($variables), array_values($variables));
+            $lines = array_map(static fn(string $key, string $value): string => $key . '=' . $value . "\n", array_keys($variables), array_values($variables));
             self::assertSame(implode('', $lines), file_get_contents($path));
         });
     }
@@ -191,6 +203,6 @@ final class DeploymentRuntimeEnvironmentTest extends TestCase
         yield 'per-value oversized' => [['APP_SECRET' => 'private-input' . str_repeat('x', 2048)]];
         yield 'nonproduction' => [['APP_ENV' => 'private-input']];
         yield 'debug enabled' => [['APP_DEBUG' => '1']];
-        yield 'too many entries' => [array_fill_keys(array_map(static fn (int $index): string => 'KEY_' . $index, range(1, 33)), 'private-input')];
+        yield 'too many entries' => [array_fill_keys(array_map(static fn(int $index): string => 'KEY_' . $index, range(1, 33)), 'private-input')];
     }
 }

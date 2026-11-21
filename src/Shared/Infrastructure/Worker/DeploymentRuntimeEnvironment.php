@@ -35,6 +35,7 @@ final readonly class DeploymentRuntimeEnvironment implements JsonSerializable
         // The media worker qualifies the encoder this names; without it the worker keeps the
         // value baked into the image's .env.
         EnvironmentVariable::VIDEO_ENCODER,
+        EnvironmentVariable::TMDB_BEARER_TOKEN,
         EnvironmentVariable::VAPID_PRIVATE_KEY, EnvironmentVariable::VAPID_PUBLIC_KEY, EnvironmentVariable::STREAM_URL_HMAC_SECRET, EnvironmentVariable::AUTH_TOTP_ENCRYPTION_KEY,
         EnvironmentVariable::APP_URL, EnvironmentVariable::DEFAULT_URI,
         // The managed preset turns OpenTelemetry export off unless the operator sets a collector.

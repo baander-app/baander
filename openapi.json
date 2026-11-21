@@ -7817,6 +7817,191 @@
                 }
             }
         },
+        "/api/movies/directors": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "List directors of accessible movies",
+                "operationId": "get_movie_director_index",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 50,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated directors",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/PaginatedResponse"
+                                        },
+                                        {
+                                            "required": [
+                                                "data"
+                                            ],
+                                            "properties": {
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/DirectorResource"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/movies/directors/{publicId}": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "Get a director of accessible movies",
+                "operationId": "get_movie_director_show",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Director",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/DirectorResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Director not found"
+                    }
+                }
+            }
+        },
+        "/api/movies/directors/{publicId}/movies": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "List accessible movies by a director",
+                "operationId": "get_movie_director_movies",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 50,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated movies",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/PaginatedResponse"
+                                        },
+                                        {
+                                            "required": [
+                                                "data"
+                                            ],
+                                            "properties": {
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/MovieResource"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Director not found"
+                    }
+                }
+            }
+        },
         "/api/admin/metadata/match/reviews": {
             "get": {
                 "tags": [
@@ -29024,6 +29209,37 @@
                         "description": "Update timestamp",
                         "type": "string",
                         "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "DirectorResource": {
+                "required": [
+                    "publicId",
+                    "name",
+                    "tmdbId",
+                    "profileUrl",
+                    "movieCount"
+                ],
+                "properties": {
+                    "publicId": {
+                        "type": "string",
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "tmdbId": {
+                        "type": "integer"
+                    },
+                    "profileUrl": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "movieCount": {
+                        "type": "integer"
                     }
                 },
                 "type": "object"

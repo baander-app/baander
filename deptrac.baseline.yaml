@@ -130,7 +130,6 @@ deptrac:
       - App\Library\Application\Port\LibraryPortInterface
     App\Metadata\Application\MovieMetadataEnricher:
       - App\Catalog\Application\Port\GenrePortInterface
-      - App\Catalog\Application\Port\MoviePortInterface
       - App\Catalog\Domain\Model\Movie
       - App\Metadata\Infrastructure\Api\Tmdb\DTO\TmdbMovieDto
       - App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter

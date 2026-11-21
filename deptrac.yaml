@@ -36,7 +36,7 @@ deptrac:
         Shared: ['Shared Domain', 'Shared Application', 'Shared Infrastructure', 'Shared Live Snapshot Infrastructure', 'Shared Interface']
         Activity: ['Activity Artist Merge Contract', 'Activity Album Merge Contract', 'Activity Domain', 'Activity Application', 'Activity Infrastructure', 'Activity Resources', 'Activity Interface']
         Auth: ['Auth Live Authority Contract', 'Auth Domain', 'Auth Identity Contract', 'Auth User Identifier Contract', 'Auth Device Approval Event Contract', 'Auth WebSocket Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
-        Catalog: ['Catalog Video Contract', 'Catalog Song Availability Contract', 'Catalog Song Lookup Contract', 'Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Resources', 'Catalog Interface']
+        Catalog: ['Catalog Video Contract', 'Catalog Song Availability Contract', 'Catalog Song Lookup Contract', 'Catalog Movie Contract', 'Catalog Director Contract', 'Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Resources', 'Catalog Interface']
         Filesystem: ['Filesystem Infrastructure', 'Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
         Library: ['Library Live Audience Contract', 'Library File Availability Contract', 'Library Read Scope Contract', 'Library Content Stats Contract', 'Library Files Discovered Contract', 'Library Provisioning Contract', 'Library Media Files Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
         Lyrics: ['Lyrics Fetch Request Contract', 'Lyrics Album Merge Contract', 'Lyrics Domain', 'Lyrics Application', 'Lyrics Infrastructure', 'Lyrics Resources', 'Lyrics Interface']
@@ -280,6 +280,16 @@ deptrac:
         - type: classLike
           value: '^App\\Catalog\\Application\\(Port\\VideoPortInterface|Dto\\VideoSourceMetadata)$'
 
+    - name: 'Catalog Movie Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Catalog\\Application\\Port\\MoviePortInterface$'
+
+    - name: 'Catalog Director Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Catalog\\Application\\Port\\(DirectorPortInterface|DirectorCredit)$'
+
     - name: 'Catalog Application'
       collectors:
         - type: bool
@@ -293,6 +303,8 @@ deptrac:
               value: '^App\\Catalog\\Application\\Port\\SongAvailabilityPortInterface$'
             - type: classLike
               value: '^App\\Catalog\\Application\\Port\\(SongLookupInterface|SongLyricSignature)$'
+            - type: classLike
+              value: '^App\\Catalog\\Application\\Port\\(MoviePortInterface|DirectorPortInterface|DirectorCredit)$'
 
     - name: 'Catalog Infrastructure'
       collectors:
@@ -1311,7 +1323,17 @@ deptrac:
     'Catalog Domain':
       - Core
       - 'Shared Domain'
+    'Catalog Movie Contract':
+      - Core
+      - 'Catalog Domain'
+      - 'Shared Domain'
+    'Catalog Director Contract':
+      - Core
+      - 'Catalog Domain'
+      - 'Shared Domain'
     'Catalog Application':
+      - 'Catalog Movie Contract'
+      - 'Catalog Director Contract'
       - Core
       - 'Media Metadata Values'
       - 'Transcode Probe Contract'
@@ -1330,6 +1352,8 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Catalog Infrastructure':
+      - 'Catalog Movie Contract'
+      - 'Catalog Director Contract'
       - 'Media Video Quality Contract'
       - Core
       - 'Transcode Timeline Preview Contract'
@@ -1360,6 +1384,8 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Catalog Interface':
+      - 'Catalog Movie Contract'
+      - 'Catalog Director Contract'
       - Core
       - 'Catalog Video Contract'
       - 'Catalog Song Availability Contract'
@@ -1545,6 +1571,8 @@ deptrac:
       - 'Shared Application'
     'Metadata MusicBrainz Lookup Contract': []
     'Metadata Application':
+      - 'Catalog Movie Contract'
+      - 'Catalog Director Contract'
       - Core
       - 'Media Metadata Values'
       - 'Metadata Sync Contract'

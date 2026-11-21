@@ -500,6 +500,18 @@ final class PresetDeploymentTest extends TestCase
         self::assertSame($worker, new DeploymentRuntimeEnvironment($worker)->variables);
     }
 
+    public function testWorkerEnvironmentCarriesTheConfiguredMovieMetadataToken(): void
+    {
+        $data = self::configuration();
+        $data['environment']['TMDB_BEARER_TOKEN'] = 'fixture-tmdb-token';
+
+        $worker = Renderer::workerEnvironment(Configuration::fromArray($data), $this->profile());
+
+        self::assertSame('fixture-tmdb-token', $worker['TMDB_BEARER_TOKEN'] ?? null);
+        ksort($worker);
+        self::assertSame($worker, new DeploymentRuntimeEnvironment($worker)->variables);
+    }
+
     public function testProcessSizeBoundsMatchTheApplicationProfile(): void
     {
         self::assertSame([

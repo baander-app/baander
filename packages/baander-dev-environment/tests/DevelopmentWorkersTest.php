@@ -725,6 +725,21 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         self::assertSame($runtime, new DeploymentRuntimeEnvironment($runtime)->variables);
     }
 
+    public function testWorkerCredentialsCarryTheConfiguredMovieMetadataToken(): void
+    {
+        AtomicFile::writeJson(
+            $this->store->directory('persistent') . '/env.json',
+            $this->environment() + ['TMDB_BEARER_TOKEN' => 'fixture-tmdb-token'],
+        );
+
+        new WorkerDeployment($this->store, $this->preparationRunner())->prepare($this->instance, $this->release);
+        $runtime = AtomicFile::readJson($this->instance['workers']['directory'] . '/credentials.json')['runtimeEnvironment'];
+
+        self::assertSame('fixture-tmdb-token', $runtime['TMDB_BEARER_TOKEN'] ?? null);
+        ksort($runtime);
+        self::assertSame($runtime, new DeploymentRuntimeEnvironment($runtime)->variables);
+    }
+
     public function testDerivedBindIsRefusedBeforeSavingWorkerPointer(): void
     {
         AtomicFile::writeJson($this->store->directory('persistent') . '/env.json', $this->environment());

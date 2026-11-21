@@ -8,6 +8,7 @@ use App\Catalog\Domain\Model\Movie;
 use App\Catalog\Domain\Model\MovieState;
 use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\MovieDirectorCreditEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Query\CatalogReadScopeQuery;
@@ -19,6 +20,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Infrastructure\Doctrine\Repository\PgroongaSearchTrait;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\DBAL\ArrayParameterType;
 
 /**
  * Pure domain repository for movies.
@@ -29,8 +31,7 @@ final class MovieRepository implements MovieRepositoryInterface
 
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
-    ) {
-    }
+    ) {}
 
     public function findVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): ?Movie
     {
@@ -63,6 +64,72 @@ final class MovieRepository implements MovieRepositoryInterface
             ->getSingleScalarResult();
     }
 
+    public function findVisibleByUuids(array $ids, LibraryReadScope $scope): array
+    {
+        if (count($ids) > 100) {
+            throw new \InvalidArgumentException('Load at most 100 movies in one batch.');
+        }
+        if ($ids === []) {
+            return [];
+        }
+        $strings = array_map(static fn(Uuid $id): string => $id->toString(), $ids);
+        $entities = $this->visibleQuery($scope)
+            ->andWhere('visible.id IN (:ids)')
+            ->setParameter('ids', $strings, ArrayParameterType::STRING)
+            ->innerJoin('visible.library', 'movie_library')
+            ->addSelect('movie_library')
+            ->getQuery()
+            ->getResult();
+        $byId = [];
+        foreach ($entities as $entity) {
+            $byId[$entity->getId()->toString()] = $entity;
+        }
+        if ($byId === []) {
+            return [];
+        }
+        $links = $this->entityManager->createQueryBuilder()
+            ->select('link', 'video')
+            ->from(MovieVideoEntity::class, 'link')
+            ->innerJoin('link.video', 'video')
+            ->where('IDENTITY(link.movie) IN (:ids)')
+            ->setParameter('ids', array_keys($byId), ArrayParameterType::STRING)
+            ->orderBy('link.sortOrder', 'ASC')
+            ->addOrderBy('link.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+        $linksByMovie = [];
+        foreach ($links as $link) {
+            $linksByMovie[$link->getMovie()->getId()->toString()][] = $link;
+        }
+        $movies = [];
+        foreach ($strings as $id) {
+            if (isset($byId[$id])) {
+                $movies[] = $this->toDomain($byId[$id], $linksByMovie[$id] ?? []);
+            }
+        }
+
+        return $movies;
+    }
+
+    public function movieIdsByLibraryAfter(Uuid $libraryId, ?Uuid $after = null, int $limit = 100): array
+    {
+        $query = $this->entityManager->createQueryBuilder()
+            ->select('movie.id AS movieId')
+            ->from(MovieEntity::class, 'movie')
+            ->where('IDENTITY(movie.library) = :libraryId')
+            ->setParameter('libraryId', $libraryId, 'uuid')
+            ->orderBy('movie.id', 'ASC')
+            ->setMaxResults(max(1, min(100, $limit)));
+        if ($after !== null) {
+            $query->andWhere('movie.id > :after')->setParameter('after', $after, 'uuid');
+        }
+        $rows = $query->getQuery()->getArrayResult();
+
+        return array_map(static fn(array $row): Uuid => $row['movieId'] instanceof Uuid
+            ? $row['movieId']
+            : Uuid::fromString($row['movieId']), $rows);
+    }
+
     private function visibleQuery(LibraryReadScope $scope): \Doctrine\ORM\QueryBuilder
     {
         $qb = $this->entityManager
@@ -87,6 +154,17 @@ final class MovieRepository implements MovieRepositoryInterface
         $this->syncToEntity($movie, $entity);
         $this->syncMovieVideos($movie, $entity);
         $this->entityManager->persist($entity);
+    }
+
+    public function saveMetadata(Movie $movie): void
+    {
+        $entity = $this->entityManager->find(MovieEntity::class, $movie->getId());
+        if ($entity === null) {
+            throw new \LogicException('Cannot update metadata for a movie that has not been persisted.');
+        }
+
+        $this->syncMetadataToEntity($movie, $entity);
+        $this->entityManager->flush();
     }
 
     public function flush(): void
@@ -121,7 +199,7 @@ final class MovieRepository implements MovieRepositoryInterface
             ->getRepository(MovieEntity::class)
             ->findBy(['library' => $libraryId], ['title' => 'ASC']);
 
-        return array_map(fn (MovieEntity $entity) => $this->toDomain($entity), $entities);
+        return array_map(fn(MovieEntity $entity) => $this->toDomain($entity), $entities);
     }
 
     public function findByTitleAndLibrary(string $title, Uuid $libraryId): ?Movie
@@ -165,7 +243,7 @@ final class MovieRepository implements MovieRepositoryInterface
                 ->getOffset())
                 ->getQuery()
                 ->getResult();
-            $movies = array_map(fn (MovieEntity $entity) => $this->toDomain($entity), $entities);
+            $movies = array_map(fn(MovieEntity $entity) => $this->toDomain($entity), $entities);
 
             return SearchResult::create($movies, $total);
         }
@@ -182,7 +260,7 @@ final class MovieRepository implements MovieRepositoryInterface
             $predicate['types'],
         );
 
-        $movies = array_map(fn (MovieEntity $entity) => $this->toDomain($entity), $result['entities']);
+        $movies = array_map(fn(MovieEntity $entity) => $this->toDomain($entity), $result['entities']);
 
         return SearchResult::create($movies, $result['total'], $result['highestScore']);
     }
@@ -207,11 +285,13 @@ final class MovieRepository implements MovieRepositoryInterface
         $this->entityManager->remove($entity);
         $this->entityManager->flush();
 
-        // The database deletes the movie's video links (ON DELETE CASCADE). A link this manager
+        // The database deletes the movie's video and director links (ON DELETE CASCADE). A link this manager
         // still holds would point at the deleted movie and fail the next flush that writes anything.
-        foreach ($this->entityManager->getUnitOfWork()->getIdentityMap()[MovieVideoEntity::class] ?? [] as $link) {
-            if ($link instanceof MovieVideoEntity && $link->getMovie() === $entity) {
-                $this->entityManager->detach($link);
+        foreach ([MovieVideoEntity::class, MovieDirectorCreditEntity::class] as $linkClass) {
+            foreach ($this->entityManager->getUnitOfWork()->getIdentityMap()[$linkClass] ?? [] as $link) {
+                if ($link->getMovie() === $entity) {
+                    $this->entityManager->detach($link);
+                }
             }
         }
     }
@@ -241,13 +321,14 @@ final class MovieRepository implements MovieRepositoryInterface
         );
     }
 
-    private function toDomain(MovieEntity $entity): Movie
+    /** @param list<MovieVideoEntity>|null $junctionRows */
+    private function toDomain(MovieEntity $entity, ?array $junctionRows = null): Movie
     {
         $videoIds = [];
         $videoPublicIds = [];
-        $junctionRows = $this->entityManager
+        $junctionRows ??= $this->entityManager
             ->getRepository(MovieVideoEntity::class)
-            ->findBy(['movie' => $entity->getId()]);
+            ->findBy(['movie' => $entity->getId()], ['sortOrder' => 'ASC', 'id' => 'ASC']);
 
         foreach ($junctionRows as $junction) {
             $videoIds[] = $junction->getVideo()->getId()->toString();
@@ -284,6 +365,11 @@ final class MovieRepository implements MovieRepositoryInterface
         $entity->setTitle($movie->getTitle());
         $entity->setYear($movie->getYear());
         $entity->setSummary($movie->getSummary());
+        $this->syncMetadataToEntity($movie, $entity);
+    }
+
+    private function syncMetadataToEntity(Movie $movie, MovieEntity $entity): void
+    {
         $entity->setTmdbId($movie->getTmdbId());
         $entity->setImdbId($movie->getImdbId());
         $entity->setOverview($movie->getOverview());

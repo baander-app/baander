@@ -22,6 +22,8 @@ use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\DTO\PaginatedResponse;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
+use OpenApi\Spec\Parameter;
+use OpenApi\Spec\Schema as ParameterSchema;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
@@ -29,7 +31,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[OA\Tag(name: 'Catalog', description: 'Album, artist, song, movie, and genre management endpoints')]
-#[Route('/api/movies', name: 'movie_')]
+#[Route('/api/movies', name: 'movie_', requirements: ['publicId' => '[0-9a-zA-Z_-]{21}'])]
 #[\Symfony\Component\Security\Http\Attribute\IsGranted('ROLE_ADMIN', methods: ['POST', 'PUT', 'PATCH', 'DELETE'])]
 final class MovieController
 {
@@ -41,8 +43,7 @@ final class MovieController
         private readonly LibraryReadScopeProviderInterface $libraryReadScopeProvider,
         private readonly VideoPortInterface $videoRepository,
         private readonly MessageBusInterface $bus,
-    ) {
-    }
+    ) {}
 
     /**
      * List movies (paginated).
@@ -50,14 +51,35 @@ final class MovieController
     #[OA\Get(
         path: '/api/movies/',
         summary: 'List movies (paginated)',
-        parameters: [
-            new OA\Parameter(name: 'page', description: 'Page number', in: 'query', schema: new OA\Schema(type: 'integer', default: 1)),
-            new OA\Parameter(name: 'limit', description: 'Items per page (max 100)', in: 'query', schema: new OA\Schema(type: 'integer', default: 50)),
-            new OA\Parameter(name: 'q', description: 'Search query', in: 'query', schema: new OA\Schema(type: 'string')),
-        ],
         responses: [
             new OA\Response(response: '200', description: 'Paginated list of movies', content: new OA\JsonContent(ref: new Model(type: PaginatedResponse::class))),
         ],
+    )]
+    #[Parameter(
+        name: 'page',
+        description: 'Page number',
+        in: 'query',
+        schema: new ParameterSchema(
+            type: 'integer',
+            default: 1,
+        ),
+    )]
+    #[Parameter(
+        name: 'limit',
+        description: 'Items per page (max 100)',
+        in: 'query',
+        schema: new ParameterSchema(
+            type: 'integer',
+            default: 50,
+        ),
+    )]
+    #[Parameter(
+        name: 'q',
+        description: 'Search query',
+        in: 'query',
+        schema: new ParameterSchema(
+            type: 'string',
+        ),
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
     public function index(Request $request): JsonResponse
@@ -89,9 +111,6 @@ final class MovieController
     #[OA\Get(
         path: '/api/movies/{publicId}',
         summary: 'Get a single movie',
-        parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Movie public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
-        ],
         responses: [
             new OA\Response(response: '200', description: 'Movie details', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', ref: new Model(type: MovieResource::class))],
@@ -99,6 +118,18 @@ final class MovieController
             )),
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
+    )]
+    #[Parameter(
+        name: 'publicId',
+        description: 'Movie public ID',
+        in: 'path',
+        required: true,
+        schema: new ParameterSchema(
+            type: 'string',
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+            maxLength: 21,
+            minLength: 21,
+        ),
     )]
     #[Route('/{publicId}', name: 'show', methods: ['GET'])]
     public function show(string $publicId): JsonResponse
@@ -147,13 +178,10 @@ final class MovieController
         path: '/api/movies/{publicId}',
         summary: 'Update a movie',
         requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'title', type: 'string', nullable: true),
-                new OA\Property(property: 'year', type: 'integer', nullable: true),
-                new OA\Property(property: 'summary', type: 'string', nullable: true),
-            ])),
-        parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Movie public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
-        ],
+            new OA\Property(property: 'title', type: 'string', nullable: true),
+            new OA\Property(property: 'year', type: 'integer', nullable: true),
+            new OA\Property(property: 'summary', type: 'string', nullable: true),
+        ])),
         responses: [
             new OA\Response(response: '200', description: 'Movie updated', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', ref: new Model(type: MovieResource::class))],
@@ -162,6 +190,18 @@ final class MovieController
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
+    )]
+    #[Parameter(
+        name: 'publicId',
+        description: 'Movie public ID',
+        in: 'path',
+        required: true,
+        schema: new ParameterSchema(
+            type: 'string',
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+            maxLength: 21,
+            minLength: 21,
+        ),
     )]
     #[Route('/{publicId}', name: 'update', methods: ['PATCH'])]
     #[CliCounterpart('app:movie:update')]
@@ -183,9 +223,6 @@ final class MovieController
     #[OA\Delete(
         path: '/api/movies/{publicId}',
         summary: 'Delete a movie',
-        parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Movie public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
-        ],
         responses: [
             new OA\Response(
                 response: '200',
@@ -198,6 +235,18 @@ final class MovieController
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Invalid public ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
+    )]
+    #[Parameter(
+        name: 'publicId',
+        description: 'Movie public ID',
+        in: 'path',
+        required: true,
+        schema: new ParameterSchema(
+            type: 'string',
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+            maxLength: 21,
+            minLength: 21,
+        ),
     )]
     #[Route('/{publicId}', name: 'destroy', methods: ['DELETE'])]
     #[CliCounterpart('app:movie:delete')]

@@ -27,6 +27,7 @@ final class EnvironmentVariable
     public const string CONVERT_STORAGE_PATH = 'CONVERT_STORAGE_PATH';
     public const string MEDIA_STORAGE_PATH = 'MEDIA_STORAGE_PATH';
     public const string VIDEO_ENCODER = 'VIDEO_ENCODER';
+    public const string TMDB_BEARER_TOKEN = 'TMDB_BEARER_TOKEN';
 
     public const string AUTH_TOTP_ENCRYPTION_KEY = 'AUTH_TOTP_ENCRYPTION_KEY';
     public const string OAUTH_PRIVATE_KEY_PATH = 'OAUTH_PRIVATE_KEY_PATH';

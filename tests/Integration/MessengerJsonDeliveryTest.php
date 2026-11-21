@@ -33,6 +33,12 @@ use App\Metadata\Application\Message\SyncArtistMessage;
 use App\Metadata\Application\Message\SyncArtistsMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
+use App\Metadata\Application\Message\SyncMovieMessage;
+use App\Metadata\Application\MessageHandler\SyncMovieHandler;
+use App\Metadata\Application\MovieMetadataEnricher;
+use App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter;
+use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Application\Port\DirectorPortInterface;
 use App\Metadata\Application\MessageHandler\SyncLibraryHandler;
 use App\Metadata\Application\MessageHandler\SyncSongHandler;
 use App\Metadata\Infrastructure\Api\CoverArtArchive\CoverArtArchiveAdapter;
@@ -101,7 +107,7 @@ final class MessengerJsonDeliveryTest extends TestCase
         $async = $this->transport();
         $failed = $this->transport();
         $bus = new MessageBus([
-            new SendMessageMiddleware(new SendersLocator([ExtractAlbumCoverCommand::class => ['async']], new ServiceLocator(['async' => static fn () => $async]))),
+            new SendMessageMiddleware(new SendersLocator([ExtractAlbumCoverCommand::class => ['async']], new ServiceLocator(['async' => static fn() => $async]))),
             new HandleMessageMiddleware(new HandlersLocator([ExtractAlbumCoverCommand::class => [$this->complete(...), function (ExtractAlbumCoverCommand $command): never {
                 ++$this->attempted;
                 throw new \RuntimeException('Poison message');
@@ -119,11 +125,11 @@ final class MessengerJsonDeliveryTest extends TestCase
         });
         $events->addSubscriber(new AddErrorDetailsStampListener());
         $events->addSubscriber(new SendFailedMessageForRetryListener(
-            new ServiceLocator(['async' => static fn () => $async]),
-            new ServiceLocator(['async' => static fn () => new MultiplierRetryStrategy(1, 0)]),
+            new ServiceLocator(['async' => static fn() => $async]),
+            new ServiceLocator(['async' => static fn() => new MultiplierRetryStrategy(1, 0)]),
             eventDispatcher: $events,
         ));
-        $events->addSubscriber(new SendFailedMessageToFailureTransportListener(new ServiceLocator(['async' => static fn () => $failed])));
+        $events->addSubscriber(new SendFailedMessageToFailureTransportListener(new ServiceLocator(['async' => static fn() => $failed])));
         // Bound the run even if a regression prevents the expected retry/dead-letter transition.
         $events->addListener(WorkerRunningEvent::class, static function (WorkerRunningEvent $event): void {
             if ($event->isWorkerIdle()) {
@@ -162,12 +168,13 @@ final class MessengerJsonDeliveryTest extends TestCase
             public array $attempts = [];
         };
         $bus = new MessageBus([
-            new SendMessageMiddleware(new SendersLocator([ExecuteScheduledJobCommand::class => ['async']], new ServiceLocator(['async' => static fn () => $async]))),
+            new SendMessageMiddleware(new SendersLocator([ExecuteScheduledJobCommand::class => ['async']], new ServiceLocator(['async' => static fn() => $async]))),
             new HandleMessageMiddleware(new HandlersLocator([ExecuteScheduledJobCommand::class => [new HandlerDescriptor(
                 static function (ExecuteScheduledJobCommand $delivered) use ($deliveries): never {
                     $deliveries->attempts[] = $delivered->parameters;
                     throw new \RuntimeException('Fixture scheduled numeric delivery failure.');
-                }, ['from_transport' => 'async'],
+                },
+                ['from_transport' => 'async'],
             )]])),
         ]);
         $bus->dispatch($command);
@@ -180,11 +187,11 @@ final class MessengerJsonDeliveryTest extends TestCase
         });
         $events->addSubscriber(new AddErrorDetailsStampListener());
         $events->addSubscriber(new SendFailedMessageForRetryListener(
-            new ServiceLocator(['async' => static fn () => $async]),
-            new ServiceLocator(['async' => static fn () => new MultiplierRetryStrategy(1, 0)]),
+            new ServiceLocator(['async' => static fn() => $async]),
+            new ServiceLocator(['async' => static fn() => new MultiplierRetryStrategy(1, 0)]),
             eventDispatcher: $events,
         ));
-        $events->addSubscriber(new SendFailedMessageToFailureTransportListener(new ServiceLocator(['async' => static fn () => $failed])));
+        $events->addSubscriber(new SendFailedMessageToFailureTransportListener(new ServiceLocator(['async' => static fn() => $failed])));
         $deadline = hrtime(true) / 1e9 + 3.0;
         $events->addListener(WorkerRunningEvent::class, static function (WorkerRunningEvent $event) use ($deadline): void {
             if ($event->isWorkerIdle() || hrtime(true) / 1e9 >= $deadline) {
@@ -222,6 +229,7 @@ final class MessengerJsonDeliveryTest extends TestCase
     {
         $messages = [
             'song' => SyncSongMessage::class,
+            'movie' => SyncMovieMessage::class,
             'album' => SyncAlbumMessage::class,
             'album match queue' => DrainAlbumMatchesMessage::class,
             'library' => SyncLibraryMessage::class,
@@ -256,16 +264,38 @@ final class MessengerJsonDeliveryTest extends TestCase
             $message = new SyncSongMessage($id, true);
             $songs = $this->createMock(SongPortInterface::class);
             $songs->expects($this->once())->method('findByUuid')->with($id)
-                ->willReturnCallback(static function () use (&$effects): null { ++$effects; return null; });
+                ->willReturnCallback(static function () use (&$effects): null {
+                    ++$effects;
+                    return null;
+                });
             // Missing aggregate is intentional: real handler lookup proves selection,
             // while this transport test never performs external metadata requests.
             $enricher = new SongMetadataEnricher($musicBrainz, $songs, $genres, $logger);
             $handler = new SyncSongHandler($songs, $enricher, $logger);
+        } elseif ($messageType === SyncMovieMessage::class) {
+            $message = new SyncMovieMessage($id, true);
+            $movies = $this->createMock(MoviePortInterface::class);
+            $movies->expects($this->once())->method('findByUuid')->with($id)
+                ->willReturnCallback(static function () use (&$effects): null {
+                    ++$effects;
+                    return null;
+                });
+            $enricher = new MovieMetadataEnricher(
+                new TmdbAdapter('fixture-token', $logger, $encoder, $httpClient),
+                $movies,
+                $genres,
+                $logger,
+                $this->createStub(DirectorPortInterface::class),
+                new PassThroughTransaction(),
+            );
+            $handler = new SyncMovieHandler($movies, $enricher);
         } elseif ($messageType === SyncAlbumMessage::class) {
             $message = new SyncAlbumMessage($id, true);
             $requests = $this->createMock(AlbumMatchRequestInterface::class);
             $requests->expects($this->once())->method('requestForAdmin')->with($id)
-                ->willReturnCallback(static function () use (&$effects): void { ++$effects; });
+                ->willReturnCallback(static function () use (&$effects): void {
+                    ++$effects;
+                });
             $handler = new RequestAlbumMatchHandler($requests);
         } elseif ($messageType === DrainAlbumMatchesMessage::class) {
             $message = new DrainAlbumMatchesMessage(outages: 1);
@@ -274,7 +304,10 @@ final class MessengerJsonDeliveryTest extends TestCase
             $states = new InMemoryAlbumMatchStates()->has(new AlbumMatchState($id, AlbumMatchStatus::Requested, AlbumMatchSource::Admin, $clock->now()));
             $matcher = $this->createMock(AutomaticAlbumMatcherInterface::class);
             $matcher->expects($this->once())->method('match')->with($id)
-                ->willReturnCallback(static function () use (&$effects): AutomaticMatchOutcome { ++$effects; return AutomaticMatchOutcome::matched(); });
+                ->willReturnCallback(static function () use (&$effects): AutomaticMatchOutcome {
+                    ++$effects;
+                    return AutomaticMatchOutcome::matched();
+                });
             $nestedBus = $this->createMock(MessageBusInterface::class);
             $nestedBus->expects($this->never())->method('dispatch');
             $handler = new DrainAlbumMatchesHandler($states, $matcher, new AlbumMatchQueueChain(new ArrayAdapter()), $this->createStub(SystemSettingsPortInterface::class), $nestedBus, $clock, $logger);
@@ -282,15 +315,21 @@ final class MessengerJsonDeliveryTest extends TestCase
             $message = new SyncLibraryMessage($id, true, true);
             $albums = $this->createMock(AlbumPortInterface::class);
             $albums->expects($this->once())->method('findByLibrary')->with($id)
-                ->willReturnCallback(static function () use (&$effects): array { ++$effects; return []; });
+                ->willReturnCallback(static function () use (&$effects): array {
+                    ++$effects;
+                    return [];
+                });
             $nestedBus = $this->createMock(MessageBusInterface::class);
             $nestedBus->expects($this->never())->method('dispatch');
-            $handler = new SyncLibraryHandler($albums, $nestedBus, $logger, new CancelAtCheckpoint());
+            $handler = new SyncLibraryHandler($albums, $nestedBus, $logger, new CancelAtCheckpoint(), $this->createStub(\App\Catalog\Application\Port\MoviePortInterface::class));
         } elseif ($messageType === SyncArtistsMessage::class) {
             $message = new SyncArtistsMessage();
             $artists = $this->createMock(ArtistPortInterface::class);
             $artists->expects($this->once())->method('identifiedWithMissingDetailsAfter')
-                ->willReturnCallback(static function () use (&$effects): array { ++$effects; return []; });
+                ->willReturnCallback(static function () use (&$effects): array {
+                    ++$effects;
+                    return [];
+                });
             $nestedBus = $this->createMock(MessageBusInterface::class);
             $nestedBus->expects($this->never())->method('dispatch');
             $marks = new InMemoryQueuedArtistSyncs();
@@ -301,7 +340,10 @@ final class MessengerJsonDeliveryTest extends TestCase
             // The artist is gone, so the real handler ends without asking MusicBrainz.
             $artists = $this->createMock(ArtistPortInterface::class);
             $artists->expects($this->once())->method('findFreshByUuid')->with($id)
-                ->willReturnCallback(static function () use (&$effects): null { ++$effects; return null; });
+                ->willReturnCallback(static function () use (&$effects): null {
+                    ++$effects;
+                    return null;
+                });
             $nestedBus = $this->createMock(MessageBusInterface::class);
             $nestedBus->expects($this->never())->method('dispatch');
             $marks = new InMemoryQueuedArtistSyncs();
@@ -320,7 +362,10 @@ final class MessengerJsonDeliveryTest extends TestCase
             $message = new SyncCountryStationsCommand($id, 'DK');
             $stations = $this->createMock(RadioStationPortInterface::class);
             $stations->expects($this->once())->method('syncCountryStations')->with($id, 'DK')
-                ->willReturnCallback(static function () use (&$effects): int { ++$effects; return 3; });
+                ->willReturnCallback(static function () use (&$effects): int {
+                    ++$effects;
+                    return 3;
+                });
             $handler = new SyncCountryStationsHandler($stations);
         }
 
@@ -336,7 +381,7 @@ final class MessengerJsonDeliveryTest extends TestCase
             $descriptors[] = new HandlerDescriptor($handler, ['from_transport' => $registration->fromTransport]);
         }
         $bus = new MessageBus([
-            new SendMessageMiddleware(new SendersLocator([$messageType => ['async']], new ServiceLocator(['async' => static fn () => $async]))),
+            new SendMessageMiddleware(new SendersLocator([$messageType => ['async']], new ServiceLocator(['async' => static fn() => $async]))),
             new HandleMessageMiddleware(new HandlersLocator([$messageType => $descriptors])),
         ]);
         $bus->dispatch($message);

@@ -78,12 +78,12 @@ final class ProviderDestinationAdapterTest extends TestCase
             return new MockResponse('{}');
         });
         $client = new PublicHttpClient($raw, new PublicDestinationPolicy(static fn(string $host): array => ['127.0.0.1']));
-        if ($provider === 'spotify') {
+        if (in_array($provider, ['spotify', 'tmdb'], true)) {
             try {
                 $this->invokeProvider($provider, $client, $logger);
                 self::fail('Spotify authentication must report its failed token acquisition.');
             } catch (\RuntimeException $exception) {
-                self::assertSame('Failed to authenticate with Spotify API.', $exception->getMessage());
+                self::assertSame($provider === 'spotify' ? 'Failed to authenticate with Spotify API.' : 'TMDB API request failed.', $exception->getMessage());
             }
         } else {
             self::assertNull($this->invokeProvider($provider, $client, $logger));
@@ -110,8 +110,8 @@ final class ProviderDestinationAdapterTest extends TestCase
         try {
             self::assertNull($this->invokeProvider($provider, $client, $logger));
         } catch (\RuntimeException $exception) {
-            self::assertSame('spotify', $provider);
-            self::assertSame('Failed to authenticate with Spotify API.', $exception->getMessage());
+            self::assertContains($provider, ['spotify', 'tmdb']);
+            self::assertSame($provider === 'spotify' ? 'Failed to authenticate with Spotify API.' : 'TMDB API request failed.', $exception->getMessage());
         }
         self::assertSame(1, $requests);
         self::assertStringNotContainsString(self::SECRET, json_encode($handler->getRecords(), JSON_THROW_ON_ERROR));

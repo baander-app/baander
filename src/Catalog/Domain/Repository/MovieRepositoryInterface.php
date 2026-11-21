@@ -22,7 +22,20 @@ interface MovieRepositoryInterface extends Searchable
 
     public function countVisible(LibraryReadScope $scope): int;
 
+    /**
+     * @param list<Uuid> $ids
+     *
+     * @return list<Movie> Accessible movies in the supplied ID order, at most 100
+     */
+    public function findVisibleByUuids(array $ids, LibraryReadScope $scope): array;
+
+    /** @return list<Uuid> At most 100 IDs in ascending order */
+    public function movieIdsByLibraryAfter(Uuid $libraryId, ?Uuid $after = null, int $limit = 100): array;
+
     public function save(Movie $movie): void;
+
+    /** Updates an existing movie's provider metadata while preserving its other state. */
+    public function saveMetadata(Movie $movie): void;
 
     public function persist(Movie $movie): void;
 

@@ -9,7 +9,7 @@ final readonly class TmdbMovieDto
     /**
      * @param int[] $genreIds
      * @param array{name: string, character?: string, order?: int}[] $cast
-     * @param array{name: string, job?: string, department?: string}[] $crew
+     * @param list<array{id: int, name: string, job: string, department: string, profilePath: ?string}> $crew
      */
     public function __construct(
         public int $id,
@@ -31,8 +31,8 @@ final readonly class TmdbMovieDto
         public array $cast = [],
         public array $crew = [],
         public float $popularity = 0.0,
-    ) {
-    }
+        public bool $creditsAvailable = false,
+    ) {}
 
     /**
      * @param array<string, mixed> $data
@@ -44,18 +44,20 @@ final readonly class TmdbMovieDto
         $cast = [];
         $crew = [];
         if (isset($data['credits']['cast'])) {
-            $cast = array_map(fn (array $c) => [
+            $cast = array_map(fn(array $c) => [
                 'name' => $c['name'] ?? '',
                 'character' => $c['character'] ?? '',
                 'order' => $c['order'] ?? 0,
             ], array_slice($data['credits']['cast'], 0, 10));
         }
         if (isset($data['credits']['crew'])) {
-            $crew = array_map(fn (array $c) => [
+            $crew = array_values(array_map(fn(array $c) => [
+                'id' => $c['id'] ?? 0,
+                'profilePath' => $c['profile_path'] ?? null,
                 'name' => $c['name'] ?? '',
                 'job' => $c['job'] ?? '',
                 'department' => $c['department'] ?? '',
-            ], array_filter($data['credits']['crew'], fn (array $c) => ($c['job'] ?? '') === 'Director'));
+            ], array_filter($data['credits']['crew'], fn(array $c) => ($c['job'] ?? '') === 'Director')));
         }
 
         return new self(
@@ -72,12 +74,13 @@ final readonly class TmdbMovieDto
             originalLanguage: $data['original_language'] ?? null,
             tagline: $data['tagline'] ?? null,
             imdbId: $data['imdb_id'] ?? null,
-            genreIds: $data['genre_ids'] ?? array_map(fn (array $g) => $g['id'], $data['genres'] ?? []),
+            genreIds: $data['genre_ids'] ?? array_map(fn(array $g) => $g['id'], $data['genres'] ?? []),
             belongsToCollectionId: $collection['id'] ?? null,
             belongsToCollectionName: $collection['name'] ?? null,
             cast: $cast,
             crew: $crew,
             popularity: (float) ($data['popularity'] ?? 0.0),
+            creditsAvailable: isset($data['credits']['crew']) && is_array($data['credits']['crew']),
         );
     }
 

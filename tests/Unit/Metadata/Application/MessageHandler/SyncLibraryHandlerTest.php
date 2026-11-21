@@ -19,6 +19,64 @@ use Symfony\Component\Messenger\MessageBusInterface;
 
 final class SyncLibraryHandlerTest extends TestCase
 {
+    public function testLibrarySyncQueuesItsMoviesWithForcePropagation(): void
+    {
+        $libraryId = Uuid::v7();
+        $movie = \App\Catalog\Domain\Model\Movie::create($libraryId, 'Owned Film', 2026);
+        $movies = $this->createMock(\App\Catalog\Application\Port\MoviePortInterface::class);
+        $movies->expects(self::once())->method('movieIdsByLibraryAfter')->with($libraryId, null, 100)->willReturn([$movie->getId()]);
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::once())->method('dispatch')->willReturnCallback(static function (object $message) use ($movie): Envelope {
+            self::assertInstanceOf(\App\Metadata\Application\Message\SyncMovieMessage::class, $message);
+            self::assertTrue($movie->getId()->equals($message->movieId));
+            self::assertTrue($message->forceUpdate);
+
+            return new Envelope($message);
+        });
+        $handler = new SyncLibraryHandler($this->createStub(AlbumPortInterface::class), $bus, new NullLogger(), new CancelAtCheckpoint(), $movies);
+
+        $handler(new SyncLibraryMessage($libraryId, true));
+    }
+
+    public function testMovieDispatchWalksBoundedIdPagesAndPreservesEveryQueuedId(): void
+    {
+        $libraryId = Uuid::v7();
+        $ids = array_map(static fn(int $number): Uuid => Uuid::v7(), range(1, 101));
+        $movies = $this->createMock(\App\Catalog\Application\Port\MoviePortInterface::class);
+        $movies->expects(self::never())->method('findByLibrary');
+        $reads = 0;
+        $movies->expects(self::exactly(2))->method('movieIdsByLibraryAfter')->willReturnCallback(
+            static function (Uuid $library, ?Uuid $after, int $limit) use ($libraryId, $ids, &$reads): array {
+                self::assertTrue($libraryId->equals($library));
+                self::assertSame(100, $limit);
+                if (++$reads === 1) {
+                    self::assertNull($after);
+                    return array_slice($ids, 0, 100);
+                }
+                self::assertInstanceOf(Uuid::class, $after);
+                self::assertTrue($ids[99]->equals($after));
+                return [$ids[100]];
+            },
+        );
+        $queued = [];
+        $bus = $this->createStub(MessageBusInterface::class);
+        $bus->method('dispatch')->willReturnCallback(static function (object $message) use (&$queued): Envelope {
+            self::assertInstanceOf(\App\Metadata\Application\Message\SyncMovieMessage::class, $message);
+            self::assertTrue($message->forceUpdate);
+            $queued[] = $message->movieId->toString();
+            return new Envelope($message);
+        });
+        $handler = new SyncLibraryHandler(
+            $this->createStub(AlbumPortInterface::class),
+            $bus,
+            new NullLogger(),
+            new CancelAtCheckpoint(),
+            $movies,
+        );
+        $handler(new SyncLibraryMessage($libraryId, true));
+        self::assertSame(array_map(static fn(Uuid $id): string => $id->toString(), $ids), $queued);
+    }
+
     public function testACancelledJobStopsBeforeItsNextAlbum(): void
     {
         $libraryId = Uuid::v7();
@@ -40,7 +98,7 @@ final class SyncLibraryHandlerTest extends TestCase
         $checkpoint = new CancelAtCheckpoint(passes: 2);
 
         try {
-            (new SyncLibraryHandler($catalog, $bus, new NullLogger(), $checkpoint))(new SyncLibraryMessage($libraryId));
+            (new SyncLibraryHandler($catalog, $bus, new NullLogger(), $checkpoint, $this->createStub(\App\Catalog\Application\Port\MoviePortInterface::class)))(new SyncLibraryMessage($libraryId));
             self::fail('A cancelled library sync must stop.');
         } catch (JobCancelledException) {
         }

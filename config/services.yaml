@@ -739,10 +739,16 @@ services:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\GenreRepository
     App\Catalog\Domain\Repository\MovieRepositoryInterface:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\MovieRepository
+    App\Catalog\Domain\Repository\DirectorRepositoryInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\DirectorRepository
     App\Catalog\Domain\Repository\VideoRepositoryInterface:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\VideoRepository
     App\Catalog\Domain\Repository\AlbumMatchStateRepositoryInterface:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\AlbumMatchStateRepository
+
+    App\Shared\Infrastructure\OpenApi\SpecParameterRouteDescriber:
+        tags:
+            - { name: nelmio_api_doc.route_describer, priority: 0 }
 
     # --- Catalog Application Port Aliases ---
     App\Catalog\Application\Port\ArtistPortInterface:
@@ -771,6 +777,8 @@ services:
         alias: App\Catalog\Infrastructure\GenreService
     App\Catalog\Application\Port\MoviePortInterface:
         alias: App\Catalog\Infrastructure\MovieService
+    App\Catalog\Application\Port\DirectorPortInterface:
+        alias: App\Catalog\Infrastructure\DirectorService
     App\Catalog\Application\Port\AlbumDuplicatePortInterface:
         alias: App\Catalog\Infrastructure\AlbumDuplicateService
     App\Catalog\Application\Port\AlbumMergePortInterface:
