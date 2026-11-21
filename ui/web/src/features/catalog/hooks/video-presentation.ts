@@ -11,15 +11,19 @@ export interface AudioPresentation {
 }
 
 export interface VideoPresentationCommands {
-  setQuality(id: string): void
+  setQuality(id: string): Promise<void>
   setSubtitle(id: SubtitlePreference): void
   setSubtitleOffset(ms: number): void
   setAudio(index: number | null, offsetMs: number): Promise<void>
 }
 
 export interface VideoPresentationSettings extends AudioPresentation {
-  qualities: PresentationChoice[]
+  qualityLimits: {
+    maxWidth?: number | null
+    maxHeight?: number | null
+  }
   quality: string
+  pendingQuality: string | null
   currentQuality: string | null
   subtitles: PresentationChoice[]
   subtitle: SubtitlePreference
@@ -29,8 +33,9 @@ export interface VideoPresentationSettings extends AudioPresentation {
 }
 
 export const initialVideoSettings = (): VideoPresentationSettings => ({
-  qualities: [],
+  qualityLimits: {},
   quality: 'auto',
+  pendingQuality: null,
   currentQuality: null,
   subtitles: [],
   subtitle: 'off',

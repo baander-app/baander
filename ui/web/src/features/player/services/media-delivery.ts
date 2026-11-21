@@ -30,6 +30,7 @@ export type NegotiatedDelivery = DeliveryIdentity &
         kind: 'original' | 'cached' | 'copy'
         url: string
         reason: string | null
+        sessionId?: string | null
       }
     | {
       kind: 'encoded'
@@ -154,6 +155,7 @@ export async function negotiateMediaDelivery(
     requestId?: string
     audioStreamIndex?: number | null
     audioOffsetMs?: number
+    qualityTier?: DeliveryRequest['qualityTier']
   },
   signal: AbortSignal
 ): Promise<NegotiatedDelivery> {
@@ -178,6 +180,9 @@ export async function negotiateMediaDelivery(
         : {}),
       ...(input.audioOffsetMs !== undefined
         ? { audioOffsetMs: input.audioOffsetMs }
+        : {}),
+      ...(input.qualityTier !== undefined
+        ? { qualityTier: input.qualityTier }
         : {}),
       kind: input.kind,
       id: input.id,
@@ -219,7 +224,13 @@ export async function negotiateMediaDelivery(
         (response.kind === 'cached' && input.kind === 'video' && !selection)
       )
         return invalidResponse()
-      return { ...identity, kind: response.kind, reason, url: response.url }
+      return {
+        ...identity,
+        kind: response.kind,
+        reason,
+        url: response.url,
+        ...(response.sessionId != null ? { sessionId: response.sessionId } : {})
+      }
     default:
       return invalidResponse()
   }

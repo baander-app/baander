@@ -79,11 +79,23 @@ const MovieTitle = styled(ContentText)`
   min-width: 0;
 `
 const VideoContainer = styled.div`
+  position: relative;
   display: flex;
   flex: 1;
+  min-width: 0;
   min-height: 0;
   align-items: center;
   justify-content: center;
+  > div {
+    position: absolute;
+    inset: 0;
+  }
+  video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
   [role='status'] {
     padding: var(--space-lg);
     ${textRole('body')}

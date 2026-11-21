@@ -11,7 +11,11 @@ import { observeSubtitleOffset } from './subtitle-offset'
 import { attachNativePlayback } from './native-playback'
 import { attachHlsPlayback, type SubtitlePreference } from './hls-playback'
 import type { PlaybackObservation } from '@/features/session/services/playback-execution'
-import type { PostTranscodeSessionPosition200 } from '@/shared/api-client/gen/endpoints'
+import {
+  DeliveryRequestQualityTier,
+  type DeliveryRequest,
+  type PostTranscodeSessionPosition200
+} from '@/shared/api-client/gen/endpoints'
 import {
   detectDestinationCapabilities,
   negotiateMediaDelivery,
@@ -19,6 +23,12 @@ import {
   type NegotiatedDelivery
 } from '@/features/player/services/media-delivery'
 import { getPlaybackClientRequestId } from '@/features/session/services/playback-session-coordinator'
+
+type QualityPreference = 'auto' | NonNullable<DeliveryRequest['qualityTier']>
+
+function isQualityPreference(id: string): id is QualityPreference {
+  return id === 'auto' || Object.hasOwn(DeliveryRequestQualityTier, id)
+}
 
 interface UseBaanderPlayerOptions {
   videoId: string
@@ -253,12 +263,29 @@ export function useBaanderPlayer({
     } | null = null
     let restartUnproven = false
     let subtitlePreference: SubtitlePreference | undefined
-    let qualityPreference = 'auto'
+    let qualityPreference: QualityPreference = 'auto'
     let audioSelection: AudioPresentation = {
       audioStreamIndex: null,
       audioOffsetMs: 0
     }
-    let audioChangeRevision = 0
+    let presentationRevision = 0
+    let presentationMutations: Promise<void> = Promise.resolve()
+    let retryPresentationRecovery: (() => Promise<void>) | null = null
+    let pendingPresentationMutations = 0
+    let presentationQuiescing = false
+    let presentationCancellationError: unknown = null
+    let presentationSessionId: string | null = null
+    let recoveringPresentation = false
+    let presentationRestore: {
+      position: number
+      paused: boolean
+    } | null = null
+    let acceptedAudio = audioSelection
+    let acceptedQuality: QualityPreference = qualityPreference
+    let requestedPresentation: AudioPresentation & { quality: QualityPreference } = {
+      ...audioSelection,
+      quality: qualityPreference
+    }
     let attachmentControls: {
       setQuality(id: string): void
       refreshSubtitles(): void
@@ -341,7 +368,9 @@ export function useBaanderPlayer({
     const cursor = () =>
       sourceSeekPosition ??
       recoveryPosition ??
-      (pendingLoad ? mediaStart + pendingLoad.position : playbackPosition())
+      (pendingLoad
+        ? mediaStart + pendingLoad.position
+        : (presentationRestore?.position ?? playbackPosition()))
     const atSourceEnd = (position: number) =>
       sourceDuration > 0 && position >= sourceDuration - SOURCE_END_TOLERANCE
     const clearSourceSeek = () => {
@@ -488,7 +517,9 @@ export function useBaanderPlayer({
       else if (video.paused) playVideo()
     }
 
-    const refresh = async (initial = false) => {
+    const refresh = async (initial = false, presentation?: number) => {
+      const superseded = () =>
+        presentation !== undefined && presentation !== presentationRevision
       if (!active() || terminal || recoveryFenced.current) return
       if (!initial && snapshot === null) return
       const revision = ++requestRevision
@@ -509,17 +540,38 @@ export function useBaanderPlayer({
             video,
             'video'
           )
+          if (active()) {
+            setSettings((current) => {
+              if (
+                current.qualityLimits.maxWidth === capabilities.maxWidth &&
+                current.qualityLimits.maxHeight === capabilities.maxHeight
+              ) {
+                return current
+              }
+              return {
+                ...current,
+                qualityLimits: {
+                  maxWidth: capabilities.maxWidth,
+                  maxHeight: capabilities.maxHeight
+                }
+              }
+            })
+          }
           const decision = await negotiateMediaDelivery(
             {
               kind: 'video',
               id: videoId,
               capabilities,
               requestId,
-              ...audioSelection
+              ...audioSelection,
+              ...(qualityPreference === 'auto'
+                ? {}
+                : { qualityTier: qualityPreference })
             },
             abort.signal
           )
-          if (!active() || terminal || revision < appliedRequest) return
+          if (!active() || terminal || revision < appliedRequest || superseded())
+            return
           delivery = decision
         }
         if (delivery.kind === 'incompatible')
@@ -547,6 +599,9 @@ export function useBaanderPlayer({
               path: `/api/transcode/${videoId}/master.m3u8`,
               requestId,
               ...audioSelection,
+              ...(qualityPreference === 'auto'
+                ? {}
+                : { qualityTier: qualityPreference }),
               ...(delivery.kind === 'encoded' &&
               (initial || snapshot === null || snapshot.sessionId === null)
                 ? {}
@@ -566,7 +621,11 @@ export function useBaanderPlayer({
           )
           data = result.data
         }
-        if (!active() || terminal || revision < appliedRequest) return
+        if (active() && revision >= appliedRequest && data.sessionId) {
+          presentationSessionId = data.sessionId
+        }
+        if (!active() || terminal || revision < appliedRequest || superseded())
+          return
         const previous = snapshot
         // A later response cannot move an attached job backwards in durable state.
         if (
@@ -829,12 +888,11 @@ export function useBaanderPlayer({
             ).href,
             // A restore into the tail starts loading at its landing.
             position: tailLanding(pendingLoad.position) ?? pendingLoad.position,
-            getQualityPreference: () => qualityPreference,
-            onQualityChoices: (qualities, currentQuality) => {
+            getQualityPreference: () => 'auto',
+            onQualityChoices: (_qualities, currentQuality) => {
               if (active() && attachment === attachmentRevision)
                 setSettings((current) => ({
                   ...current,
-                  qualities,
                   currentQuality
                 }))
             },
@@ -889,7 +947,8 @@ export function useBaanderPlayer({
           restorePendingLoad()
         }
       } catch (error) {
-        if (!active() || terminal || revision < appliedRequest) return
+        if (!active() || terminal || revision < appliedRequest || superseded())
+          return
         if (error instanceof MediaCompatibilityError && active()) {
           terminalError = error
           setError(error.message)
@@ -1392,6 +1451,10 @@ export function useBaanderPlayer({
         pendingLoad = null
         canonicalSeekRecovery = null
         attachmentRestored = true
+        if (recoveringPresentation) {
+          presentationRestore = null
+          recoveringPresentation = false
+        }
         if (
           sourceEnd &&
           snapshot.status === 'paused' &&
@@ -1683,6 +1746,7 @@ export function useBaanderPlayer({
       )
         return
       playbackStarted = true
+      if (presentationRestore) presentationRestore.paused = false
       if (canControlStatus() && desiredStatus() === 'paused') control('resume')
       if (attachmentReady) playVideo()
     }
@@ -1690,6 +1754,7 @@ export function useBaanderPlayer({
       if (!active() || terminal) return
       executionPermitted = false
       playbackStarted = false
+      if (presentationRestore) presentationRestore.paused = true
       if (canControlStatus() && desiredStatus() === 'running') control('pause')
       video.pause()
     }
@@ -1722,7 +1787,7 @@ export function useBaanderPlayer({
     })
     const observe = (): PlaybackObservation => ({
       observedState: terminal ? 'unknown' : video.paused ? 'paused' : 'playing',
-      position: playbackPosition(),
+      position: cursor(),
       volume: video.volume
     })
     const waitFor = async (
@@ -1881,40 +1946,281 @@ export function useBaanderPlayer({
       },
       quiesce: async (signal) => {
         signal.throwIfAborted()
+        const position = cursor()
+        presentationRevision++
+        retryPresentationRecovery = null
+        presentationQuiescing = true
+        requestedPresentation = { ...acceptedAudio, quality: acceptedQuality }
+        setSettings((current) => ({
+          ...current,
+          pendingAudio: null,
+          pendingQuality: null
+        }))
         executionEpoch++
         executionPermitted = false
         playbackStarted = false
+        if (presentationRestore) presentationRestore.paused = true
         video.pause()
-        while (pendingControls > 0) {
+        try {
+          while (pendingControls > 0 || pendingPresentationMutations > 0) {
+            signal.throwIfAborted()
+            if (!active()) {
+              throw new DOMException(
+                'Video execution was replaced.',
+                'AbortError'
+              )
+            }
+            await new Promise<void>((resolve) => window.setTimeout(resolve, 20))
+          }
           signal.throwIfAborted()
-          if (!active())
-            throw new DOMException(
-              'Video execution was replaced.',
-              'AbortError'
-            )
-          await new Promise<void>((resolve) => window.setTimeout(resolve, 20))
+          if (presentationCancellationError) throw presentationCancellationError
+          video.pause()
+          return { ...observe(), position }
+        } finally {
+          presentationQuiescing = false
         }
-        signal.throwIfAborted()
-        video.pause()
-        return observe()
       }
     }
     const assertPresentationAvailable = () => {
       if (
         !active() ||
         recoveryFenced.current ||
+        presentationQuiescing ||
         callbacks.current.canControlPresentation?.() === false
       ) {
         throw new Error('Video presentation is unavailable.')
       }
     }
 
+    const preparePresentationReplacement = (
+      position: number,
+      paused: boolean
+    ) => {
+      retiringPlayback = {
+        attachment: attachmentRevision,
+        suppressPause: true
+      }
+      video.pause()
+      playbackStarted = !paused
+      restart = { position, paused }
+      cancelSeekReconciliation()
+      seekChain = null
+      canonicalSeekRecovery = null
+      clearSourceSeek()
+      releaseAttachment()
+      snapshot = null
+      loadedIdentity = null
+      loadedSet = null
+      localStatusRevision++
+      statusReconciliation = null
+      localStatus = null
+      localStatusOwner = null
+      attachedCapability = null
+      recoveryPosition = null
+      delivery = null
+      terminal = false
+      terminalError = null
+      controlError = null
+      appliedRequest = requestRevision + 1
+      changeState('preparing')
+    }
+
+    const retirePresentationSession = async (sessionId: string) => {
+      try {
+        await AXIOS_INSTANCE.delete(
+          `/api/transcode/sessions/${encodeURIComponent(sessionId)}`,
+          { signal: abort.signal, timeout: 5000 }
+        )
+        presentationSessionId = null
+        presentationCancellationError = null
+      } catch (error) {
+        presentationCancellationError = error
+        throw error
+      }
+    }
+
+    const enqueuePresentationMutation = (mutate: () => Promise<void>) => {
+      const previousMutation = presentationMutations
+      pendingPresentationMutations++
+      const mutation = previousMutation.then(mutate).finally(() => {
+        pendingPresentationMutations--
+      })
+      presentationMutations = mutation.catch(() => {})
+      return mutation
+    }
+
+    const changePresentation = async (
+      patch: Partial<AudioPresentation & { quality: QualityPreference }>
+    ) => {
+      assertPresentationAvailable()
+      const revision = ++presentationRevision
+      retryPresentationRecovery = null
+      const selection = { ...requestedPresentation, ...patch }
+      requestedPresentation = selection
+      const owned = () =>
+        active() &&
+        !recoveryFenced.current &&
+        callbacks.current.canControlPresentation?.() !== false &&
+        revision === presentationRevision
+      const assertOwned = () => {
+        if (!owned()) {
+          throw new DOMException(
+            'Presentation selection was replaced.',
+            'AbortError'
+          )
+        }
+      }
+      const audio = {
+        audioStreamIndex: selection.audioStreamIndex,
+        audioOffsetMs: selection.audioOffsetMs
+      }
+      setError(null)
+      setSettings((current) => ({
+        ...current,
+        pendingAudio:
+          patch.audioStreamIndex !== undefined ||
+          patch.audioOffsetMs !== undefined ||
+          audio.audioStreamIndex !== acceptedAudio.audioStreamIndex ||
+          audio.audioOffsetMs !== acceptedAudio.audioOffsetMs
+            ? audio
+            : null,
+        pendingQuality:
+          patch.quality !== undefined || selection.quality !== acceptedQuality
+            ? selection.quality
+            : null
+      }))
+      const mutate = async () => {
+        assertOwned()
+        try {
+          const position = cursor()
+          const paused = presentationRestore?.paused ?? (
+            desiredStatus() !== 'running' || !playbackStarted
+          )
+          const restoring = { position, paused }
+          presentationRestore = restoring
+          recoveringPresentation = false
+          const sessionId = presentationSessionId ?? snapshot?.sessionId
+          preparePresentationReplacement(position, paused)
+          if (sessionId) {
+            await retirePresentationSession(sessionId)
+            assertOwned()
+          }
+          const requestId = await (clientRequestId ??=
+            getPlaybackClientRequestId(abort.signal))
+          assertOwned()
+          const capabilities = await detectDestinationCapabilities(video, 'video')
+          assertOwned()
+          const decision = await negotiateMediaDelivery(
+            {
+              kind: 'video',
+              id: videoId,
+              capabilities,
+              requestId,
+              ...audio,
+              ...(selection.quality === 'auto'
+                ? {}
+                : { qualityTier: selection.quality })
+            },
+            abort.signal
+          )
+          if (decision.kind === 'copy' && decision.sessionId) {
+            presentationSessionId = decision.sessionId
+          }
+          assertOwned()
+          if (decision.kind === 'incompatible') {
+            throw new MediaCompatibilityError(decision.reason)
+          }
+          audioSelection = audio
+          qualityPreference = selection.quality
+          playbackStarted = !restoring.paused
+          restart = { position: cursor(), paused: restoring.paused }
+          delivery = decision
+          await refresh(true, revision)
+          await waitFor(() => {
+            assertOwned()
+            restorePendingLoad()
+            return (
+              attachmentReady &&
+              attachmentRestored &&
+              !pendingLoad &&
+              !seekChain &&
+              sourceSeekPosition === null
+            )
+          }, abort.signal)
+          assertOwned()
+          acceptedAudio = audio
+          acceptedQuality = selection.quality
+          presentationRestore = null
+          setSettings((current) => ({
+            ...current,
+            ...audio,
+            quality: acceptedQuality,
+            pendingAudio: null,
+            pendingQuality: null
+          }))
+        } catch (error) {
+          if (active() && revision === presentationRevision) {
+            requestedPresentation = { ...acceptedAudio, quality: acceptedQuality }
+            audioSelection = acceptedAudio
+            qualityPreference = acceptedQuality
+            const restore = presentationRestore
+            if (restore && owned()) {
+              const position = cursor()
+              preparePresentationReplacement(position, restore.paused)
+              presentationRestore = { position, paused: restore.paused }
+              recoveringPresentation = true
+            }
+            setSettings((current) => ({
+              ...current,
+              pendingAudio: null,
+              pendingQuality: null
+            }))
+            if (owned()) {
+              setError(
+                error instanceof Error
+                  ? error.message
+                  : 'Presentation selection failed.'
+              )
+              if (restore) {
+                const recover = async () => {
+                  assertOwned()
+                  try {
+                    if (presentationSessionId) {
+                      await retirePresentationSession(presentationSessionId)
+                      assertOwned()
+                    }
+                    await refresh(true, revision)
+                  } catch (recoveryError) {
+                    assertOwned()
+                    throw recoveryError
+                  }
+                }
+                if (presentationSessionId && presentationCancellationError) {
+                  retryPresentationRecovery = recover
+                } else {
+                  try {
+                    await recover()
+                  } catch (recoveryError) {
+                    if (owned()) retryPresentationRecovery = recover
+                    throw recoveryError
+                  }
+                }
+              }
+            }
+          }
+          assertOwned()
+          throw error
+        }
+      }
+      await enqueuePresentationMutation(mutate)
+    }
+
     presentationRef.current = {
-      setQuality: (id) => {
-        assertPresentationAvailable()
-        qualityPreference = id
-        attachmentControls?.setQuality(id)
-        setSettings((current) => ({ ...current, quality: id }))
+      setQuality: async (id) => {
+        if (!isQualityPreference(id)) {
+          throw new Error('Quality selection is invalid.')
+        }
+        await changePresentation({ quality: id })
       },
       setSubtitle: (id) => {
         assertPresentationAvailable()
@@ -1933,114 +2239,10 @@ export function useBaanderPlayer({
         if (index !== null && (!Number.isInteger(index) || index < 0)) {
           throw new Error('Audio track is invalid.')
         }
-        assertPresentationAvailable()
-        const revision = ++audioChangeRevision
-        const selection = {
+        await changePresentation({
           audioStreamIndex: index,
           audioOffsetMs: offsetMs
-        }
-        const owned = () =>
-          active() &&
-          !recoveryFenced.current &&
-          callbacks.current.canControlPresentation?.() !== false &&
-          revision === audioChangeRevision
-        setSettings((current) => ({ ...current, pendingAudio: selection }))
-        try {
-          const requestId = await (clientRequestId ??=
-            getPlaybackClientRequestId(abort.signal))
-          const capabilities = await detectDestinationCapabilities(
-            video,
-            'video'
-          )
-          const decision = await negotiateMediaDelivery(
-            {
-              kind: 'video',
-              id: videoId,
-              capabilities,
-              requestId,
-              ...selection
-            },
-            abort.signal
-          )
-          if (!owned()) {
-            throw new DOMException(
-              'Audio selection was replaced.',
-              'AbortError'
-            )
-          }
-          if (decision.kind === 'incompatible') {
-            throw new MediaCompatibilityError(decision.reason)
-          }
-          const position = cursor()
-          const paused = desiredStatus() !== 'running' || !playbackStarted
-          retiringPlayback = {
-            attachment: attachmentRevision,
-            suppressPause: true
-          }
-          video.pause()
-          playbackStarted = !paused
-          restart = { position, paused }
-          audioSelection = selection
-          cancelSeekReconciliation()
-          seekChain = null
-          canonicalSeekRecovery = null
-          clearSourceSeek()
-          releaseAttachment()
-          snapshot = null
-          loadedIdentity = null
-          loadedSet = null
-          localStatusRevision++
-          statusReconciliation = null
-          localStatus = null
-          localStatusOwner = null
-          attachedCapability = null
-          recoveryPosition = null
-          delivery = decision
-          terminal = false
-          terminalError = null
-          controlError = null
-          appliedRequest = requestRevision + 1
-          changeState('preparing')
-          await refresh(true)
-          await waitFor(() => {
-            if (!owned()) {
-              throw new DOMException(
-                'Audio selection was replaced.',
-                'AbortError'
-              )
-            }
-            restorePendingLoad()
-            return (
-              attachmentReady &&
-              attachmentRestored &&
-              !pendingLoad &&
-              !seekChain &&
-              sourceSeekPosition === null
-            )
-          }, abort.signal)
-          if (!owned()) {
-            throw new DOMException(
-              'Audio selection was replaced.',
-              'AbortError'
-            )
-          }
-          setSettings((current) => ({
-            ...current,
-            ...selection,
-            pendingAudio: null
-          }))
-        } catch (error) {
-          if (active() && revision === audioChangeRevision) {
-            setSettings((current) => ({ ...current, pendingAudio: null }))
-            if (owned())
-              setError(
-                error instanceof Error
-                  ? error.message
-                  : 'Audio selection failed.'
-              )
-          }
-          throw error
-        }
+        })
       }
     }
     executionRef.current = execution
@@ -2048,6 +2250,20 @@ export function useBaanderPlayer({
     refresh(true).catch(() => fail())
     const timer = window.setInterval(() => {
       if (recoveryFenced.current) return
+      if (retryPresentationRecovery && pendingPresentationMutations === 0) {
+        const recover = retryPresentationRecovery
+        retryPresentationRecovery = null
+        enqueuePresentationMutation(recover).catch((error: unknown) => {
+          if (error instanceof DOMException && error.name === 'AbortError') return
+          retryPresentationRecovery = recover
+          setError(
+            error instanceof Error
+              ? error.message
+              : 'Presentation recovery failed.'
+          )
+        })
+        return
+      }
       const buffered = video.buffered
       const bufferedUntil = buffered.length
         ? mediaStart + buffered.end(buffered.length - 1)
@@ -2076,7 +2292,7 @@ export function useBaanderPlayer({
       canonicalSeekRecovery = null
       seekChain = null
       clearSourceSeek()
-      audioChangeRevision++
+      presentationRevision++
       subtitleOffset.dispose()
       presentationRef.current = null
       abort.abort()

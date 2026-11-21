@@ -65,7 +65,7 @@ vi.mock('@/features/catalog/hooks/hls-playback', () => ({
   }
 }))
 vi.mock('@/shared/api-client/axios-instance', () => ({
-  AXIOS_INSTANCE: { post }
+  AXIOS_INSTANCE: { post, delete: vi.fn(async () => ({ data: {} })) }
 }))
 
 describe('useBaanderPlayer authorization', () => {
@@ -140,6 +140,138 @@ describe('useBaanderPlayer authorization', () => {
       }),
       expect.any(AbortSignal)
     )
+  })
+
+  it.each(['original', 'copy', 'encoded'] as const)(
+    'renegotiates quality from %s without browser rendition controls and returns to Auto',
+    async (kind) => {
+      post.mockResolvedValue({
+        data: {
+          url: '/manifest',
+          jobId: 'job',
+          jobIds: ['job'],
+          sessionId: 'session',
+          generation: 1,
+          revision: 1,
+          renditionSet: 'job.1',
+          ready: true,
+          position: 0,
+          startTime: 0,
+          duration: 1200,
+          status: 'paused'
+        }
+      })
+      negotiate.mockResolvedValueOnce({
+        kind,
+        url: kind === 'original' ? '/original.mp4' : null,
+        jobId: 'job',
+        selection: { transport: kind === 'original' ? 'file' : 'hls' }
+      })
+      const containerRef = { current: document.createElement('div') }
+      const { result, rerender, unmount } = renderHook(
+        ({ videoId }) => useBaanderPlayer({ videoId, containerRef }),
+        { initialProps: { videoId: 'first-video' } }
+      )
+      await act(async () => {})
+      const video = containerRef.current.querySelector('video')!
+      act(() => video.dispatchEvent(new Event('loadedmetadata')))
+      act(() => {
+        result.current.seekTo(90)
+        result.current.presentationCommands.setSubtitle('s3')
+        result.current.presentationCommands.setSubtitleOffset(400)
+      })
+      negotiate.mockResolvedValue({
+        kind: 'cached',
+        url: '/manual/master.m3u8',
+        selection: { transport: 'hls' }
+      })
+      let change!: Promise<void>
+      act(() => {
+        change = result.current.presentationCommands.setQuality('480p')
+      })
+      await act(async () => {})
+      act(() => video.dispatchEvent(new Event('loadedmetadata')))
+      await act(async () => change)
+      expect(negotiate).toHaveBeenLastCalledWith(
+        expect.objectContaining({ qualityTier: '480p' }),
+        expect.any(AbortSignal)
+      )
+      expect(result.current.settings).toMatchObject({
+        quality: '480p',
+        pendingQuality: null,
+        subtitle: 's3',
+        subtitleOffsetMs: 400
+      })
+      expect(result.current.execution.observe().position).toBe(90)
+      expect(video.play).not.toHaveBeenCalled()
+      act(() => {
+        change = result.current.presentationCommands.setQuality('auto')
+      })
+      await act(async () => {})
+      act(() => video.dispatchEvent(new Event('loadedmetadata')))
+      await act(async () => change)
+      expect(negotiate.mock.lastCall![0]).not.toHaveProperty('qualityTier')
+      expect(result.current.settings.quality).toBe('auto')
+      rerender({ videoId: 'second-video' })
+      await act(async () => {})
+      expect(result.current.settings).toMatchObject({
+        quality: 'auto',
+        pendingQuality: null,
+        audioStreamIndex: null,
+        audioOffsetMs: 0,
+        subtitleOffsetMs: 0
+      })
+      unmount()
+    }
+  )
+
+  it('carries accepted manual quality through native seeking and signed delivery renewal', async () => {
+    vi.useFakeTimers()
+    const expiry = Math.floor(Date.now() / 1000) + 4
+    negotiate.mockResolvedValueOnce({
+      kind: 'original',
+      url: '/original.mp4',
+      selection: { transport: 'file' }
+    })
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() =>
+      useBaanderPlayer({ videoId: 'video', containerRef })
+    )
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    act(() => video.dispatchEvent(new Event('loadedmetadata')))
+    act(() => result.current.seekTo(90))
+    negotiate
+      .mockResolvedValueOnce({
+        kind: 'cached',
+        url: `/manual/master.m3u8?exp=${expiry}`,
+        selection: { transport: 'hls' }
+      })
+      .mockResolvedValue({
+        kind: 'cached',
+        url: `/manual/master.m3u8?exp=${expiry + 120}`,
+        selection: { transport: 'hls' }
+      })
+    let change!: Promise<void>
+    act(() => {
+      change = result.current.presentationCommands.setQuality('480p')
+    })
+    await act(async () => {})
+    act(() => video.dispatchEvent(new Event('loadedmetadata')))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(40)
+      await change
+    })
+    act(() => result.current.seekTo(120))
+    await act(async () => vi.advanceTimersByTimeAsync(5000))
+    act(() => video.dispatchEvent(new Event('loadedmetadata')))
+    expect(
+      negotiate.mock.calls.slice(1).map(([input]) => input.qualityTier)
+    ).toEqual(['480p', '480p'])
+    expect(result.current.settings.quality).toBe('480p')
+    expect(result.current.execution.observe().position).toBe(120)
+    expect(post).not.toHaveBeenCalled()
+    unmount()
   })
 
   it('plays cached immutable HLS without producer controls', async () => {

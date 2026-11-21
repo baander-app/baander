@@ -7,7 +7,11 @@ import { attachNativePlayback } from '../native-playback'
 import { useBaanderPlayer } from '../useBaanderPlayer'
 
 vi.mock('@/shared/api-client/axios-instance', () => ({
-  AXIOS_INSTANCE: { post: vi.fn(), get: vi.fn() }
+  AXIOS_INSTANCE: {
+    post: vi.fn(),
+    get: vi.fn(),
+    delete: vi.fn(async () => ({ data: {} }))
+  }
 }))
 vi.mock('@/features/session/services/playback-session-coordinator', () => ({
   getPlaybackClientRequestId: vi.fn(async () => 'client-request')
@@ -224,6 +228,7 @@ describe('useBaanderPlayer sessions and source end', () => {
 
   beforeEach(() => {
     server = { ...first }
+    vi.mocked(AXIOS_INSTANCE.delete).mockReset().mockResolvedValue({ data: {} })
     signs = []
     controls = []
     sign = () => server
@@ -285,6 +290,7 @@ describe('useBaanderPlayer sessions and source end', () => {
     element: {
       seekable?: number
       staysSeeking?: boolean
+      canControlPresentation?: () => boolean
     } = {}
   ) => {
     // One ref object for the hook's lifetime: a new one on every render would remount the player.
@@ -295,7 +301,8 @@ describe('useBaanderPlayer sessions and source end', () => {
         videoId: 'video-1',
         containerRef,
         coordinated: true,
-        onCompleted: completed
+        onCompleted: completed,
+        canControlPresentation: element.canControlPresentation
       })
     )
     mounted.push(rendered)
@@ -1552,7 +1559,837 @@ describe('useBaanderPlayer sessions and source end', () => {
     }
   )
 
-  it('reports a failed audio change while retaining accepted settings and the original attachment', async () => {
+  it('negotiates manual quality and retains accepted quality on admission failure', async () => {
+    const { rendered } = await mount()
+    vi.mocked(negotiateMediaDelivery).mockRejectedValueOnce(
+      new Error('Selected quality is unavailable.')
+    )
+    await act(async () => {
+      await expect(
+        rendered.result.current.presentationCommands.setQuality('480p')
+      ).rejects.toThrow('Selected quality is unavailable.')
+    })
+    expect(negotiateMediaDelivery).toHaveBeenCalledWith(
+      expect.objectContaining({ qualityTier: '480p' }),
+      expect.any(AbortSignal)
+    )
+    expect(rendered.result.current.settings).toMatchObject({
+      quality: 'auto',
+      pendingQuality: null
+    })
+    expect(attachments()).toBe(2)
+  })
+
+  it.each(['paused', 'playing'] as const)(
+    'negotiates quality at the %s source cursor and confirms only after restoration',
+    async (desiredState) => {
+      const { rendered, state, video } = await mount({ seekable: 223.59 })
+      if (desiredState === 'playing') {
+        await act(async () => {
+          await rendered.result.current.execution.execute(
+            'play',
+            undefined,
+            signal()
+          )
+        })
+      }
+      state.time = 70
+      act(() => {
+        rendered.result.current.presentationCommands.setSubtitle('s2')
+        rendered.result.current.presentationCommands.setSubtitleOffset(800)
+      })
+      server = { ...first, jobId: 'quality-job', sessionId: 'quality-session' }
+      vi.mocked(negotiateMediaDelivery).mockResolvedValueOnce({
+        kind: 'encoded',
+        jobId: 'quality-job'
+      } as never)
+      let change!: Promise<void>
+      act(() => {
+        change = rendered.result.current.presentationCommands.setQuality('480p')
+      })
+      expect(rendered.result.current.settings).toMatchObject({
+        quality: 'auto',
+        pendingQuality: '480p'
+      })
+      await waitFor(() => expect(seeks()).toContain(70))
+      await act(async () => {
+        video.dispatchEvent(new Event('canplay'))
+        await change
+      })
+      expect(rendered.result.current.settings).toMatchObject({
+        quality: '480p',
+        pendingQuality: null,
+        subtitle: 's2',
+        subtitleOffsetMs: 800
+      })
+      expect(state.paused).toBe(desiredState === 'paused')
+      expect(rendered.result.current.execution.observe().position).toBe(70)
+      expect(signs).toContainEqual(
+        expect.objectContaining({ qualityTier: '480p' })
+      )
+      expect(negotiateMediaDelivery).toHaveBeenLastCalledWith(
+        expect.objectContaining({ qualityTier: '480p' }),
+        expect.any(AbortSignal)
+      )
+    }
+  )
+
+  it.each(['audio', 'quality'] as const)(
+    'merges pending %s with a newer presentation request and fences the old completion',
+    async (firstSelection) => {
+      const { rendered, state, video } = await mount({ seekable: 223.59 })
+      state.time = 70
+      let resolveAudio!: (
+        value: Awaited<ReturnType<typeof negotiateMediaDelivery>>
+      ) => void
+      vi.mocked(negotiateMediaDelivery).mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveAudio = resolve
+          })
+      )
+      let audio!: Promise<unknown>
+      act(() => {
+        const commands = rendered.result.current.presentationCommands
+        const change = firstSelection === 'audio'
+          ? commands.setAudio(3, 600)
+          : commands.setQuality('360p')
+        audio = change.catch((error) => error)
+      })
+      await waitFor(() => expect(resolveAudio).toBeDefined())
+      server = { ...first, jobId: 'merged-job', sessionId: 'merged-session' }
+      let quality!: Promise<void>
+      act(() => {
+        const commands = rendered.result.current.presentationCommands
+        quality = firstSelection === 'audio'
+          ? commands.setQuality('360p')
+          : commands.setAudio(3, 600)
+      })
+      await act(async () => {
+        resolveAudio({ kind: 'encoded', jobId: 'stale-job' } as never)
+        expect(await audio).toMatchObject({ name: 'AbortError' })
+      })
+      await waitFor(() => expect(seeks()).toContain(70))
+      expect(negotiateMediaDelivery).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          qualityTier: '360p',
+          audioStreamIndex: 3,
+          audioOffsetMs: 600
+        }),
+        expect.any(AbortSignal)
+      )
+      await act(async () => {
+        video.dispatchEvent(new Event('canplay'))
+        await quality
+      })
+      expect(rendered.result.current.settings).toMatchObject({
+        quality: '360p',
+        audioStreamIndex: 3,
+        audioOffsetMs: 600,
+        pendingQuality: null,
+        pendingAudio: null
+      })
+      expect(attachments()).toBe(2)
+    }
+  )
+
+  it('discards a stale quality negotiation failure after a newer audio intent is confirmed', async () => {
+    const { rendered, state, video } = await mount({ seekable: 223.59 })
+    state.time = 70
+    let reject!: (error: Error) => void
+    vi.mocked(negotiateMediaDelivery).mockImplementationOnce(
+      () =>
+        new Promise((_resolve, fail) => {
+          reject = fail
+        })
+    )
+    let firstChange!: Promise<unknown>
+    act(() => {
+      firstChange = rendered.result.current.presentationCommands
+        .setQuality('480p')
+        .catch((error) => error)
+    })
+    await waitFor(() => expect(reject).toBeDefined())
+    let secondChange!: Promise<void>
+    act(() => {
+      secondChange = rendered.result.current.presentationCommands.setAudio(3, 100)
+    })
+    await act(async () => {
+      reject(new Error('Stale network failure.'))
+      expect(await firstChange).toMatchObject({ name: 'AbortError' })
+    })
+    await waitFor(() => expect(seeks()).toContain(70))
+    await act(async () => {
+      video.dispatchEvent(new Event('canplay'))
+      await secondChange
+    })
+    expect(rendered.result.current.settings).toMatchObject({
+      quality: '480p',
+      audioStreamIndex: 3,
+      audioOffsetMs: 100,
+      pendingQuality: null,
+      pendingAudio: null
+    })
+    expect(rendered.result.current.error).toBeNull()
+  })
+
+  it('restores a paused manual-quality replacement at the source end', async () => {
+    server = {
+      ...first,
+      startTime: 204,
+      position: 223.59,
+      status: 'paused'
+    }
+    const { rendered, execution, state, video } = await mount({ seekable: 19.59 })
+    await act(async () => {
+      await execution.prepare(223.59, false, signal())
+    })
+    server = {
+      ...server,
+      jobId: 'end-quality-job',
+      sessionId: 'end-quality-session'
+    }
+    let change!: Promise<void>
+    act(() => {
+      change = rendered.result.current.presentationCommands.setQuality('480p')
+    })
+    await waitFor(() => expect(attachments()).toBe(2))
+    await act(async () => {
+      video.dispatchEvent(new Event('canplay'))
+      await change
+    })
+    expect(rendered.result.current.settings.quality).toBe('480p')
+    expect(execution.observe().position).toBe(223.59)
+    expect(state.paused).toBe(true)
+    expect(seeks()).toEqual([223.59])
+  })
+
+  it('retries the same retirement before restoring the accepted presentation', async () => {
+    const { rendered, execution, state, video } = await mount({ seekable: 223.59 })
+    state.time = 70
+    let allowRetirement!: () => void
+    vi.mocked(AXIOS_INSTANCE.delete)
+      .mockRejectedValueOnce(new Error('Cancellation is unavailable.'))
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            allowRetirement = () => resolve({ data: {} })
+          })
+      )
+    await act(async () => {
+      await expect(
+        rendered.result.current.presentationCommands.setQuality('480p')
+      ).rejects.toThrow('Cancellation is unavailable.')
+    })
+    expect(AXIOS_INSTANCE.delete).toHaveBeenCalledTimes(1)
+    expect(negotiateMediaDelivery).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(allowRetirement).toBeDefined(), { timeout: 2000 })
+    expect(negotiateMediaDelivery).toHaveBeenCalledTimes(1)
+    await act(async () => allowRetirement())
+    await waitFor(() => expect(attachments()).toBe(2))
+    await act(async () => {
+      video.dispatchEvent(new Event('canplay'))
+      await execution.ready(signal())
+    })
+    expect(negotiateMediaDelivery).toHaveBeenCalledTimes(2)
+    expect(negotiateMediaDelivery).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ qualityTier: expect.anything() }),
+      expect.any(AbortSignal)
+    )
+    expect(rendered.result.current.settings.quality).toBe('auto')
+    expect(execution.observe().position).toBe(70)
+    expect(state.paused).toBe(true)
+  })
+
+  it('waits for an in-flight group retirement before reporting a quiesced handoff', async () => {
+    const { rendered, execution, state } = await mount({ seekable: 223.59 })
+    state.time = 70
+    let cancelled!: () => void
+    vi.mocked(AXIOS_INSTANCE.delete).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          cancelled = () => resolve({ data: {} })
+        })
+    )
+    let change!: Promise<unknown>
+    act(() => {
+      change = rendered.result.current.presentationCommands
+        .setQuality('480p')
+        .catch((error) => error)
+    })
+    await waitFor(() => expect(cancelled).toBeDefined())
+    let handoff!: Promise<Awaited<ReturnType<typeof execution.quiesce>>>
+    let quiesced = false
+    act(() => {
+      handoff = execution.quiesce(signal()).then((observation) => {
+        quiesced = true
+        return observation
+      })
+    })
+    await act(async () => {})
+    expect(quiesced).toBe(false)
+    await act(async () => {
+      cancelled()
+      expect(await change).toMatchObject({ name: 'AbortError' })
+      expect(await handoff).toMatchObject({
+        observedState: 'paused',
+        position: 70
+      })
+    })
+    expect(negotiateMediaDelivery).toHaveBeenCalledTimes(1)
+    expect(AXIOS_INSTANCE.delete).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects handoff when its in-flight cancellation fails instead of admitting a successor', async () => {
+    const { rendered, execution } = await mount()
+    let rejectCancellation!: (error: Error) => void
+    vi.mocked(AXIOS_INSTANCE.delete).mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectCancellation = reject
+        })
+    )
+    let change!: Promise<unknown>
+    act(() => {
+      change = rendered.result.current.presentationCommands
+        .setQuality('480p')
+        .catch((error) => error)
+    })
+    await waitFor(() => expect(rejectCancellation).toBeDefined())
+    const cancellationError = new Error('Cancellation outcome is unknown.')
+    const handoff = execution.quiesce(signal()).catch((error) => error)
+    await act(async () => {
+      rejectCancellation(cancellationError)
+      expect(await change).toMatchObject({ name: 'AbortError' })
+      expect(await handoff).toBe(cancellationError)
+    })
+    expect(negotiateMediaDelivery).toHaveBeenCalledTimes(1)
+  })
+
+  it('quiesces a pending presentation without waiting for its media readiness', async () => {
+    const { rendered, execution, state } = await mount({ seekable: 223.59 })
+    state.time = 70
+    vi.mocked(attachHlsPlayback).mockImplementationOnce(() => () => {})
+    let change!: Promise<unknown>
+    act(() => {
+      change = rendered.result.current.presentationCommands
+        .setQuality('480p')
+        .catch((error) => error)
+    })
+    await waitFor(() => expect(attachments()).toBe(2))
+    await act(async () => {
+      expect(await execution.quiesce(signal())).toMatchObject({
+        observedState: 'paused',
+        position: 70
+      })
+      expect(await change).toMatchObject({ name: 'AbortError' })
+    })
+    expect(rendered.result.current.settings.quality).toBe('auto')
+  })
+
+  it('rejects handoff while a group cancellation outcome remains unconfirmed', async () => {
+    const { rendered, execution, state } = await mount({ seekable: 223.59 })
+    state.time = 70
+    vi.mocked(AXIOS_INSTANCE.delete).mockRejectedValue(
+      new Error('Cancellation outcome is unknown.')
+    )
+    await act(async () => {
+      await expect(
+        rendered.result.current.presentationCommands.setQuality('480p')
+      ).rejects.toThrow('Cancellation outcome is unknown.')
+    })
+    await act(async () => {
+      await expect(execution.quiesce(signal())).rejects.toThrow(
+        'Cancellation outcome is unknown.'
+      )
+    })
+    expect(AXIOS_INSTANCE.delete).toHaveBeenCalledTimes(1)
+    expect(rendered.result.current.settings.quality).toBe('auto')
+  })
+
+  it.each(['encoded', 'copy'] as const)(
+    'retries a failed %s candidate cleanup before readmitting the accepted presentation',
+    async (kind) => {
+      const { rendered, execution, state, video } = await mount({ seekable: 223.59 })
+      state.time = 70
+      server = { ...first, jobId: 'candidate-job', sessionId: 'candidate-session' }
+      const identity = {
+        jobId: 'candidate-job',
+        requestId: 'client-request',
+        selection: null,
+        reason: null
+      }
+      vi.mocked(negotiateMediaDelivery).mockResolvedValueOnce(
+        kind === 'copy'
+          ? {
+              ...identity,
+              kind: 'copy',
+              url: '/candidate/master.m3u8',
+              sessionId: 'candidate-session'
+            }
+          : { ...identity, kind: 'encoded', url: null }
+      )
+      vi.mocked(attachHlsPlayback).mockImplementationOnce((options) => {
+        options.onError()
+        return () => {}
+      })
+      let allowCleanup!: () => void
+      vi.mocked(AXIOS_INSTANCE.delete)
+        .mockResolvedValueOnce({ data: {} })
+        .mockRejectedValueOnce(new Error('Candidate cancellation is unconfirmed.'))
+        .mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              allowCleanup = () => resolve({ data: {} })
+            })
+        )
+      await act(async () => {
+        await expect(
+          rendered.result.current.presentationCommands.setQuality('480p')
+        ).rejects.toThrow('Candidate cancellation is unconfirmed.')
+      })
+      expect(rendered.result.current.settings).toMatchObject({
+        quality: 'auto',
+        pendingQuality: null,
+        audioStreamIndex: null,
+        audioOffsetMs: 0
+      })
+      await waitFor(() => expect(allowCleanup).toBeDefined(), { timeout: 2000 })
+      expect(negotiateMediaDelivery).toHaveBeenCalledTimes(2)
+      expect(AXIOS_INSTANCE.delete).toHaveBeenNthCalledWith(
+        3,
+        '/api/transcode/sessions/candidate-session',
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      )
+      server = { ...first, sessionId: 'recovered-session' }
+      await act(async () => allowCleanup())
+      await waitFor(() => expect(attachments()).toBe(3))
+      await act(async () => {
+        video.dispatchEvent(new Event('canplay'))
+        await execution.ready(signal())
+      })
+      expect(negotiateMediaDelivery).toHaveBeenCalledTimes(3)
+      expect(negotiateMediaDelivery).toHaveBeenLastCalledWith(
+        expect.not.objectContaining({ qualityTier: expect.anything() }),
+        expect.any(AbortSignal)
+      )
+      expect(rendered.result.current.settings.quality).toBe('auto')
+      expect(execution.observe().position).toBe(70)
+      expect(state.paused).toBe(true)
+    }
+  )
+
+  it('keeps a failed candidate fenced across a newer intent whose retirement also fails', async () => {
+    const { rendered, execution, state, video } = await mount({ seekable: 223.59 })
+    state.time = 70
+    server = { ...first, jobId: 'candidate-job', sessionId: 'candidate-session' }
+    vi.mocked(attachHlsPlayback).mockImplementationOnce((options) => {
+      options.onError()
+      return () => {}
+    })
+    let allowCleanup!: () => void
+    vi.mocked(AXIOS_INSTANCE.delete)
+      .mockResolvedValueOnce({ data: {} })
+      .mockRejectedValueOnce(new Error('Candidate cleanup is unknown.'))
+      .mockRejectedValueOnce(new Error('Candidate cleanup remains unknown.'))
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            allowCleanup = () => resolve({ data: {} })
+          })
+      )
+    await act(async () => {
+      await expect(
+        rendered.result.current.presentationCommands.setQuality('480p')
+      ).rejects.toThrow('Candidate cleanup is unknown.')
+    })
+    await act(async () => {
+      await expect(
+        rendered.result.current.presentationCommands.setQuality('360p')
+      ).rejects.toThrow('Candidate cleanup remains unknown.')
+    })
+    expect(negotiateMediaDelivery).toHaveBeenCalledTimes(2)
+    await waitFor(() => expect(allowCleanup).toBeDefined(), { timeout: 2000 })
+    expect(negotiateMediaDelivery).toHaveBeenCalledTimes(2)
+    expect(AXIOS_INSTANCE.delete).toHaveBeenNthCalledWith(
+      4,
+      '/api/transcode/sessions/candidate-session',
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
+    server = { ...first, sessionId: 'accepted-recovery' }
+    await act(async () => allowCleanup())
+    await waitFor(() => expect(attachments()).toBe(3))
+    await act(async () => {
+      video.dispatchEvent(new Event('canplay'))
+      await execution.ready(signal())
+    })
+    expect(negotiateMediaDelivery).toHaveBeenCalledTimes(3)
+    expect(rendered.result.current.settings.quality).toBe('auto')
+    expect(execution.observe().position).toBe(70)
+  })
+
+  it('blocks handoff while an admitted candidate cleanup remains unconfirmed', async () => {
+    const { rendered, execution } = await mount({ seekable: 223.59 })
+    server = { ...first, jobId: 'candidate-job', sessionId: 'candidate-session' }
+    vi.mocked(attachHlsPlayback).mockImplementationOnce((options) => {
+      options.onError()
+      return () => {}
+    })
+    vi.mocked(AXIOS_INSTANCE.delete)
+      .mockResolvedValueOnce({ data: {} })
+      .mockRejectedValue(new Error('Candidate cancellation is unconfirmed.'))
+    await act(async () => {
+      await expect(
+        rendered.result.current.presentationCommands.setQuality('480p')
+      ).rejects.toThrow('Candidate cancellation is unconfirmed.')
+    })
+    await act(async () => {
+      await expect(execution.quiesce(signal())).rejects.toThrow(
+        'Candidate cancellation is unconfirmed.'
+      )
+    })
+    expect(negotiateMediaDelivery).toHaveBeenCalledTimes(2)
+    expect(AXIOS_INSTANCE.delete).toHaveBeenCalledTimes(2)
+    expect(rendered.result.current.settings).toMatchObject({
+      quality: 'auto',
+      pendingQuality: null
+    })
+  })
+
+  it.each(['audio', 'quality'] as const)(
+    'reports the retained source cursor while %s replacement resets the native clock',
+    async (setting) => {
+      const { rendered, execution, state, video } = await mount({ seekable: 223.59 })
+      state.time = 10
+      let retired!: () => void
+      vi.mocked(AXIOS_INSTANCE.delete).mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            retired = () => resolve({ data: {} })
+          })
+      )
+      let change!: Promise<void>
+      act(() => {
+        const commands = rendered.result.current.presentationCommands
+        change = setting === 'quality'
+          ? commands.setQuality('480p')
+          : commands.setAudio(3, 100)
+      })
+      await waitFor(() => expect(retired).toBeDefined())
+      state.time = 0
+      expect(execution.observe()).toMatchObject({
+        observedState: 'paused',
+        position: 10
+      })
+      await act(async () => retired())
+      await waitFor(() => expect(attachments()).toBe(2))
+      await act(async () => {
+        video.dispatchEvent(new Event('canplay'))
+        await change
+      })
+      expect(execution.observe().position).toBe(10)
+      state.time = 12
+      expect(execution.observe().position).toBe(12)
+    }
+  )
+
+  it('waits for group cancellation before admitting the latest merged selection', async () => {
+    const { rendered, state, video } = await mount({ seekable: 223.59 })
+    state.time = 70
+    let cancelled!: () => void
+    vi.mocked(AXIOS_INSTANCE.delete).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          cancelled = () => resolve({ data: {} })
+        })
+    )
+    let firstChange!: Promise<unknown>
+    act(() => {
+      firstChange = rendered.result.current.presentationCommands
+        .setQuality('480p')
+        .catch((error) => error)
+    })
+    await waitFor(() => expect(cancelled).toBeDefined())
+    let secondChange!: Promise<void>
+    act(() => {
+      secondChange = rendered.result.current.presentationCommands.setQuality('360p')
+    })
+    expect(negotiateMediaDelivery).toHaveBeenCalledTimes(1)
+    expect(AXIOS_INSTANCE.delete).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      cancelled()
+      expect(await firstChange).toMatchObject({ name: 'AbortError' })
+    })
+    await waitFor(() => expect(seeks()).toContain(70))
+    await act(async () => {
+      video.dispatchEvent(new Event('canplay'))
+      await secondChange
+    })
+    expect(negotiateMediaDelivery).toHaveBeenCalledTimes(2)
+    expect(negotiateMediaDelivery).toHaveBeenLastCalledWith(
+      expect.objectContaining({ qualityTier: '360p' }),
+      expect.any(AbortSignal)
+    )
+    expect(AXIOS_INSTANCE.delete).toHaveBeenCalledTimes(1)
+    expect(rendered.result.current.settings.quality).toBe('360p')
+    expect(rendered.result.current.execution.observe().position).toBe(70)
+  })
+
+  it('cancels a superseded copy admission using its own session before the successor starts', async () => {
+    const { rendered, state, video } = await mount({ seekable: 223.59 })
+    state.time = 70
+    let completeCopy!: (
+      decision: Awaited<ReturnType<typeof negotiateMediaDelivery>>
+    ) => void
+    vi.mocked(negotiateMediaDelivery).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          completeCopy = resolve
+        })
+    )
+    let firstChange!: Promise<unknown>
+    act(() => {
+      firstChange = rendered.result.current.presentationCommands
+        .setQuality('480p')
+        .catch((error) => error)
+    })
+    await waitFor(() => expect(completeCopy).toBeDefined())
+    let secondChange!: Promise<void>
+    act(() => {
+      secondChange = rendered.result.current.presentationCommands.setQuality('360p')
+    })
+    await act(async () => {
+      completeCopy({
+        kind: 'copy',
+        url: '/copy/master.m3u8',
+        jobId: 'copy-job',
+        sessionId: 'superseded-copy-session',
+        requestId: 'client-request',
+        selection: null,
+        reason: null
+      })
+      expect(await firstChange).toMatchObject({ name: 'AbortError' })
+    })
+    await waitFor(() => expect(seeks()).toContain(70))
+    await act(async () => {
+      video.dispatchEvent(new Event('canplay'))
+      await secondChange
+    })
+    expect(AXIOS_INSTANCE.delete).toHaveBeenNthCalledWith(
+      2,
+      '/api/transcode/sessions/superseded-copy-session',
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
+    expect(negotiateMediaDelivery).toHaveBeenCalledTimes(3)
+    expect(rendered.result.current.settings.quality).toBe('360p')
+  })
+
+  it.each(['playing', 'pause', 'play'] as const)(
+    'retains %s intent through overlapping quality replacement preparation',
+    async (intent) => {
+      const { rendered, execution, state, video } = await mount({ seekable: 223.59 })
+      if (intent !== 'play') {
+        await act(async () => {
+          await execution.execute('play', undefined, signal())
+        })
+      }
+      state.time = 70
+      const send = vi.mocked(AXIOS_INSTANCE.post).getMockImplementation()!
+      let release!: () => void
+      let held = false
+      vi.mocked(AXIOS_INSTANCE.post).mockImplementation(
+        async (path: string, body?: unknown) => {
+          if (path === '/api/stream/sign' && !held) {
+            held = true
+            return new Promise((resolve) => {
+              release = () => resolve({
+                data: { ...server, sessionId: 'superseded-session' }
+              })
+            })
+          }
+          return send(path, body)
+        }
+      )
+      let firstChange!: Promise<unknown>
+      act(() => {
+        firstChange = rendered.result.current.presentationCommands
+          .setQuality('480p')
+          .catch((error) => error)
+      })
+      await waitFor(() => expect(release).toBeDefined())
+      if (intent === 'pause') act(() => rendered.result.current.pause())
+      if (intent === 'play') act(() => rendered.result.current.play())
+      let secondChange!: Promise<void>
+      act(() => {
+        secondChange = rendered.result.current.presentationCommands.setQuality('360p')
+      })
+      await act(async () => {
+        release()
+        expect(await firstChange).toMatchObject({ name: 'AbortError' })
+      })
+      await waitFor(() => expect(seeks()).toContain(70))
+      await act(async () => {
+        video.dispatchEvent(new Event('canplay'))
+        await secondChange
+      })
+      expect(AXIOS_INSTANCE.delete).toHaveBeenLastCalledWith(
+        '/api/transcode/sessions/superseded-session',
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      )
+      expect(state.paused).toBe(intent === 'pause')
+      expect(execution.observe().position).toBe(70)
+      expect(rendered.result.current.settings.quality).toBe('360p')
+    }
+  )
+
+  it.each(['paused', 'playing'] as const)(
+    'automatically restores the accepted presentation at its %s cursor after replacement signing fails',
+    async (desiredState) => {
+      const { rendered, execution, state, video } = await mount({ seekable: 223.59 })
+      if (desiredState === 'playing') {
+        await act(async () => {
+          await execution.execute('play', undefined, signal())
+        })
+      }
+      state.time = 70
+      const initialSign = sign
+      let failed = false
+      sign = (body) => {
+        if (!failed) {
+          failed = true
+          throw unavailable()
+        }
+        return initialSign(body)
+      }
+      await act(async () => {
+        await expect(
+          rendered.result.current.presentationCommands.setQuality('480p')
+        ).rejects.toThrow('Video source could not be prepared.')
+      })
+      await waitFor(() => expect(attachments()).toBe(2))
+      await act(async () => {
+        video.dispatchEvent(new Event('canplay'))
+        await execution.ready(signal())
+      })
+      expect(negotiateMediaDelivery).toHaveBeenLastCalledWith(
+        expect.not.objectContaining({ qualityTier: expect.anything() }),
+        expect.any(AbortSignal)
+      )
+      expect(rendered.result.current.settings).toMatchObject({
+        quality: 'auto',
+        pendingQuality: null,
+        audioStreamIndex: null,
+        audioOffsetMs: 0
+      })
+      expect(execution.observe().position).toBe(70)
+      expect(state.paused).toBe(desiredState === 'paused')
+    }
+  )
+
+  it('retains the saved cursor when a newer request supersedes automatic recovery after the native clock resets', async () => {
+    const { rendered, state, video } = await mount({ seekable: 223.59 })
+    state.time = 70
+    const send = vi.mocked(AXIOS_INSTANCE.post).getMockImplementation()!
+    let attempts = 0
+    let recover!: () => void
+    vi.mocked(AXIOS_INSTANCE.post).mockImplementation(
+      async (path: string, body?: unknown) => {
+        if (path === '/api/stream/sign') {
+          attempts++
+          if (attempts === 1) throw unavailable()
+          if (attempts === 2) {
+            return new Promise((resolve) => {
+              recover = () => resolve({ data: server })
+            })
+          }
+        }
+        return send(path, body)
+      }
+    )
+    let firstChange!: Promise<unknown>
+    act(() => {
+      firstChange = rendered.result.current.presentationCommands
+        .setQuality('480p')
+        .catch((error) => error)
+    })
+    await waitFor(() => expect(recover).toBeDefined())
+    state.time = 0
+    let secondChange!: Promise<void>
+    act(() => {
+      secondChange = rendered.result.current.presentationCommands.setQuality('360p')
+    })
+    await act(async () => {
+      recover()
+      expect(await firstChange).toMatchObject({ name: 'AbortError' })
+    })
+    await waitFor(() => expect(attachments()).toBe(2))
+    await act(async () => {
+      video.dispatchEvent(new Event('canplay'))
+      await secondChange
+    })
+    expect(rendered.result.current.execution.observe().position).toBe(70)
+    expect(rendered.result.current.settings.quality).toBe('360p')
+  })
+
+  it('retains a useful cursor when replacement preparation fails and a newer quality is requested', async () => {
+    const { rendered, state, video } = await mount({ seekable: 223.59 })
+    state.time = 70
+    sign = () => {
+      throw unavailable()
+    }
+    await act(async () => {
+      await expect(
+        rendered.result.current.presentationCommands.setQuality('480p')
+      ).rejects.toThrow('Video source could not be prepared.')
+    })
+    expect(rendered.result.current.settings).toMatchObject({
+      quality: 'auto',
+      pendingQuality: null
+    })
+    sign = () => server
+    let change!: Promise<void>
+    act(() => {
+      change = rendered.result.current.presentationCommands.setQuality('360p')
+    })
+    await waitFor(() => expect(seeks()).toContain(70))
+    await act(async () => {
+      video.dispatchEvent(new Event('canplay'))
+      await change
+    })
+    expect(rendered.result.current.settings.quality).toBe('360p')
+    expect(rendered.result.current.execution.observe().position).toBe(70)
+  })
+
+  it('fences quality admission after local ownership is lost', async () => {
+    let local = true
+    const { rendered } = await mount({ canControlPresentation: () => local })
+    let resolve!: (
+      value: Awaited<ReturnType<typeof negotiateMediaDelivery>>
+    ) => void
+    vi.mocked(negotiateMediaDelivery).mockImplementationOnce(
+      () =>
+        new Promise((complete) => {
+          resolve = complete
+        })
+    )
+    let change!: Promise<unknown>
+    act(() => {
+      change = rendered.result.current.presentationCommands
+        .setQuality('480p')
+        .catch((error) => error)
+    })
+    await waitFor(() => expect(resolve).toBeDefined())
+    local = false
+    await act(async () => {
+      resolve({ kind: 'encoded', jobId: 'remote-candidate' } as never)
+      expect(await change).toMatchObject({ name: 'AbortError' })
+    })
+    expect(rendered.result.current.settings.quality).toBe('auto')
+    expect(rendered.result.current.error).toBeNull()
+    expect(attachments()).toBe(1)
+  })
+
+  it('reports a failed audio change and restores the accepted presentation', async () => {
     const { rendered } = await mount()
     const attached = attachments()
     vi.mocked(negotiateMediaDelivery).mockRejectedValueOnce(
@@ -1568,7 +2405,7 @@ describe('useBaanderPlayer sessions and source end', () => {
       audioOffsetMs: 0,
       pendingAudio: null
     })
-    expect(attachments()).toBe(attached)
+    expect(attachments()).toBe(attached + 1)
     expect(rendered.result.current.error).toBe('Selected audio is unavailable.')
   })
 
@@ -1595,10 +2432,9 @@ describe('useBaanderPlayer sessions and source end', () => {
       new Error('Second choice failed.')
     )
     await act(async () => {
-      await expect(
-        rendered.result.current.presentationCommands.setAudio(3, -100)
-      ).rejects.toThrow('Second choice failed.')
+      const second = rendered.result.current.presentationCommands.setAudio(3, -100)
       resolveFirst({ kind: 'encoded', jobId: 'old-candidate' } as never)
+      await expect(second).rejects.toThrow('Second choice failed.')
       const error = await first
       expect(error).toMatchObject({ name: 'AbortError' })
     })
@@ -1608,7 +2444,7 @@ describe('useBaanderPlayer sessions and source end', () => {
       pendingAudio: null,
       subtitleOffsetMs: 700
     })
-    expect(attachments()).toBe(1)
+    expect(attachments()).toBe(2)
   })
 
   it.each(['paused', 'playing'] as const)(

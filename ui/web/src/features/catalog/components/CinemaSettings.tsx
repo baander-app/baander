@@ -70,6 +70,11 @@ function audioTrackLabel(track: VideoAudioTrack) {
   return name || `Track ${track.index + 1}`
 }
 
+function qualityLabel(id: string) {
+  if (id === 'auto') return 'Auto'
+  return id === '4K' ? '2160p / 4K' : id
+}
+
 export function CinemaSettings({
   information,
   local
@@ -79,8 +84,13 @@ export function CinemaSettings({
 }) {
   const commands = useVideoPresentation((state) => state.commands)
   const available = useVideoPresentation((state) => state.controlsAvailable)
-  const qualities = useVideoPresentation((state) => state.qualities)
+  const qualityLimits = useVideoPresentation((state) => state.qualityLimits)
+  const qualities = (information?.qualityChoices ?? []).filter((choice) =>
+    (!qualityLimits?.maxWidth || choice.width <= qualityLimits.maxWidth) &&
+    (!qualityLimits?.maxHeight || choice.height <= qualityLimits.maxHeight)
+  )
   const quality = useVideoPresentation((state) => state.quality)
+  const pendingQuality = useVideoPresentation((state) => state.pendingQuality)
   const currentQuality = useVideoPresentation((state) => state.currentQuality)
   const subtitles = useVideoPresentation((state) => state.subtitles)
   const subtitle = useVideoPresentation((state) => state.subtitle)
@@ -88,12 +98,30 @@ export function CinemaSettings({
   const audioIndex = useVideoPresentation((state) => state.audioStreamIndex)
   const audioOffset = useVideoPresentation((state) => state.audioOffsetMs)
   const pending = useVideoPresentation((state) => state.pendingAudio)
+  const requestedAudioIndex = pending ? pending.audioStreamIndex : audioIndex
+  const acceptedAudioTrack = information?.audioTracks.find(
+    (track) => track.index === audioIndex
+  )
+  const acceptedAudioLabel = audioIndex === null || audioIndex === undefined
+    ? 'Default audio'
+    : acceptedAudioTrack
+      ? audioTrackLabel(acceptedAudioTrack)
+      : `Track ${audioIndex + 1}`
   const enabled = local && available && !!commands
+  const reportPresentationError = (error: unknown) => {
+    if (
+      (error instanceof Error || error instanceof DOMException) &&
+      error.name === 'AbortError'
+    ) {
+      return
+    }
+    useVideoPresentation.getState().reportError(error)
+  }
   const changeAudio = (index: number | null, offset: number) => {
     if (!commands) return
     commands
       .setAudio(index, offset)
-      .catch(useVideoPresentation.getState().reportError)
+      .catch(reportPresentationError)
   }
   return (
     <Settings aria-label="Playback settings">
@@ -107,9 +135,13 @@ export function CinemaSettings({
       <label>
         Quality
         <Select
-          value={quality ?? 'auto'}
+          value={pendingQuality ?? quality ?? 'auto'}
           disabled={!enabled}
-          onValueChange={(id) => commands?.setQuality(id)}
+          onValueChange={(id) => {
+            commands
+              ?.setQuality(id)
+              .catch(reportPresentationError)
+          }}
         >
           <SelectTrigger aria-label="Quality">
             <SelectValue />
@@ -118,35 +150,41 @@ export function CinemaSettings({
             <SelectItem value="auto">
               Auto{currentQuality ? ` · ${currentQuality}` : ''}
             </SelectItem>
-            {qualities
-              ?.filter((item) => item.id !== 'auto')
-              .map((item) => (
-                <SelectItem key={item.id} value={item.id}>
-                  {item.label}
-                </SelectItem>
-              ))}
+            {qualities.map((item) => (
+              <SelectItem key={item.id} value={item.id}>
+                {item.id === '4K' ? '2160p / 4K' : item.label}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </label>
-      {enabled && !qualities?.some((item) => item.id !== 'auto') ? (
+      {pendingQuality ? (
+        <p role="status">
+          Changing quality to{' '}
+          {qualityLabel(pendingQuality)}…
+        </p>
+      ) : null}
+      {pendingQuality ? <p>Accepted quality: {qualityLabel(quality ?? 'auto')}</p> : null}
+      {currentQuality ? <p>Current output: {currentQuality}</p> : null}
+      {enabled && !qualities.length ? (
         <p>
-          Quality is selected automatically by this browser. Manual quality
-          selection is unavailable.
+          No manual resolution is available for this source and destination.
+          Sources with unknown dimensions or below 360p use Auto.
         </p>
       ) : null}
       <label>
         Audio track
         <Select
           value={
-            audioIndex === null || audioIndex === undefined
+            requestedAudioIndex === null || requestedAudioIndex === undefined
               ? 'default'
-              : String(audioIndex)
+              : String(requestedAudioIndex)
           }
-          disabled={!enabled || !!pending || !information?.audioTracks.length}
+          disabled={!enabled || !information?.audioTracks.length}
           onValueChange={(value) =>
             changeAudio(
               value === 'default' ? null : Number(value),
-              audioOffset ?? 0
+              pending?.audioOffsetMs ?? audioOffset ?? 0
             )
           }
         >
@@ -164,15 +202,25 @@ export function CinemaSettings({
           </SelectContent>
         </Select>
       </label>
-      {pending ? <p role="status">Changing audio…</p> : null}
+      {pending ? (
+        <>
+          <p role="status">Changing audio…</p>
+          <p>Accepted audio: {acceptedAudioLabel} · {audioOffset ?? 0} ms</p>
+        </>
+      ) : null}
       {information && !information.audioTracks.length ? (
         <p>This movie has no audio track.</p>
       ) : null}
       <CinemaTiming
         label="Audio timing"
-        value={audioOffset ?? 0}
-        disabled={!enabled || !!pending || !information?.audioTracks.length}
-        onChange={(offset) => changeAudio(audioIndex ?? null, offset)}
+        value={pending?.audioOffsetMs ?? audioOffset ?? 0}
+        disabled={!enabled || !information?.audioTracks.length}
+        onChange={(offset) =>
+          changeAudio(
+            pending ? pending.audioStreamIndex : (audioIndex ?? null),
+            offset
+          )
+        }
       />
       <label>
         Subtitles

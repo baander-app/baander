@@ -123,7 +123,15 @@ export function VideoPlaybackRuntime() {
     const commands =
       presentationCommands && ownsPresentation()
         ? {
-            setQuality: (id: string) => currentCommands().setQuality(id),
+            setQuality: async (id: string) => {
+              await currentCommands().setQuality(id)
+              if (!ownsPresentation()) {
+                throw new DOMException(
+                  'Video presentation was replaced.',
+                  'AbortError'
+                )
+              }
+            },
             setSubtitle: (
               id: Parameters<typeof presentationCommands.setSubtitle>[0]
             ) => currentCommands().setSubtitle(id),
@@ -131,7 +139,12 @@ export function VideoPlaybackRuntime() {
               currentCommands().setSubtitleOffset(ms),
             setAudio: async (index: number | null, offsetMs: number) => {
               await currentCommands().setAudio(index, offsetMs)
-              currentCommands()
+              if (!ownsPresentation()) {
+                throw new DOMException(
+                  'Video presentation was replaced.',
+                  'AbortError'
+                )
+              }
             }
           }
         : null

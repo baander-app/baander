@@ -150,6 +150,36 @@ describe('media delivery negotiation', () => {
     )
   })
 
+  it.each(['360p', '480p', '720p', '1080p', '1440p', '4K'] as const)(
+    'forwards the requested %s resolution to delivery negotiation',
+    async (qualityTier) => {
+      deliver.mockResolvedValue({ kind: 'encoded', requestId, selection })
+      const signal = new AbortController().signal
+
+      await negotiateMediaDelivery({ ...video, qualityTier }, signal)
+
+      expect(deliver).toHaveBeenCalledExactlyOnceWith(
+        { ...capabilities, kind: 'video', id: 'video', requestId, qualityTier },
+        { signal }
+      )
+    }
+  )
+
+  it('preserves the copy session needed to retire an admitted presentation', async () => {
+    deliver.mockResolvedValue({
+      kind: 'copy',
+      url: '/api/transcode/video/master.m3u8',
+      requestId,
+      jobId: 'owned-job',
+      sessionId: 'owned-session',
+      selection
+    })
+
+    const result = await negotiateMediaDelivery(video, new AbortController().signal)
+
+    expect(result).toMatchObject({ kind: 'copy', sessionId: 'owned-session' })
+  })
+
   it.each(['original', 'cached', 'copy'] as const)(
     'preserves a signed %s audio URL without requiring a video job',
     async (kind) => {

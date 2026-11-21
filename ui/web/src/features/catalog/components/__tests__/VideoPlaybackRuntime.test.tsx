@@ -317,10 +317,33 @@ describe('VideoPlaybackRuntime', () => {
     )
   })
 
+  it.each(['audio', 'quality'] as const)(
+    'rejects an in-flight %s completion after ownership changes',
+    async (selection) => {
+      await run('prepare', 0, 'paused')
+      const commands = useVideoPresentation.getState().commands!
+      let complete!: () => void
+      const operation = new Promise<void>((resolve) => {
+        complete = resolve
+      })
+      if (selection === 'quality') {
+        presentationCommands.setQuality.mockImplementationOnce(() => operation)
+      } else {
+        presentationCommands.setAudio.mockImplementationOnce(() => operation)
+      }
+      const change = selection === 'quality'
+        ? commands.setQuality('480p')
+        : commands.setAudio(3, 100)
+      session.snapshot!.activeIncarnationId = 'remote'
+      complete()
+      await expect(change).rejects.toMatchObject({ name: 'AbortError' })
+    }
+  )
+
   it('fences commands belonging to a video that was replaced', async () => {
     await run('prepare', 0, 'paused')
     const commands = useVideoPresentation.getState().commands!
     act(() => useVideoPresentation.getState().select('video-2'))
-    expect(() => commands.setQuality('auto')).toThrow('local video destination')
+    await expect(commands.setQuality('auto')).rejects.toThrow('local video destination')
   })
 })

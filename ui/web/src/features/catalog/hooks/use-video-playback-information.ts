@@ -15,7 +15,14 @@ export interface VideoAudioTrack {
   channels: number
   isDefault: boolean
 }
+export interface VideoQualityChoice {
+  id: '360p' | '480p' | '720p' | '1080p' | '1440p' | '4K'
+  label: string
+  width: number
+  height: number
+}
 export interface VideoPlaybackInformation {
+  qualityChoices: VideoQualityChoice[]
   audioTracks: VideoAudioTrack[]
   subtitleTracks: {
     index: number
