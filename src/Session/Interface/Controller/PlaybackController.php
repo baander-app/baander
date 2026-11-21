@@ -18,8 +18,7 @@ use App\Session\Interface\Request\TransferPlaybackRequest;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use OpenApi\Attributes as OA;
-use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Spec as OA;
 use App\Session\Interface\Resource\PlaybackSnapshotResource;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -35,36 +34,48 @@ final readonly class PlaybackController
 
     public function __construct(private Security $security, private PlaybackCoordinationInterface $playback) {}
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/session/endpoints',
         summary: 'Register a fresh playback endpoint incarnation',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(ref: new Model(type: RegisterPlaybackEndpointRequest::class)),
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: RegisterPlaybackEndpointRequest::class),
+            ),
         ),
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Complete playback snapshot',
-                content: new OA\JsonContent(
-                    required: ['data'],
-                    properties: [new OA\Property(property: 'data', ref: new Model(type: PlaybackSnapshotResource::class))],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: PlaybackSnapshotResource::class),
+                        ],
+                        required: ['data'],
+                    ),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Invalid playback request',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
             new OA\Response(
                 response: '401',
                 description: 'Not authenticated',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'Playback authority or revision conflict',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
         ],
     )]
@@ -74,36 +85,48 @@ final readonly class PlaybackController
         return $this->respond(PlaybackOperation::Endpoint, $input->toArray(), $request);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/session/transfer',
         summary: 'Begin an acknowledged playback transfer',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(ref: new Model(type: TransferPlaybackRequest::class)),
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: TransferPlaybackRequest::class),
+            ),
         ),
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Complete playback snapshot',
-                content: new OA\JsonContent(
-                    required: ['data'],
-                    properties: [new OA\Property(property: 'data', ref: new Model(type: PlaybackSnapshotResource::class))],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: PlaybackSnapshotResource::class),
+                        ],
+                        required: ['data'],
+                    ),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Invalid playback request',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
             new OA\Response(
                 response: '401',
                 description: 'Not authenticated',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'Playback authority or revision conflict',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
         ],
     )]
@@ -113,39 +136,56 @@ final readonly class PlaybackController
         return $this->respond(PlaybackOperation::Transfer, $input->toArray(), $request);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/session/ack',
         summary: 'Acknowledge an owned endpoint command',
+        parameters: [
+            new OA\Parameter(
+                name: 'X-Baander-Playback-Endpoint',
+                in: 'header',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+        ],
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(ref: new Model(type: AcknowledgePlaybackRequest::class)),
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: AcknowledgePlaybackRequest::class),
+            ),
         ),
-        parameters: [
-            new OA\Parameter(name: 'X-Baander-Playback-Endpoint', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-        ],
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Complete playback snapshot',
-                content: new OA\JsonContent(
-                    required: ['data'],
-                    properties: [new OA\Property(property: 'data', ref: new Model(type: PlaybackSnapshotResource::class))],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: PlaybackSnapshotResource::class),
+                        ],
+                        required: ['data'],
+                    ),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Invalid playback request',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
             new OA\Response(
                 response: '401',
                 description: 'Not authenticated',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'Playback authority or revision conflict',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
         ],
     )]
@@ -155,39 +195,56 @@ final readonly class PlaybackController
         return $this->respond(PlaybackOperation::Acknowledge, $input->toArray(), $request);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/session/observe',
         summary: 'Renew endpoint presence and report observed playback',
+        parameters: [
+            new OA\Parameter(
+                name: 'X-Baander-Playback-Endpoint',
+                in: 'header',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+        ],
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(ref: new Model(type: ObservePlaybackRequest::class)),
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: ObservePlaybackRequest::class),
+            ),
         ),
-        parameters: [
-            new OA\Parameter(name: 'X-Baander-Playback-Endpoint', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-        ],
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Complete playback snapshot',
-                content: new OA\JsonContent(
-                    required: ['data'],
-                    properties: [new OA\Property(property: 'data', ref: new Model(type: PlaybackSnapshotResource::class))],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: PlaybackSnapshotResource::class),
+                        ],
+                        required: ['data'],
+                    ),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Invalid playback request',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
             new OA\Response(
                 response: '401',
                 description: 'Not authenticated',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'Playback authority or revision conflict',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
         ],
     )]
@@ -197,78 +254,108 @@ final readonly class PlaybackController
         return $this->respond(PlaybackOperation::Observe, $input->toArray(), $request);
     }
 
-    #[OA\Post(path: '/api/session/control', summary: 'Control the committed playback runner', requestBody: new OA\RequestBody(
-        required: true,
-        content: new OA\JsonContent(ref: new Model(type: ControlPlaybackRequest::class)),
-    ), parameters: [
-        new OA\Parameter(
-            name: 'X-Baander-Playback-Endpoint',
-            description: 'Required when incarnationId is supplied. Authenticates the endpoint receiving its pending commands in the response.',
-            in: 'header',
-            required: false,
-            schema: new OA\Schema(type: 'string'),
-        ),
-    ], responses: [
-        new OA\Response(
-            response: '200',
-            description: 'Complete playback snapshot',
-            content: new OA\JsonContent(
-                required: ['data'],
-                properties: [new OA\Property(property: 'data', ref: new Model(type: PlaybackSnapshotResource::class))],
+    #[OA\Operation\Post(
+        path: '/api/session/control',
+        summary: 'Control the committed playback runner',
+        parameters: [
+            new OA\Parameter(
+                name: 'X-Baander-Playback-Endpoint',
+                in: 'header',
+                description: 'Required when incarnationId is supplied. Authenticates the endpoint receiving its pending commands in the response.',
+                required: false,
+                schema: new OA\Schema(type: 'string'),
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: ControlPlaybackRequest::class),
             ),
         ),
-        new OA\Response(
-            response: '422',
-            description: 'Invalid playback request',
-            content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
-        ),
-        new OA\Response(
-            response: '401',
-            description: 'Not authenticated',
-            content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
-        ),
-        new OA\Response(
-            response: '409',
-            description: 'Playback authority or revision conflict',
-            content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
-        ),
-    ])]
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'Complete playback snapshot',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: PlaybackSnapshotResource::class),
+                        ],
+                        required: ['data'],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid playback request',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Playback authority or revision conflict',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+        ],
+    )]
     #[Route('/control', name: 'control', methods: ['POST'])]
     public function control(#[MapRequestPayload] ControlPlaybackRequest $input, Request $request): JsonResponse
     {
         return $this->respond(PlaybackOperation::Control, $input->toArray(), $request);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/session/reconcile',
         summary: 'Stop an uncertain transfer target',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(ref: new Model(type: ReconcilePlaybackRequest::class)),
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: ReconcilePlaybackRequest::class),
+            ),
         ),
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Complete playback snapshot',
-                content: new OA\JsonContent(
-                    required: ['data'],
-                    properties: [new OA\Property(property: 'data', ref: new Model(type: PlaybackSnapshotResource::class))],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: PlaybackSnapshotResource::class),
+                        ],
+                        required: ['data'],
+                    ),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Invalid playback request',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
             new OA\Response(
                 response: '401',
                 description: 'Not authenticated',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'Playback authority or revision conflict',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
         ],
     )]
@@ -278,14 +365,27 @@ final readonly class PlaybackController
         return $this->respond(PlaybackOperation::Reconcile, $input->toArray(), $request);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/session/recover-local',
         summary: 'Recover a proven stopped local browser incarnation',
-        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: RecoverLocalPlaybackRequest::class))),
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: RecoverLocalPlaybackRequest::class),
+            ),
+        ),
         responses: [
-            new OA\Response(response: '200', description: 'Capability-free snapshot and recorded recovery result', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', ref: new Model(type: PlaybackSnapshotResource::class))],
-            )),
+            new OA\Response(
+                response: '200',
+                description: 'Capability-free snapshot and recorded recovery result',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: PlaybackSnapshotResource::class),
+                        ],
+                    ),
+                ),
+            ),
             new OA\Response(response: '401', description: 'Not authenticated'),
             new OA\Response(response: '409', description: 'Recovery authority refused'),
             new OA\Response(response: '422', description: 'Invalid recovery request'),
@@ -297,45 +397,57 @@ final readonly class PlaybackController
         return $this->respond(PlaybackOperation::RecoverLocal, $input->toArray(), $request);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/session/close',
         summary: 'Report that an endpoint is going away and its players have stopped',
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(ref: new Model(type: ClosePlaybackEndpointRequest::class)),
-        ),
         parameters: [
             new OA\Parameter(
                 name: 'X-Baander-Playback-Endpoint',
-                description: 'The capability of the incarnation that reports its close.',
                 in: 'header',
+                description: 'The capability of the incarnation that reports its close.',
                 required: true,
                 schema: new OA\Schema(type: 'string'),
             ),
         ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: ClosePlaybackEndpointRequest::class),
+            ),
+        ),
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Complete playback snapshot without commands. The same for a repeated report and for an incarnation the session no longer names.',
-                content: new OA\JsonContent(
-                    required: ['data'],
-                    properties: [new OA\Property(property: 'data', ref: new Model(type: PlaybackSnapshotResource::class))],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: PlaybackSnapshotResource::class),
+                        ],
+                        required: ['data'],
+                    ),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Invalid playback request',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
             new OA\Response(
                 response: '401',
                 description: 'Not authenticated',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'Endpoint capability missing or invalid',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
         ],
     )]
@@ -345,45 +457,57 @@ final readonly class PlaybackController
         return $this->respond(PlaybackOperation::Close, $input->toArray(), $request);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/session/override',
         summary: 'End the hold of a destination that is no longer registered',
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(ref: new Model(type: OverridePlaybackRequest::class)),
-        ),
         parameters: [
             new OA\Parameter(
                 name: 'X-Baander-Playback-Endpoint',
-                description: 'The capability of the registered endpoint that asks.',
                 in: 'header',
+                description: 'The capability of the registered endpoint that asks.',
                 required: true,
                 schema: new OA\Schema(type: 'string'),
             ),
         ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: OverridePlaybackRequest::class),
+            ),
+        ),
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Complete playback snapshot with the recorded result of the request. A repeated request returns the same result.',
-                content: new OA\JsonContent(
-                    required: ['data'],
-                    properties: [new OA\Property(property: 'data', ref: new Model(type: PlaybackSnapshotResource::class))],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: PlaybackSnapshotResource::class),
+                        ],
+                        required: ['data'],
+                    ),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Invalid playback request',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
             new OA\Response(
                 response: '401',
                 description: 'Not authenticated',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'Playback authority or revision conflict, a destination that is still registered, or nothing to override',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
         ],
     )]
@@ -393,36 +517,55 @@ final readonly class PlaybackController
         return $this->respond(PlaybackOperation::Override, $input->toArray(), $request);
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/session/snapshot',
         summary: 'Recover the complete playback snapshot',
         parameters: [
-            new OA\Parameter(name: 'incarnationId', in: 'query', schema: new OA\Schema(type: 'string', format: 'uuid')),
-            new OA\Parameter(name: 'X-Baander-Playback-Endpoint', in: 'header', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'incarnationId',
+                in: 'query',
+                schema: new OA\Schema(type: 'string', format: 'uuid'),
+            ),
+            new OA\Parameter(
+                name: 'X-Baander-Playback-Endpoint',
+                in: 'header',
+                required: false,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Complete playback snapshot',
-                content: new OA\JsonContent(
-                    required: ['data'],
-                    properties: [new OA\Property(property: 'data', ref: new Model(type: PlaybackSnapshotResource::class))],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: PlaybackSnapshotResource::class),
+                        ],
+                        required: ['data'],
+                    ),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Invalid playback request',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
             new OA\Response(
                 response: '401',
                 description: 'Not authenticated',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'Playback authority or revision conflict',
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
         ],
     )]

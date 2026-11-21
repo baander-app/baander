@@ -12,8 +12,7 @@ use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\DispatchesMessagesTrait;
-use OpenApi\Attributes as OA;
-use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -34,31 +33,89 @@ final class AlbumCoverController
     ) {
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/albums/{publicId}/cover',
         summary: 'Upload a cover image for an album',
+        parameters: [
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Album public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
+        ],
         requestBody: new OA\RequestBody(
             description: 'Cover image file (multipart form upload with field name "cover")',
             required: true,
             content: new OA\MediaType(
                 mediaType: 'multipart/form-data',
                 schema: new OA\Schema(
-                    required: ['cover'],
                     properties: [
-                        new OA\Property(property: 'cover', description: 'Image file (jpeg, png, or webp, max 10 MB)', type: 'string', format: 'binary'),
+                        'cover' => new OA\Schema(
+                            description: 'Image file (jpeg, png, or webp, max 10 MB)',
+                            type: 'string',
+                            format: 'binary',
+                        ),
                     ],
+                    required: ['cover'],
                 ),
             ),
         ),
-        parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
-        ],
         responses: [
-            new OA\Response(response: '200', description: 'Cover image uploaded successfully', content: new OA\JsonContent(properties: [new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21), new OA\Property(property: 'url', type: 'string'), new OA\Property(property: 'size', type: 'integer'), new OA\Property(property: 'width', type: 'integer'), new OA\Property(property: 'height', type: 'integer')])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Album not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error (invalid public ID, missing file, oversized file, or unsupported type)', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Cover image uploaded successfully',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'publicId' => new OA\Schema(
+                                type: 'string',
+                                minLength: 21,
+                                maxLength: 21,
+                                pattern: '^[0-9a-zA-Z_-]{21}$',
+                            ),
+                            'url' => new OA\Schema(type: 'string'),
+                            'size' => new OA\Schema(type: 'integer'),
+                            'width' => new OA\Schema(type: 'integer'),
+                            'height' => new OA\Schema(type: 'integer'),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Album not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error (invalid public ID, missing file, oversized file, or unsupported type)',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('', name: 'upload', methods: ['POST'])]
@@ -75,18 +132,53 @@ final class AlbumCoverController
         return $this->successResponse(CoverImageResource::from($cover));
     }
 
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/albums/{publicId}/cover',
         summary: 'Delete the cover image from an album',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Album public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Cover image deleted successfully'),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Album or cover image not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid public ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Album or cover image not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid public ID',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('', name: 'delete', methods: ['DELETE'])]

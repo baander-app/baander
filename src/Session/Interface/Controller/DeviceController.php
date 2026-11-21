@@ -12,8 +12,7 @@ use App\Session\Interface\Request\RenameDeviceRequest;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
@@ -30,32 +29,53 @@ final class DeviceController
         private readonly DevicePortInterface $devicePort,
     ) {}
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/devices',
         summary: 'Register or touch a device (upsert)',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(ref: new Model(type: RegisterDeviceRequest::class)),
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: RegisterDeviceRequest::class),
+            ),
         ),
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Device registered',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(
-                            property: 'data',
-                            properties: [
-                                new OA\Property(property: 'message', type: 'string', example: 'Device registered.'),
-                            ],
-                            type: 'object',
-                        ),
-                    ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'message' => new OA\Schema(type: 'string', example: 'Device registered.'),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '400', description: 'Malformed request body', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '400',
+                description: 'Malformed request body',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('', name: 'register', methods: ['POST'])]
@@ -73,27 +93,51 @@ final class DeviceController
         return $this->successResponse(['message' => 'Device registered.']);
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/devices',
         summary: 'List all devices registered for the current user',
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'List of devices',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', type: 'array', items: new OA\Items(
-                            properties: [
-                                new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-                                new OA\Property(property: 'deviceId', description: 'Browser-generated device token; distinct from publicId', type: 'string', format: 'uuid'),
-                                new OA\Property(property: 'name', type: 'string'),
-                                new OA\Property(property: 'lastUsedAt', type: 'string', format: 'date-time', nullable: true),
-                            ],
-                        )),
-                    ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(
+                                    properties: [
+                                        'publicId' => new OA\Schema(
+                                            type: 'string',
+                                            minLength: 21,
+                                            maxLength: 21,
+                                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                                        ),
+                                        'deviceId' => new OA\Schema(
+                                            description: 'Browser-generated device token; distinct from publicId',
+                                            type: 'string',
+                                            format: 'uuid',
+                                        ),
+                                        'name' => new OA\Schema(type: 'string'),
+                                        'lastUsedAt' => new OA\Schema(
+                                            type: 'string',
+                                            format: 'date-time',
+                                            nullable: true,
+                                        ),
+                                    ],
+                                ),
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('', name: 'list', methods: ['GET'])]
@@ -110,36 +154,71 @@ final class DeviceController
         return $this->successResponse($devices);
     }
 
-    #[OA\Put(
+    #[OA\Operation\Put(
         path: '/api/devices/{deviceId}',
         summary: 'Rename a device',
+        parameters: [
+            new OA\Parameter(
+                name: 'deviceId',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
+        ],
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(
-                required: ['name'],
-                properties: [
-                    new OA\Property(property: 'name', type: 'string'),
-                ],
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'name' => new OA\Schema(type: 'string'),
+                    ],
+                    required: ['name'],
+                ),
             ),
         ),
-        parameters: [
-            new OA\Parameter(name: 'deviceId', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
-        ],
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Device renamed',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'message', type: 'string', example: 'Device renamed.'),
-                        ], type: 'object'),
-                    ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'message' => new OA\Schema(type: 'string', example: 'Device renamed.'),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Device not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Device not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{deviceId}', name: 'rename', methods: ['PUT'])]
@@ -167,25 +246,46 @@ final class DeviceController
         return $this->successResponse(['message' => 'Device renamed.']);
     }
 
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/devices/{deviceId}',
         summary: 'Forget (remove) a device',
         parameters: [
-            new OA\Parameter(name: 'deviceId', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'deviceId',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Device removed',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'message', type: 'string', example: 'Device forgotten.'),
-                        ], type: 'object'),
-                    ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'message' => new OA\Schema(type: 'string', example: 'Device forgotten.'),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{deviceId}', name: 'forget', methods: ['DELETE'])]

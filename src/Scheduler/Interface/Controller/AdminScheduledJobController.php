@@ -15,8 +15,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -40,18 +39,23 @@ final class AdminScheduledJobController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/scheduler/jobs',
         summary: 'List all scheduled jobs',
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'List of scheduled jobs',
-                content: new OA\JsonContent(properties: [
-                    new OA\Property(property: 'data', type: 'array', items: new OA\Items(
-                        ref: new Model(type: ScheduledJobResource::class),
-                    )),
-                ]),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(ref: ScheduledJobResource::class),
+                            ),
+                        ],
+                    ),
+                ),
             ),
         ],
     )]
@@ -66,14 +70,28 @@ final class AdminScheduledJobController
         );
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/scheduler/jobs/{id}',
         summary: 'Get a scheduled job',
         responses: [
-            new OA\Response(response: '200', description: 'Scheduled job details', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', ref: new Model(type: ScheduledJobResource::class)),
-            ])),
-            new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Scheduled job details',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: ScheduledJobResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Job not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{id}', name: 'show', requirements: ['id' => self::PUBLIC_ID], methods: ['GET'])]
@@ -88,18 +106,34 @@ final class AdminScheduledJobController
         return $this->successResponse(ScheduledJobResource::from($job));
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/admin/scheduler/jobs',
         summary: 'Create a scheduled job',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(ref: new Model(type: CreateScheduledJobRequest::class)),
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: CreateScheduledJobRequest::class),
+            ),
         ),
         responses: [
-            new OA\Response(response: '201', description: 'Job created', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', ref: new Model(type: ScheduledJobResource::class)),
-            ])),
-            new OA\Response(response: '422', description: 'Invalid job, such as an unschedulable command or parameters outside its schema', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '201',
+                description: 'Job created',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: ScheduledJobResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid job, such as an unschedulable command or parameters outside its schema',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('', name: 'create', methods: ['POST'])]
@@ -118,20 +152,48 @@ final class AdminScheduledJobController
         return $this->successResponse(ScheduledJobResource::from($job), Response::HTTP_CREATED);
     }
 
-    #[OA\Put(
+    #[OA\Operation\Put(
         path: '/api/admin/scheduler/jobs/{id}',
         summary: 'Update a scheduled job',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(ref: new Model(type: UpdateScheduledJobRequest::class)),
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: UpdateScheduledJobRequest::class),
+            ),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Job updated', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', ref: new Model(type: ScheduledJobResource::class)),
-            ])),
-            new OA\Response(response: '422', description: 'Invalid job, such as an unschedulable command or parameters outside its schema', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '409', description: 'Job changed concurrently; reload before retrying', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Job updated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: ScheduledJobResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid job, such as an unschedulable command or parameters outside its schema',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Job changed concurrently; reload before retrying',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Job not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{id}', name: 'update', requirements: ['id' => self::PUBLIC_ID], methods: ['PUT'])]
@@ -155,13 +217,25 @@ final class AdminScheduledJobController
         return $this->successResponse(ScheduledJobResource::from($job));
     }
 
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/admin/scheduler/jobs/{id}',
         summary: 'Delete a scheduled job',
         responses: [
             new OA\Response(response: '204', description: 'Job deleted'),
-            new OA\Response(response: '409', description: 'Job changed concurrently; reload before retrying', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '409',
+                description: 'Job changed concurrently; reload before retrying',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Job not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{id}', name: 'delete', requirements: ['id' => self::PUBLIC_ID], methods: ['DELETE'])]
@@ -177,15 +251,35 @@ final class AdminScheduledJobController
         return $this->noContent();
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/admin/scheduler/jobs/{id}/pause',
         summary: 'Pause a scheduled job',
         responses: [
-            new OA\Response(response: '200', description: 'Job paused, or already paused', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', ref: new Model(type: ScheduledJobResource::class)),
-            ])),
-            new OA\Response(response: '409', description: 'Job is disabled, or changed concurrently; reload before retrying', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Job paused, or already paused',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: ScheduledJobResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Job is disabled, or changed concurrently; reload before retrying',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Job not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{id}/pause', name: 'pause', requirements: ['id' => self::PUBLIC_ID], methods: ['POST'])]
@@ -202,15 +296,35 @@ final class AdminScheduledJobController
         return $this->successResponse(ScheduledJobResource::from($job));
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/admin/scheduler/jobs/{id}/resume',
         summary: 'Resume a paused scheduled job',
         responses: [
-            new OA\Response(response: '200', description: 'Job resumed, or already active', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', ref: new Model(type: ScheduledJobResource::class)),
-            ])),
-            new OA\Response(response: '409', description: 'Job is disabled, or changed concurrently; reload before retrying', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Job resumed, or already active',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: ScheduledJobResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Job is disabled, or changed concurrently; reload before retrying',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Job not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{id}/resume', name: 'resume', requirements: ['id' => self::PUBLIC_ID], methods: ['POST'])]
@@ -227,23 +341,63 @@ final class AdminScheduledJobController
         return $this->successResponse(ScheduledJobResource::from($job));
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/admin/scheduler/jobs/{id}/trigger',
         summary: 'Record a durable manual scheduled job request',
-        parameters: [new OA\Parameter(
-            name: 'Idempotency-Key', description: 'Request UUID. Reuse this UUID after an uncertain response to recover the same occurrence. A UUID is generated if omitted.', in: 'header', required: false,
-            schema: new OA\Schema(type: 'string', format: 'uuid'),
-        )],
+        parameters: [
+            new OA\Parameter(
+                name: 'Idempotency-Key',
+                in: 'header',
+                description: 'Request UUID. Reuse this UUID after an uncertain response to recover the same occurrence. A UUID is generated if omitted.',
+                required: false,
+                schema: new OA\Schema(type: 'string', format: 'uuid'),
+            ),
+        ],
         responses: [
-            new OA\Response(response: '202', description: 'Manual request durably accepted; execution is asynchronous',
-                headers: [new OA\Header(header: 'Idempotency-Key', description: 'Accepted request UUID', schema: new OA\Schema(type: 'string', format: 'uuid'))],
-                content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [
-                    new OA\Property(property: 'occurrenceId', type: 'string'),
-                    new OA\Property(property: 'jobId', type: 'string'),
-                ])])),
-            new OA\Response(response: '400', description: 'Invalid request UUID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '409', description: 'Request UUID already belongs to another job or origin', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Job not found for a new request', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '202',
+                description: 'Manual request durably accepted; execution is asynchronous',
+                headers: [
+                    new OA\Header(
+                        header: 'Idempotency-Key',
+                        description: 'Accepted request UUID',
+                        schema: new OA\Schema(type: 'string', format: 'uuid'),
+                    ),
+                ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                properties: [
+                                    'occurrenceId' => new OA\Schema(type: 'string'),
+                                    'jobId' => new OA\Schema(type: 'string'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid request UUID',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Request UUID already belongs to another job or origin',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Job not found for a new request',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{id}/trigger', name: 'trigger', requirements: ['id' => self::PUBLIC_ID], methods: ['POST'])]
@@ -275,15 +429,35 @@ final class AdminScheduledJobController
         return $response;
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/admin/scheduler/jobs/{id}/enable',
         summary: 'Enable a disabled scheduled job',
         responses: [
-            new OA\Response(response: '200', description: 'Job enabled, or already enabled', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', ref: new Model(type: ScheduledJobResource::class)),
-            ])),
-            new OA\Response(response: '409', description: 'Job changed concurrently; reload before retrying', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Job enabled, or already enabled',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: ScheduledJobResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Job changed concurrently; reload before retrying',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Job not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{id}/enable', name: 'enable', requirements: ['id' => self::PUBLIC_ID], methods: ['POST'])]
@@ -300,15 +474,35 @@ final class AdminScheduledJobController
         return $this->successResponse(ScheduledJobResource::from($job));
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/admin/scheduler/jobs/{id}/disable',
         summary: 'Disable a scheduled job',
         responses: [
-            new OA\Response(response: '200', description: 'Job disabled, or already disabled', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', ref: new Model(type: ScheduledJobResource::class)),
-            ])),
-            new OA\Response(response: '409', description: 'Job changed concurrently; reload before retrying', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Job disabled, or already disabled',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: ScheduledJobResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Job changed concurrently; reload before retrying',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Job not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{id}/disable', name: 'disable', requirements: ['id' => self::PUBLIC_ID], methods: ['POST'])]
@@ -325,16 +519,27 @@ final class AdminScheduledJobController
         return $this->successResponse(ScheduledJobResource::from($job));
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/scheduler/jobs/commands',
         summary: 'List available schedulable commands',
         responses: [
-            new OA\Response(response: '200', description: 'Available commands', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', properties: [
-                    new OA\Property(property: 'messenger', type: 'object'),
-                    new OA\Property(property: 'console', type: 'object'),
-                ], type: 'object'),
-            ])),
+            new OA\Response(
+                response: '200',
+                description: 'Available commands',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'messenger' => new OA\Schema(type: 'object'),
+                                    'console' => new OA\Schema(type: 'object'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
         ],
     )]
     #[Route('/commands', name: 'commands', methods: ['GET'])]

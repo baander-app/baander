@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Controller;
 
 use App\Shared\Infrastructure\Swoole\SwoolePoolStatsProvider;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -14,19 +14,15 @@ final class PrometheusMetricsController
 {
     public function __construct(
         private readonly SwoolePoolStatsProvider $poolStatsProvider,
-    )
-    {
+    ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/metrics',
-        description: 'Prometheus metrics endpoint. Returns Swoole and application metrics in Prometheus text exposition format.',
         summary: 'Prometheus metrics',
+        description: 'Prometheus metrics endpoint. Returns Swoole and application metrics in Prometheus text exposition format.',
         responses: [
-            new OA\Response(
-                response: '200',
-                description: 'Prometheus text format metrics',
-            ),
+            new OA\Response(response: '200', description: 'Prometheus text format metrics'),
         ],
     )]
     #[Route('/metrics', name: 'prometheus_metrics', methods: ['GET'])]

@@ -8,8 +8,7 @@ use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Command\BatchExtractCoversCommand;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use OpenApi\Attributes as OA;
-use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -25,18 +24,39 @@ final class ExtractCoversController
     public function __construct(
         private readonly AlbumPortInterface $albumService,
         private readonly MessageBusInterface $bus,
-    )
-    {
+    ) {
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/albums/covers/extract',
-        description: 'Queues individual extraction jobs for embedded cover art from audio files for all albums without a cover image.',
         summary: 'Extract cover art for all albums missing one',
+        description: 'Queues individual extraction jobs for embedded cover art from audio files for all albums without a cover image.',
         responses: [
-            new OA\Response(response: '202', description: 'Batch extraction dispatched', content: new OA\JsonContent(properties: [new OA\Property(property: 'albums', type: 'integer')])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '202',
+                description: 'Batch extraction dispatched',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'albums' => new OA\Schema(type: 'integer'),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route(methods: ['POST'])]

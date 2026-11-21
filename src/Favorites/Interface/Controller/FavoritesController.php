@@ -15,8 +15,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\DTO\PaginatedResponse;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -38,24 +37,60 @@ final class FavoritesController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/favorites/',
         summary: 'List user favorites',
         parameters: [
-            new OA\Parameter(name: 'entityType', in: 'query', required: false, schema: new OA\Schema(type: 'string', enum: ['song', 'album', 'artist'])),
-            new OA\Parameter(name: 'page', in: 'query', required: false, schema: new OA\Schema(type: 'integer', minimum: 1)),
-            new OA\Parameter(name: 'limit', in: 'query', required: false, schema: new OA\Schema(type: 'integer', maximum: 100, minimum: 1)),
+            new OA\Parameter(
+                name: 'entityType',
+                in: 'query',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['song', 'album', 'artist'],
+                ),
+            ),
+            new OA\Parameter(
+                name: 'page',
+                in: 'query',
+                required: false,
+                schema: new OA\Schema(type: 'integer', minimum: 1),
+            ),
+            new OA\Parameter(
+                name: 'limit',
+                in: 'query',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 1,
+                    maximum: 100,
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: \App\Favorites\Interface\Resource\FavoriteResource::class))),
-                new OA\Property(property: 'meta', properties: [
-                    new OA\Property(property: 'current_page', type: 'integer'),
-                    new OA\Property(property: 'last_page', type: 'integer'),
-                    new OA\Property(property: 'per_page', type: 'integer'),
-                    new OA\Property(property: 'total', type: 'integer'),
-                ], type: 'object'),
-            ])),
+            new OA\Response(
+                response: '200',
+                description: 'Success',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(ref: \App\Favorites\Interface\Resource\FavoriteResource::class),
+                            ),
+                            'meta' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'current_page' => new OA\Schema(type: 'integer'),
+                                    'last_page' => new OA\Schema(type: 'integer'),
+                                    'per_page' => new OA\Schema(type: 'integer'),
+                                    'total' => new OA\Schema(type: 'integer'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
@@ -85,7 +120,7 @@ final class FavoritesController
         ));
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/favorites/',
         summary: 'Add a favorite',
         requestBody: new OA\RequestBody(
@@ -93,16 +128,29 @@ final class FavoritesController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
-                    required: ['entityType', 'entityPublicId'],
                     properties: [
-                        new OA\Property(property: 'entityType', type: 'string', enum: ['song', 'album', 'artist']),
-                        new OA\Property(property: 'entityPublicId', type: 'string'),
+                        'entityType' => new OA\Schema(
+                            type: 'string',
+                            enum: ['song', 'album', 'artist'],
+                        ),
+                        'entityPublicId' => new OA\Schema(type: 'string'),
                     ],
+                    required: ['entityType', 'entityPublicId'],
                 ),
             ),
         ),
         responses: [
-            new OA\Response(response: '201', description: 'Created', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', ref: new Model(type: \App\Favorites\Interface\Resource\FavoriteResource::class))])),
+            new OA\Response(
+                response: '201',
+                description: 'Created',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: \App\Favorites\Interface\Resource\FavoriteResource::class),
+                        ],
+                    ),
+                ),
+            ),
             new OA\Response(response: '422', description: 'Invalid favorite payload'),
         ],
     )]
@@ -124,14 +172,29 @@ final class FavoritesController
         return $this->created(FavoriteResource::from($favorite));
     }
 
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/favorites/{publicId}',
         summary: 'Remove a favorite',
         parameters: [
-            new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Removed', content: new OA\JsonContent(properties: [new OA\Property(property: 'message', type: 'string')])),
+            new OA\Response(
+                response: '200',
+                description: 'Removed',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'message' => new OA\Schema(type: 'string'),
+                        ],
+                    ),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'remove', methods: ['DELETE'])]

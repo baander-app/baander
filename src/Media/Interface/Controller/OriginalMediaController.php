@@ -22,8 +22,7 @@ use App\Shared\Interface\DTO\ApiError;
 use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Transcode\Application\Port\AudioRenditionPortInterface;
 use App\Transcode\Application\Port\StreamAuthPortInterface;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -46,13 +45,36 @@ final readonly class OriginalMediaController
     ) {
     }
 
-    #[OA\Get(path: '/api/stream/video', summary: 'Deliver an authorized original video with byte ranges')]
-    #[OA\Head(path: '/api/stream/video', summary: 'Return the original video response headers without a body')]
-    #[OA\Parameter(name: 'id', in: 'query', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\Operation\Get(
+        path: '/api/stream/video',
+        summary: 'Deliver an authorized original video with byte ranges',
+    )]
+    #[OA\Operation\Head(
+        path: '/api/stream/video',
+        summary: 'Return the original video response headers without a body',
+    )]
+    #[OA\Parameter(
+        name: 'id',
+        in: 'query',
+        required: true,
+        schema: new OA\Schema(type: 'string'),
+    )]
     #[OA\Response(response: 200, description: 'Original video')]
     #[OA\Response(response: 206, description: 'Byte range')]
-    #[OA\Response(response: 403, description: 'Media access denied', content: new OA\JsonContent(ref: new Model(type: ApiError::class)))]
-    #[OA\Response(response: 404, description: 'Playback media is unavailable', content: new OA\JsonContent(ref: new Model(type: ApiError::class)))]
+    #[OA\Response(
+        response: 403,
+        description: 'Media access denied',
+        content: new OA\MediaType\Json(
+            schema: new OA\Schema(ref: ApiError::class),
+        ),
+    )]
+    #[OA\Response(
+        response: 404,
+        description: 'Playback media is unavailable',
+        content: new OA\MediaType\Json(
+            schema: new OA\Schema(ref: ApiError::class),
+        ),
+    )]
     #[Route('/api/stream/video', name: 'stream_original_video', methods: ['GET', 'HEAD'])]
     public function video(Request $request): Response
     {
@@ -70,20 +92,63 @@ final readonly class OriginalMediaController
         return $source === null ? $this->notFound('Playback media is unavailable.') : $this->file($source->filePath, $source->mimeType);
     }
 
-    #[OA\Get(path: '/api/stream/original/track', summary: 'Deliver authorized track audio with byte ranges')]
-    #[OA\Head(path: '/api/stream/original/track', summary: 'Return the track audio response headers without a body')]
-    #[OA\Parameter(name: 'id', in: 'query', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\Operation\Get(
+        path: '/api/stream/original/track',
+        summary: 'Deliver authorized track audio with byte ranges',
+    )]
+    #[OA\Operation\Head(
+        path: '/api/stream/original/track',
+        summary: 'Return the track audio response headers without a body',
+    )]
+    #[OA\Parameter(
+        name: 'id',
+        in: 'query',
+        required: true,
+        schema: new OA\Schema(type: 'string'),
+    )]
     #[OA\Response(response: 200, description: 'Track audio')]
     #[OA\Response(response: 206, description: 'Byte range')]
-    #[OA\Response(response: 400, description: 'Invalid audio presentation mode, rendition format or bitrate', content: new OA\JsonContent(ref: new Model(type: ApiError::class)))]
-    #[OA\Response(response: 403, description: 'Media access denied', content: new OA\JsonContent(ref: new Model(type: ApiError::class)))]
-    #[OA\Response(response: 404, description: 'Playback media is unavailable', content: new OA\JsonContent(ref: new Model(type: ApiError::class)))]
-    #[OA\Response(response: 409, description: 'Completed rendition unavailable or the selected audio cannot be copied; negotiate delivery again. The error details carry the reason.', content: new OA\JsonContent(ref: new Model(type: ApiError::class)))]
+    #[OA\Response(
+        response: 400,
+        description: 'Invalid audio presentation mode, rendition format or bitrate',
+        content: new OA\MediaType\Json(
+            schema: new OA\Schema(ref: ApiError::class),
+        ),
+    )]
+    #[OA\Response(
+        response: 403,
+        description: 'Media access denied',
+        content: new OA\MediaType\Json(
+            schema: new OA\Schema(ref: ApiError::class),
+        ),
+    )]
+    #[OA\Response(
+        response: 404,
+        description: 'Playback media is unavailable',
+        content: new OA\MediaType\Json(
+            schema: new OA\Schema(ref: ApiError::class),
+        ),
+    )]
+    #[OA\Response(
+        response: 409,
+        description: 'Completed rendition unavailable or the selected audio cannot be copied; negotiate delivery again. The error details carry the reason.',
+        content: new OA\MediaType\Json(
+            schema: new OA\Schema(ref: ApiError::class),
+        ),
+    )]
     #[OA\Response(
         response: 503,
         description: 'Every audio slot stayed busy for the whole start wait, so the stream copy has not started yet. The copy stays queued; retry after the Retry-After delay to follow it. The error details carry reason audio_slots_busy.',
-        headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: AudioRenditionBusyException::RETRY_AFTER_SECONDS))],
-        content: new OA\JsonContent(ref: new Model(type: ApiError::class)),
+        headers: [
+            new OA\Header(
+                header: 'Retry-After',
+                description: 'Seconds to wait before retrying',
+                schema: new OA\Schema(type: 'integer', example: AudioRenditionBusyException::RETRY_AFTER_SECONDS),
+            ),
+        ],
+        content: new OA\MediaType\Json(
+            schema: new OA\Schema(ref: ApiError::class),
+        ),
     )]
     #[Route('/api/stream/original/track', name: 'stream_original_track', methods: ['GET', 'HEAD'])]
     public function track(Request $request): Response

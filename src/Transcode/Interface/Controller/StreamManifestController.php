@@ -17,7 +17,7 @@ use App\Transcode\Application\Port\PlaybackPortInterface;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
 use App\Transcode\Interface\Security\SignedStreamRequest;
 use Symfony\Component\HttpFoundation\Request;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
@@ -37,15 +37,36 @@ final class StreamManifestController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/transcode/{videoId}/master.m3u8',
         summary: 'Get HLS master playlist',
         parameters: [
-            new OA\Parameter(name: 'set', description: 'Canonical signed set of admitted job and generation pairs', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'videoId', description: 'Video public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'set',
+                in: 'query',
+                description: 'Canonical signed set of admitted job and generation pairs',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'videoId',
+                in: 'path',
+                description: 'Video public identifier',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'HLS master manifest', content: new OA\MediaType(mediaType: 'application/vnd.apple.mpegurl')),
+            new OA\Response(
+                response: '200',
+                description: 'HLS master manifest',
+                content: new OA\MediaType(mediaType: 'application/vnd.apple.mpegurl'),
+            ),
         ],
     )]
     #[Route('/{videoId}/master.m3u8', name: 'master_manifest', methods: ['GET'])]
@@ -63,16 +84,41 @@ final class StreamManifestController
         ]);
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/transcode/{jobPublicId}/tracks/{track}/media.m3u8',
         summary: 'Get HLS media playlist for a specific rendition',
         parameters: [
-            new OA\Parameter(name: 'track', description: 'Published media component', in: 'path', required: true, schema: new OA\Schema(type: 'string', enum: ['video', 'audio'])),
-            new OA\Parameter(name: 'generation', description: 'Pinned media execution generation', in: 'query', required: true, schema: new OA\Schema(type: 'integer', minimum: 1)),
-            new OA\Parameter(name: 'jobPublicId', description: 'Job public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'track',
+                in: 'path',
+                description: 'Published media component',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['video', 'audio'],
+                ),
+            ),
+            new OA\Parameter(
+                name: 'generation',
+                in: 'query',
+                description: 'Pinned media execution generation',
+                required: true,
+                schema: new OA\Schema(type: 'integer', minimum: 1),
+            ),
+            new OA\Parameter(
+                name: 'jobPublicId',
+                in: 'path',
+                description: 'Job public ID',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'HLS media manifest', content: new OA\MediaType(mediaType: 'application/vnd.apple.mpegurl')),
+            new OA\Response(
+                response: '200',
+                description: 'HLS media manifest',
+                content: new OA\MediaType(mediaType: 'application/vnd.apple.mpegurl'),
+            ),
         ],
     )]
     #[Route('/{jobPublicId}/tracks/{track}/media.m3u8', name: 'media_manifest', requirements: ['track' => 'video|audio'], methods: ['GET'])]
@@ -90,15 +136,36 @@ final class StreamManifestController
         ]);
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/transcode/{videoId}/manifest.mpd',
         summary: 'Get DASH manifest for a video',
         parameters: [
-            new OA\Parameter(name: 'set', description: 'Canonical signed set of admitted job and generation pairs', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'videoId', description: 'Video public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'set',
+                in: 'query',
+                description: 'Canonical signed set of admitted job and generation pairs',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'videoId',
+                in: 'path',
+                description: 'Video public identifier',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'DASH manifest', content: new OA\MediaType(mediaType: 'application/dash+xml')),
+            new OA\Response(
+                response: '200',
+                description: 'DASH manifest',
+                content: new OA\MediaType(mediaType: 'application/dash+xml'),
+            ),
         ],
     )]
     #[Route('/{videoId}/manifest.mpd', name: 'dash_manifest', methods: ['GET'])]
@@ -119,16 +186,63 @@ final class StreamManifestController
         ]);
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/transcode/{videoId}/quality-ladder',
         summary: 'Get available quality tiers for a video',
         parameters: [
-            new OA\Parameter(name: 'requestId', description: 'Playback client session identifier', in: 'query', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
-            new OA\Parameter(name: 'jobIds', description: 'Exact admitted jobs', in: 'query', required: true, schema: new OA\Schema(type: 'array', items: new OA\Items(type: 'string'), maxItems: 3, minItems: 1)),
-            new OA\Parameter(name: 'videoId', description: 'Video public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'requestId',
+                in: 'query',
+                description: 'Playback client session identifier',
+                required: true,
+                schema: new OA\Schema(type: 'string', format: 'uuid'),
+            ),
+            new OA\Parameter(
+                name: 'jobIds',
+                in: 'query',
+                description: 'Exact admitted jobs',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'array',
+                    items: new OA\Schema(type: 'string'),
+                    minItems: 1,
+                    maxItems: 3,
+                ),
+            ),
+            new OA\Parameter(
+                name: 'videoId',
+                in: 'path',
+                description: 'Video public identifier',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Available quality tiers', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'quality', type: 'string'), new OA\Property(property: 'width', type: 'integer'), new OA\Property(property: 'height', type: 'integer')]))])),
+            new OA\Response(
+                response: '200',
+                description: 'Available quality tiers',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(
+                                    properties: [
+                                        'quality' => new OA\Schema(type: 'string'),
+                                        'width' => new OA\Schema(type: 'integer'),
+                                        'height' => new OA\Schema(type: 'integer'),
+                                    ],
+                                ),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
         ],
     )]
     #[Route('/{videoId}/quality-ladder', name: 'quality_ladder', methods: ['GET'])]
@@ -157,16 +271,41 @@ final class StreamManifestController
         return $this->successResponse($tiers);
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/transcode/{jobPublicId}/subtitles/{language}/media.m3u8',
         summary: 'Get HLS subtitle playlist for a source track',
         parameters: [
-            new OA\Parameter(name: 'generation', description: 'Pinned media execution generation', in: 'query', required: true, schema: new OA\Schema(type: 'integer', minimum: 1)),
-            new OA\Parameter(name: 'jobPublicId', description: 'Job public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'language', description: 'Source subtitle track key: s followed by the absolute FFprobe stream index (for example s2)', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'generation',
+                in: 'query',
+                description: 'Pinned media execution generation',
+                required: true,
+                schema: new OA\Schema(type: 'integer', minimum: 1),
+            ),
+            new OA\Parameter(
+                name: 'jobPublicId',
+                in: 'path',
+                description: 'Job public ID',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'language',
+                in: 'path',
+                description: 'Source subtitle track key: s followed by the absolute FFprobe stream index (for example s2)',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'HLS subtitle manifest', content: new OA\MediaType(mediaType: 'application/vnd.apple.mpegurl', schema: new OA\Schema(type: 'string'))),
+            new OA\Response(
+                response: '200',
+                description: 'HLS subtitle manifest',
+                content: new OA\MediaType(
+                    mediaType: 'application/vnd.apple.mpegurl',
+                    schema: new OA\Schema(type: 'string'),
+                ),
+            ),
         ],
     )]
     #[Route('/{jobPublicId}/subtitles/{language}/media.m3u8', name: 'subtitle_manifest', methods: ['GET'])]

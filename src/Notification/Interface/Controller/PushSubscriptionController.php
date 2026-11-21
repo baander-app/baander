@@ -11,8 +11,7 @@ use App\Notification\Application\Port\PushSubscriptionRegistrationPortInterface;
 use App\Notification\Application\Port\PushSubscriptionRemovalPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use OpenApi\Attributes as OA;
-use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -44,7 +43,7 @@ final class PushSubscriptionController
     /**
      * Subscribe to browser push notifications.
      */
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/push/subscribe',
         summary: 'Subscribe to push notifications',
         requestBody: new OA\RequestBody(
@@ -52,32 +51,70 @@ final class PushSubscriptionController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
-                    required: ['endpoint', 'keys', 'contentEncoding'],
                     properties: [
-                        new OA\Property(property: 'endpoint', type: 'string'),
-                        new OA\Property(property: 'keys', properties: [
-                            new OA\Property(property: 'p256dh', type: 'string'),
-                            new OA\Property(property: 'auth', type: 'string'),
-                        ], type: 'object'),
-                        new OA\Property(property: 'contentEncoding', type: 'string', enum: ['aesgcm', 'aes128gcm']),
+                        'endpoint' => new OA\Schema(type: 'string'),
+                        'keys' => new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'p256dh' => new OA\Schema(type: 'string'),
+                                'auth' => new OA\Schema(type: 'string'),
+                            ],
+                        ),
+                        'contentEncoding' => new OA\Schema(
+                            type: 'string',
+                            enum: ['aesgcm', 'aes128gcm'],
+                        ),
                     ],
+                    required: ['endpoint', 'keys', 'contentEncoding'],
                 ),
             ),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Updated owned subscription', content: new OA\JsonContent(
-                required: ['status'],
-                properties: [new OA\Property(property: 'status', type: 'string', enum: ['subscribed'])],
-            )),
-            new OA\Response(response: '201', description: 'Subscribed', content: new OA\JsonContent(
-                required: ['status'],
-                properties: [new OA\Property(property: 'status', type: 'string', enum: ['subscribed'])],
-            )),
+            new OA\Response(
+                response: '200',
+                description: 'Updated owned subscription',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'status' => new OA\Schema(
+                                type: 'string',
+                                enum: ['subscribed'],
+                            ),
+                        ],
+                        required: ['status'],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '201',
+                description: 'Subscribed',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'status' => new OA\Schema(
+                                type: 'string',
+                                enum: ['subscribed'],
+                            ),
+                        ],
+                        required: ['status'],
+                    ),
+                ),
+            ),
             new OA\Response(response: '401', description: 'Authentication required'),
-            new OA\Response(response: '409', description: 'Subscription unavailable', content: new OA\JsonContent(
-                ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class),
-            )),
-            new OA\Response(response: '422', description: 'Invalid subscription', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '409',
+                description: 'Subscription unavailable',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid subscription',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/subscribe', name: 'subscribe', methods: ['POST'])]
@@ -125,7 +162,7 @@ final class PushSubscriptionController
     /**
      * Unsubscribe from push notifications by endpoint.
      */
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/push/subscribe',
         summary: 'Unsubscribe from push notifications',
         requestBody: new OA\RequestBody(
@@ -133,10 +170,10 @@ final class PushSubscriptionController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
-                    required: ['endpoint'],
                     properties: [
-                        new OA\Property(property: 'endpoint', type: 'string'),
+                        'endpoint' => new OA\Schema(type: 'string'),
                     ],
+                    required: ['endpoint'],
                 ),
             ),
         ),
@@ -169,7 +206,7 @@ final class PushSubscriptionController
     /**
      * Remove all push subscriptions for the authenticated user.
      */
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/push/subscriptions',
         summary: 'Remove all push subscriptions',
         responses: [

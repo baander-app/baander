@@ -6,7 +6,7 @@ namespace App\Auth\Interface\Controller\OAuth;
 
 use App\Auth\Application\Port\AccessTokenSigningKeyInterface;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -20,33 +20,41 @@ final class JwksController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/.well-known/jwks.json',
-        description: 'Returns the public signing keys used by the authorization server for JWT verification.',
         summary: 'JSON Web Key Set (RFC 7517)',
-        security: [],
+        description: 'Returns the public signing keys used by the authorization server for JWT verification.',
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'JSON Web Key Set',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'keys', type: 'array', items: new OA\Items(
-                            properties: [
-                                new OA\Property(property: 'kty', type: 'string', example: 'RSA'),
-                                new OA\Property(property: 'use', type: 'string', example: 'sig'),
-                                new OA\Property(property: 'alg', type: 'string', example: 'RS256'),
-                                new OA\Property(property: 'kid', description: 'The key\'s RFC 7638 thumbprint; access tokens name it in their header', type: 'string'),
-                                new OA\Property(property: 'n', description: 'Base64url-encoded modulus', type: 'string'),
-                                new OA\Property(property: 'e', description: 'Base64url-encoded exponent', type: 'string'),
-                            ],
-                            type: 'object',
-                        )),
-                    ],
-                    type: 'object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'keys' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(
+                                    type: 'object',
+                                    properties: [
+                                        'kty' => new OA\Schema(type: 'string', example: 'RSA'),
+                                        'use' => new OA\Schema(type: 'string', example: 'sig'),
+                                        'alg' => new OA\Schema(type: 'string', example: 'RS256'),
+                                        'kid' => new OA\Schema(
+                                            description: 'The key\'s RFC 7638 thumbprint; access tokens name it in their header',
+                                            type: 'string',
+                                        ),
+                                        'n' => new OA\Schema(description: 'Base64url-encoded modulus', type: 'string'),
+                                        'e' => new OA\Schema(description: 'Base64url-encoded exponent', type: 'string'),
+                                    ],
+                                ),
+                            ),
+                        ],
+                    ),
                 ),
             ),
         ],
+        security: [],
     )]
     #[Route('/.well-known/jwks.json', name: 'jwks', methods: ['GET'])]
     public function __invoke(): JsonResponse

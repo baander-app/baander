@@ -28,8 +28,7 @@ use App\Shared\Domain\Model\Email;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Request\QueryParameters;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -63,32 +62,84 @@ final class AdminUserController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/users',
         summary: 'List all users (paginated)',
         parameters: [
-            new OA\Parameter(name: 'role', description: 'Filter by role', in: 'query', schema: new OA\Schema(type: 'string', enum: ['ROLE_USER', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN'])),
-            new OA\Parameter(name: 'disabled', description: 'Filter by disabled status', in: 'query', schema: new OA\Schema(type: 'boolean')),
-            new OA\Parameter(name: 'limit', description: 'Results per page', in: 'query', schema: new OA\Schema(type: 'integer', default: 50, maximum: 100, minimum: 1)),
-            new OA\Parameter(name: 'offset', description: 'Result offset', in: 'query', schema: new OA\Schema(type: 'integer', default: 0, minimum: 0)),
+            new OA\Parameter(
+                name: 'role',
+                in: 'query',
+                description: 'Filter by role',
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['ROLE_USER', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN'],
+                ),
+            ),
+            new OA\Parameter(
+                name: 'disabled',
+                in: 'query',
+                description: 'Filter by disabled status',
+                schema: new OA\Schema(type: 'boolean'),
+            ),
+            new OA\Parameter(
+                name: 'limit',
+                in: 'query',
+                description: 'Results per page',
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 1,
+                    maximum: 100,
+                    default: 50,
+                ),
+            ),
+            new OA\Parameter(
+                name: 'offset',
+                in: 'query',
+                description: 'Result offset',
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 0,
+                    default: 0,
+                ),
+            ),
         ],
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Paginated user list',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: AdminUserResource::class))),
-                        new OA\Property(property: 'meta', properties: [
-                            new OA\Property(property: 'total', type: 'integer'),
-                            new OA\Property(property: 'limit', type: 'integer'),
-                            new OA\Property(property: 'offset', type: 'integer'),
-                        ], type: 'object'),
-                    ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(ref: AdminUserResource::class),
+                            ),
+                            'meta' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'total' => new OA\Schema(type: 'integer'),
+                                    'limit' => new OA\Schema(type: 'integer'),
+                                    'offset' => new OA\Schema(type: 'integer'),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '400', description: 'Invalid query parameters', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Forbidden; admins need the admin.can_view_users setting', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid query parameters',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden; admins need the admin.can_view_users setting',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('', name: 'list', methods: ['GET'])]
@@ -113,20 +164,49 @@ final class AdminUserController
         ]);
     }
 
-    #[OA\Post(path: '/api/admin/users', description: 'Super admins may create any user. Admins may create users with ROLE_USER only, and only while the admin.can_create_users setting is on.', summary: 'Create a new user', requestBody: new OA\RequestBody(
-        required: true,
-        content: new OA\JsonContent(ref: new Model(type: AdminCreateUserRequest::class)),
-    ), responses: [
-        new OA\Response(response: '201', description: 'User created', content: new OA\JsonContent(properties: [
-            new OA\Property(property: 'data', ref: new Model(type: AdminUserResource::class)),
-        ])),
-        new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
-    ])]
+    #[OA\Operation\Post(
+        path: '/api/admin/users',
+        summary: 'Create a new user',
+        description: 'Super admins may create any user. Admins may create users with ROLE_USER only, and only while the admin.can_create_users setting is on.',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: AdminCreateUserRequest::class),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: '201',
+                description: 'User created',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: AdminUserResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
+        ],
+    )]
     #[Route('', name: 'create', methods: ['POST'])]
     #[CliCounterpart('app:user:create')]
     public function create(
-        #[MapRequestPayload] AdminCreateUserRequest $request,
+        #[MapRequestPayload]
+        AdminCreateUserRequest $request,
     ): JsonResponse {
         // Checked here rather than with #[IsGranted]: the vote needs the requested roles,
         // and the payload is mapped only after #[IsGranted] subjects are resolved.
@@ -151,18 +231,58 @@ final class AdminUserController
         return $this->successResponse(AdminUserResource::from($user), Response::HTTP_CREATED);
     }
 
-    #[OA\Patch(path: '/api/admin/users/{publicId}', description: 'A new email address takes effect at once, counts as verified and replaces a change the user had pending; the previous address is told of the change. The CLI counterparts are app:user:rename and app:user:change-email.', summary: 'Update a user', requestBody: new OA\RequestBody(
-        required: true,
-        content: new OA\JsonContent(ref: new Model(type: AdminUpdateUserRequest::class)),
-    ), responses: [
-        new OA\Response(response: '200', description: 'User updated', content: new OA\JsonContent(properties: [
-            new OA\Property(property: 'data', ref: new Model(type: AdminUserResource::class)),
-        ])),
-        new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(response: '403', description: 'The request changes the signed-in administrator\'s own email address', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(response: '409', description: 'Email already taken', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
-    ])]
+    #[OA\Operation\Patch(
+        path: '/api/admin/users/{publicId}',
+        summary: 'Update a user',
+        description: 'A new email address takes effect at once, counts as verified and replaces a change the user had pending; the previous address is told of the change. The CLI counterparts are app:user:rename and app:user:change-email.',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: AdminUpdateUserRequest::class),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'User updated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: AdminUserResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'User not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'The request changes the signed-in administrator\'s own email address',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Email already taken',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
+        ],
+    )]
     #[Route('/{publicId}', name: 'update', methods: ['PATCH'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:user:rename')]
@@ -188,12 +308,18 @@ final class AdminUserController
         return $this->successResponse(AdminUserResource::from($user ?? $this->userLookup->byIdentifier($publicId)));
     }
 
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/admin/users/{publicId}',
         summary: 'Delete a user',
         responses: [
             new OA\Response(response: '204', description: 'User deleted'),
-            new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'User not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'delete', methods: ['DELETE'])]
@@ -207,19 +333,41 @@ final class AdminUserController
         return $this->noContent();
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/admin/users/{publicId}/roles',
         summary: 'Assign roles to a user',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(ref: new Model(type: AdminAssignRolesRequest::class)),
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: AdminAssignRolesRequest::class),
+            ),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Roles assigned', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', ref: new Model(type: AdminUserResource::class)),
-            ])),
-            new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Roles assigned',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: AdminUserResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'User not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}/roles', name: 'assign_roles', methods: ['POST'])]
@@ -233,18 +381,49 @@ final class AdminUserController
         return $this->successResponse(AdminUserResource::from($user));
     }
 
-    #[OA\Post(path: '/api/admin/users/{publicId}/reset-password', description: 'Sets the password and signs the user out of every session.', summary: 'Reset a user password', requestBody: new OA\RequestBody(
-        required: true,
-        content: new OA\JsonContent(ref: new Model(type: AdminResetPasswordRequest::class)),
-    ), responses: [
-        new OA\Response(response: '200', description: 'Password reset', content: new OA\JsonContent(properties: [
-            new OA\Property(property: 'data', properties: [
-                new OA\Property(property: 'message', type: 'string'),
-            ], type: 'object'),
-        ])),
-        new OA\Response(response: '403', description: 'The target is the signed-in administrator', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-    ])]
+    #[OA\Operation\Post(
+        path: '/api/admin/users/{publicId}/reset-password',
+        summary: 'Reset a user password',
+        description: 'Sets the password and signs the user out of every session.',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: AdminResetPasswordRequest::class),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'Password reset',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'message' => new OA\Schema(type: 'string'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'The target is the signed-in administrator',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'User not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+        ],
+    )]
     #[Route('/{publicId}/reset-password', name: 'reset_password', methods: ['POST'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:user:reset-password')]
@@ -260,14 +439,45 @@ final class AdminUserController
         return $this->successResponse(['message' => 'Password reset successfully.']);
     }
 
-    #[OA\Post(path: '/api/admin/users/{publicId}/reset-totp', description: 'Removes the stored TOTP secret without reading it and signs the user out of every session, so they sign in with their password alone.', summary: 'Turn off a user\'s TOTP', responses: [
-        new OA\Response(response: '200', description: 'TOTP is off', content: new OA\JsonContent(properties: [
-            new OA\Property(property: 'data', ref: new Model(type: AdminUserResource::class)),
-        ])),
-        new OA\Response(response: '403', description: 'The target is the signed-in administrator', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(response: '409', description: 'The user has no TOTP to reset', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-    ])]
+    #[OA\Operation\Post(
+        path: '/api/admin/users/{publicId}/reset-totp',
+        summary: 'Turn off a user\'s TOTP',
+        description: 'Removes the stored TOTP secret without reading it and signs the user out of every session, so they sign in with their password alone.',
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'TOTP is off',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: AdminUserResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'The target is the signed-in administrator',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'User not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'The user has no TOTP to reset',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+        ],
+    )]
     #[Route('/{publicId}/reset-totp', name: 'reset_totp', methods: ['POST'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:user:reset-totp')]
@@ -284,12 +494,31 @@ final class AdminUserController
         return $this->successResponse(AdminUserResource::from($user));
     }
 
-    #[OA\Post(path: '/api/admin/users/{publicId}/verify-email', description: 'Marks the current address verified, as redeeming its verification link would; a verified address stays as it is. A pending email change is left alone. The CLI counterpart is app:user:mark-email-verified.', summary: 'Mark a user\'s email address verified', responses: [
-        new OA\Response(response: '200', description: 'The address is verified', content: new OA\JsonContent(properties: [
-            new OA\Property(property: 'data', ref: new Model(type: AdminUserResource::class)),
-        ])),
-        new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-    ])]
+    #[OA\Operation\Post(
+        path: '/api/admin/users/{publicId}/verify-email',
+        summary: 'Mark a user\'s email address verified',
+        description: 'Marks the current address verified, as redeeming its verification link would; a verified address stays as it is. A pending email change is left alone. The CLI counterpart is app:user:mark-email-verified.',
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'The address is verified',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: AdminUserResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'User not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+        ],
+    )]
     #[Route('/{publicId}/verify-email', name: 'verify_email', methods: ['POST'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:user:mark-email-verified')]
@@ -301,14 +530,28 @@ final class AdminUserController
         return $this->successResponse(AdminUserResource::from($user));
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/admin/users/{publicId}/disable',
         summary: 'Disable a user',
         responses: [
-            new OA\Response(response: '200', description: 'User disabled', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', ref: new Model(type: AdminUserResource::class)),
-            ])),
-            new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'User disabled',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: AdminUserResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'User not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}/disable', name: 'disable', methods: ['POST'])]
@@ -324,14 +567,28 @@ final class AdminUserController
         return $this->successResponse(AdminUserResource::from($user));
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/admin/users/{publicId}/enable',
         summary: 'Enable a user',
         responses: [
-            new OA\Response(response: '200', description: 'User enabled', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', ref: new Model(type: AdminUserResource::class)),
-            ])),
-            new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'User enabled',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: AdminUserResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'User not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}/enable', name: 'enable', methods: ['POST'])]

@@ -12,8 +12,7 @@ use App\Media\Interface\Resource\ImageResource;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use Baander\ImageProcessing\BlurHash\BlurHashGenerator;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -39,21 +38,51 @@ final class ImageController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/images/{publicId}',
         summary: 'Get image metadata by public ID',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Image public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21), example: 'aB3dE5fG7hJ9kL1mN3pQr'),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Image public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+                example: 'aB3dE5fG7hJ9kL1mN3pQr',
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Image metadata',
-                headers: [new OA\Header(header: 'Cache-Control', description: 'Private response; storage and caching prohibited', schema: new OA\Schema(type: 'string', example: 'private, no-store'))],
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', ref: new Model(type: ImageResource::class))],
-                    type: 'object',
+            new OA\Response(
+                response: '200',
+                description: 'Image metadata',
+                headers: [
+                    new OA\Header(
+                        header: 'Cache-Control',
+                        description: 'Private response; storage and caching prohibited',
+                        schema: new OA\Schema(type: 'string', example: 'private, no-store'),
+                    ),
+                ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: ImageResource::class),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '404', description: 'Image not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Image not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'show', methods: ['GET'])]
@@ -77,22 +106,63 @@ final class ImageController
         return $response;
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/images/{publicId}/file',
         summary: 'Serve the image file binary data',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Image public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21), example: 'aB3dE5fG7hJ9kL1mN3pQr'),
-            new OA\Parameter(name: 'preset', description: 'Image size preset', in: 'query', required: false, schema: new OA\Schema(type: 'string', enum: ['thumb', 'small', 'medium', 'large'])),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Image public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+                example: 'aB3dE5fG7hJ9kL1mN3pQr',
+            ),
+            new OA\Parameter(
+                name: 'preset',
+                in: 'query',
+                description: 'Image size preset',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['thumb', 'small', 'medium', 'large'],
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Image file binary data',
+            new OA\Response(
+                response: '200',
+                description: 'Image file binary data',
                 headers: [
-                    new OA\Header(header: 'Content-Type', description: 'MIME type of the image (e.g. image/jpeg, image/webp)', schema: new OA\Schema(type: 'string')),
-                    new OA\Header(header: 'Content-Length', description: 'File size in bytes', schema: new OA\Schema(type: 'integer')),
-                    new OA\Header(header: 'Cache-Control', description: 'Private response; storage and caching prohibited', schema: new OA\Schema(type: 'string', example: 'private, no-store')),
+                    new OA\Header(
+                        header: 'Content-Type',
+                        description: 'MIME type of the image (e.g. image/jpeg, image/webp)',
+                        schema: new OA\Schema(type: 'string'),
+                    ),
+                    new OA\Header(
+                        header: 'Content-Length',
+                        description: 'File size in bytes',
+                        schema: new OA\Schema(type: 'integer'),
+                    ),
+                    new OA\Header(
+                        header: 'Cache-Control',
+                        description: 'Private response; storage and caching prohibited',
+                        schema: new OA\Schema(type: 'string', example: 'private, no-store'),
+                    ),
                 ],
             ),
-            new OA\Response(response: '404', description: 'Image or image file not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Image or image file not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}/file', name: 'file', methods: ['GET'])]
@@ -159,25 +229,71 @@ final class ImageController
         }
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/images/{publicId}/blurhash',
         summary: 'Get the blurhash representation of an image',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Image public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21), example: 'aB3dE5fG7hJ9kL1mN3pQr'),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Image public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+                example: 'aB3dE5fG7hJ9kL1mN3pQr',
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Blurhash string with dimensions',
-                headers: [new OA\Header(header: 'Cache-Control', description: 'Private response; storage and caching prohibited', schema: new OA\Schema(type: 'string', example: 'private, no-store'))],
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'blurhash', description: 'Blurhash string, or null if not computed', type: 'string', example: 'LKO2:N%2Tw=w]~RBVZRi};RPxuwH', nullable: true),
-                        new OA\Property(property: 'width', description: 'Original image width in pixels', type: 'integer', nullable: true),
-                        new OA\Property(property: 'height', description: 'Original image height in pixels', type: 'integer', nullable: true),
-                    ], type: 'object')],
-                    type: 'object',
+            new OA\Response(
+                response: '200',
+                description: 'Blurhash string with dimensions',
+                headers: [
+                    new OA\Header(
+                        header: 'Cache-Control',
+                        description: 'Private response; storage and caching prohibited',
+                        schema: new OA\Schema(type: 'string', example: 'private, no-store'),
+                    ),
+                ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'blurhash' => new OA\Schema(
+                                        description: 'Blurhash string, or null if not computed',
+                                        type: 'string',
+                                        nullable: true,
+                                        example: 'LKO2:N%2Tw=w]~RBVZRi};RPxuwH',
+                                    ),
+                                    'width' => new OA\Schema(
+                                        description: 'Original image width in pixels',
+                                        type: 'integer',
+                                        nullable: true,
+                                    ),
+                                    'height' => new OA\Schema(
+                                        description: 'Original image height in pixels',
+                                        type: 'integer',
+                                        nullable: true,
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '404', description: 'Image not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Image not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}/blurhash', name: 'blurhash', methods: ['GET'])]

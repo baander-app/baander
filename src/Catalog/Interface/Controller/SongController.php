@@ -26,15 +26,17 @@ use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\DTO\CursorPaginatedResponse;
 use App\Shared\Interface\Exception\InvalidQueryParameter;
 use App\Shared\Interface\Request\QueryParameters;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
-#[OA\Tag(name: 'Catalog', description: 'Album, artist, song, movie, and genre management endpoints')]
+#[OA\Tag(
+    name: 'Catalog',
+    description: 'Album, artist, song, movie, and genre management endpoints',
+)]
 #[Route('/api/songs', name: 'song_')]
 #[\Symfony\Component\Security\Http\Attribute\IsGranted('ROLE_ADMIN', methods: ['POST', 'PUT', 'PATCH', 'DELETE'])]
 final class SongController
@@ -54,23 +56,98 @@ final class SongController
     /**
      * List/search songs (cursor-paginated).
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/songs/',
         summary: 'List songs (cursor-paginated)',
         parameters: [
-            new OA\Parameter(name: 'cursor', description: 'Cursor for pagination (base64-encoded)', in: 'query', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'limit', description: 'Items per page (max 100)', in: 'query', schema: new OA\Schema(type: 'integer', default: 50)),
-            new OA\Parameter(name: 'q', description: 'Search query', in: 'query', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'genres', description: 'Comma-separated genre slugs to filter by', in: 'query', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'artistId', description: 'Filter by artist public ID', in: 'query', schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
-            new OA\Parameter(name: 'albumId', description: 'Filter by album public ID', in: 'query', schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
-            new OA\Parameter(name: 'publicIds', description: 'Comma-separated public IDs to filter by', in: 'query', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'sort', description: 'Sort field. A cursor is valid only with the sort and order that issued it.', in: 'query', schema: new OA\Schema(type: 'string', default: 'title', enum: ['title', 'artist', 'album', 'year', 'added'])),
-            new OA\Parameter(name: 'order', description: 'Sort order', in: 'query', schema: new OA\Schema(type: 'string', default: 'asc', enum: ['asc', 'desc'])),
+            new OA\Parameter(
+                name: 'cursor',
+                in: 'query',
+                description: 'Cursor for pagination (base64-encoded)',
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'limit',
+                in: 'query',
+                description: 'Items per page (max 100)',
+                schema: new OA\Schema(type: 'integer', default: 50),
+            ),
+            new OA\Parameter(
+                name: 'q',
+                in: 'query',
+                description: 'Search query',
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'genres',
+                in: 'query',
+                description: 'Comma-separated genre slugs to filter by',
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'artistId',
+                in: 'query',
+                description: 'Filter by artist public ID',
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
+            new OA\Parameter(
+                name: 'albumId',
+                in: 'query',
+                description: 'Filter by album public ID',
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
+            new OA\Parameter(
+                name: 'publicIds',
+                in: 'query',
+                description: 'Comma-separated public IDs to filter by',
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'sort',
+                in: 'query',
+                description: 'Sort field. A cursor is valid only with the sort and order that issued it.',
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['title', 'artist', 'album', 'year', 'added'],
+                    default: 'title',
+                ),
+            ),
+            new OA\Parameter(
+                name: 'order',
+                in: 'query',
+                description: 'Sort order',
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['asc', 'desc'],
+                    default: 'asc',
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Cursor-paginated list of songs', content: new OA\JsonContent(ref: new Model(type: CursorPaginatedResponse::class))),
-            new OA\Response(response: '400', description: 'Unsupported sort field or order, or a cursor issued for another sort field or order', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Cursor-paginated list of songs',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: CursorPaginatedResponse::class),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'Unsupported sort field or order, or a cursor issued for another sort field or order',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
@@ -107,18 +184,43 @@ final class SongController
     /**
      * Get a single song.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/songs/{publicId}',
         summary: 'Get a single song',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Song public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Song public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Song details', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', ref: new Model(type: SongResource::class))],
-                type: 'object',
-            )),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Song details',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: SongResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'show', methods: ['GET'])]
@@ -146,28 +248,65 @@ final class SongController
     /**
      * Update a song.
      */
-    #[OA\Patch(
+    #[OA\Operation\Patch(
         path: '/api/songs/{publicId}',
         summary: 'Update a song',
-        requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'title', type: 'string', nullable: true),
-                new OA\Property(property: 'track', type: 'integer', nullable: true),
-                new OA\Property(property: 'disc', type: 'integer', nullable: true),
-                new OA\Property(property: 'year', type: 'integer', nullable: true),
-                new OA\Property(property: 'comment', type: 'string', nullable: true),
-                new OA\Property(property: 'lyrics', type: 'string', nullable: true),
-                new OA\Property(property: 'explicit', type: 'boolean', nullable: true),
-            ])),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Song public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Song public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
+        requestBody: new OA\RequestBody(
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'title' => new OA\Schema(type: 'string', nullable: true),
+                        'track' => new OA\Schema(type: 'integer', nullable: true),
+                        'disc' => new OA\Schema(type: 'integer', nullable: true),
+                        'year' => new OA\Schema(type: 'integer', nullable: true),
+                        'comment' => new OA\Schema(type: 'string', nullable: true),
+                        'lyrics' => new OA\Schema(type: 'string', nullable: true),
+                        'explicit' => new OA\Schema(type: 'boolean', nullable: true),
+                    ],
+                ),
+            ),
+        ),
         responses: [
-            new OA\Response(response: '200', description: 'Song updated', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', ref: new Model(type: SongResource::class))],
-                type: 'object',
-            )),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Song updated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: SongResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'update', methods: ['PATCH'])]
@@ -196,23 +335,50 @@ final class SongController
     /**
      * Delete a song.
      */
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/songs/{publicId}',
         summary: 'Delete a song',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Song public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Song public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Deleted',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', ref: new Model(type: CatalogDeletionResource::class))],
-                    type: 'object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: CatalogDeletionResource::class),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid public ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid public ID',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'destroy', methods: ['DELETE'])]

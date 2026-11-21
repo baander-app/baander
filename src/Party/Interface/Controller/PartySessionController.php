@@ -22,8 +22,7 @@ use App\Party\Interface\Request\CreatePartySessionRequest;
 use App\Party\Interface\Request\SyncPlaybackRequest;
 use App\Party\Interface\Resource\PartyMemberResource;
 use App\Party\Interface\Resource\PartySessionResource;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
@@ -59,20 +58,42 @@ final class PartySessionController
         return $stamp?->getResult();
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/party/sessions/',
         summary: 'Create a new watch party session',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\MediaType(
                 mediaType: 'application/json',
-                schema: new OA\Schema(ref: new Model(type: CreatePartySessionRequest::class)),
+                schema: new OA\Schema(ref: CreatePartySessionRequest::class),
             ),
         ),
         responses: [
-            new OA\Response(response: '201', description: 'Created', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', ref: new Model(type: PartySessionResource::class))])),
-            new OA\Response(response: '404', description: 'The video or transcode job does not exist, or the user may not play its video', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error, including a transcode job of another video', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '201',
+                description: 'Created',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: PartySessionResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'The video or transcode job does not exist, or the user may not play its video',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error, including a transcode job of another video',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'create', methods: ['POST'])]
@@ -105,13 +126,41 @@ final class PartySessionController
         return $this->created(['data' => PartySessionResource::from($this->identities->session($this->unwrapResult($envelope)))]);
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/party/sessions/',
-        description: 'Lists only the active parties the caller hosts or has joined. A party\'s host invites the users who may join it; an invited user finds the party here once they have joined.',
         summary: 'List the caller\'s active party sessions',
+        description: 'Lists only the active parties the caller hosts or has joined. A party\'s host invites the users who may join it; an invited user finds the party here once they have joined.',
         responses: [
-            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)]))])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Success',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(
+                                    properties: [
+                                        'publicId' => new OA\Schema(
+                                            type: 'string',
+                                            minLength: 21,
+                                            maxLength: 21,
+                                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                                        ),
+                                    ],
+                                ),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
@@ -122,17 +171,71 @@ final class PartySessionController
         return $this->successResponse(PartySessionResource::collection(array_map($this->identities->session(...), $sessions)));
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/party/sessions/{publicId}',
-        description: 'Returns the session and its members to the session\'s host and members only. Live updates arrive over the application WebSocket: request a single-use ticket from `POST /api/ws/tickets`, upgrade at `/api/ws`, then send `party.join` with the session public ID as `sessionId` to enter its room.',
         summary: 'Get a party session',
+        description: 'Returns the session and its members to the session\'s host and members only. Live updates arrive over the application WebSocket: request a single-use ticket from `POST /api/ws/tickets`, upgrade at `/api/ws`, then send `party.join` with the session public ID as `sessionId` to enter its room.',
         parameters: [
-            new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21), new OA\Property(property: 'members', type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)]))])])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'The session does not exist, or the caller is neither its host nor a member', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Success',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                properties: [
+                                    'publicId' => new OA\Schema(
+                                        type: 'string',
+                                        minLength: 21,
+                                        maxLength: 21,
+                                        pattern: '^[0-9a-zA-Z_-]{21}$',
+                                    ),
+                                    'members' => new OA\Schema(
+                                        type: 'array',
+                                        items: new OA\Schema(
+                                            properties: [
+                                                'publicId' => new OA\Schema(
+                                                    type: 'string',
+                                                    minLength: 21,
+                                                    maxLength: 21,
+                                                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                                                ),
+                                            ],
+                                        ),
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'The session does not exist, or the caller is neither its host nor a member',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'show', methods: ['GET'])]
@@ -151,18 +254,65 @@ final class PartySessionController
         ));
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/party/sessions/{publicId}/join',
-        description: 'Only a member of the session and a user its host has invited may join. A member who joins again keeps their place, also when the session is full. Every other caller gets the answer an unknown session gets.',
         summary: 'Join a party session',
+        description: 'Only a member of the session and a user its host has invited may join. A member who joins again keeps their place, also when the session is full. Every other caller gets the answer an unknown session gets.',
         parameters: [
-            new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Joined', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)])])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'The session does not exist, or the caller is neither a member of it nor invited to it', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '409', description: 'The session has ended, or it is full and the caller is not a member of it yet', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Joined',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                properties: [
+                                    'publicId' => new OA\Schema(
+                                        type: 'string',
+                                        minLength: 21,
+                                        maxLength: 21,
+                                        pattern: '^[0-9a-zA-Z_-]{21}$',
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'The session does not exist, or the caller is neither a member of it nor invited to it',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'The session has ended, or it is full and the caller is not a member of it yet',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}/join', name: 'join', methods: ['POST'])]
@@ -181,15 +331,46 @@ final class PartySessionController
         return $this->successResponse(PartyMemberResource::from($this->identities->member($member)));
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/party/sessions/{publicId}/leave',
         summary: 'Leave a party session',
         parameters: [
-            new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Left', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'message', type: 'string')], type: 'object')])),
-            new OA\Response(response: '404', description: 'The session does not exist, or the caller is neither its host nor a member', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Left',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'message' => new OA\Schema(type: 'string'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'The session does not exist, or the caller is neither its host nor a member',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}/leave', name: 'leave', methods: ['POST'])]
@@ -208,15 +389,46 @@ final class PartySessionController
         return $this->successResponse(['message' => 'Left session.']);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/party/sessions/{publicId}/sync',
         summary: 'Synchronize playback position',
         parameters: [
-            new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Synced position', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'serverPosition', type: 'number')], type: 'object')])),
-            new OA\Response(response: '404', description: 'The session does not exist, or the caller is neither its host nor a member', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Synced position',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'serverPosition' => new OA\Schema(type: 'number'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'The session does not exist, or the caller is neither its host nor a member',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}/sync', name: 'sync', methods: ['POST'])]
@@ -237,16 +449,53 @@ final class PartySessionController
         return $this->successResponse(['serverPosition' => $position]);
     }
 
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/party/sessions/{publicId}',
         summary: 'End a party session (host only)',
         parameters: [
-            new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Ended', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'message', type: 'string')], type: 'object')])),
-            new OA\Response(response: '403', description: 'The caller is a member of the session but not its host', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'The session does not exist, or the caller is neither its host nor a member', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Ended',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'message' => new OA\Schema(type: 'string'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'The caller is a member of the session but not its host',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'The session does not exist, or the caller is neither its host nor a member',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'end', methods: ['DELETE'])]

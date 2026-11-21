@@ -9,8 +9,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\UserPreference\Application\Port\ThemeMoodPortInterface;
 use App\UserPreference\Interface\Request\UpdateThemeMoodRequest;
-use OpenApi\Attributes as OA;
-use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -35,13 +34,29 @@ final class ThemeMoodController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/user/theme-mood/',
-        description: 'Returns the current theme mood for the authenticated user.',
         summary: 'Get theme mood',
+        description: 'Returns the current theme mood for the authenticated user.',
         responses: [
-            new OA\Response(response: '200', description: 'Theme mood', content: new OA\JsonContent(properties: [new OA\Property(property: 'mood', type: 'string')])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Theme mood',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'mood' => new OA\Schema(type: 'string'),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
@@ -57,7 +72,7 @@ final class ThemeMoodController
         ]);
     }
 
-    #[OA\Put(
+    #[OA\Operation\Put(
         path: '/api/user/theme-mood/',
         summary: 'Update theme mood',
         requestBody: new OA\RequestBody(
@@ -65,17 +80,39 @@ final class ThemeMoodController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
-                    required: ['mood'],
                     properties: [
-                        new OA\Property(property: 'mood', type: 'string'),
+                        'mood' => new OA\Schema(type: 'string'),
                     ],
+                    required: ['mood'],
                 ),
             ),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Mood updated', content: new OA\JsonContent(properties: [new OA\Property(property: 'mood', type: 'string')])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid input', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Mood updated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'mood' => new OA\Schema(type: 'string'),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid input',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'update', methods: ['PUT'])]

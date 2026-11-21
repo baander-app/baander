@@ -9,8 +9,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\UserPreference\Application\Port\SidebarConfigPortInterface;
 use App\UserPreference\Interface\Request\UpdateSidebarSectionsRequest;
-use OpenApi\Attributes as OA;
-use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -37,31 +36,64 @@ final class SidebarConfigController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/user/sidebar-config/{mediaType}',
-        description: 'Returns the sidebar configuration for the authenticated user and given media type. Returns defaults if no custom config exists.',
         summary: 'Get sidebar configuration for a media type',
+        description: 'Returns the sidebar configuration for the authenticated user and given media type. Returns defaults if no custom config exists.',
         responses: [
-            new OA\Response(response: '200', description: 'Sidebar configuration', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', properties: [
-                    new OA\Property(property: 'mediaType', type: 'string'),
-                    new OA\Property(property: 'sections', type: 'array', items: new OA\Items(properties: [
-                        new OA\Property(property: 'id', type: 'string'),
-                        new OA\Property(property: 'label', type: 'string'),
-                        new OA\Property(property: 'type', type: 'string'),
-                        new OA\Property(property: 'items', type: 'array', items: new OA\Items(properties: [
-                            new OA\Property(property: 'id', type: 'string'),
-                            new OA\Property(property: 'type', type: 'string'),
-                            new OA\Property(property: 'label', type: 'string'),
-                            new OA\Property(property: 'icon', type: 'string'),
-                            new OA\Property(property: 'config', type: 'object'),
-                        ])),
-                    ])),
-                    new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time'),
-                ], type: 'object'),
-            ])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid media type', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Sidebar configuration',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'mediaType' => new OA\Schema(type: 'string'),
+                                    'sections' => new OA\Schema(
+                                        type: 'array',
+                                        items: new OA\Schema(
+                                            properties: [
+                                                'id' => new OA\Schema(type: 'string'),
+                                                'label' => new OA\Schema(type: 'string'),
+                                                'type' => new OA\Schema(type: 'string'),
+                                                'items' => new OA\Schema(
+                                                    type: 'array',
+                                                    items: new OA\Schema(
+                                                        properties: [
+                                                            'id' => new OA\Schema(type: 'string'),
+                                                            'type' => new OA\Schema(type: 'string'),
+                                                            'label' => new OA\Schema(type: 'string'),
+                                                            'icon' => new OA\Schema(type: 'string'),
+                                                            'config' => new OA\Schema(type: 'object'),
+                                                        ],
+                                                    ),
+                                                ),
+                                            ],
+                                        ),
+                                    ),
+                                    'updatedAt' => new OA\Schema(type: 'string', format: 'date-time'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid media type',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{mediaType}', name: 'get', methods: ['GET'])]
@@ -82,7 +114,7 @@ final class SidebarConfigController
         return $this->successResponse($this->buildSectionsResponse($config, $mediaType));
     }
 
-    #[OA\Put(
+    #[OA\Operation\Put(
         path: '/api/user/sidebar-config/{mediaType}',
         summary: 'Update sidebar configuration for a media type',
         requestBody: new OA\RequestBody(
@@ -90,26 +122,23 @@ final class SidebarConfigController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
-                    required: ['sections'],
                     properties: [
-                        new OA\Property(
-                            property: 'sections',
+                        'sections' => new OA\Schema(
                             type: 'array',
-                            items: new OA\Items(
+                            items: new OA\Schema(
                                 properties: [
-                                    new OA\Property(property: 'id', type: 'string'),
-                                    new OA\Property(property: 'label', type: 'string'),
-                                    new OA\Property(property: 'type', type: 'string'),
-                                    new OA\Property(
-                                        property: 'items',
+                                    'id' => new OA\Schema(type: 'string'),
+                                    'label' => new OA\Schema(type: 'string'),
+                                    'type' => new OA\Schema(type: 'string'),
+                                    'items' => new OA\Schema(
                                         type: 'array',
-                                        items: new OA\Items(
+                                        items: new OA\Schema(
                                             properties: [
-                                                new OA\Property(property: 'id', type: 'string'),
-                                                new OA\Property(property: 'type', type: 'string'),
-                                                new OA\Property(property: 'label', type: 'string'),
-                                                new OA\Property(property: 'icon', type: 'string'),
-                                                new OA\Property(property: 'config', type: 'object'),
+                                                'id' => new OA\Schema(type: 'string'),
+                                                'type' => new OA\Schema(type: 'string'),
+                                                'label' => new OA\Schema(type: 'string'),
+                                                'icon' => new OA\Schema(type: 'string'),
+                                                'config' => new OA\Schema(type: 'object'),
                                             ],
                                         ),
                                     ),
@@ -117,30 +146,64 @@ final class SidebarConfigController
                             ),
                         ),
                     ],
+                    required: ['sections'],
                 ),
             ),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Configuration updated', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', properties: [
-                    new OA\Property(property: 'mediaType', type: 'string'),
-                    new OA\Property(property: 'sections', type: 'array', items: new OA\Items(properties: [
-                        new OA\Property(property: 'id', type: 'string'),
-                        new OA\Property(property: 'label', type: 'string'),
-                        new OA\Property(property: 'type', type: 'string'),
-                        new OA\Property(property: 'items', type: 'array', items: new OA\Items(properties: [
-                            new OA\Property(property: 'id', type: 'string'),
-                            new OA\Property(property: 'type', type: 'string'),
-                            new OA\Property(property: 'label', type: 'string'),
-                            new OA\Property(property: 'icon', type: 'string'),
-                            new OA\Property(property: 'config', type: 'object'),
-                        ])),
-                    ])),
-                    new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time'),
-                ], type: 'object'),
-            ])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid input', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Configuration updated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'mediaType' => new OA\Schema(type: 'string'),
+                                    'sections' => new OA\Schema(
+                                        type: 'array',
+                                        items: new OA\Schema(
+                                            properties: [
+                                                'id' => new OA\Schema(type: 'string'),
+                                                'label' => new OA\Schema(type: 'string'),
+                                                'type' => new OA\Schema(type: 'string'),
+                                                'items' => new OA\Schema(
+                                                    type: 'array',
+                                                    items: new OA\Schema(
+                                                        properties: [
+                                                            'id' => new OA\Schema(type: 'string'),
+                                                            'type' => new OA\Schema(type: 'string'),
+                                                            'label' => new OA\Schema(type: 'string'),
+                                                            'icon' => new OA\Schema(type: 'string'),
+                                                            'config' => new OA\Schema(type: 'object'),
+                                                        ],
+                                                    ),
+                                                ),
+                                            ],
+                                        ),
+                                    ),
+                                    'updatedAt' => new OA\Schema(type: 'string', format: 'date-time'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid input',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{mediaType}', name: 'update', methods: ['PUT'])]
@@ -169,13 +232,25 @@ final class SidebarConfigController
         return $this->successResponse($this->buildSectionsResponse($config, $mediaType));
     }
 
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/user/sidebar-config/{mediaType}',
         summary: 'Reset sidebar configuration to defaults for a media type',
         responses: [
             new OA\Response(response: '204', description: 'Configuration reset'),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid media type', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid media type',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{mediaType}', name: 'delete', methods: ['DELETE'])]

@@ -13,8 +13,7 @@ use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\DispatchesMessagesTrait;
 use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\ValidationError;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -34,26 +33,71 @@ final class AdminAlbumController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/albums/{publicId}/delete-preview',
         summary: 'Preview what will be deleted when deleting an album',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
-            new OA\Parameter(name: 'deleteFiles', description: 'Also check each song file as a delete with deleteFiles would', in: 'query', required: false, schema: new OA\Schema(type: 'boolean')),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Album public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
+            new OA\Parameter(
+                name: 'deleteFiles',
+                in: 'query',
+                description: 'Also check each song file as a delete with deleteFiles would',
+                required: false,
+                schema: new OA\Schema(type: 'boolean'),
+            ),
         ],
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Delete preview data',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', ref: new Model(type: AlbumDeletePreviewResource::class))],
-                    type: 'object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: AlbumDeletePreviewResource::class),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '404', description: 'Album not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid public ID', content: new OA\JsonContent(ref: new Model(type: ValidationError::class))),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Album not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid public ID',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}/delete-preview', name: 'delete_preview', methods: ['GET'])]
@@ -68,28 +112,85 @@ final class AdminAlbumController
         return $this->successResponse(AlbumDeletePreviewResource::from($preview));
     }
 
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/admin/albums/{publicId}',
         summary: 'Delete an album with optional file deletion',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
-            new OA\Parameter(name: 'deleteFiles', description: 'Also delete the song audio files, inside the library root only', in: 'query', required: false, schema: new OA\Schema(type: 'boolean')),
-            new OA\Parameter(name: 'deleteCover', description: 'Whether to delete cover image (default: true)', in: 'query', required: false, schema: new OA\Schema(type: 'boolean')),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Album public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
+            new OA\Parameter(
+                name: 'deleteFiles',
+                in: 'query',
+                description: 'Also delete the song audio files, inside the library root only',
+                required: false,
+                schema: new OA\Schema(type: 'boolean'),
+            ),
+            new OA\Parameter(
+                name: 'deleteCover',
+                in: 'query',
+                description: 'Whether to delete cover image (default: true)',
+                required: false,
+                schema: new OA\Schema(type: 'boolean'),
+            ),
         ],
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Album deleted; with deleteFiles, the files removed and left',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', ref: new Model(type: CatalogDeletionResource::class))],
-                    type: 'object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: CatalogDeletionResource::class),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '404', description: 'Album not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '409', description: 'With deleteFiles: a scan holds the library, or the server cannot write a song directory; nothing was deleted', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid public ID, or with deleteFiles a song file outside the library root; nothing was deleted', content: new OA\JsonContent(ref: new Model(type: ValidationError::class))),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Album not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'With deleteFiles: a scan holds the library, or the server cannot write a song directory; nothing was deleted',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid public ID, or with deleteFiles a song file outside the library root; nothing was deleted',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'delete', methods: ['DELETE'])]

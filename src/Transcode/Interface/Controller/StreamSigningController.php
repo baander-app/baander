@@ -14,8 +14,7 @@ use App\Transcode\Application\Port\PlaybackPortInterface;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
 use App\Transcode\Application\Port\StreamAuthPortInterface;
 use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
@@ -35,154 +34,120 @@ final class StreamSigningController
         private readonly TranscodeStreamingPortInterface $streaming,
     ) {}
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/stream/sign',
         summary: 'Generate a signed URL for a stream resource',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(
-                required: ['path', 'requestId'],
-                properties: [
-                    new OA\Property(
-                        property: 'path',
-                        type: 'string',
-                        example: '/api/transcode/0123456789abABCD_-xyz/master.m3u8',
-                    ),
-                    new OA\Property(property: 'expiresInSeconds', type: 'int', example: 86400),
-                    new OA\Property(
-                        property: 'refresh',
-                        description: 'Read current playback state without creating another admission',
-                        type: 'boolean',
-                    ),
-                    new OA\Property(
-                        property: 'audioStreamIndex',
-                        description: 'Absolute source audio stream index; null selects the source default',
-                        type: 'integer',
-                        minimum: 0,
-                        nullable: true,
-                    ),
-                    new OA\Property(
-                        property: 'audioOffsetMs',
-                        description: 'Source audio correction in milliseconds; positive plays later',
-                        type: 'integer',
-                        maximum: 10000,
-                        minimum: -10000,
-                        default: 0,
-                    ),
-                    new OA\Property(
-                        property: 'qualityTier',
-                        type: 'string',
-                        enum: ['360p', '480p', '720p', '1080p', '1440p', '4K'],
-                        nullable: true,
-                    ),
-                    new OA\Property(
-                        property: 'requestId',
-                        description: 'Stable playback client session identifier, retained across reloads and reconnects',
-                        type: 'string',
-                        format: 'uuid',
-                    ),
-                    new OA\Property(
-                        property: 'jobIds',
-                        description: 'Exact admitted jobs; required for refresh and omitted for new admission',
-                        type: 'array',
-                        items: new OA\Items(type: 'string'),
-                        maxItems: 3,
-                        minItems: 1,
-                        uniqueItems: true,
-                    ),
-                    new OA\Property(
-                        property: 'attachedSet',
-                        description: 'Rendition set the player has attached, as returned in renditionSet; refresh only. A rendition named here stays in the signed set on a smaller published lead than one that still has to join',
-                        type: 'string',
-                        example: '0123456789abABCD_-xyz.3',
-                    ),
-                ],
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'path' => new OA\Schema(type: 'string', example: '/api/transcode/0123456789abABCD_-xyz/master.m3u8'),
+                        'expiresInSeconds' => new OA\Schema(type: 'int', example: 86400),
+                        'refresh' => new OA\Schema(
+                            description: 'Read current playback state without creating another admission',
+                            type: 'boolean',
+                        ),
+                        'audioStreamIndex' => new OA\Schema(
+                            description: 'Absolute source audio stream index; null selects the source default',
+                            type: 'integer',
+                            nullable: true,
+                            minimum: 0,
+                        ),
+                        'audioOffsetMs' => new OA\Schema(
+                            description: 'Source audio correction in milliseconds; positive plays later',
+                            type: 'integer',
+                            minimum: -10000,
+                            maximum: 10000,
+                            default: 0,
+                        ),
+                        'qualityTier' => new OA\Schema(
+                            type: 'string',
+                            nullable: true,
+                            enum: ['360p', '480p', '720p', '1080p', '1440p', '4K'],
+                        ),
+                        'requestId' => new OA\Schema(
+                            description: 'Stable playback client session identifier, retained across reloads and reconnects',
+                            type: 'string',
+                            format: 'uuid',
+                        ),
+                        'jobIds' => new OA\Schema(
+                            description: 'Exact admitted jobs; required for refresh and omitted for new admission',
+                            type: 'array',
+                            items: new OA\Schema(type: 'string'),
+                            minItems: 1,
+                            maxItems: 3,
+                            uniqueItems: true,
+                        ),
+                        'attachedSet' => new OA\Schema(
+                            description: 'Rendition set the player has attached, as returned in renditionSet; refresh only. A rendition named here stays in the signed set on a smaller published lead than one that still has to join',
+                            type: 'string',
+                            example: '0123456789abABCD_-xyz.3',
+                        ),
+                    ],
+                    required: ['path', 'requestId'],
+                ),
             ),
         ),
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Signed URL generated',
-                content: new OA\JsonContent(properties: [
-                    new OA\Property(
-                        property: 'jobIds',
-                        type: 'array',
-                        items: new OA\Items(type: 'string'),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'jobIds' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(type: 'string'),
+                            ),
+                            'requestId' => new OA\Schema(type: 'string', format: 'uuid'),
+                            'url' => new OA\Schema(type: 'string', nullable: true),
+                            'sig' => new OA\Schema(type: 'string'),
+                            'exp' => new OA\Schema(type: 'integer'),
+                            'generation' => new OA\Schema(type: 'integer'),
+                            'jobId' => new OA\Schema(type: 'string'),
+                            'sessionId' => new OA\Schema(type: 'string', nullable: true),
+                            'revision' => new OA\Schema(type: 'integer'),
+                            'ready' => new OA\Schema(type: 'boolean'),
+                            'position' => new OA\Schema(type: 'number'),
+                            'status' => new OA\Schema(type: 'string'),
+                            'startTime' => new OA\Schema(type: 'number', nullable: true),
+                            'duration' => new OA\Schema(type: 'number', nullable: true),
+                            'renditionSet' => new OA\Schema(type: 'string'),
+                        ],
                     ),
-                    new OA\Property(
-                        property: 'requestId',
-                        type: 'string',
-                        format: 'uuid',
-                    ),
-                    new OA\Property(
-                        property: 'url',
-                        type: 'string',
-                        nullable: true,
-                    ),
-                    new OA\Property(
-                        property: 'sig',
-                        type: 'string',
-                    ),
-                    new OA\Property(
-                        property: 'exp',
-                        type: 'integer',
-                    ),
-                    new OA\Property(
-                        property: 'generation',
-                        type: 'integer',
-                    ),
-                    new OA\Property(
-                        property: 'jobId',
-                        type: 'string',
-                    ),
-                    new OA\Property(
-                        property: 'sessionId',
-                        type: 'string',
-                        nullable: true,
-                    ),
-                    new OA\Property(
-                        property: 'revision',
-                        type: 'integer',
-                    ),
-                    new OA\Property(
-                        property: 'ready',
-                        type: 'boolean',
-                    ),
-                    new OA\Property(
-                        property: 'position',
-                        type: 'number',
-                    ),
-                    new OA\Property(
-                        property: 'status',
-                        type: 'string',
-                    ),
-                    new OA\Property(
-                        property: 'startTime',
-                        type: 'number',
-                        nullable: true,
-                    ),
-                    new OA\Property(
-                        property: 'duration',
-                        type: 'number',
-                        nullable: true,
-                    ),
-                    new OA\Property(
-                        property: 'renditionSet',
-                        type: 'string',
-                    ),
-                ]),
+                ),
             ),
             new OA\Response(response: '400', description: 'Invalid request'),
-            new OA\Response(response: '410', description: 'A refresh named only sessions that have ended. Sessions that expired may be started again; failed or cancelled ones may not', content: new OA\JsonContent(required: [
-                'error',
-                'reason',
-            ], properties: [
-                new OA\Property(property: 'error', type: 'string'),
-                new OA\Property(property: 'reason', type: 'string', enum: ['expired', 'failed', 'cancelled']),
-            ])),
-            new OA\Response(response: '503', description: 'Transcode startup is temporarily unavailable', headers: [
-                new OA\Header(header: 'Retry-After', schema: new OA\Schema(type: 'integer', example: 2)),
-            ], content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '410',
+                description: 'A refresh named only sessions that have ended. Sessions that expired may be started again; failed or cancelled ones may not',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'error' => new OA\Schema(type: 'string'),
+                            'reason' => new OA\Schema(
+                                type: 'string',
+                                enum: ['expired', 'failed', 'cancelled'],
+                            ),
+                        ],
+                        required: ['error', 'reason'],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '503',
+                description: 'Transcode startup is temporarily unavailable',
+                headers: [
+                    new OA\Header(
+                        header: 'Retry-After',
+                        schema: new OA\Schema(type: 'integer', example: 2),
+                    ),
+                ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/sign', name: 'sign', methods: ['POST'])]

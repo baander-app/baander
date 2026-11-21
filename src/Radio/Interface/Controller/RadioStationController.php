@@ -10,8 +10,7 @@ use App\Radio\Application\Port\RadioStationPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -30,18 +29,38 @@ final class RadioStationController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/radio/countries',
         summary: 'List available countries from IPRD',
         responses: [
-            new OA\Response(response: '200', description: 'List of countries', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [
-                    new OA\Property(property: 'code', description: 'ISO 3166-1 alpha-2 country code', type: 'string'),
-                    new OA\Property(property: 'name', type: 'string'),
-                ], type: 'object'))],
-                type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'List of countries',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(
+                                    type: 'object',
+                                    properties: [
+                                        'code' => new OA\Schema(description: 'ISO 3166-1 alpha-2 country code', type: 'string'),
+                                        'name' => new OA\Schema(type: 'string'),
+                                    ],
+                                ),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/countries', name: 'countries', methods: ['GET'])]
@@ -56,30 +75,78 @@ final class RadioStationController
         return $this->successResponse($this->subscriptionPort->listAvailableCountries());
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/radio/stations',
         summary: 'Browse/search stations',
         parameters: [
-            new OA\Parameter(name: 'country', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'q', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'country',
+                in: 'query',
+                required: false,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'q',
+                in: 'query',
+                required: false,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'List of stations', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [
-                    new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-                    new OA\Property(property: 'externalId', description: 'Station identifier assigned by the external provider', type: 'string'),
-                    new OA\Property(property: 'sourceId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-                    new OA\Property(property: 'name', type: 'string'),
-                    new OA\Property(property: 'countrycode', type: 'string'),
-                    new OA\Property(property: 'url_resolved', type: 'string', format: 'uri', nullable: true),
-                    new OA\Property(property: 'favicon', type: 'string', format: 'uri', nullable: true),
-                    new OA\Property(property: 'tags', type: 'string', nullable: true),
-                    new OA\Property(property: 'codec', type: 'string', nullable: true),
-                    new OA\Property(property: 'bitrate', type: 'integer', nullable: true),
-                ], type: 'object'))],
-                type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'List of stations',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(
+                                    type: 'object',
+                                    properties: [
+                                        'publicId' => new OA\Schema(
+                                            type: 'string',
+                                            minLength: 21,
+                                            maxLength: 21,
+                                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                                        ),
+                                        'externalId' => new OA\Schema(description: 'Station identifier assigned by the external provider', type: 'string'),
+                                        'sourceId' => new OA\Schema(
+                                            type: 'string',
+                                            minLength: 21,
+                                            maxLength: 21,
+                                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                                        ),
+                                        'name' => new OA\Schema(type: 'string'),
+                                        'countrycode' => new OA\Schema(type: 'string'),
+                                        'url_resolved' => new OA\Schema(
+                                            type: 'string',
+                                            format: 'uri',
+                                            nullable: true,
+                                        ),
+                                        'favicon' => new OA\Schema(
+                                            type: 'string',
+                                            format: 'uri',
+                                            nullable: true,
+                                        ),
+                                        'tags' => new OA\Schema(type: 'string', nullable: true),
+                                        'codec' => new OA\Schema(type: 'string', nullable: true),
+                                        'bitrate' => new OA\Schema(type: 'integer', nullable: true),
+                                    ],
+                                ),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/stations', name: 'stations', methods: ['GET'])]

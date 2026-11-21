@@ -21,8 +21,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\Request\QueryParameters;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -55,19 +54,64 @@ final class ActivityController
     /**
      * Get the authenticated user's activity history (paginated).
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/activity/history',
         summary: "Get the authenticated user's activity history",
         parameters: [
-            new OA\Parameter(name: 'limit', description: 'Maximum number of activities to return', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 50, maximum: 100, minimum: 1)),
-            new OA\Parameter(name: 'offset', description: 'Number of activities to skip', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 0, minimum: 0)),
+            new OA\Parameter(
+                name: 'limit',
+                in: 'query',
+                description: 'Maximum number of activities to return',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 1,
+                    maximum: 100,
+                    default: 50,
+                ),
+            ),
+            new OA\Parameter(
+                name: 'offset',
+                in: 'query',
+                description: 'Number of activities to skip',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 0,
+                    default: 0,
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: ActivityResource::class)))], type: 'object',
-            )),
-            new OA\Response(response: '400', description: 'Invalid query parameter', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Success',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(ref: ActivityResource::class),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid query parameter',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/history', name: 'history', methods: ['GET'])]
@@ -95,28 +139,100 @@ final class ActivityController
     /**
      * Record a play event for a song.
      */
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/activity/play',
         summary: 'Record a play event for a song or movie',
-        requestBody: new OA\RequestBody(required: true, content: new OA\MediaType(mediaType: 'application/json', schema: new OA\Schema(
-            properties: [
-                new OA\Property(property: 'songId', description: 'Public ID of the song being played', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
-                new OA\Property(property: 'albumId', description: 'Public ID of the album', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
-                new OA\Property(property: 'artistId', description: 'Public ID of the artist', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
-                new OA\Property(property: 'movieId', description: 'Public ID of the movie', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
-                new OA\Property(property: 'platform', description: 'Playback platform (e.g. web, mobile, desktop)', type: 'string', nullable: true),
-                new OA\Property(property: 'player', description: 'Player application name', type: 'string', nullable: true),
-            ],
-        ))),
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    properties: [
+                        'songId' => new OA\Schema(
+                            description: 'Public ID of the song being played',
+                            type: 'string',
+                            nullable: true,
+                            minLength: 21,
+                            maxLength: 21,
+                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                        ),
+                        'albumId' => new OA\Schema(
+                            description: 'Public ID of the album',
+                            type: 'string',
+                            nullable: true,
+                            minLength: 21,
+                            maxLength: 21,
+                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                        ),
+                        'artistId' => new OA\Schema(
+                            description: 'Public ID of the artist',
+                            type: 'string',
+                            nullable: true,
+                            minLength: 21,
+                            maxLength: 21,
+                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                        ),
+                        'movieId' => new OA\Schema(
+                            description: 'Public ID of the movie',
+                            type: 'string',
+                            nullable: true,
+                            minLength: 21,
+                            maxLength: 21,
+                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                        ),
+                        'platform' => new OA\Schema(
+                            description: 'Playback platform (e.g. web, mobile, desktop)',
+                            type: 'string',
+                            nullable: true,
+                        ),
+                        'player' => new OA\Schema(
+                            description: 'Player application name',
+                            type: 'string',
+                            nullable: true,
+                        ),
+                    ],
+                ),
+            ),
+        ),
         responses: [
-            new OA\Response(response: '201', description: 'Activity recorded', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', ref: new Model(type: ActivityResource::class))], type: 'object',
-            )),
-            new OA\Response(response: '200', description: 'Existing activity updated', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', ref: new Model(type: ActivityResource::class))], type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '201',
+                description: 'Activity recorded',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: ActivityResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '200',
+                description: 'Existing activity updated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: ActivityResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/play', name: 'play', methods: ['POST'])]
@@ -212,18 +328,50 @@ final class ActivityController
     /**
      * Toggle love on an activity.
      */
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/activity/love/{publicId}',
         summary: 'Toggle love on an activity',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Activity public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Activity public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', ref: new Model(type: ActivityResource::class))], type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Success',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: ActivityResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/love/{publicId}', name: 'love', methods: ['POST'])]
@@ -264,14 +412,32 @@ final class ActivityController
     /**
      * Get the authenticated user's loved items.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/activity/loved',
         summary: "Get the authenticated user's loved items",
         responses: [
-            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: ActivityResource::class)))], type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Success',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(ref: ActivityResource::class),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/loved', name: 'loved', methods: ['GET'])]

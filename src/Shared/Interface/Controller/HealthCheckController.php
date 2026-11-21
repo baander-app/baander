@@ -8,7 +8,7 @@ use App\Shared\Application\Port\ServerDrainStateInterface;
 use App\Shared\Infrastructure\Health\HealthCheckService;
 use App\Shared\Infrastructure\Health\HealthCheckResult;
 use App\Shared\Infrastructure\Health\HealthStatus;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -24,35 +24,44 @@ final class HealthCheckController
         private readonly HealthCheckService $healthCheckService,
         private readonly ServerDrainStateInterface $drain,
         private readonly LoggerInterface $logger = new NullLogger(),
-    )
-    {
+    ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/health',
-        description: 'Returns the health status of all system components (PostgreSQL, Redis, the background worker, the worker deployment profile, Swoole, memory). A missing worker heartbeat reports the worker as not available until a worker has reported in. The worker profile reads unhealthy when the active worker boot was started with another deployment profile than web runs. The background worker, the worker profile and memory are listed but do not decide the status code: each can read unhealthy while the endpoint answers 200.',
         summary: 'Health check endpoint',
+        description: 'Returns the health status of all system components (PostgreSQL, Redis, the background worker, the worker deployment profile, Swoole, memory). A missing worker heartbeat reports the worker as not available until a worker has reported in. The worker profile reads unhealthy when the active worker boot was started with another deployment profile than web runs. The background worker, the worker profile and memory are listed but do not decide the status code: each can read unhealthy while the endpoint answers 200.',
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'All systems healthy',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'status', type: 'string', example: 'healthy'),
-                        new OA\Property(property: 'checks', type: 'array', items: new OA\Items(type: 'object')),
-                    ],
-                    type: 'object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'status' => new OA\Schema(type: 'string', example: 'healthy'),
+                            'checks' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(type: 'object'),
+                            ),
+                        ],
+                    ),
                 ),
             ),
             new OA\Response(
                 response: '503',
                 description: 'One or more components unhealthy',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'status', type: 'string', example: 'unhealthy'),
-                        new OA\Property(property: 'checks', type: 'array', items: new OA\Items(type: 'object')),
-                    ],
-                    type: 'object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'status' => new OA\Schema(type: 'string', example: 'unhealthy'),
+                            'checks' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(type: 'object'),
+                            ),
+                        ],
+                    ),
                 ),
             ),
         ],
@@ -65,31 +74,41 @@ final class HealthCheckController
         return $this->buildResponse($results);
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/ready',
-        description: 'Kubernetes readiness probe. Checks dependency availability (PostgreSQL, Redis). Returns 503 if any dependency is unreachable, and while the web server drains before it stops; the drain answer lists a single `server` check and checks no dependency. The background worker and memory are not dependencies: a worker outage or a web server worker near its memory limit does not make the web container unready.',
         summary: 'Readiness probe',
+        description: 'Kubernetes readiness probe. Checks dependency availability (PostgreSQL, Redis). Returns 503 if any dependency is unreachable, and while the web server drains before it stops; the drain answer lists a single `server` check and checks no dependency. The background worker and memory are not dependencies: a worker outage or a web server worker near its memory limit does not make the web container unready.',
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Dependencies ready',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'status', type: 'string', example: 'ready'),
-                        new OA\Property(property: 'checks', type: 'array', items: new OA\Items(type: 'object')),
-                    ],
-                    type: 'object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'status' => new OA\Schema(type: 'string', example: 'ready'),
+                            'checks' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(type: 'object'),
+                            ),
+                        ],
+                    ),
                 ),
             ),
             new OA\Response(
                 response: '503',
                 description: 'Dependencies not ready, or the web server is draining',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'status', type: 'string', example: 'not_ready'),
-                        new OA\Property(property: 'checks', type: 'array', items: new OA\Items(type: 'object')),
-                    ],
-                    type: 'object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'status' => new OA\Schema(type: 'string', example: 'not_ready'),
+                            'checks' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(type: 'object'),
+                            ),
+                        ],
+                    ),
                 ),
             ),
         ],
@@ -110,22 +129,31 @@ final class HealthCheckController
         return $this->buildResponse($results, 'ready', 'not_ready');
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/live',
-        description: 'Kubernetes liveness probe. Checks if the Swoole worker process is alive. Always returns 200 if the process can respond, also while the web server drains before it stops; `draining` is then true. A client that asks whether the server is back treats a draining answer as down.',
         summary: 'Liveness probe',
+        description: 'Kubernetes liveness probe. Checks if the Swoole worker process is alive. Always returns 200 if the process can respond, also while the web server drains before it stops; `draining` is then true. A client that asks whether the server is back treats a draining answer as down.',
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Process is alive',
-                content: new OA\JsonContent(
-                    required: ['status', 'draining', 'checks'],
-                    properties: [
-                        new OA\Property(property: 'status', type: 'string', example: 'alive'),
-                        new OA\Property(property: 'draining', description: 'Whether the web server is draining before it stops', type: 'boolean', example: false),
-                        new OA\Property(property: 'checks', type: 'array', items: new OA\Items(type: 'object')),
-                    ],
-                    type: 'object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'status' => new OA\Schema(type: 'string', example: 'alive'),
+                            'draining' => new OA\Schema(
+                                description: 'Whether the web server is draining before it stops',
+                                type: 'boolean',
+                                example: false,
+                            ),
+                            'checks' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(type: 'object'),
+                            ),
+                        ],
+                        required: ['status', 'draining', 'checks'],
+                    ),
                 ),
             ),
         ],

@@ -10,8 +10,7 @@ use App\Catalog\Interface\Resource\DuplicateGroupResource;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
@@ -30,30 +29,52 @@ final class AlbumDuplicateController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/albums/duplicates',
         summary: 'List all duplicate album groups in the library',
         parameters: [
             new OA\Parameter(
                 name: 'libraryId',
-                description: 'Library ID to scan for duplicates',
                 in: 'query',
+                description: 'Library ID to scan for duplicates',
                 required: true,
-                schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
             ),
         ],
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'List of duplicate groups',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: DuplicateGroupResource::class))),
-                    ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(ref: DuplicateGroupResource::class),
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '403', description: 'Forbidden - admin only', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '400', description: 'Invalid library ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden - admin only',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid library ID',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/duplicates', name: 'duplicates', methods: ['GET'])]

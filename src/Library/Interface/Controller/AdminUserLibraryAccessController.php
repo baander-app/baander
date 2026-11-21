@@ -11,8 +11,7 @@ use App\Library\Interface\Resource\LibraryAccessResource;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\DispatchesMessagesTrait;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
@@ -36,16 +35,51 @@ final class AdminUserLibraryAccessController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/users/{userId}/libraries',
         summary: "List every library with the user's access to it",
-        parameters: [new OA\Parameter(name: 'userId', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21))],
+        parameters: [
+            new OA\Parameter(
+                name: 'userId',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
+        ],
         responses: [
-            new OA\Response(response: '200', description: 'Every library in display order', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: LibraryAccessResource::class))),
-            ])),
-            new OA\Response(response: '403', description: 'Forbidden; admins need the admin.can_view_users setting, as for the user list', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Every library in display order',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(ref: LibraryAccessResource::class),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden; admins need the admin.can_view_users setting, as for the user list',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'User not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('', name: 'index', methods: ['GET'])]
@@ -56,16 +90,62 @@ final class AdminUserLibraryAccessController
         return $this->successResponse(LibraryAccessResource::collection($this->dispatch(new ListLibraryAccessQuery($userId))));
     }
 
-    #[OA\Put(path: '/api/admin/users/{userId}/libraries/{libraryId}', description: 'Granting access the user already has changes nothing.', summary: 'Let the user see a library', parameters: [
-        new OA\Parameter(name: 'userId', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
-        new OA\Parameter(name: 'libraryId', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
-    ], responses: [
-        new OA\Response(response: '200', description: 'The library with the access granted', content: new OA\JsonContent(properties: [
-            new OA\Property(property: 'data', ref: new Model(type: LibraryAccessResource::class)),
-        ])),
-        new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(response: '404', description: 'User or library not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-    ])]
+    #[OA\Operation\Put(
+        path: '/api/admin/users/{userId}/libraries/{libraryId}',
+        summary: 'Let the user see a library',
+        description: 'Granting access the user already has changes nothing.',
+        parameters: [
+            new OA\Parameter(
+                name: 'userId',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
+            new OA\Parameter(
+                name: 'libraryId',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'The library with the access granted',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: LibraryAccessResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'User or library not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+        ],
+    )]
     #[Route('/{libraryId}', name: 'grant', methods: ['PUT'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:library:member:grant')]
@@ -74,16 +154,62 @@ final class AdminUserLibraryAccessController
         return $this->successResponse(LibraryAccessResource::from($this->dispatch(new GrantLibraryAccessCommand($userId, $libraryId))));
     }
 
-    #[OA\Delete(path: '/api/admin/users/{userId}/libraries/{libraryId}', description: "Revoking access the user lacks changes nothing. The user's next request is refused; signed media URLs already issued stay valid until they expire.", summary: 'Stop the user seeing a library', parameters: [
-        new OA\Parameter(name: 'userId', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
-        new OA\Parameter(name: 'libraryId', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
-    ], responses: [
-        new OA\Response(response: '200', description: 'The library with the access revoked', content: new OA\JsonContent(properties: [
-            new OA\Property(property: 'data', ref: new Model(type: LibraryAccessResource::class)),
-        ])),
-        new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(response: '404', description: 'User or library not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-    ])]
+    #[OA\Operation\Delete(
+        path: '/api/admin/users/{userId}/libraries/{libraryId}',
+        summary: 'Stop the user seeing a library',
+        description: "Revoking access the user lacks changes nothing. The user's next request is refused; signed media URLs already issued stay valid until they expire.",
+        parameters: [
+            new OA\Parameter(
+                name: 'userId',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
+            new OA\Parameter(
+                name: 'libraryId',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'The library with the access revoked',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: LibraryAccessResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'User or library not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+        ],
+    )]
     #[Route('/{libraryId}', name: 'revoke', methods: ['DELETE'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:library:member:revoke')]

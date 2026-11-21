@@ -6,7 +6,7 @@ namespace App\Shared\Interface\Controller;
 
 use App\Shared\Application\Port\ServerDiagnosticsInterface;
 use App\Shared\Interface\Attribute\CliCounterpart;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
@@ -25,25 +25,32 @@ final readonly class SpanDebugController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/debug/spans',
         summary: 'Recent server spans, newest first',
         parameters: [
             new OA\Parameter(
                 name: 'limit',
-                description: 'Number of spans to return, at most 500',
                 in: 'query',
+                description: 'Number of spans to return, at most 500',
                 required: false,
-                schema: new OA\Schema(type: 'integer', default: 100, maximum: 500, minimum: 0),
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 0,
+                    maximum: 500,
+                    default: 100,
+                ),
             ),
         ],
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'List of recent spans',
-                content: new OA\JsonContent(
-                    type: 'array',
-                    items: new OA\Items(type: 'object'),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'array',
+                        items: new OA\Schema(type: 'object'),
+                    ),
                 ),
             ),
         ],
@@ -55,11 +62,21 @@ final readonly class SpanDebugController
         return new JsonResponse($this->diagnostics->spans($request->query->getInt('limit', self::DEFAULT_LIMIT)));
     }
 
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/debug/spans',
         summary: 'Clear the span buffer of every worker',
         responses: [
-            new OA\Response(response: '200', description: 'Spans cleared', content: new OA\JsonContent(properties: [new OA\Property(property: 'status', type: 'string')])),
+            new OA\Response(
+                response: '200',
+                description: 'Spans cleared',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'status' => new OA\Schema(type: 'string'),
+                        ],
+                    ),
+                ),
+            ),
         ],
     )]
     #[Route('/api/debug/spans', name: 'debug_spans_clear', methods: ['DELETE'])]

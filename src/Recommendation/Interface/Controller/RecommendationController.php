@@ -15,8 +15,7 @@ use App\Recommendation\Application\Query\GetTargetingRecommendationsQuery;
 use App\Recommendation\Interface\Resource\RecommendationResource;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -42,17 +41,40 @@ final class RecommendationController
     /**
      * Get personalized recommendations for the authenticated user.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/recommendations/',
         summary: 'Get personalized recommendations for the authenticated user',
         parameters: [
-            new OA\Parameter(name: 'limit', description: 'Max recommendations (max 200)', in: 'query', schema: new OA\Schema(type: 'integer', default: 50)),
+            new OA\Parameter(
+                name: 'limit',
+                in: 'query',
+                description: 'Max recommendations (max 200)',
+                schema: new OA\Schema(type: 'integer', default: 50),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: RecommendationResource::class)))], type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Success',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(ref: RecommendationResource::class),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
@@ -77,42 +99,63 @@ final class RecommendationController
     /**
      * Get "For You" recommendations with explanations.
      */
-    #[OA\Get(path: '/api/recommendations/for-you', description: 'Returns aggregated recommendations with one-line explanations and per-strategy scores', summary: 'Get personalized recommendations with explanation breakdown', parameters: [
-        new OA\Parameter(name: 'limit', description: 'Max recommendations (max 100)', in: 'query', schema: new OA\Schema(type: 'integer', default: 50)),
-    ], responses: [
-        new OA\Response(
-            response: '200',
-            description: 'Success',
-            content: new OA\JsonContent(
-                properties: [
-                    new OA\Property(
-                        property: 'data',
-                        type: 'array',
-                        items: new OA\Items(
-                            properties: [
-                                new OA\Property(property: 'target_id', type: 'string'),
-                                new OA\Property(property: 'target_type', type: 'string'),
-                                new OA\Property(property: 'total_score', type: 'number'),
-                                new OA\Property(property: 'explanation', type: 'string'),
-                                new OA\Property(property: 'strategies', type: 'object', additionalProperties: true),
-                                new OA\Property(property: 'song', required: ['public_id', 'title', 'album_id', 'track', 'disc', 'year', 'length', 'available'], properties: [
-                                    new OA\Property(property: 'public_id', type: 'string'),
-                                    new OA\Property(property: 'title', type: 'string'),
-                                    new OA\Property(property: 'album_id', type: 'string'),
-                                    new OA\Property(property: 'track', type: 'integer', nullable: true),
-                                    new OA\Property(property: 'disc', type: 'integer', nullable: true),
-                                    new OA\Property(property: 'year', type: 'integer', nullable: true),
-                                    new OA\Property(property: 'length', type: 'number', nullable: true),
-                                    new OA\Property(property: 'available', type: 'boolean'),
-                                ]),
-                            ],
-                        ),
-                    ),
-                ],
+    #[OA\Operation\Get(
+        path: '/api/recommendations/for-you',
+        summary: 'Get personalized recommendations with explanation breakdown',
+        description: 'Returns aggregated recommendations with one-line explanations and per-strategy scores',
+        parameters: [
+            new OA\Parameter(
+                name: 'limit',
+                in: 'query',
+                description: 'Max recommendations (max 100)',
+                schema: new OA\Schema(type: 'integer', default: 50),
             ),
-        ),
-        new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-    ])]
+        ],
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'Success',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(
+                                    properties: [
+                                        'target_id' => new OA\Schema(type: 'string'),
+                                        'target_type' => new OA\Schema(type: 'string'),
+                                        'total_score' => new OA\Schema(type: 'number'),
+                                        'explanation' => new OA\Schema(type: 'string'),
+                                        'strategies' => new OA\Schema(type: 'object', additionalProperties: true),
+                                        'song' => new OA\Schema(
+                                            properties: [
+                                                'public_id' => new OA\Schema(type: 'string'),
+                                                'title' => new OA\Schema(type: 'string'),
+                                                'album_id' => new OA\Schema(type: 'string'),
+                                                'track' => new OA\Schema(type: 'integer', nullable: true),
+                                                'disc' => new OA\Schema(type: 'integer', nullable: true),
+                                                'year' => new OA\Schema(type: 'integer', nullable: true),
+                                                'length' => new OA\Schema(type: 'number', nullable: true),
+                                                'available' => new OA\Schema(type: 'boolean'),
+                                            ],
+                                            required: ['public_id', 'title', 'album_id', 'track', 'disc', 'year', 'length', 'available'],
+                                        ),
+                                    ],
+                                ),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+        ],
+    )]
     #[Route('/for-you', name: 'for_you', methods: ['GET'])]
     public function forYou(Request $request): JsonResponse
     {
@@ -136,18 +179,50 @@ final class RecommendationController
     /**
      * Get recommendations for a source entity.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/recommendations/source/{sourceType}/{sourceId}',
         summary: 'Get recommendations for a source entity',
         parameters: [
-            new OA\Parameter(name: 'sourceType', description: 'Source entity type', in: 'path', required: true, schema: new OA\Schema(type: 'string', enum: ['song', 'album', 'artist', 'movie', 'video'])),
-            new OA\Parameter(name: 'sourceId', description: 'Source entity ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'limit', description: 'Max recommendations (max 100)', in: 'query', schema: new OA\Schema(type: 'integer', default: 100)),
+            new OA\Parameter(
+                name: 'sourceType',
+                in: 'path',
+                description: 'Source entity type',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['song', 'album', 'artist', 'movie', 'video'],
+                ),
+            ),
+            new OA\Parameter(
+                name: 'sourceId',
+                in: 'path',
+                description: 'Source entity ID',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'limit',
+                in: 'query',
+                description: 'Max recommendations (max 100)',
+                schema: new OA\Schema(type: 'integer', default: 100),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: RecommendationResource::class)))], type: 'object',
-            )),
+            new OA\Response(
+                response: '200',
+                description: 'Success',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(ref: RecommendationResource::class),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
         ],
     )]
     #[Route('/source/{sourceType}/{sourceId}', name: 'by_source', methods: ['GET'])]
@@ -170,18 +245,50 @@ final class RecommendationController
     /**
      * Get recommendations targeting an entity.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/recommendations/targeting/{targetType}/{targetId}',
         summary: 'Get recommendations targeting an entity',
         parameters: [
-            new OA\Parameter(name: 'targetType', description: 'Target entity type', in: 'path', required: true, schema: new OA\Schema(type: 'string', enum: ['song', 'album', 'artist', 'movie', 'video'])),
-            new OA\Parameter(name: 'targetId', description: 'Target entity ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'limit', description: 'Max recommendations (max 100)', in: 'query', schema: new OA\Schema(type: 'integer', default: 100)),
+            new OA\Parameter(
+                name: 'targetType',
+                in: 'path',
+                description: 'Target entity type',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['song', 'album', 'artist', 'movie', 'video'],
+                ),
+            ),
+            new OA\Parameter(
+                name: 'targetId',
+                in: 'path',
+                description: 'Target entity ID',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'limit',
+                in: 'query',
+                description: 'Max recommendations (max 100)',
+                schema: new OA\Schema(type: 'integer', default: 100),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: RecommendationResource::class)))], type: 'object',
-            )),
+            new OA\Response(
+                response: '200',
+                description: 'Success',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(ref: RecommendationResource::class),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
         ],
     )]
     #[Route('/targeting/{targetType}/{targetId}', name: 'targeting', methods: ['GET'])]
@@ -204,29 +311,56 @@ final class RecommendationController
     /**
      * Create a recommendation.
      */
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/recommendations/',
         summary: 'Create a recommendation',
         requestBody: new OA\RequestBody(
-            content: new OA\JsonContent(
-                properties: [
-                    new OA\Property(property: 'source_type', type: 'string', example: 'song'),
-                    new OA\Property(property: 'source_id', type: 'string', example: 'song-123'),
-                    new OA\Property(property: 'target_type', type: 'string', example: 'song'),
-                    new OA\Property(property: 'target_id', type: 'string', example: 'song-456'),
-                    new OA\Property(property: 'score', type: 'number', format: 'float', example: 0.85),
-                    new OA\Property(property: 'name', type: 'string', example: 'default'),
-                    new OA\Property(property: 'position', type: 'integer', example: 1),
-                ],
-                type: 'object',
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    type: 'object',
+                    properties: [
+                        'source_type' => new OA\Schema(type: 'string', example: 'song'),
+                        'source_id' => new OA\Schema(type: 'string', example: 'song-123'),
+                        'target_type' => new OA\Schema(type: 'string', example: 'song'),
+                        'target_id' => new OA\Schema(type: 'string', example: 'song-456'),
+                        'score' => new OA\Schema(
+                            type: 'number',
+                            format: 'float',
+                            example: 0.85,
+                        ),
+                        'name' => new OA\Schema(type: 'string', example: 'default'),
+                        'position' => new OA\Schema(type: 'integer', example: 1),
+                    ],
+                ),
             ),
         ),
         responses: [
-            new OA\Response(response: '201', description: 'Created', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', ref: new Model(type: RecommendationResource::class))], type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '201',
+                description: 'Created',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: RecommendationResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'store', methods: ['POST'])]
@@ -262,16 +396,34 @@ final class RecommendationController
     /**
      * Delete a recommendation by public ID.
      */
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/recommendations/{publicId}',
         summary: 'Delete a recommendation',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Recommendation public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Recommendation public ID',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Deleted'),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'destroy', methods: ['DELETE'])]
@@ -296,16 +448,37 @@ final class RecommendationController
     /**
      * Delete all recommendations for a source entity.
      */
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/recommendations/source/{sourceType}/{sourceId}',
         summary: 'Delete all recommendations for a source entity',
         parameters: [
-            new OA\Parameter(name: 'sourceType', description: 'Source entity type', in: 'path', required: true, schema: new OA\Schema(type: 'string', enum: ['song', 'album', 'artist', 'movie', 'video'])),
-            new OA\Parameter(name: 'sourceId', description: 'Source entity ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'sourceType',
+                in: 'path',
+                description: 'Source entity type',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['song', 'album', 'artist', 'movie', 'video'],
+                ),
+            ),
+            new OA\Parameter(
+                name: 'sourceId',
+                in: 'path',
+                description: 'Source entity ID',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Deleted'),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/source/{sourceType}/{sourceId}', name: 'destroy_by_source', methods: ['DELETE'])]

@@ -28,8 +28,7 @@ use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\DispatchesMessagesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\DTO\PaginatedResponse;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -38,7 +37,10 @@ use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
-#[OA\Tag(name: 'Catalog', description: 'Album, artist, song, movie, and genre management endpoints')]
+#[OA\Tag(
+    name: 'Catalog',
+    description: 'Album, artist, song, movie, and genre management endpoints',
+)]
 #[Route('/api/artists', name: 'artist_')]
 final class ArtistController
 {
@@ -56,24 +58,44 @@ final class ArtistController
     /**
      * Create a new artist.
      */
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/artists/',
         summary: 'Create a new artist',
-        requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'name', type: 'string'),
-                new OA\Property(property: 'country', type: 'string', nullable: true),
-                new OA\Property(property: 'gender', type: 'string', nullable: true),
-                new OA\Property(property: 'type', type: 'string', nullable: true),
-                new OA\Property(property: 'disambiguation', type: 'string', nullable: true),
-                new OA\Property(property: 'sortName', type: 'string', nullable: true),
-                new OA\Property(property: 'biography', type: 'string', nullable: true),
-            ])),
+        requestBody: new OA\RequestBody(
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'name' => new OA\Schema(type: 'string'),
+                        'country' => new OA\Schema(type: 'string', nullable: true),
+                        'gender' => new OA\Schema(type: 'string', nullable: true),
+                        'type' => new OA\Schema(type: 'string', nullable: true),
+                        'disambiguation' => new OA\Schema(type: 'string', nullable: true),
+                        'sortName' => new OA\Schema(type: 'string', nullable: true),
+                        'biography' => new OA\Schema(type: 'string', nullable: true),
+                    ],
+                ),
+            ),
+        ),
         responses: [
-            new OA\Response(response: '201', description: 'Artist created', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', ref: new Model(type: ArtistResource::class))],
-                type: 'object',
-            )),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '201',
+                description: 'Artist created',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: ArtistResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'store', methods: ['POST'])]
@@ -97,19 +119,59 @@ final class ArtistController
     /**
      * List/search artists (paginated).
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/artists/',
         summary: 'List artists (paginated)',
         parameters: [
-            new OA\Parameter(name: 'page', description: 'Page number', in: 'query', schema: new OA\Schema(type: 'integer', default: 1)),
-            new OA\Parameter(name: 'limit', description: 'Items per page (max 100)', in: 'query', schema: new OA\Schema(type: 'integer', default: 50)),
-            new OA\Parameter(name: 'q', description: 'Search query', in: 'query', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'genre', description: 'Filter by genre slug', in: 'query', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'sort', description: 'Sort field (name)', in: 'query', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'order', description: 'Sort order (asc, desc)', in: 'query', schema: new OA\Schema(type: 'string', default: 'asc', enum: ['asc', 'desc'])),
+            new OA\Parameter(
+                name: 'page',
+                in: 'query',
+                description: 'Page number',
+                schema: new OA\Schema(type: 'integer', default: 1),
+            ),
+            new OA\Parameter(
+                name: 'limit',
+                in: 'query',
+                description: 'Items per page (max 100)',
+                schema: new OA\Schema(type: 'integer', default: 50),
+            ),
+            new OA\Parameter(
+                name: 'q',
+                in: 'query',
+                description: 'Search query',
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'genre',
+                in: 'query',
+                description: 'Filter by genre slug',
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'sort',
+                in: 'query',
+                description: 'Sort field (name)',
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'order',
+                in: 'query',
+                description: 'Sort order (asc, desc)',
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['asc', 'desc'],
+                    default: 'asc',
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Paginated list of artists', content: new OA\JsonContent(ref: new Model(type: PaginatedResponse::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Paginated list of artists',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: PaginatedResponse::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
@@ -161,18 +223,43 @@ final class ArtistController
     /**
      * Get a single artist.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/artists/{publicId}',
         summary: 'Get a single artist',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Artist public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Artist details', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', ref: new Model(type: ArtistResource::class))],
-                type: 'object',
-            )),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Artist details',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: ArtistResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'show', methods: ['GET'])]
@@ -203,28 +290,65 @@ final class ArtistController
     /**
      * Update an artist.
      */
-    #[OA\Patch(
+    #[OA\Operation\Patch(
         path: '/api/artists/{publicId}',
         summary: 'Update an artist',
-        requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'name', type: 'string', nullable: true),
-                new OA\Property(property: 'country', type: 'string', nullable: true),
-                new OA\Property(property: 'gender', type: 'string', nullable: true),
-                new OA\Property(property: 'type', type: 'string', nullable: true),
-                new OA\Property(property: 'disambiguation', type: 'string', nullable: true),
-                new OA\Property(property: 'sortName', type: 'string', nullable: true),
-                new OA\Property(property: 'biography', type: 'string', nullable: true),
-            ])),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Artist public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
+        requestBody: new OA\RequestBody(
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'name' => new OA\Schema(type: 'string', nullable: true),
+                        'country' => new OA\Schema(type: 'string', nullable: true),
+                        'gender' => new OA\Schema(type: 'string', nullable: true),
+                        'type' => new OA\Schema(type: 'string', nullable: true),
+                        'disambiguation' => new OA\Schema(type: 'string', nullable: true),
+                        'sortName' => new OA\Schema(type: 'string', nullable: true),
+                        'biography' => new OA\Schema(type: 'string', nullable: true),
+                    ],
+                ),
+            ),
+        ),
         responses: [
-            new OA\Response(response: '200', description: 'Artist updated', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', ref: new Model(type: ArtistResource::class))],
-                type: 'object',
-            )),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Artist updated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: ArtistResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'update', methods: ['PATCH'])]
@@ -250,23 +374,50 @@ final class ArtistController
     /**
      * Delete an artist.
      */
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/artists/{publicId}',
         summary: 'Delete an artist',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Artist public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Deleted, with the cover image',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', ref: new Model(type: CatalogDeletionResource::class))],
-                    type: 'object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: CatalogDeletionResource::class),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid public ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid public ID',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'destroy', methods: ['DELETE'])]
@@ -282,21 +433,64 @@ final class ArtistController
     /**
      * Add a song to an artist with a role.
      */
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/artists/{publicId}/songs',
         summary: 'Add a song to an artist',
-        requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'songId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-                new OA\Property(property: 'role', type: 'string'),
-            ])),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Artist public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
+        requestBody: new OA\RequestBody(
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'songId' => new OA\Schema(
+                            type: 'string',
+                            minLength: 21,
+                            maxLength: 21,
+                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                        ),
+                        'role' => new OA\Schema(type: 'string'),
+                    ],
+                ),
+            ),
+        ),
         responses: [
-            new OA\Response(response: '204', description: 'Song added to artist, or the artist already had the credit'),
-            new OA\Response(response: '404', description: 'Artist or song not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '409', description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Malformed public ID or song ID, or an unknown role', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '204',
+                description: 'Song added to artist, or the artist already had the credit',
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Artist or song not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Malformed public ID or song ID, or an unknown role',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}/songs', name: 'add_song', methods: ['POST'])]
@@ -312,18 +506,58 @@ final class ArtistController
     /**
      * Remove a song from an artist.
      */
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/artists/{publicId}/songs/{songId}',
         summary: 'Remove a song from an artist',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
-            new OA\Parameter(name: 'songId', description: 'Song public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Artist public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
+            new OA\Parameter(
+                name: 'songId',
+                in: 'path',
+                description: 'Song public identifier',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
             new OA\Response(response: '204', description: "Every one of the artist's credits on the song removed"),
-            new OA\Response(response: '404', description: 'Artist not found, or the artist has no credit on the song', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '409', description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Malformed public ID or song ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Artist not found, or the artist has no credit on the song',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Malformed public ID or song ID',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}/songs/{songId}', name: 'remove_song', methods: ['DELETE'])]
@@ -339,22 +573,75 @@ final class ArtistController
     /**
      * Update the role of an artist on a song.
      */
-    #[OA\Patch(
+    #[OA\Operation\Patch(
         path: '/api/artists/{publicId}/songs/{songId}',
         summary: 'Update artist role on a song',
-        requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'role', type: 'string'),
-                new OA\Property(property: 'currentRole', description: 'The role of the credit to change; required when the artist holds several roles on the song', type: 'string', nullable: true),
-            ])),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
-            new OA\Parameter(name: 'songId', description: 'Song public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Artist public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
+            new OA\Parameter(
+                name: 'songId',
+                in: 'path',
+                description: 'Song public identifier',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
+        requestBody: new OA\RequestBody(
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'role' => new OA\Schema(type: 'string'),
+                        'currentRole' => new OA\Schema(
+                            description: 'The role of the credit to change; required when the artist holds several roles on the song',
+                            type: 'string',
+                            nullable: true,
+                        ),
+                    ],
+                ),
+            ),
+        ),
         responses: [
-            new OA\Response(response: '204', description: 'Role updated; a credit changed to a role the artist already holds on the song is removed'),
-            new OA\Response(response: '404', description: 'Artist not found, or the artist has no such credit on the song', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '409', description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Malformed public ID or song ID, an unknown role, or no current role while the artist holds several', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '204',
+                description: 'Role updated; a credit changed to a role the artist already holds on the song is removed',
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Artist not found, or the artist has no such credit on the song',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Malformed public ID or song ID, an unknown role, or no current role while the artist holds several',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}/songs/{songId}', name: 'update_song_role', methods: ['PATCH'])]
@@ -370,21 +657,64 @@ final class ArtistController
     /**
      * Add an album to an artist with a role.
      */
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/artists/{publicId}/albums',
         summary: 'Add an album to an artist',
-        requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'albumId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-                new OA\Property(property: 'role', type: 'string'),
-            ])),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Artist public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
+        requestBody: new OA\RequestBody(
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'albumId' => new OA\Schema(
+                            type: 'string',
+                            minLength: 21,
+                            maxLength: 21,
+                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                        ),
+                        'role' => new OA\Schema(type: 'string'),
+                    ],
+                ),
+            ),
+        ),
         responses: [
-            new OA\Response(response: '204', description: 'Album added to artist, or the artist already had the credit'),
-            new OA\Response(response: '404', description: 'Artist or album not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '409', description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Malformed public ID or album ID, or an unknown role', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '204',
+                description: 'Album added to artist, or the artist already had the credit',
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Artist or album not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Malformed public ID or album ID, or an unknown role',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}/albums', name: 'add_album', methods: ['POST'])]
@@ -400,18 +730,61 @@ final class ArtistController
     /**
      * Remove an album from an artist.
      */
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/artists/{publicId}/albums/{albumId}',
         summary: 'Remove an album from an artist',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
-            new OA\Parameter(name: 'albumId', description: 'Album public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Artist public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
+            new OA\Parameter(
+                name: 'albumId',
+                in: 'path',
+                description: 'Album public identifier',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '204', description: "Every one of the artist's credits on the album removed"),
-            new OA\Response(response: '404', description: 'Artist not found, or the artist has no credit on the album', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '409', description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Malformed public ID or album ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '204',
+                description: "Every one of the artist's credits on the album removed",
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Artist not found, or the artist has no credit on the album',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Malformed public ID or album ID',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}/albums/{albumId}', name: 'remove_album', methods: ['DELETE'])]
@@ -427,22 +800,75 @@ final class ArtistController
     /**
      * Update the role of an artist on an album.
      */
-    #[OA\Patch(
+    #[OA\Operation\Patch(
         path: '/api/artists/{publicId}/albums/{albumId}',
         summary: 'Update artist role on an album',
-        requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'role', type: 'string'),
-                new OA\Property(property: 'currentRole', description: 'The role of the credit to change; required when the artist holds several roles on the album', type: 'string', nullable: true),
-            ])),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
-            new OA\Parameter(name: 'albumId', description: 'Album public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Artist public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
+            new OA\Parameter(
+                name: 'albumId',
+                in: 'path',
+                description: 'Album public identifier',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
+        requestBody: new OA\RequestBody(
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'role' => new OA\Schema(type: 'string'),
+                        'currentRole' => new OA\Schema(
+                            description: 'The role of the credit to change; required when the artist holds several roles on the album',
+                            type: 'string',
+                            nullable: true,
+                        ),
+                    ],
+                ),
+            ),
+        ),
         responses: [
-            new OA\Response(response: '204', description: 'Role updated; a credit changed to a role the artist already holds on the album is removed'),
-            new OA\Response(response: '404', description: 'Artist not found, or the artist has no such credit on the album', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '409', description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Malformed public ID or album ID, an unknown role, or no current role while the artist holds several', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '204',
+                description: 'Role updated; a credit changed to a role the artist already holds on the album is removed',
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Artist not found, or the artist has no such credit on the album',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Malformed public ID or album ID, an unknown role, or no current role while the artist holds several',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}/albums/{albumId}', name: 'update_album_role', methods: ['PATCH'])]

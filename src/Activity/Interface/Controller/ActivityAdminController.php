@@ -8,8 +8,7 @@ use App\Activity\Application\Port\ActivityAnalyticsPortInterface;
 use App\Activity\Interface\Request\ActivityAnalyticsRange;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
@@ -30,30 +29,58 @@ final class ActivityAdminController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/activity/summary',
         summary: 'Get activity summary statistics',
         parameters: [
-            new OA\Parameter(name: 'from', description: self::FROM_DESCRIPTION, in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
-            new OA\Parameter(name: 'to', description: self::TO_DESCRIPTION, in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
+            new OA\Parameter(
+                name: 'from',
+                in: 'query',
+                description: self::FROM_DESCRIPTION,
+                required: false,
+                schema: new OA\Schema(type: 'string', format: 'date'),
+            ),
+            new OA\Parameter(
+                name: 'to',
+                in: 'query',
+                description: self::TO_DESCRIPTION,
+                required: false,
+                schema: new OA\Schema(type: 'string', format: 'date'),
+            ),
         ],
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Activity summary',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'total_plays', type: 'integer'),
-                            new OA\Property(property: 'unique_tracks', type: 'integer'),
-                            new OA\Property(property: 'unique_artists', type: 'integer'),
-                            new OA\Property(property: 'total_listening_time', type: 'integer'),
-                        ]),
-                    ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                properties: [
+                                    'total_plays' => new OA\Schema(type: 'integer'),
+                                    'unique_tracks' => new OA\Schema(type: 'integer'),
+                                    'unique_artists' => new OA\Schema(type: 'integer'),
+                                    'total_listening_time' => new OA\Schema(type: 'integer'),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '400', description: 'Invalid query parameters', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid query parameters',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/summary', name: 'summary', methods: ['GET'])]
@@ -65,33 +92,73 @@ final class ActivityAdminController
         return $this->successResponse($this->analytics->getSummary($range->from, $range->to));
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/activity/top-tracks',
         summary: 'Get top tracks by play count',
         parameters: [
-            new OA\Parameter(name: 'from', description: self::FROM_DESCRIPTION, in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
-            new OA\Parameter(name: 'to', description: self::TO_DESCRIPTION, in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
-            new OA\Parameter(name: 'limit', description: 'Max results', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 10, maximum: 100, minimum: 1)),
+            new OA\Parameter(
+                name: 'from',
+                in: 'query',
+                description: self::FROM_DESCRIPTION,
+                required: false,
+                schema: new OA\Schema(type: 'string', format: 'date'),
+            ),
+            new OA\Parameter(
+                name: 'to',
+                in: 'query',
+                description: self::TO_DESCRIPTION,
+                required: false,
+                schema: new OA\Schema(type: 'string', format: 'date'),
+            ),
+            new OA\Parameter(
+                name: 'limit',
+                in: 'query',
+                description: 'Max results',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 1,
+                    maximum: 100,
+                    default: 10,
+                ),
+            ),
         ],
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Top tracks list',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', type: 'array', items: new OA\Items(
-                            properties: [
-                                new OA\Property(property: 'track_name', type: 'string'),
-                                new OA\Property(property: 'artist_name', type: 'string', nullable: true),
-                                new OA\Property(property: 'album_name', type: 'string', nullable: true),
-                                new OA\Property(property: 'play_count', type: 'integer'),
-                            ],
-                        )),
-                    ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(
+                                    properties: [
+                                        'track_name' => new OA\Schema(type: 'string'),
+                                        'artist_name' => new OA\Schema(type: 'string', nullable: true),
+                                        'album_name' => new OA\Schema(type: 'string', nullable: true),
+                                        'play_count' => new OA\Schema(type: 'integer'),
+                                    ],
+                                ),
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '400', description: 'Invalid query parameters', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid query parameters',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/top-tracks', name: 'top_tracks', methods: ['GET'])]
@@ -104,31 +171,71 @@ final class ActivityAdminController
         return $this->successResponse($this->analytics->getTopTracks($range->from, $range->to, $limit));
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/activity/top-artists',
         summary: 'Get top artists by play count',
         parameters: [
-            new OA\Parameter(name: 'from', description: self::FROM_DESCRIPTION, in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
-            new OA\Parameter(name: 'to', description: self::TO_DESCRIPTION, in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
-            new OA\Parameter(name: 'limit', description: 'Max results', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 10, maximum: 100, minimum: 1)),
+            new OA\Parameter(
+                name: 'from',
+                in: 'query',
+                description: self::FROM_DESCRIPTION,
+                required: false,
+                schema: new OA\Schema(type: 'string', format: 'date'),
+            ),
+            new OA\Parameter(
+                name: 'to',
+                in: 'query',
+                description: self::TO_DESCRIPTION,
+                required: false,
+                schema: new OA\Schema(type: 'string', format: 'date'),
+            ),
+            new OA\Parameter(
+                name: 'limit',
+                in: 'query',
+                description: 'Max results',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 1,
+                    maximum: 100,
+                    default: 10,
+                ),
+            ),
         ],
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Top artists list',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', type: 'array', items: new OA\Items(
-                            properties: [
-                                new OA\Property(property: 'artist_name', type: 'string'),
-                                new OA\Property(property: 'play_count', type: 'integer'),
-                            ],
-                        )),
-                    ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(
+                                    properties: [
+                                        'artist_name' => new OA\Schema(type: 'string'),
+                                        'play_count' => new OA\Schema(type: 'integer'),
+                                    ],
+                                ),
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '400', description: 'Invalid query parameters', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid query parameters',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/top-artists', name: 'top_artists', methods: ['GET'])]
@@ -141,29 +248,57 @@ final class ActivityAdminController
         return $this->successResponse($this->analytics->getTopArtists($range->from, $range->to, $limit));
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/activity/engagement',
         summary: 'Get user engagement metrics',
         parameters: [
-            new OA\Parameter(name: 'from', description: self::FROM_DESCRIPTION, in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
-            new OA\Parameter(name: 'to', description: self::TO_DESCRIPTION, in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
+            new OA\Parameter(
+                name: 'from',
+                in: 'query',
+                description: self::FROM_DESCRIPTION,
+                required: false,
+                schema: new OA\Schema(type: 'string', format: 'date'),
+            ),
+            new OA\Parameter(
+                name: 'to',
+                in: 'query',
+                description: self::TO_DESCRIPTION,
+                required: false,
+                schema: new OA\Schema(type: 'string', format: 'date'),
+            ),
         ],
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Engagement metrics',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'active_users', type: 'integer'),
-                            new OA\Property(property: 'avg_plays_per_user', type: 'number'),
-                            new OA\Property(property: 'avg_session_length', type: 'number'),
-                        ]),
-                    ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                properties: [
+                                    'active_users' => new OA\Schema(type: 'integer'),
+                                    'avg_plays_per_user' => new OA\Schema(type: 'number'),
+                                    'avg_session_length' => new OA\Schema(type: 'number'),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '400', description: 'Invalid query parameters', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid query parameters',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/engagement', name: 'engagement', methods: ['GET'])]

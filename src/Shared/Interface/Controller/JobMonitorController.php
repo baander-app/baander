@@ -10,8 +10,7 @@ use App\Shared\Application\Port\JobMonitorAdministrationInterface;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\Resource\JobMonitorResource;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
@@ -34,23 +33,46 @@ final class JobMonitorController
     /**
      * Get job monitoring status summary.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/monitor/status',
         summary: 'Get background job monitoring status summary',
         responses: [
-            new OA\Response(response: '200', description: 'Job monitor state',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'counts', description: 'Job counts by status', type: 'object'),
-                        new OA\Property(property: 'running', type: 'array', items: new OA\Items(properties: [
-                            new OA\Property(property: 'jobId', description: 'Public job identifier', type: 'string'),
-                            new OA\Property(property: 'name', description: 'Job name', type: 'string'),
-                            new OA\Property(property: 'queue', description: 'Queue the job is running on', type: 'string'),
-                            new OA\Property(property: 'startedAt', type: 'string', format: 'date-time', nullable: true),
-                            new OA\Property(property: 'progress', description: 'Job progress between 0 and 100', type: 'integer', nullable: true),
-                        ], type: 'object')),
-                    ], type: 'object')],
-                    type: 'object',
+            new OA\Response(
+                response: '200',
+                description: 'Job monitor state',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'counts' => new OA\Schema(description: 'Job counts by status', type: 'object'),
+                                    'running' => new OA\Schema(
+                                        type: 'array',
+                                        items: new OA\Schema(
+                                            type: 'object',
+                                            properties: [
+                                                'jobId' => new OA\Schema(description: 'Public job identifier', type: 'string'),
+                                                'name' => new OA\Schema(description: 'Job name', type: 'string'),
+                                                'queue' => new OA\Schema(description: 'Queue the job is running on', type: 'string'),
+                                                'startedAt' => new OA\Schema(
+                                                    type: 'string',
+                                                    format: 'date-time',
+                                                    nullable: true,
+                                                ),
+                                                'progress' => new OA\Schema(
+                                                    description: 'Job progress between 0 and 100',
+                                                    type: 'integer',
+                                                    nullable: true,
+                                                ),
+                                            ],
+                                        ),
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
         ],
@@ -65,52 +87,155 @@ final class JobMonitorController
     /**
      * Get job list with filtering, sorting, and cursor-based pagination.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/monitor/jobs',
         summary: 'Get background jobs with filtering, sorting, and pagination',
         parameters: [
-            new OA\Parameter(name: 'status', description: 'Filter by job status', in: 'query', required: false, schema: new OA\Schema(type: 'string', enum: ['queued',
-                                                                                                                                                             'running',
-                                                                                                                                                             'finished',
-                                                                                                                                                             'failed',
-                                                                                                                                                             'cancelled'])),
-            new OA\Parameter(name: 'name', description: 'Filter by job name (partial match)', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'queue', description: 'Filter by queue name (exact match)', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'sort', description: 'Sort field', in: 'query', required: false, schema: new OA\Schema(type: 'string', default: 'createdAt', enum: ['createdAt',
-                                                                                                                                                                       'startedAt',
-                                                                                                                                                                       'finishedAt',
-                                                                                                                                                                       'duration'])),
-            new OA\Parameter(name: 'direction', description: 'Sort direction', in: 'query', required: false, schema: new OA\Schema(type: 'string', default: 'desc', enum: ['asc',
-                                                                                                                                                                           'desc'])),
-            new OA\Parameter(name: 'limit', description: 'Page size (1-200)', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 50, maximum: 200, minimum: 1)),
-            new OA\Parameter(name: 'cursor', description: 'Cursor string for pagination', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
-        ],
-        responses: [
-            new OA\Response(response: '200', description: 'Paginated job list',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'items', type: 'array', items: new OA\Items(properties: [
-                            new OA\Property(property: 'jobId', description: 'Public job identifier', type: 'string'),
-                            new OA\Property(property: 'name', description: 'Job name', type: 'string', nullable: true),
-                            new OA\Property(property: 'queue', description: 'Queue the job was dispatched to', type: 'string', nullable: true),
-                            new OA\Property(property: 'status', description: 'Job status', type: 'string'),
-                            new OA\Property(property: 'progress', description: 'Job progress between 0 and 100', type: 'integer', nullable: true),
-                            new OA\Property(property: 'attempt', description: 'Current attempt number', type: 'integer'),
-                            new OA\Property(property: 'retried', description: 'Whether the job has been retried', type: 'boolean'),
-                            new OA\Property(property: 'startedAt', type: 'string', format: 'date-time', nullable: true),
-                            new OA\Property(property: 'finishedAt', type: 'string', format: 'date-time', nullable: true),
-                            new OA\Property(property: 'createdAt', description: 'Job creation timestamp', type: 'string', format: 'date-time'),
-                            new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time'),
-                            new OA\Property(property: 'exceptionClass', description: 'Exception class name (failed jobs only)', type: 'string', nullable: true),
-                        ], type: 'object')),
-                        new OA\Property(property: 'next_cursor', description: 'Cursor for the next page', type: 'string', nullable: true),
-                        new OA\Property(property: 'has_next_page', description: 'Whether there is a next page', type: 'boolean'),
-                        new OA\Property(property: 'per_page', description: 'Number of items per page', type: 'integer'),
-                    ], type: 'object')],
-                    type: 'object',
+            new OA\Parameter(
+                name: 'status',
+                in: 'query',
+                description: 'Filter by job status',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['queued', 'running', 'finished', 'failed', 'cancelled'],
                 ),
             ),
-            new OA\Response(response: '422', description: 'Unknown status', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Parameter(
+                name: 'name',
+                in: 'query',
+                description: 'Filter by job name (partial match)',
+                required: false,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'queue',
+                in: 'query',
+                description: 'Filter by queue name (exact match)',
+                required: false,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'sort',
+                in: 'query',
+                description: 'Sort field',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['createdAt', 'startedAt', 'finishedAt', 'duration'],
+                    default: 'createdAt',
+                ),
+            ),
+            new OA\Parameter(
+                name: 'direction',
+                in: 'query',
+                description: 'Sort direction',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['asc', 'desc'],
+                    default: 'desc',
+                ),
+            ),
+            new OA\Parameter(
+                name: 'limit',
+                in: 'query',
+                description: 'Page size (1-200)',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 1,
+                    maximum: 200,
+                    default: 50,
+                ),
+            ),
+            new OA\Parameter(
+                name: 'cursor',
+                in: 'query',
+                description: 'Cursor string for pagination',
+                required: false,
+                schema: new OA\Schema(type: 'string'),
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'Paginated job list',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'items' => new OA\Schema(
+                                        type: 'array',
+                                        items: new OA\Schema(
+                                            type: 'object',
+                                            properties: [
+                                                'jobId' => new OA\Schema(description: 'Public job identifier', type: 'string'),
+                                                'name' => new OA\Schema(
+                                                    description: 'Job name',
+                                                    type: 'string',
+                                                    nullable: true,
+                                                ),
+                                                'queue' => new OA\Schema(
+                                                    description: 'Queue the job was dispatched to',
+                                                    type: 'string',
+                                                    nullable: true,
+                                                ),
+                                                'status' => new OA\Schema(description: 'Job status', type: 'string'),
+                                                'progress' => new OA\Schema(
+                                                    description: 'Job progress between 0 and 100',
+                                                    type: 'integer',
+                                                    nullable: true,
+                                                ),
+                                                'attempt' => new OA\Schema(description: 'Current attempt number', type: 'integer'),
+                                                'retried' => new OA\Schema(description: 'Whether the job has been retried', type: 'boolean'),
+                                                'startedAt' => new OA\Schema(
+                                                    type: 'string',
+                                                    format: 'date-time',
+                                                    nullable: true,
+                                                ),
+                                                'finishedAt' => new OA\Schema(
+                                                    type: 'string',
+                                                    format: 'date-time',
+                                                    nullable: true,
+                                                ),
+                                                'createdAt' => new OA\Schema(
+                                                    description: 'Job creation timestamp',
+                                                    type: 'string',
+                                                    format: 'date-time',
+                                                ),
+                                                'updatedAt' => new OA\Schema(type: 'string', format: 'date-time'),
+                                                'exceptionClass' => new OA\Schema(
+                                                    description: 'Exception class name (failed jobs only)',
+                                                    type: 'string',
+                                                    nullable: true,
+                                                ),
+                                            ],
+                                        ),
+                                    ),
+                                    'next_cursor' => new OA\Schema(
+                                        description: 'Cursor for the next page',
+                                        type: 'string',
+                                        nullable: true,
+                                    ),
+                                    'has_next_page' => new OA\Schema(description: 'Whether there is a next page', type: 'boolean'),
+                                    'per_page' => new OA\Schema(description: 'Number of items per page', type: 'integer'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Unknown status',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[CliCounterpart('app:monitor:jobs')]
@@ -134,35 +259,92 @@ final class JobMonitorController
     /**
      * Get job detail by job ID.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/monitor/jobs/{jobId}',
         summary: 'Get background job detail',
         parameters: [
-            new OA\Parameter(name: 'jobId', description: 'Public job identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'jobId',
+                in: 'path',
+                description: 'Public job identifier',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Full job record',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'jobId', description: 'Public job identifier', type: 'string'),
-                        new OA\Property(property: 'name', description: 'Job name', type: 'string', nullable: true),
-                        new OA\Property(property: 'queue', description: 'Queue the job was dispatched to', type: 'string', nullable: true),
-                        new OA\Property(property: 'status', description: 'Job status', type: 'string'),
-                        new OA\Property(property: 'progress', description: 'Job progress between 0 and 100', type: 'integer', nullable: true),
-                        new OA\Property(property: 'attempt', description: 'Current attempt number', type: 'integer'),
-                        new OA\Property(property: 'retried', description: 'Whether the job has been retried', type: 'boolean'),
-                        new OA\Property(property: 'startedAt', type: 'string', format: 'date-time', nullable: true),
-                        new OA\Property(property: 'finishedAt', type: 'string', format: 'date-time', nullable: true),
-                        new OA\Property(property: 'createdAt', description: 'Job creation timestamp', type: 'string', format: 'date-time'),
-                        new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time'),
-                        new OA\Property(property: 'exceptionClass', description: 'Exception class name (failed jobs only)', type: 'string', nullable: true),
-                        new OA\Property(property: 'duration', description: 'Execution time in seconds (null if not finished)', type: 'number', format: 'float', nullable: true),
-                        new OA\Property(property: 'cancellable', description: 'Whether cancelling the job can still change anything: it is queued or running, or it has finished and work it queued, such as lyrics fetches, may still be waiting', type: 'boolean'),
-                    ], type: 'object')],
-                    type: 'object',
+            new OA\Response(
+                response: '200',
+                description: 'Full job record',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'jobId' => new OA\Schema(description: 'Public job identifier', type: 'string'),
+                                    'name' => new OA\Schema(
+                                        description: 'Job name',
+                                        type: 'string',
+                                        nullable: true,
+                                    ),
+                                    'queue' => new OA\Schema(
+                                        description: 'Queue the job was dispatched to',
+                                        type: 'string',
+                                        nullable: true,
+                                    ),
+                                    'status' => new OA\Schema(description: 'Job status', type: 'string'),
+                                    'progress' => new OA\Schema(
+                                        description: 'Job progress between 0 and 100',
+                                        type: 'integer',
+                                        nullable: true,
+                                    ),
+                                    'attempt' => new OA\Schema(description: 'Current attempt number', type: 'integer'),
+                                    'retried' => new OA\Schema(description: 'Whether the job has been retried', type: 'boolean'),
+                                    'startedAt' => new OA\Schema(
+                                        type: 'string',
+                                        format: 'date-time',
+                                        nullable: true,
+                                    ),
+                                    'finishedAt' => new OA\Schema(
+                                        type: 'string',
+                                        format: 'date-time',
+                                        nullable: true,
+                                    ),
+                                    'createdAt' => new OA\Schema(
+                                        description: 'Job creation timestamp',
+                                        type: 'string',
+                                        format: 'date-time',
+                                    ),
+                                    'updatedAt' => new OA\Schema(type: 'string', format: 'date-time'),
+                                    'exceptionClass' => new OA\Schema(
+                                        description: 'Exception class name (failed jobs only)',
+                                        type: 'string',
+                                        nullable: true,
+                                    ),
+                                    'duration' => new OA\Schema(
+                                        description: 'Execution time in seconds (null if not finished)',
+                                        type: 'number',
+                                        format: 'float',
+                                        nullable: true,
+                                    ),
+                                    'cancellable' => new OA\Schema(
+                                        description: 'Whether cancelling the job can still change anything: it is queued or running, or it has finished and work it queued, such as lyrics fetches, may still be waiting',
+                                        type: 'boolean',
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Job not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[CliCounterpart('app:monitor:job:show')]
@@ -175,28 +357,55 @@ final class JobMonitorController
     /**
      * Prune completed job monitors older than a given age.
      */
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/monitor/prune',
-        description: 'Deletes finished, failed, and cancelled job monitors older than the specified number of days. Defaults to 7 days.',
         summary: 'Prune old job monitors',
+        description: 'Deletes finished, failed, and cancelled job monitors older than the specified number of days. Defaults to 7 days.',
         requestBody: new OA\RequestBody(
-            content: new OA\JsonContent(
-                properties: [
-                    new OA\Property(property: 'days', description: 'Prune jobs older than this many days', type: 'integer', default: JobMonitorAdministrationInterface::DEFAULT_PRUNE_DAYS, maximum: JobMonitorAdministrationInterface::MAX_PRUNE_DAYS, minimum: 1),
-                ],
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'days' => new OA\Schema(
+                            description: 'Prune jobs older than this many days',
+                            type: 'integer',
+                            minimum: 1,
+                            maximum: JobMonitorAdministrationInterface::MAX_PRUNE_DAYS,
+                            default: JobMonitorAdministrationInterface::DEFAULT_PRUNE_DAYS,
+                        ),
+                    ],
+                ),
             ),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Prune result',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'pruned', description: 'Number of job monitors deleted', type: 'integer'),
-                        new OA\Property(property: 'olderThan', description: 'Cutoff timestamp', type: 'string', format: 'date-time'),
-                    ], type: 'object')],
-                    type: 'object',
+            new OA\Response(
+                response: '200',
+                description: 'Prune result',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'pruned' => new OA\Schema(description: 'Number of job monitors deleted', type: 'integer'),
+                                    'olderThan' => new OA\Schema(
+                                        description: 'Cutoff timestamp',
+                                        type: 'string',
+                                        format: 'date-time',
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '422', description: 'Days is not a whole number, or lies outside 1 to ' . JobMonitorAdministrationInterface::MAX_PRUNE_DAYS, content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(
+                response: '422',
+                description: 'Days is not a whole number, or lies outside 1 to ' . JobMonitorAdministrationInterface::MAX_PRUNE_DAYS,
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[CliCounterpart('app:monitor:prune')]
@@ -235,24 +444,51 @@ final class JobMonitorController
     /**
      * Retry a failed job by re-dispatching its original message payload.
      */
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/monitor/jobs/{jobId}/retry',
-        description: 'Re-dispatches the original message payload of a failed job. The job must be in Failed status, not previously retried, and have a stored message payload.',
         summary: 'Retry a failed background job',
+        description: 'Re-dispatches the original message payload of a failed job. The job must be in Failed status, not previously retried, and have a stored message payload.',
         parameters: [
-            new OA\Parameter(name: 'jobId', description: 'Public job identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'jobId',
+                in: 'path',
+                description: 'Public job identifier',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Job retried successfully',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'newJobId', description: 'Job ID of the newly dispatched job', type: 'string'),
-                    ], type: 'object')],
-                    type: 'object',
+            new OA\Response(
+                response: '200',
+                description: 'Job retried successfully',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'newJobId' => new OA\Schema(description: 'Job ID of the newly dispatched job', type: 'string'),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '409', description: 'Job cannot be retried: it has not failed, was already retried, or has no readable stored message', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Job not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Job cannot be retried: it has not failed, was already retried, or has no readable stored message',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[CliCounterpart('app:monitor:job:retry')]
@@ -267,24 +503,51 @@ final class JobMonitorController
     /**
      * Cancel a running job at its next checkpoint, or the work a finished job queued.
      */
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/monitor/jobs/{jobId}/cancel',
-        description: 'Sets a cooperative cancellation flag in Redis; a running job stops at its next checkpoint and becomes cancelled. A finished job that queued work to run later, such as the lyrics fetches of a bulk fetch, has that work cancelled instead: what has not run yet is skipped when it comes due, and the job becomes cancelled.',
         summary: 'Cancel a running background job, or the work a finished job queued',
+        description: 'Sets a cooperative cancellation flag in Redis; a running job stops at its next checkpoint and becomes cancelled. A finished job that queued work to run later, such as the lyrics fetches of a bulk fetch, has that work cancelled instead: what has not run yet is skipped when it comes due, and the job becomes cancelled.',
         parameters: [
-            new OA\Parameter(name: 'jobId', description: 'Public job identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'jobId',
+                in: 'path',
+                description: 'Public job identifier',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Job cancellation requested',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'cancelled', description: 'Whether the cancellation flag was set', type: 'boolean'),
-                    ], type: 'object')],
-                    type: 'object',
+            new OA\Response(
+                response: '200',
+                description: 'Job cancellation requested',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'cancelled' => new OA\Schema(description: 'Whether the cancellation flag was set', type: 'boolean'),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '409', description: 'Job cannot be cancelled because it has failed, or has finished with no queued work waiting', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Job not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Job cannot be cancelled because it has failed, or has finished with no queued work waiting',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[CliCounterpart('app:monitor:job:cancel')]

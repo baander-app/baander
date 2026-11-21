@@ -12,8 +12,7 @@ use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Transcode\Application\Port\SegmentAvailabilityInterface;
 use App\Transcode\Interface\Security\SignedStreamRequest;
 use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
-use OpenApi\Attributes as OA;
-use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -34,26 +33,103 @@ final class StreamSegmentController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/transcode/{jobPublicId}/tracks/{track}/init.mp4',
         summary: 'Get fMP4 track initialization segment',
         parameters: [
-            new OA\Parameter(name: 'track', description: 'Published media component', in: 'path', required: true, schema: new OA\Schema(type: 'string', enum: ['video', 'audio'])),
-            new OA\Parameter(name: 'generation', description: 'Pinned media execution generation', in: 'query', required: true, schema: new OA\Schema(type: 'integer', minimum: 1)),
-            new OA\Parameter(name: 'jobPublicId', description: 'Job public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'sig', description: 'URL signature', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'exp', description: 'Expiry timestamp', in: 'query', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(
+                name: 'track',
+                in: 'path',
+                description: 'Published media component',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['video', 'audio'],
+                ),
+            ),
+            new OA\Parameter(
+                name: 'generation',
+                in: 'query',
+                description: 'Pinned media execution generation',
+                required: true,
+                schema: new OA\Schema(type: 'integer', minimum: 1),
+            ),
+            new OA\Parameter(
+                name: 'jobPublicId',
+                in: 'path',
+                description: 'Job public ID',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'sig',
+                in: 'query',
+                description: 'URL signature',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'exp',
+                in: 'query',
+                description: 'Expiry timestamp',
+                required: true,
+                schema: new OA\Schema(type: 'integer'),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'fMP4 init segment', content: [new OA\MediaType(mediaType: 'video/mp4', schema: new OA\Schema(type: 'string', format: 'binary')), new OA\MediaType(mediaType: 'audio/mp4', schema: new OA\Schema(type: 'string', format: 'binary'))]),
-            new OA\Response(response: '403', description: 'Invalid or expired signature', content: new OA\JsonContent(
-                required: ['error'],
-                properties: [new OA\Property(property: 'error', type: 'string')],
-            )),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '503', description: 'Init segment is not ready; empty response body', headers: [
-                new OA\Header(header: 'Retry-After', schema: new OA\Schema(type: 'integer', example: 2)),
-            ], content: [new OA\MediaType(mediaType: 'video/mp4', schema: new OA\Schema(type: 'string', format: 'binary')), new OA\MediaType(mediaType: 'audio/mp4', schema: new OA\Schema(type: 'string', format: 'binary'))]),
+            new OA\Response(
+                response: '200',
+                description: 'fMP4 init segment',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'video/mp4',
+                        schema: new OA\Schema(type: 'string', format: 'binary'),
+                    ),
+                    new OA\MediaType(
+                        mediaType: 'audio/mp4',
+                        schema: new OA\Schema(type: 'string', format: 'binary'),
+                    ),
+                ],
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Invalid or expired signature',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'error' => new OA\Schema(type: 'string'),
+                        ],
+                        required: ['error'],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '503',
+                description: 'Init segment is not ready; empty response body',
+                headers: [
+                    new OA\Header(
+                        header: 'Retry-After',
+                        schema: new OA\Schema(type: 'integer', example: 2),
+                    ),
+                ],
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'video/mp4',
+                        schema: new OA\Schema(type: 'string', format: 'binary'),
+                    ),
+                    new OA\MediaType(
+                        mediaType: 'audio/mp4',
+                        schema: new OA\Schema(type: 'string', format: 'binary'),
+                    ),
+                ],
+            ),
         ],
     )]
     #[Route('/tracks/{track}/init.mp4', name: 'init_segment', requirements: ['track' => 'video|audio'], methods: ['GET'])]
@@ -84,22 +160,74 @@ final class StreamSegmentController
         return $this->streamFile($readyPath, $track === MediaTrack::Video ? 'video/mp4' : 'audio/mp4', $valid);
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/transcode/{jobPublicId}/tracks/{track}/segment.m4s',
         summary: 'Get fMP4 media segment (query-param routed)',
         parameters: [
-            new OA\Parameter(name: 'track', description: 'Published media component', in: 'path', required: true, schema: new OA\Schema(type: 'string', enum: ['video', 'audio'])),
-            new OA\Parameter(name: 'generation', description: 'Pinned media execution generation', in: 'query', required: true, schema: new OA\Schema(type: 'integer', minimum: 1)),
-            new OA\Parameter(name: 'jobPublicId', description: 'Job public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'index', description: 'Zero-based generation-local published segment ordinal', in: 'query', required: true, schema: new OA\Schema(type: 'integer')),
-            new OA\Parameter(name: 'sig', description: 'URL signature', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'exp', description: 'Expiry timestamp', in: 'query', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(
+                name: 'track',
+                in: 'path',
+                description: 'Published media component',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['video', 'audio'],
+                ),
+            ),
+            new OA\Parameter(
+                name: 'generation',
+                in: 'query',
+                description: 'Pinned media execution generation',
+                required: true,
+                schema: new OA\Schema(type: 'integer', minimum: 1),
+            ),
+            new OA\Parameter(
+                name: 'jobPublicId',
+                in: 'path',
+                description: 'Job public ID',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'index',
+                in: 'query',
+                description: 'Zero-based generation-local published segment ordinal',
+                required: true,
+                schema: new OA\Schema(type: 'integer'),
+            ),
+            new OA\Parameter(
+                name: 'sig',
+                in: 'query',
+                description: 'URL signature',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'exp',
+                in: 'query',
+                description: 'Expiry timestamp',
+                required: true,
+                schema: new OA\Schema(type: 'integer'),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'fMP4 media segment', content: [new OA\MediaType(mediaType: 'video/mp4'), new OA\MediaType(mediaType: 'audio/mp4')]),
+            new OA\Response(
+                response: '200',
+                description: 'fMP4 media segment',
+                content: [
+                    new OA\MediaType(mediaType: 'video/mp4'),
+                    new OA\MediaType(mediaType: 'audio/mp4'),
+                ],
+            ),
             new OA\Response(response: '503', description: 'Published segment is temporarily unavailable'),
             new OA\Response(response: '403', description: 'Invalid or expired signature'),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/tracks/{track}/segment.m4s', name: 'segment', requirements: ['track' => 'video|audio'], methods: ['GET'])]
@@ -145,19 +273,62 @@ final class StreamSegmentController
 
     // --- Subtitle Segment Delivery ---
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/transcode/{jobPublicId}/subtitles/{language}/{segment}.vtt',
         summary: 'Get subtitle segment (WebVTT)',
         parameters: [
-            new OA\Parameter(name: 'generation', description: 'Pinned media execution generation', in: 'query', required: true, schema: new OA\Schema(type: 'integer', minimum: 1)),
-            new OA\Parameter(name: 'jobPublicId', description: 'Job public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'language', description: 'Source subtitle track key: s followed by the absolute FFprobe stream index (for example s2)', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'segment', description: 'Segment name', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'sig', description: 'URL signature', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'exp', description: 'Expiry timestamp', in: 'query', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(
+                name: 'generation',
+                in: 'query',
+                description: 'Pinned media execution generation',
+                required: true,
+                schema: new OA\Schema(type: 'integer', minimum: 1),
+            ),
+            new OA\Parameter(
+                name: 'jobPublicId',
+                in: 'path',
+                description: 'Job public ID',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'language',
+                in: 'path',
+                description: 'Source subtitle track key: s followed by the absolute FFprobe stream index (for example s2)',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'segment',
+                in: 'path',
+                description: 'Segment name',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'sig',
+                in: 'query',
+                description: 'URL signature',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'exp',
+                in: 'query',
+                description: 'Expiry timestamp',
+                required: true,
+                schema: new OA\Schema(type: 'integer'),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'WebVTT subtitle file', content: new OA\MediaType(mediaType: 'text/vtt', schema: new OA\Schema(type: 'string'))),
+            new OA\Response(
+                response: '200',
+                description: 'WebVTT subtitle file',
+                content: new OA\MediaType(
+                    mediaType: 'text/vtt',
+                    schema: new OA\Schema(type: 'string'),
+                ),
+            ),
             new OA\Response(response: '403', description: 'Invalid or expired signature'),
             new OA\Response(response: '404', description: 'Not found'),
         ],

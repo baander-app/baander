@@ -12,8 +12,7 @@ use App\Auth\Interface\Resource\LoginBlockResource;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Request\QueryParameters;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -37,29 +36,62 @@ final class AdminLoginBlockController
         private readonly MessageBusInterface $bus,
     ) {}
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/login-blocks',
         summary: 'List recent honeypot blocks (paginated)',
         parameters: [
-            new OA\Parameter(name: 'limit', description: 'Results per page', in: 'query', schema: new OA\Schema(type: 'integer', default: 50, maximum: 100, minimum: 1)),
-            new OA\Parameter(name: 'offset', description: 'Result offset', in: 'query', schema: new OA\Schema(type: 'integer', default: 0, minimum: 0)),
+            new OA\Parameter(
+                name: 'limit',
+                in: 'query',
+                description: 'Results per page',
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 1,
+                    maximum: 100,
+                    default: 50,
+                ),
+            ),
+            new OA\Parameter(
+                name: 'offset',
+                in: 'query',
+                description: 'Result offset',
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 0,
+                    default: 0,
+                ),
+            ),
         ],
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Paginated block list',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: LoginBlockResource::class))),
-                        new OA\Property(property: 'meta', properties: [
-                            new OA\Property(property: 'total', type: 'integer'),
-                            new OA\Property(property: 'limit', type: 'integer'),
-                            new OA\Property(property: 'offset', type: 'integer'),
-                        ], type: 'object'),
-                    ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(ref: LoginBlockResource::class),
+                            ),
+                            'meta' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'total' => new OA\Schema(type: 'integer'),
+                                    'limit' => new OA\Schema(type: 'integer'),
+                                    'offset' => new OA\Schema(type: 'integer'),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '400', description: 'Invalid pagination', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid pagination',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('', name: 'list', methods: ['GET'])]
@@ -81,12 +113,18 @@ final class AdminLoginBlockController
         ]);
     }
 
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/admin/login-blocks/{publicId}',
         summary: 'Delete a single block',
         responses: [
             new OA\Response(response: '204', description: 'Block deleted'),
-            new OA\Response(response: '404', description: 'Block not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Block not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'delete', methods: ['DELETE'])]
@@ -99,7 +137,7 @@ final class AdminLoginBlockController
         return $this->noContent();
     }
 
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/admin/login-blocks',
         summary: 'Delete all blocks',
         responses: [

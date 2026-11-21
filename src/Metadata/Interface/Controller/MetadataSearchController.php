@@ -11,8 +11,7 @@ use App\Metadata\Infrastructure\Api\Discogs\DiscogsAdapter;
 use App\Metadata\Infrastructure\Api\LastFm\LastFmAdapter;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
-use OpenApi\Attributes as OA;
-use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
@@ -41,24 +40,79 @@ final class MetadataSearchController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/metadata/search/artist',
         summary: 'Search for artists across external sources',
         parameters: [
-            new OA\Parameter(name: 'q', description: 'Search query', in: 'query', required: true, schema: new OA\Schema(type: 'string'), example: 'Radiohead'),
-            new OA\Parameter(name: 'source', description: 'Data source: musicbrainz, discogs, or lastfm', in: 'query', required: false, schema: new OA\Schema(type: 'string', default: 'musicbrainz', enum: ['musicbrainz', 'discogs', 'lastfm'])),
-            new OA\Parameter(name: 'limit', description: 'Maximum number of results', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 25, maximum: 100, minimum: 1)),
-        ],
-        responses: [
-            new OA\Response(response: '200', description: 'Search results from the selected source',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(description: 'Source-specific artist search results', type: 'object'))],
-                    type: 'object',
+            new OA\Parameter(
+                name: 'q',
+                in: 'query',
+                description: 'Search query',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+                example: 'Radiohead',
+            ),
+            new OA\Parameter(
+                name: 'source',
+                in: 'query',
+                description: 'Data source: musicbrainz, discogs, or lastfm',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['musicbrainz', 'discogs', 'lastfm'],
+                    default: 'musicbrainz',
                 ),
             ),
-            new OA\Response(response: '400', description: 'Empty query parameter', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '429', description: 'The user already searched MusicBrainz in the last ten seconds', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '503', description: 'No turn under the shared MusicBrainz rate limit within ten seconds', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Parameter(
+                name: 'limit',
+                in: 'query',
+                description: 'Maximum number of results',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 1,
+                    maximum: 100,
+                    default: 25,
+                ),
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'Search results from the selected source',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(description: 'Source-specific artist search results', type: 'object'),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'Empty query parameter',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '429',
+                description: 'The user already searched MusicBrainz in the last ten seconds',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '503',
+                description: 'No turn under the shared MusicBrainz rate limit within ten seconds',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/artist', name: 'artist', methods: ['GET'])]
@@ -81,25 +135,86 @@ final class MetadataSearchController
         return $this->successResponse(is_array($results) ? $results : get_object_vars($results));
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/metadata/search/album',
         summary: 'Search for albums/release groups across external sources',
         parameters: [
-            new OA\Parameter(name: 'q', description: 'Search query', in: 'query', required: true, schema: new OA\Schema(type: 'string'), example: 'OK Computer'),
-            new OA\Parameter(name: 'source', description: 'Data source: musicbrainz or discogs', in: 'query', required: false, schema: new OA\Schema(type: 'string', default: 'musicbrainz', enum: ['musicbrainz', 'discogs'])),
-            new OA\Parameter(name: 'artist', description: 'Filter by artist name', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'limit', description: 'Maximum number of results', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 25, maximum: 100, minimum: 1)),
-        ],
-        responses: [
-            new OA\Response(response: '200', description: 'Search results from the selected source',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(description: 'Source-specific release group search results', type: 'object'))],
-                    type: 'object',
+            new OA\Parameter(
+                name: 'q',
+                in: 'query',
+                description: 'Search query',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+                example: 'OK Computer',
+            ),
+            new OA\Parameter(
+                name: 'source',
+                in: 'query',
+                description: 'Data source: musicbrainz or discogs',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['musicbrainz', 'discogs'],
+                    default: 'musicbrainz',
                 ),
             ),
-            new OA\Response(response: '400', description: 'Empty query parameter', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '429', description: 'The user already searched MusicBrainz in the last ten seconds', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '503', description: 'No turn under the shared MusicBrainz rate limit within ten seconds', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Parameter(
+                name: 'artist',
+                in: 'query',
+                description: 'Filter by artist name',
+                required: false,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'limit',
+                in: 'query',
+                description: 'Maximum number of results',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 1,
+                    maximum: 100,
+                    default: 25,
+                ),
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'Search results from the selected source',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(description: 'Source-specific release group search results', type: 'object'),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'Empty query parameter',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '429',
+                description: 'The user already searched MusicBrainz in the last ten seconds',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '503',
+                description: 'No turn under the shared MusicBrainz rate limit within ten seconds',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/album', name: 'album', methods: ['GET'])]
@@ -122,25 +237,86 @@ final class MetadataSearchController
         return $this->successResponse(get_object_vars($results));
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/metadata/search/song',
         summary: 'Search for songs/recordings across external sources',
         parameters: [
-            new OA\Parameter(name: 'q', description: 'Search query', in: 'query', required: true, schema: new OA\Schema(type: 'string'), example: 'Paranoid Android'),
-            new OA\Parameter(name: 'source', description: 'Data source: musicbrainz or discogs', in: 'query', required: false, schema: new OA\Schema(type: 'string', default: 'musicbrainz', enum: ['musicbrainz', 'discogs'])),
-            new OA\Parameter(name: 'artist', description: 'Filter by artist name', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'limit', description: 'Maximum number of results', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 25, maximum: 100, minimum: 1)),
-        ],
-        responses: [
-            new OA\Response(response: '200', description: 'Search results from the selected source',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(description: 'Source-specific recording search results', type: 'object'))],
-                    type: 'object',
+            new OA\Parameter(
+                name: 'q',
+                in: 'query',
+                description: 'Search query',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+                example: 'Paranoid Android',
+            ),
+            new OA\Parameter(
+                name: 'source',
+                in: 'query',
+                description: 'Data source: musicbrainz or discogs',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['musicbrainz', 'discogs'],
+                    default: 'musicbrainz',
                 ),
             ),
-            new OA\Response(response: '400', description: 'Empty query parameter', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '429', description: 'The user already searched MusicBrainz in the last ten seconds', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '503', description: 'No turn under the shared MusicBrainz rate limit within ten seconds', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Parameter(
+                name: 'artist',
+                in: 'query',
+                description: 'Filter by artist name',
+                required: false,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'limit',
+                in: 'query',
+                description: 'Maximum number of results',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 1,
+                    maximum: 100,
+                    default: 25,
+                ),
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'Search results from the selected source',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(description: 'Source-specific recording search results', type: 'object'),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'Empty query parameter',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '429',
+                description: 'The user already searched MusicBrainz in the last ten seconds',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '503',
+                description: 'No turn under the shared MusicBrainz rate limit within ten seconds',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/song', name: 'song', methods: ['GET'])]

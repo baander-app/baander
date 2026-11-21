@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Radio\Interface\Controller;
 
 use App\Radio\Application\Port\RadioSourcePortInterface;
-
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Radio\Application\Command\SyncCountryStationsCommand;
 use App\Radio\Application\Port\CountrySubscriptionPortInterface;
@@ -14,15 +13,17 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
-#[OA\Tag(name: 'Radio - Country Subscriptions', description: 'Subscribe to countries for station sync')]
+#[OA\Tag(
+    name: 'Radio - Country Subscriptions',
+    description: 'Subscribe to countries for station sync',
+)]
 #[Route('/api/radio/subscriptions', name: 'radio_subscription_')]
 final class CountrySubscriptionController
 {
@@ -36,19 +37,44 @@ final class CountrySubscriptionController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/radio/subscriptions',
         summary: "List user's country subscriptions",
         responses: [
-            new OA\Response(response: '200', description: 'List of subscriptions', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [
-                    new OA\Property(property: 'sourceId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-                    new OA\Property(property: 'countryCode', type: 'string'),
-                    new OA\Property(property: 'subscribedAt', type: 'string', format: 'date-time'),
-                ], type: 'object'))],
-                type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'List of subscriptions',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(
+                                    type: 'object',
+                                    properties: [
+                                        'sourceId' => new OA\Schema(
+                                            type: 'string',
+                                            minLength: 21,
+                                            maxLength: 21,
+                                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                                        ),
+                                        'countryCode' => new OA\Schema(type: 'string'),
+                                        'subscribedAt' => new OA\Schema(type: 'string', format: 'date-time'),
+                                    ],
+                                ),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('', name: 'list', methods: ['GET'])]
@@ -64,29 +90,64 @@ final class CountrySubscriptionController
         return $this->successResponse($this->subscriptionPort->listSubscriptions($userId));
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/radio/subscriptions',
         summary: 'Subscribe to a country',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(
-                required: ['sourceId', 'countryCode'],
-                properties: [
-                    new OA\Property(property: 'sourceId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-                    new OA\Property(property: 'countryCode', type: 'string'),
-                ],
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'sourceId' => new OA\Schema(
+                            type: 'string',
+                            minLength: 21,
+                            maxLength: 21,
+                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                        ),
+                        'countryCode' => new OA\Schema(type: 'string'),
+                    ],
+                    required: ['sourceId', 'countryCode'],
+                ),
             ),
         ),
         responses: [
-            new OA\Response(response: '201', description: 'Subscribed', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', properties: [
-                    new OA\Property(property: 'sourceId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-                    new OA\Property(property: 'countryCode', type: 'string'),
-                ], type: 'object')],
-                type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '201',
+                description: 'Subscribed',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'sourceId' => new OA\Schema(
+                                        type: 'string',
+                                        minLength: 21,
+                                        maxLength: 21,
+                                        pattern: '^[0-9a-zA-Z_-]{21}$',
+                                    ),
+                                    'countryCode' => new OA\Schema(type: 'string'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('', name: 'subscribe', methods: ['POST'])]
@@ -105,12 +166,18 @@ final class CountrySubscriptionController
         return $this->created($result);
     }
 
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/radio/subscriptions/{countryCode}',
         summary: 'Unsubscribe from a country',
         responses: [
             new OA\Response(response: '204', description: 'Unsubscribed'),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{countryCode}', name: 'unsubscribe', methods: ['DELETE'])]
@@ -139,18 +206,41 @@ final class CountrySubscriptionController
         return $this->noContent();
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/radio/subscriptions/{countryCode}/refresh',
         summary: 'Manual refresh of country stations',
         responses: [
-            new OA\Response(response: '200', description: 'Sync triggered', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', properties: [
-                    new OA\Property(property: 'synced', type: 'string', example: 'queued'),
-                ], type: 'object')],
-                type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Not subscribed', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Sync triggered',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'synced' => new OA\Schema(type: 'string', example: 'queued'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not subscribed',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{countryCode}/refresh', name: 'refresh', methods: ['POST'])]

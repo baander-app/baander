@@ -8,8 +8,7 @@ use App\QoL\Application\Port\QoLAdminPortInterface;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\DTO\ApiError;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -33,16 +32,24 @@ final class QoLAdminController
 
     public function __construct(
         private readonly QoLAdminPortInterface $adminPort,
-    )
-    {
+    ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/qol/status',
         summary: 'Get the stream governor status of every web server worker',
         responses: [
-            new OA\Response(response: '200', description: 'One status row per worker, the total of active streams, and the workers that did not answer or failed'),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'One status row per worker, the total of active streams, and the workers that did not answer or failed',
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[CliCounterpart('app:qol:status')]
@@ -52,12 +59,21 @@ final class QoLAdminController
         return $this->successResponse($this->adminPort->getStatus());
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/qol/streams',
         summary: 'List the active streams of every web server worker with their budget allocations',
         responses: [
-            new OA\Response(response: '200', description: 'Active streams per worker, their total, and the workers that did not answer or failed'),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Active streams per worker, their total, and the workers that did not answer or failed',
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[CliCounterpart('app:qol:streams')]
@@ -68,21 +84,44 @@ final class QoLAdminController
     }
 
     #[IsGranted('ROLE_SUPER_ADMIN')]
-    #[OA\Patch(
+    #[OA\Operation\Patch(
         path: '/api/admin/qol/profile',
         summary: 'Set the algorithm profile in every web server worker',
         requestBody: new OA\RequestBody(
-            content: new OA\JsonContent(
-                properties: [
-                    new OA\Property(property: 'profile', type: 'string', enum: ['conservative', 'balanced', 'aggressive']),
-                ],
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'profile' => new OA\Schema(
+                            type: 'string',
+                            enum: ['conservative', 'balanced', 'aggressive'],
+                        ),
+                    ],
+                ),
             ),
         ),
         responses: [
             new OA\Response(response: '200', description: 'Profile set and saved; one status row per worker'),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '422', description: 'Missing or unknown profile; no worker was changed', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '503', description: 'The change did not reach every worker; `details` holds the per-worker report with `missing_workers` and `worker_errors`', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Missing or unknown profile; no worker was changed',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '503',
+                description: 'The change did not reach every worker; `details` holds the per-worker report with `missing_workers` and `worker_errors`',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[CliCounterpart('app:qol:profile')]
@@ -96,13 +135,25 @@ final class QoLAdminController
     }
 
     #[IsGranted('ROLE_SUPER_ADMIN')]
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/admin/qol/reset',
         summary: 'Reset learning data in every web server worker and return each to the Learning state',
         responses: [
             new OA\Response(response: '200', description: 'Learning reset and saved; one status row per worker'),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '503', description: 'The reset did not reach every worker; `details` holds the per-worker report with `missing_workers` and `worker_errors`', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '503',
+                description: 'The reset did not reach every worker; `details` holds the per-worker report with `missing_workers` and `worker_errors`',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[CliCounterpart('app:qol:reset')]

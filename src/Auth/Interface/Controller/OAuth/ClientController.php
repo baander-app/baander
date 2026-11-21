@@ -18,8 +18,7 @@ use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\ValidationError;
 use InvalidArgumentException;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -42,20 +41,31 @@ final class ClientController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/oauth/clients/',
         summary: 'List personal access clients',
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'List of clients',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: ClientResource::class))),
-                    ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(ref: ClientResource::class),
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
@@ -73,25 +83,46 @@ final class ClientController
         return $this->successResponse(ClientResource::collection(is_array($clients) ? $clients : []));
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/oauth/clients/',
         summary: 'Create a new personal access client',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(required: ['name'], properties: [new OA\Property(property: 'name', type: 'string', example: 'My App')]),
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'name' => new OA\Schema(type: 'string', example: 'My App'),
+                    ],
+                    required: ['name'],
+                ),
+            ),
         ),
         responses: [
             new OA\Response(
                 response: '201',
                 description: 'Client created',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', ref: new Model(type: ClientResource::class)),
-                    ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: ClientResource::class),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: ValidationError::class))),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'create', methods: ['POST'])]
@@ -109,27 +140,56 @@ final class ClientController
         return $this->successResponse(ClientResource::from($client), Response::HTTP_CREATED);
     }
 
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/oauth/clients/{publicId}',
         summary: 'Revoke an OAuth client',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Client public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Client public ID',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Client revoked',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'message', type: 'string', example: 'Client revoked.'),
-                        ], type: 'object'),
-                    ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'message' => new OA\Schema(type: 'string', example: 'Client revoked.'),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '400', description: 'Invalid public ID', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '404', description: 'Client not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid public ID',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Client not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'revoke', methods: ['DELETE'])]

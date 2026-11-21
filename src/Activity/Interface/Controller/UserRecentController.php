@@ -12,8 +12,7 @@ use App\Activity\Interface\Resource\RecentItemResource;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -36,18 +35,55 @@ final class UserRecentController
     /**
      * Get recently played items for the authenticated user.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/user/recent',
         summary: 'Get recently played items',
         parameters: [
-            new OA\Parameter(name: 'limit', description: 'Max items to return (1-20)', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 5, maximum: 20, minimum: 1)),
-            new OA\Parameter(name: 'mediaType', description: 'Filter by media type', in: 'query', required: false, schema: new OA\Schema(type: 'string', enum: ['music', 'movies', 'tv', 'podcasts', 'concerts', 'ebooks'])),
+            new OA\Parameter(
+                name: 'limit',
+                in: 'query',
+                description: 'Max items to return (1-20)',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 1,
+                    maximum: 20,
+                    default: 5,
+                ),
+            ),
+            new OA\Parameter(
+                name: 'mediaType',
+                in: 'query',
+                description: 'Filter by media type',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['music', 'movies', 'tv', 'podcasts', 'concerts', 'ebooks'],
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: RecentItemResource::class)))],
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Success',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(ref: RecentItemResource::class),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/recent', name: 'recent', methods: ['GET'])]

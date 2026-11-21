@@ -9,8 +9,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\UserPreference\Application\Port\AccentColorPortInterface;
 use App\UserPreference\Interface\Request\UpdateAccentColorRequest;
-use OpenApi\Attributes as OA;
-use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -35,13 +34,29 @@ final class AccentColorController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/user/accent-color/',
-        description: 'Returns the current accent color for the authenticated user.',
         summary: 'Get accent color',
+        description: 'Returns the current accent color for the authenticated user.',
         responses: [
-            new OA\Response(response: '200', description: 'Accent color', content: new OA\JsonContent(properties: [new OA\Property(property: 'color', type: 'string')])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Accent color',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'color' => new OA\Schema(type: 'string'),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
@@ -57,7 +72,7 @@ final class AccentColorController
         ]);
     }
 
-    #[OA\Put(
+    #[OA\Operation\Put(
         path: '/api/user/accent-color/',
         summary: 'Update accent color',
         requestBody: new OA\RequestBody(
@@ -65,17 +80,39 @@ final class AccentColorController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
-                    required: ['color'],
                     properties: [
-                        new OA\Property(property: 'color', type: 'string'),
+                        'color' => new OA\Schema(type: 'string'),
                     ],
+                    required: ['color'],
                 ),
             ),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Color updated', content: new OA\JsonContent(properties: [new OA\Property(property: 'color', type: 'string')])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid input', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Color updated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'color' => new OA\Schema(type: 'string'),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid input',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'update', methods: ['PUT'])]

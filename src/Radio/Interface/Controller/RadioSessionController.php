@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Radio\Interface\Controller;
 
 use App\Radio\Application\Port\RadioStationPortInterface;
-
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Radio\Application\Command\StartRadioCommand;
 use App\Radio\Application\Command\StopRadioCommand;
@@ -15,8 +14,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
@@ -38,21 +36,49 @@ final class RadioSessionController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/radio/session',
         summary: 'Get current radio session',
         responses: [
-            new OA\Response(response: '200', description: 'Current session data', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', properties: [
-                    new OA\Property(property: 'stationId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-                    new OA\Property(property: 'stationName', type: 'string'),
-                    new OA\Property(property: 'streamUrl', type: 'string', format: 'uri'),
-                    new OA\Property(property: 'startedAt', type: 'string', format: 'date-time'),
-                ], type: 'object')],
-                type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'No active session', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Current session data',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'stationId' => new OA\Schema(
+                                        type: 'string',
+                                        minLength: 21,
+                                        maxLength: 21,
+                                        pattern: '^[0-9a-zA-Z_-]{21}$',
+                                    ),
+                                    'stationName' => new OA\Schema(type: 'string'),
+                                    'streamUrl' => new OA\Schema(type: 'string', format: 'uri'),
+                                    'startedAt' => new OA\Schema(type: 'string', format: 'date-time'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'No active session',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('', name: 'get', methods: ['GET'])]
@@ -73,29 +99,64 @@ final class RadioSessionController
         return $this->successResponse($session);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/radio/session/start',
         summary: 'Start playing a radio station',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(
-                required: ['stationId', 'streamUrl'],
-                properties: [
-                    new OA\Property(property: 'stationId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-                    new OA\Property(property: 'streamUrl', type: 'string', format: 'uri'),
-                ],
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'stationId' => new OA\Schema(
+                            type: 'string',
+                            minLength: 21,
+                            maxLength: 21,
+                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                        ),
+                        'streamUrl' => new OA\Schema(type: 'string', format: 'uri'),
+                    ],
+                    required: ['stationId', 'streamUrl'],
+                ),
             ),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Radio playing', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', properties: [
-                    new OA\Property(property: 'stationId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-                    new OA\Property(property: 'streamUrl', type: 'string', format: 'uri'),
-                ], type: 'object')],
-                type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Radio playing',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'stationId' => new OA\Schema(
+                                        type: 'string',
+                                        minLength: 21,
+                                        maxLength: 21,
+                                        pattern: '^[0-9a-zA-Z_-]{21}$',
+                                    ),
+                                    'streamUrl' => new OA\Schema(type: 'string', format: 'uri'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/start', name: 'start', methods: ['POST'])]
@@ -116,15 +177,33 @@ final class RadioSessionController
         return $this->successResponse($result);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/radio/session/stop',
         summary: 'Stop radio playback',
         responses: [
-            new OA\Response(response: '200', description: 'Radio stopped', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', type: 'object', example: null, nullable: true)],
-                type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Radio stopped',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                nullable: true,
+                                example: null,
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/stop', name: 'stop', methods: ['POST'])]

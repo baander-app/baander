@@ -20,8 +20,7 @@ use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\DispatchesMessagesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\DTO\PaginatedResponse;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use OpenApi\Spec\Parameter;
 use OpenApi\Spec\Schema as ParameterSchema;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -30,7 +29,10 @@ use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
-#[OA\Tag(name: 'Catalog', description: 'Album, artist, song, movie, and genre management endpoints')]
+#[OA\Tag(
+    name: 'Catalog',
+    description: 'Album, artist, song, movie, and genre management endpoints',
+)]
 #[Route('/api/movies', name: 'movie_', requirements: ['publicId' => '[0-9a-zA-Z_-]{21}'])]
 #[\Symfony\Component\Security\Http\Attribute\IsGranted('ROLE_ADMIN', methods: ['POST', 'PUT', 'PATCH', 'DELETE'])]
 final class MovieController
@@ -48,38 +50,36 @@ final class MovieController
     /**
      * List movies (paginated).
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/movies/',
         summary: 'List movies (paginated)',
         responses: [
-            new OA\Response(response: '200', description: 'Paginated list of movies', content: new OA\JsonContent(ref: new Model(type: PaginatedResponse::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Paginated list of movies',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: PaginatedResponse::class),
+                ),
+            ),
         ],
     )]
     #[Parameter(
         name: 'page',
-        description: 'Page number',
         in: 'query',
-        schema: new ParameterSchema(
-            type: 'integer',
-            default: 1,
-        ),
+        description: 'Page number',
+        schema: new ParameterSchema(type: 'integer', default: 1),
     )]
     #[Parameter(
         name: 'limit',
-        description: 'Items per page (max 100)',
         in: 'query',
-        schema: new ParameterSchema(
-            type: 'integer',
-            default: 50,
-        ),
+        description: 'Items per page (max 100)',
+        schema: new ParameterSchema(type: 'integer', default: 50),
     )]
     #[Parameter(
         name: 'q',
-        description: 'Search query',
         in: 'query',
-        schema: new ParameterSchema(
-            type: 'string',
-        ),
+        description: 'Search query',
+        schema: new ParameterSchema(type: 'string'),
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
     public function index(Request $request): JsonResponse
@@ -108,27 +108,41 @@ final class MovieController
     /**
      * Get a single movie.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/movies/{publicId}',
         summary: 'Get a single movie',
         responses: [
-            new OA\Response(response: '200', description: 'Movie details', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', ref: new Model(type: MovieResource::class))],
-                type: 'object',
-            )),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Movie details',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: MovieResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Parameter(
         name: 'publicId',
-        description: 'Movie public ID',
         in: 'path',
+        description: 'Movie public ID',
         required: true,
         schema: new ParameterSchema(
             type: 'string',
-            pattern: '^[0-9a-zA-Z_-]{21}$',
-            maxLength: 21,
             minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
         ),
     )]
     #[Route('/{publicId}', name: 'show', methods: ['GET'])]
@@ -174,33 +188,59 @@ final class MovieController
     /**
      * Update a movie.
      */
-    #[OA\Patch(
+    #[OA\Operation\Patch(
         path: '/api/movies/{publicId}',
         summary: 'Update a movie',
-        requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
-            new OA\Property(property: 'title', type: 'string', nullable: true),
-            new OA\Property(property: 'year', type: 'integer', nullable: true),
-            new OA\Property(property: 'summary', type: 'string', nullable: true),
-        ])),
+        requestBody: new OA\RequestBody(
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'title' => new OA\Schema(type: 'string', nullable: true),
+                        'year' => new OA\Schema(type: 'integer', nullable: true),
+                        'summary' => new OA\Schema(type: 'string', nullable: true),
+                    ],
+                ),
+            ),
+        ),
         responses: [
-            new OA\Response(response: '200', description: 'Movie updated', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', ref: new Model(type: MovieResource::class))],
-                type: 'object',
-            )),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Movie updated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: MovieResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Parameter(
         name: 'publicId',
-        description: 'Movie public ID',
         in: 'path',
+        description: 'Movie public ID',
         required: true,
         schema: new ParameterSchema(
             type: 'string',
-            pattern: '^[0-9a-zA-Z_-]{21}$',
-            maxLength: 21,
             minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
         ),
     )]
     #[Route('/{publicId}', name: 'update', methods: ['PATCH'])]
@@ -220,32 +260,48 @@ final class MovieController
     /**
      * Delete a movie.
      */
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/movies/{publicId}',
         summary: 'Delete a movie',
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Deleted',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', ref: new Model(type: CatalogDeletionResource::class))],
-                    type: 'object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: CatalogDeletionResource::class),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid public ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid public ID',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Parameter(
         name: 'publicId',
-        description: 'Movie public ID',
         in: 'path',
+        description: 'Movie public ID',
         required: true,
         schema: new ParameterSchema(
             type: 'string',
-            pattern: '^[0-9a-zA-Z_-]{21}$',
-            maxLength: 21,
             minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
         ),
     )]
     #[Route('/{publicId}', name: 'destroy', methods: ['DELETE'])]

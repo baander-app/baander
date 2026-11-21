@@ -6,7 +6,7 @@ namespace App\Shared\Interface\Controller;
 
 use App\Shared\Application\Port\ServerDiagnosticsInterface;
 use App\Shared\Interface\Attribute\CliCounterpart;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -20,32 +20,42 @@ final readonly class ServerStatsControllerWithCoroutines
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/debug/stats',
         summary: 'Per-worker server diagnostics with the shared Redis figures',
         responses: [
-            new OA\Response(response: '200', description: 'Server stats snapshot',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(
-                                property: 'workers',
-                                description: 'One entry per HTTP worker that answered: worker_id, memory, process, swoole, coroutines, pools, live_updates',
-                                type: 'array',
-                                items: new OA\Items(additionalProperties: true),
+            new OA\Response(
+                response: '200',
+                description: 'Server stats snapshot',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                properties: [
+                                    'workers' => new OA\Schema(
+                                        description: 'One entry per HTTP worker that answered: worker_id, memory, process, swoole, coroutines, pools, live_updates',
+                                        type: 'array',
+                                        items: new OA\Schema(additionalProperties: true),
+                                    ),
+                                    'missing_workers' => new OA\Schema(
+                                        description: 'Workers that did not answer in time',
+                                        type: 'array',
+                                        items: new OA\Schema(type: 'integer'),
+                                    ),
+                                    'worker_errors' => new OA\Schema(
+                                        type: 'array',
+                                        items: new OA\Schema(
+                                            properties: [
+                                                'worker_id' => new OA\Schema(type: 'integer'),
+                                                'error' => new OA\Schema(type: 'string'),
+                                            ],
+                                        ),
+                                    ),
+                                    'redis' => new OA\Schema(additionalProperties: true),
+                                ],
                             ),
-                            new OA\Property(property: 'missing_workers', description: 'Workers that did not answer in time', type: 'array', items: new OA\Items(type: 'integer')),
-                            new OA\Property(
-                                property: 'worker_errors',
-                                type: 'array',
-                                items: new OA\Items(properties: [
-                                    new OA\Property(property: 'worker_id', type: 'integer'),
-                                    new OA\Property(property: 'error', type: 'string'),
-                                ]),
-                            ),
-                            new OA\Property(property: 'redis', additionalProperties: true),
-                        ]),
-                    ],
+                        ],
+                    ),
                 ),
             ),
         ],

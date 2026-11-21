@@ -19,8 +19,7 @@ use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -30,7 +29,10 @@ use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
-#[OA\Tag(name: 'Catalog', description: 'Album, artist, song, movie, and genre management endpoints')]
+#[OA\Tag(
+    name: 'Catalog',
+    description: 'Album, artist, song, movie, and genre management endpoints',
+)]
 #[Route('/api/genres', name: 'genre_')]
 final class GenreController
 {
@@ -48,19 +50,34 @@ final class GenreController
     /**
      * List all genres (flat list, no pagination).
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/genres/',
         summary: 'List all genres (flat list)',
         parameters: [
-            new OA\Parameter(name: 'flat', description: 'Return flat list of all genres instead of root-only', in: 'query', required: false, schema: new OA\Schema(type: 'boolean', default: false)),
+            new OA\Parameter(
+                name: 'flat',
+                in: 'query',
+                description: 'Return flat list of all genres instead of root-only',
+                required: false,
+                schema: new OA\Schema(type: 'boolean', default: false),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'List of genres', content: new OA\JsonContent(
-                properties: [
-                    new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: GenreResource::class))),
-                ],
-                type: 'object',
-            )),
+            new OA\Response(
+                response: '200',
+                description: 'List of genres',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(ref: GenreResource::class),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
@@ -80,22 +97,54 @@ final class GenreController
     /**
      * Create a new genre.
      */
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/genres/',
         summary: 'Create a new genre',
-        requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'name', type: 'string'),
-                new OA\Property(property: 'slug', type: 'string'),
-                new OA\Property(property: 'parentId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
-                new OA\Property(property: 'mbid', type: 'string', nullable: true),
-            ])),
+        requestBody: new OA\RequestBody(
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'name' => new OA\Schema(type: 'string'),
+                        'slug' => new OA\Schema(type: 'string'),
+                        'parentId' => new OA\Schema(
+                            type: 'string',
+                            nullable: true,
+                            minLength: 21,
+                            maxLength: 21,
+                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                        ),
+                        'mbid' => new OA\Schema(type: 'string', nullable: true),
+                    ],
+                ),
+            ),
+        ),
         responses: [
-            new OA\Response(response: '201', description: 'Genre created', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', ref: new Model(type: GenreResource::class))],
-                type: 'object',
-            )),
-            new OA\Response(response: '409', description: 'Another genre has the slug', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid name, slug or MusicBrainz ID, or a parent that is not an existing genre', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '201',
+                description: 'Genre created',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: GenreResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Another genre has the slug',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid name, slug or MusicBrainz ID, or a parent that is not an existing genre',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'store', methods: ['POST'])]
@@ -116,27 +165,62 @@ final class GenreController
     /**
      * Get a single genre with its children.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/genres/{slug}',
         summary: 'Get a single genre with its children',
         parameters: [
-            new OA\Parameter(name: 'slug', description: 'Genre slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'slug',
+                in: 'path',
+                description: 'Genre slug',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Genre with children', content: new OA\JsonContent(
-                properties: [
-                    new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-                        new OA\Property(property: 'name', type: 'string'),
-                        new OA\Property(property: 'slug', type: 'string'),
-                        new OA\Property(property: 'parentId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
-                        new OA\Property(property: 'mbid', type: 'string'),
-                        new OA\Property(property: 'children', type: 'array', items: new OA\Items(ref: new Model(type: GenreResource::class))),
-                    ], type: 'object'),
-                ],
-                type: 'object',
-            )),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Genre with children',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'publicId' => new OA\Schema(
+                                        type: 'string',
+                                        minLength: 21,
+                                        maxLength: 21,
+                                        pattern: '^[0-9a-zA-Z_-]{21}$',
+                                    ),
+                                    'name' => new OA\Schema(type: 'string'),
+                                    'slug' => new OA\Schema(type: 'string'),
+                                    'parentId' => new OA\Schema(
+                                        type: 'string',
+                                        nullable: true,
+                                        minLength: 21,
+                                        maxLength: 21,
+                                        pattern: '^[0-9a-zA-Z_-]{21}$',
+                                    ),
+                                    'mbid' => new OA\Schema(type: 'string'),
+                                    'children' => new OA\Schema(
+                                        type: 'array',
+                                        items: new OA\Schema(ref: GenreResource::class),
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{slug}', name: 'show', methods: ['GET'])]
@@ -160,26 +244,70 @@ final class GenreController
     /**
      * Update a genre.
      */
-    #[OA\Patch(
+    #[OA\Operation\Patch(
         path: '/api/genres/{slug}',
         summary: 'Update a genre',
-        requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'name', type: 'string', nullable: true),
-                new OA\Property(property: 'slug', type: 'string', nullable: true),
-                new OA\Property(property: 'parentId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
-                new OA\Property(property: 'mbid', type: 'string', nullable: true),
-            ])),
         parameters: [
-            new OA\Parameter(name: 'slug', description: 'Genre slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'slug',
+                in: 'path',
+                description: 'Genre slug',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
+        requestBody: new OA\RequestBody(
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'name' => new OA\Schema(type: 'string', nullable: true),
+                        'slug' => new OA\Schema(type: 'string', nullable: true),
+                        'parentId' => new OA\Schema(
+                            type: 'string',
+                            nullable: true,
+                            minLength: 21,
+                            maxLength: 21,
+                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                        ),
+                        'mbid' => new OA\Schema(type: 'string', nullable: true),
+                    ],
+                ),
+            ),
+        ),
         responses: [
-            new OA\Response(response: '200', description: 'Genre updated', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', ref: new Model(type: GenreResource::class))],
-                type: 'object',
-            )),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '409', description: 'Another genre has the new slug', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid name, slug or MusicBrainz ID, a parent that is not an existing genre, or a parent that would create a circular reference', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Genre updated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: GenreResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Another genre has the new slug',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid name, slug or MusicBrainz ID, a parent that is not an existing genre, or a parent that would create a circular reference',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{slug}', name: 'update', methods: ['PATCH'])]
@@ -201,15 +329,27 @@ final class GenreController
     /**
      * Delete a genre.
      */
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/genres/{slug}',
         summary: 'Delete a genre',
         parameters: [
-            new OA\Parameter(name: 'slug', description: 'Genre slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'slug',
+                in: 'path',
+                description: 'Genre slug',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Deleted'),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{slug}', name: 'destroy', methods: ['DELETE'])]
@@ -225,18 +365,42 @@ final class GenreController
     /**
      * Assign a genre to a song.
      */
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/genres/{slug}/songs',
         summary: 'Assign a genre to a song',
-        requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'songId', description: 'Song public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-            ])),
         parameters: [
-            new OA\Parameter(name: 'slug', description: 'Genre slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'slug',
+                in: 'path',
+                description: 'Genre slug',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
+        requestBody: new OA\RequestBody(
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'songId' => new OA\Schema(
+                            description: 'Song public ID',
+                            type: 'string',
+                            minLength: 21,
+                            maxLength: 21,
+                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                        ),
+                    ],
+                ),
+            ),
+        ),
         responses: [
             new OA\Response(response: '204', description: 'Song assigned to genre'),
-            new OA\Response(response: '404', description: 'Genre or song not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Genre or song not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{slug}/songs', name: 'add_song', methods: ['POST'])]
@@ -267,16 +431,39 @@ final class GenreController
     /**
      * Remove a song from a genre.
      */
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/genres/{slug}/songs/{songId}',
         summary: 'Remove a song from a genre',
         parameters: [
-            new OA\Parameter(name: 'slug', description: 'Genre slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'songId', description: 'Song public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'slug',
+                in: 'path',
+                description: 'Genre slug',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'songId',
+                in: 'path',
+                description: 'Song public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Song removed from genre'),
-            new OA\Response(response: '404', description: 'Genre or song not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Genre or song not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{slug}/songs/{songId}', name: 'remove_song', methods: ['DELETE'])]
@@ -307,18 +494,42 @@ final class GenreController
     /**
      * Assign a genre to an album.
      */
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/genres/{slug}/albums',
         summary: 'Assign a genre to an album',
-        requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'albumId', description: 'Album public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-            ])),
         parameters: [
-            new OA\Parameter(name: 'slug', description: 'Genre slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'slug',
+                in: 'path',
+                description: 'Genre slug',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
+        requestBody: new OA\RequestBody(
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'albumId' => new OA\Schema(
+                            description: 'Album public ID',
+                            type: 'string',
+                            minLength: 21,
+                            maxLength: 21,
+                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                        ),
+                    ],
+                ),
+            ),
+        ),
         responses: [
             new OA\Response(response: '204', description: 'Album assigned to genre'),
-            new OA\Response(response: '404', description: 'Genre or album not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Genre or album not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{slug}/albums', name: 'add_album', methods: ['POST'])]
@@ -349,16 +560,39 @@ final class GenreController
     /**
      * Remove an album from a genre.
      */
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/genres/{slug}/albums/{albumId}',
         summary: 'Remove an album from a genre',
         parameters: [
-            new OA\Parameter(name: 'slug', description: 'Genre slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'albumId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'slug',
+                in: 'path',
+                description: 'Genre slug',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'albumId',
+                in: 'path',
+                description: 'Album public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Album removed from genre'),
-            new OA\Response(response: '404', description: 'Genre or album not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Genre or album not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{slug}/albums/{albumId}', name: 'remove_album', methods: ['DELETE'])]

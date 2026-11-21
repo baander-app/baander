@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Radio\Interface\Controller;
 
 use App\Radio\Application\Port\RadioStationPortInterface;
-
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Radio\Application\Command\StarStationCommand;
 use App\Radio\Application\Command\UnstarStationCommand;
@@ -15,8 +14,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
@@ -38,21 +36,50 @@ final class StarredStationController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/radio/starred',
         summary: 'List starred stations',
         responses: [
-            new OA\Response(response: '200', description: 'List of starred stations', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [
-                    new OA\Property(property: 'stationId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-                    new OA\Property(property: 'name', type: 'string'),
-                    new OA\Property(property: 'countryCode', type: 'string'),
-                    new OA\Property(property: 'streamUrl', type: 'string', format: 'uri', nullable: true),
-                    new OA\Property(property: 'starredAt', type: 'string', format: 'date-time'),
-                ], type: 'object'))],
-                type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'List of starred stations',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(
+                                    type: 'object',
+                                    properties: [
+                                        'stationId' => new OA\Schema(
+                                            type: 'string',
+                                            minLength: 21,
+                                            maxLength: 21,
+                                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                                        ),
+                                        'name' => new OA\Schema(type: 'string'),
+                                        'countryCode' => new OA\Schema(type: 'string'),
+                                        'streamUrl' => new OA\Schema(
+                                            type: 'string',
+                                            format: 'uri',
+                                            nullable: true,
+                                        ),
+                                        'starredAt' => new OA\Schema(type: 'string', format: 'date-time'),
+                                    ],
+                                ),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('', name: 'list', methods: ['GET'])]
@@ -68,28 +95,63 @@ final class StarredStationController
         return $this->successResponse($this->starredPort->listStarred($userId));
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/radio/starred',
         summary: 'Star a station',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(
-                required: ['stationId'],
-                properties: [
-                    new OA\Property(property: 'stationId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-                ],
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'stationId' => new OA\Schema(
+                            type: 'string',
+                            minLength: 21,
+                            maxLength: 21,
+                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                        ),
+                    ],
+                    required: ['stationId'],
+                ),
             ),
         ),
         responses: [
-            new OA\Response(response: '201', description: 'Station starred', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', properties: [
-                    new OA\Property(property: 'stationId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-                    new OA\Property(property: 'starred', type: 'boolean'),
-                ], type: 'object')],
-                type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '201',
+                description: 'Station starred',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'stationId' => new OA\Schema(
+                                        type: 'string',
+                                        minLength: 21,
+                                        maxLength: 21,
+                                        pattern: '^[0-9a-zA-Z_-]{21}$',
+                                    ),
+                                    'starred' => new OA\Schema(type: 'boolean'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('', name: 'star', methods: ['POST'])]
@@ -110,15 +172,32 @@ final class StarredStationController
         return $this->created($result);
     }
 
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/radio/starred/{stationId}',
         summary: 'Unstar a station',
         parameters: [
-            new OA\Parameter(name: 'stationId', description: 'Station public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'stationId',
+                in: 'path',
+                description: 'Station public identifier',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Station unstarred'),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{stationId}', name: 'unstar', methods: ['DELETE'])]

@@ -8,8 +8,7 @@ use Baander\RedisRateLimiter\Exception\RateLimiterClearFailedException;
 use Baander\RedisRateLimiter\Exception\UnknownRateLimiterException;
 use Baander\RedisRateLimiter\Administration\RateLimiterAdministrationInterface;
 use App\Shared\Interface\Attribute\CliCounterpart;
-use OpenApi\Attributes as OA;
-use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -25,33 +24,53 @@ final class RateLimiterMonitorController
 
     public function __construct(
         private readonly RateLimiterAdministrationInterface $rateLimiters,
-    )
-    {
+    ) {
     }
 
     /**
      * List every configured rate limiter with its effective configuration.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/monitor/rate-limiters',
         summary: 'List all rate limiters with configuration',
         responses: [
-            new OA\Response(response: '200', description: 'Rate limiter configurations',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'limiters', description: 'Map of rate limiter name to configuration',
-                            type: 'object',
-                            additionalProperties: new OA\AdditionalProperties(properties: [
-                                new OA\Property(property: 'policy', type: 'string', example: 'fixed_window'),
-                                new OA\Property(property: 'limit', type: 'integer'),
-                                new OA\Property(property: 'interval', type: 'string', example: '60 seconds', nullable: true),
-                                new OA\Property(property: 'description', type: 'string', nullable: true),
-                                new OA\Property(property: 'storageNamespace', description: 'Redis namespace holding only this limiter\'s state', type: 'string', example: 'baander:rate-limiter:{61d020e0131329c31cff1092c253794a7b7e3468b31b7ce86c054e2c7a5d7bce}'),
-                            ], type: 'object'),
-                        ),
-                        new OA\Property(property: 'count', description: 'Total number of configured rate limiters', type: 'integer'),
-                    ], type: 'object')],
-                    type: 'object',
+            new OA\Response(
+                response: '200',
+                description: 'Rate limiter configurations',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'limiters' => new OA\Schema(
+                                        description: 'Map of rate limiter name to configuration',
+                                        type: 'object',
+                                        additionalProperties: new OA\Schema(
+                                            type: 'object',
+                                            properties: [
+                                                'policy' => new OA\Schema(type: 'string', example: 'fixed_window'),
+                                                'limit' => new OA\Schema(type: 'integer'),
+                                                'interval' => new OA\Schema(
+                                                    type: 'string',
+                                                    nullable: true,
+                                                    example: '60 seconds',
+                                                ),
+                                                'description' => new OA\Schema(type: 'string', nullable: true),
+                                                'storageNamespace' => new OA\Schema(
+                                                    description: 'Redis namespace holding only this limiter\'s state',
+                                                    type: 'string',
+                                                    example: 'baander:rate-limiter:{61d020e0131329c31cff1092c253794a7b7e3468b31b7ce86c054e2c7a5d7bce}',
+                                                ),
+                                            ],
+                                        ),
+                                    ),
+                                    'count' => new OA\Schema(description: 'Total number of configured rate limiters', type: 'integer'),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
         ],
@@ -82,25 +101,58 @@ final class RateLimiterMonitorController
      *
      * Use to unblock rate-limited clients after configuration changes or during incidents.
      */
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/monitor/rate-limiters/clear',
-        description: 'Clears the stored state of every configured rate limiter. Requires ?confirm=true.',
         summary: 'Clear all rate limiter state',
+        description: 'Clears the stored state of every configured rate limiter. Requires ?confirm=true.',
         parameters: [
-            new OA\Parameter(name: 'confirm', description: 'Must be "true" to confirm', in: 'query', required: true, schema: new OA\Schema(type: 'string', enum: ['true'])),
-        ],
-        responses: [
-            new OA\Response(response: '200', description: 'All rate limiter state cleared',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'cleared', type: 'boolean'),
-                        new OA\Property(property: 'limiters', type: 'array', items: new OA\Items(type: 'string')),
-                    ], type: 'object')],
-                    type: 'object',
+            new OA\Parameter(
+                name: 'confirm',
+                in: 'query',
+                description: 'Must be "true" to confirm',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['true'],
                 ),
             ),
-            new OA\Response(response: '422', description: 'Missing confirm parameter', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
-            new OA\Response(response: '503', description: 'Limiter state could not be cleared', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        ],
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'All rate limiter state cleared',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'cleared' => new OA\Schema(type: 'boolean'),
+                                    'limiters' => new OA\Schema(
+                                        type: 'array',
+                                        items: new OA\Schema(type: 'string'),
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Missing confirm parameter',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '503',
+                description: 'Limiter state could not be cleared',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/clear', name: 'clear_all', methods: ['DELETE'])]
@@ -126,27 +178,70 @@ final class RateLimiterMonitorController
     /**
      * Clear the state of one rate limiter, leaving every other limiter intact.
      */
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/monitor/rate-limiters/{name}/clear',
-        description: 'Clears the stored state of the named rate limiter only. Other limiters keep their state. Requires ?confirm=true.',
         summary: 'Clear one rate limiter\'s state',
+        description: 'Clears the stored state of the named rate limiter only. Other limiters keep their state. Requires ?confirm=true.',
         parameters: [
-            new OA\Parameter(name: 'name', description: 'Rate limiter name', in: 'path', required: true, schema: new OA\Schema(type: 'string'), example: 'auth_login_ip'),
-            new OA\Parameter(name: 'confirm', description: 'Must be "true" to confirm', in: 'query', required: true, schema: new OA\Schema(type: 'string', enum: ['true'])),
-        ],
-        responses: [
-            new OA\Response(response: '200', description: 'Rate limiter state cleared',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'cleared', type: 'boolean'),
-                        new OA\Property(property: 'limiter', type: 'string'),
-                    ], type: 'object')],
-                    type: 'object',
+            new OA\Parameter(
+                name: 'name',
+                in: 'path',
+                description: 'Rate limiter name',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+                example: 'auth_login_ip',
+            ),
+            new OA\Parameter(
+                name: 'confirm',
+                in: 'query',
+                description: 'Must be "true" to confirm',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['true'],
                 ),
             ),
-            new OA\Response(response: '404', description: 'Unknown limiter name', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Missing confirm parameter', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
-            new OA\Response(response: '503', description: 'Storage namespace clear failed', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        ],
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'Rate limiter state cleared',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'cleared' => new OA\Schema(type: 'boolean'),
+                                    'limiter' => new OA\Schema(type: 'string'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Unknown limiter name',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Missing confirm parameter',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '503',
+                description: 'Storage namespace clear failed',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{name}/clear', name: 'clear', methods: ['DELETE'])]

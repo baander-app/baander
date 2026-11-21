@@ -7,7 +7,7 @@ namespace App\Shared\Interface\Controller;
 use App\Shared\Infrastructure\Health\HealthCheckService;
 use App\Shared\Infrastructure\Health\HealthStatus;
 use App\Shared\Interface\Attribute\CliCounterpart;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
@@ -24,8 +24,7 @@ final class ConfigCheckController
     public function __construct(
         private readonly HealthCheckService $healthCheckService,
         private readonly RateLimiterFactoryInterface $configCheckLimiter,
-    )
-    {
+    ) {
     }
 
     /**
@@ -34,23 +33,36 @@ final class ConfigCheckController
      * Runs all configuration checks (env vars, connectivity, framework config)
      * and returns results with a summary. Used by the admin Configuration page.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/debug/config-check',
         summary: 'Validate application configuration',
         responses: [
-            new OA\Response(response: '200', description: 'Configuration check results',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'results', type: 'array', items: new OA\Items(type: 'object')),
-                            new OA\Property(property: 'summary', properties: [
-                                new OA\Property(property: 'errors', type: 'integer'),
-                                new OA\Property(property: 'warnings', type: 'integer'),
-                                new OA\Property(property: 'passed', type: 'integer'),
-                            ], type: 'object'),
-                        ], type: 'object'),
-                    ],
-                    type: 'object',
+            new OA\Response(
+                response: '200',
+                description: 'Configuration check results',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'results' => new OA\Schema(
+                                        type: 'array',
+                                        items: new OA\Schema(type: 'object'),
+                                    ),
+                                    'summary' => new OA\Schema(
+                                        type: 'object',
+                                        properties: [
+                                            'errors' => new OA\Schema(type: 'integer'),
+                                            'warnings' => new OA\Schema(type: 'integer'),
+                                            'passed' => new OA\Schema(type: 'integer'),
+                                        ],
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
         ],

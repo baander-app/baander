@@ -19,8 +19,7 @@ use App\Transcode\Application\Port\AudioRendition;
 use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Transcode\Application\Port\AudioRenditionPortInterface;
 use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
-use OpenApi\Attributes as OA;
-use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -50,27 +49,83 @@ final class StreamController
      * rendition streams with Range support; otherwise the response streams the
      * encode while it runs, without byte ranges.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/stream/track',
         summary: 'Stream a track by PublicId with HTTP Range support',
         parameters: [
-            new OA\Parameter(name: 'id', description: 'PublicId of the track', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'format', description: 'Transcode to this audio format. Without it the original file is streamed.', in: 'query', required: false, schema: new OA\Schema(type: 'string', enum: ['opus', 'aac', 'mp3'])),
-            new OA\Parameter(name: 'bitrate', description: 'Target bitrate in bits per second; requires format. Capped at the server\'s transcode.max_bitrate (which also applies when no bitrate is given), then snapped down to the nearest of 64000, 96000, 128000, 160000, 192000, 256000 and 320000 that the format supports (opus at most 256000). A value below 64000 gets 64000.', in: 'query', required: false, schema: new OA\Schema(type: 'integer', minimum: 1)),
+            new OA\Parameter(
+                name: 'id',
+                in: 'query',
+                description: 'PublicId of the track',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'format',
+                in: 'query',
+                description: 'Transcode to this audio format. Without it the original file is streamed.',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['opus', 'aac', 'mp3'],
+                ),
+            ),
+            new OA\Parameter(
+                name: 'bitrate',
+                in: 'query',
+                description: 'Target bitrate in bits per second; requires format. Capped at the server\'s transcode.max_bitrate (which also applies when no bitrate is given), then snapped down to the nearest of 64000, 96000, 128000, 160000, 192000, 256000 and 320000 that the format supports (opus at most 256000). A value below 64000 gets 64000.',
+                required: false,
+                schema: new OA\Schema(type: 'integer', minimum: 1),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Full file (audio/video stream). A transcode that is still encoding streams progressively with Accept-Ranges: none.'),
+            new OA\Response(
+                response: '200',
+                description: 'Full file (audio/video stream). A transcode that is still encoding streams progressively with Accept-Ranges: none.',
+            ),
             new OA\Response(response: '206', description: 'Partial content (single byte range request)'),
-            new OA\Response(response: '400', description: 'Unsupported format or invalid bitrate', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'No access to the track, or a format was requested while transcode.enabled is off', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '400',
+                description: 'Unsupported format or invalid bitrate',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'No access to the track, or a format was requested while transcode.enabled is off',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
             new OA\Response(response: '416', description: 'Requested byte range is not satisfiable'),
-            new OA\Response(response: '404', description: 'Track not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '500', description: 'Transcoding failed', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Track not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '500',
+                description: 'Transcoding failed',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
             new OA\Response(
                 response: '503',
                 description: 'Every audio slot stayed busy for the whole start wait, so the rendition or stream copy has not started yet. The work stays queued; retry after the Retry-After delay to follow it. The error details carry reason audio_slots_busy.',
-                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: AudioRenditionBusyException::RETRY_AFTER_SECONDS))],
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                headers: [
+                    new OA\Header(
+                        header: 'Retry-After',
+                        description: 'Seconds to wait before retrying',
+                        schema: new OA\Schema(type: 'integer', example: AudioRenditionBusyException::RETRY_AFTER_SECONDS),
+                    ),
+                ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
         ],
     )]

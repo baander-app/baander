@@ -13,8 +13,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\Request\QueryParameters;
-use OpenApi\Attributes as OA;
-use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -39,25 +38,85 @@ final class NotificationController
     /**
      * List authenticated user's notifications.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/notifications/',
         summary: 'List notifications',
         parameters: [
-            new OA\Parameter(name: 'category', description: 'Filter by category', in: 'query', schema: new OA\Schema(type: 'string', enum: ['security', 'background_jobs', 'media_changes', 'admin_operations'])),
-            new OA\Parameter(name: 'unread', description: 'Filter unread only', in: 'query', schema: new OA\Schema(type: 'boolean')),
-            new OA\Parameter(name: 'limit', description: 'Items per page', in: 'query', schema: new OA\Schema(type: 'integer', default: 50, maximum: 100, minimum: 1)),
-            new OA\Parameter(name: 'cursor', description: 'Notification public ID for pagination', in: 'query', schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
-            new OA\Parameter(name: 'since', description: 'Exclusive creation timestamp with timezone (RFC 3339, up to six fractional digits)', in: 'query', schema: new OA\Schema(type: 'string', format: 'date-time')),
+            new OA\Parameter(
+                name: 'category',
+                in: 'query',
+                description: 'Filter by category',
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['security', 'background_jobs', 'media_changes', 'admin_operations'],
+                ),
+            ),
+            new OA\Parameter(
+                name: 'unread',
+                in: 'query',
+                description: 'Filter unread only',
+                schema: new OA\Schema(type: 'boolean'),
+            ),
+            new OA\Parameter(
+                name: 'limit',
+                in: 'query',
+                description: 'Items per page',
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 1,
+                    maximum: 100,
+                    default: 50,
+                ),
+            ),
+            new OA\Parameter(
+                name: 'cursor',
+                in: 'query',
+                description: 'Notification public ID for pagination',
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
+            new OA\Parameter(
+                name: 'since',
+                in: 'query',
+                description: 'Exclusive creation timestamp with timezone (RFC 3339, up to six fractional digits)',
+                schema: new OA\Schema(type: 'string', format: 'date-time'),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'List of notifications', content: new OA\JsonContent(
-                required: ['data', 'nextCursor'],
-                properties: [
-                    new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: NotificationResource::class))),
-                    new OA\Property(property: 'nextCursor', description: 'Cursor for the next page, or null when exhausted', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
-                ],
-            )),
-            new OA\Response(response: '400', description: 'Invalid query parameters', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'List of notifications',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(ref: NotificationResource::class),
+                            ),
+                            'nextCursor' => new OA\Schema(
+                                description: 'Cursor for the next page, or null when exhausted',
+                                type: 'string',
+                                nullable: true,
+                                minLength: 21,
+                                maxLength: 21,
+                                pattern: '^[0-9a-zA-Z_-]{21}$',
+                            ),
+                        ],
+                        required: ['data', 'nextCursor'],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid query parameters',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
@@ -110,11 +169,21 @@ final class NotificationController
     /**
      * Get unread notification count.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/notifications/unread-count',
         summary: 'Get unread notification count',
         responses: [
-            new OA\Response(response: '200', description: 'Unread count', content: new OA\JsonContent(properties: [new OA\Property(property: 'count', type: 'integer')])),
+            new OA\Response(
+                response: '200',
+                description: 'Unread count',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'count' => new OA\Schema(type: 'integer'),
+                        ],
+                    ),
+                ),
+            ),
         ],
     )]
     #[Route('/unread-count', name: 'unread_count', methods: ['GET'])]
@@ -133,16 +202,59 @@ final class NotificationController
     /**
      * Mark a single notification as read.
      */
-    #[OA\Patch(
+    #[OA\Operation\Patch(
         path: '/api/notifications/{publicId}/read',
         summary: 'Mark notification as read',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Notification public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Notification public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Notification marked as read', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21), new OA\Property(property: 'isRead', type: 'boolean')])])),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Notification marked as read',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                properties: [
+                                    'publicId' => new OA\Schema(
+                                        type: 'string',
+                                        minLength: 21,
+                                        maxLength: 21,
+                                        pattern: '^[0-9a-zA-Z_-]{21}$',
+                                    ),
+                                    'isRead' => new OA\Schema(type: 'boolean'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}/read', name: 'mark_read', methods: ['PATCH'])]
@@ -185,11 +297,21 @@ final class NotificationController
     /**
      * Mark all notifications as read.
      */
-    #[OA\Patch(
+    #[OA\Operation\Patch(
         path: '/api/notifications/read-all',
         summary: 'Mark all notifications as read',
         responses: [
-            new OA\Response(response: '200', description: 'All notifications marked as read', content: new OA\JsonContent(properties: [new OA\Property(property: 'marked', type: 'boolean')])),
+            new OA\Response(
+                response: '200',
+                description: 'All notifications marked as read',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'marked' => new OA\Schema(type: 'boolean'),
+                        ],
+                    ),
+                ),
+            ),
         ],
     )]
     #[Route('/read-all', name: 'mark_all_read', methods: ['PATCH'])]
@@ -208,16 +330,39 @@ final class NotificationController
     /**
      * Delete a notification.
      */
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/notifications/{publicId}',
         summary: 'Delete a notification',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Notification public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Notification public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Deleted'),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'delete', methods: ['DELETE'])]

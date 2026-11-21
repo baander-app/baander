@@ -10,8 +10,7 @@ use App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter;
 use App\Metadata\Infrastructure\Api\LastFm\LastFmAdapter;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
-use OpenApi\Attributes as OA;
-use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
@@ -38,27 +37,63 @@ final class MetadataBrowseController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/metadata/browse/artist/{mbid}',
         summary: 'Browse artist details from MusicBrainz, enriched with Last.fm data',
         parameters: [
-            new OA\Parameter(name: 'mbid', description: 'MusicBrainz artist ID', in: 'path', required: true, schema: new OA\Schema(type: 'string'), example: 'a74b1b7f-71a5-4011-9441-d0b5e4122711'),
+            new OA\Parameter(
+                name: 'mbid',
+                in: 'path',
+                description: 'MusicBrainz artist ID',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+                example: 'a74b1b7f-71a5-4011-9441-d0b5e4122711',
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Artist details with MusicBrainz and Last.fm data',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'musicbrainz', description: 'MusicBrainz artist data', type: 'object'),
-                            new OA\Property(property: 'lastfm', description: 'Last.fm artist enrichment data, null if unavailable', type: 'object', nullable: true),
-                        ], type: 'object'),
-                    ],
-                    type: 'object',
+            new OA\Response(
+                response: '200',
+                description: 'Artist details with MusicBrainz and Last.fm data',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'musicbrainz' => new OA\Schema(description: 'MusicBrainz artist data', type: 'object'),
+                                    'lastfm' => new OA\Schema(
+                                        description: 'Last.fm artist enrichment data, null if unavailable',
+                                        type: 'object',
+                                        nullable: true,
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '404', description: 'Artist not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '429', description: 'The user already called MusicBrainz in the last ten seconds', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '503', description: 'No turn under the shared MusicBrainz rate limit within ten seconds', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Artist not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '429',
+                description: 'The user already called MusicBrainz in the last ten seconds',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '503',
+                description: 'No turn under the shared MusicBrainz rate limit within ten seconds',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/artist/{mbid}', name: 'artist', methods: ['GET'])]
@@ -79,22 +114,53 @@ final class MetadataBrowseController
         ]);
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/metadata/browse/release-group/{mbid}',
         summary: 'Browse release group details from MusicBrainz',
         parameters: [
-            new OA\Parameter(name: 'mbid', description: 'MusicBrainz release group ID', in: 'path', required: true, schema: new OA\Schema(type: 'string'), example: 'a1cfab6f-bf37-37c3-8cdb-167912e5d26b'),
+            new OA\Parameter(
+                name: 'mbid',
+                in: 'path',
+                description: 'MusicBrainz release group ID',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+                example: 'a1cfab6f-bf37-37c3-8cdb-167912e5d26b',
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Release group details from MusicBrainz',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', description: 'MusicBrainz release group data', type: 'object')],
-                    type: 'object',
+            new OA\Response(
+                response: '200',
+                description: 'Release group details from MusicBrainz',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(description: 'MusicBrainz release group data', type: 'object'),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '404', description: 'Release group not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '429', description: 'The user already called MusicBrainz in the last ten seconds', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '503', description: 'No turn under the shared MusicBrainz rate limit within ten seconds', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Release group not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '429',
+                description: 'The user already called MusicBrainz in the last ten seconds',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '503',
+                description: 'No turn under the shared MusicBrainz rate limit within ten seconds',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/release-group/{mbid}', name: 'release_group', methods: ['GET'])]

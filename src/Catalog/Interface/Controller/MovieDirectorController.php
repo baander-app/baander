@@ -12,15 +12,17 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\DTO\PaginatedResponse;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use OpenApi\Spec\Parameter;
 use OpenApi\Spec\Schema as ParameterSchema;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 
-#[OA\Tag(name: 'Catalog', description: 'Album, artist, song, movie, and genre management endpoints')]
+#[OA\Tag(
+    name: 'Catalog',
+    description: 'Album, artist, song, movie, and genre management endpoints',
+)]
 #[Route('/api/movies/directors', name: 'movie_director_', requirements: ['publicId' => '[0-9a-zA-Z_-]{21}'])]
 final class MovieDirectorController
 {
@@ -31,49 +33,50 @@ final class MovieDirectorController
         private readonly LibraryReadScopeProviderInterface $scopeProvider,
     ) {}
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/movies/directors',
         summary: 'List directors of accessible movies',
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Paginated directors',
-                content: new OA\JsonContent(allOf: [
-                    new OA\Schema(ref: new Model(type: PaginatedResponse::class)),
-                    new OA\Schema(required: ['data'], properties: [
-                        new OA\Property(
-                            property: 'data',
-                            type: 'array',
-                            items: new OA\Items(ref: new Model(type: DirectorResource::class)),
-                        ),
-                    ]),
-                ]),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        allOf: [
+                            new OA\Schema(ref: PaginatedResponse::class),
+                            new OA\Schema(
+                                properties: [
+                                    'data' => new OA\Schema(
+                                        type: 'array',
+                                        items: new OA\Schema(ref: DirectorResource::class),
+                                    ),
+                                ],
+                                required: ['data'],
+                            ),
+                        ],
+                    ),
+                ),
             ),
         ],
     )]
     #[Parameter(
         name: 'page',
         in: 'query',
-        schema: new ParameterSchema(
-            type: 'integer',
-            default: 1,
-        ),
+        schema: new ParameterSchema(type: 'integer', default: 1),
     )]
     #[Parameter(
         name: 'limit',
         in: 'query',
         schema: new ParameterSchema(
             type: 'integer',
-            default: 50,
             maximum: 100,
+            default: 50,
         ),
     )]
     #[Parameter(
         name: 'q',
         in: 'query',
-        schema: new ParameterSchema(
-            type: 'string',
-        ),
+        schema: new ParameterSchema(type: 'string'),
     )]
     #[Route('', name: 'index', methods: ['GET'])]
     public function index(Request $request): JsonResponse
@@ -90,16 +93,21 @@ final class MovieDirectorController
         ));
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/movies/directors/{publicId}',
         summary: 'Get a director of accessible movies',
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Director',
-                content: new OA\JsonContent(required: ['data'], properties: [
-                    new OA\Property(property: 'data', ref: new Model(type: DirectorResource::class)),
-                ]),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: DirectorResource::class),
+                        ],
+                        required: ['data'],
+                    ),
+                ),
             ),
             new OA\Response(response: '404', description: 'Director not found'),
         ],
@@ -108,10 +116,7 @@ final class MovieDirectorController
         name: 'publicId',
         in: 'path',
         required: true,
-        schema: new ParameterSchema(
-            type: 'string',
-            pattern: '^[0-9a-zA-Z_-]{21}$',
-        ),
+        schema: new ParameterSchema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$'),
     )]
     #[Route('/{publicId}', name: 'show', methods: ['GET'])]
     public function show(string $publicId): JsonResponse
@@ -121,23 +126,29 @@ final class MovieDirectorController
         return $director === null ? $this->notFound() : $this->successResponse(DirectorResource::from($director));
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/movies/directors/{publicId}/movies',
         summary: 'List accessible movies by a director',
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Paginated movies',
-                content: new OA\JsonContent(allOf: [
-                    new OA\Schema(ref: new Model(type: PaginatedResponse::class)),
-                    new OA\Schema(required: ['data'], properties: [
-                        new OA\Property(
-                            property: 'data',
-                            type: 'array',
-                            items: new OA\Items(ref: new Model(type: MovieResource::class)),
-                        ),
-                    ]),
-                ]),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        allOf: [
+                            new OA\Schema(ref: PaginatedResponse::class),
+                            new OA\Schema(
+                                properties: [
+                                    'data' => new OA\Schema(
+                                        type: 'array',
+                                        items: new OA\Schema(ref: MovieResource::class),
+                                    ),
+                                ],
+                                required: ['data'],
+                            ),
+                        ],
+                    ),
+                ),
             ),
             new OA\Response(response: '404', description: 'Director not found'),
         ],
@@ -146,34 +157,26 @@ final class MovieDirectorController
         name: 'publicId',
         in: 'path',
         required: true,
-        schema: new ParameterSchema(
-            type: 'string',
-            pattern: '^[0-9a-zA-Z_-]{21}$',
-        ),
+        schema: new ParameterSchema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$'),
     )]
     #[Parameter(
         name: 'page',
         in: 'query',
-        schema: new ParameterSchema(
-            type: 'integer',
-            default: 1,
-        ),
+        schema: new ParameterSchema(type: 'integer', default: 1),
     )]
     #[Parameter(
         name: 'limit',
         in: 'query',
         schema: new ParameterSchema(
             type: 'integer',
-            default: 50,
             maximum: 100,
+            default: 50,
         ),
     )]
     #[Parameter(
         name: 'q',
         in: 'query',
-        schema: new ParameterSchema(
-            type: 'string',
-        ),
+        schema: new ParameterSchema(type: 'string'),
     )]
     #[Route('/{publicId}/movies', name: 'movies', methods: ['GET'])]
     public function movies(string $publicId, Request $request): JsonResponse

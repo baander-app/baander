@@ -12,8 +12,7 @@ use App\UserPreference\Application\Exception\EqDeviceProfileNotFound;
 use App\UserPreference\Application\Port\EqDeviceProfilePortInterface;
 use App\UserPreference\Interface\Request\CreateEqDeviceProfileRequest;
 use App\UserPreference\Interface\Request\UpdateEqDeviceProfileRequest;
-use OpenApi\Attributes as OA;
-use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -38,21 +37,40 @@ final class EqDeviceProfileController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/user/eq-profiles/',
         summary: 'List all EQ device profiles for the authenticated user',
         responses: [
-            new OA\Response(response: '200', description: 'Profile list', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'profiles', type: 'array', items: new OA\Items(properties: [
-                    new OA\Property(property: 'publicId', type: 'string'),
-                    new OA\Property(property: 'name', type: 'string'),
-                    new OA\Property(property: 'icon', type: 'string'),
-                    new OA\Property(property: 'isDefault', type: 'boolean'),
-                    new OA\Property(property: 'sortOrder', type: 'integer'),
-                    new OA\Property(property: 'version', type: 'integer'),
-                ])),
-            ])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Profile list',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'profiles' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(
+                                    properties: [
+                                        'publicId' => new OA\Schema(type: 'string'),
+                                        'name' => new OA\Schema(type: 'string'),
+                                        'icon' => new OA\Schema(type: 'string'),
+                                        'isDefault' => new OA\Schema(type: 'boolean'),
+                                        'sortOrder' => new OA\Schema(type: 'integer'),
+                                        'version' => new OA\Schema(type: 'integer'),
+                                    ],
+                                ),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
@@ -65,7 +83,7 @@ final class EqDeviceProfileController
         return $this->successResponse(['profiles' => $profiles]);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/user/eq-profiles/',
         summary: 'Create a new EQ device profile',
         requestBody: new OA\RequestBody(
@@ -73,19 +91,31 @@ final class EqDeviceProfileController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
-                    required: ['name', 'icon'],
                     properties: [
-                        new OA\Property(property: 'name', type: 'string'),
-                        new OA\Property(property: 'icon', type: 'string'),
-                        new OA\Property(property: 'deviceId', type: 'string', nullable: true),
+                        'name' => new OA\Schema(type: 'string'),
+                        'icon' => new OA\Schema(type: 'string'),
+                        'deviceId' => new OA\Schema(type: 'string', nullable: true),
                     ],
+                    required: ['name', 'icon'],
                 ),
             ),
         ),
         responses: [
             new OA\Response(response: '201', description: 'Profile created'),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid input', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid input',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'create', methods: ['POST'])]
@@ -117,15 +147,35 @@ final class EqDeviceProfileController
         return $this->successResponse($profile, 201);
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/user/eq-profiles/{id}',
         summary: 'Get a specific EQ device profile',
         responses: [
-            new OA\Response(response: '200', description: 'Profile details', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', ref: new Model(type: \App\UserPreference\Interface\Resource\EqDeviceProfileResource::class)),
-            ])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Profile not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Profile details',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: \App\UserPreference\Interface\Resource\EqDeviceProfileResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Profile not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{id}', name: 'show', methods: ['GET'])]
@@ -141,7 +191,7 @@ final class EqDeviceProfileController
         return $this->successResponse($profile);
     }
 
-    #[OA\Put(
+    #[OA\Operation\Put(
         path: '/api/user/eq-profiles/{id}',
         summary: 'Update an EQ device profile',
         requestBody: new OA\RequestBody(
@@ -150,22 +200,48 @@ final class EqDeviceProfileController
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     properties: [
-                        new OA\Property(property: 'name', type: 'string'),
-                        new OA\Property(property: 'icon', type: 'string'),
-                        new OA\Property(property: 'deviceId', type: 'string', nullable: true),
-                        new OA\Property(property: 'payload', type: 'object'),
-                        new OA\Property(property: 'sortOrder', type: 'integer'),
+                        'name' => new OA\Schema(type: 'string'),
+                        'icon' => new OA\Schema(type: 'string'),
+                        'deviceId' => new OA\Schema(type: 'string', nullable: true),
+                        'payload' => new OA\Schema(type: 'object'),
+                        'sortOrder' => new OA\Schema(type: 'integer'),
                     ],
                 ),
             ),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Profile updated', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', ref: new Model(type: \App\UserPreference\Interface\Resource\EqDeviceProfileResource::class)),
-            ])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Profile not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid input', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Profile updated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: \App\UserPreference\Interface\Resource\EqDeviceProfileResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Profile not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid input',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{id}', name: 'update', methods: ['PUT'])]
@@ -204,18 +280,47 @@ final class EqDeviceProfileController
         return $this->successResponse($profile);
     }
 
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/user/eq-profiles/{id}',
         summary: 'Delete an EQ device profile (cannot delete default)',
         responses: [
-            new OA\Response(response: '200', description: 'Profile deleted', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', properties: [
-                    new OA\Property(property: 'deleted', type: 'boolean'),
-                ], type: 'object'),
-            ])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Profile not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Cannot delete default profile', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Profile deleted',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'deleted' => new OA\Schema(type: 'boolean'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Profile not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Cannot delete default profile',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
@@ -233,15 +338,35 @@ final class EqDeviceProfileController
         return $this->successResponse(['deleted' => true]);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/user/eq-profiles/{id}/activate',
         summary: 'Set a profile as the active profile for the current user',
         responses: [
-            new OA\Response(response: '200', description: 'Profile activated', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', ref: new Model(type: \App\UserPreference\Interface\Resource\EqDeviceProfileResource::class)),
-            ])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Profile not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Profile activated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: \App\UserPreference\Interface\Resource\EqDeviceProfileResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Profile not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{id}/activate', name: 'activate', methods: ['POST'])]

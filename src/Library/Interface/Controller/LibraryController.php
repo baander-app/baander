@@ -24,8 +24,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -51,18 +50,51 @@ final class LibraryController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/libraries',
         summary: 'List all libraries',
         parameters: [
-            new OA\Parameter(name: 'type', description: 'Filter by library type', in: 'query', required: false, schema: new OA\Schema(type: 'string', enum: ['music', 'podcast', 'audiobook', 'movie', 'tv_show'])),
+            new OA\Parameter(
+                name: 'type',
+                in: 'query',
+                description: 'Filter by library type',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['music', 'podcast', 'audiobook', 'movie', 'tv_show'],
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: LibraryResource::class)))], type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid type filter', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Success',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(ref: LibraryResource::class),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid type filter',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('', name: 'index', methods: ['GET'])]
@@ -75,27 +107,66 @@ final class LibraryController
         return $this->successResponse(LibraryResource::collection($libraries));
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/libraries',
         summary: 'Create a new library (admin)',
-        requestBody: new OA\RequestBody(required: true, content: new OA\MediaType(mediaType: 'application/json', schema: new OA\Schema(
-                required: ['name', 'path', 'type'],
-                properties: [
-                    new OA\Property(property: 'name', type: 'string'),
-                    new OA\Property(property: 'path', type: 'string'),
-                    new OA\Property(property: 'type', type: 'string'),
-                    new OA\Property(property: 'sortOrder', type: 'integer'),
-                    new OA\Property(property: 'slug', type: 'string', nullable: true),
-                ],
-            ))),
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    properties: [
+                        'name' => new OA\Schema(type: 'string'),
+                        'path' => new OA\Schema(type: 'string'),
+                        'type' => new OA\Schema(type: 'string'),
+                        'sortOrder' => new OA\Schema(type: 'integer'),
+                        'slug' => new OA\Schema(type: 'string', nullable: true),
+                    ],
+                    required: ['name', 'path', 'type'],
+                ),
+            ),
+        ),
         responses: [
-            new OA\Response(response: '201', description: 'Created', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', ref: new Model(type: LibraryResource::class))], type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '409', description: 'Slug already exists', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '201',
+                description: 'Created',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: LibraryResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Administrator role required',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Slug already exists',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('', name: 'store', methods: ['POST'])]
@@ -127,18 +198,45 @@ final class LibraryController
         return $this->successResponse(LibraryResource::from($library), Response::HTTP_CREATED);
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/libraries/{id}',
         summary: 'Get a single library',
         parameters: [
-            new OA\Parameter(name: 'id', description: 'Library public ID or slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'id',
+                in: 'path',
+                description: 'Library public ID or slug',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', ref: new Model(type: LibraryResource::class))], type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Success',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: LibraryResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{id}', name: 'show', methods: ['GET'])]
@@ -148,26 +246,71 @@ final class LibraryController
         return $this->successResponse(LibraryResource::from($this->dispatch(new GetLibraryQuery($id, $this->readScopes->current()))));
     }
 
-    #[OA\Patch(
+    #[OA\Operation\Patch(
         path: '/api/libraries/{id}',
         summary: 'Rename or reorder a library (admin)',
-        requestBody: new OA\RequestBody(required: true, content: new OA\MediaType(mediaType: 'application/json', schema: new OA\Schema(
-                properties: [
-                    new OA\Property(property: 'name', type: 'string', nullable: true),
-                    new OA\Property(property: 'sortOrder', type: 'integer', nullable: true),
-                ],
-            ))),
         parameters: [
-            new OA\Parameter(name: 'id', description: 'Library public ID or slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'id',
+                in: 'path',
+                description: 'Library public ID or slug',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    properties: [
+                        'name' => new OA\Schema(type: 'string', nullable: true),
+                        'sortOrder' => new OA\Schema(type: 'integer', nullable: true),
+                    ],
+                ),
+            ),
+        ),
         responses: [
-            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', ref: new Model(type: LibraryResource::class))], type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Success',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: LibraryResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Administrator role required',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{id}', name: 'update', methods: ['PATCH'])]
@@ -180,19 +323,52 @@ final class LibraryController
         return $this->successResponse(LibraryResource::from($library));
     }
 
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/libraries/{id}',
         summary: 'Delete a library (admin)',
         parameters: [
-            new OA\Parameter(name: 'id', description: 'Library public ID or slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'id',
+                in: 'path',
+                description: 'Library public ID or slug',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Deleted', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', example: null, nullable: true)], type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Deleted',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(nullable: true, example: null),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Administrator role required',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
@@ -205,17 +381,62 @@ final class LibraryController
         return $this->json(['data' => null]);
     }
 
-    #[OA\Post(path: '/api/libraries/{id}/scan', description: 'Claims the library for a scan and dispatches an asynchronous scan job. The scan runs in the background; follow it in the job monitor and in the scan status of the library. A library that is already scanning answers 409.', summary: 'Trigger a library scan (admin)', parameters: [
-        new OA\Parameter(name: 'id', description: 'Library public ID or slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-    ], responses: [
-        new OA\Response(response: '202', description: 'Scan dispatched', content: new OA\JsonContent(
-            properties: [new OA\Property(property: 'data', ref: new Model(type: LibraryResource::class))], type: 'object',
-        )),
-        new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(response: '409', description: 'Scan already in progress', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-    ])]
+    #[OA\Operation\Post(
+        path: '/api/libraries/{id}/scan',
+        summary: 'Trigger a library scan (admin)',
+        description: 'Claims the library for a scan and dispatches an asynchronous scan job. The scan runs in the background; follow it in the job monitor and in the scan status of the library. A library that is already scanning answers 409.',
+        parameters: [
+            new OA\Parameter(
+                name: 'id',
+                in: 'path',
+                description: 'Library public ID or slug',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: '202',
+                description: 'Scan dispatched',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: LibraryResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Administrator role required',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Scan already in progress',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+        ],
+    )]
     #[Route('/{id}/scan', name: 'scan', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
     #[CliCounterpart('app:library:scan')]
@@ -228,27 +449,63 @@ final class LibraryController
         return $this->successResponse(LibraryResource::from($library), Response::HTTP_ACCEPTED);
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/libraries/{id}/stats',
         summary: 'Get library statistics',
         parameters: [
-            new OA\Parameter(name: 'id', description: 'Library public ID or slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'id',
+                in: 'path',
+                description: 'Library public ID or slug',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
-                properties: [
-                    new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'songs', type: 'integer', example: 1234),
-                        new OA\Property(property: 'albums', type: 'integer', example: 100),
-                        new OA\Property(property: 'artists', type: 'integer', example: 50),
-                        new OA\Property(property: 'genres', type: 'integer', example: 20),
-                        new OA\Property(property: 'totalSize', description: 'Total file size in bytes', type: 'integer', example: 53687091200),
-                        new OA\Property(property: 'totalDuration', description: 'Total duration in seconds', type: 'number', example: 259200.5),
-                    ], type: 'object'),
-                ], type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Success',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'songs' => new OA\Schema(type: 'integer', example: 1234),
+                                    'albums' => new OA\Schema(type: 'integer', example: 100),
+                                    'artists' => new OA\Schema(type: 'integer', example: 50),
+                                    'genres' => new OA\Schema(type: 'integer', example: 20),
+                                    'totalSize' => new OA\Schema(
+                                        description: 'Total file size in bytes',
+                                        type: 'integer',
+                                        example: 53687091200,
+                                    ),
+                                    'totalDuration' => new OA\Schema(
+                                        description: 'Total duration in seconds',
+                                        type: 'number',
+                                        example: 259200.5,
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{id}/stats', name: 'stats', methods: ['GET'])]
@@ -258,27 +515,67 @@ final class LibraryController
         return $this->successResponse($this->dispatch(new GetLibraryStatsQuery($id, $this->readScopes->current())));
     }
 
-    #[OA\Post(path: '/api/libraries/validate-path', description: 'Checks whether a filesystem path exists and is readable. Use before creating a library. Requires the administrator role.', summary: 'Validate a library path (admin)', requestBody: new OA\RequestBody(required: true, content: new OA\MediaType(mediaType: 'application/json', schema: new OA\Schema(
-            required: ['path'],
-            properties: [
-                new OA\Property(property: 'path', type: 'string', example: '/mnt/media/music'),
-            ],
-        ))), responses: [
-        new OA\Response(response: '200', description: 'Validation result', content: new OA\JsonContent(
-            properties: [
-                new OA\Property(property: 'data', properties: [
-                    new OA\Property(property: 'valid', type: 'boolean'),
-                    new OA\Property(property: 'error', type: 'string', nullable: true),
-                    new OA\Property(property: 'resolvedPath', type: 'string', nullable: true),
-                    new OA\Property(property: 'exists', type: 'boolean'),
-                    new OA\Property(property: 'readable', type: 'boolean'),
-                ], type: 'object'),
-            ], type: 'object',
-        )),
-        new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(response: '422', description: 'Path is missing', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-    ])]
+    #[OA\Operation\Post(
+        path: '/api/libraries/validate-path',
+        summary: 'Validate a library path (admin)',
+        description: 'Checks whether a filesystem path exists and is readable. Use before creating a library. Requires the administrator role.',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    properties: [
+                        'path' => new OA\Schema(type: 'string', example: '/mnt/media/music'),
+                    ],
+                    required: ['path'],
+                ),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'Validation result',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'valid' => new OA\Schema(type: 'boolean'),
+                                    'error' => new OA\Schema(type: 'string', nullable: true),
+                                    'resolvedPath' => new OA\Schema(type: 'string', nullable: true),
+                                    'exists' => new OA\Schema(type: 'boolean'),
+                                    'readable' => new OA\Schema(type: 'boolean'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Administrator role required',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Path is missing',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+        ],
+    )]
     #[Route('/validate-path', name: 'validate_path', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
     #[CliCounterpart('app:library:validate-path')]
@@ -289,18 +586,45 @@ final class LibraryController
         return $this->successResponse(PathValidationResource::from($this->pathValidator->validateInput(is_string($path) ? $path : '')));
     }
 
-    #[OA\Post(path: '/api/libraries/scan-all', description: 'Dispatches an asynchronous scan job for every library. Skips libraries already scanning.', summary: 'Trigger scan for all libraries (admin)', responses: [
-        new OA\Response(response: '202', description: 'Scans dispatched', content: new OA\JsonContent(
-            properties: [
-                new OA\Property(property: 'data', properties: [
-                    new OA\Property(property: 'dispatched', description: 'Number of scans dispatched', type: 'integer'),
-                    new OA\Property(property: 'skipped', description: 'Number of libraries skipped (already scanning)', type: 'integer'),
-                ], type: 'object'),
-            ], type: 'object',
-        )),
-        new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-    ])]
+    #[OA\Operation\Post(
+        path: '/api/libraries/scan-all',
+        summary: 'Trigger scan for all libraries (admin)',
+        description: 'Dispatches an asynchronous scan job for every library. Skips libraries already scanning.',
+        responses: [
+            new OA\Response(
+                response: '202',
+                description: 'Scans dispatched',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'dispatched' => new OA\Schema(description: 'Number of scans dispatched', type: 'integer'),
+                                    'skipped' => new OA\Schema(description: 'Number of libraries skipped (already scanning)', type: 'integer'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Administrator role required',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+        ],
+    )]
     #[Route('/scan-all', name: 'scan_all', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
     #[CliCounterpart('app:library:scan')]

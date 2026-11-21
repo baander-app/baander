@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Interface\Controller\OAuth;
 
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
@@ -34,36 +34,75 @@ final class AuthorizationServerMetadataController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/.well-known/oauth-authorization-server',
-        description: 'Returns the authorization server metadata document used by clients to discover endpoints and capabilities.',
         summary: 'OAuth 2.0 Authorization Server Metadata (RFC 8414)',
-        security: [],
+        description: 'Returns the authorization server metadata document used by clients to discover endpoints and capabilities.',
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Authorization server metadata',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'issuer', type: 'string', format: 'uri', example: 'https://baander.app'),
-                        new OA\Property(property: 'authorization_endpoint', description: 'The web app consent page (APP_URL/oauth/authorize)', type: 'string', format: 'uri'),
-                        new OA\Property(property: 'token_endpoint', type: 'string', format: 'uri'),
-                        new OA\Property(property: 'device_authorization_endpoint', type: 'string', format: 'uri'),
-                        new OA\Property(property: 'jwks_uri', type: 'string', format: 'uri'),
-                        new OA\Property(property: 'response_types_supported', type: 'array', items: new OA\Items(type: 'string')),
-                        new OA\Property(property: 'grant_types_supported', type: 'array', items: new OA\Items(type: 'string')),
-                        new OA\Property(property: 'token_endpoint_auth_methods_supported', type: 'array', items: new OA\Items(type: 'string')),
-                        new OA\Property(property: 'token_endpoint_auth_signing_alg_values_supported', description: 'Algorithms a private_key_jwt client assertion may be signed with', type: 'array', items: new OA\Items(type: 'string')),
-                        new OA\Property(property: 'code_challenge_methods_supported', type: 'array', items: new OA\Items(type: 'string')),
-                        new OA\Property(property: 'scopes_supported', type: 'array', items: new OA\Items(type: 'string')),
-                        new OA\Property(property: 'dpop_signing_alg_values_supported', type: 'array', items: new OA\Items(type: 'string')),
-                        new OA\Property(property: 'authorization_response_iss_parameter_supported', type: 'boolean'),
-                        new OA\Property(property: 'pushed_authorization_request_endpoint', description: 'Where a client pushes every authorization request first (RFC 9126)', type: 'string', format: 'uri'),
-                        new OA\Property(property: 'require_pushed_authorization_requests', description: 'Always true: the authorization endpoint accepts only pushed requests', type: 'boolean'),
-                    ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'issuer' => new OA\Schema(
+                                type: 'string',
+                                format: 'uri',
+                                example: 'https://baander.app',
+                            ),
+                            'authorization_endpoint' => new OA\Schema(
+                                description: 'The web app consent page (APP_URL/oauth/authorize)',
+                                type: 'string',
+                                format: 'uri',
+                            ),
+                            'token_endpoint' => new OA\Schema(type: 'string', format: 'uri'),
+                            'device_authorization_endpoint' => new OA\Schema(type: 'string', format: 'uri'),
+                            'jwks_uri' => new OA\Schema(type: 'string', format: 'uri'),
+                            'response_types_supported' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(type: 'string'),
+                            ),
+                            'grant_types_supported' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(type: 'string'),
+                            ),
+                            'token_endpoint_auth_methods_supported' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(type: 'string'),
+                            ),
+                            'token_endpoint_auth_signing_alg_values_supported' => new OA\Schema(
+                                description: 'Algorithms a private_key_jwt client assertion may be signed with',
+                                type: 'array',
+                                items: new OA\Schema(type: 'string'),
+                            ),
+                            'code_challenge_methods_supported' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(type: 'string'),
+                            ),
+                            'scopes_supported' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(type: 'string'),
+                            ),
+                            'dpop_signing_alg_values_supported' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(type: 'string'),
+                            ),
+                            'authorization_response_iss_parameter_supported' => new OA\Schema(type: 'boolean'),
+                            'pushed_authorization_request_endpoint' => new OA\Schema(
+                                description: 'Where a client pushes every authorization request first (RFC 9126)',
+                                type: 'string',
+                                format: 'uri',
+                            ),
+                            'require_pushed_authorization_requests' => new OA\Schema(
+                                description: 'Always true: the authorization endpoint accepts only pushed requests',
+                                type: 'boolean',
+                            ),
+                        ],
+                    ),
                 ),
             ),
         ],
+        security: [],
     )]
     #[Route('/.well-known/oauth-authorization-server', name: 'oauth_authorization_server_metadata', methods: ['GET'])]
     public function __invoke(): JsonResponse

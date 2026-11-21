@@ -29,8 +29,7 @@ use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\PaginatedResponse;
 use App\Shared\Interface\DTO\ValidationError;
 use InvalidArgumentException;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
@@ -38,7 +37,10 @@ use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Throwable;
 
-#[OA\Tag(name: 'Catalog', description: 'Album, artist, song, movie, and genre management endpoints')]
+#[OA\Tag(
+    name: 'Catalog',
+    description: 'Album, artist, song, movie, and genre management endpoints',
+)]
 #[Route('/api/albums', name: 'album_')]
 #[\Symfony\Component\Security\Http\Attribute\IsGranted('ROLE_ADMIN', methods: ['POST', 'PUT', 'PATCH', 'DELETE'])]
 final class AlbumController
@@ -55,27 +57,76 @@ final class AlbumController
         private readonly AlbumMergePortInterface $mergePort,
         private readonly MessageBusInterface $bus,
         private readonly SongAvailabilityPortInterface $availability,
-    )
-    {
+    ) {
     }
 
     /**
      * List albums (paginated).
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/albums/',
         summary: 'List albums (paginated)',
         parameters: [
-            new OA\Parameter(name: 'page', description: 'Page number', in: 'query', schema: new OA\Schema(type: 'integer', default: 1)),
-            new OA\Parameter(name: 'limit', description: 'Items per page (max 100)', in: 'query', schema: new OA\Schema(type: 'integer', default: 50)),
-            new OA\Parameter(name: 'q', description: 'Search query', in: 'query', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'sort', description: 'Sort field (title, year, artist, added)', in: 'query', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'order', description: 'Sort order (asc, desc)', in: 'query', schema: new OA\Schema(type: 'string', default: 'asc', enum: ['asc', 'desc'])),
-            new OA\Parameter(name: 'artistId', description: 'Filter by artist public ID', in: 'query', schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
-            new OA\Parameter(name: 'genre', description: 'Filter by genre slug', in: 'query', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'page',
+                in: 'query',
+                description: 'Page number',
+                schema: new OA\Schema(type: 'integer', default: 1),
+            ),
+            new OA\Parameter(
+                name: 'limit',
+                in: 'query',
+                description: 'Items per page (max 100)',
+                schema: new OA\Schema(type: 'integer', default: 50),
+            ),
+            new OA\Parameter(
+                name: 'q',
+                in: 'query',
+                description: 'Search query',
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'sort',
+                in: 'query',
+                description: 'Sort field (title, year, artist, added)',
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'order',
+                in: 'query',
+                description: 'Sort order (asc, desc)',
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['asc', 'desc'],
+                    default: 'asc',
+                ),
+            ),
+            new OA\Parameter(
+                name: 'artistId',
+                in: 'query',
+                description: 'Filter by artist public ID',
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
+            new OA\Parameter(
+                name: 'genre',
+                in: 'query',
+                description: 'Filter by genre slug',
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Paginated list of albums', content: new OA\JsonContent(ref: new Model(type: PaginatedResponse::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Paginated list of albums',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: PaginatedResponse::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
@@ -152,35 +203,77 @@ final class AlbumController
     /**
      * Get a single album with its songs.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/albums/{publicId}',
         summary: 'Get a single album with its songs',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Album public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Album with songs', content: new OA\JsonContent(
-                properties: [
-                    new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-                        new OA\Property(property: 'title', type: 'string'),
-                        new OA\Property(property: 'type', type: 'string'),
-                        new OA\Property(property: 'year', type: 'integer'),
-                        new OA\Property(property: 'label', type: 'string'),
-                        new OA\Property(property: 'barcode', type: 'string'),
-                        new OA\Property(property: 'country', type: 'string'),
-                        new OA\Property(property: 'language', description: 'Release language as stored; usually a language code, but tag readers may store free text', type: 'string', nullable: true),
-                        new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
-                        new OA\Property(property: 'songs', type: 'array', items: new OA\Items(ref: new Model(type: SongResource::class))),
-                        new OA\Property(property: 'coverImage', properties: [
-                            new OA\Property(property: 'url', type: 'string'),
-                            new OA\Property(property: 'blurhash', type: 'string', nullable: true),
-                        ], type: 'object', nullable: true),
-                    ], type: 'object'),
-                ],
-                type: 'object',
-            )),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Album with songs',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'publicId' => new OA\Schema(
+                                        type: 'string',
+                                        minLength: 21,
+                                        maxLength: 21,
+                                        pattern: '^[0-9a-zA-Z_-]{21}$',
+                                    ),
+                                    'title' => new OA\Schema(type: 'string'),
+                                    'type' => new OA\Schema(type: 'string'),
+                                    'year' => new OA\Schema(type: 'integer'),
+                                    'label' => new OA\Schema(type: 'string'),
+                                    'barcode' => new OA\Schema(type: 'string'),
+                                    'country' => new OA\Schema(type: 'string'),
+                                    'language' => new OA\Schema(
+                                        description: 'Release language as stored; usually a language code, but tag readers may store free text',
+                                        type: 'string',
+                                        nullable: true,
+                                    ),
+                                    'createdAt' => new OA\Schema(type: 'string', format: 'date-time'),
+                                    'songs' => new OA\Schema(
+                                        type: 'array',
+                                        items: new OA\Schema(ref: SongResource::class),
+                                    ),
+                                    'coverImage' => new OA\Schema(
+                                        type: 'object',
+                                        nullable: true,
+                                        properties: [
+                                            'url' => new OA\Schema(type: 'string'),
+                                            'blurhash' => new OA\Schema(type: 'string', nullable: true),
+                                        ],
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'show', methods: ['GET'])]
@@ -226,15 +319,32 @@ final class AlbumController
     /**
      * Get album cover image.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/albums/{publicId}/cover',
         summary: 'Get album cover image',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Album public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
             new OA\Response(response: '302', description: 'Redirect to cover image file'),
-            new OA\Response(response: '404', description: 'Album or cover image not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Album or cover image not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}/cover', name: 'cover', methods: ['GET'])]
@@ -274,19 +384,45 @@ final class AlbumController
     /**
      * Get duplicate albums for a specific album.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/albums/{publicId}/duplicates',
         summary: 'Get duplicate albums for a specific album',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Album public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'List of duplicate groups containing this album', content: new OA\JsonContent(
-                properties: [
-                    new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: DuplicateGroupResource::class))),
-                ],
-            )),
-            new OA\Response(response: '404', description: 'Album not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'List of duplicate groups containing this album',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(ref: DuplicateGroupResource::class),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Album not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}/duplicates', name: 'duplicates', methods: ['GET'])]
@@ -316,31 +452,68 @@ final class AlbumController
     /**
      * Update an album.
      */
-    #[OA\Patch(
+    #[OA\Operation\Patch(
         path: '/api/albums/{publicId}',
         summary: 'Update an album',
-        requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'title', type: 'string', nullable: true),
-                new OA\Property(property: 'type', type: 'string', nullable: true),
-                new OA\Property(property: 'year', type: 'integer', nullable: true),
-                new OA\Property(property: 'label', type: 'string', nullable: true),
-                new OA\Property(property: 'catalogNumber', type: 'string', nullable: true),
-                new OA\Property(property: 'barcode', type: 'string', nullable: true),
-                new OA\Property(property: 'country', type: 'string', nullable: true),
-                new OA\Property(property: 'language', type: 'string', nullable: true),
-                new OA\Property(property: 'disambiguation', type: 'string', nullable: true),
-                new OA\Property(property: 'annotation', type: 'string', nullable: true),
-            ])),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Album public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
+        requestBody: new OA\RequestBody(
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'title' => new OA\Schema(type: 'string', nullable: true),
+                        'type' => new OA\Schema(type: 'string', nullable: true),
+                        'year' => new OA\Schema(type: 'integer', nullable: true),
+                        'label' => new OA\Schema(type: 'string', nullable: true),
+                        'catalogNumber' => new OA\Schema(type: 'string', nullable: true),
+                        'barcode' => new OA\Schema(type: 'string', nullable: true),
+                        'country' => new OA\Schema(type: 'string', nullable: true),
+                        'language' => new OA\Schema(type: 'string', nullable: true),
+                        'disambiguation' => new OA\Schema(type: 'string', nullable: true),
+                        'annotation' => new OA\Schema(type: 'string', nullable: true),
+                    ],
+                ),
+            ),
+        ),
         responses: [
-            new OA\Response(response: '200', description: 'Album updated', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', ref: new Model(type: AlbumResource::class))],
-                type: 'object',
-            )),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: ValidationError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Album updated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: AlbumResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'update', methods: ['PATCH'])]
@@ -368,19 +541,55 @@ final class AlbumController
     /**
      * Merge albums.
      */
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/albums/merge',
         summary: 'Merge a source album into a target album',
-        requestBody: new OA\RequestBody(content: new OA\JsonContent(ref: new Model(type: MergeAlbumsRequest::class))),
+        requestBody: new OA\RequestBody(
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: MergeAlbumsRequest::class),
+            ),
+        ),
         responses: [
-            new OA\Response(response: '200', description: 'Albums merged', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', ref: new Model(type: AlbumResource::class))],
-                type: 'object',
-            )),
-            new OA\Response(response: '400', description: 'Invalid merge request', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '404', description: 'Album not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '409', description: 'Another change to the same albums or their songs ran at the same time and nothing was merged; `details.reason` is `merge_busy`: merge again', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: ValidationError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Albums merged',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: AlbumResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid merge request',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Album not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Another change to the same albums or their songs ran at the same time and nothing was merged; `details.reason` is `merge_busy`: merge again',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/merge', name: 'merge', methods: ['POST'])]
@@ -417,23 +626,50 @@ final class AlbumController
     /**
      * Delete an album.
      */
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/albums/{publicId}',
         summary: 'Delete an album',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Album public ID',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Deleted',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', ref: new Model(type: CatalogDeletionResource::class))],
-                    type: 'object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(ref: CatalogDeletionResource::class),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid public ID', content: new OA\JsonContent(ref: new Model(type: ValidationError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid public ID',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'destroy', methods: ['DELETE'])]

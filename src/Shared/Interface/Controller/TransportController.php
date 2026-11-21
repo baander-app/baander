@@ -14,8 +14,7 @@ use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\ValidationError;
 use App\Shared\Interface\Resource\FailedMessageResource;
 use App\Shared\Interface\Resource\TransportStatusResource;
-use OpenApi\Attributes as OA;
-use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -45,26 +44,44 @@ final class TransportController
      *
      * CLI counterpart: app:monitor:transport.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/monitor/transport/status',
-        description: 'Returns queue depths, consumer name, and consumer running status for the messenger transports. CLI counterpart: app:monitor:transport.',
         summary: 'Get transport status',
+        description: 'Returns queue depths, consumer name, and consumer running status for the messenger transports. CLI counterpart: app:monitor:transport.',
         responses: [
-            new OA\Response(response: '200', description: 'Transport status',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'asyncQueueDepth', description: 'Number of pending messages in the async stream', type: 'integer'),
-                        new OA\Property(property: 'failedQueueDepth', description: 'Number of messages held by the failure transport', type: 'integer'),
-                        new OA\Property(property: 'consumerName', description: 'Configured consumer identifier', type: 'string'),
-                        new OA\Property(property: 'consumerRunning', description: 'Whether a consumer is actively processing messages (best-effort)', type: 'boolean'),
-                    ], type: 'object')],
-                    type: 'object',
+            new OA\Response(
+                response: '200',
+                description: 'Transport status',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'asyncQueueDepth' => new OA\Schema(description: 'Number of pending messages in the async stream', type: 'integer'),
+                                    'failedQueueDepth' => new OA\Schema(description: 'Number of messages held by the failure transport', type: 'integer'),
+                                    'consumerName' => new OA\Schema(description: 'Configured consumer identifier', type: 'string'),
+                                    'consumerRunning' => new OA\Schema(
+                                        description: 'Whether a consumer is actively processing messages (best-effort)',
+                                        type: 'boolean',
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '503', description: 'Redis or the failure transport is unavailable',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'message', type: 'string')],
-                    type: 'object',
+            new OA\Response(
+                response: '503',
+                description: 'Redis or the failure transport is unavailable',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'message' => new OA\Schema(type: 'string'),
+                        ],
+                    ),
                 ),
             ),
         ],
@@ -89,25 +106,67 @@ final class TransportController
      *
      * CLI counterpart: app:failed-message:list.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/monitor/transport/failed',
-        description: 'Lists the messages held by the failure transport, newest first, including messages waiting out a retry delay. CLI counterpart: app:failed-message:list.',
         summary: 'List failed messages',
+        description: 'Lists the messages held by the failure transport, newest first, including messages waiting out a retry delay. CLI counterpart: app:failed-message:list.',
         parameters: [
-            new OA\Parameter(name: 'page', description: 'Page number', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 1, minimum: 1)),
-            new OA\Parameter(name: 'limit', description: 'Messages per page', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 50, maximum: 100, minimum: 1)),
+            new OA\Parameter(
+                name: 'page',
+                in: 'query',
+                description: 'Page number',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 1,
+                    default: 1,
+                ),
+            ),
+            new OA\Parameter(
+                name: 'limit',
+                in: 'query',
+                description: 'Messages per page',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 1,
+                    maximum: 100,
+                    default: 50,
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Paginated failed messages', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: FailedMessageResource::class))),
-                new OA\Property(property: 'meta', required: ['current_page', 'last_page', 'per_page', 'total'], properties: [
-                    new OA\Property(property: 'current_page', type: 'integer'),
-                    new OA\Property(property: 'last_page', type: 'integer'),
-                    new OA\Property(property: 'per_page', type: 'integer'),
-                    new OA\Property(property: 'total', type: 'integer'),
-                ], type: 'object'),
-            ])),
-            new OA\Response(response: '503', description: 'Failure transport unavailable', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Paginated failed messages',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(ref: FailedMessageResource::class),
+                            ),
+                            'meta' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'current_page' => new OA\Schema(type: 'integer'),
+                                    'last_page' => new OA\Schema(type: 'integer'),
+                                    'per_page' => new OA\Schema(type: 'integer'),
+                                    'total' => new OA\Schema(type: 'integer'),
+                                ],
+                                required: ['current_page', 'last_page', 'per_page', 'total'],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '503',
+                description: 'Failure transport unavailable',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/failed', name: 'failed_list', methods: ['GET'])]
@@ -137,19 +196,45 @@ final class TransportController
      *
      * CLI counterpart: messenger:failed:show {id}.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/monitor/transport/failed/{id}',
-        description: 'Returns one message held by the failure transport. CLI counterpart: messenger:failed:show {id}.',
         summary: 'Show a failed message',
+        description: 'Returns one message held by the failure transport. CLI counterpart: messenger:failed:show {id}.',
         parameters: [
-            new OA\Parameter(name: 'id', description: 'Failed message ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[1-9][0-9]{0,17}$')),
+            new OA\Parameter(
+                name: 'id',
+                in: 'path',
+                description: 'Failed message ID',
+                required: true,
+                schema: new OA\Schema(type: 'string', pattern: '^[1-9][0-9]{0,17}$'),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Failed message', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', ref: new Model(type: FailedMessageResource::class)),
-            ])),
-            new OA\Response(response: '404', description: 'Message not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '503', description: 'Failure transport unavailable', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Failed message',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: FailedMessageResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Message not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '503',
+                description: 'Failure transport unavailable',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/failed/{id}', name: 'failed_show', requirements: ['id' => self::ID_REQUIREMENT], methods: ['GET'])]
@@ -175,23 +260,53 @@ final class TransportController
      * Requires ?confirm=true query parameter to prevent accidental invocation.
      * CLI counterpart: app:failed-message:flush.
      */
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/monitor/transport/failed/flush',
-        description: 'Removes all messages from the failed transport, including messages waiting out a retry delay. Requires ?confirm=true query parameter. CLI counterpart: app:failed-message:flush.',
         summary: 'Flush all failed messages',
+        description: 'Removes all messages from the failed transport, including messages waiting out a retry delay. Requires ?confirm=true query parameter. CLI counterpart: app:failed-message:flush.',
         parameters: [
-            new OA\Parameter(name: 'confirm', description: 'Must be set to "true" to confirm the operation', in: 'query', required: true, schema: new OA\Schema(type: 'string', enum: ['true'])),
-        ],
-        responses: [
-            new OA\Response(response: '200', description: 'Failed messages flushed',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'flushed', description: 'Number of messages removed from the failed queue', type: 'integer'),
-                    ], type: 'object')],
+            new OA\Parameter(
+                name: 'confirm',
+                in: 'query',
+                description: 'Must be set to "true" to confirm the operation',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['true'],
                 ),
             ),
-            new OA\Response(response: '422', description: 'Missing confirm parameter', content: new OA\JsonContent(ref: new Model(type: ValidationError::class))),
-            new OA\Response(response: '503', description: 'Failure transport unavailable', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+        ],
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'Failed messages flushed',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'flushed' => new OA\Schema(description: 'Number of messages removed from the failed queue', type: 'integer'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Missing confirm parameter',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ValidationError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '503',
+                description: 'Failure transport unavailable',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/failed/flush', name: 'failed_flush', methods: ['POST'])]
@@ -221,24 +336,57 @@ final class TransportController
      *
      * CLI counterpart: messenger:failed:retry {id} --force.
      */
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/monitor/transport/failed/{id}/retry',
-        description: 'Handles a failed message again by running messenger:failed:retry {id} --force. A message that fails again returns to the failure transport under a new ID with its retry count increased, and stays listed until it succeeds or is removed.',
         summary: 'Retry a failed message',
+        description: 'Handles a failed message again by running messenger:failed:retry {id} --force. A message that fails again returns to the failure transport under a new ID with its retry count increased, and stays listed until it succeeds or is removed.',
         parameters: [
-            new OA\Parameter(name: 'id', description: 'Failed message ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[1-9][0-9]{0,17}$')),
+            new OA\Parameter(
+                name: 'id',
+                in: 'path',
+                description: 'Failed message ID',
+                required: true,
+                schema: new OA\Schema(type: 'string', pattern: '^[1-9][0-9]{0,17}$'),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Message retried',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'retried', description: 'The ID of the retried message', type: 'string'),
-                    ], type: 'object')],
+            new OA\Response(
+                response: '200',
+                description: 'Message retried',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'retried' => new OA\Schema(description: 'The ID of the retried message', type: 'string'),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '404', description: 'Message not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '500', description: 'Retry failed', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '503', description: 'Failure transport unavailable', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Message not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '500',
+                description: 'Retry failed',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '503',
+                description: 'Failure transport unavailable',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/failed/{id}/retry', name: 'failed_retry', requirements: ['id' => self::ID_REQUIREMENT], methods: ['POST'])]
@@ -270,23 +418,50 @@ final class TransportController
      *
      * CLI counterpart: messenger:failed:remove {id} --force.
      */
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/monitor/transport/failed/{id}',
-        description: 'Removes one message from the failure transport. CLI counterpart: messenger:failed:remove {id} --force.',
         summary: 'Remove a failed message',
+        description: 'Removes one message from the failure transport. CLI counterpart: messenger:failed:remove {id} --force.',
         parameters: [
-            new OA\Parameter(name: 'id', description: 'Failed message ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[1-9][0-9]{0,17}$')),
+            new OA\Parameter(
+                name: 'id',
+                in: 'path',
+                description: 'Failed message ID',
+                required: true,
+                schema: new OA\Schema(type: 'string', pattern: '^[1-9][0-9]{0,17}$'),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Message removed',
-                content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'removed', description: 'The ID of the removed message', type: 'string'),
-                    ], type: 'object')],
+            new OA\Response(
+                response: '200',
+                description: 'Message removed',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'removed' => new OA\Schema(description: 'The ID of the removed message', type: 'string'),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '404', description: 'Message not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '503', description: 'Failure transport unavailable', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Message not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '503',
+                description: 'Failure transport unavailable',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/failed/{id}', name: 'failed_remove', requirements: ['id' => self::ID_REQUIREMENT], methods: ['DELETE'])]

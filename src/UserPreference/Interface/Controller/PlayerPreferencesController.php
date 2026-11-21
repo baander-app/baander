@@ -12,8 +12,7 @@ use App\UserPreference\Application\Port\PlayerPreferencesPortInterface;
 use App\UserPreference\Interface\Request\PreferenceRequestBody;
 use App\UserPreference\Interface\Request\RollbackRequest;
 use App\UserPreference\Interface\Request\SavePlayerPreferencesRequest;
-use OpenApi\Attributes as OA;
-use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -37,27 +36,49 @@ final class PlayerPreferencesController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/user/player-preferences/',
-        description: 'Returns the player preferences for the authenticated user.',
         summary: 'Get player preferences',
+        description: 'Returns the player preferences for the authenticated user.',
         responses: [
-            new OA\Response(response: '200', description: 'Player preferences', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'payload', properties: [
-                    new OA\Property(property: 'shuffle', type: 'boolean'),
-                    new OA\Property(property: 'repeat', type: 'string'),
-                    new OA\Property(property: 'volume', type: 'number'),
-                    new OA\Property(property: 'muted', type: 'boolean'),
-                    new OA\Property(property: 'crossfadeEnabled', type: 'boolean'),
-                    new OA\Property(property: 'crossfadeDuration', type: 'number'),
-                    new OA\Property(property: 'replayGainEnabled', type: 'boolean'),
-                    new OA\Property(property: 'replayGainMode', type: 'string'),
-                    new OA\Property(property: 'replayGainPreAmp', type: 'number'),
-                ]),
-                new OA\Property(property: 'version', type: 'integer'),
-            ])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'No player preferences found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Player preferences',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'payload' => new OA\Schema(
+                                properties: [
+                                    'shuffle' => new OA\Schema(type: 'boolean'),
+                                    'repeat' => new OA\Schema(type: 'string'),
+                                    'volume' => new OA\Schema(type: 'number'),
+                                    'muted' => new OA\Schema(type: 'boolean'),
+                                    'crossfadeEnabled' => new OA\Schema(type: 'boolean'),
+                                    'crossfadeDuration' => new OA\Schema(type: 'number'),
+                                    'replayGainEnabled' => new OA\Schema(type: 'boolean'),
+                                    'replayGainMode' => new OA\Schema(type: 'string'),
+                                    'replayGainPreAmp' => new OA\Schema(type: 'number'),
+                                ],
+                            ),
+                            'version' => new OA\Schema(type: 'integer'),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'No player preferences found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
@@ -75,35 +96,69 @@ final class PlayerPreferencesController
         return $this->successResponse($snapshot);
     }
 
-    #[OA\Put(
+    #[OA\Operation\Put(
         path: '/api/user/player-preferences/',
         summary: 'Save player preferences',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\MediaType(
                 mediaType: 'application/json',
-                schema: new OA\Schema(ref: new Model(type: SavePlayerPreferencesRequest::class)),
+                schema: new OA\Schema(ref: SavePlayerPreferencesRequest::class),
             ),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Preferences saved', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'payload', properties: [
-                    new OA\Property(property: 'shuffle', type: 'boolean'),
-                    new OA\Property(property: 'repeat', type: 'string'),
-                    new OA\Property(property: 'volume', type: 'number'),
-                    new OA\Property(property: 'muted', type: 'boolean'),
-                    new OA\Property(property: 'crossfadeEnabled', type: 'boolean'),
-                    new OA\Property(property: 'crossfadeDuration', type: 'number'),
-                    new OA\Property(property: 'replayGainEnabled', type: 'boolean'),
-                    new OA\Property(property: 'replayGainMode', type: 'string'),
-                    new OA\Property(property: 'replayGainPreAmp', type: 'number'),
-                ]),
-                new OA\Property(property: 'version', type: 'integer'),
-            ])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '409', description: 'Version conflict', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '400', description: 'Malformed or empty JSON body', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid request body or preference fields', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Preferences saved',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'payload' => new OA\Schema(
+                                properties: [
+                                    'shuffle' => new OA\Schema(type: 'boolean'),
+                                    'repeat' => new OA\Schema(type: 'string'),
+                                    'volume' => new OA\Schema(type: 'number'),
+                                    'muted' => new OA\Schema(type: 'boolean'),
+                                    'crossfadeEnabled' => new OA\Schema(type: 'boolean'),
+                                    'crossfadeDuration' => new OA\Schema(type: 'number'),
+                                    'replayGainEnabled' => new OA\Schema(type: 'boolean'),
+                                    'replayGainMode' => new OA\Schema(type: 'string'),
+                                    'replayGainPreAmp' => new OA\Schema(type: 'number'),
+                                ],
+                            ),
+                            'version' => new OA\Schema(type: 'integer'),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Version conflict',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'Malformed or empty JSON body',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid request body or preference fields',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'update', methods: ['PUT'])]
@@ -135,18 +190,37 @@ final class PlayerPreferencesController
         ]);
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/user/player-preferences/history',
-        description: 'Returns the version history for player preferences.',
         summary: 'Get player preferences history',
+        description: 'Returns the version history for player preferences.',
         responses: [
-            new OA\Response(response: '200', description: 'Version history', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'history', type: 'array', items: new OA\Items(properties: [
-                    new OA\Property(property: 'version', type: 'integer'),
-                    new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
-                ])),
-            ])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Version history',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'history' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(
+                                    properties: [
+                                        'version' => new OA\Schema(type: 'integer'),
+                                        'createdAt' => new OA\Schema(type: 'string', format: 'date-time'),
+                                    ],
+                                ),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/history', name: 'history', methods: ['GET'])]
@@ -160,7 +234,7 @@ final class PlayerPreferencesController
         return $this->successResponse(['history' => $history]);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/user/player-preferences/rollback',
         summary: 'Rollback player preferences to a previous version',
         requestBody: new OA\RequestBody(
@@ -168,32 +242,66 @@ final class PlayerPreferencesController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
-                    required: ['version'],
                     properties: [
-                        new OA\Property(property: 'version', type: 'integer'),
+                        'version' => new OA\Schema(type: 'integer'),
                     ],
+                    required: ['version'],
                 ),
             ),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Preferences rolled back', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'payload', properties: [
-                    new OA\Property(property: 'shuffle', type: 'boolean'),
-                    new OA\Property(property: 'repeat', type: 'string'),
-                    new OA\Property(property: 'volume', type: 'number'),
-                    new OA\Property(property: 'muted', type: 'boolean'),
-                    new OA\Property(property: 'crossfadeEnabled', type: 'boolean'),
-                    new OA\Property(property: 'crossfadeDuration', type: 'number'),
-                    new OA\Property(property: 'replayGainEnabled', type: 'boolean'),
-                    new OA\Property(property: 'replayGainMode', type: 'string'),
-                    new OA\Property(property: 'replayGainPreAmp', type: 'number'),
-                ]),
-                new OA\Property(property: 'version', type: 'integer'),
-            ])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '409', description: 'Concurrent version conflict', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '400', description: 'Malformed or empty JSON body', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid request body or preference fields', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Preferences rolled back',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'payload' => new OA\Schema(
+                                properties: [
+                                    'shuffle' => new OA\Schema(type: 'boolean'),
+                                    'repeat' => new OA\Schema(type: 'string'),
+                                    'volume' => new OA\Schema(type: 'number'),
+                                    'muted' => new OA\Schema(type: 'boolean'),
+                                    'crossfadeEnabled' => new OA\Schema(type: 'boolean'),
+                                    'crossfadeDuration' => new OA\Schema(type: 'number'),
+                                    'replayGainEnabled' => new OA\Schema(type: 'boolean'),
+                                    'replayGainMode' => new OA\Schema(type: 'string'),
+                                    'replayGainPreAmp' => new OA\Schema(type: 'number'),
+                                ],
+                            ),
+                            'version' => new OA\Schema(type: 'integer'),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Concurrent version conflict',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'Malformed or empty JSON body',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid request body or preference fields',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/rollback', name: 'rollback', methods: ['POST'])]

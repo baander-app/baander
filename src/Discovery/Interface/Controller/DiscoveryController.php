@@ -18,8 +18,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
@@ -41,7 +40,7 @@ final class DiscoveryController
     ) {
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/discovery/register',
         summary: 'Register a self-hosted server',
         requestBody: new OA\RequestBody(
@@ -49,19 +48,27 @@ final class DiscoveryController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
-                    required: ['serverUrl', 'name', 'version'],
                     properties: [
-                        new OA\Property(property: 'serverUrl', type: 'string', format: 'uri'),
-                        new OA\Property(property: 'name', type: 'string'),
-                        new OA\Property(property: 'version', type: 'string'),
+                        'serverUrl' => new OA\Schema(type: 'string', format: 'uri'),
+                        'name' => new OA\Schema(type: 'string'),
+                        'version' => new OA\Schema(type: 'string'),
                     ],
+                    required: ['serverUrl', 'name', 'version'],
                 ),
             ),
         ),
         responses: [
-            new OA\Response(response: '201', description: 'Registered', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', ref: new Model(type: ServerInstanceResource::class)),
-            ])),
+            new OA\Response(
+                response: '201',
+                description: 'Registered',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: ServerInstanceResource::class),
+                        ],
+                    ),
+                ),
+            ),
         ],
     )]
     #[Route('/register', name: 'register', methods: ['POST'])]
@@ -79,7 +86,7 @@ final class DiscoveryController
         return $this->successResponse(ServerInstanceResource::from($server), Response::HTTP_CREATED);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/discovery/pairing-code',
         summary: 'Create a pairing code for a server',
         requestBody: new OA\RequestBody(
@@ -87,18 +94,30 @@ final class DiscoveryController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
-                    required: ['serverPublicId', 'method'],
                     properties: [
-                        new OA\Property(property: 'serverPublicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-                        new OA\Property(property: 'method', type: 'string', enum: ['qr_code', 'email_url', 'server_code']),
+                        'serverPublicId' => new OA\Schema(
+                            type: 'string',
+                            minLength: 21,
+                            maxLength: 21,
+                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                        ),
+                        'method' => new OA\Schema(
+                            type: 'string',
+                            enum: ['qr_code', 'email_url', 'server_code'],
+                        ),
                     ],
+                    required: ['serverPublicId', 'method'],
                 ),
             ),
         ),
         responses: [
-            new OA\Response(response: '201', description: 'Created', content: new OA\JsonContent(
-                ref: new Model(type: PairingSessionResource::class),
-            )),
+            new OA\Response(
+                response: '201',
+                description: 'Created',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: PairingSessionResource::class),
+                ),
+            ),
         ],
     )]
     #[Route('/pairing-code', name: 'pairing_code', methods: ['POST'])]
@@ -114,19 +133,40 @@ final class DiscoveryController
         return $this->created(PairingSessionResource::from($session));
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/discovery/qr-payload/{serverPublicId}',
         summary: 'Get QR payload for a pending pairing session',
         parameters: [
-            new OA\Parameter(name: 'serverPublicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'serverPublicId',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: 21,
+                    maxLength: 21,
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', properties: [
-                    new OA\Property(property: 'qrData', type: 'string'),
-                    new OA\Property(property: 'pairingCode', type: 'string'),
-                ], type: 'object'),
-            ])),
+            new OA\Response(
+                response: '200',
+                description: 'Success',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'qrData' => new OA\Schema(type: 'string'),
+                                    'pairingCode' => new OA\Schema(type: 'string'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
         ],
     )]
     #[Route('/qr-payload/{serverPublicId}', name: 'qr_payload', methods: ['GET'])]
@@ -150,7 +190,7 @@ final class DiscoveryController
         ]);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/discovery/complete-pairing',
         summary: 'Complete a pairing session',
         requestBody: new OA\RequestBody(
@@ -158,20 +198,36 @@ final class DiscoveryController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
-                    required: ['pairingCode', 'serverPublicId'],
                     properties: [
-                        new OA\Property(property: 'pairingCode', type: 'string'),
-                        new OA\Property(property: 'serverPublicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+                        'pairingCode' => new OA\Schema(type: 'string'),
+                        'serverPublicId' => new OA\Schema(
+                            type: 'string',
+                            minLength: 21,
+                            maxLength: 21,
+                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                        ),
                     ],
+                    required: ['pairingCode', 'serverPublicId'],
                 ),
             ),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Completed', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'data', properties: [
-                    new OA\Property(property: 'serverUrl', type: 'string', format: 'uri'),
-                ], type: 'object'),
-            ])),
+            new OA\Response(
+                response: '200',
+                description: 'Completed',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'serverUrl' => new OA\Schema(type: 'string', format: 'uri'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
         ],
     )]
     #[Route('/complete-pairing', name: 'complete_pairing', methods: ['POST'])]

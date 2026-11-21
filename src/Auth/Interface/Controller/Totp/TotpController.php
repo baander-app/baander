@@ -20,8 +20,7 @@ use App\Shared\Application\Exception\HandlerFailure;
 use Baander\RedisRateLimiter\Exception\RateLimiterUnavailableException;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -46,28 +45,68 @@ final class TotpController
     ) {
     }
 
-    #[OA\Post(path: '/api/auth/totp/setup', description: 'Refused while TOTP is on, and for an unverified email address with 422 and `details.reason` `email_unverified`. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.', summary: 'Generate TOTP secret and provisioning URI', requestBody: new OA\RequestBody(
-        required: true,
-        content: new OA\JsonContent(ref: new Model(type: StartTotpSetupRequest::class)),
-    ), responses: [
-        new OA\Response(
-            response: '200',
-            description: 'TOTP provisioning data',
-            content: new OA\JsonContent(
-                properties: [
-                    new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'secret', type: 'string', example: 'JBSWY3DPEHPK3PXP'),
-                        new OA\Property(property: 'provisioningUri', type: 'string', example: 'otpauth://totp/B%C3%A5nder:alice%40baander.app?secret=JBSWY3DPEHPK3PXP&issuer=B%C3%A5nder'),
-                    ], type: 'object'),
-                ],
-                type: 'object',
+    #[OA\Operation\Post(
+        path: '/api/auth/totp/setup',
+        summary: 'Generate TOTP secret and provisioning URI',
+        description: 'Refused while TOTP is on, and for an unverified email address with 422 and `details.reason` `email_unverified`. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: StartTotpSetupRequest::class),
             ),
         ),
-        new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(response: '409', description: 'TOTP is already on', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(response: '422', description: 'Validation error, an unverified email address, or the password is wrong', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
-        new OA\Response(response: '429', description: 'Too many step-up attempts for this account', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-    ])]
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'TOTP provisioning data',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'secret' => new OA\Schema(type: 'string', example: 'JBSWY3DPEHPK3PXP'),
+                                    'provisioningUri' => new OA\Schema(
+                                        type: 'string',
+                                        example: 'otpauth://totp/B%C3%A5nder:alice%40baander.app?secret=JBSWY3DPEHPK3PXP&issuer=B%C3%A5nder',
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'TOTP is already on',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error, an unverified email address, or the password is wrong',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '429',
+                description: 'Too many step-up attempts for this account',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+        ],
+    )]
     #[Route('/setup', name: 'setup', methods: ['POST'])]
     public function setup(#[MapRequestPayload(mapWhenEmpty: true)] StartTotpSetupRequest $payload): JsonResponse
     {
@@ -92,32 +131,66 @@ final class TotpController
         ]);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/auth/totp/enable',
         summary: 'Enable TOTP after verifying a code from the authenticator app',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(required: ['code'], properties: [
-                        new OA\Property(property: 'code', type: 'string', example: '123456'),
-                    ]),
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'code' => new OA\Schema(type: 'string', example: '123456'),
+                    ],
+                    required: ['code'],
+                ),
+            ),
         ),
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'TOTP enabled',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'message', type: 'string', example: 'TOTP enabled.'),
-                        ], type: 'object'),
-                    ],
-                    type: 'object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'message' => new OA\Schema(type: 'string', example: 'TOTP enabled.'),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '400', description: 'Invalid TOTP code or no pending setup', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '409', description: 'TOTP is already on', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid TOTP code or no pending setup',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'TOTP is already on',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/enable', name: 'enable', methods: ['POST'])]
@@ -144,31 +217,59 @@ final class TotpController
         ]);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/auth/totp/disable',
         summary: 'Disable TOTP (requires current TOTP code to verify)',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(required: ['code'], properties: [
-                        new OA\Property(property: 'code', type: 'string', example: '123456'),
-                    ]),
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'code' => new OA\Schema(type: 'string', example: '123456'),
+                    ],
+                    required: ['code'],
+                ),
+            ),
         ),
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'TOTP disabled',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'message', type: 'string', example: 'TOTP disabled.'),
-                        ], type: 'object'),
-                    ],
-                    type: 'object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'message' => new OA\Schema(type: 'string', example: 'TOTP disabled.'),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '400', description: 'Invalid TOTP code or TOTP not enabled', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid TOTP code or TOTP not enabled',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/disable', name: 'disable', methods: ['POST'])]

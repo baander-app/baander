@@ -21,8 +21,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -50,27 +49,47 @@ final class PasskeyController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/auth/passkey',
         summary: 'List registered passkeys for the current user',
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'List of passkeys',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', type: 'array', items: new OA\Items(
-                            properties: [
-                                new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-                                new OA\Property(property: 'name', type: 'string'),
-                                new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
-                                new OA\Property(property: 'lastUsedAt', type: 'string', format: 'date-time', nullable: true),
-                            ],
-                        )),
-                    ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(
+                                    properties: [
+                                        'publicId' => new OA\Schema(
+                                            type: 'string',
+                                            minLength: 21,
+                                            maxLength: 21,
+                                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                                        ),
+                                        'name' => new OA\Schema(type: 'string'),
+                                        'createdAt' => new OA\Schema(type: 'string', format: 'date-time'),
+                                        'lastUsedAt' => new OA\Schema(
+                                            type: 'string',
+                                            format: 'date-time',
+                                            nullable: true,
+                                        ),
+                                    ],
+                                ),
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('', name: 'list', methods: ['GET'])]
@@ -96,30 +115,66 @@ final class PasskeyController
         return $this->successResponse($items);
     }
 
-    #[OA\Post(path: '/api/auth/passkey/options', description: 'Needs a verified email address, answered otherwise with 422 and `details.reason` `email_unverified`. Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.', summary: 'Get WebAuthn registration options', requestBody: new OA\RequestBody(
-        required: true,
-        content: new OA\JsonContent(ref: new Model(type: PasskeyRegistrationOptionsRequest::class)),
-    ), responses: [
-        new OA\Response(
-            response: '200',
-            description: 'Registration options',
-            content: new OA\JsonContent(
-                properties: [
-                    new OA\Property(property: 'data', description: 'WebAuthn PublicKeyCredentialCreationOptions', type: 'object'),
-                ],
-                type: 'object',
+    #[OA\Operation\Post(
+        path: '/api/auth/passkey/options',
+        summary: 'Get WebAuthn registration options',
+        description: 'Needs a verified email address, answered otherwise with 422 and `details.reason` `email_unverified`. Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: PasskeyRegistrationOptionsRequest::class),
             ),
         ),
-        new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(response: '422', description: 'Validation error, an unverified email address, or the password or code is wrong', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
-        new OA\Response(response: '429', description: 'Too many step-up attempts for this account', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(
-            response: '503',
-            description: 'The passkey challenge store is unavailable; retry after the Retry-After delay.',
-            headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 1))],
-            content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
-        ),
-    ])]
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'Registration options',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(description: 'WebAuthn PublicKeyCredentialCreationOptions', type: 'object'),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error, an unverified email address, or the password or code is wrong',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '429',
+                description: 'Too many step-up attempts for this account',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '503',
+                description: 'The passkey challenge store is unavailable; retry after the Retry-After delay.',
+                headers: [
+                    new OA\Header(
+                        header: 'Retry-After',
+                        description: 'Seconds to wait before retrying',
+                        schema: new OA\Schema(type: 'integer', example: 1),
+                    ),
+                ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+        ],
+    )]
     #[Route('/options', name: 'options', methods: ['POST'])]
     public function registrationOptions(#[MapRequestPayload(mapWhenEmpty: true)] PasskeyRegistrationOptionsRequest $payload): JsonResponse
     {
@@ -156,39 +211,78 @@ final class PasskeyController
         return $this->successResponse($result);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/auth/passkey/register',
         summary: 'Register a new passkey',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(required: ['challengeKey', 'response'], properties: [
-                        new OA\Property(property: 'challengeKey', type: 'string', example: 'challenge-key-abc123'),
-                        new OA\Property(property: 'response', description: 'WebAuthn authenticator response (base64-encoded attestation object)', type: 'object'),
-                        new OA\Property(property: 'name', type: 'string', example: 'Passkey'),
-                    ]),
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'challengeKey' => new OA\Schema(type: 'string', example: 'challenge-key-abc123'),
+                        'response' => new OA\Schema(
+                            description: 'WebAuthn authenticator response (base64-encoded attestation object)',
+                            type: 'object',
+                        ),
+                        'name' => new OA\Schema(type: 'string', example: 'Passkey'),
+                    ],
+                    required: ['challengeKey', 'response'],
+                ),
+            ),
         ),
         responses: [
             new OA\Response(
                 response: '201',
                 description: 'Passkey registered',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'credentialId', type: 'string'),
-                            new OA\Property(property: 'name', type: 'string', example: 'Passkey'),
-                        ], type: 'object'),
-                    ],
-                    type: 'object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'credentialId' => new OA\Schema(type: 'string'),
+                                    'name' => new OA\Schema(type: 'string', example: 'Passkey'),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '400', description: 'Invalid challenge or verification failed', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid challenge or verification failed',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
             new OA\Response(
                 response: '503',
                 description: 'The passkey challenge store is unavailable; retry after the Retry-After delay.',
-                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 1))],
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                headers: [
+                    new OA\Header(
+                        header: 'Retry-After',
+                        description: 'Seconds to wait before retrying',
+                        schema: new OA\Schema(type: 'integer', example: 1),
+                    ),
+                ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
         ],
     )]
@@ -247,32 +341,52 @@ final class PasskeyController
         ], Response::HTTP_CREATED);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/auth/passkey/authenticate/options',
         summary: 'Get WebAuthn authentication options',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(properties: [
-                        new OA\Property(property: 'userId', description: 'Optional user public ID to get passkey options for', type: 'string'),
-                    ]),
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'userId' => new OA\Schema(description: 'Optional user public ID to get passkey options for', type: 'string'),
+                    ],
+                ),
+            ),
         ),
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Authentication options',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', description: 'WebAuthn PublicKeyCredentialRequestOptions', type: 'object'),
-                    ],
-                    type: 'object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(description: 'WebAuthn PublicKeyCredentialRequestOptions', type: 'object'),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
             new OA\Response(
                 response: '503',
                 description: 'The passkey challenge store is unavailable; retry after the Retry-After delay.',
-                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 1))],
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                headers: [
+                    new OA\Header(
+                        header: 'Retry-After',
+                        description: 'Seconds to wait before retrying',
+                        schema: new OA\Schema(type: 'integer', example: 1),
+                    ),
+                ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
         ],
     )]
@@ -302,41 +416,85 @@ final class PasskeyController
         return $this->successResponse($result);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/auth/passkey/authenticate',
-        description: 'The main passkey login flow goes through PasskeyAuthenticator at /api/auth/login/passkey. This endpoint is an alternative for API-based flows where the frontend manages the ceremony.',
         summary: 'Authenticate with a passkey (API-based flow)',
+        description: 'The main passkey login flow goes through PasskeyAuthenticator at /api/auth/login/passkey. This endpoint is an alternative for API-based flows where the frontend manages the ceremony.',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(required: ['challengeKey', 'response'], properties: [
-                        new OA\Property(property: 'challengeKey', type: 'string', example: 'challenge-key-abc123'),
-                        new OA\Property(property: 'response', description: 'WebAuthn authenticator response (base64-encoded assertion)', type: 'object'),
-                        new OA\Property(property: 'userId', type: 'string', nullable: true),
-                    ]),
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'challengeKey' => new OA\Schema(type: 'string', example: 'challenge-key-abc123'),
+                        'response' => new OA\Schema(
+                            description: 'WebAuthn authenticator response (base64-encoded assertion)',
+                            type: 'object',
+                        ),
+                        'userId' => new OA\Schema(type: 'string', nullable: true),
+                    ],
+                    required: ['challengeKey', 'response'],
+                ),
+            ),
         ),
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Authentication successful',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'userId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-                            new OA\Property(property: 'credentialId', type: 'string'),
-                            new OA\Property(property: 'signCount', type: 'integer'),
-                        ], type: 'object'),
-                    ],
-                    type: 'object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'userId' => new OA\Schema(
+                                        type: 'string',
+                                        minLength: 21,
+                                        maxLength: 21,
+                                        pattern: '^[0-9a-zA-Z_-]{21}$',
+                                    ),
+                                    'credentialId' => new OA\Schema(type: 'string'),
+                                    'signCount' => new OA\Schema(type: 'integer'),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '400', description: 'Invalid challenge or verification failed', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '401', description: 'No passkey found for credential ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid challenge or verification failed',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'No passkey found for credential ID',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
             new OA\Response(
                 response: '503',
                 description: 'The passkey challenge store is unavailable; retry after the Retry-After delay.',
-                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 1))],
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                headers: [
+                    new OA\Header(
+                        header: 'Retry-After',
+                        description: 'Seconds to wait before retrying',
+                        schema: new OA\Schema(type: 'integer', example: 1),
+                    ),
+                ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
         ],
     )]
@@ -407,28 +565,55 @@ final class PasskeyController
         ]);
     }
 
-    #[OA\Delete(
+    #[OA\Operation\Delete(
         path: '/api/auth/passkey/{publicId}',
         summary: 'Delete a passkey',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Passkey public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Passkey public ID',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Passkey deleted',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'message', type: 'string', example: 'Passkey deleted.'),
-                            new OA\Property(property: 'signal', description: 'WebAuthn AllAcceptedCredentials signal for updating the passkey picker', type: 'object', nullable: true),
-                        ], type: 'object'),
-                    ],
-                    type: 'object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'message' => new OA\Schema(type: 'string', example: 'Passkey deleted.'),
+                                    'signal' => new OA\Schema(
+                                        description: 'WebAuthn AllAcceptedCredentials signal for updating the passkey picker',
+                                        type: 'object',
+                                        nullable: true,
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Passkey not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Passkey not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'delete', methods: ['DELETE'])]

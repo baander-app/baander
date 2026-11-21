@@ -15,8 +15,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Transcode\Application\Port\StreamAuthPortInterface;
 use App\Transcode\Application\Port\CompletedVideoDeliveryPort;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
@@ -35,22 +34,26 @@ final readonly class DeliveryController
         private CompletedVideoDeliveryPort $completed,
     ) {}
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/stream/delivery',
         summary: 'Choose compatible delivery for the destination before loading media',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(ref: new Model(type: DeliveryRequest::class)),
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: DeliveryRequest::class),
+            ),
         ),
-        responses: [new OA\Response(
-            response: '200',
-            description: 'Delivery choice, or a terminal compatibility reason',
-            content: new OA\JsonContent(ref: new Model(type: DeliveryResource::class)),
-        ),
-            new OA\Response(response: '400', description: 'Invalid capabilities or media identifier'), new OA\Response(
-                response: '401',
-                description: 'Authentication required',
-            )],
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'Delivery choice, or a terminal compatibility reason',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: DeliveryResource::class),
+                ),
+            ),
+            new OA\Response(response: '400', description: 'Invalid capabilities or media identifier'),
+            new OA\Response(response: '401', description: 'Authentication required'),
+        ],
     )]
     #[Route('/api/stream/delivery', name: 'stream_delivery', methods: ['POST'])]
     public function decide(#[MapRequestPayload] DeliveryRequest $request): JsonResponse

@@ -9,8 +9,7 @@ use App\Shared\Application\LiveUpdates\LiveAccessDenied;
 use App\Shared\Application\LiveUpdates\LiveSnapshotReader;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Resource\LiveRecoveryResource;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\AsController;
@@ -26,11 +25,17 @@ final readonly class LiveRecoveryController
 
     #[Route('/api/live/recovery', name: 'live_recovery', methods: ['GET'])]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/live/recovery',
         summary: 'Recover current live update authorization and health',
         responses: [
-            new OA\Response(response: 200, description: 'Current authorized live families', content: new OA\JsonContent(ref: new Model(type: LiveRecoveryResource::class))),
+            new OA\Response(
+                response: 200,
+                description: 'Current authorized live families',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: LiveRecoveryResource::class),
+                ),
+            ),
             new OA\Response(response: 401, description: 'Authentication required'),
             new OA\Response(response: 403, description: 'Current principal unavailable'),
         ],

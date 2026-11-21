@@ -6,7 +6,7 @@ namespace App\Shared\Interface\Controller;
 
 use App\Shared\Application\Port\ServerDiagnosticsInterface;
 use App\Shared\Interface\Attribute\CliCounterpart;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -18,11 +18,17 @@ final readonly class WorkerStatsController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/debug/workers',
         summary: 'Server HTTP and user worker statistics',
         responses: [
-            new OA\Response(response: '200', description: 'Worker stats', content: new OA\JsonContent(type: 'object')),
+            new OA\Response(
+                response: '200',
+                description: 'Worker stats',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(type: 'object'),
+                ),
+            ),
         ],
     )]
     #[Route('/api/debug/workers', name: 'debug_workers', methods: ['GET'])]

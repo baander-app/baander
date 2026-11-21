@@ -10,8 +10,7 @@ use App\Metadata\Interface\Request\MatchMetadataRequest;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\DTO\ValidationError;
-use OpenApi\Attributes as OA;
-use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
@@ -33,44 +32,84 @@ final class MetadataSyncController
     ) {
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/metadata/extract',
         summary: 'Extract embedded metadata from a local media file',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(
-                required: ['path'],
-                properties: [
-                    new OA\Property(property: 'path', type: 'string'),
-                ],
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'path' => new OA\Schema(type: 'string'),
+                    ],
+                    required: ['path'],
+                ),
             ),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Extracted metadata from the file',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'format', description: 'Detected file format (mp3, m4a, flac, ogg, opus, wav, wma, aiff or aac)', type: 'string', example: 'flac'),
-                            new OA\Property(property: 'metadata', properties: [
-                                new OA\Property(property: 'title', type: 'string', nullable: true),
-                                new OA\Property(property: 'artist', type: 'string', nullable: true),
-                                new OA\Property(property: 'album', type: 'string', nullable: true),
-                                new OA\Property(property: 'albumArtist', type: 'string', nullable: true),
-                                new OA\Property(property: 'trackNumber', type: 'integer', nullable: true),
-                                new OA\Property(property: 'discNumber', type: 'integer', nullable: true),
-                                new OA\Property(property: 'year', type: 'integer', nullable: true),
-                                new OA\Property(property: 'genre', description: 'Genre values in tag order', type: 'array', items: new OA\Items(type: 'string')),
-                                new OA\Property(property: 'composer', type: 'string', nullable: true),
-                                new OA\Property(property: 'bpm', type: 'integer', nullable: true),
-                                new OA\Property(property: 'duration', description: 'Duration in seconds', type: 'number', nullable: true),
-                                new OA\Property(property: 'bitrate', description: 'Bitrate in kbps', type: 'integer', nullable: true),
-                                new OA\Property(property: 'mbid', description: 'MusicBrainz recording ID', type: 'string', nullable: true),
-                                new OA\Property(property: 'mbAlbumId', description: 'MusicBrainz release ID', type: 'string', nullable: true),
-                                new OA\Property(property: 'mbArtistId', description: 'MusicBrainz artist ID', type: 'string', nullable: true),
-                            ], type: 'object'),
-                        ], type: 'object'),
-                    ],
-                    type: 'object',
+            new OA\Response(
+                response: '200',
+                description: 'Extracted metadata from the file',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'format' => new OA\Schema(
+                                        description: 'Detected file format (mp3, m4a, flac, ogg, opus, wav, wma, aiff or aac)',
+                                        type: 'string',
+                                        example: 'flac',
+                                    ),
+                                    'metadata' => new OA\Schema(
+                                        type: 'object',
+                                        properties: [
+                                            'title' => new OA\Schema(type: 'string', nullable: true),
+                                            'artist' => new OA\Schema(type: 'string', nullable: true),
+                                            'album' => new OA\Schema(type: 'string', nullable: true),
+                                            'albumArtist' => new OA\Schema(type: 'string', nullable: true),
+                                            'trackNumber' => new OA\Schema(type: 'integer', nullable: true),
+                                            'discNumber' => new OA\Schema(type: 'integer', nullable: true),
+                                            'year' => new OA\Schema(type: 'integer', nullable: true),
+                                            'genre' => new OA\Schema(
+                                                description: 'Genre values in tag order',
+                                                type: 'array',
+                                                items: new OA\Schema(type: 'string'),
+                                            ),
+                                            'composer' => new OA\Schema(type: 'string', nullable: true),
+                                            'bpm' => new OA\Schema(type: 'integer', nullable: true),
+                                            'duration' => new OA\Schema(
+                                                description: 'Duration in seconds',
+                                                type: 'number',
+                                                nullable: true,
+                                            ),
+                                            'bitrate' => new OA\Schema(
+                                                description: 'Bitrate in kbps',
+                                                type: 'integer',
+                                                nullable: true,
+                                            ),
+                                            'mbid' => new OA\Schema(
+                                                description: 'MusicBrainz recording ID',
+                                                type: 'string',
+                                                nullable: true,
+                                            ),
+                                            'mbAlbumId' => new OA\Schema(
+                                                description: 'MusicBrainz release ID',
+                                                type: 'string',
+                                                nullable: true,
+                                            ),
+                                            'mbArtistId' => new OA\Schema(
+                                                description: 'MusicBrainz artist ID',
+                                                type: 'string',
+                                                nullable: true,
+                                            ),
+                                        ],
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
             new OA\Response(response: '401', description: 'Authentication required'),
@@ -78,7 +117,9 @@ final class MetadataSyncController
             new OA\Response(
                 response: '422',
                 description: 'Invalid request, or no file exists at the path, or the file is in a format the tag readers do not support',
-                content: new OA\JsonContent(ref: new Model(type: ValidationError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ValidationError::class),
+                ),
             ),
         ],
     )]
@@ -90,37 +131,67 @@ final class MetadataSyncController
         return $this->files->extract($payload->path) |> $this->successResponse(...);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/metadata/match',
         summary: 'Match extracted metadata against candidate sources',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(
-                required: ['path', 'candidates'],
-                properties: [
-                    new OA\Property(property: 'path', type: 'string'),
-                    new OA\Property(property: 'candidates', type: 'array', items: new OA\Items(type: 'object')),
-                ],
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'path' => new OA\Schema(type: 'string'),
+                        'candidates' => new OA\Schema(
+                            type: 'array',
+                            items: new OA\Schema(type: 'object'),
+                        ),
+                    ],
+                    required: ['path', 'candidates'],
+                ),
             ),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Matched results ranked by confidence',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [
-                            new OA\Property(property: 'source', description: 'Match source identifier when supplied by the candidate', type: 'string', nullable: true),
-                            new OA\Property(property: 'sourceId', description: 'Source-specific ID when supplied by the candidate', type: 'string', nullable: true),
-                            new OA\Property(property: 'confidence', description: 'Match confidence score', type: 'number', format: 'float'),
-                            new OA\Property(property: 'data', properties: [
-                                new OA\Property(property: 'title', type: 'string', nullable: true),
-                                new OA\Property(property: 'artist', type: 'string', nullable: true),
-                                new OA\Property(property: 'album', type: 'string', nullable: true),
-                                new OA\Property(property: 'year', type: 'integer', nullable: true),
-                                new OA\Property(property: 'mbid', type: 'string', nullable: true),
-                            ], type: 'object'),
-                        ], type: 'object')),
-                    ],
-                    type: 'object',
+            new OA\Response(
+                response: '200',
+                description: 'Matched results ranked by confidence',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(
+                                    type: 'object',
+                                    properties: [
+                                        'source' => new OA\Schema(
+                                            description: 'Match source identifier when supplied by the candidate',
+                                            type: 'string',
+                                            nullable: true,
+                                        ),
+                                        'sourceId' => new OA\Schema(
+                                            description: 'Source-specific ID when supplied by the candidate',
+                                            type: 'string',
+                                            nullable: true,
+                                        ),
+                                        'confidence' => new OA\Schema(
+                                            description: 'Match confidence score',
+                                            type: 'number',
+                                            format: 'float',
+                                        ),
+                                        'data' => new OA\Schema(
+                                            type: 'object',
+                                            properties: [
+                                                'title' => new OA\Schema(type: 'string', nullable: true),
+                                                'artist' => new OA\Schema(type: 'string', nullable: true),
+                                                'album' => new OA\Schema(type: 'string', nullable: true),
+                                                'year' => new OA\Schema(type: 'integer', nullable: true),
+                                                'mbid' => new OA\Schema(type: 'string', nullable: true),
+                                            ],
+                                        ),
+                                    ],
+                                ),
+                            ),
+                        ],
+                    ),
                 ),
             ),
             new OA\Response(response: '401', description: 'Authentication required'),
@@ -128,7 +199,9 @@ final class MetadataSyncController
             new OA\Response(
                 response: '422',
                 description: 'Invalid request, or no file exists at the path, or the file is in a format the tag readers do not support',
-                content: new OA\JsonContent(ref: new Model(type: ValidationError::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ValidationError::class),
+                ),
             ),
         ],
     )]

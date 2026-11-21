@@ -20,8 +20,7 @@ use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\ValidationError;
 use InvalidArgumentException;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
@@ -38,7 +37,10 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  * keys and revoke clients. The app:oauth:client:* console commands dispatch the
  * same application messages, and the handlers' outcome exceptions decide the status.
  */
-#[OA\Tag(name: 'Admin / OAuth clients', description: 'OAuth client registration for administrators')]
+#[OA\Tag(
+    name: 'Admin / OAuth clients',
+    description: 'OAuth client registration for administrators',
+)]
 #[Route('/api/admin/oauth/clients', name: 'admin_oauth_clients_')]
 #[IsGranted('ROLE_ADMIN')]
 final class AdminOAuthClientController
@@ -50,17 +52,40 @@ final class AdminOAuthClientController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/oauth/clients',
-        description: 'Every client except users\' personal access clients, revoked ones included, newest first. The first-party login client is listed with type first_party and cannot be changed here.',
         summary: 'List OAuth clients',
+        description: 'Every client except users\' personal access clients, revoked ones included, newest first. The first-party login client is listed with type first_party and cannot be changed here.',
         responses: [
-            new OA\Response(response: '200', description: 'The clients', content: new OA\JsonContent(
-                required: ['data'],
-                properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: AdminOAuthClientResource::class)))],
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '403', description: 'Not an administrator', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'The clients',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(ref: AdminOAuthClientResource::class),
+                            ),
+                        ],
+                        required: ['data'],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Not an administrator',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('', name: 'list', methods: ['GET'])]
@@ -73,19 +98,50 @@ final class AdminOAuthClientController
         return $this->successResponse(AdminOAuthClientResource::collection($clients));
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/admin/oauth/clients',
-        description: 'Registers a device client (public, device authorization grant), a public client (authorization code with PKCE) or a confidential client (authorization code with client authentication). A confidential client authenticates with a generated secret (client_secret_post, the default), which is in this response only, or with its own signing keys (private_key_jwt), given as exactly one of an inline JWK Set and a jwks_uri.',
         summary: 'Register an OAuth client',
-        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: AdminCreateOAuthClientRequest::class))),
+        description: 'Registers a device client (public, device authorization grant), a public client (authorization code with PKCE) or a confidential client (authorization code with client authentication). A confidential client authenticates with a generated secret (client_secret_post, the default), which is in this response only, or with its own signing keys (private_key_jwt), given as exactly one of an inline JWK Set and a jwks_uri.',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: AdminCreateOAuthClientRequest::class),
+            ),
+        ),
         responses: [
-            new OA\Response(response: '201', description: 'Client registered', content: new OA\JsonContent(
-                required: ['data'],
-                properties: [new OA\Property(property: 'data', ref: new Model(type: AdminOAuthClientCredentialsResource::class))],
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '403', description: 'Not a super administrator', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid name, type, redirect URIs, authentication method or keys; `error.details.reason` is `invalid_registration` when the registration rules reject them', content: new OA\JsonContent(ref: new Model(type: ValidationError::class))),
+            new OA\Response(
+                response: '201',
+                description: 'Client registered',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: AdminOAuthClientCredentialsResource::class),
+                        ],
+                        required: ['data'],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Not a super administrator',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid name, type, redirect URIs, authentication method or keys; `error.details.reason` is `invalid_registration` when the registration rules reject them',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('', name: 'create', methods: ['POST'])]
@@ -106,20 +162,60 @@ final class AdminOAuthClientController
         return self::noStore($this->successResponse(AdminOAuthClientCredentialsResource::from($registered), Response::HTTP_CREATED));
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/admin/oauth/clients/{clientId}/rotate-secret',
-        description: 'Clients that authenticate with client_secret_post only. The old secret stops working at once; tokens already issued stay valid. The new secret is in this response only.',
         summary: 'Rotate a client\'s secret',
-        parameters: [new OA\Parameter(name: 'clientId', description: 'The OAuth client_id', in: 'path', required: true, schema: new OA\Schema(type: 'string'))],
+        description: 'Clients that authenticate with client_secret_post only. The old secret stops working at once; tokens already issued stay valid. The new secret is in this response only.',
+        parameters: [
+            new OA\Parameter(
+                name: 'clientId',
+                in: 'path',
+                description: 'The OAuth client_id',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+        ],
         responses: [
-            new OA\Response(response: '200', description: 'New secret issued', content: new OA\JsonContent(
-                required: ['data'],
-                properties: [new OA\Property(property: 'data', ref: new Model(type: AdminOAuthClientCredentialsResource::class))],
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '403', description: 'Not a super administrator', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '404', description: 'Unknown client', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '409', description: 'The client is first-party (`error.details.reason` = `protected_client`), has no secret (`no_secret`) or is revoked (`revoked`)', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'New secret issued',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: AdminOAuthClientCredentialsResource::class),
+                        ],
+                        required: ['data'],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Not a super administrator',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Unknown client',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'The client is first-party (`error.details.reason` = `protected_client`), has no secret (`no_secret`) or is revoked (`revoked`)',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{clientId}/rotate-secret', name: 'rotate_secret', methods: ['POST'])]
@@ -138,22 +234,73 @@ final class AdminOAuthClientController
         return self::noStore($this->successResponse(AdminOAuthClientCredentialsResource::from($registered)));
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/admin/oauth/clients/{clientId}/keys',
-        description: 'Clients that authenticate with private_key_jwt only. Replaces the inline JWK Set or the jwks_uri; the new source may be of the other kind. Assertions signed with the old keys stop working at once; tokens already issued stay valid.',
         summary: 'Replace a client\'s public keys',
-        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: AdminReplaceOAuthClientKeysRequest::class))),
-        parameters: [new OA\Parameter(name: 'clientId', description: 'The OAuth client_id', in: 'path', required: true, schema: new OA\Schema(type: 'string'))],
+        description: 'Clients that authenticate with private_key_jwt only. Replaces the inline JWK Set or the jwks_uri; the new source may be of the other kind. Assertions signed with the old keys stop working at once; tokens already issued stay valid.',
+        parameters: [
+            new OA\Parameter(
+                name: 'clientId',
+                in: 'path',
+                description: 'The OAuth client_id',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: AdminReplaceOAuthClientKeysRequest::class),
+            ),
+        ),
         responses: [
-            new OA\Response(response: '200', description: 'Keys replaced', content: new OA\JsonContent(
-                required: ['data'],
-                properties: [new OA\Property(property: 'data', ref: new Model(type: AdminOAuthClientResource::class))],
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '403', description: 'Not a super administrator', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '404', description: 'Unknown client', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '409', description: 'The client is first-party (`error.details.reason` = `protected_client`), does not authenticate with keys (`no_keys`) or is revoked (`revoked`)', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '422', description: 'Not exactly one key source, or keys the rules reject; `error.details.reason` is `invalid_keys`', content: new OA\JsonContent(ref: new Model(type: ValidationError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Keys replaced',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: AdminOAuthClientResource::class),
+                        ],
+                        required: ['data'],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Not a super administrator',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Unknown client',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'The client is first-party (`error.details.reason` = `protected_client`), does not authenticate with keys (`no_keys`) or is revoked (`revoked`)',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Not exactly one key source, or keys the rules reject; `error.details.reason` is `invalid_keys`',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{clientId}/keys', name: 'replace_keys', methods: ['POST'])]
@@ -171,20 +318,60 @@ final class AdminOAuthClientController
         return self::noStore($this->successResponse(AdminOAuthClientResource::from($client)));
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/admin/oauth/clients/{clientId}/revoke',
-        description: 'Revokes the client together with every access and refresh token issued to it. Revoking a revoked client succeeds again.',
         summary: 'Revoke an OAuth client',
-        parameters: [new OA\Parameter(name: 'clientId', description: 'The OAuth client_id', in: 'path', required: true, schema: new OA\Schema(type: 'string'))],
+        description: 'Revokes the client together with every access and refresh token issued to it. Revoking a revoked client succeeds again.',
+        parameters: [
+            new OA\Parameter(
+                name: 'clientId',
+                in: 'path',
+                description: 'The OAuth client_id',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+        ],
         responses: [
-            new OA\Response(response: '200', description: 'Client revoked', content: new OA\JsonContent(
-                required: ['data'],
-                properties: [new OA\Property(property: 'data', ref: new Model(type: AdminOAuthClientResource::class))],
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '403', description: 'Not a super administrator', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '404', description: 'Unknown client', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '409', description: 'The client is first-party (`error.details.reason` = `protected_client`)', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Client revoked',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: AdminOAuthClientResource::class),
+                        ],
+                        required: ['data'],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Not a super administrator',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Unknown client',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'The client is first-party (`error.details.reason` = `protected_client`)',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{clientId}/revoke', name: 'revoke', methods: ['POST'])]

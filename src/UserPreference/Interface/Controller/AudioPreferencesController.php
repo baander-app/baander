@@ -12,8 +12,7 @@ use App\UserPreference\Application\Port\AudioPreferencesPortInterface;
 use App\UserPreference\Interface\Request\PreferenceRequestBody;
 use App\UserPreference\Interface\Request\RollbackRequest;
 use App\UserPreference\Interface\Request\SaveAudioPreferencesRequest;
-use OpenApi\Attributes as OA;
-use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -37,17 +36,40 @@ final class AudioPreferencesController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/user/audio-preferences/',
-        description: 'Returns the audio preferences for the authenticated user. Payload uses the validated flat audio settings contract.',
         summary: 'Get audio preferences',
+        description: 'Returns the audio preferences for the authenticated user. Payload uses the validated flat audio settings contract.',
         responses: [
-            new OA\Response(response: '200', description: 'Audio preferences', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'payload', description: 'Audio settings snapshot; see SaveAudioPreferencesRequest for its fields.', type: 'object'),
-                new OA\Property(property: 'version', type: 'integer'),
-            ])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'No audio preferences found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Audio preferences',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'payload' => new OA\Schema(
+                                description: 'Audio settings snapshot; see SaveAudioPreferencesRequest for its fields.',
+                                type: 'object',
+                            ),
+                            'version' => new OA\Schema(type: 'integer'),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'No audio preferences found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
@@ -65,25 +87,57 @@ final class AudioPreferencesController
         return $this->successResponse($snapshot);
     }
 
-    #[OA\Put(
+    #[OA\Operation\Put(
         path: '/api/user/audio-preferences/',
         summary: 'Save audio preferences',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\MediaType(
                 mediaType: 'application/json',
-                schema: new OA\Schema(ref: new Model(type: SaveAudioPreferencesRequest::class)),
+                schema: new OA\Schema(ref: SaveAudioPreferencesRequest::class),
             ),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Preferences saved', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'payload', description: 'Validated audio settings echoed back from the request.', type: 'object'),
-                new OA\Property(property: 'version', type: 'integer'),
-            ])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '409', description: 'Version conflict', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '400', description: 'Malformed or empty JSON body', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid request body or preference fields', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Preferences saved',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'payload' => new OA\Schema(description: 'Validated audio settings echoed back from the request.', type: 'object'),
+                            'version' => new OA\Schema(type: 'integer'),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Version conflict',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'Malformed or empty JSON body',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid request body or preference fields',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'update', methods: ['PUT'])]
@@ -115,18 +169,37 @@ final class AudioPreferencesController
         ]);
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/user/audio-preferences/history',
-        description: 'Returns the version history for audio preferences.',
         summary: 'Get audio preferences history',
+        description: 'Returns the version history for audio preferences.',
         responses: [
-            new OA\Response(response: '200', description: 'Version history', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'history', type: 'array', items: new OA\Items(properties: [
-                    new OA\Property(property: 'version', type: 'integer'),
-                    new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
-                ])),
-            ])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Version history',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'history' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(
+                                    properties: [
+                                        'version' => new OA\Schema(type: 'integer'),
+                                        'createdAt' => new OA\Schema(type: 'string', format: 'date-time'),
+                                    ],
+                                ),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/history', name: 'history', methods: ['GET'])]
@@ -140,7 +213,7 @@ final class AudioPreferencesController
         return $this->successResponse(['history' => $history]);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/user/audio-preferences/rollback',
         summary: 'Rollback audio preferences to a previous version',
         requestBody: new OA\RequestBody(
@@ -148,22 +221,54 @@ final class AudioPreferencesController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
-                    required: ['version'],
                     properties: [
-                        new OA\Property(property: 'version', type: 'integer'),
+                        'version' => new OA\Schema(type: 'integer'),
                     ],
+                    required: ['version'],
                 ),
             ),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Preferences rolled back', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'payload', description: 'Audio settings at the rolled-back version.', type: 'object'),
-                new OA\Property(property: 'version', type: 'integer'),
-            ])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '409', description: 'Concurrent version conflict', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '400', description: 'Malformed or empty JSON body', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid request body or preference fields', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Preferences rolled back',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'payload' => new OA\Schema(description: 'Audio settings at the rolled-back version.', type: 'object'),
+                            'version' => new OA\Schema(type: 'integer'),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Concurrent version conflict',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'Malformed or empty JSON body',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid request body or preference fields',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/rollback', name: 'rollback', methods: ['POST'])]

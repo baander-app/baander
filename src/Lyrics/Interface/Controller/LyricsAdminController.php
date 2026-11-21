@@ -13,8 +13,7 @@ use App\Shared\Application\JobCancelledException;
 use App\Shared\Application\Port\JobMonitorAdministrationInterface;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use OpenApi\Attributes as OA;
-use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
@@ -33,26 +32,37 @@ final class LyricsAdminController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/lyrics/coverage',
         summary: 'Get lyrics coverage stats',
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Lyrics coverage statistics',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'totalTracks', type: 'integer'),
-                            new OA\Property(property: 'tracksWithLyrics', type: 'integer'),
-                            new OA\Property(property: 'tracksWithoutLyrics', type: 'integer'),
-                            new OA\Property(property: 'coveragePercentage', type: 'number'),
-                            new OA\Property(property: 'bySource', type: 'object'),
-                        ], type: 'object'),
-                    ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'totalTracks' => new OA\Schema(type: 'integer'),
+                                    'tracksWithLyrics' => new OA\Schema(type: 'integer'),
+                                    'tracksWithoutLyrics' => new OA\Schema(type: 'integer'),
+                                    'coveragePercentage' => new OA\Schema(type: 'number'),
+                                    'bySource' => new OA\Schema(type: 'object'),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/coverage', name: 'coverage', methods: ['GET'])]
@@ -62,34 +72,70 @@ final class LyricsAdminController
         return $this->successResponse($this->lyricsAdmin->getCoverage());
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/admin/lyrics/bulk-fetch',
         summary: 'Queue a lyrics fetch for every song without lyrics (SUPER_ADMIN only)',
         requestBody: new OA\RequestBody(
             required: false,
-            content: new OA\JsonContent(
-                properties: [
-                    new OA\Property(property: 'limit', description: 'Most songs to queue; absent or null queues every song without lyrics', type: 'integer', nullable: true, minimum: 1),
-                ],
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'limit' => new OA\Schema(
+                            description: 'Most songs to queue; absent or null queues every song without lyrics',
+                            type: 'integer',
+                            nullable: true,
+                            minimum: 1,
+                        ),
+                    ],
+                ),
             ),
         ),
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Bulk fetch triggered',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'jobsEnqueued', description: 'Songs queued for fetching', type: 'integer'),
-                            new OA\Property(property: 'skippedNoArtist', description: 'Songs without lyrics not queued because they have no primary artist credit', type: 'integer'),
-                            new OA\Property(property: 'skippedNoLength', description: 'Songs without lyrics not queued because their length is missing or not positive', type: 'integer'),
-                        ], type: 'object'),
-                    ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'jobsEnqueued' => new OA\Schema(description: 'Songs queued for fetching', type: 'integer'),
+                                    'skippedNoArtist' => new OA\Schema(
+                                        description: 'Songs without lyrics not queued because they have no primary artist credit',
+                                        type: 'integer',
+                                    ),
+                                    'skippedNoLength' => new OA\Schema(
+                                        description: 'Songs without lyrics not queued because their length is missing or not positive',
+                                        type: 'integer',
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '409', description: 'The run was cancelled in the job monitor while it queued; the fetches it queued are skipped', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Limit is not an integer of at least 1', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Forbidden — SUPER_ADMIN only', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '409',
+                description: 'The run was cancelled in the job monitor while it queued; the fetches it queued are skipped',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Limit is not an integer of at least 1',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden — SUPER_ADMIN only',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/bulk-fetch', name: 'bulk_fetch', methods: ['POST'])]
@@ -115,42 +161,66 @@ final class LyricsAdminController
         return $this->successResponse(BulkFetchLyricsResult::fromRun($run)->toArray());
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/lyrics/sync-status',
         summary: 'Get lyrics sync job status and the latest bulk fetch run',
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Sync status',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'lastSyncAt', type: 'string', nullable: true),
-                            new OA\Property(property: 'recentJobs', type: 'integer'),
-                            new OA\Property(property: 'failedJobs', type: 'integer'),
-                            new OA\Property(property: 'completedJobs', type: 'integer'),
-                            new OA\Property(
-                                property: 'latestRun',
-                                description: 'The bulk fetch run that finished queueing last, until a day after its last fetch was due; null when there is none. A fetch counts once a worker has handled it.',
-                                properties: [
-                                    new OA\Property(property: 'jobId', description: 'Job-monitor ID of the run, or null for a run outside a job', type: 'string', nullable: true),
-                                    new OA\Property(property: 'finishedAt', description: 'When the run finished queueing', type: 'string', format: 'date-time'),
-                                    new OA\Property(property: 'queued', description: 'Fetches the run queued', type: 'integer'),
-                                    new OA\Property(property: 'found', description: 'Fetches that found lyrics', type: 'integer'),
-                                    new OA\Property(property: 'noMatch', description: 'Fetches LRCLIB had no lyrics for', type: 'integer'),
-                                    new OA\Property(property: 'skippedNoArtist', description: 'Songs not looked up because they have no primary artist credit', type: 'integer'),
-                                    new OA\Property(property: 'skippedNoLength', description: 'Songs not looked up because their length is missing or not positive', type: 'integer'),
-                                    new OA\Property(property: 'rejected', description: 'Fetches whose request LRCLIB rejected', type: 'integer'),
-                                    new OA\Property(property: 'unavailable', description: 'Fetches that found LRCLIB unavailable', type: 'integer'),
-                                ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
                                 type: 'object',
-                                nullable: true,
+                                properties: [
+                                    'lastSyncAt' => new OA\Schema(type: 'string', nullable: true),
+                                    'recentJobs' => new OA\Schema(type: 'integer'),
+                                    'failedJobs' => new OA\Schema(type: 'integer'),
+                                    'completedJobs' => new OA\Schema(type: 'integer'),
+                                    'latestRun' => new OA\Schema(
+                                        description: 'The bulk fetch run that finished queueing last, until a day after its last fetch was due; null when there is none. A fetch counts once a worker has handled it.',
+                                        type: 'object',
+                                        nullable: true,
+                                        properties: [
+                                            'jobId' => new OA\Schema(
+                                                description: 'Job-monitor ID of the run, or null for a run outside a job',
+                                                type: 'string',
+                                                nullable: true,
+                                            ),
+                                            'finishedAt' => new OA\Schema(
+                                                description: 'When the run finished queueing',
+                                                type: 'string',
+                                                format: 'date-time',
+                                            ),
+                                            'queued' => new OA\Schema(description: 'Fetches the run queued', type: 'integer'),
+                                            'found' => new OA\Schema(description: 'Fetches that found lyrics', type: 'integer'),
+                                            'noMatch' => new OA\Schema(description: 'Fetches LRCLIB had no lyrics for', type: 'integer'),
+                                            'skippedNoArtist' => new OA\Schema(
+                                                description: 'Songs not looked up because they have no primary artist credit',
+                                                type: 'integer',
+                                            ),
+                                            'skippedNoLength' => new OA\Schema(
+                                                description: 'Songs not looked up because their length is missing or not positive',
+                                                type: 'integer',
+                                            ),
+                                            'rejected' => new OA\Schema(description: 'Fetches whose request LRCLIB rejected', type: 'integer'),
+                                            'unavailable' => new OA\Schema(description: 'Fetches that found LRCLIB unavailable', type: 'integer'),
+                                        ],
+                                    ),
+                                ],
                             ),
-                        ], type: 'object'),
-                    ],
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/sync-status', name: 'sync_status', methods: ['GET'])]

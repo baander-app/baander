@@ -17,8 +17,7 @@ use App\Transcode\Application\Port\TranscodePublicViewInterface;
 use App\Transcode\Application\Query\TranscodeJobQueryPort;
 use App\Transcode\Interface\Resource\TranscodeJobResource;
 use App\Transcode\Interface\Resource\TranscodeMetricsResource;
-use OpenApi\Attributes as OA;
-use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
@@ -41,11 +40,30 @@ final class TranscodeJobController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/transcode/jobs/',
         summary: 'List orphaned transcode jobs in accessible libraries',
         responses: [
-            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'publicId', type: 'string'), new OA\Property(property: 'status', type: 'string'), new OA\Property(property: 'qualityTier', type: 'string')]))])),
+            new OA\Response(
+                response: '200',
+                description: 'Success',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(
+                                    properties: [
+                                        'publicId' => new OA\Schema(type: 'string'),
+                                        'status' => new OA\Schema(type: 'string'),
+                                        'qualityTier' => new OA\Schema(type: 'string'),
+                                    ],
+                                ),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
@@ -63,15 +81,43 @@ final class TranscodeJobController
         return $this->successResponse($data);
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/transcode/jobs/{publicId}',
         summary: 'Get a transcode job by public ID',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Job public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Job public ID',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'publicId', type: 'string'), new OA\Property(property: 'status', type: 'string'), new OA\Property(property: 'qualityTier', type: 'string')])])),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Success',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                properties: [
+                                    'publicId' => new OA\Schema(type: 'string'),
+                                    'status' => new OA\Schema(type: 'string'),
+                                    'qualityTier' => new OA\Schema(type: 'string'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'show', methods: ['GET'])]
@@ -87,12 +133,34 @@ final class TranscodeJobController
         return $this->successResponse(TranscodeJobResource::from($this->publicView->job($job)));
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/transcode/jobs/cleanup',
         summary: 'Expire stale transcode sessions and clean up orphaned transcode jobs (no active sessions)',
         responses: [
-            new OA\Response(response: '200', description: 'Cleanup result', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'expired', type: 'integer'), new OA\Property(property: 'cleaned', type: 'integer')], type: 'object')])),
-            new OA\Response(response: '503', description: 'The run removed every job it could and left at least one behind; `details` holds the `expired`, `cleaned` and `failed` counts, and the server log names each job that failed', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Cleanup result',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'expired' => new OA\Schema(type: 'integer'),
+                                    'cleaned' => new OA\Schema(type: 'integer'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '503',
+                description: 'The run removed every job it could and left at least one behind; `details` holds the `expired`, `cleaned` and `failed` counts, and the server log names each job that failed',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/cleanup', name: 'cleanup', methods: ['POST'])]
@@ -110,15 +178,33 @@ final class TranscodeJobController
         return $this->successResponse($result->toArray());
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/transcode/jobs/{publicId}/metrics',
         summary: 'Get transcode job metrics',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Job public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Job public ID',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(ref: new Model(type: TranscodeMetricsResource::class))),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Success',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: TranscodeMetricsResource::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}/metrics', name: 'metrics', methods: ['GET'])]
@@ -132,12 +218,18 @@ final class TranscodeJobController
         return $this->successResponse(TranscodeMetricsResource::from($this->publicView->job($job)));
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/transcode/jobs/list',
         summary: 'List transcode jobs for the authenticated user',
         responses: [
             new OA\Response(response: '200', description: 'Success'),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/list', name: 'list', methods: ['GET'], priority: 1)]

@@ -15,8 +15,7 @@ use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -39,34 +38,61 @@ final class PasskeyLoginController
     ) {
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/auth/login/passkey',
-        description: 'Requires a DPoP proof carrying a server-issued nonce, as password login does. The proof is checked before the assertion, so a nonce challenge leaves the assertion valid for a retry. The issued tokens are bound to the proof key.',
         summary: 'Authenticate with a WebAuthn passkey',
-        security: [],
+        description: 'Requires a DPoP proof carrying a server-issued nonce, as password login does. The proof is checked before the assertion, so a nonce challenge leaves the assertion valid for a retry. The issued tokens are bound to the proof key.',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(required: ['challengeKey', 'response'], properties: [
-                    new OA\Property(property: 'challengeKey', description: 'Key returned by /api/auth/passkey/authenticate/options', type: 'string'),
-                    new OA\Property(property: 'response', description: 'WebAuthn assertion from navigator.credentials.get()', type: 'object'),
-                    new OA\Property(property: 'userId', description: 'Optional user ID the assertion must belong to', type: 'string'),
-                ]),
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'challengeKey' => new OA\Schema(description: 'Key returned by /api/auth/passkey/authenticate/options', type: 'string'),
+                        'response' => new OA\Schema(description: 'WebAuthn assertion from navigator.credentials.get()', type: 'object'),
+                        'userId' => new OA\Schema(description: 'Optional user ID the assertion must belong to', type: 'string'),
+                    ],
+                    required: ['challengeKey', 'response'],
+                ),
+            ),
         ),
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Authentication successful',
-                content: new OA\JsonContent(ref: new Model(type: TokenResource::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: TokenResource::class),
+                ),
             ),
-            new OA\Response(response: '400', description: 'DPoP nonce challenge (use_dpop_nonce) with a DPoP-Nonce header, or an invalid proof. A missing proof returns an ApiError.', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\OAuthError::class))),
-            new OA\Response(response: '401', description: 'Invalid passkey or verification failed', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '400',
+                description: 'DPoP nonce challenge (use_dpop_nonce) with a DPoP-Nonce header, or an invalid proof. A missing proof returns an ApiError.',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\OAuthError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Invalid passkey or verification failed',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
             new OA\Response(
                 response: '503',
                 description: 'The DPoP nonce store or the passkey challenge store is unavailable, or issuing the session waited too long on a database lock; retry after the Retry-After delay. When the nonce store is down, the proof could not be checked and the answer carries no DPoP-Nonce header.',
-                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 5))],
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                headers: [
+                    new OA\Header(
+                        header: 'Retry-After',
+                        description: 'Seconds to wait before retrying',
+                        schema: new OA\Schema(type: 'integer', example: 5),
+                    ),
+                ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
         ],
+        security: [],
     )]
     #[Route('/passkey', name: 'passkey', methods: ['POST'])]
     public function __invoke(Request $request): JsonResponse

@@ -13,8 +13,7 @@ use App\Auth\Application\Port\WebSocketTicketIssuerInterface;
 use App\Auth\Interface\Resource\WebSocketTicketResource;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\DTO\ApiError;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -27,16 +26,52 @@ final readonly class WebSocketTicketController
 
     public function __construct(private Security $security, private WebSocketTicketIssuerInterface $tickets) {}
 
-    #[OA\Post(path: '/api/ws/tickets', summary: 'Issue a single-use WebSocket handshake ticket', parameters: [
-        new OA\Parameter(name: 'Origin', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-    ], responses: [
-        new OA\Response(response: '200', description: 'A ticket valid for at most thirty seconds', content: new OA\JsonContent(properties: [
-            new OA\Property(property: 'data', ref: new Model(type: WebSocketTicketResource::class)),
-        ])),
-        new OA\Response(response: '401', description: 'Authentication required', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-        new OA\Response(response: '403', description: 'DPoP proof or Origin refused', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-        new OA\Response(response: '503', description: 'Ticket authorization or storage unavailable', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-    ])]
+    #[OA\Operation\Post(
+        path: '/api/ws/tickets',
+        summary: 'Issue a single-use WebSocket handshake ticket',
+        parameters: [
+            new OA\Parameter(
+                name: 'Origin',
+                in: 'header',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'A ticket valid for at most thirty seconds',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: WebSocketTicketResource::class),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Authentication required',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'DPoP proof or Origin refused',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '503',
+                description: 'Ticket authorization or storage unavailable',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+        ],
+    )]
     #[Route('/api/ws/tickets', name: 'auth_websocket_ticket', methods: ['POST'])]
     public function issue(Request $request): JsonResponse
     {

@@ -46,8 +46,7 @@ use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\OAuthError;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Exception\JsonException;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -99,18 +98,47 @@ final class OAuthController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/oauth/authorize',
-        description: 'Backs the consent page at `APP_URL/oauth/authorize`, which RFC 8414 metadata advertises as the authorization endpoint. The client pushed its request to the pushed authorization request endpoint first; the page passes on only `client_id` and `request_uri`, and this endpoint describes the pushed request for the signed-in user. Looking it up does not use it up. It never redirects. When the client is invalid, or the pushed request is unknown, expired, already used or another client\'s (`invalid_request_uri`), the error has no `redirect_uri`: show it to the user. Any other error carries `redirect_uri`, the pushed redirect URI with `error`, `error_description`, the pushed `state` and `iss` (RFC 6749 section 4.1.2.1, RFC 9207); navigate there.',
         summary: 'Look up a pushed authorization request (RFC 9126 section 4)',
+        description: 'Backs the consent page at `APP_URL/oauth/authorize`, which RFC 8414 metadata advertises as the authorization endpoint. The client pushed its request to the pushed authorization request endpoint first; the page passes on only `client_id` and `request_uri`, and this endpoint describes the pushed request for the signed-in user. Looking it up does not use it up. It never redirects. When the client is invalid, or the pushed request is unknown, expired, already used or another client\'s (`invalid_request_uri`), the error has no `redirect_uri`: show it to the user. Any other error carries `redirect_uri`, the pushed redirect URI with `error`, `error_description`, the pushed `state` and `iss` (RFC 6749 section 4.1.2.1, RFC 9207); navigate there.',
         parameters: [
-            new OA\Parameter(name: 'client_id', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'request_uri', description: 'The request URI the pushed authorization request endpoint returned', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'client_id',
+                in: 'query',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'request_uri',
+                in: 'query',
+                description: 'The request URI the pushed authorization request endpoint returned',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'A pushed request awaiting the user\'s decision', content: new OA\JsonContent(ref: new Model(type: AuthorizationRequestResource::class))),
-            new OA\Response(response: '400', description: 'Invalid request; with `redirect_uri` when the user cannot grant a valid pushed request', content: new OA\JsonContent(ref: new Model(type: AuthorizationErrorResource::class))),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'A pushed request awaiting the user\'s decision',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: AuthorizationRequestResource::class),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid request; with `redirect_uri` when the user cannot grant a valid pushed request',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: AuthorizationErrorResource::class),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/authorize', name: 'authorize', methods: ['GET'])]
@@ -132,15 +160,38 @@ final class OAuthController
         return self::noStore(new JsonResponse(AuthorizationRequestResource::from($authorization)));
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/oauth/authorize',
-        description: 'Records the signed-in user\'s decision on the pushed request the consent page showed, named by the same `client_id` and `request_uri`. Either decision uses the request up. Approval answers with the pushed redirect URI carrying `code`, the pushed `state` and `iss` (RFC 9207); denial with `error=access_denied`, the pushed `state` and `iss`. The page navigates to `redirect_uri`. Errors follow GET; a request another decision already used answers `invalid_request_uri`.',
         summary: 'Approve or deny a pushed authorization request (RFC 6749 section 4.1.2)',
-        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: AuthorizationDecisionRequest::class))),
+        description: 'Records the signed-in user\'s decision on the pushed request the consent page showed, named by the same `client_id` and `request_uri`. Either decision uses the request up. Approval answers with the pushed redirect URI carrying `code`, the pushed `state` and `iss` (RFC 9207); denial with `error=access_denied`, the pushed `state` and `iss`. The page navigates to `redirect_uri`. Errors follow GET; a request another decision already used answers `invalid_request_uri`.',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: AuthorizationDecisionRequest::class),
+            ),
+        ),
         responses: [
-            new OA\Response(response: '200', description: 'Where to send the user agent', content: new OA\JsonContent(ref: new Model(type: AuthorizationRedirectResource::class))),
-            new OA\Response(response: '400', description: 'Invalid request; with `redirect_uri` when the user cannot grant a valid pushed request', content: new OA\JsonContent(ref: new Model(type: AuthorizationErrorResource::class))),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Where to send the user agent',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: AuthorizationRedirectResource::class),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid request; with `redirect_uri` when the user cannot grant a valid pushed request',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: AuthorizationErrorResource::class),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/authorize', name: 'authorize_decision', methods: ['POST'])]
@@ -173,40 +224,93 @@ final class OAuthController
     }
 
     /** @throws ServiceUnavailableHttpException for a server fault while storing the request */
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/oauth/par',
-        description: 'Every authorization request is pushed here first. The client authenticates as at the token endpoint and binds the request to its DPoP key (RFC 9449 section 10.1) with a `DPoP` proof header carrying a server-issued nonce, the `dpop_jkt` parameter, or both naming the same key; the authorization code is later bound to that key. A proof is checked as at the token endpoint: `use_dpop_nonce` and `invalid_dpop_proof` answers carry a `DPoP-Nonce` header, and every answer to a verified proof carries the next nonce. Send the browser to the authorization endpoint with only `client_id` and the returned `request_uri`. Parameters may be form-encoded (RFC 9126) or JSON. Answers carry `Cache-Control: no-store`.',
         summary: 'Push an authorization request (RFC 9126 section 2)',
-        security: [],
+        description: 'Every authorization request is pushed here first. The client authenticates as at the token endpoint and binds the request to its DPoP key (RFC 9449 section 10.1) with a `DPoP` proof header carrying a server-issued nonce, the `dpop_jkt` parameter, or both naming the same key; the authorization code is later bound to that key. A proof is checked as at the token endpoint: `use_dpop_nonce` and `invalid_dpop_proof` answers carry a `DPoP-Nonce` header, and every answer to a verified proof carries the next nonce. Send the browser to the authorization endpoint with only `client_id` and the returned `request_uri`. Parameters may be form-encoded (RFC 9126) or JSON. Answers carry `Cache-Control: no-store`.',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(
-                required: ['response_type', 'scope', 'code_challenge', 'code_challenge_method'],
-                properties: [
-                    new OA\Property(property: 'response_type', type: 'string', enum: ['code']),
-                    new OA\Property(property: 'client_id', description: 'Required unless an HTTP Basic header names the client; it may repeat that client', type: 'string'),
-                    new OA\Property(property: 'client_secret', description: 'Secret clients that do not send it with HTTP Basic', type: 'string'),
-                    new OA\Property(property: 'redirect_uri', description: 'Required unless the client registered exactly one redirect URI', type: 'string', format: 'uri'),
-                    new OA\Property(property: 'scope', description: 'Space-separated scopes; at least one must be grantable (profile, email, library or playlist), others are dropped', type: 'string'),
-                    new OA\Property(property: 'state', description: 'At most 1024 bytes', type: 'string'),
-                    new OA\Property(property: 'code_challenge', description: 'BASE64URL(SHA256(code_verifier))', type: 'string'),
-                    new OA\Property(property: 'code_challenge_method', type: 'string', enum: ['S256']),
-                    new OA\Property(property: 'dpop_jkt', description: 'JWK SHA-256 thumbprint of the DPoP key (RFC 7638); required without a DPoP proof header', type: 'string'),
-                ],
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'response_type' => new OA\Schema(
+                            type: 'string',
+                            enum: ['code'],
+                        ),
+                        'client_id' => new OA\Schema(
+                            description: 'Required unless an HTTP Basic header names the client; it may repeat that client',
+                            type: 'string',
+                        ),
+                        'client_secret' => new OA\Schema(description: 'Secret clients that do not send it with HTTP Basic', type: 'string'),
+                        'redirect_uri' => new OA\Schema(
+                            description: 'Required unless the client registered exactly one redirect URI',
+                            type: 'string',
+                            format: 'uri',
+                        ),
+                        'scope' => new OA\Schema(
+                            description: 'Space-separated scopes; at least one must be grantable (profile, email, library or playlist), others are dropped',
+                            type: 'string',
+                        ),
+                        'state' => new OA\Schema(description: 'At most 1024 bytes', type: 'string'),
+                        'code_challenge' => new OA\Schema(description: 'BASE64URL(SHA256(code_verifier))', type: 'string'),
+                        'code_challenge_method' => new OA\Schema(
+                            type: 'string',
+                            enum: ['S256'],
+                        ),
+                        'dpop_jkt' => new OA\Schema(
+                            description: 'JWK SHA-256 thumbprint of the DPoP key (RFC 7638); required without a DPoP proof header',
+                            type: 'string',
+                        ),
+                    ],
+                    required: ['response_type', 'scope', 'code_challenge', 'code_challenge_method'],
+                ),
             ),
         ),
         responses: [
-            new OA\Response(response: '201', description: 'The request URI for the authorization endpoint (RFC 9126 section 2.2)', content: new OA\JsonContent(ref: new Model(type: PushedAuthorizationRequestResource::class))),
-            new OA\Response(response: '400', description: 'OAuth error, including invalid_scope when no requested scope can be granted, invalid_dpop_proof when the proof and dpop_jkt name different keys, use_dpop_nonce, and request_not_supported for a request object', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
-            new OA\Response(response: '401', description: 'Client authentication failed, or the client is revoked', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
-            new OA\Response(response: '413', description: 'The request body is larger than 64 KiB (`invalid_request`)', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
+            new OA\Response(
+                response: '201',
+                description: 'The request URI for the authorization endpoint (RFC 9126 section 2.2)',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: PushedAuthorizationRequestResource::class),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'OAuth error, including invalid_scope when no requested scope can be granted, invalid_dpop_proof when the proof and dpop_jkt name different keys, use_dpop_nonce, and request_not_supported for a request object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: OAuthError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Client authentication failed, or the client is revoked',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: OAuthError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '413',
+                description: 'The request body is larger than 64 KiB (`invalid_request`)',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: OAuthError::class),
+                ),
+            ),
             new OA\Response(
                 response: '503',
                 description: 'The server could not store the request, for example while its database restarts, the rate limit or DPoP nonce store is unavailable, or the client\'s jwks_uri key set cannot be fetched; push again after the Retry-After delay. Carries no DPoP-Nonce header.',
-                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 5))],
-                content: new OA\JsonContent(ref: new Model(type: ApiError::class)),
+                headers: [
+                    new OA\Header(
+                        header: 'Retry-After',
+                        description: 'Seconds to wait before retrying',
+                        schema: new OA\Schema(type: 'integer', example: 5),
+                    ),
+                ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
             ),
         ],
+        security: [],
     )]
     #[Route('/par', name: 'par', methods: ['POST'])]
     public function par(Request $request): Response
@@ -244,40 +348,85 @@ final class OAuthController
     }
 
     /** @throws ServiceUnavailableHttpException for a server fault during the grant */
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/oauth/token',
-        description: 'Requires a DPoP proof carrying a server-issued nonce. A missing or invalid proof is answered with `invalid_dpop_proof`, a proof without a fresh nonce with `use_dpop_nonce`; both carry a `DPoP-Nonce` header. Every answer carries the nonce for the next proof and `Cache-Control: no-store`. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded (RFC 6749) or JSON. Every request names its client in `client_id` or in an HTTP Basic `Authorization` header. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`, or `client_assertion` with `client_assertion_type`, by the one method they were registered with. A secret client sends its secret in the body or, with its client ID, in HTTP Basic (`client_secret_basic`, each part form-urlencoded first), never both; a failed Basic authentication is answered with a `WWW-Authenticate: Basic` challenge. A client assertion (RFC 7523 as updated by RFC 10070) is a JWT signed with one of the client\'s registered keys: `iss` and `sub` are the `client_id`, `aud` is the issuer identifier as its sole value, `exp` and `jti` are required, it lives at most 300 seconds by default, and its `jti` is accepted once. Its `typ` header is `client-authentication+jwt` or absent.',
         summary: 'OAuth 2.0 token endpoint (RFC 6749 section 3.2)',
-        security: [],
+        description: 'Requires a DPoP proof carrying a server-issued nonce. A missing or invalid proof is answered with `invalid_dpop_proof`, a proof without a fresh nonce with `use_dpop_nonce`; both carry a `DPoP-Nonce` header. Every answer carries the nonce for the next proof and `Cache-Control: no-store`. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded (RFC 6749) or JSON. Every request names its client in `client_id` or in an HTTP Basic `Authorization` header. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`, or `client_assertion` with `client_assertion_type`, by the one method they were registered with. A secret client sends its secret in the body or, with its client ID, in HTTP Basic (`client_secret_basic`, each part form-urlencoded first), never both; a failed Basic authentication is answered with a `WWW-Authenticate: Basic` challenge. A client assertion (RFC 7523 as updated by RFC 10070) is a JWT signed with one of the client\'s registered keys: `iss` and `sub` are the `client_id`, `aud` is the issuer identifier as its sole value, `exp` and `jti` are required, it lives at most 300 seconds by default, and its `jti` is accepted once. Its `typ` header is `client-authentication+jwt` or absent.',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(
-                required: ['grant_type'],
-                properties: [
-                    new OA\Property(property: 'grant_type', type: 'string', enum: ['authorization_code', 'refresh_token', 'urn:ietf:params:oauth:grant-type:device_code']),
-                    new OA\Property(property: 'client_id', description: 'Required unless an HTTP Basic header names the client; it may repeat that client', type: 'string'),
-                    new OA\Property(property: 'client_secret', description: 'Secret clients that do not send it with HTTP Basic', type: 'string'),
-                    new OA\Property(property: 'client_assertion', description: 'Signed JWT client assertion; confidential clients registered for private_key_jwt only', type: 'string'),
-                    new OA\Property(property: 'client_assertion_type', description: 'Sent with client_assertion', type: 'string', enum: [ClientCredentials::JWT_BEARER_ASSERTION_TYPE]),
-                    new OA\Property(property: 'code', description: 'Authorization code (authorization_code grant)', type: 'string'),
-                    new OA\Property(property: 'redirect_uri', description: 'The redirect URI of the authorization request (authorization_code grant)', type: 'string', format: 'uri'),
-                    new OA\Property(property: 'code_verifier', description: 'PKCE code verifier (authorization_code grant)', type: 'string'),
-                    new OA\Property(property: 'device_code', description: 'Device code (device_code grant)', type: 'string'),
-                    new OA\Property(property: 'refresh_token', description: 'Refresh token (refresh_token grant)', type: 'string'),
-                ],
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'grant_type' => new OA\Schema(
+                            type: 'string',
+                            enum: ['authorization_code', 'refresh_token', 'urn:ietf:params:oauth:grant-type:device_code'],
+                        ),
+                        'client_id' => new OA\Schema(
+                            description: 'Required unless an HTTP Basic header names the client; it may repeat that client',
+                            type: 'string',
+                        ),
+                        'client_secret' => new OA\Schema(description: 'Secret clients that do not send it with HTTP Basic', type: 'string'),
+                        'client_assertion' => new OA\Schema(
+                            description: 'Signed JWT client assertion; confidential clients registered for private_key_jwt only',
+                            type: 'string',
+                        ),
+                        'client_assertion_type' => new OA\Schema(
+                            description: 'Sent with client_assertion',
+                            type: 'string',
+                            enum: [ClientCredentials::JWT_BEARER_ASSERTION_TYPE],
+                        ),
+                        'code' => new OA\Schema(description: 'Authorization code (authorization_code grant)', type: 'string'),
+                        'redirect_uri' => new OA\Schema(
+                            description: 'The redirect URI of the authorization request (authorization_code grant)',
+                            type: 'string',
+                            format: 'uri',
+                        ),
+                        'code_verifier' => new OA\Schema(description: 'PKCE code verifier (authorization_code grant)', type: 'string'),
+                        'device_code' => new OA\Schema(description: 'Device code (device_code grant)', type: 'string'),
+                        'refresh_token' => new OA\Schema(description: 'Refresh token (refresh_token grant)', type: 'string'),
+                    ],
+                    required: ['grant_type'],
+                ),
             ),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'DPoP-bound token pair (RFC 6749 section 5.1)', content: new OA\JsonContent(ref: new Model(type: OAuthTokenResource::class))),
-            new OA\Response(response: '400', description: 'OAuth error, including the device polling answers authorization_pending, slow_down, access_denied and expired_token, and the DPoP answers invalid_dpop_proof and use_dpop_nonce', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
-            new OA\Response(response: '401', description: 'Client authentication failed, or the client is revoked', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'DPoP-bound token pair (RFC 6749 section 5.1)',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: OAuthTokenResource::class),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'OAuth error, including the device polling answers authorization_pending, slow_down, access_denied and expired_token, and the DPoP answers invalid_dpop_proof and use_dpop_nonce',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: OAuthError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Client authentication failed, or the client is revoked',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: OAuthError::class),
+                ),
+            ),
             new OA\Response(
                 response: '503',
                 description: 'The server could not decide on the grant, for example while its database restarts, the DPoP nonce store or client assertion jti store is unavailable, or the client\'s jwks_uri key set cannot be fetched; the presented token may still be valid, so retry after the Retry-After delay, with a newly signed client assertion. Carries no DPoP-Nonce header.',
-                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 5))],
-                content: new OA\JsonContent(ref: new Model(type: ApiError::class)),
+                headers: [
+                    new OA\Header(
+                        header: 'Retry-After',
+                        description: 'Seconds to wait before retrying',
+                        schema: new OA\Schema(type: 'integer', example: 5),
+                    ),
+                ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
             ),
         ],
+        security: [],
     )]
     #[Route('/token', name: 'token', methods: ['POST'])]
     public function token(Request $request): Response
@@ -314,24 +463,50 @@ final class OAuthController
         return self::noStore($response);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/oauth/revoke',
         summary: 'Revoke an access or refresh token of the signed-in user and its chain (RFC 7009)',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(required: ['token'], properties: [
-                    new OA\Property(property: 'token', type: 'string', example: 'access-token-to-revoke'),
-                    new OA\Property(property: 'tokenTypeHint', description: 'Hint for the token type (e.g. "access_token" or "refresh_token")', type: 'string'),
-                ]),
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'token' => new OA\Schema(type: 'string', example: 'access-token-to-revoke'),
+                        'tokenTypeHint' => new OA\Schema(
+                            description: 'Hint for the token type (e.g. "access_token" or "refresh_token")',
+                            type: 'string',
+                        ),
+                    ],
+                    required: ['token'],
+                ),
+            ),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Token revoked (always 200 for an unknown token or one of another user, per RFC 7009 section 2.2); the chain is revoked and the WebSocket connections opened with it are closed at once, or by the next socket reconciliation when the web server could not close them now', content: new OA\JsonContent()),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Token revoked (always 200 for an unknown token or one of another user, per RFC 7009 section 2.2); the chain is revoked and the WebSocket connections opened with it are closed at once, or by the next socket reconciliation when the web server could not close them now',
+                content: new OA\MediaType\Json(),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
             new OA\Response(
                 response: '503',
                 description: 'The chain could not be revoked; the token is still live, so send the same request again after the Retry-After delay.',
-                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 5))],
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                headers: [
+                    new OA\Header(
+                        header: 'Retry-After',
+                        description: 'Seconds to wait before retrying',
+                        schema: new OA\Schema(type: 'integer', example: 5),
+                    ),
+                ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
         ],
     )]
@@ -373,35 +548,76 @@ final class OAuthController
         return new JsonResponse(null, Response::HTTP_OK);
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/oauth/device/authorize',
-        description: 'Only clients registered as device clients may start the device flow. A confidential client authenticates as at the token endpoint. Parameters may be form-encoded (RFC 8628) or JSON. Show the user code and `verification_uri` (or encode `verification_uri_complete` in a QR code), then poll the token endpoint with the device code no faster than `interval` seconds.',
         summary: 'Device authorization request (RFC 8628 section 3.1)',
-        security: [],
+        description: 'Only clients registered as device clients may start the device flow. A confidential client authenticates as at the token endpoint. Parameters may be form-encoded (RFC 8628) or JSON. Show the user code and `verification_uri` (or encode `verification_uri_complete` in a QR code), then poll the token endpoint with the device code no faster than `interval` seconds.',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(
-                required: ['client_id', 'scope'],
-                properties: [
-                    new OA\Property(property: 'client_id', type: 'string'),
-                    new OA\Property(property: 'client_secret', description: 'Confidential clients registered for client_secret_post only', type: 'string'),
-                    new OA\Property(property: 'client_assertion', description: 'Signed JWT client assertion; confidential clients registered for private_key_jwt only', type: 'string'),
-                    new OA\Property(property: 'client_assertion_type', description: 'Sent with client_assertion', type: 'string', enum: [ClientCredentials::JWT_BEARER_ASSERTION_TYPE]),
-                    new OA\Property(property: 'scope', description: 'Space-separated scopes; at least one must be grantable (profile, email, library or playlist), others are dropped', type: 'string'),
-                ],
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'client_id' => new OA\Schema(type: 'string'),
+                        'client_secret' => new OA\Schema(
+                            description: 'Confidential clients registered for client_secret_post only',
+                            type: 'string',
+                        ),
+                        'client_assertion' => new OA\Schema(
+                            description: 'Signed JWT client assertion; confidential clients registered for private_key_jwt only',
+                            type: 'string',
+                        ),
+                        'client_assertion_type' => new OA\Schema(
+                            description: 'Sent with client_assertion',
+                            type: 'string',
+                            enum: [ClientCredentials::JWT_BEARER_ASSERTION_TYPE],
+                        ),
+                        'scope' => new OA\Schema(
+                            description: 'Space-separated scopes; at least one must be grantable (profile, email, library or playlist), others are dropped',
+                            type: 'string',
+                        ),
+                    ],
+                    required: ['client_id', 'scope'],
+                ),
             ),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Device code issued (RFC 8628 section 3.2)', content: new OA\JsonContent(ref: new Model(type: DeviceAuthorizationResource::class))),
-            new OA\Response(response: '400', description: 'Missing client_id, the client may not use the device flow, or no requested scope can be granted (invalid_scope)', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
-            new OA\Response(response: '401', description: 'Unknown or revoked client, or client authentication failed', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Device code issued (RFC 8628 section 3.2)',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: DeviceAuthorizationResource::class),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'Missing client_id, the client may not use the device flow, or no requested scope can be granted (invalid_scope)',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: OAuthError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Unknown or revoked client, or client authentication failed',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: OAuthError::class),
+                ),
+            ),
             new OA\Response(
                 response: '503',
                 description: 'The client assertion could not be judged because the client assertion jti store is unavailable or the client\'s jwks_uri key set cannot be fetched; retry after the Retry-After delay with a newly signed client assertion.',
-                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 5))],
-                content: new OA\JsonContent(ref: new Model(type: ApiError::class)),
+                headers: [
+                    new OA\Header(
+                        header: 'Retry-After',
+                        description: 'Seconds to wait before retrying',
+                        schema: new OA\Schema(type: 'integer', example: 5),
+                    ),
+                ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
             ),
         ],
+        security: [],
     )]
     #[Route('/device/authorize', name: 'device_authorize', methods: ['POST'])]
     public function deviceAuthorize(Request $request): JsonResponse
@@ -420,20 +636,46 @@ final class OAuthController
         return self::noStore(new JsonResponse(DeviceAuthorizationResource::from($authorization)));
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/oauth/device/verify',
-        description: 'Backs the device page at `APP_URL/device`. Shows the signed-in user which client a user code belongs to before they approve or deny it. Case, spaces and dashes in the code do not matter. `scopes` are the scopes the issued token would carry.',
         summary: 'Look up a pending device authorization request (RFC 8628 section 3.3)',
+        description: 'Backs the device page at `APP_URL/device`. Shows the signed-in user which client a user code belongs to before they approve or deny it. Case, spaces and dashes in the code do not matter. `scopes` are the scopes the issued token would carry.',
         parameters: [
-            new OA\Parameter(name: 'user_code', description: 'The user code displayed on the device', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'user_code',
+                in: 'query',
+                description: 'The user code displayed on the device',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'The pending request', content: new OA\JsonContent(
-                required: ['data'],
-                properties: [new OA\Property(property: 'data', ref: new Model(type: PendingDeviceAuthorizationResource::class))],
-            )),
-            new OA\Response(response: '400', description: 'Missing user code, or an unknown, expired or already decided one; `error.details.reason` is `user_code_required`, `invalid_user_code` or `device_already_processed`', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'The pending request',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: PendingDeviceAuthorizationResource::class),
+                        ],
+                        required: ['data'],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'Missing user code, or an unknown, expired or already decided one; `error.details.reason` is `user_code_required`, `invalid_user_code` or `device_already_processed`',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/device/verify', name: 'device_verify', methods: ['GET'])]
@@ -454,31 +696,60 @@ final class OAuthController
         return $this->successResponse(PendingDeviceAuthorizationResource::from($pending));
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/oauth/device/approve',
-        description: 'Records the signed-in user\'s decision. Approval gives the device a token pair for this user at its next poll and notifies the user. Denial makes the next poll answer `access_denied`.',
         summary: 'Approve or deny a device authorization request (RFC 8628 section 3.3)',
+        description: 'Records the signed-in user\'s decision. Approval gives the device a token pair for this user at its next poll and notifies the user. Denial makes the next poll answer `access_denied`.',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(ref: new Model(type: DeviceApproveRequest::class)),
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: DeviceApproveRequest::class),
+            ),
         ),
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Device approved or denied',
-                content: new OA\JsonContent(
-                    required: ['data'],
-                    properties: [
-                        new OA\Property(property: 'data', required: ['decision', 'message'], properties: [
-                            new OA\Property(property: 'decision', type: 'string', enum: ['approved', 'denied']),
-                            new OA\Property(property: 'message', type: 'string', example: 'Device approved successfully.'),
-                        ], type: 'object'),
-                    ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'decision' => new OA\Schema(
+                                        type: 'string',
+                                        enum: ['approved', 'denied'],
+                                    ),
+                                    'message' => new OA\Schema(type: 'string', example: 'Device approved successfully.'),
+                                ],
+                                required: ['decision', 'message'],
+                            ),
+                        ],
+                        required: ['data'],
+                    ),
                 ),
             ),
-            new OA\Response(response: '400', description: 'Unknown, expired or already decided user code; `error.details.reason` is `invalid_user_code` or `device_already_processed`', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '400',
+                description: 'Unknown, expired or already decided user code; `error.details.reason` is `invalid_user_code` or `device_already_processed`',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/device/approve', name: 'device_approve', methods: ['POST'])]

@@ -13,8 +13,7 @@ use App\Notification\Interface\Request\UpdatePreferenceRequest;
 use App\Notification\Interface\Resource\NotificationPreferenceResource;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use OpenApi\Attributes as OA;
-use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -25,7 +24,10 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 #[AsController]
-#[OA\Tag(name: 'Notification Preferences', description: 'User notification preference management')]
+#[OA\Tag(
+    name: 'Notification Preferences',
+    description: 'User notification preference management',
+)]
 #[Route('/api/notifications/preferences', name: 'notification_preference_')]
 final class PreferenceController
 {
@@ -36,19 +38,37 @@ final class PreferenceController
         private readonly ValidatorInterface $validator,
         private readonly JsonEncoder $jsonEncoder,
         private readonly Security $security,
-    )
-    {
+    ) {
     }
 
     /**
      * Get all notification preferences for the authenticated user.
      */
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/notifications/preferences/',
-        description: 'Returns all category × channel preference combinations for the authenticated user.',
         summary: 'Get notification preferences',
+        description: 'Returns all category × channel preference combinations for the authenticated user.',
         responses: [
-            new OA\Response(response: '200', description: 'List of preferences', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'category', type: 'string'), new OA\Property(property: 'channel', type: 'string'), new OA\Property(property: 'enabled', type: 'boolean')]))])),
+            new OA\Response(
+                response: '200',
+                description: 'List of preferences',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(
+                                    properties: [
+                                        'category' => new OA\Schema(type: 'string'),
+                                        'channel' => new OA\Schema(type: 'string'),
+                                        'enabled' => new OA\Schema(type: 'boolean'),
+                                    ],
+                                ),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
@@ -93,7 +113,7 @@ final class PreferenceController
     /**
      * Batch update notification preferences.
      */
-    #[OA\Put(
+    #[OA\Operation\Put(
         path: '/api/notifications/preferences/',
         summary: 'Update notification preferences',
         requestBody: new OA\RequestBody(
@@ -101,27 +121,48 @@ final class PreferenceController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
-                    required: ['preferences'],
                     properties: [
-                        new OA\Property(
-                            property: 'preferences',
+                        'preferences' => new OA\Schema(
                             type: 'array',
-                            items: new OA\Items(
-                                required: ['category', 'channel', 'enabled'],
+                            items: new OA\Schema(
                                 properties: [
-                                    new OA\Property(property: 'category', type: 'string', enum: ['security', 'background_jobs', 'media_changes']),
-                                    new OA\Property(property: 'channel', type: 'string', enum: ['in_app', 'email', 'push', 'webhook']),
-                                    new OA\Property(property: 'enabled', type: 'boolean'),
+                                    'category' => new OA\Schema(
+                                        type: 'string',
+                                        enum: ['security', 'background_jobs', 'media_changes'],
+                                    ),
+                                    'channel' => new OA\Schema(
+                                        type: 'string',
+                                        enum: ['in_app', 'email', 'push', 'webhook'],
+                                    ),
+                                    'enabled' => new OA\Schema(type: 'boolean'),
                                 ],
+                                required: ['category', 'channel', 'enabled'],
                             ),
                         ),
                     ],
+                    required: ['preferences'],
                 ),
             ),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Preferences updated', content: new OA\JsonContent(properties: [new OA\Property(property: 'updated', type: 'boolean')])),
-            new OA\Response(response: '422', description: 'Invalid input', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Preferences updated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'updated' => new OA\Schema(type: 'boolean'),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Invalid input',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'update', methods: ['PUT'])]

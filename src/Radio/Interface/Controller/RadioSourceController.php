@@ -9,8 +9,7 @@ use App\Radio\Application\Port\RadioSourcePortInterface;
 use App\Radio\Interface\Request\CreateRadioSourceRequest;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -30,22 +29,51 @@ final class RadioSourceController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/radio/sources',
         summary: 'List all radio sources',
         responses: [
-            new OA\Response(response: '200', description: 'List of sources', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [
-                    new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-                    new OA\Property(property: 'name', type: 'string'),
-                    new OA\Property(property: 'type', type: 'string'),
-                    new OA\Property(property: 'syncUrl', type: 'string', format: 'uri'),
-                    new OA\Property(property: 'syncSchedule', type: 'string', nullable: true),
-                    new OA\Property(property: 'lastSync', type: 'string', format: 'date-time', nullable: true),
-                ], type: 'object'))],
-                type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'List of sources',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(
+                                    type: 'object',
+                                    properties: [
+                                        'publicId' => new OA\Schema(
+                                            type: 'string',
+                                            minLength: 21,
+                                            maxLength: 21,
+                                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                                        ),
+                                        'name' => new OA\Schema(type: 'string'),
+                                        'type' => new OA\Schema(type: 'string'),
+                                        'syncUrl' => new OA\Schema(type: 'string', format: 'uri'),
+                                        'syncSchedule' => new OA\Schema(type: 'string', nullable: true),
+                                        'lastSync' => new OA\Schema(
+                                            type: 'string',
+                                            format: 'date-time',
+                                            nullable: true,
+                                        ),
+                                    ],
+                                ),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('', name: 'list', methods: ['GET'])]
@@ -59,34 +87,73 @@ final class RadioSourceController
         return $this->successResponse($this->sourcePort->listSources());
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/radio/sources',
         summary: 'Create a radio source (admin)',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(
-                required: ['name', 'type', 'syncUrl'],
-                properties: [
-                    new OA\Property(property: 'name', type: 'string'),
-                    new OA\Property(property: 'type', type: 'string'),
-                    new OA\Property(property: 'syncUrl', type: 'string', format: 'uri'),
-                    new OA\Property(property: 'syncConfig', type: 'array', items: new OA\Items()),
-                    new OA\Property(property: 'syncSchedule', type: 'string', nullable: true),
-                ],
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(
+                    properties: [
+                        'name' => new OA\Schema(type: 'string'),
+                        'type' => new OA\Schema(type: 'string'),
+                        'syncUrl' => new OA\Schema(type: 'string', format: 'uri'),
+                        'syncConfig' => new OA\Schema(
+                            type: 'array',
+                            items: new OA\Schema(),
+                        ),
+                        'syncSchedule' => new OA\Schema(type: 'string', nullable: true),
+                    ],
+                    required: ['name', 'type', 'syncUrl'],
+                ),
             ),
         ),
         responses: [
-            new OA\Response(response: '201', description: 'Source created', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', properties: [
-                    new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-                    new OA\Property(property: 'name', type: 'string'),
-                    new OA\Property(property: 'type', type: 'string'),
-                ], type: 'object')],
-                type: 'object',
-            )),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '201',
+                description: 'Source created',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'publicId' => new OA\Schema(
+                                        type: 'string',
+                                        minLength: 21,
+                                        maxLength: 21,
+                                        pattern: '^[0-9a-zA-Z_-]{21}$',
+                                    ),
+                                    'name' => new OA\Schema(type: 'string'),
+                                    'type' => new OA\Schema(type: 'string'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Administrator role required',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('', name: 'create', methods: ['POST'])]

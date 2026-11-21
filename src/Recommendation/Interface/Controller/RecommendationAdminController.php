@@ -15,8 +15,7 @@ use App\Recommendation\Interface\Resource\RecommendationGenerationResource;
 use App\Recommendation\Interface\Resource\RecommendationJobResource;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -43,25 +42,35 @@ final class RecommendationAdminController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/recommendations/coverage',
         summary: 'Get recommendation coverage statistics',
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Coverage statistics',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'total_tracks', type: 'integer'),
-                            new OA\Property(property: 'tracks_with_recommendations', type: 'integer'),
-                            new OA\Property(property: 'tracks_without_recommendations', type: 'integer'),
-                            new OA\Property(property: 'coverage_percentage', type: 'number'),
-                        ]),
-                    ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                properties: [
+                                    'total_tracks' => new OA\Schema(type: 'integer'),
+                                    'tracks_with_recommendations' => new OA\Schema(type: 'integer'),
+                                    'tracks_without_recommendations' => new OA\Schema(type: 'integer'),
+                                    'coverage_percentage' => new OA\Schema(type: 'number'),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[CliCounterpart('app:recommendation:stats')]
@@ -71,23 +80,33 @@ final class RecommendationAdminController
         return $this->successResponse($this->insights->getCoverage());
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/recommendations/source-quality',
         summary: 'Get recommendation source quality breakdown',
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Source quality breakdown',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'by_source_type', type: 'object', additionalProperties: true),
-                            new OA\Property(property: 'avg_confidence_score', type: 'number'),
-                        ]),
-                    ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                properties: [
+                                    'by_source_type' => new OA\Schema(type: 'object', additionalProperties: true),
+                                    'avg_confidence_score' => new OA\Schema(type: 'number'),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[CliCounterpart('app:recommendation:stats')]
@@ -97,23 +116,33 @@ final class RecommendationAdminController
         return $this->successResponse($this->insights->getSourceQuality());
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/recommendations/freshness',
         summary: 'Get recommendation freshness metrics',
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Freshness metrics',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'avg_age_seconds', type: 'number'),
-                            new OA\Property(property: 'last_generated_at', type: 'string', nullable: true),
-                        ]),
-                    ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                properties: [
+                                    'avg_age_seconds' => new OA\Schema(type: 'number'),
+                                    'last_generated_at' => new OA\Schema(type: 'string', nullable: true),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[CliCounterpart('app:recommendation:stats')]
@@ -123,41 +152,85 @@ final class RecommendationAdminController
         return $this->successResponse($this->insights->getFreshness());
     }
 
-    #[OA\Post(path: '/api/admin/recommendations/generate', description: 'Creates a recommendation job. In the web server the job runs on the CPU process pool and the response returns at once with the pending job; without the pool the job runs during the request and the response carries its counts.', summary: 'Trigger recommendation generation', responses: [
-        new OA\Response(
-            response: '202',
-            description: 'Generation job started (async)',
-            content: new OA\JsonContent(
-                properties: [
-                    new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'job_id', type: 'string'),
-                        new OA\Property(property: 'public_id', type: 'string'),
-                        new OA\Property(property: 'mode', type: 'string', enum: ['full', 'incremental']),
-                        new OA\Property(property: 'status', type: 'string', example: 'pending'),
-                        new OA\Property(property: 'execution', type: 'string', example: 'async', enum: ['async']),
-                    ]),
-                ],
+    #[OA\Operation\Post(
+        path: '/api/admin/recommendations/generate',
+        summary: 'Trigger recommendation generation',
+        description: 'Creates a recommendation job. In the web server the job runs on the CPU process pool and the response returns at once with the pending job; without the pool the job runs during the request and the response carries its counts.',
+        responses: [
+            new OA\Response(
+                response: '202',
+                description: 'Generation job started (async)',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                properties: [
+                                    'job_id' => new OA\Schema(type: 'string'),
+                                    'public_id' => new OA\Schema(type: 'string'),
+                                    'mode' => new OA\Schema(
+                                        type: 'string',
+                                        enum: ['full', 'incremental'],
+                                    ),
+                                    'status' => new OA\Schema(type: 'string', example: 'pending'),
+                                    'execution' => new OA\Schema(
+                                        type: 'string',
+                                        enum: ['async'],
+                                        example: 'async',
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
             ),
-        ),
-        new OA\Response(
-            response: '200',
-            description: 'Generation ran during the request (sync)',
-            content: new OA\JsonContent(
-                properties: [
-                    new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'job_id', type: 'string'),
-                        new OA\Property(property: 'public_id', type: 'string'),
-                        new OA\Property(property: 'mode', type: 'string', enum: ['full', 'incremental']),
-                        new OA\Property(property: 'status', type: 'string', enum: ['completed', 'cancelled']),
-                        new OA\Property(property: 'counts', type: 'object', example: ['collaborative' => 150, 'content' => 200, 'genre' => 100]),
-                        new OA\Property(property: 'execution', type: 'string', enum: ['sync']),
-                    ]),
-                ],
+            new OA\Response(
+                response: '200',
+                description: 'Generation ran during the request (sync)',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                properties: [
+                                    'job_id' => new OA\Schema(type: 'string'),
+                                    'public_id' => new OA\Schema(type: 'string'),
+                                    'mode' => new OA\Schema(
+                                        type: 'string',
+                                        enum: ['full', 'incremental'],
+                                    ),
+                                    'status' => new OA\Schema(
+                                        type: 'string',
+                                        enum: ['completed', 'cancelled'],
+                                    ),
+                                    'counts' => new OA\Schema(
+                                        type: 'object',
+                                        example: ['collaborative' => 150, 'content' => 200, 'genre' => 100],
+                                    ),
+                                    'execution' => new OA\Schema(
+                                        type: 'string',
+                                        enum: ['sync'],
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
             ),
-        ),
-        new OA\Response(response: '422', description: 'Invalid mode', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-    ])]
+            new OA\Response(
+                response: '422',
+                description: 'Invalid mode',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+        ],
+    )]
     #[CliCounterpart('app:recommendation:generate')]
     #[Route('/generate', name: 'generate', methods: ['POST'])]
     public function generate(Request $request, #[CurrentUser] UserInterface $user): JsonResponse
@@ -173,22 +246,44 @@ final class RecommendationAdminController
         return $this->successResponse(RecommendationGenerationResource::from($result), $result->isAsync() ? 202 : 200);
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/recommendations/jobs/{publicId}',
         summary: 'Get recommendation job status',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Job public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Job public ID',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Job details',
-                content: new OA\JsonContent(properties: [
-                    new OA\Property(property: 'data', ref: new Model(type: RecommendationJobResource::class)),
-                ]),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(ref: RecommendationJobResource::class),
+                        ],
+                    ),
+                ),
             ),
-            new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '404',
+                description: 'Job not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[CliCounterpart('app:recommendation:job:show')]
@@ -198,29 +293,69 @@ final class RecommendationAdminController
         return $this->successResponse(RecommendationJobResource::from($this->dispatch(new GetRecommendationJobQuery($publicId))));
     }
 
-    #[OA\Post(path: '/api/admin/recommendations/jobs/{publicId}/requeue', description: 'Creates a new job with the same parameters as the original and starts it like a generated job.', summary: 'Requeue a failed or cancelled recommendation job', parameters: [
-        new OA\Parameter(name: 'publicId', description: 'Job public ID to requeue', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-    ], responses: [
-        new OA\Response(
-            response: '201',
-            description: 'Job requeued and started',
-            content: new OA\JsonContent(
-                properties: [
-                    new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'job_id', type: 'string'),
-                        new OA\Property(property: 'public_id', type: 'string'),
-                        new OA\Property(property: 'mode', type: 'string', enum: ['full', 'incremental']),
-                        new OA\Property(property: 'status', type: 'string', example: 'pending'),
-                        new OA\Property(property: 'execution', type: 'string', enum: ['async', 'sync']),
-                        new OA\Property(property: 'counts', description: 'Only when the job ran during the request', type: 'object'),
-                    ]),
-                ],
+    #[OA\Operation\Post(
+        path: '/api/admin/recommendations/jobs/{publicId}/requeue',
+        summary: 'Requeue a failed or cancelled recommendation job',
+        description: 'Creates a new job with the same parameters as the original and starts it like a generated job.',
+        parameters: [
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Job public ID to requeue',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
             ),
-        ),
-        new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(response: '409', description: 'Job cannot be requeued (not failed or cancelled)', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-    ])]
+        ],
+        responses: [
+            new OA\Response(
+                response: '201',
+                description: 'Job requeued and started',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                properties: [
+                                    'job_id' => new OA\Schema(type: 'string'),
+                                    'public_id' => new OA\Schema(type: 'string'),
+                                    'mode' => new OA\Schema(
+                                        type: 'string',
+                                        enum: ['full', 'incremental'],
+                                    ),
+                                    'status' => new OA\Schema(type: 'string', example: 'pending'),
+                                    'execution' => new OA\Schema(
+                                        type: 'string',
+                                        enum: ['async', 'sync'],
+                                    ),
+                                    'counts' => new OA\Schema(description: 'Only when the job ran during the request', type: 'object'),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Job not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Job cannot be requeued (not failed or cancelled)',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+        ],
+    )]
     #[CliCounterpart('app:recommendation:job:requeue')]
     #[Route('/jobs/{publicId}/requeue', name: 'job_requeue', methods: ['POST'])]
     public function requeueJob(string $publicId, #[CurrentUser] UserInterface $user): JsonResponse
@@ -231,14 +366,44 @@ final class RecommendationAdminController
         return $this->successResponse(RecommendationGenerationResource::from($result), 201);
     }
 
-    #[OA\Delete(path: '/api/admin/recommendations/jobs/{publicId}', description: 'Cancelling a cancelled job succeeds without change.', summary: 'Cancel a recommendation job', parameters: [
-        new OA\Parameter(name: 'publicId', description: 'Job public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-    ], responses: [
-        new OA\Response(response: '204', description: 'Job cancelled'),
-        new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(response: '409', description: 'Job already completed or failed', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-        new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-    ])]
+    #[OA\Operation\Delete(
+        path: '/api/admin/recommendations/jobs/{publicId}',
+        summary: 'Cancel a recommendation job',
+        description: 'Cancelling a cancelled job succeeds without change.',
+        parameters: [
+            new OA\Parameter(
+                name: 'publicId',
+                in: 'path',
+                description: 'Job public ID',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+        ],
+        responses: [
+            new OA\Response(response: '204', description: 'Job cancelled'),
+            new OA\Response(
+                response: '404',
+                description: 'Job not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'Job already completed or failed',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+        ],
+    )]
     #[CliCounterpart('app:recommendation:job:cancel')]
     #[Route('/jobs/{publicId}', name: 'job_cancel', methods: ['DELETE'])]
     public function cancelJob(string $publicId): JsonResponse
@@ -248,23 +413,55 @@ final class RecommendationAdminController
         return $this->noContent();
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/recommendations/jobs',
         summary: 'List recent recommendation jobs',
         parameters: [
-            new OA\Parameter(name: 'limit', description: 'Max jobs to return, 1-100', in: 'query', schema: new OA\Schema(type: 'integer', default: 20)),
-            new OA\Parameter(name: 'status', description: 'Filter by status', in: 'query', schema: new OA\Schema(type: 'string', enum: ['pending', 'in_progress', 'completed', 'failed', 'cancelled'])),
+            new OA\Parameter(
+                name: 'limit',
+                in: 'query',
+                description: 'Max jobs to return, 1-100',
+                schema: new OA\Schema(type: 'integer', default: 20),
+            ),
+            new OA\Parameter(
+                name: 'status',
+                in: 'query',
+                description: 'Filter by status',
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['pending', 'in_progress', 'completed', 'failed', 'cancelled'],
+                ),
+            ),
         ],
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'List of jobs, newest first',
-                content: new OA\JsonContent(properties: [
-                    new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: RecommendationJobResource::class))),
-                ]),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(ref: RecommendationJobResource::class),
+                            ),
+                        ],
+                    ),
+                ),
             ),
-            new OA\Response(response: '422', description: 'Unknown status', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '422',
+                description: 'Unknown status',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[CliCounterpart('app:recommendation:job:list')]

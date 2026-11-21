@@ -7,8 +7,7 @@ namespace App\Media\Interface\Controller;
 use App\Media\Application\Port\MediaAdminPortInterface;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use OpenApi\Attributes as OA;
-use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -25,30 +24,44 @@ final class MediaAdminController
     ) {
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/media/storage-stats',
         summary: 'Get image storage statistics',
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Storage statistics',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'totalImages', type: 'integer'),
-                            new OA\Property(property: 'totalSize', type: 'integer'),
-                            new OA\Property(property: 'byType', type: 'array', items: new OA\Items(
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
                                 properties: [
-                                    new OA\Property(property: 'type', type: 'string'),
-                                    new OA\Property(property: 'count', type: 'integer'),
-                                    new OA\Property(property: 'size', type: 'integer'),
+                                    'totalImages' => new OA\Schema(type: 'integer'),
+                                    'totalSize' => new OA\Schema(type: 'integer'),
+                                    'byType' => new OA\Schema(
+                                        type: 'array',
+                                        items: new OA\Schema(
+                                            properties: [
+                                                'type' => new OA\Schema(type: 'string'),
+                                                'count' => new OA\Schema(type: 'integer'),
+                                                'size' => new OA\Schema(type: 'integer'),
+                                            ],
+                                        ),
+                                    ),
                                 ],
-                            )),
-                        ], type: 'object'),
-                    ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/storage-stats', name: 'storage_stats', methods: ['GET'])]
@@ -58,22 +71,33 @@ final class MediaAdminController
         return $this->successResponse($this->mediaAdmin->getStorageStats());
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/admin/media/prune-missing',
         summary: 'Dispatch async job to prune image records whose files no longer exist on disk',
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Job dispatched',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'dispatched', type: 'boolean'),
-                        ], type: 'object'),
-                    ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'dispatched' => new OA\Schema(type: 'boolean'),
+                                ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/prune-missing', name: 'prune_missing', methods: ['POST'])]
@@ -83,30 +107,49 @@ final class MediaAdminController
         return $this->successResponse($this->mediaAdmin->pruneMissingImages());
     }
 
-    #[OA\Get(
+    #[OA\Operation\Get(
         path: '/api/admin/media/missing-check',
         summary: 'Check how many images have missing files (dry-run)',
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Missing images report',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'totalImages', type: 'integer'),
-                            new OA\Property(property: 'missingCount', type: 'integer'),
-                            new OA\Property(property: 'missingImages', type: 'array', items: new OA\Items(
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
                                 properties: [
-                                    new OA\Property(property: 'publicId', type: 'string', pattern: '^[A-Za-z0-9_-]{21}$', maxLength: 21, minLength: 21),
-                                    new OA\Property(property: 'path', type: 'string'),
-                                    new OA\Property(property: 'type', type: 'string'),
+                                    'totalImages' => new OA\Schema(type: 'integer'),
+                                    'missingCount' => new OA\Schema(type: 'integer'),
+                                    'missingImages' => new OA\Schema(
+                                        type: 'array',
+                                        items: new OA\Schema(
+                                            properties: [
+                                                'publicId' => new OA\Schema(
+                                                    type: 'string',
+                                                    minLength: 21,
+                                                    maxLength: 21,
+                                                    pattern: '^[A-Za-z0-9_-]{21}$',
+                                                ),
+                                                'path' => new OA\Schema(type: 'string'),
+                                                'type' => new OA\Schema(type: 'string'),
+                                            ],
+                                        ),
+                                    ),
                                 ],
-                            )),
-                        ], type: 'object'),
-                    ],
+                            ),
+                        ],
+                    ),
                 ),
             ),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '403',
+                description: 'Forbidden',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/missing-check', name: 'missing_check', methods: ['GET'])]

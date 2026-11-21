@@ -17,8 +17,7 @@ use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -42,28 +41,46 @@ final class LoginController
     ) {
     }
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/auth/login',
         summary: 'Authenticate with email and password',
-        security: [],
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(ref: new Model(type: \App\Auth\Interface\Request\User\LoginRequest::class)),
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: \App\Auth\Interface\Request\User\LoginRequest::class),
+            ),
         ),
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Authentication successful',
-                content: new OA\JsonContent(ref: new Model(type: TokenResource::class)),
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: TokenResource::class),
+                ),
             ),
-            new OA\Response(response: '401', description: 'Invalid credentials', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '401',
+                description: 'Invalid credentials',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
             new OA\Response(
                 response: '503',
                 description: 'The DPoP nonce store is unavailable, so the proof could not be checked, or issuing the session waited too long on a database lock; retry after the Retry-After delay. Carries no DPoP-Nonce header.',
-                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 5))],
-                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+                headers: [
+                    new OA\Header(
+                        header: 'Retry-After',
+                        description: 'Seconds to wait before retrying',
+                        schema: new OA\Schema(type: 'integer', example: 5),
+                    ),
+                ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
             ),
         ],
+        security: [],
     )]
     #[Route('/login', name: 'login', methods: ['POST'])]
     public function __invoke(Request $request): JsonResponse
