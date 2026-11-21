@@ -36,6 +36,13 @@ indentation, readable multiline callbacks and object literals, and separate logi
 steps. Avoid compressed test setup and several statements on one line. Prefer named
 types for repeated nested shapes. Do not introduce Prettier for this project.
 
+Write readable formatting from the first draft, including tests. Expand type
+members, nested objects, long calls and JSX attributes across lines when they
+contain separate ideas. Keep each statement on its own line; do not compress
+callbacks or control flow to save space. Before handing off work, inspect every
+touched TypeScript and TSX file for readability. Passing lint or typecheck does
+not establish that the code is properly formatted.
+
 ## Components, effects, and stores
 
 Type component props and state without `any`. Interfaces, type aliases, and

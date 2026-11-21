@@ -67,6 +67,15 @@ CLI commands and isolated child processes may use blocking process APIs delibera
 Native coroutine execution still needs bounded execution and cleanup; do not infer
 that all standard I/O or process execution is safe under every runtime mode.
 
+## PHP formatting
+
+Write readable PHP from the first draft, including tests. Follow the project's
+formatter and four-space indentation. Expand long constructor signatures, calls,
+associative arrays and conditions across lines; keep each statement on its own
+line. Do not compress control flow or test setup to save space. Run the applicable
+formatter on touched files, then inspect their readability before handing off
+work. Passing syntax checks or static analysis does not replace this review.
+
 ## Companion rules
 
 - [Domain models](ddd-domain-models.md)
