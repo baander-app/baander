@@ -284,7 +284,16 @@ namespace App\Playlist\Interface\Resource;
 
 use App\Shared\Interface\Resource\AbstractResource;
 use App\Shared\Domain\Model\PublicId;
+use OpenApi\Spec as OA;
 
+#[OA\Schema(
+    type: 'object',
+    properties: [
+        'albumPublicId' => new OA\Schema(type: 'string'),
+    ],
+    required: ['albumPublicId'],
+    component: 'FavoriteAlbumResource',
+)]
 final class FavoriteAlbumResource extends AbstractResource
 {
     public static function from(mixed $source): array
@@ -302,27 +311,40 @@ final class FavoriteAlbumResource extends AbstractResource
 
 ## 10. Request DTO
 
-A request DTO uses promoted properties with Symfony validation attributes and `#[OA\Schema]` for the OpenAPI documentation. Request DTOs live in `Interface/Request/` and accept public IDs at public transport boundaries.
+A request DTO uses promoted properties with Symfony validation attributes and a
+native `OpenApi\Spec\Schema` declaration. Request DTOs live in `Interface/Request/`
+and accept public IDs at public transport boundaries. The schema explicitly
+records fields, required values, defaults, nullability and constraints; validation
+attributes do not generate this metadata. Use keyed Schema values in `properties`
+and a stable `component:` name for reusable schemas.
 
 ```php
 // src/Playlist/Interface/Request/AddFavoriteAlbumRequest.php
 namespace App\Playlist\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[OA\Schema(
-    schema: 'AddFavoriteAlbumRequest',
-    required: ['albumPublicId'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'albumPublicId', type: 'string', example: 'V1StGXR8_Z5jdHi6B-myT'),
+        'albumPublicId' => new OA\Schema(
+            type: 'string',
+            example: 'V1StGXR8_Z5jdHi6B-myT',
+            default: '',
+        ),
     ],
+    required: ['albumPublicId'],
+    component: 'AddFavoriteAlbumRequest',
 )]
 final readonly class AddFavoriteAlbumRequest
 {
     public function __construct(
         #[Assert\NotBlank(message: 'Album public ID is required.')]
-        #[Assert\Regex(pattern: '/^[A-Za-z0-9_-]{21}$/D', message: 'Album public ID must be a 21-character NanoID.')]
+        #[Assert\Regex(
+            pattern: '/^[A-Za-z0-9_-]{21}$/D',
+            message: 'Album public ID must be a 21-character NanoID.',
+        )]
         public string $albumPublicId = '',
     ) {}
 }
@@ -340,11 +362,11 @@ use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Playlist\Application\Port\FavoriteAlbumPortInterface;
 use App\Playlist\Interface\Request\AddFavoriteAlbumRequest;
+use App\Playlist\Interface\Resource\FavoriteAlbumResource;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
@@ -362,15 +384,31 @@ final class FavoriteAlbumController
         private readonly FavoriteAlbumPortInterface $favoriteAlbumService,
     ) {}
 
-    #[OA\Post(
+    #[OA\Operation\Post(
         path: '/api/favorites/albums',
         summary: 'Add an album to favorites',
-        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: AddFavoriteAlbumRequest::class))),
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType\Json(ref: AddFavoriteAlbumRequest::class),
+        ),
         responses: [
-            new OA\Response(response: '201', description: 'Added to favorites'),
-            new OA\Response(response: '401', description: 'Not authenticated'),
-            new OA\Response(response: '404', description: 'Album not found'),
-            new OA\Response(response: '422', description: 'Validation error'),
+            new OA\Response(
+                response: '201',
+                description: 'Added to favorites',
+                content: new OA\MediaType\Json(ref: FavoriteAlbumResource::class),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Album not found',
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+            ),
         ],
     )]
     #[Route('', name: 'store', methods: ['POST'])]
@@ -395,7 +433,12 @@ final class FavoriteAlbumController
 }
 ```
 
-No separate route configuration file is needed.
+No separate route configuration file is needed. Native class references connect
+the request body and response content to their component schemas. The exporter
+reads those declarations with the Symfony routes through the Shared application
+`OpenApiExporterInterface`; its native implementation owns compilation. See
+[API Reference](api-reference.md#openapi-specification) for export and client
+generation commands. Keep named arguments in the actual Spec constructor order.
 
 ## 12. Tests
 
@@ -567,7 +610,7 @@ When adding a feature, verify each item:
 - [ ] Service alias wired in `config/services.yaml`
 - [ ] Doctrine migration
 - [ ] Resource extending `AbstractResource` in `Interface/Resource/`
-- [ ] Request DTO with validation and OpenAPI attributes in `Interface/Request/`
+- [ ] Request DTO with validation and explicit native Spec schema metadata in `Interface/Request/`
 - [ ] Controller depending on ports, using `#[Route]` attributes in `Interface/Controller/`
 - [ ] Unit tests for domain logic and resource transformations
 - [ ] Functional test for the API endpoint

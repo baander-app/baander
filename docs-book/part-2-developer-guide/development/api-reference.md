@@ -4,9 +4,22 @@ Bånder exposes a resource-oriented JSON API documented with OpenAPI. It identif
 
 ## OpenAPI Specification
 
-Nelmio ApiDoc generates Baander's OpenAPI specification from the attributes on controllers, request DTOs, and response resources. Route and schema tests check its coverage; export and client-generation checks detect drift in the checked-in artifacts.
+`NativeOpenApiExporter` assembles native `OpenApi\Spec` declarations from
+controllers and referenced request/resource classes, resolves their schemas and
+compiles the document through the native OpenAPI 3.0 pipeline. Symfony route
+metadata supplies route paths, methods and missing path parameters. Explicit
+request schemas own required fields, defaults, nullability and constraints;
+Symfony validation does not infer them for the exporter.
 
-The JSON documentation route is `/api/doc.json`; the Swagger UI route at `/api/doc` is currently commented out in `config/routes/nelmio_api_doc.yaml`. The repository tracks `openapi.json`, which supplies the web Orval client. After changing an API contract, export the specification and regenerate the client:
+Reusable schemas use stable `component:` names and keyed Schema properties.
+Native class references connect request bodies and responses to those schemas.
+See [Adding a Feature](adding-a-feature.md#10-request-dto) for declaration examples.
+
+The CLI command and protected `GET /api/doc.json` endpoint share the application
+`OpenApiExporterInterface`; its service alias selects the native Infrastructure
+implementation. The JSON route is declared in `config/routes/openapi.yaml`.
+The repository tracks `openapi.json`, which supplies the web Orval client. After
+changing an API contract, export the specification and regenerate the client:
 
 ```bash
 make exec cmd="php bin/console app:export-openapi-spec --output=/tmp/baander-openapi.json"

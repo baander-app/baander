@@ -9,7 +9,7 @@ CLI commands for developer tooling — OpenAPI spec export and API documentation
 
 Two Symfony console commands:
 
-- **ExportOpenApiSpecCommand** — exports the Nelmio-generated OpenAPI spec to a file
+- **ExportOpenApiSpecCommand** — exports the native OpenAPI spec through the Shared application exporter port
 - **GenerateDocsCommand** — scans the codebase and generates HTML API documentation
 
 `DocGenerator/` contains the scanning and rendering internals (`CodebaseScanner`, `HtmlRenderer`, `MarkdownConverter`) and their models (`BoundedContext`, `ClassInfo`, `HandlerInfo`, `RouteInfo`).
@@ -20,8 +20,14 @@ Two Symfony console commands:
 
 ## Notes
 
-The Command Utility layer may depend only on Shared Domain. Commands that use a
-context's application code live in that context's `Interface/Console/`:
+The general Command Utility layer retains its Shared Domain dependency boundary.
+`ExportOpenApiSpecCommand` belongs to the dedicated OpenAPI Export Command layer
+and consumes Shared's `OpenApiExporterInterface`. Dependency injection selects
+`NativeOpenApiExporter`; the command does not import its Infrastructure class.
+The protected `/api/doc.json` endpoint uses the same port and exporter.
+
+Commands that use a context's business application code live in that context's
+`Interface/Console/`:
 
 - `app:dev:create-users` is `src/Auth/Interface/Console/CreateUsersCommand.php`.
   `app:dev:setup` stays here and runs it as a subprocess.

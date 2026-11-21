@@ -37,7 +37,16 @@ make exec cmd="php bin/console app:export-openapi-spec --check"
 The preview mounts application source read-only. The examples export to a writable
 temporary directory inside the container, then redirect the file to the host.
 
-The command renders Nelmio ApiDoc's `default` area from route and OpenAPI attributes. The export covers application `/api` routes and excludes the generated documentation endpoint `/api/doc.json`. Health probes, `/metrics`, WebSocket paths and `/.well-known` endpoints are outside it. The output file is written relative to the working directory inside the container (usually `/var/www/html`).
+The command uses the application `OpenApiExporterInterface`, implemented by
+`NativeOpenApiExporter`, to compile native Spec declarations and Symfony route
+metadata. The protected `GET /api/doc.json` endpoint uses the same exporter.
+Generation reads application declarations and routes; the tracked JSON file is
+an output artifact and client-generation input.
+
+The export covers application `/api` routes and excludes `/api/doc.json`. Health
+probes, `/metrics`, WebSocket paths and `/.well-known` endpoints are outside it.
+The output path is relative to the working directory inside the container
+(usually `/var/www/html`).
 
 The web [Orval](https://orval.dev/) configuration reads the tracked `openapi.json`. After exporting a changed contract, run `yarn generate` in `ui/web` and include both artifacts in the change. `yarn generate:check` regenerates the web client and fails if tracked generated files differ.
 

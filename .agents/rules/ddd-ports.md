@@ -22,10 +22,17 @@ contract needs them, not solely because of the HTTP verb. Resources map domain d
 to explicit response fields using the existing `AbstractResource::from()` contract.
 Do not expose mutable state objects or persistence entities as response contracts.
 
-Use OpenAPI attributes consistent with current routes and response schemas. Shared
-`OA\Tag` names must have consistent descriptions. Follow the current Nelmio model
-references; do not mechanically combine `properties:` with `type: 'object'` on
-`OA\JsonContent` or `OA\Items`, which this project's integration does not handle.
+Use native `OpenApi\Spec` attributes consistent with current routes and response
+schemas. Shared Tag names must have consistent descriptions. Give reusable
+schemas stable `component:` names, express object properties as keyed native
+Schema values, and reference request/resource classes directly from native
+Schema or MediaType declarations. Document required fields, nullability,
+constraints and defaults explicitly; Symfony validation does not generate those
+schemas. Keep named arguments in the actual constructor's parameter order.
+
+`NativeOpenApiExporter` implements the Shared application
+`OpenApiExporterInterface` for CLI export and the protected JSON endpoint.
+Its CLI and JSON entrypoints consume that port, not the Infrastructure exporter.
 Keep serialized payload shapes explicit and version-compatible; controller DTOs
 are not permission to place framework objects in persisted event payloads.
 
