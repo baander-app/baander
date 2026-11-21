@@ -46,10 +46,12 @@ final class EqDeviceProfileController
                 description: 'Profile list',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'profiles' => new OA\Schema(
                                 type: 'array',
                                 items: new OA\Schema(
+                                    type: 'object',
                                     properties: [
                                         'publicId' => new OA\Schema(type: 'string'),
                                         'name' => new OA\Schema(type: 'string'),
@@ -91,6 +93,7 @@ final class EqDeviceProfileController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'name' => new OA\Schema(type: 'string'),
                         'icon' => new OA\Schema(type: 'string'),
@@ -156,6 +159,7 @@ final class EqDeviceProfileController
                 description: 'Profile details',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: \App\UserPreference\Interface\Resource\EqDeviceProfileResource::class),
                         ],
@@ -199,6 +203,7 @@ final class EqDeviceProfileController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'name' => new OA\Schema(type: 'string'),
                         'icon' => new OA\Schema(type: 'string'),
@@ -215,6 +220,7 @@ final class EqDeviceProfileController
                 description: 'Profile updated',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: \App\UserPreference\Interface\Resource\EqDeviceProfileResource::class),
                         ],
@@ -289,6 +295,7 @@ final class EqDeviceProfileController
                 description: 'Profile deleted',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',
@@ -347,6 +354,7 @@ final class EqDeviceProfileController
                 description: 'Profile activated',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: \App\UserPreference\Interface\Resource\EqDeviceProfileResource::class),
                         ],

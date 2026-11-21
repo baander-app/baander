@@ -68,6 +68,7 @@ final class AdminLoginBlockController
                 description: 'Paginated block list',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',

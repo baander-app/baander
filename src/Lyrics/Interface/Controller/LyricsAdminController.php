@@ -41,6 +41,7 @@ final class LyricsAdminController
                 description: 'Lyrics coverage statistics',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',
@@ -79,6 +80,7 @@ final class LyricsAdminController
             required: false,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'limit' => new OA\Schema(
                             description: 'Most songs to queue; absent or null queues every song without lyrics',
@@ -96,6 +98,7 @@ final class LyricsAdminController
                 description: 'Bulk fetch triggered',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',
@@ -170,6 +173,7 @@ final class LyricsAdminController
                 description: 'Sync status',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',

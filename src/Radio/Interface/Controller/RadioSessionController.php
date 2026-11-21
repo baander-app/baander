@@ -106,6 +106,7 @@ final class RadioSessionController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'stationId' => new OA\Schema(
                             type: 'string',

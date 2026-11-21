@@ -48,10 +48,12 @@ final class WebhookController
                 description: 'List of webhooks',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
                                 items: new OA\Schema(
+                                    type: 'object',
                                     properties: [
                                         'publicId' => new OA\Schema(
                                             type: 'string',
@@ -96,6 +98,7 @@ final class WebhookController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'url' => new OA\Schema(type: 'string', format: 'uri'),
                         'category_filter' => new OA\Schema(
@@ -114,8 +117,10 @@ final class WebhookController
                 description: 'Webhook created',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'publicId' => new OA\Schema(
                                         type: 'string',
@@ -182,6 +187,7 @@ final class WebhookController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'url' => new OA\Schema(type: 'string', format: 'uri'),
                         'category_filter' => new OA\Schema(
@@ -199,8 +205,10 @@ final class WebhookController
                 description: 'Webhook updated',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'publicId' => new OA\Schema(
                                         type: 'string',
@@ -330,6 +338,7 @@ final class WebhookController
                 description: 'New secret, returned once',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',

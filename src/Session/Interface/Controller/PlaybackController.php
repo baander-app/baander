@@ -49,6 +49,7 @@ final readonly class PlaybackController
                 description: 'Complete playback snapshot',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: PlaybackSnapshotResource::class),
                         ],
@@ -100,6 +101,7 @@ final readonly class PlaybackController
                 description: 'Complete playback snapshot',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: PlaybackSnapshotResource::class),
                         ],
@@ -159,6 +161,7 @@ final readonly class PlaybackController
                 description: 'Complete playback snapshot',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: PlaybackSnapshotResource::class),
                         ],
@@ -218,6 +221,7 @@ final readonly class PlaybackController
                 description: 'Complete playback snapshot',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: PlaybackSnapshotResource::class),
                         ],
@@ -278,6 +282,7 @@ final readonly class PlaybackController
                 description: 'Complete playback snapshot',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: PlaybackSnapshotResource::class),
                         ],
@@ -329,6 +334,7 @@ final readonly class PlaybackController
                 description: 'Complete playback snapshot',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: PlaybackSnapshotResource::class),
                         ],
@@ -380,6 +386,7 @@ final readonly class PlaybackController
                 description: 'Capability-free snapshot and recorded recovery result',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: PlaybackSnapshotResource::class),
                         ],
@@ -421,6 +428,7 @@ final readonly class PlaybackController
                 description: 'Complete playback snapshot without commands. The same for a repeated report and for an incarnation the session no longer names.',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: PlaybackSnapshotResource::class),
                         ],
@@ -481,6 +489,7 @@ final readonly class PlaybackController
                 description: 'Complete playback snapshot with the recorded result of the request. A repeated request returns the same result.',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: PlaybackSnapshotResource::class),
                         ],
@@ -539,6 +548,7 @@ final readonly class PlaybackController
                 description: 'Complete playback snapshot',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: PlaybackSnapshotResource::class),
                         ],

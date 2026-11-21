@@ -51,6 +51,7 @@ final class PushSubscriptionController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'endpoint' => new OA\Schema(type: 'string'),
                         'keys' => new OA\Schema(
@@ -75,6 +76,7 @@ final class PushSubscriptionController
                 description: 'Updated owned subscription',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'status' => new OA\Schema(
                                 type: 'string',
@@ -90,6 +92,7 @@ final class PushSubscriptionController
                 description: 'Subscribed',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'status' => new OA\Schema(
                                 type: 'string',
@@ -170,6 +173,7 @@ final class PushSubscriptionController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'endpoint' => new OA\Schema(type: 'string'),
                     ],

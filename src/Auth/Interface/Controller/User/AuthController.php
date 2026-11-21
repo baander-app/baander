@@ -91,6 +91,7 @@ final class AuthController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'name' => new OA\Schema(type: 'string', example: 'Alice'),
                         'email' => new OA\Schema(
@@ -247,6 +248,7 @@ final class AuthController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'refreshToken' => new OA\Schema(type: 'string', example: 'your-refresh-token'),
                     ],
@@ -370,6 +372,7 @@ final class AuthController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'email' => new OA\Schema(
                             type: 'string',
@@ -594,6 +597,7 @@ final class AuthController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'name' => new OA\Schema(type: 'string', example: 'Alice Johnson'),
                     ],
@@ -920,6 +924,7 @@ final class AuthController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'currentPassword' => new OA\Schema(type: 'string', example: '********'),
                         'newPassword' => new OA\Schema(

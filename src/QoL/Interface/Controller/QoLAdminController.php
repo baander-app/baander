@@ -90,6 +90,7 @@ final class QoLAdminController
         requestBody: new OA\RequestBody(
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'profile' => new OA\Schema(
                             type: 'string',

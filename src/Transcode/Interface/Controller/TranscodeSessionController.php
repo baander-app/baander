@@ -59,6 +59,7 @@ final class TranscodeSessionController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'videoId' => new OA\Schema(
                             type: 'string',
@@ -172,10 +173,12 @@ final class TranscodeSessionController
                 description: 'Success',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
                                 items: new OA\Schema(
+                                    type: 'object',
                                     properties: [
                                         'publicId' => new OA\Schema(type: 'string'),
                                         'status' => new OA\Schema(type: 'string'),
@@ -235,8 +238,10 @@ final class TranscodeSessionController
                 description: 'Success',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'publicId' => new OA\Schema(type: 'string'),
                                     'status' => new OA\Schema(type: 'string'),
@@ -288,6 +293,7 @@ final class TranscodeSessionController
                 description: 'Paused',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'message' => new OA\Schema(type: 'string'),
                         ],
@@ -337,6 +343,7 @@ final class TranscodeSessionController
                 description: 'Resumed',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'message' => new OA\Schema(type: 'string'),
                         ],
@@ -386,6 +393,7 @@ final class TranscodeSessionController
                 description: 'Cancelled',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'message' => new OA\Schema(type: 'string'),
                         ],
@@ -434,6 +442,7 @@ final class TranscodeSessionController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'audioProfile' => new OA\Schema(
                             type: 'string',
@@ -458,6 +467,7 @@ final class TranscodeSessionController
                 description: 'Updated',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'status' => new OA\Schema(type: 'string'),
                         ],
@@ -537,6 +547,7 @@ final class TranscodeSessionController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'position' => new OA\Schema(type: 'number', format: 'float'),
                         'action' => new OA\Schema(
@@ -568,6 +579,7 @@ final class TranscodeSessionController
                 description: 'Command processed; fences or replay may leave state unchanged. Read current session state separately for execution progress.',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'status' => new OA\Schema(
                                 type: 'string',

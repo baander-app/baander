@@ -38,6 +38,7 @@ final readonly class VideoPlaybackInformationController
                 description: 'Playback information',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: VideoPlaybackInformationResource::class),
                         ],

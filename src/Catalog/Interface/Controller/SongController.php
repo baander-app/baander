@@ -268,6 +268,7 @@ final class SongController
         requestBody: new OA\RequestBody(
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'title' => new OA\Schema(type: 'string', nullable: true),
                         'track' => new OA\Schema(type: 'integer', nullable: true),

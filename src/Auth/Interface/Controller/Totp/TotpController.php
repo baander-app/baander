@@ -138,6 +138,7 @@ final class TotpController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'code' => new OA\Schema(type: 'string', example: '123456'),
                     ],
@@ -224,6 +225,7 @@ final class TotpController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'code' => new OA\Schema(type: 'string', example: '123456'),
                     ],

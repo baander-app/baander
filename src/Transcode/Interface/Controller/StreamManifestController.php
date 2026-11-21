@@ -228,10 +228,12 @@ final class StreamManifestController
                 description: 'Available quality tiers',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
                                 items: new OA\Schema(
+                                    type: 'object',
                                     properties: [
                                         'quality' => new OA\Schema(type: 'string'),
                                         'width' => new OA\Schema(type: 'integer'),

@@ -96,6 +96,7 @@ final class StreamSegmentController
                 description: 'Invalid or expired signature',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'error' => new OA\Schema(type: 'string'),
                         ],

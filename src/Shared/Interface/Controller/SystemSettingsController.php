@@ -47,6 +47,7 @@ final class SystemSettingsController
                 description: 'System settings',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
@@ -81,6 +82,7 @@ final class SystemSettingsController
                 description: 'Setting definitions',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
@@ -113,6 +115,7 @@ final class SystemSettingsController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'settings' => new OA\Schema(
                             description: 'Setting key to new value',
@@ -130,6 +133,7 @@ final class SystemSettingsController
                 description: 'Updated settings',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
@@ -198,6 +202,7 @@ final class SystemSettingsController
                 description: 'The setting after the reset',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: SystemSettingResource::class),
                         ],

@@ -46,6 +46,7 @@ final class AudioPreferencesController
                 description: 'Audio preferences',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'payload' => new OA\Schema(
                                 description: 'Audio settings snapshot; see SaveAudioPreferencesRequest for its fields.',
@@ -103,6 +104,7 @@ final class AudioPreferencesController
                 description: 'Preferences saved',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'payload' => new OA\Schema(description: 'Validated audio settings echoed back from the request.', type: 'object'),
                             'version' => new OA\Schema(type: 'integer'),
@@ -179,10 +181,12 @@ final class AudioPreferencesController
                 description: 'Version history',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'history' => new OA\Schema(
                                 type: 'array',
                                 items: new OA\Schema(
+                                    type: 'object',
                                     properties: [
                                         'version' => new OA\Schema(type: 'integer'),
                                         'createdAt' => new OA\Schema(type: 'string', format: 'date-time'),
@@ -221,6 +225,7 @@ final class AudioPreferencesController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'version' => new OA\Schema(type: 'integer'),
                     ],
@@ -234,6 +239,7 @@ final class AudioPreferencesController
                 description: 'Preferences rolled back',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'payload' => new OA\Schema(description: 'Audio settings at the rolled-back version.', type: 'object'),
                             'version' => new OA\Schema(type: 'integer'),

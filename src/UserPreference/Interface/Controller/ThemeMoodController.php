@@ -44,6 +44,7 @@ final class ThemeMoodController
                 description: 'Theme mood',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'mood' => new OA\Schema(type: 'string'),
                         ],
@@ -80,6 +81,7 @@ final class ThemeMoodController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'mood' => new OA\Schema(type: 'string'),
                     ],
@@ -93,6 +95,7 @@ final class ThemeMoodController
                 description: 'Mood updated',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'mood' => new OA\Schema(type: 'string'),
                         ],

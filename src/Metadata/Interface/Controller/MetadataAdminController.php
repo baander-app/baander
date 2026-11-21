@@ -39,6 +39,7 @@ final class MetadataAdminController
                 description: 'Sync status',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',
@@ -51,6 +52,7 @@ final class MetadataAdminController
                                     'sources' => new OA\Schema(
                                         type: 'array',
                                         items: new OA\Schema(
+                                            type: 'object',
                                             properties: [
                                                 'name' => new OA\Schema(type: 'string'),
                                                 'synced' => new OA\Schema(type: 'integer'),
@@ -86,6 +88,7 @@ final class MetadataAdminController
         requestBody: new OA\RequestBody(
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'source' => new OA\Schema(
                             description: 'genres for the genre sync only; null or absent for one sync per library and one artist sync',
@@ -103,6 +106,7 @@ final class MetadataAdminController
                 description: 'Sync triggered',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',
@@ -158,10 +162,12 @@ final class MetadataAdminController
                 description: 'Provider list',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
                                 items: new OA\Schema(
+                                    type: 'object',
                                     properties: [
                                         'name' => new OA\Schema(type: 'string'),
                                         'enabled' => new OA\Schema(type: 'boolean'),

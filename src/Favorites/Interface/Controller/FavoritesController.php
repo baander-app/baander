@@ -73,6 +73,7 @@ final class FavoritesController
                 description: 'Success',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
@@ -128,6 +129,7 @@ final class FavoritesController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'entityType' => new OA\Schema(
                             type: 'string',
@@ -145,6 +147,7 @@ final class FavoritesController
                 description: 'Created',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: \App\Favorites\Interface\Resource\FavoriteResource::class),
                         ],
@@ -189,6 +192,7 @@ final class FavoritesController
                 description: 'Removed',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'message' => new OA\Schema(type: 'string'),
                         ],

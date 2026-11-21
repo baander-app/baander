@@ -43,6 +43,7 @@ final readonly class WebSocketTicketController
                 description: 'A ticket valid for at most thirty seconds',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: WebSocketTicketResource::class),
                         ],

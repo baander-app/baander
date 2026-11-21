@@ -71,6 +71,7 @@ final readonly class SpanDebugController
                 description: 'Spans cleared',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'status' => new OA\Schema(type: 'string'),
                         ],

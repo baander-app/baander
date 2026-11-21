@@ -52,6 +52,7 @@ final class AlbumDuplicateController
                 description: 'List of duplicate groups',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',

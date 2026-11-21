@@ -407,6 +407,7 @@ final class AlbumController
                 description: 'List of duplicate groups containing this album',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
@@ -472,6 +473,7 @@ final class AlbumController
         requestBody: new OA\RequestBody(
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'title' => new OA\Schema(type: 'string', nullable: true),
                         'type' => new OA\Schema(type: 'string', nullable: true),

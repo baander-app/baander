@@ -97,6 +97,7 @@ final class CountrySubscriptionController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'sourceId' => new OA\Schema(
                             type: 'string',

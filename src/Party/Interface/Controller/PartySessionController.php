@@ -74,6 +74,7 @@ final class PartySessionController
                 description: 'Created',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: PartySessionResource::class),
                         ],
@@ -136,10 +137,12 @@ final class PartySessionController
                 description: 'Success',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
                                 items: new OA\Schema(
+                                    type: 'object',
                                     properties: [
                                         'publicId' => new OA\Schema(
                                             type: 'string',
@@ -194,8 +197,10 @@ final class PartySessionController
                 description: 'Success',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'publicId' => new OA\Schema(
                                         type: 'string',
@@ -206,6 +211,7 @@ final class PartySessionController
                                     'members' => new OA\Schema(
                                         type: 'array',
                                         items: new OA\Schema(
+                                            type: 'object',
                                             properties: [
                                                 'publicId' => new OA\Schema(
                                                     type: 'string',
@@ -277,8 +283,10 @@ final class PartySessionController
                 description: 'Joined',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'publicId' => new OA\Schema(
                                         type: 'string',
@@ -353,6 +361,7 @@ final class PartySessionController
                 description: 'Left',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',
@@ -411,6 +420,7 @@ final class PartySessionController
                 description: 'Synced position',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',
@@ -471,6 +481,7 @@ final class PartySessionController
                 description: 'Ended',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',

@@ -41,9 +41,10 @@ final class StreamSigningController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'path' => new OA\Schema(type: 'string', example: '/api/transcode/0123456789abABCD_-xyz/master.m3u8'),
-                        'expiresInSeconds' => new OA\Schema(type: 'int', example: 86400),
+                        'expiresInSeconds' => new OA\Schema(type: 'integer', example: 86400),
                         'refresh' => new OA\Schema(
                             description: 'Read current playback state without creating another admission',
                             type: 'boolean',
@@ -95,6 +96,7 @@ final class StreamSigningController
                 description: 'Signed URL generated',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'jobIds' => new OA\Schema(
                                 type: 'array',
@@ -124,6 +126,7 @@ final class StreamSigningController
                 description: 'A refresh named only sessions that have ended. Sessions that expired may be started again; failed or cancelled ones may not',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'error' => new OA\Schema(type: 'string'),
                             'reason' => new OA\Schema(

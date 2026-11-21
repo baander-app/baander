@@ -50,6 +50,7 @@ final class ClientController
                 description: 'List of clients',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
@@ -90,6 +91,7 @@ final class ClientController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'name' => new OA\Schema(type: 'string', example: 'My App'),
                     ],
@@ -103,6 +105,7 @@ final class ClientController
                 description: 'Client created',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: ClientResource::class),
                         ],
@@ -158,6 +161,7 @@ final class ClientController
                 description: 'Client revoked',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',

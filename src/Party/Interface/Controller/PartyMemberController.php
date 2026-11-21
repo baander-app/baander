@@ -60,10 +60,12 @@ final class PartyMemberController
                 description: 'Success',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
                                 items: new OA\Schema(
+                                    type: 'object',
                                     properties: [
                                         'publicId' => new OA\Schema(
                                             type: 'string',
@@ -133,6 +135,7 @@ final class PartyMemberController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'audioProfileId' => new OA\Schema(type: 'string', nullable: true),
                         'subtitleTrackId' => new OA\Schema(type: 'string', nullable: true),
@@ -146,8 +149,10 @@ final class PartyMemberController
                 description: 'Updated',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'publicId' => new OA\Schema(
                                         type: 'string',
@@ -227,6 +232,7 @@ final class PartyMemberController
         requestBody: new OA\RequestBody(
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'newHostUserId' => new OA\Schema(
                             type: 'string',
@@ -245,6 +251,7 @@ final class PartyMemberController
                 description: 'Host transferred',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',

@@ -33,6 +33,7 @@ final class MediaAdminController
                 description: 'Storage statistics',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',
@@ -42,6 +43,7 @@ final class MediaAdminController
                                     'byType' => new OA\Schema(
                                         type: 'array',
                                         items: new OA\Schema(
+                                            type: 'object',
                                             properties: [
                                                 'type' => new OA\Schema(type: 'string'),
                                                 'count' => new OA\Schema(type: 'integer'),
@@ -80,6 +82,7 @@ final class MediaAdminController
                 description: 'Job dispatched',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',
@@ -116,6 +119,7 @@ final class MediaAdminController
                 description: 'Missing images report',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',
@@ -125,6 +129,7 @@ final class MediaAdminController
                                     'missingImages' => new OA\Schema(
                                         type: 'array',
                                         items: new OA\Schema(
+                                            type: 'object',
                                             properties: [
                                                 'publicId' => new OA\Schema(
                                                     type: 'string',

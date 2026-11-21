@@ -364,6 +364,7 @@ final class JobMonitorController
         requestBody: new OA\RequestBody(
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'days' => new OA\Schema(
                             description: 'Prune jobs older than this many days',

@@ -67,6 +67,7 @@ final class LyricsController
                 description: 'Lyrics for the song',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 oneOf: [
@@ -120,6 +121,7 @@ final class LyricsController
     #[OA\Operation\Post(
         path: '/api/songs/{publicId}/lyrics/fetch',
         summary: 'Fetch lyrics from LRCLIB for a song',
+        description: 'A song that has lyrics keeps them, and the response returns them without asking LRCLIB.' . "\n" . 'A song without an artist or a positive length is not looked up, and that cause, like a' . "\n" . 'request LRCLIB rejects, is a conflict whose `details.reason` names it.',
         parameters: [
             new OA\Parameter(
                 name: 'publicId',
@@ -135,6 +137,7 @@ final class LyricsController
                 description: 'The song\'s lyrics, just fetched or already stored; an empty array when LRCLIB has none',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 oneOf: [
@@ -205,6 +208,7 @@ final class LyricsController
     #[OA\Operation\Get(
         path: '/api/lyrics/search',
         summary: 'Search LRCLIB for lyrics',
+        description: 'The route requires the administrator role, as fetch and apply do: the whole server' . "\n" . 'sends LRCLIB one request every two seconds, and each search is one of them.',
         parameters: [
             new OA\Parameter(
                 name: 'q',
@@ -212,6 +216,7 @@ final class LyricsController
                 description: 'Search query',
                 required: true,
                 schema: new OA\Schema(type: 'string'),
+                example: 'Still Alive Portal',
             ),
         ],
         responses: [
@@ -220,6 +225,7 @@ final class LyricsController
                 description: 'Search results; an empty array when nothing matches',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
@@ -294,6 +300,7 @@ final class LyricsController
                 description: 'Lyrics applied to song',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: LyricsResource::class),
                         ],

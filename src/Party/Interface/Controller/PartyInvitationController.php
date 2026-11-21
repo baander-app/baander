@@ -73,6 +73,7 @@ final class PartyInvitationController
                 description: 'The invitations, oldest first',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',

@@ -39,6 +39,7 @@ final class MetadataSyncController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'path' => new OA\Schema(type: 'string'),
                     ],
@@ -138,6 +139,7 @@ final class MetadataSyncController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'path' => new OA\Schema(type: 'string'),
                         'candidates' => new OA\Schema(

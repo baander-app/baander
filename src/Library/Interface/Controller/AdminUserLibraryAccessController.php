@@ -57,6 +57,7 @@ final class AdminUserLibraryAccessController
                 description: 'Every library in display order',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
@@ -124,6 +125,7 @@ final class AdminUserLibraryAccessController
                 description: 'The library with the access granted',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: LibraryAccessResource::class),
                         ],
@@ -188,6 +190,7 @@ final class AdminUserLibraryAccessController
                 description: 'The library with the access revoked',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: LibraryAccessResource::class),
                         ],

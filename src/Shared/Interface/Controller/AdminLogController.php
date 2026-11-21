@@ -40,6 +40,7 @@ final readonly class AdminLogController
                 description: 'Source inventory',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: LogSourcesResource::class),
                         ],
@@ -129,6 +130,7 @@ final readonly class AdminLogController
                 description: 'Log snapshot page',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: LogEntriesResource::class),
                         ],
@@ -162,6 +164,7 @@ final readonly class AdminLogController
                 description: 'Retained log record',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: LogRecordResource::class),
                         ],
@@ -193,6 +196,7 @@ final readonly class AdminLogController
                 description: 'SQL rows and snapshot coverage',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: LogSqlResource::class),
                         ],

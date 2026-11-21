@@ -46,8 +46,10 @@ final class PlayerPreferencesController
                 description: 'Player preferences',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'payload' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'shuffle' => new OA\Schema(type: 'boolean'),
                                     'repeat' => new OA\Schema(type: 'string'),
@@ -112,8 +114,10 @@ final class PlayerPreferencesController
                 description: 'Preferences saved',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'payload' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'shuffle' => new OA\Schema(type: 'boolean'),
                                     'repeat' => new OA\Schema(type: 'string'),
@@ -200,10 +204,12 @@ final class PlayerPreferencesController
                 description: 'Version history',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'history' => new OA\Schema(
                                 type: 'array',
                                 items: new OA\Schema(
+                                    type: 'object',
                                     properties: [
                                         'version' => new OA\Schema(type: 'integer'),
                                         'createdAt' => new OA\Schema(type: 'string', format: 'date-time'),
@@ -242,6 +248,7 @@ final class PlayerPreferencesController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'version' => new OA\Schema(type: 'integer'),
                     ],
@@ -255,8 +262,10 @@ final class PlayerPreferencesController
                 description: 'Preferences rolled back',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'payload' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'shuffle' => new OA\Schema(type: 'boolean'),
                                     'repeat' => new OA\Schema(type: 'string'),

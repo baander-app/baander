@@ -49,10 +49,12 @@ final class TranscodeJobController
                 description: 'Success',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
                                 items: new OA\Schema(
+                                    type: 'object',
                                     properties: [
                                         'publicId' => new OA\Schema(type: 'string'),
                                         'status' => new OA\Schema(type: 'string'),
@@ -99,8 +101,10 @@ final class TranscodeJobController
                 description: 'Success',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'publicId' => new OA\Schema(type: 'string'),
                                     'status' => new OA\Schema(type: 'string'),
@@ -142,6 +146,7 @@ final class TranscodeJobController
                 description: 'Cleanup result',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',

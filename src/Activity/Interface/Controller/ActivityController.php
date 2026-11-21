@@ -147,6 +147,7 @@ final class ActivityController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'songId' => new OA\Schema(
                             description: 'Public ID of the song being played',

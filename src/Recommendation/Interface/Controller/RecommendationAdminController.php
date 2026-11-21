@@ -51,8 +51,10 @@ final class RecommendationAdminController
                 description: 'Coverage statistics',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'total_tracks' => new OA\Schema(type: 'integer'),
                                     'tracks_with_recommendations' => new OA\Schema(type: 'integer'),
@@ -89,8 +91,10 @@ final class RecommendationAdminController
                 description: 'Source quality breakdown',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'by_source_type' => new OA\Schema(type: 'object', additionalProperties: true),
                                     'avg_confidence_score' => new OA\Schema(type: 'number'),
@@ -125,8 +129,10 @@ final class RecommendationAdminController
                 description: 'Freshness metrics',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'avg_age_seconds' => new OA\Schema(type: 'number'),
                                     'last_generated_at' => new OA\Schema(type: 'string', nullable: true),
@@ -162,8 +168,10 @@ final class RecommendationAdminController
                 description: 'Generation job started (async)',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'job_id' => new OA\Schema(type: 'string'),
                                     'public_id' => new OA\Schema(type: 'string'),
@@ -188,8 +196,10 @@ final class RecommendationAdminController
                 description: 'Generation ran during the request (sync)',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'job_id' => new OA\Schema(type: 'string'),
                                     'public_id' => new OA\Schema(type: 'string'),
@@ -264,6 +274,7 @@ final class RecommendationAdminController
                 description: 'Job details',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: RecommendationJobResource::class),
                         ],
@@ -312,8 +323,10 @@ final class RecommendationAdminController
                 description: 'Job requeued and started',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'job_id' => new OA\Schema(type: 'string'),
                                     'public_id' => new OA\Schema(type: 'string'),
@@ -439,6 +452,7 @@ final class RecommendationAdminController
                 description: 'List of jobs, newest first',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',

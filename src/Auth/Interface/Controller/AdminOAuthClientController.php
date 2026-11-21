@@ -62,6 +62,7 @@ final class AdminOAuthClientController
                 description: 'The clients',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
@@ -114,6 +115,7 @@ final class AdminOAuthClientController
                 description: 'Client registered',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: AdminOAuthClientCredentialsResource::class),
                         ],
@@ -181,6 +183,7 @@ final class AdminOAuthClientController
                 description: 'New secret issued',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: AdminOAuthClientCredentialsResource::class),
                         ],
@@ -259,6 +262,7 @@ final class AdminOAuthClientController
                 description: 'Keys replaced',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: AdminOAuthClientResource::class),
                         ],
@@ -337,6 +341,7 @@ final class AdminOAuthClientController
                 description: 'Client revoked',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: AdminOAuthClientResource::class),
                         ],

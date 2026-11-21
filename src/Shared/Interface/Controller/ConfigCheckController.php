@@ -36,6 +36,7 @@ final class ConfigCheckController
     #[OA\Operation\Get(
         path: '/api/debug/config-check',
         summary: 'Validate application configuration',
+        description: 'Runs all configuration checks (env vars, connectivity, framework config)' . "\n" . 'and returns results with a summary. Used by the admin Configuration page.',
         responses: [
             new OA\Response(
                 response: '200',

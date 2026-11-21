@@ -141,6 +141,7 @@ final class TransportController
                 description: 'Paginated failed messages',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
@@ -215,6 +216,7 @@ final class TransportController
                 description: 'Failed message',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: FailedMessageResource::class),
                         ],
@@ -282,6 +284,7 @@ final class TransportController
                 description: 'Failed messages flushed',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',
@@ -355,6 +358,7 @@ final class TransportController
                 description: 'Message retried',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',
@@ -437,6 +441,7 @@ final class TransportController
                 description: 'Message removed',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',

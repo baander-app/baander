@@ -77,6 +77,7 @@ final class MusicBrainzMatchController
                 description: 'One page of albums that need a review',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',
@@ -84,6 +85,7 @@ final class MusicBrainzMatchController
                                     'items' => new OA\Schema(
                                         type: 'array',
                                         items: new OA\Schema(
+                                            type: 'object',
                                             properties: [
                                                 'albumPublicId' => new OA\Schema(description: 'The album\'s public ID', type: 'string'),
                                                 'title' => new OA\Schema(description: 'The album\'s title', type: 'string'),
@@ -208,6 +210,7 @@ final class MusicBrainzMatchController
                 description: 'What was searched, and the candidates found; an empty list when MusicBrainz has none',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: MatchCandidatesResource::class),
                         ],
@@ -307,6 +310,7 @@ final class MusicBrainzMatchController
                 description: 'What a match with the candidate would set',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: MatchComparisonResource::class),
                         ],
@@ -403,6 +407,7 @@ final class MusicBrainzMatchController
                 description: 'What the match wrote',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: MatchApplyResultResource::class),
                         ],

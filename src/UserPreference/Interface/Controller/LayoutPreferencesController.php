@@ -46,8 +46,10 @@ final class LayoutPreferencesController
                 description: 'Layout preferences',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'payload' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'mode' => new OA\Schema(type: 'string'),
                                     'activeTab' => new OA\Schema(type: 'string'),
@@ -105,8 +107,10 @@ final class LayoutPreferencesController
                 description: 'Preferences saved',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'payload' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'mode' => new OA\Schema(type: 'string'),
                                     'activeTab' => new OA\Schema(type: 'string'),
@@ -186,10 +190,12 @@ final class LayoutPreferencesController
                 description: 'Version history',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'history' => new OA\Schema(
                                 type: 'array',
                                 items: new OA\Schema(
+                                    type: 'object',
                                     properties: [
                                         'version' => new OA\Schema(type: 'integer'),
                                         'createdAt' => new OA\Schema(type: 'string', format: 'date-time'),
@@ -228,6 +234,7 @@ final class LayoutPreferencesController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'version' => new OA\Schema(type: 'integer'),
                     ],
@@ -241,8 +248,10 @@ final class LayoutPreferencesController
                 description: 'Preferences rolled back',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'payload' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'mode' => new OA\Schema(type: 'string'),
                                     'activeTab' => new OA\Schema(type: 'string'),

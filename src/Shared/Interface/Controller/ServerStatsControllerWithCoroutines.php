@@ -29,8 +29,10 @@ final readonly class ServerStatsControllerWithCoroutines
                 description: 'Server stats snapshot',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'workers' => new OA\Schema(
                                         description: 'One entry per HTTP worker that answered: worker_id, memory, process, swoole, coroutines, pools, live_updates',
@@ -45,6 +47,7 @@ final readonly class ServerStatsControllerWithCoroutines
                                     'worker_errors' => new OA\Schema(
                                         type: 'array',
                                         items: new OA\Schema(
+                                            type: 'object',
                                             properties: [
                                                 'worker_id' => new OA\Schema(type: 'integer'),
                                                 'error' => new OA\Schema(type: 'string'),

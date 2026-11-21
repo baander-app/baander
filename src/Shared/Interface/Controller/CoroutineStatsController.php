@@ -27,6 +27,7 @@ final readonly class CoroutineStatsController
                 description: 'Coroutine and channel stats per worker',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'workers' => new OA\Schema(
                                 description: 'One entry per HTTP worker that answered: worker_id, coroutines, active_cids, channels',
@@ -41,6 +42,7 @@ final readonly class CoroutineStatsController
                             'worker_errors' => new OA\Schema(
                                 type: 'array',
                                 items: new OA\Schema(
+                                    type: 'object',
                                     properties: [
                                         'worker_id' => new OA\Schema(type: 'integer'),
                                         'error' => new OA\Schema(type: 'string'),

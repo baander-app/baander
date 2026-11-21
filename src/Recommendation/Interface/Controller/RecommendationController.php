@@ -117,10 +117,12 @@ final class RecommendationController
                 description: 'Success',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
                                 items: new OA\Schema(
+                                    type: 'object',
                                     properties: [
                                         'target_id' => new OA\Schema(type: 'string'),
                                         'target_type' => new OA\Schema(type: 'string'),
@@ -128,6 +130,7 @@ final class RecommendationController
                                         'explanation' => new OA\Schema(type: 'string'),
                                         'strategies' => new OA\Schema(type: 'object', additionalProperties: true),
                                         'song' => new OA\Schema(
+                                            type: 'object',
                                             properties: [
                                                 'public_id' => new OA\Schema(type: 'string'),
                                                 'title' => new OA\Schema(type: 'string'),

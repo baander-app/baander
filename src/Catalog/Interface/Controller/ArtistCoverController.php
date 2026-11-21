@@ -56,6 +56,7 @@ final class ArtistCoverController
             content: new OA\MediaType(
                 mediaType: 'multipart/form-data',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'cover' => new OA\Schema(
                             description: 'Image file (jpeg, png, or webp, max 10 MB)',
@@ -73,6 +74,7 @@ final class ArtistCoverController
                 description: 'Cover image uploaded successfully',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'publicId' => new OA\Schema(
                                 type: 'string',

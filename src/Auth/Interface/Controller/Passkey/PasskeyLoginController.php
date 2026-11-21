@@ -46,6 +46,7 @@ final class PasskeyLoginController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'challengeKey' => new OA\Schema(description: 'Key returned by /api/auth/passkey/authenticate/options', type: 'string'),
                         'response' => new OA\Schema(description: 'WebAuthn assertion from navigator.credentials.get()', type: 'object'),

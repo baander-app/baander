@@ -58,15 +58,25 @@ final readonly class OriginalMediaController
         in: 'query',
         required: true,
         schema: new OA\Schema(type: 'string'),
+        fan: OA\Fan::All,
     )]
-    #[OA\Response(response: 200, description: 'Original video')]
-    #[OA\Response(response: 206, description: 'Byte range')]
+    #[OA\Response(
+        response: 200,
+        description: 'Original video',
+        fan: OA\Fan::All,
+    )]
+    #[OA\Response(
+        response: 206,
+        description: 'Byte range',
+        fan: OA\Fan::All,
+    )]
     #[OA\Response(
         response: 403,
         description: 'Media access denied',
         content: new OA\MediaType\Json(
             schema: new OA\Schema(ref: ApiError::class),
         ),
+        fan: OA\Fan::All,
     )]
     #[OA\Response(
         response: 404,
@@ -74,6 +84,7 @@ final readonly class OriginalMediaController
         content: new OA\MediaType\Json(
             schema: new OA\Schema(ref: ApiError::class),
         ),
+        fan: OA\Fan::All,
     )]
     #[Route('/api/stream/video', name: 'stream_original_video', methods: ['GET', 'HEAD'])]
     public function video(Request $request): Response
@@ -105,15 +116,25 @@ final readonly class OriginalMediaController
         in: 'query',
         required: true,
         schema: new OA\Schema(type: 'string'),
+        fan: OA\Fan::All,
     )]
-    #[OA\Response(response: 200, description: 'Track audio')]
-    #[OA\Response(response: 206, description: 'Byte range')]
+    #[OA\Response(
+        response: 200,
+        description: 'Track audio',
+        fan: OA\Fan::All,
+    )]
+    #[OA\Response(
+        response: 206,
+        description: 'Byte range',
+        fan: OA\Fan::All,
+    )]
     #[OA\Response(
         response: 400,
         description: 'Invalid audio presentation mode, rendition format or bitrate',
         content: new OA\MediaType\Json(
             schema: new OA\Schema(ref: ApiError::class),
         ),
+        fan: OA\Fan::All,
     )]
     #[OA\Response(
         response: 403,
@@ -121,6 +142,7 @@ final readonly class OriginalMediaController
         content: new OA\MediaType\Json(
             schema: new OA\Schema(ref: ApiError::class),
         ),
+        fan: OA\Fan::All,
     )]
     #[OA\Response(
         response: 404,
@@ -128,6 +150,7 @@ final readonly class OriginalMediaController
         content: new OA\MediaType\Json(
             schema: new OA\Schema(ref: ApiError::class),
         ),
+        fan: OA\Fan::All,
     )]
     #[OA\Response(
         response: 409,
@@ -135,6 +158,7 @@ final readonly class OriginalMediaController
         content: new OA\MediaType\Json(
             schema: new OA\Schema(ref: ApiError::class),
         ),
+        fan: OA\Fan::All,
     )]
     #[OA\Response(
         response: 503,
@@ -149,6 +173,7 @@ final readonly class OriginalMediaController
         content: new OA\MediaType\Json(
             schema: new OA\Schema(ref: ApiError::class),
         ),
+        fan: OA\Fan::All,
     )]
     #[Route('/api/stream/original/track', name: 'stream_original_track', methods: ['GET', 'HEAD'])]
     public function track(Request $request): Response

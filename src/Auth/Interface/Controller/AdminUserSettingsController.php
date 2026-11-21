@@ -63,6 +63,7 @@ final class AdminUserSettingsController
                 description: "The user's settings",
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
@@ -141,6 +142,7 @@ final class AdminUserSettingsController
                 description: 'The setting after the change',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: AdminUserSettingResource::class),
                         ],
@@ -221,6 +223,7 @@ final class AdminUserSettingsController
                 description: 'The setting after the reset',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: AdminUserSettingResource::class),
                         ],

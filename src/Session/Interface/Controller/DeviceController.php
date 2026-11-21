@@ -44,6 +44,7 @@ final class DeviceController
                 description: 'Device registered',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',
@@ -102,10 +103,12 @@ final class DeviceController
                 description: 'List of devices',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
                                 items: new OA\Schema(
+                                    type: 'object',
                                     properties: [
                                         'publicId' => new OA\Schema(
                                             type: 'string',
@@ -174,6 +177,7 @@ final class DeviceController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'name' => new OA\Schema(type: 'string'),
                     ],
@@ -187,6 +191,7 @@ final class DeviceController
                 description: 'Device renamed',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',
@@ -268,6 +273,7 @@ final class DeviceController
                 description: 'Device removed',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',

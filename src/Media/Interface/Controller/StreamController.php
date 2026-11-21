@@ -52,6 +52,7 @@ final class StreamController
     #[OA\Operation\Get(
         path: '/api/stream/track',
         summary: 'Stream a track by PublicId with HTTP Range support',
+        description: 'With `format` (and optionally `bitrate`) the track is transcoded. A cached' . "\n" . 'rendition streams with Range support; otherwise the response streams the' . "\n" . 'encode while it runs, without byte ranges.',
         parameters: [
             new OA\Parameter(
                 name: 'id',

@@ -45,6 +45,7 @@ final class MovieDirectorController
                         allOf: [
                             new OA\Schema(ref: PaginatedResponse::class),
                             new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'data' => new OA\Schema(
                                         type: 'array',
@@ -102,6 +103,7 @@ final class MovieDirectorController
                 description: 'Director',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: DirectorResource::class),
                         ],
@@ -138,6 +140,7 @@ final class MovieDirectorController
                         allOf: [
                             new OA\Schema(ref: PaginatedResponse::class),
                             new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'data' => new OA\Schema(
                                         type: 'array',

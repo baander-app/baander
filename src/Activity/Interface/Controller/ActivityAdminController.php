@@ -54,8 +54,10 @@ final class ActivityAdminController
                 description: 'Activity summary',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'total_plays' => new OA\Schema(type: 'integer'),
                                     'unique_tracks' => new OA\Schema(type: 'integer'),
@@ -129,10 +131,12 @@ final class ActivityAdminController
                 description: 'Top tracks list',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
                                 items: new OA\Schema(
+                                    type: 'object',
                                     properties: [
                                         'track_name' => new OA\Schema(type: 'string'),
                                         'artist_name' => new OA\Schema(type: 'string', nullable: true),
@@ -208,10 +212,12 @@ final class ActivityAdminController
                 description: 'Top artists list',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
                                 items: new OA\Schema(
+                                    type: 'object',
                                     properties: [
                                         'artist_name' => new OA\Schema(type: 'string'),
                                         'play_count' => new OA\Schema(type: 'integer'),
@@ -273,8 +279,10 @@ final class ActivityAdminController
                 description: 'Engagement metrics',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'active_users' => new OA\Schema(type: 'integer'),
                                     'avg_plays_per_user' => new OA\Schema(type: 'number'),

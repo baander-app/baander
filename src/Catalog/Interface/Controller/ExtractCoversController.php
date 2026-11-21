@@ -37,6 +37,7 @@ final class ExtractCoversController
                 description: 'Batch extraction dispatched',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'albums' => new OA\Schema(type: 'integer'),
                         ],

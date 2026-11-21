@@ -94,6 +94,7 @@ final class RadioSourceController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'name' => new OA\Schema(type: 'string'),
                         'type' => new OA\Schema(type: 'string'),

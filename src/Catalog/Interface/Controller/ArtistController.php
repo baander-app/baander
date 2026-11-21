@@ -64,6 +64,7 @@ final class ArtistController
         requestBody: new OA\RequestBody(
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'name' => new OA\Schema(type: 'string'),
                         'country' => new OA\Schema(type: 'string', nullable: true),
@@ -310,6 +311,7 @@ final class ArtistController
         requestBody: new OA\RequestBody(
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'name' => new OA\Schema(type: 'string', nullable: true),
                         'country' => new OA\Schema(type: 'string', nullable: true),
@@ -453,6 +455,7 @@ final class ArtistController
         requestBody: new OA\RequestBody(
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'songId' => new OA\Schema(
                             type: 'string',
@@ -605,6 +608,7 @@ final class ArtistController
         requestBody: new OA\RequestBody(
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'role' => new OA\Schema(type: 'string'),
                         'currentRole' => new OA\Schema(
@@ -677,6 +681,7 @@ final class ArtistController
         requestBody: new OA\RequestBody(
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'albumId' => new OA\Schema(
                             type: 'string',
@@ -832,6 +837,7 @@ final class ArtistController
         requestBody: new OA\RequestBody(
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'role' => new OA\Schema(type: 'string'),
                         'currentRole' => new OA\Schema(

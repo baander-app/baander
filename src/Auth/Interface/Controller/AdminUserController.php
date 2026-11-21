@@ -109,6 +109,7 @@ final class AdminUserController
                 description: 'Paginated user list',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
@@ -180,6 +181,7 @@ final class AdminUserController
                 description: 'User created',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: AdminUserResource::class),
                         ],
@@ -247,6 +249,7 @@ final class AdminUserController
                 description: 'User updated',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: AdminUserResource::class),
                         ],
@@ -348,6 +351,7 @@ final class AdminUserController
                 description: 'Roles assigned',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: AdminUserResource::class),
                         ],
@@ -397,6 +401,7 @@ final class AdminUserController
                 description: 'Password reset',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',
@@ -449,6 +454,7 @@ final class AdminUserController
                 description: 'TOTP is off',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: AdminUserResource::class),
                         ],
@@ -504,6 +510,7 @@ final class AdminUserController
                 description: 'The address is verified',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: AdminUserResource::class),
                         ],
@@ -539,6 +546,7 @@ final class AdminUserController
                 description: 'User disabled',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: AdminUserResource::class),
                         ],
@@ -576,6 +584,7 @@ final class AdminUserController
                 description: 'User enabled',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: AdminUserResource::class),
                         ],

@@ -48,6 +48,7 @@ final class AdminScheduledJobController
                 description: 'List of scheduled jobs',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
@@ -79,6 +80,7 @@ final class AdminScheduledJobController
                 description: 'Scheduled job details',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: ScheduledJobResource::class),
                         ],
@@ -121,6 +123,7 @@ final class AdminScheduledJobController
                 description: 'Job created',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: ScheduledJobResource::class),
                         ],
@@ -167,6 +170,7 @@ final class AdminScheduledJobController
                 description: 'Job updated',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: ScheduledJobResource::class),
                         ],
@@ -260,6 +264,7 @@ final class AdminScheduledJobController
                 description: 'Job paused, or already paused',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: ScheduledJobResource::class),
                         ],
@@ -305,6 +310,7 @@ final class AdminScheduledJobController
                 description: 'Job resumed, or already active',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: ScheduledJobResource::class),
                         ],
@@ -366,8 +372,10 @@ final class AdminScheduledJobController
                 ],
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'occurrenceId' => new OA\Schema(type: 'string'),
                                     'jobId' => new OA\Schema(type: 'string'),
@@ -438,6 +446,7 @@ final class AdminScheduledJobController
                 description: 'Job enabled, or already enabled',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: ScheduledJobResource::class),
                         ],
@@ -483,6 +492,7 @@ final class AdminScheduledJobController
                 description: 'Job disabled, or already disabled',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: ScheduledJobResource::class),
                         ],
@@ -528,6 +538,7 @@ final class AdminScheduledJobController
                 description: 'Available commands',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',

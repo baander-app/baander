@@ -58,10 +58,12 @@ final class PasskeyController
                 description: 'List of passkeys',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
                                 items: new OA\Schema(
+                                    type: 'object',
                                     properties: [
                                         'publicId' => new OA\Schema(
                                             type: 'string',
@@ -218,6 +220,7 @@ final class PasskeyController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'challengeKey' => new OA\Schema(type: 'string', example: 'challenge-key-abc123'),
                         'response' => new OA\Schema(
@@ -348,6 +351,7 @@ final class PasskeyController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'userId' => new OA\Schema(description: 'Optional user public ID to get passkey options for', type: 'string'),
                     ],
@@ -424,6 +428,7 @@ final class PasskeyController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'challengeKey' => new OA\Schema(type: 'string', example: 'challenge-key-abc123'),
                         'response' => new OA\Schema(

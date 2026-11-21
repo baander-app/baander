@@ -54,10 +54,12 @@ final class PreferenceController
                 description: 'List of preferences',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
                                 items: new OA\Schema(
+                                    type: 'object',
                                     properties: [
                                         'category' => new OA\Schema(type: 'string'),
                                         'channel' => new OA\Schema(type: 'string'),
@@ -121,10 +123,12 @@ final class PreferenceController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'preferences' => new OA\Schema(
                             type: 'array',
                             items: new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'category' => new OA\Schema(
                                         type: 'string',
@@ -150,6 +154,7 @@ final class PreferenceController
                 description: 'Preferences updated',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'updated' => new OA\Schema(type: 'boolean'),
                         ],

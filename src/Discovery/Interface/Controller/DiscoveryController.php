@@ -48,6 +48,7 @@ final class DiscoveryController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'serverUrl' => new OA\Schema(type: 'string', format: 'uri'),
                         'name' => new OA\Schema(type: 'string'),
@@ -63,6 +64,7 @@ final class DiscoveryController
                 description: 'Registered',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: ServerInstanceResource::class),
                         ],
@@ -94,6 +96,7 @@ final class DiscoveryController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'serverPublicId' => new OA\Schema(
                             type: 'string',
@@ -155,6 +158,7 @@ final class DiscoveryController
                 description: 'Success',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',
@@ -198,6 +202,7 @@ final class DiscoveryController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'pairingCode' => new OA\Schema(type: 'string'),
                         'serverPublicId' => new OA\Schema(
@@ -217,6 +222,7 @@ final class DiscoveryController
                 description: 'Completed',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',

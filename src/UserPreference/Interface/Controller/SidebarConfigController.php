@@ -46,6 +46,7 @@ final class SidebarConfigController
                 description: 'Sidebar configuration',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',
@@ -54,6 +55,7 @@ final class SidebarConfigController
                                     'sections' => new OA\Schema(
                                         type: 'array',
                                         items: new OA\Schema(
+                                            type: 'object',
                                             properties: [
                                                 'id' => new OA\Schema(type: 'string'),
                                                 'label' => new OA\Schema(type: 'string'),
@@ -61,6 +63,7 @@ final class SidebarConfigController
                                                 'items' => new OA\Schema(
                                                     type: 'array',
                                                     items: new OA\Schema(
+                                                        type: 'object',
                                                         properties: [
                                                             'id' => new OA\Schema(type: 'string'),
                                                             'type' => new OA\Schema(type: 'string'),
@@ -122,10 +125,12 @@ final class SidebarConfigController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'sections' => new OA\Schema(
                             type: 'array',
                             items: new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'id' => new OA\Schema(type: 'string'),
                                     'label' => new OA\Schema(type: 'string'),
@@ -133,6 +138,7 @@ final class SidebarConfigController
                                     'items' => new OA\Schema(
                                         type: 'array',
                                         items: new OA\Schema(
+                                            type: 'object',
                                             properties: [
                                                 'id' => new OA\Schema(type: 'string'),
                                                 'type' => new OA\Schema(type: 'string'),
@@ -156,6 +162,7 @@ final class SidebarConfigController
                 description: 'Configuration updated',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',
@@ -164,6 +171,7 @@ final class SidebarConfigController
                                     'sections' => new OA\Schema(
                                         type: 'array',
                                         items: new OA\Schema(
+                                            type: 'object',
                                             properties: [
                                                 'id' => new OA\Schema(type: 'string'),
                                                 'label' => new OA\Schema(type: 'string'),
@@ -171,6 +179,7 @@ final class SidebarConfigController
                                                 'items' => new OA\Schema(
                                                     type: 'array',
                                                     items: new OA\Schema(
+                                                        type: 'object',
                                                         properties: [
                                                             'id' => new OA\Schema(type: 'string'),
                                                             'type' => new OA\Schema(type: 'string'),

@@ -134,6 +134,7 @@ final class PlaylistController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'name' => new OA\Schema(type: 'string'),
                         'description' => new OA\Schema(type: 'string', nullable: true),
@@ -433,6 +434,7 @@ final class PlaylistController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'name' => new OA\Schema(type: 'string', nullable: true),
                         'description' => new OA\Schema(type: 'string', nullable: true),
@@ -606,6 +608,7 @@ final class PlaylistController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'songId' => new OA\Schema(
                             type: 'string',
@@ -1009,6 +1012,7 @@ final class PlaylistController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'expectedRevision' => new OA\Schema(
                             description: 'Revision returned with the displayed playlist order',

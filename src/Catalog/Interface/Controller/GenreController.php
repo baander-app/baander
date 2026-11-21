@@ -103,6 +103,7 @@ final class GenreController
         requestBody: new OA\RequestBody(
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'name' => new OA\Schema(type: 'string'),
                         'slug' => new OA\Schema(type: 'string'),
@@ -259,6 +260,7 @@ final class GenreController
         requestBody: new OA\RequestBody(
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'name' => new OA\Schema(type: 'string', nullable: true),
                         'slug' => new OA\Schema(type: 'string', nullable: true),
@@ -380,6 +382,7 @@ final class GenreController
         requestBody: new OA\RequestBody(
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'songId' => new OA\Schema(
                             description: 'Song public ID',
@@ -509,6 +512,7 @@ final class GenreController
         requestBody: new OA\RequestBody(
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'albumId' => new OA\Schema(
                             description: 'Album public ID',

@@ -92,6 +92,7 @@ final class NotificationController
                 description: 'List of notifications',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
@@ -178,6 +179,7 @@ final class NotificationController
                 description: 'Unread count',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'count' => new OA\Schema(type: 'integer'),
                         ],
@@ -225,8 +227,10 @@ final class NotificationController
                 description: 'Notification marked as read',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
+                                type: 'object',
                                 properties: [
                                     'publicId' => new OA\Schema(
                                         type: 'string',
@@ -306,6 +310,7 @@ final class NotificationController
                 description: 'All notifications marked as read',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'marked' => new OA\Schema(type: 'boolean'),
                         ],

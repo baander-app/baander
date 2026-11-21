@@ -232,6 +232,7 @@ final class OAuthController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'response_type' => new OA\Schema(
                             type: 'string',
@@ -356,6 +357,7 @@ final class OAuthController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'grant_type' => new OA\Schema(
                             type: 'string',
@@ -470,6 +472,7 @@ final class OAuthController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'token' => new OA\Schema(type: 'string', example: 'access-token-to-revoke'),
                         'tokenTypeHint' => new OA\Schema(
@@ -556,6 +559,7 @@ final class OAuthController
             required: true,
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'client_id' => new OA\Schema(type: 'string'),
                         'client_secret' => new OA\Schema(
@@ -655,6 +659,7 @@ final class OAuthController
                 description: 'The pending request',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(ref: PendingDeviceAuthorizationResource::class),
                         ],
@@ -712,6 +717,7 @@ final class OAuthController
                 description: 'Device approved or denied',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'object',

@@ -44,6 +44,7 @@ final class AccentColorController
                 description: 'Accent color',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'color' => new OA\Schema(type: 'string'),
                         ],
@@ -80,6 +81,7 @@ final class AccentColorController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'color' => new OA\Schema(type: 'string'),
                     ],
@@ -93,6 +95,7 @@ final class AccentColorController
                 description: 'Color updated',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
+                        type: 'object',
                         properties: [
                             'color' => new OA\Schema(type: 'string'),
                         ],

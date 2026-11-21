@@ -115,6 +115,7 @@ final class LibraryController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'name' => new OA\Schema(type: 'string'),
                         'path' => new OA\Schema(type: 'string'),
@@ -263,6 +264,7 @@ final class LibraryController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'name' => new OA\Schema(type: 'string', nullable: true),
                         'sortOrder' => new OA\Schema(type: 'integer', nullable: true),
@@ -524,6 +526,7 @@ final class LibraryController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'path' => new OA\Schema(type: 'string', example: '/mnt/media/music'),
                     ],

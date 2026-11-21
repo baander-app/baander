@@ -194,6 +194,7 @@ final class MovieController
         requestBody: new OA\RequestBody(
             content: new OA\MediaType\Json(
                 schema: new OA\Schema(
+                    type: 'object',
                     properties: [
                         'title' => new OA\Schema(type: 'string', nullable: true),
                         'year' => new OA\Schema(type: 'integer', nullable: true),
