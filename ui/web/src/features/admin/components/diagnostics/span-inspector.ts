@@ -130,15 +130,32 @@ export interface TraceWaterfall {
   durationUs: number
 }
 
+export function buildSpanTimeline(spans: readonly Span[]): TraceWaterfall {
+  if (spans.length === 0) return { rows: [], startTimeUs: 0, durationUs: 0 }
+
+  const startTimeUs = Math.min(...spans.map((span) => span.start_time_us))
+  const endTimeUs = Math.max(...spans.map((span) => span.start_time_us + span.duration_us))
+  const durationUs = Math.max(0, endTimeUs - startTimeUs)
+  const rows = spans.map((span) => ({
+    span,
+    depth: 0,
+    missingParent: false,
+    offsetUs: span.start_time_us - startTimeUs,
+    durationUs: span.duration_us,
+    offsetPercent: durationUs === 0 ? 0 : (span.start_time_us - startTimeUs) / durationUs * 100,
+    widthPercent: durationUs === 0 ? 0 : span.duration_us / durationUs * 100,
+  }))
+  return { rows, startTimeUs, durationUs }
+}
+
 export function buildTraceWaterfall(snapshot: readonly Span[], traceId: string): TraceWaterfall {
   const members = snapshot.filter((span) => span.trace_id === traceId).sort((a, b) => (
     a.start_time_us - b.start_time_us || a.span_id.localeCompare(b.span_id)
   ))
   if (members.length === 0) return { rows: [], startTimeUs: 0, durationUs: 0 }
 
-  const startTimeUs = Math.min(...members.map((span) => span.start_time_us))
-  const endTimeUs = Math.max(...members.map((span) => span.start_time_us + span.duration_us))
-  const durationUs = Math.max(0, endTimeUs - startTimeUs)
+  const timeline = buildSpanTimeline(members)
+  const timingBySpan = new Map(timeline.rows.map((row) => [row.span, row]))
   const byId = new Map(members.map((span) => [span.span_id, span]))
   const children = new Map<string, Span[]>()
   for (const span of members) {
@@ -153,15 +170,10 @@ export function buildTraceWaterfall(snapshot: readonly Span[], traceId: string):
   function visit(span: Span, depth: number) {
     if (visited.has(span)) return
     visited.add(span)
-    const offsetUs = span.start_time_us - startTimeUs
     rows.push({
-      span,
+      ...timingBySpan.get(span)!,
       depth,
       missingParent: span.parent_span_id !== null && !byId.has(span.parent_span_id),
-      offsetUs,
-      durationUs: span.duration_us,
-      offsetPercent: durationUs === 0 ? 0 : offsetUs / durationUs * 100,
-      widthPercent: durationUs === 0 ? 0 : span.duration_us / durationUs * 100,
     })
     for (const child of children.get(span.span_id) ?? []) visit(child, depth + 1)
   }
@@ -171,7 +183,7 @@ export function buildTraceWaterfall(snapshot: readonly Span[], traceId: string):
   }
   for (const span of members) visit(span, 0)
 
-  return { rows, startTimeUs, durationUs }
+  return { ...timeline, rows }
 }
 
 export function spanKey(span: Span): string {

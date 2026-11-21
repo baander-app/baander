@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Span } from '../../api/debug-api'
 import {
+  buildSpanTimeline,
   buildTraceWaterfall,
   DEFAULT_SPAN_FILTERS,
   filterSpans,
@@ -85,6 +86,31 @@ describe('span search', () => {
     expect(filterSpans(items, newest)).toEqual([recent, middle, oldSlow])
     expect(filterSpans(items, slowest)).toEqual([oldSlow, middle, recent])
     expect(items).toEqual([middle, oldSlow, recent])
+  })
+})
+
+describe('retained span timeline', () => {
+  it('compares independent requests on one domain without inventing hierarchy or changing order', () => {
+    const early = span({ trace_id: 'early', start_time_us: 1000, duration_us: 2000 })
+    const later = span({ trace_id: 'later', parent_span_id: 'outside', start_time_us: 2000, duration_us: 3000 })
+    const result = buildSpanTimeline([later, early])
+    expect(result.startTimeUs).toBe(1000)
+    expect(result.durationUs).toBe(4000)
+    expect(result.rows.map(row => row.span)).toEqual([later, early])
+    expect(result.rows[0]).toMatchObject({ depth: 0, missingParent: false, offsetPercent: 25, widthPercent: 75 })
+    expect(result.rows[1]).toMatchObject({ depth: 0, offsetPercent: 0, widthPercent: 50 })
+    const reordered = buildSpanTimeline([early, later])
+    expect(reordered.startTimeUs).toBe(result.startTimeUs)
+    expect(reordered.durationUs).toBe(result.durationUs)
+    expect(buildSpanTimeline([later])).toMatchObject({ startTimeUs: 2000, durationUs: 3000 })
+  })
+
+  it('keeps empty and instantaneous snapshots finite', () => {
+    expect(buildSpanTimeline([])).toEqual({ rows: [], startTimeUs: 0, durationUs: 0 })
+    expect(buildSpanTimeline([span({ duration_us: 0 })])).toMatchObject({
+      durationUs: 0,
+      rows: [{ offsetPercent: 0, widthPercent: 0 }],
+    })
   })
 })
 
