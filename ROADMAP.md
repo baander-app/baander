@@ -167,8 +167,8 @@ The prior parameter bridge migrated fourteen definitions in the two movie/direct
 controllers to the exact Spec parameter class. Its acceptance checkpoint is now
 superseded: the user rejected the deprecated serializer, context and annotation
 classes introduced by the adapter. Replacement follows the reviewed
-[Native Spec OpenAPI plan](docs/plans/2026-11-21-1517-refactor-native-spec-openapi-plan.md);
-its implementation and acceptance remain separate work. The prior real export
+[Native Spec OpenAPI plan](docs/plans/2026-11-21-1517-refactor-native-spec-openapi-plan.md).
+The delivery checkpoint appears under Native OpenAPI export. The prior real export
 was structurally equal to its baseline across 279 paths and 172 component
 schemas, and regenerated Orval client output is byte-identical. Five host tests
 pass with 54 assertions, and all five simplification lenses report no actionable
@@ -180,13 +180,44 @@ and scoped queries. Final PHPStan passes all 4,073 files, and Deptrac reports no
 violations, warnings or errors. Seven bounded source-review follow-ups report no
 findings and close the five original director defects. That review preceded the
 user's rejection of the parameter adapter's deprecated boundary. The replacement
-plan has passed document review; implementation and verification remain open. Runtime acceptance for the player
+plan and its acceptance evidence appear below. Runtime acceptance for the player
 and director features is complete: the six original player scenarios pass in one
 explicit browser run, and the director navigation scenario passes in a separate
 rerun after correcting the test to select Movies. All seven intended cases pass
-across those two runs, with no fixture-cleanup failures. This does not establish
-acceptance of the new deprecation correction. No user token was configured or
-provider bulk fetch started.
+across those two runs, with no fixture-cleanup failures. No user token was
+configured and no provider bulk fetch started.
+
+## Native OpenAPI export
+
+Symfony routes and `OpenApi\Spec` declarations now supply the API document.
+The CLI and protected `/api/doc.json` route share the native exporter. Nelmio
+ApiDoc and the deprecated parameter adapter are removed. A fresh export process
+loads no deprecated OpenAPI classes. The Composer resolution keeps all other
+package versions and upgrades swagger-php from 7.0.0 to 7.2.0. The new release
+preserves empty Media Type objects for binaries and streaming manifests.
+
+Before the request enum refinements, the native JSON document and parsed YAML
+matched all 279 paths and 172 component schemas in `08aa25b4`. The comparison
+ignored object key order and preserved array order and JSON value types. The
+final document differs at 40 entries, all covered by the enum changes in the
+[reviewed plan](docs/plans/2026-11-21-1517-refactor-native-spec-openapi-plan.md).
+The generated web types expose the recognized token hints, library types and
+backend, artist roles, theme mood and playback choices. Composed playback schemas
+preserve their previous index value types. The five nullable enum corrections
+leave the regenerated client byte-identical to its previous output.
+
+The CI image passed 296 affected tests with 4,122 assertions across 19 files.
+The final schema refinements passed 47 focused tests with 2,583 assertions.
+The final schema composition passed 23 acceptance examples and 12 TypeScript
+assignments, including six expected type errors. PHPStan passed all 4,079 files.
+Deptrac reports zero violations, warnings and errors after the two explicit enum
+contracts were added. The session-wide PHP signature audit covered 425 files and
+5,225 calls and attributes with zero ordering mismatches. The web build passed,
+and lint reported zero errors and 12 existing warnings. Code review found no
+migration regressions. The final edits corrected five existing nullable enums
+and made the checkpoint schema assertions independent of the generated map.
+The dependency checker still reports 49 ignored local worktree inventory gaps
+and seven unchanged Swoole fork inventory findings.
 
 ## Frontend build warnings
 

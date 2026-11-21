@@ -1114,3 +1114,12 @@ A known interval or source for which log collection cannot establish completenes
 ### Configuration path
 
 An immutable sequence of literal keys and nonnegative indexes used to read a configuration value. `Baander\Core\Configuration\ConfigPath` builds these paths and reads values or strict integers; the owning context defines setting names, validation and defaults. A missing key differs from a present `null`, dots inside keys are literal, and diagnostics omit values.
+
+## API documentation
+
+### Native OpenAPI export
+
+The process that assembles `OpenApi\Spec` declarations with Symfony route
+metadata and compiles an OpenAPI 3.0 document. The CLI and `/api/doc.json`
+use the same exporter. The tracked `openapi.json` is an output used for web
+client generation. See the [API reference](docs-book/part-2-developer-guide/development/api-reference.md).

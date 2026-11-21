@@ -644,8 +644,8 @@ races, rollback, genre identity and scoped queries. Final PHPStan passes all
 4,073 files, and Deptrac reports no violations, warnings or errors. The original
 five director review findings are resolved; seven bounded follow-up passes report
 no findings. That review preceded the user's rejection of the adapter's deprecated
-boundary. The replacement plan has passed document review; implementation and verification
-remain open.
+boundary. The native export and its verification are recorded in the
+[roadmap](../../ROADMAP.md#native-openapi-export).
 Runtime acceptance for the player and director features is complete: all six original player browser
 scenarios pass in one explicit run, and director navigation passes in a separate
 rerun after the test selected Movies. All seven intended cases pass across those
@@ -671,5 +671,5 @@ review also reports no findings. Lifecycle proof coverage remains unchanged.
 
 The warning correction is saved in local commit `fc8d9305`. Runtime, director,
 viewport-fit, environment and browser work is delivered and verified at the
-checkpoints above. The rejected parameter bridge remains a superseded checkpoint;
-its native Spec replacement continues as separate work under the reviewed plan.
+checkpoints above. The native export supersedes the rejected parameter bridge.
+Its verification appears in the [roadmap](../../ROADMAP.md#native-openapi-export).

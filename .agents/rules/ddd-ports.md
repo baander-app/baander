@@ -27,14 +27,15 @@ schemas. Shared Tag names must have consistent descriptions. Give reusable
 schemas stable `component:` names, express object properties as keyed native
 Schema values, and reference request/resource classes directly from native
 Schema or MediaType declarations. Document required fields, nullability,
-constraints and defaults explicitly; Symfony validation does not generate those
-schemas. Keep named arguments in the actual constructor's parameter order.
+constraints and defaults explicitly. Use schema enums for finite choices and
+reuse backed PHP enums where the domain defines the values. Every documented
+default must satisfy its schema. Keep named arguments in the actual constructor's
+parameter order.
 
 `NativeOpenApiExporter` implements the Shared application
-`OpenApiExporterInterface` for CLI export and the protected JSON endpoint.
-Its CLI and JSON entrypoints consume that port, not the Infrastructure exporter.
-Keep serialized payload shapes explicit and version-compatible; controller DTOs
-are not permission to place framework objects in persisted event payloads.
+`OpenApiExporterInterface` for CLI export and the protected JSON endpoint. Both
+entrypoints consume the port. Keep serialized payload shapes explicit and
+version-compatible. Persisted event payloads must use serializable data values.
 
 ## Wiring and verification
 

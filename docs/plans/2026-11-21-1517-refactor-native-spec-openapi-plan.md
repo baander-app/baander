@@ -12,7 +12,7 @@ execution: code
 
 ## Goal Capsule
 
-**Objective:** Maintain and publish Baander's API documentation through swagger-php's native Spec API, with the existing published contract intact.
+**Objective:** Maintain and publish Baander's API documentation through swagger-php's native Spec API, preserving the migration baseline and applying only the separately requested finite-choice refinements.
 
 **Means:** Convert application declarations to `OpenApi\Spec`, assemble and resolve native declarations through public APIs, then run the native augmenters and compiler, and replace the Nelmio ApiDoc exporter with a native Symfony integration.
 
@@ -32,14 +32,16 @@ The application currently declares most documentation through deprecated `OpenAp
 
 - R1. Application documentation declarations use supported native Spec classes. Remove direct application use of deprecated OpenAPI Attributes, Annotations, Context, Serializer, Analysis and Generator APIs, including reflection helpers and test fixtures.
 - R2. Actual CLI and HTTP document generation runs exclusively through the native Spec pipeline. It must not autoload the deprecated OpenAPI pipeline or consume the previous JSON document as generation input.
-- R3. Preserve the published document: all 279 paths and 172 component schemas, operation identifiers, request and response shapes, constraints, defaults, nullability, references, descriptions, tags, security, binary/SSE content and component names. Preserve generated client behavior and types. A migration is not authorization to strengthen or weaken the API contract.
+- R3. Preserve the published document: all 279 paths and 172 component schemas, operation identifiers, request and response shapes, constraints, defaults, nullability, references, descriptions, tags, security, binary/SSE content and component names. Preserve generated client behavior and types during migration. The separately requested finite-choice refinements in U8 are the only intended contract changes; record their exact generated type changes.
 - R4. Preserve `GET /api/doc.json`, the existing export command and its options, export/check behavior and existing development generation commands. The active documentation entrypoint is JSON; no documentation UI or new external asset dependency is required.
 - R5. Remove obsolete Nelmio ApiDoc services, bundle registration, dependency, configuration and the Spec-to-legacy adapter after replacement works. Retain independent Nelmio Cors functionality.
 - R6. Update authoritative development guidance and static checks so future declarations use the native integration. Keep movie, director, authentication, scheduler and other application behavior unchanged.
+- R7. Document the finite choices identified in the request-field audit with native enums, reuse authoritative domain enum values, and remove schema defaults that are outside those enums. Preserve runtime defaults, validation and extensible free-text fields. This is an intentional contract refinement requested after the migration plan.
+- R8. Named arguments in PHP changed during this work follow the actual declared parameter order, including runtime calls and attributes. Preserve evaluation behavior.
 
 ### Acceptance Examples
 
-- AE1. Exporting in a fresh process yields the same normalized document as the pre-migration baseline, including director paths and movie timeline JPEG metadata; no deprecated OpenAPI class is loaded.
+- AE1. Before the finite-choice refinements, exporting in a fresh process yields the same normalized document as the pre-migration baseline, including director paths and movie timeline JPEG metadata; no deprecated OpenAPI class is loaded. Subsequent exports differ only by the explicitly requested refinements.
 - AE2. The document retains authentication request requirements, anonymous operation security, nested playback command arrays, nullable media fields, preference object envelopes and backed-enum string values.
 - AE3. `GET /api/doc.json` and the CLI return equivalent documents through the same native exporter; generation does not require an old JSON file to exist.
 - AE4. A new request/resource is documented with native class references and explicit schemas, and the Tag rule recognizes native Tag attributes.
@@ -86,7 +88,7 @@ An off-checkout PHP probe used Builder, Mode::SPEC, native root/operation/parame
 
 ### Ownership and Sequencing
 
-U1 establishes concrete native declaration patterns and route augmentation interfaces. U2, U3 and U4 then run in parallel with non-overlapping file ownership. The integration owner coordinates references and owns U5. U6 follows declaration conversion; U7 validates the combined result. All units form one delivery. The lead serializes CI/preview lifecycle and owns shared configuration and generated artifacts.
+U1 establishes concrete native declaration patterns and route augmentation interfaces. U2, U3 and U4 then run in parallel with non-overlapping file ownership. The integration owner coordinates references and owns U5. U6 follows declaration conversion. U7 first establishes full migration equality; U8 then applies the authorized finite-choice refinements, and U9 audits the final changed PHP. Return to U7 for combined final verification and review. All units form one delivery. The lead serializes CI/preview lifecycle and owns shared configuration and generated artifacts.
 
 The exact new integration class names may be selected in U1 to fit existing Shared Infrastructure conventions. Keep native machinery in Infrastructure. Define a small framework-free export port under `src/Shared/Application/Port/` for the command and new Interface JSON controller; the controller must not import the Infrastructure implementation. The lead wires its service alias. Application/domain code receives no OpenAPI framework dependency merely to generate documentation. Existing scheduler schema reflection is updated in place because it has a real runtime consumer.
 
@@ -132,7 +134,11 @@ Add complete explicit schemas to all 21 gap request DTOs, covering their 100 fie
 
 **Owner:** Integration worker plus lead for shared files. **Dependencies:** U1–U4.
 
-Wire the native service into `src/Command/ExportOpenApiSpecCommand.php` and a native JSON controller for the existing `app.swagger` route. Replace RenderOpenApi dependencies in `tests/Unit/Command/ExportOpenApiSpecCommandTest.php`, `tests/Integration/OpenApiSpecTest.php` and `tests/Integration/TranscodeStartupUnavailableTest.php`. Remove `SpecParameterRouteDescriber.php` and its legacy-focused unit test. Remove its service tag, obsolete Nelmio ApiDoc service aliases/configuration, bundle registration and Composer dependency; update the lockfile with only the required dependency resolution. Remove the obsolete ApiDoc recipe entry from `symfony.lock` and regenerate tracked `config/reference.php` after bundle removal. Preserve Nelmio Cors and unrelated configuration. Keep generation command names and options stable.
+Wire the native service into `src/Command/ExportOpenApiSpecCommand.php` and a native JSON controller for the existing `app.swagger` route. Replace RenderOpenApi dependencies in `tests/Unit/Command/ExportOpenApiSpecCommandTest.php`, `tests/Integration/OpenApiSpecTest.php` and `tests/Integration/TranscodeStartupUnavailableTest.php`. Remove `SpecParameterRouteDescriber.php` and its legacy-focused unit test. Remove its service tag, obsolete Nelmio ApiDoc service aliases/configuration, bundle registration and Composer dependency; update the lockfile with only the required dependency resolution.
+
+The actual native export exposed an upstream 7.0 serialization defect: empty Media Type objects become JSON arrays in eight binary response content entries. The [7.2.0 compiler](https://github.com/zircote/swagger-php/blob/7.2.0/src/Compiler/OpenApi31Compiler.php) returns an empty object correctly, while 7.1.0 still returns an array. Set the direct requirement to `^7.2` and lock 7.2.0, with a red-before-upgrade serialization regression. Off-checkout Composer resolution changes only swagger-php from 7.0.0 to 7.2.0; keep the update scoped to that dependency. A disposable 7.2.0 alternate loader also produces a real native Symfony console export with zero normalized differences across all 279 paths and 172 schemas. This establishes release feasibility, not completion of the installed dependency and final CI gates. Do not add an output patch or invented media schema to hide the defect.
+
+Remove the obsolete ApiDoc recipe entry from `symfony.lock` and regenerate tracked `config/reference.php` after bundle removal. Preserve Nelmio Cors and unrelated configuration. Keep generation command names and options stable.
 
 **Verification:** Actual container service compilation, CLI export/check tests and HTTP JSON route tests pass with old artifacts unavailable as runtime input. Fresh-process export loads no deprecated OpenAPI pipeline. The old adapter and obsolete ApiDoc wiring are absent.
 
@@ -146,26 +152,56 @@ Update `packages/baander-phpstan-rules/src/Rules/ConsistentOpenApiTagDescription
 
 ### U7. Verify the Full Contract and Complete Review
 
-**Owner:** Lead. **Dependencies:** U1–U6.
+**Owner:** Lead. **Dependencies:** U1–U6 for the migration equality checkpoint; U8–U9 for combined final verification and review.
 
 Run full normalized document comparison against the pinned baseline and retain readable differences for diagnosis. Compare all document content, not only path/schema counts. Regenerate OpenAPI and client through normal commands; investigate every generated type/operation change. Verify HTTP and CLI agreement, clean-checkout service wiring and absence of runtime dependence on old generated artifacts. Run ce-simplify-code on converted patterns/integration and ce-code-review on the complete change; apply justified findings, then repeat only affected checks.
 
 **Verification:** Authoritative CI image checks, PHPStan and Deptrac are green; all published contract assertions pass; final generated artifacts and docs match implementation. Lead records exact suite counts and any justified mechanical JSON ordering differences inline.
 
+### U8. Document Finite Request Choices
+
+**Owner:** Request worker; controller owner applies mirrored inline declarations; lead owns generated clients. **Dependencies:** Original migration contract comparison and focused review of this addition.
+
+The user explicitly requested enums for hints such as `tokenTypeHint`. Add native enum metadata for these eight fields:
+
+| Request field | Values and default handling |
+| --- | --- |
+| `RevokeTokenRequest.tokenTypeHint` | `access_token`, `refresh_token`; remove the schema's empty-string default. Document recognized hints and retain ignored unknown hints. |
+| `CreateLibraryRequest.type` | `LibraryType`: `music`, `podcast`, `audiobook`, `movie`, `tv_show`; remove the empty schema default and incorrect plural examples. |
+| `CreateLibraryRequest.filesystemType` | `FilesystemType`: `local`; retain that default. |
+| `ArtistSongRequest.role`, `ArtistAlbumRequest.role`, `UpdateRoleRequest.role`, `UpdateRoleRequest.currentRole` | `ArtistRole`: `primary`, `featured`, `producer`, `composer`, `conductor`, `remixer`, `djmix`, `other`; retain optional currentRole nullability/default, including null as an allowed schema value. |
+| `RegisterPlaybackEndpointRequest.capabilities.items` | `song`, `video`, `volume`, matching its existing `All`/`Choice` validation; preserve the array default. |
+
+**Verified nullable-enum follow-up:** Five touched request schemas declare `nullable: true` and `default: null` while omitting null from their enums: `AdminCreateOAuthClientRequest.authMethod`, `DeliveryRequest.qualityTier`, `AcknowledgePlaybackRequest.rejectionReason`, `ControlPlaybackRequest.desiredState` and `UpdateTranscodeSessionRequest.audioProfile`. Their PHP fields are already nullable with null defaults. [OpenAPI 3.0.3 Schema Object fields](https://spec.openapis.org/oas/v3.0.3.html#schema-object), section 4.7.24.2, leave enum restrictions effective when nullable is set. Include null in these five published enums, preserving every string value, runtime default and validator. The verified `allOf` composition already satisfies the checkpoint constraint-preservation design; this five-field correction leaves it unchanged.
+
+Remove the already-invalid empty schema defaults from `AdminCreateOAuthClientRequest.type`, `DeviceApproveRequest.decision`, `CreatePairingCodeRequest.method` and `UpdateThemeMoodRequest.mood`; their existing enums and runtime defaults stay intact. Add `kind: song|video` metadata for `ControlPlaybackRequest.media`, `ClosePlaybackEndpointRequest.checkpoint.media` and `RecoverLocalPlaybackRequest.checkpoint.media`. The checkpoint schemas currently expose media only through a generic additional-properties map. Naming `media` removes that value from the parent additional-properties check, so retaining the parent declaration alone would not preserve its effect. Compose the constraints previously applied to that value with the minimal kind refinement, or use an equivalent schema preserving those constraints. Keep prior required lists, nullable/default behavior and non-kind value restrictions, including string-valued media properties and the prior non-object alternatives; do not rewrite the checkpoint contract or add unrelated restrictions. The existing Collection/Choice and `PlaybackCheckpoint` validation is the authority for the kind values.
+
+Apply equivalent metadata to inline controller declarations for the same fields. Do not restrict artist type/gender, album type or playback platform: their current write paths accept free text. Do not turn the token hint into a rejecting runtime enum: [RFC 7009 sections 2.1–2.2](https://www.rfc-editor.org/rfc/rfc7009.html#section-2.2) require unknown hints to be ignored, and the current revocation controller ignores the hint. Artist role handlers already use `ArtistCreditInput::role`, which checks `ArtistRole::tryFrom`; library and filesystem types have authoritative domain enums. No runtime acceptance policy changes are required.
+
+**Verification:** First establish full migration equality against the original pinned baseline. Then assert the explicitly refined enum fields/defaults in the actual exported document, compare all other content against that checkpoint, regenerate clients and check their consumers. Run existing affected validation/handler tests and explicit export assertions. Defaults in the amended finite-choice schemas must be admitted by those schemas. Assert that checkpoint media examples retain their prior outcomes except for the explicit kind refinement: numeric `publicId` remains invalid, nullable media and a previously allowed non-integer numeric media value retain their prior acceptance, and existing additional string properties remain allowed. Check accepted and rejected kind values without adding a new required field. Assert that these five nullable enums explicitly admit their existing null defaults and retain their full previous string lists. Run the actual Orval comparison to establish whether generated output changes; do not assume the nullable flag or unchanged runtime fields prove generated equivalence. Keep every changed PHP named argument in constructor order.
+
+### U9. Audit Named Argument Order
+
+**Owner:** Lead and owners of reported files. **Dependencies:** Final source changes, including U8.
+
+Audit all PHP files changed since the initial cinema plan's parent, including new files, against actual function, method and constructor signatures. Include attributes and nullsafe calls. Fix mismatches without changing evaluation effects, preserve readable multiline declarations, and retain the signature-order rule in the project's PHP guidance.
+
+**Verification:** A reflection-aware audit and independent parser coverage agree on the call set. Resolve any unvisited trait call through native reflection or an analyzed consumer. Report exact files/calls checked and zero remaining mismatches after final edits; run existing tests for any changed runtime call sites.
+
 ## Verification Contract
 
-The baseline comparison recursively normalizes object-key order only. Array order, required lists, parameter order, enum values, scalar types, nulls and default object/array distinctions remain observable. Preserve the original document separately while generating the candidate; never overwrite the comparison source. No ignored schema differences or output postprocessor may conceal a contract change.
+The baseline comparison recursively normalizes object-key order only. Array order, required lists, parameter order, enum values, scalar types, nulls and default object/array distinctions remain observable. Preserve the original document separately while generating the candidate; never overwrite the comparison source. No ignored schema differences or output postprocessor may conceal a contract change. Establish this equality before U8; compare its explicitly enumerated refinements separately against that verified checkpoint.
 
 Run focused host tests for pure native assembly, resolution, augmentation, compilation and reflection; run container/service, HTTP, CLI, full OpenApiSpecTest and static gates in the authoritative CI image coordinated by the lead. Existing exporter command tests retain failure behavior assertions. Extend integration coverage to route-derived parameters, request payloads, nullable/defaulted fields, nested collections, enum backing values, anonymous security, explicit envelopes and the JPEG/SSE response exemptions already required by those actual endpoints.
 
 A fresh PHP process performs a real export and inspects declared classes for deprecated OpenAPI families, including Annotations, Attributes, Context, Serializer, Generator, Analysis and Builder\Mode. The direct-use gate also rejects deprecated methods such as Builder::setMode. Pair this with a direct-use source test so unused deprecated declarations cannot escape the runtime check. Test that the native exporter works when the old baseline file is unavailable as generation input. Keep test comparisons on disposable fixtures/local services; no external production requests are needed.
 
-Before completion, run scoped PHP formatting, `git diff --check`, relevant custom-rule tests, all affected OpenAPI/export/request/resource/scheduler tests, PHPStan and Deptrac. Serialize expensive checks and preview lifecycle. Browser retesting is only needed if actual frontend behavior or generated client changes; this plan requires neither to change.
+Before completion, run scoped PHP formatting, `git diff --check`, relevant custom-rule tests, all affected OpenAPI/export/request/resource/scheduler tests, PHPStan and Deptrac. Serialize expensive checks and preview lifecycle. U8 intentionally changes generated finite-choice types, so compare those diffs and check their consumers through typecheck and build. Run targeted browser checks if the refinement changes emitted client runtime or frontend behavior; type-only refinements do not require repeating unrelated playback scenarios.
 
 ## Definition of Done
 
-- All six product requirements and four acceptance examples have implementation and verification evidence.
-- Native export reproduces all 279 paths and 172 schemas and the complete baseline contract; any nonsemantic object-key ordering change is documented.
+- All eight product requirements and four acceptance examples have implementation and verification evidence.
+- Native migration reproduces all 279 paths and 172 schemas and the complete baseline contract. The separately requested U8 enum refinements and resulting generated type changes are recorded explicitly; any nonsemantic object-key ordering change is documented.
 - Application code, affected tests and actual export use no deprecated OpenAPI APIs. The ApiDoc dependency and bridge are removed; Cors remains functional.
 - CLI and JSON entrypoint behavior, fresh-install wiring and generated client remain correct.
 - Guidance and static checks describe the native mechanism; ROADMAP.md records the delivered scope and exact verification checkpoint.
