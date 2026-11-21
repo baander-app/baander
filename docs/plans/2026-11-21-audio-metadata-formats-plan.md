@@ -91,6 +91,7 @@ The package remains framework-independent and retains its logger-based malformed
 - Intent: implement R3–R5 using KTD2–KTD4.
 - Files: WAV reader, new AIFF/AAC readers, ID3 reuse helper if required, and package tests.
 - Checks: sixteen-byte PCM format chunks, odd padding, INFO/ID3 precedence, ID3 artwork, AIFF sample count and rate, AAC ADTS versus MPEG sync, tagged AAC, truncation and skipped audio payloads.
+- Correct the verified shared ID3 omission of recording and release MusicBrainz identifiers: `Id3Parser` ignores the recording UFID and release user-text field, and `Id3Reader` never maps them. Cover these identifiers through MP3, WAV, AIFF and AAC readers using the [Picard tag mapping](https://picard-docs.musicbrainz.org/en/latest/appendices/tag_mapping.html).
 
 ### U3. Detection and catalog integration
 

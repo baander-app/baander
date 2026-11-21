@@ -47,6 +47,7 @@ final class Id3Parser
         'artists' => 'ARTISTS',
         'musicbrainz artist id' => 'MUSICBRAINZ_ARTISTID',
         'musicbrainz album artist id' => 'MUSICBRAINZ_ALBUMARTISTID',
+        'musicbrainz album id' => 'MUSICBRAINZ_ALBUMID',
     ];
 
     private bool $isValid = false;
@@ -121,37 +122,57 @@ final class Id3Parser
      */
     private function parseId3v2($handle): void
     {
-        $signature = fread($handle, 3);
-
-        if ($signature !== self::ID3V2_SIGNATURE) {
+        $header = fread($handle, 10);
+        if (strlen($header) !== 10 || substr($header, 0, 3) !== self::ID3V2_SIGNATURE) {
             return;
         }
+        $size = $this->syncSafeToInt(substr($header, 6, 4));
+        if ($size > 16 * 1024 * 1024) {
+            return;
+        }
+        $this->parseBytes($header . ($size > 0 ? fread($handle, $size) : ''));
+    }
 
-        $majorVersion = ord(fread($handle, 1));
-        $minorVersion = ord(fread($handle, 1));
-        $this->version = "ID3v2.{$majorVersion}.{$minorVersion}";
-
-        // Skip flags (1 byte)
-        fread($handle, 1);
-
-        // Read tag size (syncsafe integer)
-        $sizeBytes = fread($handle, 4);
-        $tagSize = $this->syncSafeToInt($sizeBytes);
-
-        $this->logger->debug('Id3Parser: found ID3v2 tag', [
-            'version' => $this->version,
-            'size' => $tagSize,
-        ]);
-
-        fseek($handle, 10); // Skip header
-        $tagData = fread($handle, $tagSize);
-
-        $this->parseFrames($tagData, $majorVersion);
-
+    /** Parse a bounded ID3v2 tag already extracted from an audio container. */
+    public function parseBytes(string $bytes): void
+    {
+        $this->tags = [];
+        $this->pictures = [];
+        $this->isValid = false;
+        $this->version = null;
+        if (strlen($bytes) < 10 || substr($bytes, 0, 3) !== self::ID3V2_SIGNATURE) {
+            return;
+        }
+        $major = ord($bytes[3]);
+        $flags = ord($bytes[5]);
+        $sizeBytes = substr($bytes, 6, 4);
+        if (!in_array($major, [3, 4], true) || preg_match('/[\x80-\xff]/', $sizeBytes) === 1) {
+            return;
+        }
+        $size = $this->syncSafeToInt($sizeBytes);
+        if ($size > 16 * 1024 * 1024 || $size > strlen($bytes) - 10) {
+            return;
+        }
+        $data = substr($bytes, 10, $size);
+        if (($flags & 0x80) !== 0 && $major === 3) {
+            $data = str_replace("\xff\0", "\xff", $data);
+        }
+        if (($flags & 0x40) !== 0) {
+            if (strlen($data) < 4) {
+                return;
+            }
+            $extendedSize = $major === 4 ? $this->syncSafeToInt(substr($data, 0, 4)) : unpack('N', substr($data, 0, 4))[1] + 4;
+            if ($extendedSize < 4 || $extendedSize > strlen($data)) {
+                return;
+            }
+            $data = substr($data, $extendedSize);
+        }
+        $this->version = "ID3v2.{$major}." . ord($bytes[4]);
+        $this->parseFrames($data, $major, ($flags & 0x80) !== 0);
         $this->isValid = true;
     }
 
-    private function parseFrames(string $tagData, int $majorVersion): void
+    private function parseFrames(string $tagData, int $majorVersion, bool $unsynchronised = false): void
     {
         $offset = 0;
         $tagSize = strlen($tagData);
@@ -179,7 +200,7 @@ final class Id3Parser
                     | ord($sizeBytes[2]) << 8
                     | ord($sizeBytes[3]);
 
-            // Skip flags (2 bytes)
+            $frameFlags = ord($tagData[$offset + 1]);
             $offset += 2;
 
             if ($offset + $frameSize > $tagSize) {
@@ -189,15 +210,36 @@ final class Id3Parser
             $frameData = substr($tagData, $offset, $frameSize);
             $offset += $frameSize;
 
+            if ($frameSize === 0 || ($frameFlags & ($majorVersion === 4 ? 0x4d : 0xe0)) !== 0) {
+                continue;
+            }
+            if ($majorVersion === 4 && ($unsynchronised || ($frameFlags & 0x02) !== 0)) {
+                $frameData = str_replace("\xff\0", "\xff", $frameData);
+            }
             if ($frameId === 'APIC') {
                 $this->parsePictureFrame($frameData);
             } elseif ($frameId === 'COMM') {
                 $this->parseCommentFrame($frameData, $majorVersion);
             } elseif ($frameId === 'TXXX') {
                 $this->parseUserTextFrame($frameData, $majorVersion);
+            } elseif ($frameId === 'UFID') {
+                $this->parseUniqueIdentifierFrame($frameData);
             } elseif (str_starts_with($frameId, 'T')) {
                 $this->parseTextFrame($frameId, $frameData, $majorVersion);
             }
+        }
+    }
+
+    private function parseUniqueIdentifierFrame(string $data): void
+    {
+        $separator = strpos($data, "\0");
+        if ($separator === false || substr($data, 0, $separator) !== 'http://musicbrainz.org') {
+            return;
+        }
+
+        $identifier = trim(substr($data, $separator + 1), " \t\n\r\0\x0B");
+        if ($identifier !== '') {
+            $this->addTag('MUSICBRAINZ_TRACKID', [$identifier]);
         }
     }
 
@@ -252,13 +294,16 @@ final class Id3Parser
 
     private function parsePictureFrame(string $data): void
     {
+        if (strlen($data) < 4) {
+            return;
+        }
         $offset = 0;
         $encoding = ord($data[$offset]);
         $offset += 1;
 
         // MIME type (null-terminated)
         $mimeEnd = strpos($data, "\0", $offset);
-        if ($mimeEnd === false) {
+        if ($mimeEnd === false || $mimeEnd + 1 >= strlen($data)) {
             return;
         }
 

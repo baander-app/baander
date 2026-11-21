@@ -43,6 +43,14 @@ final class Id3Reader
         return $this->mapToMetadata($parser);
     }
 
+    public function readBytes(string $bytes): ExtractedMetadata
+    {
+        $parser = new Id3Parser('', $this->logger);
+        $parser->parseBytes($bytes);
+
+        return $this->mapToMetadata($parser);
+    }
+
     private function mapToMetadata(Id3Parser $parser): ExtractedMetadata
     {
         $metadata = new ExtractedMetadata();
@@ -55,6 +63,8 @@ final class Id3Reader
         $metadata->setAlbumArtists($tags['ALBUMARTIST'] ?? []);
         $metadata->setMbArtistIds($tags['MUSICBRAINZ_ARTISTID'] ?? []);
         $metadata->setMbAlbumArtistIds($tags['MUSICBRAINZ_ALBUMARTISTID'] ?? []);
+        $metadata->setMbid($this->first($tags, 'MUSICBRAINZ_TRACKID'));
+        $metadata->setMbAlbumId($this->first($tags, 'MUSICBRAINZ_ALBUMID'));
         $metadata->setComposer($this->first($tags, 'COMPOSER'));
         $metadata->setComment($this->first($tags, 'COMMENT'));
 
