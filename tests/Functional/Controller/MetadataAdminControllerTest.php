@@ -6,6 +6,7 @@ namespace App\Tests\Functional\Controller;
 
 use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\Message\SyncArtistsMessage;
+use App\Metadata\Application\Message\SyncPeopleMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
 use App\Shared\Domain\Model\PublicId;
@@ -77,7 +78,7 @@ final class MetadataAdminControllerTest extends TestCase
         $this->assertArrayHasKey('jobsDispatched', $data['data']);
     }
 
-    public function testSyncAllQueuesOneLibrarySyncPerLibraryAndOneArtistSyncOnBothPathsAndReportsTheirCount(): void
+    public function testSyncAllQueuesLibraryArtistAndPersonJobsOnBothPathsAndReportsTheirCount(): void
     {
         $this->createLibraryWithSongs(1);
         $this->createLibraryWithSongs(1);
@@ -87,13 +88,14 @@ final class MetadataAdminControllerTest extends TestCase
         $response = $this->authenticatedRequest('POST', '/api/admin/metadata/trigger-sync', $this->createAdminUser(), ['source' => null]);
 
         $data = $this->assertJsonResponse($response, 200, 'data');
-        $this->assertSame(count($libraries) + 1, $data['data']['jobsDispatched'], 'One job per library and one for the artists.');
+        $this->assertSame(count($libraries) + 2, $data['data']['jobsDispatched'], 'One job per library plus the Artist and Person syncs.');
         $queued = $this->queued(SyncLibraryMessage::class);
         $this->assertCount(count($libraries), $queued);
         $queuedIds = array_map(static fn (SyncLibraryMessage $message): string => $message->libraryId->toString(), $queued);
         sort($queuedIds);
         $this->assertSame($libraries, $queuedIds);
         $this->assertEquals([new SyncArtistsMessage()], $this->queued(SyncArtistsMessage::class));
+        $this->assertEquals([new SyncPeopleMessage()], $this->queued(SyncPeopleMessage::class));
         $this->assertSame([], $this->queued(SyncAlbumMessage::class), 'The library syncs queue the album syncs when they run.');
         $this->swooleTasks()->reset();
 
@@ -103,6 +105,7 @@ final class MetadataAdminControllerTest extends TestCase
         $this->assertStringContainsString(sprintf('Queued %d metadata sync job(s)', $data['data']['jobsDispatched']), $tester->getDisplay());
         $this->assertCount(count($libraries), $this->queued(SyncLibraryMessage::class));
         $this->assertEquals([new SyncArtistsMessage()], $this->queued(SyncArtistsMessage::class));
+        $this->assertEquals([new SyncPeopleMessage()], $this->queued(SyncPeopleMessage::class));
     }
 
     public function testGenreSyncQueuesOnlyAlbumAndSongSyncsOnBothPaths(): void

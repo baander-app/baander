@@ -109,7 +109,14 @@ final readonly class DirectorRepository implements DirectorRepositoryInterface
         if ($movie === null) {
             throw new LogicException('Cannot credit a movie that has not been persisted.');
         }
-        $state = $this->entityManager->find(MoviePersonCreditStateEntity::class, $movieId);
+        $state = $this->entityManager->createQueryBuilder()
+            ->select('state')
+            ->from(MoviePersonCreditStateEntity::class, 'state')
+            ->where('IDENTITY(state.movie) = :movieId')
+            ->setParameter('movieId', $movieId, 'uuid')
+            ->getQuery()
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getOneOrNullResult();
         if ($state !== null) {
             $this->entityManager->refresh($state);
             if (!$forceUpdate && $state->directorsInitialized()) {

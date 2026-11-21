@@ -1431,6 +1431,7 @@ deptrac:
       - 'Shared Application'
     'Catalog Persistence Associations':
       - Core
+      - 'Catalog Application'
       - 'Catalog Domain'
       - 'Catalog Infrastructure'
       - 'Catalog TV Contract'

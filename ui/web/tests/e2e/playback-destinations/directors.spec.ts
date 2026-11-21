@@ -43,6 +43,12 @@ test('directors browse real credits, paginate and open their movies', async ({ b
     await expect(page.getByRole('heading', { level: 1, name: director.name, exact: true }))
       .toBeVisible()
     const title = `Owned playback movie ${run}`
+    await page.getByRole('link', { name: 'Full profile and credits' }).click()
+    await expect(page).toHaveURL(new RegExp(`/people/${director.publicId}$`))
+    await expect(page.getByRole('heading', { level: 1, name: director.name, exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: title, exact: true })).toBeVisible()
+    await expect(page.getByText('Director', { exact: true })).toBeVisible()
+    await page.goBack()
     await page.getByRole('button', { name: new RegExp(title) }).click()
     await expect(page).toHaveURL(new RegExp(`/movies/${manifest.movie.publicId}$`))
     await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible()

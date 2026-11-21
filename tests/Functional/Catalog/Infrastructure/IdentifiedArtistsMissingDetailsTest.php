@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Catalog\Infrastructure;
 
+use App\Catalog\Application\Command\Person\ManagePersonCommand;
 use App\Catalog\Application\Port\ArtistPortInterface;
+use App\Catalog\Application\Port\PersonAdministrationPortInterface;
 use App\Catalog\Domain\Model\Artist;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
@@ -21,7 +23,7 @@ final class IdentifiedArtistsMissingDetailsTest extends TestCase
         $this->artists = static::getContainer()->get(ArtistPortInterface::class);
     }
 
-    public function testOnlyArtistsWithAnIdAndAnEmptyDetailAreFoundOnceEachWithTheirId(): void
+    public function testArtistsWithMissingDetailsOrAnUnlinkedPersonIdentityAreFoundOnce(): void
     {
         $empty = [
             'sortName' => $this->store(self::complete(sortName: null)),
@@ -31,7 +33,12 @@ final class IdentifiedArtistsMissingDetailsTest extends TestCase
             'lifeSpanBegin' => $this->store(self::complete(lifeSpanBegin: null)),
             'lifeSpanEnd' => $this->store(self::complete(lifeSpanEnd: null)),
         ];
-        $complete = $this->store(self::complete());
+        $completePerson = $this->store(self::complete());
+        $completeGroup = $this->store(self::complete(type: 'Group'));
+        $linked = $this->store(self::complete());
+        $people = static::getContainer()->get(PersonAdministrationPortInterface::class);
+        $person = $people->execute(new ManagePersonCommand('create', null, null, null, ['name' => 'Linked musician']));
+        $people->execute(new ManagePersonCommand('link-artist', $person['publicId'], $linked->getPublicId()->toString(), null, []));
         $withoutId = $this->store(Artist::create('Disturbed'));
 
         $found = $this->walk(1_000);
@@ -39,7 +46,9 @@ final class IdentifiedArtistsMissingDetailsTest extends TestCase
         foreach ($empty as $field => $artist) {
             self::assertSame($artist->getMbid(), $found[$artist->getId()->toString()] ?? null, 'An artist without a ' . $field . ' is found.');
         }
-        self::assertArrayNotHasKey($complete->getId()->toString(), $found);
+        self::assertSame($completePerson->getMbid(), $found[$completePerson->getId()->toString()] ?? null);
+        self::assertArrayNotHasKey($completeGroup->getId()->toString(), $found);
+        self::assertArrayNotHasKey($linked->getId()->toString(), $found);
         self::assertArrayNotHasKey($withoutId->getId()->toString(), $found);
     }
 

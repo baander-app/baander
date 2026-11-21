@@ -55,7 +55,8 @@ final class TvRegistrationHandlersTest extends TestCase
         $libraries->method('findByUuid')->willReturn($library);
         $title = new TvTitleRecord(Uuid::v7(), new PublicId(), $library->getId(), 12, 'A series');
         $data = new TvTitleMetadata(12, 'A series', null, null, [], null);
-        $events = new \ArrayObject(['start']);
+        $trace = new \stdClass();
+        $trace->steps = ['start'];
         $metadata = $this->createMock(TvMetadataPortInterface::class);
         $metadata->expects(self::once())->method('series')->with(12)
             ->willReturnCallback(static function () use ($trace, $data): TvTitleMetadata {
@@ -106,7 +107,8 @@ final class TvRegistrationHandlersTest extends TestCase
         $metadata->method('episode')->willReturn(new TvTitleMetadata(42, 'Episode', null, null, [], []));
         $credits = $this->createStub(PersonCreditPortInterface::class);
         $credits->method('syncTvCredits')->willReturn(true);
-        $events = new \ArrayObject(['start']);
+        $trace = new \stdClass();
+        $trace->steps = ['start'];
         $transaction = $this->createStub(TransactionPortInterface::class);
         $transaction->method('run')->willReturnCallback(static function (callable $operation) use ($trace): mixed {
             $result = $operation();
