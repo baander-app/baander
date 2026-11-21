@@ -81,7 +81,7 @@ for (const width of [1280, 390]) {
   test(`search and inspect the trace tree at ${width}px`, async ({ asAdmin: page }, testInfo) => {
     await page.setViewportSize({ width, height: 1000 })
     await page.route('**/api/debug/spans*', route => route.fulfill({ json: [child, span(), ...branches, sibling, independent] }))
-    await spaNavigate(page)('/admin?tab=diagnostics')
+    await spaNavigate(page)('/admin/spans')
     const section = page.getByRole('region', { name: 'Recent spans', exact: true })
     const overview = section.getByRole('treegrid', { name: 'Spans', exact: true })
     await expect(overview.locator('[data-timeline-bar]')).toHaveCount(12)
@@ -175,7 +175,7 @@ test('refresh and clear preserve honest selection state', async ({ asAdmin: page
     if (failRefresh) return route.fulfill({ status: 500, json: { message: 'Read failed' } })
     return route.fulfill({ json: retained })
   })
-  await spaNavigate(page)('/admin?tab=diagnostics')
+  await spaNavigate(page)('/admin/spans')
   const section = page.getByRole('region', { name: 'Recent spans', exact: true })
   await section.getByRole('treegrid', { name: 'Spans', exact: true }).getByRole('row', { name: /catalog lookup/ }).click()
   await section.getByRole('treegrid', { name: 'Trace waterfall' }).getByRole('row', { name: /catalog lookup/ }).click()
@@ -201,7 +201,7 @@ test('refresh and clear preserve honest selection state', async ({ asAdmin: page
 test('instantaneous spans retain a visible selectable marker', async ({ asAdmin: page }) => {
   const instant = span({ span_id: '00f067aa0ba902b0', operation_name: 'instant request', start_time_us: START_TIME + 120_000, duration_us: 0 })
   await page.route('**/api/debug/spans*', route => route.fulfill({ json: [instant, span()] }))
-  await spaNavigate(page)('/admin?tab=diagnostics')
+  await spaNavigate(page)('/admin/spans')
   const section = page.getByRole('region', { name: 'Recent spans', exact: true })
   await section.getByRole('treegrid', { name: 'Spans' }).getByRole('row', { name: /instant request/ }).click()
   const row = section.getByRole('treegrid', { name: 'Trace waterfall' }).getByRole('row', { name: /instant request/ })
@@ -223,7 +223,7 @@ function retainedSpans() {
 
 test('large traces measure inline details and remain keyboard navigable', async ({ asAdmin: page }) => {
   await page.route('**/api/debug/spans*', route => route.fulfill({ json: retainedSpans() }))
-  await spaNavigate(page)('/admin?tab=diagnostics')
+  await spaNavigate(page)('/admin/spans')
   const section = page.getByRole('region', { name: 'Recent spans', exact: true })
   const results = section.getByRole('treegrid', { name: 'Spans', exact: true })
   await expect(results.locator('[data-span-row]').first()).toBeVisible()
@@ -248,6 +248,117 @@ test('large traces measure inline details and remain keyboard navigable', async 
   await expectTiming(trace.getByRole('row', { selected: true }), 499 / 619, 120 / 619)
 })
 
+test('diagnostics links to the dedicated spans page', async ({ asAdmin: page }) => {
+  let reads = 0
+  await page.route('**/api/debug/spans*', route => {
+    reads++
+    return route.fulfill({ json: [span()] })
+  })
+  await spaNavigate(page)('/admin?tab=diagnostics')
+  const link = page.getByRole('link', { name: 'Open spans', exact: true })
+  await expect(link).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Recent spans', exact: true })).toHaveCount(0)
+  expect(reads).toBe(0)
+  await link.click()
+  await expect(page).toHaveURL(/\/admin\/spans$/)
+  await expect(page.getByRole('treegrid', { name: 'Spans', exact: true })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('treegrid', { name: 'Spans', exact: true })).toBeVisible()
+})
+
+for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 640 }]) {
+  test(`dedicated workspace keeps selection anchored at ${viewport.width}px`, async ({ asAdmin: page }) => {
+    await page.setViewportSize(viewport)
+    const spans = retainedSpans().map((item, index) => index === 240 ? {
+      ...item, attributes: { context: 'A long diagnostic line\n'.repeat(50) },
+    } : item)
+    await page.route('**/api/debug/spans*', route => route.fulfill({ json: spans }))
+    await spaNavigate(page)('/admin/spans')
+    await expect(page.getByRole('link', { name: 'Spans', exact: true })).toHaveAttribute('aria-current', 'page')
+    const workspace = page.getByRole('region', { name: 'Recent spans', exact: true })
+    const main = page.getByRole('main')
+    const results = workspace.getByRole('treegrid', { name: 'Spans', exact: true })
+    await results.locator('[data-span-row]').first().click()
+    const trace = workspace.getByRole('treegrid', { name: 'Trace waterfall', exact: true })
+    const mainBounds = (await main.boundingBox())!
+    const workspaceBounds = (await workspace.boundingBox())!
+    const traceBounds = (await trace.boundingBox())!
+    expect(workspaceBounds.height).toBeCloseTo(mainBounds.height, 0)
+    expect(workspaceBounds.y).toBeCloseTo(mainBounds.y, 0)
+    expect(traceBounds.height).toBeGreaterThan(72)
+    expect(Math.abs(traceBounds.y + traceBounds.height - workspaceBounds.y - workspaceBounds.height)).toBeLessThanOrEqual(18)
+    const outerScroll = () => page.evaluate(() => ({
+      document: document.scrollingElement!.scrollTop,
+      main: document.querySelector('main')!.scrollTop,
+      overflow: document.documentElement.scrollHeight - window.innerHeight,
+    }))
+    expect(await outerScroll()).toEqual({ document: 0, main: 0, overflow: 0 })
+    await trace.evaluate(element => { element.scrollTop = 240 * 32 - 16 })
+    const row = trace.getByRole('row', { name: /retained request 240 ·/ })
+    await expect(row).toBeVisible()
+    const top = (await row.boundingBox())!.y
+    const scrollTop = await trace.evaluate(element => element.scrollTop)
+    const visibleRow = (await row.boundingBox())!
+    expect(visibleRow.y).toBeGreaterThan(traceBounds.y + 40)
+    expect(visibleRow.y + visibleRow.height).toBeLessThan(traceBounds.y + traceBounds.height)
+    // Use viewport coordinates so the driver does not scroll before the pointer selection.
+    await page.mouse.click(visibleRow.x + 100, visibleRow.y + 16)
+    await expect(trace.getByRole('region', { name: 'Span inspector' })).toBeVisible()
+    await expect.poll(async () => (await row.boundingBox())!.y).toBeCloseTo(top, 0)
+    expect(await trace.evaluate(element => element.scrollTop)).toBe(scrollTop)
+    expect(await outerScroll()).toEqual({ document: 0, main: 0, overflow: 0 })
+    await page.keyboard.press('Escape')
+    await expect(row).toBeFocused()
+    expect((await row.boundingBox())!.y).toBeCloseTo(top, 0)
+    await page.keyboard.press('End')
+    await expect(trace.getByRole('row', { name: /retained request 499 ·/ })).toBeFocused()
+    expect(await outerScroll()).toEqual({ document: 0, main: 0, overflow: 0 })
+  })
+}
+
+test('switching inline selection preserves a visible row after scrolling backward', async ({ asAdmin: page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+  const spans = retainedSpans()
+  for (const item of spans.slice(1)) item.parent_span_id = spans[0].span_id
+  await page.route('**/api/debug/spans*', route => route.fulfill({ json: spans }))
+  await spaNavigate(page)('/admin/spans')
+  const section = page.getByRole('region', { name: 'Recent spans', exact: true })
+  await section.getByRole('treegrid', { name: 'Spans', exact: true }).locator('[data-span-row]').first().click()
+  const trace = section.getByRole('treegrid', { name: 'Trace waterfall', exact: true })
+  const closedHeight = await trace.evaluate(element => element.scrollHeight)
+  await trace.getByRole('row', { name: /retained request 0 ·/ }).click()
+  await expect(trace.getByRole('region', { name: 'Span inspector' })).toBeVisible()
+  await trace.evaluate(element => { element.scrollTop = 2500 })
+  await expect.poll(() => trace.evaluate(element => element.scrollTop)).toBe(2500)
+  await trace.evaluate(element => { element.scrollTop -= 64 })
+  const key = await trace.evaluate(element => {
+    const bounds = element.getBoundingClientRect()
+    return Array.from(element.querySelectorAll<HTMLElement>('[data-span-row]')).find(row => {
+      const rowBounds = row.getBoundingClientRect()
+      return rowBounds.top > bounds.top + 48 && rowBounds.bottom < bounds.bottom
+    })!.dataset.spanRow
+  })
+  const row = trace.locator(`[data-span-row="${key}"]`)
+  const before = (await row.boundingBox())!
+  await page.mouse.click(before.x + 100, before.y + 16)
+  await expect(row).toHaveAttribute('aria-selected', 'true')
+  await expect.poll(async () => (await row.boundingBox())!.y).toBeCloseTo(before.y, 0)
+  await expect.poll(async () => {
+    const detailHeight = (await trace.locator('[data-span-detail]').boundingBox())!.height
+    return Math.abs(await trace.evaluate(element => element.scrollHeight) - closedHeight - detailHeight)
+  }).toBeLessThan(2)
+  const measuredHeight = await trace.evaluate(element => element.scrollHeight)
+  await trace.evaluate(element => { element.scrollTop = 0 })
+  await expect(trace.getByRole('row', { name: /retained request 0 ·/ })).toBeVisible()
+  expect(await trace.evaluate(element => element.scrollHeight)).toBe(measuredHeight)
+  await trace.getByRole('button', { name: 'Collapse retained request 0', exact: true }).click()
+  await expect(trace.getByRole('region', { name: 'Span inspector' })).toHaveCount(0)
+  await trace.getByRole('button', { name: 'Expand retained request 0', exact: true }).click()
+  await expect.poll(() => trace.evaluate(element => element.scrollHeight)).toBe(closedHeight)
+  expect(await page.evaluate(() => document.scrollingElement!.scrollTop)).toBe(0)
+  expect(await page.getByRole('main').evaluate(element => element.scrollTop)).toBe(0)
+})
+
 test('frozen snapshots and live updates preserve scroll and zoom', async ({ asAdmin: page }) => {
   test.setTimeout(70_000)
   let retained = retainedSpans()
@@ -256,7 +367,7 @@ test('frozen snapshots and live updates preserve scroll and zoom', async ({ asAd
     reads++
     return route.fulfill({ json: retained })
   })
-  await spaNavigate(page)('/admin?tab=diagnostics')
+  await spaNavigate(page)('/admin/spans')
   const section = page.getByRole('region', { name: 'Recent spans', exact: true })
   const results = section.getByRole('treegrid', { name: 'Spans', exact: true })
   await expect(results.locator('[data-span-row]').first()).toBeVisible()

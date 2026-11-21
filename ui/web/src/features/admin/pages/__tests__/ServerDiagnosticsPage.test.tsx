@@ -1,5 +1,6 @@
 import { cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from '../../../../../tests/test-utils'
@@ -10,7 +11,6 @@ import {
   getSpans,
   getWorkerStats,
   type CoroutineStats,
-  type Span,
   type WorkerCoroutines,
   type WorkerStats,
 } from '../../api/debug-api'
@@ -113,35 +113,13 @@ const WORKER_STATS: WorkerStats = {
   user_workers: { total: 1 },
 }
 
-const SPANS: Span[] = [
-  {
-    trace_id: '4bf92f3577b34da6a3ce929d0e0e4736',
-    span_id: '00f067aa0ba902b7',
-    parent_span_id: null,
-    operation_name: 'GET api_albums_index',
-    service: 'baander',
-    kind: 'server',
-    start_time_us: 1_790_000_000_000_000,
-    duration_us: 12_345,
-    attributes: {
-      'http.request.method': 'GET',
-      'baander.route': 'api_albums_index',
-      'http.response.status_code': 200,
-    },
-    status_code: 'OK',
-    status_message: '',
-    file_path: null,
-    line_number: null,
-  },
-]
-
 let queryClient: QueryClient
 
 function mount() {
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   return render(
     <QueryClientProvider client={queryClient}>
-      <ServerDiagnosticsPage />
+      <MemoryRouter><ServerDiagnosticsPage /></MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -173,7 +151,7 @@ describe('ServerDiagnosticsPage', () => {
     client.setCoordinator(coordinator)
     const stop = coordinator.start()
     const release = coordinator.beginMutation(['admin-runtime'])
-    render(<QueryClientProvider client={client}><ServerDiagnosticsPage /></QueryClientProvider>)
+    render(<QueryClientProvider client={client}><MemoryRouter><ServerDiagnosticsPage /></MemoryRouter></QueryClientProvider>)
     try {
       expect(screen.queryByText('Failed to load server diagnostics.')).toBeNull()
       expect(mockServerStats).not.toHaveBeenCalled()
@@ -192,7 +170,7 @@ describe('ServerDiagnosticsPage', () => {
     mockServerStats.mockResolvedValue(SERVER_STATS)
     mockCoroutineStats.mockResolvedValue(COROUTINE_STATS)
     mockWorkerStats.mockResolvedValue(WORKER_STATS)
-    mockSpans.mockResolvedValue(SPANS)
+    mockSpans.mockResolvedValue([])
     mockClearSpans.mockResolvedValue(undefined)
   })
 
@@ -263,18 +241,14 @@ describe('ServerDiagnosticsPage', () => {
     expect(within(pools).queryByText('Transcode pool')).not.toBeInTheDocument()
   })
 
-  it('shows spans with operation name, status code and duration in milliseconds', async () => {
+  it('links to the dedicated spans page without collecting spans', async () => {
     mount()
 
-    const spans = await screen.findByRole('region', { name: 'Recent spans' })
-    expect(await within(spans).findByText('GET api_albums_index')).toBeInTheDocument()
-    const spanRow = within(spans).getByRole('row', { name: /GET api_albums_index/ })
-    expect(within(spanRow).getByText('200')).toBeInTheDocument()
-    expect(within(spanRow).getByText('12.3 ms')).toBeInTheDocument()
-    expect(mockSpans).toHaveBeenCalledWith(500, expect.any(AbortSignal))
-
-    await userEvent.click(within(spans).getByRole('button', { name: 'Clear' }))
-    expect(mockClearSpans).toHaveBeenCalledTimes(1)
+    const link = await screen.findByRole('link', { name: 'Open spans' })
+    expect(link).toHaveAttribute('href', '/admin/spans')
+    expect(screen.queryByRole('region', { name: 'Recent spans' })).not.toBeInTheDocument()
+    expect(mockSpans).not.toHaveBeenCalled()
+    expect(mockClearSpans).not.toHaveBeenCalled()
   })
 
   it('shows an error with a retry button when the server stats fail', async () => {

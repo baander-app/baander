@@ -2,8 +2,14 @@ import styled from 'styled-components'
 import { textRole } from '@/shared/theme'
 
 export const InspectorBody = styled.div`
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-md);
   padding: var(--space-md);
+  min-height: 0;
   min-width: 0;
+  overflow: hidden;
   ${textRole('body-sm')}
   overflow-wrap: anywhere;
 `

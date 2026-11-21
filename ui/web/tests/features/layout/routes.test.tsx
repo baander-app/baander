@@ -1,7 +1,19 @@
 import { describe, it, expect } from 'vitest'
+import { matchRoutes } from 'react-router-dom'
+import { AdminRoute } from '@/features/admin/components/layout/AdminRoute'
+import { AdminShell } from '@/features/admin/components/layout/AdminShell'
+import { SpansPage } from '@/features/admin/pages/SpansPage'
 import { protectedRoutes } from '@/features/layout/routes'
 
 describe('route structure', () => {
+  it('serves the dedicated spans workspace inside the guarded admin shell', () => {
+    const matches = matchRoutes(protectedRoutes, '/admin/spans')
+    const elements = matches?.map(match => match.route.element)
+
+    expect(elements).toEqual(expect.arrayContaining([<AdminRoute />, <AdminShell />, <SpansPage />]))
+    expect(matches?.at(-1)?.route.path).toBe('/admin/spans')
+  })
+
   it('/ redirects to /music by default', () => {
     const appShellRoutes = protectedRoutes[0].children?.[0]?.children as Array<{ path: string; element: React.ReactElement }>
     const rootRoute = appShellRoutes.find((r) => r.path === '/')

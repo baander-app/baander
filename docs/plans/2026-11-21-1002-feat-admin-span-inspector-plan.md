@@ -139,6 +139,7 @@ The user supplied `/tmp/codex-clipboard-Lh1PzQ.png` (dense tree and service bars
 - Selection must use the current `--color-highlight` theme token; the removed `--color-accent` alias cannot provide a visible selection background. Browser checks cover selection in light and dark themes.
 - Filter, metadata, action and detail layouts must use the prescribed spacing scale; use `--space-md` for their gaps. Browser checks cover the resulting desktop and narrow layouts.
 - Review corrections: enabling Live after a successful clear must not restore the suppressed cached snapshot, including after a failed read. Keep a regression for this transition. Give icon-only branch and all-tree controls shared tooltips, and reset evicted selection without a cascading effect update.
+- Selection remeasurement correction: when an expanded span is off-screen, selecting another row must release its cached detail height and preserve the new row's viewport position. The browser regression exposed 1,198 pixels of stale height after backward scrolling; verify that total scroll height contains only the current inline details, including when returning to the old row.
 - Verification: Focused component and existing diagnostics page tests; web typecheck, lint and production build; browser checks at desktop and narrow widths against the isolated preview.
 
 ### U3. Operator guidance and acceptance record

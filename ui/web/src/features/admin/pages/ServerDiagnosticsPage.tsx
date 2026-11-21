@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import { textRole } from '@/shared/theme'
 import { Button } from '@/shared/components/ui/button'
@@ -7,7 +8,6 @@ import { CoroutinesSection } from '../components/diagnostics/CoroutinesSection'
 import { DeveloperToolsCard } from '../components/diagnostics/DeveloperToolsCard'
 import { RedisCard } from '../components/diagnostics/RedisCard'
 import { SectionSkeleton } from '../components/diagnostics/SectionStates'
-import { SpansSection } from '../components/diagnostics/SpansSection'
 import { WorkerFailureNotice } from '../components/diagnostics/WorkerFailureNotice'
 import { WorkerPoolsSection } from '../components/diagnostics/WorkerPoolsSection'
 import { WorkersTable } from '../components/diagnostics/WorkersTable'
@@ -113,7 +113,14 @@ export function ServerDiagnosticsPage() {
         </Grid>
       </Section>
 
-      <SpansSection />
+      <Section>
+        <SectionTitle>Spans</SectionTitle>
+        <div>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/admin/spans">Open spans</Link>
+          </Button>
+        </div>
+      </Section>
 
       {dataUpdatedAt > 0 && (
         <MutedSmall>

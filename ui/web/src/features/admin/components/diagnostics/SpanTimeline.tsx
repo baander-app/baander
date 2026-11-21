@@ -18,12 +18,17 @@ const TICKS = [0, 25, 50, 75, 100]
 const ZOOM_LEVELS = [1, 2, 4, 8]
 
 const Root = styled.div`
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
   min-width: 0;
   width: 100%;
 `
 const Toolbar = styled.div`
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-md);
@@ -31,7 +36,9 @@ const Toolbar = styled.div`
 `
 const Origin = styled.div`
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--color-muted-foreground);
   ${textRole('mono-sm')}
 `
@@ -40,7 +47,8 @@ const Zoom = styled.div`
 `
 const Scroll = styled.div`
   --timeline-label-width: 320px;
-  max-height: 38rem;
+  flex: 1;
+  min-height: 0;
   min-width: 0;
   width: 100%;
   overflow: auto;
@@ -264,6 +272,7 @@ export function SpanTimeline({ timeline, label, selectedKey, onSelect, onClose, 
   const scrollRef = useRef<HTMLDivElement>(null)
   const axisTrackRef = useRef<HTMLDivElement>(null)
   const anchorRef = useRef<ViewAnchor | null>(null)
+  const selectionAnchorRef = useRef<ViewAnchor | null>(null)
   const [activeKey, setActiveKey] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set())
   const [zoom, setZoom] = useState(1)
@@ -289,7 +298,8 @@ export function SpanTimeline({ timeline, label, selectedKey, onSelect, onClose, 
     count: virtual ? rows.length : 0,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => ROW_HEIGHT,
-    getItemKey: (index) => spanKey(rows[index].span),
+    // Expanded details must never supply the cached height of a closed group.
+    getItemKey: (index) => `${spanKey(rows[index].span)}:${hierarchical && index === selectedIndex ? 'expanded' : 'closed'}`,
     overscan: 5,
     scrollMargin: AXIS_HEIGHT,
     initialRect: { width: 720, height: 480 },
@@ -343,8 +353,33 @@ export function SpanTimeline({ timeline, label, selectedKey, onSelect, onClose, 
   }, [rows, virtual, virtualizer, rememberAnchor])
 
   useLayoutEffect(() => {
+    const anchor = selectionAnchorRef.current
+    const scroll = scrollRef.current
+    if (!anchor || !scroll) return
+    const { key, offset, left } = anchor
+    function restore() {
+      const row = document.getElementById(`${id}-${key}`)
+      if (!row || !scroll) return
+      scroll.scrollTop += row.getBoundingClientRect().top - scroll.getBoundingClientRect().top - offset
+      scroll.scrollLeft = left
+    }
+    restore()
+    const frame = requestAnimationFrame(() => {
+      restore()
+      selectionAnchorRef.current = null
+    })
+    return () => cancelAnimationFrame(frame)
+  })
+
+  useLayoutEffect(() => {
     rememberAnchor()
   })
+
+  function rememberSelectionAnchor(key: string) {
+    const row = document.getElementById(`${id}-${key}`)
+    const scroll = scrollRef.current
+    if (row && scroll) selectionAnchorRef.current = { key, offset: row.getBoundingClientRect().top - scroll.getBoundingClientRect().top, left: scroll.scrollLeft }
+  }
 
   function focusRow(key: string, reveal = false) {
     setActiveKey(key)
@@ -353,11 +388,18 @@ export function SpanTimeline({ timeline, label, selectedKey, onSelect, onClose, 
     requestAnimationFrame(() => {
       const row = document.getElementById(`${id}-${key}`)
       row?.focus({ preventScroll: true })
-      if (reveal && !virtual) row?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+      const scroll = scrollRef.current
+      if (reveal && !virtual && row && scroll) {
+        const bounds = row.getBoundingClientRect()
+        const viewport = scroll.getBoundingClientRect()
+        if (bounds.top < viewport.top + AXIS_HEIGHT) scroll.scrollTop += bounds.top - viewport.top - AXIS_HEIGHT
+        else if (bounds.bottom > viewport.bottom) scroll.scrollTop += bounds.bottom - viewport.bottom
+      }
     })
   }
 
   function closeDetails() {
+    if (selectedKey) rememberSelectionAnchor(selectedKey)
     onClose?.()
     if (selectedKey) focusRow(selectedKey)
   }
@@ -394,7 +436,10 @@ export function SpanTimeline({ timeline, label, selectedKey, onSelect, onClose, 
     else if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
       if (hierarchical && key === selectedKey) closeDetails()
-      else onSelect(row.span)
+      else {
+        rememberSelectionAnchor(key)
+        onSelect(row.span)
+      }
       return
     } else if (hierarchical && event.key === 'ArrowLeft') {
       event.preventDefault()
@@ -451,7 +496,10 @@ export function SpanTimeline({ timeline, label, selectedKey, onSelect, onClose, 
           onClick={() => {
             setActiveKey(key)
             if (hierarchical && selected) closeDetails()
-            else onSelect(span)
+            else {
+              rememberSelectionAnchor(key)
+              onSelect(span)
+            }
             document.getElementById(`${id}-${key}`)?.focus({ preventScroll: true })
           }}
         >
@@ -493,7 +541,7 @@ export function SpanTimeline({ timeline, label, selectedKey, onSelect, onClose, 
   return (
     <TooltipProvider><Root>
       <Toolbar>
-        <Origin>Origin: <time dateTime={spanStartTime(timeline.startTimeUs)}>{spanStartTime(timeline.startTimeUs)}</time></Origin>
+        <Origin title={spanStartTime(timeline.startTimeUs)}>Origin: <time dateTime={spanStartTime(timeline.startTimeUs)}>{spanStartTime(timeline.startTimeUs)}</time></Origin>
         <Zoom>
           <Select value={String(zoom)} onValueChange={(value) => {
             setZoom(Number(value))

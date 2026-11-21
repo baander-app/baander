@@ -19,6 +19,7 @@ const navItems: NavItem[] = [
   { to: '/admin/radio', label: 'Radio' },
   { to: '/admin/analytics', label: 'Analytics' },
   { to: '/admin/logs', label: 'Logs', superAdminOnly: true },
+  { to: '/admin/spans', label: 'Spans', superAdminOnly: true },
   { to: '/admin/settings', label: 'Settings', superAdminOnly: true },
 ]
 
