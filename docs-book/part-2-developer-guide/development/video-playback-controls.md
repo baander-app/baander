@@ -81,11 +81,28 @@ reporting an error; uninterrupted playback hides it after inactivity. Shared
 controls retain keyboard labels and focus behavior. Fullscreen includes the
 application document so portalled menus remain visible.
 
-Quality selection belongs to the active attachment. The HLS adapter exposes Auto
-and the published renditions, retaining a manual preference across rendition-set
-changes. When that rendition disappears, playback falls back to automatic
-selection. Native playback exposes only its actual capabilities. Transport and
-volume commands continue through the listening session; presentation settings
+The persistent video host fills the available cinema area. The video scales within
+those bounds while preserving its aspect ratio, leaving unused space when the
+picture and player have different shapes. Display fit is independent of encoded
+resolution: selecting a lower tier changes the decoded pixels, while the player
+continues to fit the picture without cropping. Resizing and fullscreen use the
+same containment behavior.
+
+Quality selection uses delivery negotiation for original-file, copy, encoded and
+native HLS playback. Auto keeps ordinary delivery selection and limits its
+encoding ladder to the configured video encoder slots. A manual choice
+requests a supported resolution tier through `qualityTier`; the source dimensions,
+quality policy and destination capabilities limit the choices. The
+playback-information resource supplies these choices independently of the current
+manifest. Unknown dimensions and sources below the smallest supported tier retain
+Auto without offering an upscale.
+
+A compatible original or copy can satisfy a manual tier at the source height.
+Otherwise delivery reuses an exact completed presentation or admits the requested
+encode tier alone. It does not substitute a smaller cached rendition. The player
+shows the pending request separately from the confirmed selection and current
+output; failed admission does not confirm the requested quality. Transport and
+volume commands continue through the listening session, and presentation settings
 require the matching local video owner.
 
 The playback-information API supplies scoped audio tracks, subtitle descriptions,
@@ -122,7 +139,36 @@ The subtitle adapter applies each correction to saved original cue times and
 reconciles cues that arrive later.
 
 The runtime keeps the source cursor and play/pause intent while replacing an
-audio presentation. The UI distinguishes pending and accepted settings. Settings
-survive seeks and attachment renewal for the same movie and reset when a different
-movie is selected. Remote destinations keep transport controls; presentation
-settings explain that they must be changed on the playing destination.
+audio or quality presentation. Its reported source cursor uses the retained
+position while the replacement resets the media element's clock. Both choices share the same transition revision,
+so an older completion cannot overwrite newer intent. The UI distinguishes pending
+and accepted settings. Selectors show the pending choice, allowing a return to
+the accepted Auto or default audio setting while a replacement is being prepared.
+Audio-track and timing changes retain the pending companion value; repeated
+100 ms timing gestures accumulate against the pending offset.
+
+Changes serialize cancellation and admission. Before starting a replacement or
+recovering the accepted presentation, the runtime must successfully cancel any
+session whose identifier it already holds. Copy negotiation returns that
+identifier before signing, so even a replacement that fails during signing can
+be cancelled. This ordering allows a single producer slot to serve successive
+choices.
+
+If cancellation fails, the player retains the accepted settings, source cursor
+and play/pause intent. Its existing one-second poll queues another cancellation
+attempt for the same session, with a five-second timeout for each request.
+Admission waits for cancellation to succeed; newer intent or loss of playback
+ownership prevents the old recovery from continuing. If preparation fails after
+cancellation succeeds, recovery restarts the accepted presentation. A destination
+handoff waits for pending presentation changes to settle and fails if cancellation
+remains unconfirmed, so a late cancellation cannot overtake the handoff.
+
+Settings survive seeks and attachment renewal for the same movie and reset when
+a different movie is selected. Remote destinations keep transport controls;
+presentation settings explain that they must be changed on the playing destination.
+
+Closing the owner while an admission response is lost has a separate cleanup
+limit: the server may already have admitted a session whose identifier the player
+never received. That session can remain until server expiry. Cancelling it safely
+requires a server-scoped cancellation protocol; cancelling the former owner's
+whole session group after ownership changes could also cancel its successor.

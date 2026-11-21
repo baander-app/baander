@@ -74,7 +74,7 @@ checks again before launching children; diagnostics identify the setting without
 printing its credential-bearing value. These checks preserve the configured
 streams, group and generated identity. They do not test endpoint connectivity.
 
-The validated workload catalog in `config/packages/messenger.php` supplies eighteen
+The validated workload catalog in `config/packages/messenger.php` supplies twenty
 default production routes and two explicit-only workloads: lyrics fetch and
 webhook delivery. Container compilation checks routes, handlers, codecs, JSON
 serialization and bounded retry policies; producer dispatch checks the selected
@@ -116,6 +116,7 @@ providers need credentials in the process that makes the request.
 |----------|---------|-------------|
 | `DISCOGS_TOKEN` | — | Discogs API personal access token. The admitted worker recipe cannot currently provision it for queued enrichment; see [External APIs](../media/external-apis.md#configuration). |
 | `LASTFM_API_KEY` | — | Last.fm API key for web artist search and browse information; stored metadata sync does not use it. |
+| `TMDB_BEARER_TOKEN` | empty | Optional bearer token for TMDB movie metadata and director credits. Admitted worker credentials and preset/preview worker setup carry it; apply the [configuration lifecycle](README.md) after changing it. |
 | `SPOTIFY_CLIENT_ID` | — | Adapter credential; no current application workflow calls Spotify. |
 | `SPOTIFY_CLIENT_SECRET` | — | Companion adapter secret; it does not enable a current workflow. |
 | `TASTE_DIVE_API_KEY` | — | Adapter credential; no current application workflow calls TasteDive. |

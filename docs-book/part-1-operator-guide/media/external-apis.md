@@ -12,6 +12,7 @@ See [Library Management](library-management.md#what-happens-to-new-music) for au
 | Cover Art Archive | The front cover of the MusicBrainz release a match applies | No API key. Requests send the same User-Agent and take turns under the MusicBrainz rate limit. |
 | Discogs | Metadata searches that name Discogs as their source | `DISCOGS_TOKEN` |
 | Last.fm | Artist search and artist information in metadata browse responses | `LASTFM_API_KEY` |
+| TMDB | Movie metadata and director credits requested by library metadata sync | `TMDB_BEARER_TOKEN` in the metadata worker |
 | Spotify | Adapter exists, but no application service currently calls it | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` are not needed for current workflows |
 | TasteDive | Adapter exists, but no application service currently calls it | `TASTE_DIVE_API_KEY` is not needed for current workflows |
 | LRCLIB | Lyrics fetches for songs without local lyrics | No API key. The client sends a fixed application User-Agent. |
@@ -47,6 +48,7 @@ Use this table when catalog records exist but enrichment is missing.
 | **Cover Art Archive** | A match that would add a front cover writes nothing. Automatic matching pauses as it does for a MusicBrainz outage; an administrator's apply answers `503`. A cover the Cover Art Archive refuses is no outage: automatic matching applies the match without the cover, and an administrator's apply with the cover ticked answers `409` and writes nothing. |
 | **Discogs** | Metadata searches that name Discogs as their source get no results from it. Matching and the song sync do not call Discogs. |
 | **Last.fm** | Last.fm artist search and browse information are unavailable. Matching and the song sync do not call Last.fm. |
+| **TMDB** | Movie metadata and director credits remain unchanged when lookup fails; the movie sync reports failure for retry. Missing credentials do not prevent local movie import or playback. |
 | **Spotify / TasteDive** | No impact on current application workflows. |
 | **LRCLIB** | Remote lyrics fetches cannot supply lyrics; readable `.lrc` sidecars still provide local lyrics during ingestion. A fetch that found LRCLIB unavailable, or could not be sent within its wait, stores nothing, and a later fetch may succeed. |
 
@@ -64,6 +66,13 @@ An administrator can request a metadata sync of every library; see [`app:metadat
 2. The chosen result must pass the match-quality check.
 3. Accepted changes are stored in the catalog and appear on later reads. Last.fm browse responses do not become an automatic third stage of stored enrichment.
 
+Library sync also queues each movie for TMDB enrichment. A movie's stored TMDB ID
+controls the lookup; otherwise enrichment searches its title and year. Normal
+sync fills missing director credits, while missing or failed credit information
+retains the stored set. See [Movie directors](library-management.md#movie-directors)
+for browsing and replacement behavior. This work starts through metadata sync;
+scanning alone does not request director credits.
+
 Lyrics have a separate `lyrics.auto_fetch` setting, also off by default. It requests LRCLIB lyrics for newly created tracks without an `.lrc` sidecar, and for tracks without lyrics that a rescan gives an artist credit or a new length. The bulk [`app:lyrics:fetch`](../commands/app-lyrics-fetch.md) command can request lyrics for existing tracks independently of that setting. Embedded cover extraction is another separate task; see [Cover Art Extraction](library-management.md#cover-art-extraction).
 
 ## Configuration
@@ -72,6 +81,13 @@ Put web lookup credentials in the private Compose environment file described in
 [Getting Started](../getting-started/installation.md#command-context), rather than committing them
 to the checkout. Apply changes using the [configuration lifecycle](../configuration/README.md).
 This configures web; it does not configure the independent worker image.
+
+TMDB movie enrichment runs in workers. Set the optional `TMDB_BEARER_TOKEN` in
+the private deployment environment and apply the configuration lifecycle so the
+workers receive the change. The admitted credentials, preset renderer and preview
+worker setup forward this token; the default is empty. An unconfigured token
+does not provide authenticated TMDB lookup, but local movie import and playback
+remain available.
 
 Queued metadata sync runs in workers. Their credentials file accepts a restricted
 set of keys that currently excludes `DISCOGS_TOKEN` and `LASTFM_API_KEY`, and the
@@ -90,5 +106,6 @@ For current optional integrations, obtain the credential from its provider:
 
 - **Discogs**: generate a personal access token in the provider's developer settings and set `DISCOGS_TOKEN`.
 - **Last.fm**: register an API application and set its API key as `LASTFM_API_KEY`.
+- **TMDB**: configure its bearer token as `TMDB_BEARER_TOKEN` in the private deployment environment, then apply the configuration lifecycle above.
 
 MusicBrainz and LRCLIB do not require an API key for these lookups. Spotify and TasteDive credentials do not activate an application workflow in the current implementation.

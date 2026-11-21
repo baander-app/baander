@@ -220,6 +220,23 @@ without an index observation is unavailable until a scan confirms its source.
 
 ## Catalog
 
+### Director
+
+A Catalog identity for a movie director, with a stable internal UUID and public ID.
+Imported directors are matched by TMDB person ID, not by name; two people with the
+same name remain distinct. The record carries a display name and optional profile
+image URL. Directory visibility and movie counts derive from movies the reader
+can access.
+
+### Movie director credit
+
+The link between one movie and one director. A movie can credit several directors,
+and a director can have credits on several movies. Normal metadata enrichment
+fills missing credits; forced enrichment replaces the set, including a successful
+empty result. Missing or failed credit information retains the stored set. The
+[library guide](docs-book/part-1-operator-guide/media/library-management.md#movie-directors)
+describes enrichment and browsing.
+
 ### Artist credit
 
 The link between a song or album and one artist, with a role such as primary. The
@@ -474,6 +491,17 @@ Another client's job for the same source has independent controls, execution cla
 The immutable set of owned video job public IDs and their individual execution
 generations carried by a signed adaptive HLS or DASH manifest request. It fixes
 which outputs the player may switch between; a changed set needs a new signature.
+
+### Manual video quality
+
+A viewer's explicit choice of a canonical resolution tier for the current movie.
+Delivery keeps a compatible source at that height, reuses an exact completed presentation,
+or admits only the requested encoding tier. It does not substitute a lower tier.
+Auto removes the explicit choice and restores ordinary delivery negotiation.
+Source dimensions, destination limits and stable QoL qualification determine the
+choices. Admission checks current capacity when the viewer requests the
+presentation. The [playback controls guide](docs-book/part-2-developer-guide/development/video-playback-controls.md)
+describes the API and runtime contract.
 
 ### Published presentation
 

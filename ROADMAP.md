@@ -46,6 +46,198 @@ report no remaining findings.
 The frontend and backend coding rules retain the user's formatting preference:
 readable multiline code, separate statements and a readability check beyond lint.
 
+Manual quality selection now negotiates the requested resolution for original,
+copy, encoded and native HLS playback. The menu lists canonical tiers that fit the
+source, destination and stable QoL qualification, independently of the currently
+published renditions. Delivery retains compatible source-height media, reuses an
+exact completed presentation or admits the requested tier alone. Auto restores
+ordinary delivery selection. Changes preserve the source cursor, pause state,
+audio language, audio correction, subtitle selection and subtitle correction.
+Audio and quality changes share a revision so stale responses cannot overwrite
+newer choices. Pending selection, confirmed selection and current output remain
+distinct. The persistent host now bounds the video to the available cinema area,
+and aspect-preserving containment fits the picture independently of its encoded
+resolution. Lower tiers still use the available display area without cropping;
+resizing and fullscreen retain the selected encoding tier.
+
+Review corrections carry `qualityTier` through the shared delivery adapter,
+reject allocations for a different tier and include matching copy output in
+completed-presentation reuse. Auto now limits its encoding ladder to the configured
+video encoder slots: a single-slot deployment previously tried to admit an
+additional rendition that could not fit. Presentation changes serialize session retirement,
+admission and recovery, so a single producer slot can serve successive choices.
+Failed cancellation retains the accepted settings and cursor until the same
+session is successfully retired. Pending audio, quality and transport intent
+survive overlapping changes; selectors allow reversal to Auto or default audio,
+and repeated timing gestures accumulate against the pending offset. Handoff waits
+for presentation changes and rejects unconfirmed cancellation. The changed code
+uses readable multiline formatting. All five original review findings, two
+follow-up findings and one later finding are corrected; the final focused source
+review reports no findings.
+
+Separate open work: closing the owner while an admission response is lost can
+leave a newly admitted session whose identifier the player never received until
+server expiry. This behavior predates manual quality selection. As the
+[playback controls guide](docs-book/part-2-developer-guide/development/video-playback-controls.md)
+explains, cleanup needs a server-scoped cancellation protocol: cancelling the
+former owner's whole group after ownership changes could cancel its successor.
+
+Manual-quality verification on 2026-11-21: the CI image passes 479 backend tests
+with 4,059 assertions across 33 files: 391 ordinary tests with 2,679 assertions,
+28 native tests with 160 assertions, and two stack selections of 41 tests with
+847 assertions and 19 tests with 373 assertions. The full web suite passes
+3,808 tests in 311 files. After the final recovery corrections, both player-hook
+suites pass all 300 tests; the delivery transport suite passes all 31 tests.
+Final PHPStan checks all 4,047 files in the CI image with no errors; Deptrac reports
+no violations, warnings or errors. Full web lint reports no errors and 12 existing warnings, and the final typecheck
+passes. The production build passes after the viewport-fit change, and all ten
+focused overlay tests pass. After the Auto admission correction, the affected CI
+suite passes 45 tests with 268 assertions; these overlap the backend baseline.
+Scoped viewport-fit lint passes with no errors.
+
+The one-slot manual-quality browser run passes for both original and copy starts.
+It verifies decoded 720p, 480p and 360p media and return to Auto, source cursor and
+pause retention, and actual display geometry at desktop and portrait sizes and in
+fullscreen. Both original/copy delivery browser checks also pass. The broader
+cinema scenario exposed a source cursor reported as zero while replacement reset
+the native clock; retaining the protected cursor fixes both regression cases, and
+the final 300-test hook rerun passes. A later cinema rerun could not complete
+because an unrelated paused media producer held the sole video slot. Fixture
+cleanup completed with no survivors; the producer was left untouched. The cinema
+rerun and cross-client encoded handoff subsequently pass with the other original
+player cases: all six pass after restoring the ordinary eight-slot profile. The
+handoff needs concurrent producers and did not pass with one slot. The earlier
+one-slot replacement and viewport-fit proof remains valid.
+
+## Movie directors
+
+Director browsing is implemented with persisted Catalog director identities and
+movie credits. **Directors** opens a searchable, paginated directory; each director
+links to their accessible movies through the existing movie cards. Names, optional
+portraits and movie counts come from stored records, and every query applies the
+reader's library scope. TMDB person IDs distinguish people who share a name.
+
+The existing metadata sync now queues movie enrichment, allowing existing movies
+to acquire director credits when TMDB is configured. Normal enrichment fills
+missing credits; forced enrichment replaces them, including an authoritative empty
+result. Absent or failed credits retain the stored set. Movie metadata and accepted
+credit updates commit together; existing TMDB movie identity controls lookups,
+and a conflicting search match cannot redirect writes to another local movie.
+The [library guide](docs-book/part-1-operator-guide/media/library-management.md#movie-directors)
+and [sync command reference](docs-book/part-1-operator-guide/commands/app-metadata-sync.md)
+explain the workflow and its limits.
+
+Director verification on 2026-11-21: the CI image passes 213 backend tests with
+1,346 assertions across 15 files: 123 ordinary tests with 616 assertions, 48 native
+tests with 72 assertions, and two stack selections of 28 tests with 394 assertions
+and 14 tests with 264 assertions. These checks cover real Catalog column types,
+indexes and foreign keys, idempotency, rollback, concurrent identity reuse, forced
+empty replacement and detached credit cleanup. The actual library dispatch,
+message codec, movie consumer and persistence path pass together. Filmography
+hydration takes four queries for a 50-movie page; movie sync reads each identity
+page with one query. The final query-proof rerun passes three tests with 125
+assertions after test-only corrections; these overlap the 213-test baseline and
+add one assertion.
+
+The additive director migration `Version20261121143000` has applied successfully
+to the isolated preview, and the ordinary eight-slot profile and environment are
+restored. Optional `TMDB_BEARER_TOKEN` now passes through admitted worker
+credentials and preset/preview worker setup. The runtime environment suite's
+43 tests and 66 assertions are included in the 213-test backend result; preset
+worker filters separately pass three tests with seven assertions, and preview
+worker filters pass two tests with five assertions. All three added token
+regressions failed before the correction.
+
+All 99 focused frontend tests and typecheck pass. Director directory, detail and
+movie queries use a library-scoped sampled policy: visible views refresh every
+30 seconds and after catalog hints, with hidden-view pause, resume and unmount
+covered through the generated hooks and live coordinator. This supplies credit
+refresh without claiming a new backend event producer. The full web checkpoint
+passes 3,828 tests in 313 files, before the later cached-data/error restoration
+guard. All 26 focused navigation, live-update and route tests in three files
+pass, including four regressions that failed before correction, detail
+search retaining the directory origin, and later live updates preserving newly
+chosen scroll and focus positions. The final UI simplification pass found no
+further changes. The cached-data/error restoration regression also passes after
+the guard; the post-guard production build, typecheck and scoped lint pass. The
+full web lint checkpoint reported no errors and 12 existing warnings.
+PHPStan passed all 4,068 files before the separate Spec parameter integration.
+
+The prior parameter bridge migrated fourteen definitions in the two movie/director
+controllers to the exact Spec parameter class. Its acceptance checkpoint is now
+superseded: the user rejected the deprecated serializer, context and annotation
+classes introduced by the adapter. The proper Spec pipeline is under research;
+no replacement design or whole-repository migration is assumed. The prior real
+export was structurally equal to its baseline across 279 paths and 172 component
+schemas, and regenerated Orval client output is byte-identical. Five host tests
+pass with 54 assertions, and all five simplification lenses report no actionable
+findings. Affected final CI passes 51 tests with 2,748 assertions across ten files:
+nine ordinary tests with 87 assertions and stack selections of 34 tests with
+2,503 assertions and eight tests with 158 assertions. These overlap the 213-test
+baseline and cover actual OpenAPI export, metadata races, rollback, genre identity
+and scoped queries. Final PHPStan passes all 4,073 files, and Deptrac reports no
+violations, warnings or errors. Seven bounded source-review follow-ups report no
+findings and close the five original director defects. That review preceded the
+user's rejection of the parameter adapter's deprecated boundary. Its replacement
+design, review and verification remain open. Runtime acceptance for the player
+and director features is complete: the six original player scenarios pass in one
+explicit browser run, and the director navigation scenario passes in a separate
+rerun after correcting the test to select Movies. All seven intended cases pass
+across those two runs, with no fixture-cleanup failures. This does not establish
+acceptance of the new deprecation correction. No user token was configured or
+provider bulk fetch started.
+
+## Frontend build warnings
+
+Path validation now imports its already-eager API directly in
+`use-path-validation.ts`, retaining attempt and authorization ownership checks.
+The Vite configuration uses Node's `import.meta.dirname` for its six filesystem
+paths. The production build no longer reports the ineffective dynamic import or
+native configuration directory warning.
+
+Verification: all six library lifecycle tests pass; typecheck, scoped lint and
+production build pass. An isolated browser smoke loads the emitted application
+and worker, renders the anonymous login view, reloads it and checks a protected
+route's login redirect. It reports no page, console, asset or external-request
+errors. Bounded simplification and correctness review report no findings, and
+whitespace checks pass. The correction is saved in local commit `fc8d9305`.
+No validation test, player/director logic or chunking configuration changed.
+
+The minified app is 2322.71 kB, compared with 2322.86 kB before this correction.
+HLS remains 578.15 kB and Three remains 742.80 kB. Their size warning stays
+enabled. The installed full-feature HLS public entry is a single module; Three
+is already loaded on visualizer activation. App/vendor or route splitting remains
+a separate optimization requiring measured benefit and compiled-graph smoke
+coverage, rather than threshold changes or reduced media features.
+
+## Local environment defaults
+
+Image builds, source snapshots and qualification archives now exclude the
+checkout's local `.env`. The tracked `.env.example` supplies safe defaults,
+including CPU encoder settings and empty optional provider credentials. Docker
+stages materialize their runtime `.env` from that template. Host qualification
+archives and backend CI source mounts prepare the same base file before boot,
+without reading private checkout values or changing the source snapshot digest.
+The [installation guide](docs-book/part-1-operator-guide/getting-started/installation.md)
+and [developer setup](docs-book/part-2-developer-guide/getting-started/README.md)
+distinguish build defaults from private runtime configuration.
+
+Verification: source snapshot tests pass 15 tests with 66 assertions. CI bootstrap
+passes both tests with 18 assertions after reproducing the missing-base-file
+failure. Safe archive/workflow checks pass 36 tests with 190 assertions, with two
+POSIX-dependent cases skipped; the subsequent real-archive check passes one test
+with 15 assertions. Synthetic Docker context qualification verifies 37 excluded
+and 31 preserved files and a safe image-local `.env`; fresh-template Dotenv boot
+also passes. Touched formatting, tooling PHPStan, source policy and whitespace
+checks pass. All five simplification lenses and focused correctness/adversarial
+review report no findings. These checks qualify the changed context and staging
+mechanisms; no full application or host fixture-image rebuild was run.
+
+The local `.env` is removed from the Git index and matches the ignore rule. Its
+SHA-256 checksum, inode, permissions and size are unchanged. The environment
+change is saved in local commit `cd1b02c0`. The isolated preview is ready after
+the safe-template build, with the existing local file retained.
+
 ## Browser test devices
 
 The [browser device cleanup plan](docs/plans/2026-11-21-fix-browser-test-device-cleanup-plan.md)
