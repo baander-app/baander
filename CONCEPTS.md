@@ -224,22 +224,34 @@ without an index observation is unavailable until a scan confirms its source.
 
 ## Catalog
 
+### Person
+
+The Catalog identity for an individual credited in movies, television or
+music. A Person can have several verified provider identifiers and can link to
+multiple individual Artist identities. A reader sees the Person and their
+credits through works in libraries they can access.
+[Person and cross-media credits plan](docs/plans/2026-11-21-1948-feat-person-and-cross-media-credits-plan.md).
+
+### Person credit
+
+The link between a Person and a cataloged movie, TV series or episode.
+It records a cast or crew role and can include a character, credited name and
+billing order. The Person profile also shows song and album credits through
+linked Artists. [Credit relationship model](docs/plans/2026-11-21-1948-feat-person-and-cross-media-credits-plan.md#relationship-model).
+
 ### Director
 
-A Catalog identity for a movie director, with a stable internal UUID and public ID.
-Imported directors are matched by TMDB person ID, not by name; two people with the
-same name remain distinct. The record carries a display name and optional profile
-image URL. Directory visibility and movie counts derive from movies the reader
-can access.
+A Person with a directing credit on a movie. Director browsing derives its
+visibility and counts from the reader's accessible movies. The original
+Director public IDs still identify those People.
 
 ### Movie director credit
 
-The link between one movie and one director. A movie can credit several directors,
-and a director can have credits on several movies. Normal metadata enrichment
-fills missing credits; forced enrichment replaces the set, including a successful
-empty result. Missing or failed credit information retains the stored set. The
-[library guide](docs-book/part-1-operator-guide/media/library-management.md#movie-directors)
-describes enrichment and browsing.
+A movie crew credit with the director role. A movie can credit several
+directors, and a Person can hold other roles on the same movie. Normal movie
+enrichment fills missing credits. Forced refresh replaces complete provider
+sets, including successful empty results. Unavailable sets keep their stored
+credits. [Library guide](docs-book/part-1-operator-guide/media/library-management.md#people-and-credits).
 
 ### Artist credit
 

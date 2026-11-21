@@ -65,30 +65,24 @@ After discovery, background ingestion adds new albums and tracks to the catalog.
 
 `metadata.auto_sync` also acts on albums Baander already has, so a rescan with the setting on queues every album it touches that has no match yet; an album left for review is queued again only when its number of songs has changed. `lyrics.auto_fetch` acts on new tracks and on the tracks a rescan repairs; see [What a rescan repairs](../commands/app-library-scan.md#what-a-rescan-repairs). The bulk lyrics fetch, [`app:lyrics:fetch`](../commands/app-lyrics-fetch.md), and the syncs and fetches an administrator starts are not affected by either setting.
 
-### Movie directors
+### People and credits
 
-Open **Directors** under Movies to browse directors credited on movies in your
-accessible libraries. Search the directory, open a director and select a movie
-from their paginated movie list. Counts include only accessible movies. Directors
-with the same name remain separate when TMDB identifies them as different people;
-a movie can credit more than one director. Missing portraits use a fallback.
-Visible director views refresh every 30 seconds and after catalog update hints;
-sampling pauses while hidden and resumes when the view becomes visible.
+Open **People** under Movies to search names and aliases. Each profile shows the
+movie, TV, song and album credits from libraries you can access. Open a name in
+the credits on a movie, series or episode to reach the same profile. A linked
+music Artist also links to their Person profile. **Directors** still opens the
+directory of people with directing credits in your accessible movies.
 
-Existing movies acquire director credits through the normal
-[metadata sync](../commands/app-metadata-sync.md), started from the administrator
-metadata page or `app:metadata:sync`. The library job queues movie enrichment,
-and workers fetch movie details and director credits from TMDB. Those workers
-need `TMDB_BEARER_TOKEN` configured for the lookup; see the current
-[worker configuration](external-apis.md#configuration). Local movie scanning
-and playback do not require TMDB credentials.
+To fill movie cast and crew, run [metadata sync](../commands/app-metadata-sync.md).
+To add television credits, register a [series](../commands/app-tv-series-register.md)
+in a TV library, then register the [episodes](../commands/app-tv-episode-register.md)
+you want in the catalog. Registration imports title metadata and credits. TV
+file scanning and playback are separate workflows.
 
-A normal sync fills missing director credits. Failed or missing credit information
-keeps the stored set; forced enrichment replaces it, including a successful empty
-result. The sync command has no force option, and `--source=genres` does not queue
-movie enrichment. An empty directory can therefore mean that movies have not yet
-been enriched or that the provider supplied no credits; check background job
-outcomes before repeating a sync.
+TMDB person IDs keep same-name people distinct. An individual MusicBrainz
+Artist can link to the same Person through verified provider IDs. Use
+[app:person:manage](../commands/app-person-manage.md) to inspect conflicting
+claims, correct profiles or merge confirmed duplicates.
 
 ## File Watching
 

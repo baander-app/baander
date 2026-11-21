@@ -4,6 +4,35 @@ Updated: 2026-11-21. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
+## Person profiles and cross-media credits
+
+Baander now opens one Person profile from movie, TV, song and album credits.
+Director IDs and bookmarks carry forward. Individual Artists link to a Person
+through verified provider identifiers, so artist credit roles and credited
+names still come from the music catalog. Profiles and counts use the reader's
+library access. TV credits come from registered series and episodes.
+[Implementation plan](docs/plans/2026-11-21-1948-feat-person-and-cross-media-credits-plan.md),
+[People and credits guide](docs-book/part-1-operator-guide/media/library-management.md#people-and-credits).
+
+The PostgreSQL run covered the populated Director upgrade, concurrent imports,
+claims that wait on a merge, separate cast and crew replacement, scoped credit
+reads and portrait access. It passed 30 tests with 286 assertions. The Redis
+Artist queue passed seven tests with 28 assertions, including reconciliation
+after a cached details-only answer. The full web suite passed 3,844 tests in
+316 files. Web typecheck passed, ESLint reported zero errors, and the OpenAPI
+export and generated client checks passed. Symfony container lint and Deptrac
+passed, with zero dependency violations.
+
+`make ci` stopped at Composer normalization. The manifest and lockfile are
+identical to the base commit. The broader backend selection also reproduced
+the existing unclassified video and admin log routes recorded below. The focused CI-image run passed its 273-test unit lane with 1,302 assertions and
+its 21-test deployed-stack lane with 139 assertions. A Director state lookup
+failed in the other lane. The corrected Director and Redis selection passed
+14 tests with 189 assertions. PHPStan passed in the CI image.
+[Director persistence](tests/Integration/DirectorCreditPersistenceTest.php),
+[Person identity persistence](tests/Integration/PersonIdentityPersistenceTest.php),
+[Scoped People reads](tests/Integration/PeopleReadRepositoryTest.php).
+
 ## Shared identifier patterns
 
 `PublicId` now supplies the length and patterns used by PHP validators, route
@@ -157,7 +186,7 @@ missing credits; forced enrichment replaces them, including an authoritative emp
 result. Absent or failed credits retain the stored set. Movie metadata and accepted
 credit updates commit together; existing TMDB movie identity controls lookups,
 and a conflicting search match cannot redirect writes to another local movie.
-The [library guide](docs-book/part-1-operator-guide/media/library-management.md#movie-directors)
+The [library guide](docs-book/part-1-operator-guide/media/library-management.md#people-and-credits)
 and [sync command reference](docs-book/part-1-operator-guide/commands/app-metadata-sync.md)
 explain the workflow and its limits.
 
