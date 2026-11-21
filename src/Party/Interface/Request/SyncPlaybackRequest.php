@@ -4,17 +4,30 @@ declare(strict_types=1);
 
 namespace App\Party\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\Range;
 
 #[OA\Schema(
-    schema: 'SyncPlaybackRequest',
-    required: ['clientPosition', 'clientLatency'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'clientPosition', type: 'number', format: 'float', example: 42.5),
-        new OA\Property(property: 'clientLatency', type: 'number', format: 'float', example: 0.15),
+        'clientPosition' => new OA\Schema(
+            type: 'number',
+            format: 'float',
+            example: 42.5,
+            default: 0.0,
+        ),
+        'clientLatency' => new OA\Schema(
+            type: 'number',
+            format: 'float',
+            minimum: 0,
+            maximum: 10,
+            example: 0.15,
+            default: 0.0,
+        ),
     ],
+    required: ['clientPosition', 'clientLatency'],
+    component: 'SyncPlaybackRequest',
 )]
 final readonly class SyncPlaybackRequest
 {

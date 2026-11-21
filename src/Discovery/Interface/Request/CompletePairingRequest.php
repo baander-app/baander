@@ -4,16 +4,27 @@ declare(strict_types=1);
 
 namespace App\Discovery\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 
 #[OA\Schema(
-    schema: 'CompletePairingRequest',
-    required: ['pairingCode', 'serverPublicId'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'pairingCode', type: 'string', example: 'BCDF-GHJK'),
-        new OA\Property(property: 'serverPublicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+        'pairingCode' => new OA\Schema(
+            type: 'string',
+            example: 'BCDF-GHJK',
+            default: '',
+        ),
+        'serverPublicId' => new OA\Schema(
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+            default: '',
+        ),
     ],
+    required: ['pairingCode', 'serverPublicId'],
+    component: 'CompletePairingRequest',
 )]
 final readonly class CompletePairingRequest
 {

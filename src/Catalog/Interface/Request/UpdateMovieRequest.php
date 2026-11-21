@@ -4,15 +4,30 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'UpdateMovieRequest',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'title', type: 'string', example: 'Updated Movie Title', nullable: true),
-        new OA\Property(property: 'year', type: 'integer', example: 2024, nullable: true),
-        new OA\Property(property: 'summary', type: 'string', nullable: true),
+        'title' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            example: 'Updated Movie Title',
+            default: null,
+        ),
+        'year' => new OA\Schema(
+            type: 'integer',
+            nullable: true,
+            example: 2024,
+            default: null,
+        ),
+        'summary' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
     ],
+    component: 'UpdateMovieRequest',
 )]
 final readonly class UpdateMovieRequest
 {

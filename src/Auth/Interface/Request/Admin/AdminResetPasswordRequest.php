@@ -4,15 +4,22 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Request\Admin;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[OA\Schema(
-    schema: 'AdminResetPasswordRequest',
-    required: ['password'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'password', type: 'string', example: '********', minLength: 8),
+        'password' => new OA\Schema(
+            type: 'string',
+            minLength: 8,
+            maxLength: 255,
+            example: '********',
+            default: '',
+        ),
     ],
+    required: ['password'],
+    component: 'AdminResetPasswordRequest',
 )]
 final readonly class AdminResetPasswordRequest
 {

@@ -4,15 +4,21 @@ declare(strict_types=1);
 
 namespace App\Session\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[OA\Schema(
-    schema: 'RenameDeviceRequest',
-    required: ['name'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'name', type: 'string', example: 'Kitchen Speaker', maxLength: 255),
+        'name' => new OA\Schema(
+            type: 'string',
+            maxLength: 255,
+            example: 'Kitchen Speaker',
+            default: '',
+        ),
     ],
+    required: ['name'],
+    component: 'RenameDeviceRequest',
 )]
 final readonly class RenameDeviceRequest
 {

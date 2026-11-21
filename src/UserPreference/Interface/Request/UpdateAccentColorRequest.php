@@ -4,15 +4,21 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[OA\Schema(
-    schema: 'UpdateAccentColorRequest',
-    required: ['color'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'color', type: 'string', example: 'violet'),
+        'color' => new OA\Schema(
+            type: 'string',
+            maxLength: 32,
+            example: 'violet',
+            default: '',
+        ),
     ],
+    required: ['color'],
+    component: 'UpdateAccentColorRequest',
 )]
 final readonly class UpdateAccentColorRequest
 {

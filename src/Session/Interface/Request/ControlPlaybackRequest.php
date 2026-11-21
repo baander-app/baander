@@ -4,8 +4,66 @@ declare(strict_types=1);
 
 namespace App\Session\Interface\Request;
 
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
+#[OA\Schema(
+    type: 'object',
+    properties: [
+        'requestId' => new OA\Schema(type: 'string'),
+        'expectedRevision' => new OA\Schema(type: 'integer', minimum: 0),
+        'action' => new OA\Schema(
+            type: 'string',
+            enum: ['play', 'pause', 'seek', 'load', 'stop', 'volume', 'queue'],
+        ),
+        'position' => new OA\Schema(
+            type: 'number',
+            format: 'float',
+            nullable: true,
+            minimum: 0,
+            default: null,
+        ),
+        'media' => new OA\Schema(
+            type: 'object',
+            nullable: true,
+            additionalProperties: new OA\Schema(type: 'string'),
+            default: null,
+        ),
+        'queue' => new OA\Schema(
+            type: 'array',
+            nullable: true,
+            items: new OA\Schema(type: 'string'),
+            default: null,
+        ),
+        'currentTrackIndex' => new OA\Schema(
+            type: 'integer',
+            nullable: true,
+            minimum: 0,
+            default: null,
+        ),
+        'desiredState' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            enum: ['playing', 'paused', 'stopped'],
+            default: null,
+        ),
+        'volume' => new OA\Schema(
+            type: 'number',
+            format: 'float',
+            nullable: true,
+            minimum: 0,
+            maximum: 1,
+            default: null,
+        ),
+        'incarnationId' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
+    ],
+    required: ['requestId', 'expectedRevision', 'action'],
+    component: 'ControlPlaybackRequest',
+)]
 final readonly class ControlPlaybackRequest
 {
     /**

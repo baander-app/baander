@@ -4,45 +4,35 @@ declare(strict_types=1);
 
 namespace App\Transcode\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\Choice;
 
 #[OA\Schema(
-    schema: 'CreateTranscodeSessionRequest',
-    required: ['videoId', 'requestId'],
+    type: 'object',
     properties: [
-        new OA\Property(
-            property: 'videoId',
+        'videoId' => new OA\Schema(
             type: 'string',
+            minLength: 21,
+            maxLength: 21,
             pattern: '^[0-9a-zA-Z_-]{21}$',
             example: '0123456789abABCD_-xyz',
-            maxLength: 21,
-            minLength: 21,
+            default: '',
         ),
-        new OA\Property(
-            property: 'requestId',
+        'requestId' => new OA\Schema(
             description: 'Stable playback client session identifier',
             type: 'string',
             format: 'uuid',
+            default: '',
         ),
-        new OA\Property(
-            property: 'qualityTier',
+        'qualityTier' => new OA\Schema(
             type: 'string',
+            enum: ['360p', '480p', '720p', '1080p', '1440p', '4K'],
             example: '1080p',
-            enum: [
-                '360p',
-                '480p',
-                '720p',
-                '1080p',
-                '1440p',
-                '4K',
-            ],
+            default: '1080p',
         ),
-        new OA\Property(
-            property: 'audioProfile',
+        'audioProfile' => new OA\Schema(
             type: 'string',
-            example: 'streaming_stereo',
             enum: [
                 'mobile_mono',
                 'mobile_stereo',
@@ -53,35 +43,32 @@ use Symfony\Component\Validator\Constraints\Choice;
                 'hifi_stereo',
                 'opus_stereo',
             ],
+            example: 'streaming_stereo',
+            default: 'streaming_stereo',
         ),
-        new OA\Property(
-            property: 'audioStreamIndex',
+        'audioStreamIndex' => new OA\Schema(
             description: 'Absolute source audio stream index; null selects the source default',
             type: 'integer',
-            minimum: 0,
             nullable: true,
+            minimum: 0,
+            default: null,
         ),
-        new OA\Property(
-            property: 'audioOffsetMs',
+        'audioOffsetMs' => new OA\Schema(
             description: 'Source audio correction in milliseconds; positive plays later',
             type: 'integer',
-            maximum: 10000,
             minimum: -10000,
+            maximum: 10000,
             default: 0,
         ),
-        new OA\Property(
-            property: 'priority',
+        'priority' => new OA\Schema(
             type: 'string',
+            enum: ['critical', 'high', 'normal', 'low', 'bulk'],
             example: 'normal',
-            enum: [
-                'critical',
-                'high',
-                'normal',
-                'low',
-                'bulk',
-            ],
+            default: 'normal',
         ),
     ],
+    required: ['videoId', 'requestId'],
+    component: 'CreateTranscodeSessionRequest',
 )]
 final readonly class CreateTranscodeSessionRequest
 {

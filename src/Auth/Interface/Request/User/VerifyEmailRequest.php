@@ -4,15 +4,20 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Request\User;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 
 #[OA\Schema(
-    schema: 'VerifyEmailRequest',
-    required: ['token'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'token', type: 'string', example: 'verification-token-abc123'),
+        'token' => new OA\Schema(
+            type: 'string',
+            example: 'verification-token-abc123',
+            default: '',
+        ),
     ],
+    required: ['token'],
+    component: 'VerifyEmailRequest',
 )]
 final readonly class VerifyEmailRequest
 {

@@ -4,37 +4,42 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[OA\Schema(
-    required: ['sections'],
+    type: 'object',
     properties: [
-        new OA\Property(
-            property: 'sections',
+        'sections' => new OA\Schema(
             type: 'array',
-            items: new OA\Items(
+            items: new OA\Schema(
                 properties: [
-                    new OA\Property(property: 'id', type: 'string', example: 'music-quick-jump'),
-                    new OA\Property(property: 'label', type: 'string', example: 'Quick Jump'),
-                    new OA\Property(property: 'type', type: 'string', example: 'navigation'),
-                    new OA\Property(
-                        property: 'items',
+                    'id' => new OA\Schema(type: 'string', example: 'music-quick-jump'),
+                    'label' => new OA\Schema(type: 'string', example: 'Quick Jump'),
+                    'type' => new OA\Schema(type: 'string', example: 'navigation'),
+                    'items' => new OA\Schema(
                         type: 'array',
-                        items: new OA\Items(
+                        items: new OA\Schema(
                             properties: [
-                                new OA\Property(property: 'id', type: 'string', example: 'music-home'),
-                                new OA\Property(property: 'type', type: 'string', example: 'page_link', enum: ['page_link', 'smart_filter', 'panel_action']),
-                                new OA\Property(property: 'label', type: 'string', example: 'Home'),
-                                new OA\Property(property: 'icon', type: 'string', example: 'home'),
-                                new OA\Property(property: 'config', type: 'object'),
+                                'id' => new OA\Schema(type: 'string', example: 'music-home'),
+                                'type' => new OA\Schema(
+                                    type: 'string',
+                                    enum: ['page_link', 'smart_filter', 'panel_action'],
+                                    example: 'page_link',
+                                ),
+                                'label' => new OA\Schema(type: 'string', example: 'Home'),
+                                'icon' => new OA\Schema(type: 'string', example: 'home'),
+                                'config' => new OA\Schema(type: 'object'),
                             ],
                         ),
                     ),
                 ],
             ),
+            default: [],
         ),
     ],
+    required: ['sections'],
+    component: 'UpdateSidebarSectionsRequest',
 )]
 final readonly class UpdateSidebarSectionsRequest
 {

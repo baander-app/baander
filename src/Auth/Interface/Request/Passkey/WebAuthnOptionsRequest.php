@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Request\Passkey;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'WebAuthnOptionsRequest',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'userId', description: 'Optional user public ID to get passkey options for', type: 'string'),
+        'userId' => new OA\Schema(
+            description: 'Optional user public ID to get passkey options for',
+            type: 'string',
+            default: '',
+        ),
     ],
+    component: 'WebAuthnOptionsRequest',
 )]
 final readonly class WebAuthnOptionsRequest
 {

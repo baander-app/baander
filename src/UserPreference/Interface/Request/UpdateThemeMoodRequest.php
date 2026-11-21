@@ -4,15 +4,22 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[OA\Schema(
-    schema: 'UpdateThemeMoodRequest',
-    required: ['mood'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'mood', type: 'string', example: 'dark'),
+        'mood' => new OA\Schema(
+            type: 'string',
+            maxLength: 32,
+            enum: ['dark', 'warm', 'cool', 'balanced'],
+            example: 'dark',
+            default: '',
+        ),
     ],
+    required: ['mood'],
+    component: 'UpdateThemeMoodRequest',
 )]
 final readonly class UpdateThemeMoodRequest
 {

@@ -4,19 +4,35 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Request\User;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\Email;
 use Symfony\Component\Validator\Constraints\Length;
 
 #[OA\Schema(
-    schema: 'LoginRequest',
-    required: ['email', 'password'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'email', type: 'string', format: 'email', example: 'alice@example.com'),
-        new OA\Property(property: 'password', type: 'string', example: '********'),
-        new OA\Property(property: 'totpCode', description: 'Required when user has TOTP enabled', type: 'string', example: '123456'),
+        'email' => new OA\Schema(
+            type: 'string',
+            format: 'email',
+            example: 'alice@example.com',
+            default: '',
+        ),
+        'password' => new OA\Schema(
+            type: 'string',
+            example: '********',
+            default: '',
+        ),
+        'totpCode' => new OA\Schema(
+            description: 'Required when user has TOTP enabled',
+            type: 'string',
+            nullable: true,
+            example: '123456',
+            default: null,
+        ),
     ],
+    required: ['email', 'password'],
+    component: 'LoginRequest',
 )]
 final readonly class LoginRequest
 {

@@ -11,7 +11,7 @@ use App\Catalog\Application\Command\MusicBrainzMatch\SeenField;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchField;
 use App\Catalog\Interface\Resource\MatchComparisonResource;
 use App\Shared\Application\Exception\InvalidInputException;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 /**
  * The body of POST /api/admin/metadata/match/{type}/{publicId}/apply, and what
@@ -22,47 +22,88 @@ use OpenApi\Attributes as OA;
  * @phpstan-import-type ComparisonData from MatchComparisonResource
  */
 #[OA\Schema(
-    schema: 'ApplyMatchRequest',
-    required: ['candidate'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'candidate', description: 'The MusicBrainz ID compared: a release for an album, a recording for a song, an artist for an artist', type: 'string'),
-        new OA\Property(property: 'fields', description: 'The ticked field rows, each by its key with the current value the comparison showed', type: 'array', items: new OA\Items(
-            required: ['key', 'current'],
-            properties: [
-                new OA\Property(property: 'key', description: 'The row\'s key: the field, or "<song public ID>:<field>" for a row of one of an album\'s songs', type: 'string'),
-                new OA\Property(
-                    property: 'current',
-                    description: 'The current value the row showed; null when it showed none',
-                    nullable: true,
-                    oneOf: [
-                        new OA\Schema(type: 'string'),
-                        new OA\Schema(type: 'integer'),
-                        new OA\Schema(type: 'boolean'),
-                        new OA\Schema(type: 'array', items: new OA\Items(type: 'string')),
-                    ],
-                ),
-            ],
-            type: 'object',
-        )),
-        new OA\Property(property: 'credits', description: 'The ticked credits rows, each by its key with the credits the comparison showed as current', type: 'array', items: new OA\Items(
-            required: ['key', 'current'],
-            properties: [
-                new OA\Property(property: 'key', description: 'The row\'s key: "credits", or "<song public ID>:credits" for one of an album\'s songs', type: 'string'),
-                new OA\Property(property: 'current', type: 'array', items: new OA\Items(
-                    required: ['artistPublicId', 'role', 'creditedName'],
-                    properties: [
-                        new OA\Property(property: 'artistPublicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-                        new OA\Property(property: 'role', type: 'string', nullable: true),
-                        new OA\Property(property: 'creditedName', type: 'string'),
-                    ],
-                    type: 'object',
-                )),
-            ],
-            type: 'object',
-        )),
-        new OA\Property(property: 'artistActions', description: 'The public IDs of the artists whose listed merge or removal stays ticked', type: 'array', items: new OA\Items(type: 'string')),
-        new OA\Property(property: 'keptArtists', description: 'The public IDs of the artists whose listed merge or removal was unticked', type: 'array', items: new OA\Items(type: 'string')),
+        'candidate' => new OA\Schema(
+            description: 'The MusicBrainz ID compared: a release for an album, a recording for a song, an artist for an artist',
+            type: 'string',
+            default: '',
+        ),
+        'fields' => new OA\Schema(
+            description: 'The ticked field rows, each by its key with the current value the comparison showed',
+            type: 'array',
+            items: new OA\Schema(
+                type: 'object',
+                properties: [
+                    'key' => new OA\Schema(
+                        description: 'The row\'s key: the field, or "<song public ID>:<field>" for a row of one of an album\'s songs',
+                        type: 'string',
+                    ),
+                    'current' => new OA\Schema(
+                        description: 'The current value the row showed; null when it showed none',
+                        nullable: true,
+                        oneOf: [
+                            new OA\Schema(type: 'string'),
+                            new OA\Schema(type: 'integer'),
+                            new OA\Schema(type: 'boolean'),
+                            new OA\Schema(
+                                type: 'array',
+                                items: new OA\Schema(type: 'string'),
+                            ),
+                        ],
+                    ),
+                ],
+                required: ['key', 'current'],
+            ),
+            default: [],
+        ),
+        'credits' => new OA\Schema(
+            description: 'The ticked credits rows, each by its key with the credits the comparison showed as current',
+            type: 'array',
+            items: new OA\Schema(
+                type: 'object',
+                properties: [
+                    'key' => new OA\Schema(
+                        description: 'The row\'s key: "credits", or "<song public ID>:credits" for one of an album\'s songs',
+                        type: 'string',
+                    ),
+                    'current' => new OA\Schema(
+                        type: 'array',
+                        items: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'artistPublicId' => new OA\Schema(
+                                    type: 'string',
+                                    minLength: 21,
+                                    maxLength: 21,
+                                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                                ),
+                                'role' => new OA\Schema(type: 'string', nullable: true),
+                                'creditedName' => new OA\Schema(type: 'string'),
+                            ],
+                            required: ['artistPublicId', 'role', 'creditedName'],
+                        ),
+                    ),
+                ],
+                required: ['key', 'current'],
+            ),
+            default: [],
+        ),
+        'artistActions' => new OA\Schema(
+            description: 'The public IDs of the artists whose listed merge or removal stays ticked',
+            type: 'array',
+            items: new OA\Schema(type: 'string'),
+            default: [],
+        ),
+        'keptArtists' => new OA\Schema(
+            description: 'The public IDs of the artists whose listed merge or removal was unticked',
+            type: 'array',
+            items: new OA\Schema(type: 'string'),
+            default: [],
+        ),
     ],
+    required: ['candidate'],
+    component: 'ApplyMatchRequest',
 )]
 final readonly class ApplyMatchRequest
 {

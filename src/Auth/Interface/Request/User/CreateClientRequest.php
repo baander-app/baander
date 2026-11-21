@@ -4,16 +4,23 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Request\User;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\Length;
 
 #[OA\Schema(
-    schema: 'CreateClientRequest',
-    required: ['name'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'name', type: 'string', example: 'My App', maxLength: 255),
+        'name' => new OA\Schema(
+            type: 'string',
+            minLength: 1,
+            maxLength: 255,
+            example: 'My App',
+            default: '',
+        ),
     ],
+    required: ['name'],
+    component: 'CreateClientRequest',
 )]
 final readonly class CreateClientRequest
 {

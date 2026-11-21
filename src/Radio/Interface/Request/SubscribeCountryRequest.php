@@ -4,8 +4,28 @@ declare(strict_types=1);
 
 namespace App\Radio\Interface\Request;
 
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
+#[OA\Schema(
+    type: 'object',
+    properties: [
+        'sourceId' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            minLength: 21,
+            maxLength: 21,
+            default: null,
+        ),
+        'countryCode' => new OA\Schema(
+            type: 'string',
+            minLength: 2,
+            maxLength: 2,
+            default: '',
+        ),
+    ],
+    component: 'SubscribeCountryRequest',
+)]
 final readonly class SubscribeCountryRequest
 {
     public function __construct(

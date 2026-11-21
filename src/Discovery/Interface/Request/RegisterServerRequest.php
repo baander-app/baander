@@ -4,18 +4,23 @@ declare(strict_types=1);
 
 namespace App\Discovery\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\Url;
 
 #[OA\Schema(
-    schema: 'RegisterServerRequest',
-    required: ['serverUrl', 'name', 'version'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'serverUrl', type: 'string', format: 'uri'),
-        new OA\Property(property: 'name', type: 'string'),
-        new OA\Property(property: 'version', type: 'string'),
+        'serverUrl' => new OA\Schema(
+            type: 'string',
+            format: 'uri',
+            default: '',
+        ),
+        'name' => new OA\Schema(type: 'string', default: ''),
+        'version' => new OA\Schema(type: 'string', default: ''),
     ],
+    required: ['serverUrl', 'name', 'version'],
+    component: 'RegisterServerRequest',
 )]
 final readonly class RegisterServerRequest
 {

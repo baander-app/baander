@@ -4,15 +4,20 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Request\OAuth;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 
 #[OA\Schema(
-    schema: 'RefreshTokenRequest',
-    required: ['refreshToken'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'refreshToken', type: 'string', example: 'your-refresh-token'),
+        'refreshToken' => new OA\Schema(
+            type: 'string',
+            example: 'your-refresh-token',
+            default: '',
+        ),
     ],
+    required: ['refreshToken'],
+    component: 'RefreshTokenRequest',
 )]
 final readonly class RefreshTokenRequest
 {

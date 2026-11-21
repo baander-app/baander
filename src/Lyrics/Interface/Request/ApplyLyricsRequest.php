@@ -4,15 +4,24 @@ declare(strict_types=1);
 
 namespace App\Lyrics\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 
 #[OA\Schema(
-    schema: 'ApplyLyricsRequest',
-    required: ['songPublicId'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'songPublicId', description: 'Public ID of the song to apply lyrics to', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', example: '0123456789abABCD_-xyz', maxLength: 21, minLength: 21),
+        'songPublicId' => new OA\Schema(
+            description: 'Public ID of the song to apply lyrics to',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+            example: '0123456789abABCD_-xyz',
+            default: '',
+        ),
     ],
+    required: ['songPublicId'],
+    component: 'ApplyLyricsRequest',
 )]
 final readonly class ApplyLyricsRequest
 {

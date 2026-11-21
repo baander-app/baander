@@ -4,17 +4,34 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[OA\Schema(
-    schema: 'CreateEqDeviceProfileRequest',
-    required: ['name', 'icon'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'name', type: 'string', example: 'Headphones', maxLength: 255),
-        new OA\Property(property: 'icon', type: 'string', example: 'headphones'),
-        new OA\Property(property: 'deviceId', description: 'Client audio-output token, independent of database identity', type: 'string', example: 'audio-output-group-abc', nullable: true),
+        'name' => new OA\Schema(
+            type: 'string',
+            maxLength: 255,
+            example: 'Headphones',
+            default: '',
+        ),
+        'icon' => new OA\Schema(
+            type: 'string',
+            enum: ['headphones', 'speakers', 'hifi-speaker', 'wireless-speaker', 'car', 'tv', 'monitor', 'custom'],
+            example: 'headphones',
+            default: 'custom',
+        ),
+        'deviceId' => new OA\Schema(
+            description: 'Client audio-output token, independent of database identity',
+            type: 'string',
+            nullable: true,
+            example: 'audio-output-group-abc',
+            default: null,
+        ),
     ],
+    required: ['name', 'icon'],
+    component: 'CreateEqDeviceProfileRequest',
 )]
 final readonly class CreateEqDeviceProfileRequest
 {

@@ -5,9 +5,33 @@ declare(strict_types=1);
 namespace App\Scheduler\Interface\Request;
 
 use App\Scheduler\Interface\Validator\CronExpression;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
+#[OA\Schema(
+    type: 'object',
+    properties: [
+        'name' => new OA\Schema(type: 'string', maxLength: 255),
+        'expression' => new OA\Schema(type: 'string'),
+        'jobType' => new OA\Schema(
+            type: 'string',
+            enum: ['messenger', 'console'],
+        ),
+        'command' => new OA\Schema(type: 'string'),
+        'description' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
+        'parameters' => new OA\Schema(
+            type: 'object',
+            additionalProperties: new OA\Schema(nullable: true),
+            default: new \stdClass(),
+        ),
+    ],
+    required: ['name', 'expression', 'jobType', 'command'],
+    component: 'CreateScheduledJobRequest',
+)]
 final readonly class CreateScheduledJobRequest
 {
     /** @param array<string, mixed> $parameters */
@@ -29,7 +53,6 @@ final readonly class CreateScheduledJobRequest
 
         public ?string $description = null,
 
-        #[OA\Property(type: 'object', default: new \stdClass(), additionalProperties: new OA\AdditionalProperties(nullable: true))]
         public array $parameters = [],
     ) {
     }

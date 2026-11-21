@@ -4,8 +4,42 @@ declare(strict_types=1);
 
 namespace App\Session\Interface\Request;
 
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
+#[OA\Schema(
+    type: 'object',
+    properties: [
+        'deviceId' => new OA\Schema(type: 'string'),
+        'endpointId' => new OA\Schema(type: 'string'),
+        'name' => new OA\Schema(
+            type: 'string',
+            minLength: 1,
+            maxLength: 128,
+            default: 'Browser',
+        ),
+        'capabilities' => new OA\Schema(
+            type: 'array',
+            items: new OA\Schema(type: 'string'),
+            minItems: 1,
+            maxItems: 3,
+            default: ['song', 'video'],
+        ),
+        'tabId' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
+        'localRecoveryEligible' => new OA\Schema(type: 'boolean', default: false),
+        'pageId' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
+    ],
+    required: ['deviceId', 'endpointId'],
+    component: 'RegisterPlaybackEndpointRequest',
+)]
 final readonly class RegisterPlaybackEndpointRequest
 {
     /** @param list<string> $capabilities */

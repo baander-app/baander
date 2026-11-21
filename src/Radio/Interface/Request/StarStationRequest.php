@@ -4,8 +4,21 @@ declare(strict_types=1);
 
 namespace App\Radio\Interface\Request;
 
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
+#[OA\Schema(
+    type: 'object',
+    properties: [
+        'stationId' => new OA\Schema(
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+        ),
+    ],
+    required: ['stationId'],
+    component: 'StarStationRequest',
+)]
 final readonly class StarStationRequest
 {
     public function __construct(

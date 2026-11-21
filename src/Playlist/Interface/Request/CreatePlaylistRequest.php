@@ -4,21 +4,49 @@ declare(strict_types=1);
 
 namespace App\Playlist\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\Length;
 
 #[OA\Schema(
-    schema: 'CreatePlaylistRequest',
-    required: ['name'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'name', type: 'string', example: 'My Playlist', maxLength: 255),
-        new OA\Property(property: 'description', type: 'string', example: 'A great playlist', nullable: true),
-        new OA\Property(property: 'isPublic', type: 'boolean', example: false),
-        new OA\Property(property: 'isCollaborative', type: 'boolean', example: false),
-        new OA\Property(property: 'isSmart', type: 'boolean', example: false),
-        new OA\Property(property: 'smartRules', description: 'Rules for smart playlist auto-population', type: 'array', items: new OA\Items(type: 'object')),
+        'name' => new OA\Schema(
+            type: 'string',
+            maxLength: 255,
+            example: 'My Playlist',
+            default: '',
+        ),
+        'description' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            example: 'A great playlist',
+            default: null,
+        ),
+        'isPublic' => new OA\Schema(
+            type: 'boolean',
+            example: false,
+            default: false,
+        ),
+        'isCollaborative' => new OA\Schema(
+            type: 'boolean',
+            example: false,
+            default: false,
+        ),
+        'isSmart' => new OA\Schema(
+            type: 'boolean',
+            example: false,
+            default: false,
+        ),
+        'smartRules' => new OA\Schema(
+            description: 'Rules for smart playlist auto-population',
+            type: 'array',
+            items: new OA\Schema(type: 'object'),
+            default: [],
+        ),
     ],
+    required: ['name'],
+    component: 'CreatePlaylistRequest',
 )]
 final readonly class CreatePlaylistRequest
 {

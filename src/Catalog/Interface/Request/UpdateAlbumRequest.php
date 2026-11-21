@@ -4,23 +4,73 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'UpdateAlbumRequest',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'title', type: 'string', example: 'Updated Album Title', nullable: true),
-        new OA\Property(property: 'type', description: 'Album type (e.g. album, single, ep, compilation)', type: 'string', nullable: true),
-        new OA\Property(property: 'year', type: 'integer', example: 2024, nullable: true),
-        new OA\Property(property: 'label', type: 'string', nullable: true),
-        new OA\Property(property: 'catalogNumber', type: 'string', nullable: true),
-        new OA\Property(property: 'barcode', type: 'string', nullable: true),
-        new OA\Property(property: 'country', type: 'string', nullable: true),
-        new OA\Property(property: 'language', type: 'string', nullable: true),
-        new OA\Property(property: 'disambiguation', type: 'string', nullable: true),
-        new OA\Property(property: 'annotation', type: 'string', nullable: true),
-        new OA\Property(property: 'lockedFields', description: 'Full list of locked field names. Replaces the existing list.', type: 'array', items: new OA\Items(type: 'string'), nullable: true),
+        'title' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            example: 'Updated Album Title',
+            default: null,
+        ),
+        'type' => new OA\Schema(
+            description: 'Album type (e.g. album, single, ep, compilation)',
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
+        'year' => new OA\Schema(
+            type: 'integer',
+            nullable: true,
+            example: 2024,
+            default: null,
+        ),
+        'label' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
+        'catalogNumber' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
+        'barcode' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
+        'country' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
+        'language' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
+        'disambiguation' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
+        'annotation' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
+        'lockedFields' => new OA\Schema(
+            description: 'Full list of locked field names. Replaces the existing list.',
+            type: 'array',
+            nullable: true,
+            items: new OA\Schema(type: 'string'),
+            default: null,
+        ),
     ],
+    component: 'UpdateAlbumRequest',
 )]
 final readonly class UpdateAlbumRequest
 {

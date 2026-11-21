@@ -5,15 +5,28 @@ declare(strict_types=1);
 namespace App\Auth\Interface\Request\Admin;
 
 use App\Auth\Application\CommandHandler\User\RenameUserHandler;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[OA\Schema(
-    schema: 'AdminUpdateUserRequest',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'email', type: 'string', format: 'email', example: 'user@example.com'),
-        new OA\Property(property: 'name', type: 'string', example: 'Alice'),
+        'email' => new OA\Schema(
+            type: 'string',
+            format: 'email',
+            nullable: true,
+            example: 'user@example.com',
+            default: null,
+        ),
+        'name' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            maxLength: 255,
+            example: 'Alice',
+            default: null,
+        ),
     ],
+    component: 'AdminUpdateUserRequest',
 )]
 final readonly class AdminUpdateUserRequest
 {

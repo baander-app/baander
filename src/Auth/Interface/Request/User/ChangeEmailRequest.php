@@ -4,18 +4,34 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Request\User;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\Email as EmailConstraint;
 use Symfony\Component\Validator\Constraints\NotBlank;
 
 #[OA\Schema(
-    schema: 'ChangeEmailRequest',
-    required: ['email', 'currentPassword'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'email', type: 'string', format: 'email', example: 'alice@example.com'),
-        new OA\Property(property: 'currentPassword', type: 'string', example: '********'),
-        new OA\Property(property: 'totpCode', description: 'A current TOTP code; needed when TOTP is on', type: 'string', example: '123456', nullable: true),
+        'email' => new OA\Schema(
+            type: 'string',
+            format: 'email',
+            example: 'alice@example.com',
+            default: '',
+        ),
+        'currentPassword' => new OA\Schema(
+            type: 'string',
+            example: '********',
+            default: '',
+        ),
+        'totpCode' => new OA\Schema(
+            description: 'A current TOTP code; needed when TOTP is on',
+            type: 'string',
+            nullable: true,
+            example: '123456',
+            default: null,
+        ),
     ],
+    required: ['email', 'currentPassword'],
+    component: 'ChangeEmailRequest',
 )]
 final readonly class ChangeEmailRequest
 {

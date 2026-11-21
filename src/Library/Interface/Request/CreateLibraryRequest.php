@@ -4,21 +4,49 @@ declare(strict_types=1);
 
 namespace App\Library\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\Length;
 
 #[OA\Schema(
-    schema: 'CreateLibraryRequest',
-    required: ['name', 'path', 'type'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'name', type: 'string', example: 'My Music', maxLength: 255),
-        new OA\Property(property: 'path', description: 'Filesystem path to the library root', type: 'string', example: '/mnt/media/music'),
-        new OA\Property(property: 'type', description: 'Library type (e.g. music, movies, videos)', type: 'string'),
-        new OA\Property(property: 'filesystemType', description: 'Filesystem backend (e.g. local)', type: 'string'),
-        new OA\Property(property: 'sortOrder', type: 'integer', example: 0),
-        new OA\Property(property: 'slug', description: 'URL-friendly slug', type: 'string', nullable: true),
+        'name' => new OA\Schema(
+            type: 'string',
+            maxLength: 255,
+            example: 'My Music',
+            default: '',
+        ),
+        'path' => new OA\Schema(
+            description: 'Filesystem path to the library root',
+            type: 'string',
+            example: '/mnt/media/music',
+            default: '',
+        ),
+        'type' => new OA\Schema(
+            description: 'Library type (e.g. music, movies, videos)',
+            type: 'string',
+            default: '',
+        ),
+        'filesystemType' => new OA\Schema(
+            description: 'Filesystem backend (e.g. local)',
+            type: 'string',
+            default: 'local',
+        ),
+        'sortOrder' => new OA\Schema(
+            type: 'integer',
+            example: 0,
+            default: 0,
+        ),
+        'slug' => new OA\Schema(
+            description: 'URL-friendly slug',
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
     ],
+    required: ['name', 'path', 'type'],
+    component: 'CreateLibraryRequest',
 )]
 final readonly class CreateLibraryRequest
 {

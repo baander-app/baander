@@ -4,19 +4,38 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Request\User;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\Email;
 use Symfony\Component\Validator\Constraints\Length;
 
 #[OA\Schema(
-    schema: 'RegisterRequest',
-    required: ['name', 'email', 'password'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'name', type: 'string', example: 'Alice', maxLength: 255),
-        new OA\Property(property: 'email', type: 'string', format: 'email', example: 'alice@example.com', maxLength: 255),
-        new OA\Property(property: 'password', type: 'string', example: '********', maxLength: 255),
+        'name' => new OA\Schema(
+            type: 'string',
+            minLength: 1,
+            maxLength: 255,
+            example: 'Alice',
+            default: '',
+        ),
+        'email' => new OA\Schema(
+            type: 'string',
+            format: 'email',
+            maxLength: 255,
+            example: 'alice@example.com',
+            default: '',
+        ),
+        'password' => new OA\Schema(
+            type: 'string',
+            minLength: 8,
+            maxLength: 255,
+            example: '********',
+            default: '',
+        ),
     ],
+    required: ['name', 'email', 'password'],
+    component: 'RegisterRequest',
 )]
 final readonly class RegisterRequest
 {

@@ -4,16 +4,38 @@ declare(strict_types=1);
 
 namespace App\Playlist\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'UpdatePlaylistRequest',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'name', type: 'string', example: 'Updated Playlist Name', nullable: true),
-        new OA\Property(property: 'description', type: 'string', example: 'Updated description', nullable: true),
-        new OA\Property(property: 'isPublic', type: 'boolean', example: true, nullable: true),
-        new OA\Property(property: 'isCollaborative', description: "The owner's switch for collaborator editing", type: 'boolean', example: false, nullable: true),
+        'name' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            example: 'Updated Playlist Name',
+            default: null,
+        ),
+        'description' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            example: 'Updated description',
+            default: null,
+        ),
+        'isPublic' => new OA\Schema(
+            type: 'boolean',
+            nullable: true,
+            example: true,
+            default: null,
+        ),
+        'isCollaborative' => new OA\Schema(
+            description: "The owner's switch for collaborator editing",
+            type: 'boolean',
+            nullable: true,
+            example: false,
+            default: null,
+        ),
     ],
+    component: 'UpdatePlaylistRequest',
 )]
 final readonly class UpdatePlaylistRequest
 {

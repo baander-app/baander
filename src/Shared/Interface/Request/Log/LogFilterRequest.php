@@ -6,8 +6,52 @@ namespace App\Shared\Interface\Request\Log;
 
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\LogViewer\LogQuery;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
+#[OA\Schema(
+    type: 'object',
+    properties: [
+        'sources' => new OA\Schema(
+            type: 'array',
+            items: new OA\Schema(type: 'string'),
+            default: [],
+        ),
+        'search' => new OA\Schema(type: 'string', default: ''),
+        'levels' => new OA\Schema(
+            type: 'array',
+            items: new OA\Schema(type: 'string'),
+            default: [],
+        ),
+        'channels' => new OA\Schema(
+            type: 'array',
+            items: new OA\Schema(type: 'string'),
+            default: [],
+        ),
+        'correlationId' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
+        'since' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
+        'until' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
+        'limit' => new OA\Schema(type: 'integer', default: 200),
+        'cursor' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
+        'order' => new OA\Schema(type: 'string', default: 'desc'),
+    ],
+    component: 'LogFilterRequest',
+)]
 final readonly class LogFilterRequest
 {
     /**
@@ -16,10 +60,10 @@ final readonly class LogFilterRequest
      * @param list<string> $channels
      */
     public function __construct(
-        #[OA\Property(type: 'array', items: new OA\Items(type: 'string'))] public array $sources = [],
+        public array $sources = [],
         public string $search = '',
-        #[OA\Property(type: 'array', items: new OA\Items(type: 'string'))] public array $levels = [],
-        #[OA\Property(type: 'array', items: new OA\Items(type: 'string'))] public array $channels = [],
+        public array $levels = [],
+        public array $channels = [],
         public ?string $correlationId = null,
         public ?string $since = null,
         public ?string $until = null,

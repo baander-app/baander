@@ -4,26 +4,37 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Interface\Request;
 
-use Nelmio\ApiDocBundle\Attribute\Ignore;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[OA\Schema(
-    schema: 'SaveLayoutPreferencesRequest',
-    required: ['payload', 'version'],
+    type: 'object',
     properties: [
-        new OA\Property(
-            property: 'payload',
-            required: ['mode', 'activeTab'],
-            properties: [
-                new OA\Property(property: 'mode', type: 'string', example: 'expanded', enum: SaveLayoutPreferencesRequest::MODES),
-                new OA\Property(property: 'activeTab', type: 'string', example: 'queue', enum: SaveLayoutPreferencesRequest::TABS),
-            ],
+        'payload' => new OA\Schema(
             type: 'object',
+            properties: [
+                'mode' => new OA\Schema(
+                    type: 'string',
+                    enum: SaveLayoutPreferencesRequest::MODES,
+                    example: 'expanded',
+                ),
+                'activeTab' => new OA\Schema(
+                    type: 'string',
+                    enum: SaveLayoutPreferencesRequest::TABS,
+                    example: 'queue',
+                ),
+            ],
+            required: ['mode', 'activeTab'],
             additionalProperties: false,
         ),
-        new OA\Property(property: 'version', type: 'integer', example: 0, minimum: 0),
+        'version' => new OA\Schema(
+            type: 'integer',
+            minimum: 0,
+            example: 0,
+        ),
     ],
+    required: ['payload', 'version'],
+    component: 'SaveLayoutPreferencesRequest',
 )]
 final readonly class SaveLayoutPreferencesRequest
 {
@@ -32,7 +43,6 @@ final readonly class SaveLayoutPreferencesRequest
 
     /** @param array<string, mixed> $payload */
     public function __construct(
-        #[Ignore]
         #[Assert\NotNull(message: 'Payload is required.')]
         #[Assert\Type(type: 'array')]
         #[Assert\Collection(
@@ -44,7 +54,6 @@ final readonly class SaveLayoutPreferencesRequest
         )]
         public array $payload = [],
 
-        #[Ignore]
         #[Assert\NotNull(message: 'Version is required.')]
         #[Assert\GreaterThanOrEqual(value: 0, message: 'Version must be at least 0.')]
         public int $version = 0,

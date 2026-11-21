@@ -4,16 +4,25 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Request\OAuth;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 
 #[OA\Schema(
-    schema: 'RevokeTokenRequest',
-    required: ['token'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'token', type: 'string', example: 'access-token-to-revoke'),
-        new OA\Property(property: 'tokenTypeHint', description: 'Hint for the token type (e.g. "access_token" or "refresh_token")', type: 'string'),
+        'token' => new OA\Schema(
+            type: 'string',
+            example: 'access-token-to-revoke',
+            default: '',
+        ),
+        'tokenTypeHint' => new OA\Schema(
+            description: 'Hint for the token type (e.g. "access_token" or "refresh_token")',
+            type: 'string',
+            default: '',
+        ),
     ],
+    required: ['token'],
+    component: 'RevokeTokenRequest',
 )]
 final readonly class RevokeTokenRequest
 {

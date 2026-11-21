@@ -4,17 +4,29 @@ declare(strict_types=1);
 
 namespace App\Metadata\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\Count;
 
 #[OA\Schema(
-    schema: 'MatchMetadataRequest',
-    required: ['path', 'candidates'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'path', description: 'Filesystem path to the media file', type: 'string', example: '/mnt/media/music/album/song.flac'),
-        new OA\Property(property: 'candidates', description: 'Array of metadata match candidates', type: 'array', items: new OA\Items(type: 'object')),
+        'path' => new OA\Schema(
+            description: 'Filesystem path to the media file',
+            type: 'string',
+            example: '/mnt/media/music/album/song.flac',
+            default: '',
+        ),
+        'candidates' => new OA\Schema(
+            description: 'Array of metadata match candidates',
+            type: 'array',
+            items: new OA\Schema(type: 'object'),
+            minItems: 1,
+            default: [],
+        ),
     ],
+    required: ['path', 'candidates'],
+    component: 'MatchMetadataRequest',
 )]
 final readonly class MatchMetadataRequest
 {

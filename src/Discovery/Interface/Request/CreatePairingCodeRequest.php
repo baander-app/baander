@@ -4,17 +4,28 @@ declare(strict_types=1);
 
 namespace App\Discovery\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\Choice;
 
 #[OA\Schema(
-    schema: 'CreatePairingCodeRequest',
-    required: ['serverPublicId', 'method'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'serverPublicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'method', type: 'string', enum: ['qr_code', 'email_url', 'server_code']),
+        'serverPublicId' => new OA\Schema(
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+            default: '',
+        ),
+        'method' => new OA\Schema(
+            type: 'string',
+            enum: ['qr_code', 'email_url', 'server_code'],
+            default: '',
+        ),
     ],
+    required: ['serverPublicId', 'method'],
+    component: 'CreatePairingCodeRequest',
 )]
 final readonly class CreatePairingCodeRequest
 {

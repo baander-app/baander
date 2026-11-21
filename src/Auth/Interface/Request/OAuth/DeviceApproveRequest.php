@@ -4,18 +4,29 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Request\OAuth;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\Choice;
 use Symfony\Component\Validator\Constraints\Length;
 
 #[OA\Schema(
-    schema: 'DeviceApproveRequest',
-    required: ['userCode', 'decision'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'userCode', type: 'string', example: 'ABCD-EFGH', maxLength: 255),
-        new OA\Property(property: 'decision', type: 'string', example: 'approve', enum: ['approve', 'deny']),
+        'userCode' => new OA\Schema(
+            type: 'string',
+            maxLength: 255,
+            example: 'ABCD-EFGH',
+            default: '',
+        ),
+        'decision' => new OA\Schema(
+            type: 'string',
+            enum: ['approve', 'deny'],
+            example: 'approve',
+            default: '',
+        ),
     ],
+    required: ['userCode', 'decision'],
+    component: 'DeviceApproveRequest',
 )]
 final readonly class DeviceApproveRequest
 {

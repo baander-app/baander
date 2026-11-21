@@ -4,6 +4,13 @@ declare(strict_types=1);
 
 namespace App\Shared\Application\LiveUpdates;
 
+use OpenApi\Spec as OA;
+
+#[OA\Schema(
+    type: 'string',
+    enum: [LiveFamily::class],
+    component: 'LiveFamily',
+)]
 enum LiveFamily: string
 {
     case Catalog = 'catalog';

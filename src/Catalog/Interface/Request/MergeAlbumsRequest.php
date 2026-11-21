@@ -4,16 +4,29 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[OA\Schema(
-    schema: 'MergeAlbumsRequest',
-    required: ['targetPublicId', 'sourcePublicId'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'targetPublicId', description: 'Public ID of the target album (the one to keep)', type: 'string'),
-        new OA\Property(property: 'sourcePublicId', description: 'Public ID of the source album (the one to merge into target)', type: 'string'),
+        'targetPublicId' => new OA\Schema(
+            description: 'Public ID of the target album (the one to keep)',
+            type: 'string',
+            minLength: 1,
+            maxLength: 50,
+            default: '',
+        ),
+        'sourcePublicId' => new OA\Schema(
+            description: 'Public ID of the source album (the one to merge into target)',
+            type: 'string',
+            minLength: 1,
+            maxLength: 50,
+            default: '',
+        ),
     ],
+    required: ['targetPublicId', 'sourcePublicId'],
+    component: 'MergeAlbumsRequest',
 )]
 final readonly class MergeAlbumsRequest
 {

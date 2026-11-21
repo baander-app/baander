@@ -4,18 +4,32 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[OA\Schema(
-    schema: 'CreateGenreRequest',
-    required: ['name', 'slug'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'name', type: 'string', example: 'Jazz'),
-        new OA\Property(property: 'slug', type: 'string', example: 'jazz'),
-        new OA\Property(property: 'parentId', description: 'Public ID of the parent genre', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
-        new OA\Property(property: 'mbid', description: 'MusicBrainz ID', type: 'string', nullable: true),
+        'name' => new OA\Schema(type: 'string', example: 'Jazz'),
+        'slug' => new OA\Schema(type: 'string', example: 'jazz'),
+        'parentId' => new OA\Schema(
+            description: 'Public ID of the parent genre',
+            type: 'string',
+            nullable: true,
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+            default: null,
+        ),
+        'mbid' => new OA\Schema(
+            description: 'MusicBrainz ID',
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
     ],
+    required: ['name', 'slug'],
+    component: 'CreateGenreRequest',
 )]
 final readonly class CreateGenreRequest
 {

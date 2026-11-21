@@ -4,8 +4,35 @@ declare(strict_types=1);
 
 namespace App\Session\Interface\Request;
 
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
+#[OA\Schema(
+    type: 'object',
+    properties: [
+        'incarnationId' => new OA\Schema(type: 'string'),
+        'expectedRevision' => new OA\Schema(type: 'integer', minimum: 0),
+        'observedState' => new OA\Schema(
+            type: 'string',
+            enum: ['playing', 'paused', 'stopped', 'unknown'],
+        ),
+        'position' => new OA\Schema(
+            type: 'number',
+            format: 'float',
+            minimum: 0,
+        ),
+        'volume' => new OA\Schema(
+            type: 'number',
+            format: 'float',
+            nullable: true,
+            minimum: 0,
+            maximum: 1,
+            default: null,
+        ),
+    ],
+    required: ['incarnationId', 'expectedRevision', 'observedState', 'position'],
+    component: 'ObservePlaybackRequest',
+)]
 final readonly class ObservePlaybackRequest
 {
     public function __construct(

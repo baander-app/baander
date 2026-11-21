@@ -4,9 +4,21 @@ declare(strict_types=1);
 
 namespace App\Shared\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
+#[OA\Schema(
+    type: 'object',
+    properties: [
+        'settings' => new OA\Schema(
+            description: 'Setting key to new value',
+            type: 'object',
+            additionalProperties: true,
+        ),
+    ],
+    required: ['settings'],
+    component: 'UpdateSystemSettingsRequest',
+)]
 final readonly class UpdateSystemSettingsRequest
 {
     /**
@@ -14,7 +26,6 @@ final readonly class UpdateSystemSettingsRequest
      */
     public function __construct(
         #[Assert\NotNull]
-        #[OA\Property(description: 'Setting key to new value', type: 'object', additionalProperties: true)]
         public array $settings,
     ) {
     }

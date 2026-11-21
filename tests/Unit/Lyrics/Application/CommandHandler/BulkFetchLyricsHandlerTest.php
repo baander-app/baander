@@ -140,7 +140,22 @@ final class BulkFetchLyricsHandlerTest extends TestCase
 
     public function testASchedulesFormOffersTheSpacingARunUsesByDefault(): void
     {
-        self::assertSame(3000, BulkFetchLyricsCommand::schedulerParameters()['delayMs']['default']);
+        self::assertSame([
+            'limit' => [
+                'type' => 'integer',
+                'required' => false,
+                'description' => 'Maximum number of songs to process in one run',
+                'default' => null,
+                'nullable' => true,
+            ],
+            'delayMs' => [
+                'type' => 'integer',
+                'required' => false,
+                'description' => 'Milliseconds between the queued fetches. A value below the default is raised to the default',
+                'default' => 3000,
+                'nullable' => true,
+            ],
+        ], BulkFetchLyricsCommand::schedulerParameters());
     }
 
     public function testWithoutALimitEverySongWithoutLyricsIsQueued(): void

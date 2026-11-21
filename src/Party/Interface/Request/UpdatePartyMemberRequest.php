@@ -4,14 +4,23 @@ declare(strict_types=1);
 
 namespace App\Party\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'UpdatePartyMemberRequest',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'audioProfileId', type: 'string', nullable: true),
-        new OA\Property(property: 'subtitleTrackId', type: 'string', nullable: true),
+        'audioProfileId' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
+        'subtitleTrackId' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
     ],
+    component: 'UpdatePartyMemberRequest',
 )]
 final readonly class UpdatePartyMemberRequest
 {

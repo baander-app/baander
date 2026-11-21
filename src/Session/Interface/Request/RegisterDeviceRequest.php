@@ -4,16 +4,27 @@ declare(strict_types=1);
 
 namespace App\Session\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[OA\Schema(
-    schema: 'RegisterDeviceRequest',
-    required: ['deviceId'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'deviceId', description: 'Browser-generated device token from localStorage; distinct from the persisted device publicId', type: 'string', format: 'uuid'),
-        new OA\Property(property: 'name', type: 'string', example: 'Living Room Speaker', maxLength: 255),
+        'deviceId' => new OA\Schema(
+            description: 'Browser-generated device token from localStorage; distinct from the persisted device publicId',
+            type: 'string',
+            format: 'uuid',
+            default: '',
+        ),
+        'name' => new OA\Schema(
+            type: 'string',
+            maxLength: 255,
+            example: 'Living Room Speaker',
+            default: 'Device',
+        ),
     ],
+    required: ['deviceId'],
+    component: 'RegisterDeviceRequest',
 )]
 final readonly class RegisterDeviceRequest
 {

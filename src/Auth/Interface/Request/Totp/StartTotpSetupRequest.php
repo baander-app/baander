@@ -4,15 +4,20 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Request\Totp;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 
 #[OA\Schema(
-    schema: 'StartTotpSetupRequest',
-    required: ['currentPassword'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'currentPassword', type: 'string', example: '********'),
+        'currentPassword' => new OA\Schema(
+            type: 'string',
+            example: '********',
+            default: '',
+        ),
     ],
+    required: ['currentPassword'],
+    component: 'StartTotpSetupRequest',
 )]
 final readonly class StartTotpSetupRequest
 {

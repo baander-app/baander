@@ -4,16 +4,26 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[OA\Schema(
-    schema: 'ArtistAlbumRequest',
-    required: ['albumId', 'role'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'albumId', description: 'Album public identifier', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'role', description: 'Artist role (primary, featured, producer, composer, conductor, remixer, djmix, other)', type: 'string'),
+        'albumId' => new OA\Schema(
+            description: 'Album public identifier',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
+        'role' => new OA\Schema(
+            description: 'Artist role (primary, featured, producer, composer, conductor, remixer, djmix, other)',
+            type: 'string',
+        ),
     ],
+    required: ['albumId', 'role'],
+    component: 'ArtistAlbumRequest',
 )]
 final readonly class ArtistAlbumRequest
 {

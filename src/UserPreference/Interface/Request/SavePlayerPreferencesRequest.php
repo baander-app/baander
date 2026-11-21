@@ -4,39 +4,74 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Interface\Request;
 
-use Nelmio\ApiDocBundle\Attribute\Ignore;
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[OA\Schema(
-    schema: 'SavePlayerPreferencesRequest',
-    required: ['payload', 'version'],
+    type: 'object',
     properties: [
-        new OA\Property(
-            property: 'payload',
-            required: ['shuffle', 'repeat', 'volume', 'muted', 'crossfadeEnabled', 'crossfadeDuration', 'replayGainEnabled', 'replayGainMode', 'replayGainPreAmp'],
-            properties: [
-                new OA\Property(property: 'shuffle', type: 'boolean', example: false),
-                new OA\Property(property: 'repeat', type: 'string', example: 'off', enum: ['off', 'all', 'one']),
-                new OA\Property(property: 'volume', type: 'number', example: 0.8, maximum: 1, minimum: 0),
-                new OA\Property(property: 'muted', type: 'boolean', example: false),
-                new OA\Property(property: 'crossfadeEnabled', type: 'boolean', example: false),
-                new OA\Property(property: 'crossfadeDuration', type: 'number', example: 5.0, maximum: 12, minimum: 0),
-                new OA\Property(property: 'replayGainEnabled', type: 'boolean', example: false),
-                new OA\Property(property: 'replayGainMode', type: 'string', example: 'track', enum: ['track', 'album']),
-                new OA\Property(property: 'replayGainPreAmp', type: 'number', example: 0.0, maximum: 15, minimum: -15),
-            ],
+        'payload' => new OA\Schema(
             type: 'object',
+            properties: [
+                'shuffle' => new OA\Schema(type: 'boolean', example: false),
+                'repeat' => new OA\Schema(
+                    type: 'string',
+                    enum: ['off', 'all', 'one'],
+                    example: 'off',
+                ),
+                'volume' => new OA\Schema(
+                    type: 'number',
+                    minimum: 0,
+                    maximum: 1,
+                    example: 0.8,
+                ),
+                'muted' => new OA\Schema(type: 'boolean', example: false),
+                'crossfadeEnabled' => new OA\Schema(type: 'boolean', example: false),
+                'crossfadeDuration' => new OA\Schema(
+                    type: 'number',
+                    minimum: 0,
+                    maximum: 12,
+                    example: 5.0,
+                ),
+                'replayGainEnabled' => new OA\Schema(type: 'boolean', example: false),
+                'replayGainMode' => new OA\Schema(
+                    type: 'string',
+                    enum: ['track', 'album'],
+                    example: 'track',
+                ),
+                'replayGainPreAmp' => new OA\Schema(
+                    type: 'number',
+                    minimum: -15,
+                    maximum: 15,
+                    example: 0.0,
+                ),
+            ],
+            required: [
+                'shuffle',
+                'repeat',
+                'volume',
+                'muted',
+                'crossfadeEnabled',
+                'crossfadeDuration',
+                'replayGainEnabled',
+                'replayGainMode',
+                'replayGainPreAmp',
+            ],
             additionalProperties: false,
         ),
-        new OA\Property(property: 'version', type: 'integer', example: 0, minimum: 0),
+        'version' => new OA\Schema(
+            type: 'integer',
+            minimum: 0,
+            example: 0,
+        ),
     ],
+    required: ['payload', 'version'],
+    component: 'SavePlayerPreferencesRequest',
 )]
 final readonly class SavePlayerPreferencesRequest
 {
     /** @param array<string, mixed> $payload */
     public function __construct(
-        #[Ignore]
         #[Assert\NotNull(message: 'Payload is required.')]
         #[Assert\Type(type: 'array')]
         #[Assert\Collection(
@@ -55,7 +90,6 @@ final readonly class SavePlayerPreferencesRequest
         )]
         public array $payload = [],
 
-        #[Ignore]
         #[Assert\NotNull(message: 'Version is required.')]
         #[Assert\GreaterThanOrEqual(value: 0, message: 'Version must be at least 0.')]
         public int $version = 0,

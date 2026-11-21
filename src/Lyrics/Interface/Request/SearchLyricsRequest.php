@@ -4,18 +4,24 @@ declare(strict_types=1);
 
 namespace App\Lyrics\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 /**
  * The query string of GET /api/lyrics/search. SearchLyricsQuery rejects a blank query, so the
  * API and app:lyrics:search answer it the same way.
  */
 #[OA\Schema(
-    schema: 'SearchLyricsRequest',
-    required: ['q'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'q', description: 'Search query for lyrics', type: 'string', example: 'Still Alive Portal'),
+        'q' => new OA\Schema(
+            description: 'Search query for lyrics',
+            type: 'string',
+            example: 'Still Alive Portal',
+            default: '',
+        ),
     ],
+    required: ['q'],
+    component: 'SearchLyricsRequest',
 )]
 final readonly class SearchLyricsRequest
 {

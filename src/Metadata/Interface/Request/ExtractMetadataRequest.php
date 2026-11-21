@@ -4,15 +4,21 @@ declare(strict_types=1);
 
 namespace App\Metadata\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 
 #[OA\Schema(
-    schema: 'ExtractMetadataRequest',
-    required: ['path'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'path', description: 'Filesystem path to the media file to analyze', type: 'string', example: '/mnt/media/music/album/song.flac'),
+        'path' => new OA\Schema(
+            description: 'Filesystem path to the media file to analyze',
+            type: 'string',
+            example: '/mnt/media/music/album/song.flac',
+            default: '',
+        ),
     ],
+    required: ['path'],
+    component: 'ExtractMetadataRequest',
 )]
 final readonly class ExtractMetadataRequest
 {

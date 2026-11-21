@@ -4,17 +4,29 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Request\User;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\Length;
 use Symfony\Component\Validator\Constraints\NotBlank;
 
 #[OA\Schema(
-    schema: 'ResetPasswordRequest',
-    required: ['token', 'password'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'token', description: 'The password reset token.', type: 'string', maxLength: 255),
-        new OA\Property(property: 'password', type: 'string', example: '********', maxLength: 255, minLength: 8),
+        'token' => new OA\Schema(
+            description: 'The password reset token.',
+            type: 'string',
+            maxLength: 255,
+            default: '',
+        ),
+        'password' => new OA\Schema(
+            type: 'string',
+            minLength: 8,
+            maxLength: 255,
+            example: '********',
+            default: '',
+        ),
     ],
+    required: ['token', 'password'],
+    component: 'ResetPasswordRequest',
 )]
 final readonly class ResetPasswordRequest
 {

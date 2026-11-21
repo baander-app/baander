@@ -4,17 +4,14 @@ declare(strict_types=1);
 
 namespace App\Scheduler\Domain\Model;
 
-use OpenApi\Attributes\Property;
-use OpenApi\Generator;
+use OpenApi\Spec\Property;
+use OpenApi\Undefined;
 
 /**
- * Trait for building scheduler parameter schemas from OA-annotated classes.
+ * Builds scheduler parameter schemas from native OpenAPI property attributes.
  *
- * Reads #[OA\Property] attributes from a given class and produces the
+ * Reads each property's native schema and produces the
  * parameter schema array expected by SchedulableCommandInterface::schedulerParameters().
- *
- * Uses Generator::isDefault() to guard against OpenApi's sentinel UNDEFINED
- * strings that leak into responses when compared with naive null/empty checks.
  *
  * Usage:
  *   class MyCommand implements SchedulableCommandInterface {
@@ -27,7 +24,7 @@ use OpenApi\Generator;
 trait SchedulerParameterSchema
 {
     /**
-     * @param class-string $class The OA-annotated parameter class
+     * @param class-string $class The parameter class
      * @return array<string, array{type: string, required: bool, description?: string, default?: mixed, format?: string, example?: mixed, enum?: array<string>, nullable?: bool}>
      */
     protected static function buildSchemaFromOaClass(string $class): array
@@ -41,33 +38,36 @@ trait SchedulerParameterSchema
                 continue;
             }
 
-            $oaProperty = $attributes[0]->newInstance();
+            $propertySchema = $attributes[0]->newInstance()->schema;
+            if ($propertySchema === null) {
+                continue;
+            }
             $name = $property->getName();
 
             $entry = [
-                'type' => !Generator::isDefault($oaProperty->type) ? $oaProperty->type : 'string',
-                'required' => !$property->hasDefaultValue() && (Generator::isDefault($oaProperty->nullable) || !$oaProperty->nullable),
-                'description' => !Generator::isDefault($oaProperty->description) ? $oaProperty->description : '',
+                'type' => $propertySchema->type ?? 'string',
+                'required' => !$property->hasDefaultValue() && $propertySchema->nullable !== true,
+                'description' => !Undefined::isDefault($propertySchema->description) ? ($propertySchema->description ?? '') : '',
             ];
 
             if ($property->hasDefaultValue()) {
                 $entry['default'] = $property->getDefaultValue();
             }
 
-            if (!Generator::isDefault($oaProperty->nullable) && $oaProperty->nullable) {
+            if ($propertySchema->nullable === true) {
                 $entry['nullable'] = true;
             }
 
-            if (!Generator::isDefault($oaProperty->format) && $oaProperty->format !== '') {
-                $entry['format'] = $oaProperty->format;
+            if ($propertySchema->format !== null && $propertySchema->format !== '') {
+                $entry['format'] = $propertySchema->format;
             }
 
-            if (!Generator::isDefault($oaProperty->example)) {
-                $entry['example'] = $oaProperty->example;
+            if (!Undefined::isDefault($propertySchema->example)) {
+                $entry['example'] = $propertySchema->example;
             }
 
-            if (!Generator::isDefault($oaProperty->enum) && $oaProperty->enum !== []) {
-                $entry['enum'] = $oaProperty->enum;
+            if ($propertySchema->enum !== null && $propertySchema->enum !== []) {
+                $entry['enum'] = $propertySchema->enum;
             }
 
             $schema[$name] = $entry;

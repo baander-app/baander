@@ -4,20 +4,58 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'UpdateSongRequest',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'title', type: 'string', example: 'Updated Song Title', nullable: true),
-        new OA\Property(property: 'track', description: 'Track number on the album', type: 'integer', nullable: true),
-        new OA\Property(property: 'disc', description: 'Disc number for multi-disc albums', type: 'integer', nullable: true),
-        new OA\Property(property: 'year', type: 'integer', nullable: true),
-        new OA\Property(property: 'comment', type: 'string', nullable: true),
-        new OA\Property(property: 'lyrics', type: 'string', nullable: true),
-        new OA\Property(property: 'explicit', type: 'boolean', nullable: true),
-        new OA\Property(property: 'lockedFields', description: 'Full list of locked field names. Replaces the existing list.', type: 'array', items: new OA\Items(type: 'string'), nullable: true),
+        'title' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            example: 'Updated Song Title',
+            default: null,
+        ),
+        'track' => new OA\Schema(
+            description: 'Track number on the album',
+            type: 'integer',
+            nullable: true,
+            default: null,
+        ),
+        'disc' => new OA\Schema(
+            description: 'Disc number for multi-disc albums',
+            type: 'integer',
+            nullable: true,
+            default: null,
+        ),
+        'year' => new OA\Schema(
+            type: 'integer',
+            nullable: true,
+            default: null,
+        ),
+        'comment' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
+        'lyrics' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
+        'explicit' => new OA\Schema(
+            type: 'boolean',
+            nullable: true,
+            default: null,
+        ),
+        'lockedFields' => new OA\Schema(
+            description: 'Full list of locked field names. Replaces the existing list.',
+            type: 'array',
+            nullable: true,
+            items: new OA\Schema(type: 'string'),
+            default: null,
+        ),
     ],
+    component: 'UpdateSongRequest',
 )]
 final readonly class UpdateSongRequest
 {

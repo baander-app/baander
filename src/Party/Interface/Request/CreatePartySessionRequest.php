@@ -4,19 +4,40 @@ declare(strict_types=1);
 
 namespace App\Party\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\Range;
 use Symfony\Component\Validator\Constraints\Regex;
 
 #[OA\Schema(
-    schema: 'CreatePartySessionRequest',
-    required: ['videoId'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'videoId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-        new OA\Property(property: 'transcodeJobId', description: 'Transcode job of the video that the host\'s playback steers', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
-        new OA\Property(property: 'maxMembers', type: 'integer', example: 10, maximum: 50, minimum: 2),
+        'videoId' => new OA\Schema(
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+            default: '',
+        ),
+        'transcodeJobId' => new OA\Schema(
+            description: 'Transcode job of the video that the host\'s playback steers',
+            type: 'string',
+            nullable: true,
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+            default: null,
+        ),
+        'maxMembers' => new OA\Schema(
+            type: 'integer',
+            minimum: 2,
+            maximum: 50,
+            example: 10,
+            default: 10,
+        ),
     ],
+    required: ['videoId'],
+    component: 'CreatePartySessionRequest',
 )]
 final readonly class CreatePartySessionRequest
 {

@@ -4,28 +4,33 @@ declare(strict_types=1);
 
 namespace App\Notification\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[OA\Schema(
-    schema: 'UpdatePreferenceRequest',
-    required: ['preferences'],
+    type: 'object',
     properties: [
-        new OA\Property(
-            property: 'preferences',
+        'preferences' => new OA\Schema(
             type: 'array',
-            items: new OA\Items(
-                required: ['category', 'channel', 'enabled'],
+            items: new OA\Schema(
                 properties: [
-                    new OA\Property(property: 'category', type: 'string', enum: ['security',
-                                                                                 'background_jobs',
-                                                                                 'media_changes']),
-                    new OA\Property(property: 'channel', type: 'string', enum: ['in_app', 'email', 'push', 'webhook']),
-                    new OA\Property(property: 'enabled', type: 'boolean'),
+                    'category' => new OA\Schema(
+                        type: 'string',
+                        enum: ['security', 'background_jobs', 'media_changes'],
+                    ),
+                    'channel' => new OA\Schema(
+                        type: 'string',
+                        enum: ['in_app', 'email', 'push', 'webhook'],
+                    ),
+                    'enabled' => new OA\Schema(type: 'boolean'),
                 ],
+                required: ['category', 'channel', 'enabled'],
             ),
+            default: [],
         ),
     ],
+    required: ['preferences'],
+    component: 'UpdatePreferenceRequest',
 )]
 final readonly class UpdatePreferenceRequest
 {

@@ -4,18 +4,45 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[OA\Schema(
-    schema: 'UpdateEqDeviceProfileRequest',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'name', type: 'string', example: 'Living Room', maxLength: 255),
-        new OA\Property(property: 'icon', type: 'string', example: 'speakers'),
-        new OA\Property(property: 'deviceId', description: 'Client audio-output token, independent of database identity', type: 'string', nullable: true),
-        new OA\Property(property: 'payload', type: 'object'),
-        new OA\Property(property: 'sortOrder', type: 'integer', example: 0),
+        'name' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            maxLength: 255,
+            example: 'Living Room',
+            default: null,
+        ),
+        'icon' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            enum: ['headphones', 'speakers', 'hifi-speaker', 'wireless-speaker', 'car', 'tv', 'monitor', 'custom'],
+            example: 'speakers',
+            default: null,
+        ),
+        'deviceId' => new OA\Schema(
+            description: 'Client audio-output token, independent of database identity',
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
+        'payload' => new OA\Schema(
+            type: 'object',
+            nullable: true,
+            default: null,
+        ),
+        'sortOrder' => new OA\Schema(
+            type: 'integer',
+            nullable: true,
+            example: 0,
+            default: null,
+        ),
     ],
+    component: 'UpdateEqDeviceProfileRequest',
 )]
 final readonly class UpdateEqDeviceProfileRequest
 {

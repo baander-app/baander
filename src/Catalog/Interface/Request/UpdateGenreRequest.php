@@ -4,16 +4,39 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 
 #[OA\Schema(
-    schema: 'UpdateGenreRequest',
+    type: 'object',
     properties: [
-        new OA\Property(property: 'name', type: 'string', example: 'Updated Genre Name', nullable: true),
-        new OA\Property(property: 'slug', type: 'string', nullable: true),
-        new OA\Property(property: 'parentId', description: 'Public ID of the parent genre', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, maxLength: 21, minLength: 21),
-        new OA\Property(property: 'mbid', description: 'MusicBrainz ID', type: 'string', nullable: true),
+        'name' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            example: 'Updated Genre Name',
+            default: null,
+        ),
+        'slug' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
+        'parentId' => new OA\Schema(
+            description: 'Public ID of the parent genre',
+            type: 'string',
+            nullable: true,
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+            default: null,
+        ),
+        'mbid' => new OA\Schema(
+            description: 'MusicBrainz ID',
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
     ],
+    component: 'UpdateGenreRequest',
 )]
 final readonly class UpdateGenreRequest
 {

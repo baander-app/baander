@@ -4,15 +4,22 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[OA\Schema(
-    schema: 'GenreAlbumRequest',
-    required: ['albumId'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'albumId', description: 'Album public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
+        'albumId' => new OA\Schema(
+            description: 'Album public ID',
+            type: 'string',
+            minLength: 21,
+            maxLength: 21,
+            pattern: '^[0-9a-zA-Z_-]{21}$',
+        ),
     ],
+    required: ['albumId'],
+    component: 'GenreAlbumRequest',
 )]
 final readonly class GenreAlbumRequest
 {

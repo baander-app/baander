@@ -4,8 +4,17 @@ declare(strict_types=1);
 
 namespace App\Session\Interface\Request;
 
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
+#[OA\Schema(
+    type: 'object',
+    properties: [
+        'expectedRevision' => new OA\Schema(type: 'integer', minimum: 0),
+    ],
+    required: ['expectedRevision'],
+    component: 'ReconcilePlaybackRequest',
+)]
 final readonly class ReconcilePlaybackRequest
 {
     public function __construct(

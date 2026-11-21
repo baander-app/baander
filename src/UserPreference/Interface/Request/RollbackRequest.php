@@ -4,15 +4,21 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[OA\Schema(
-    schema: 'RollbackRequest',
-    required: ['version'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'version', type: 'integer', example: 2, minimum: 1),
+        'version' => new OA\Schema(
+            type: 'integer',
+            minimum: 1,
+            example: 2,
+            default: 0,
+        ),
     ],
+    required: ['version'],
+    component: 'RollbackRequest',
 )]
 final readonly class RollbackRequest
 {

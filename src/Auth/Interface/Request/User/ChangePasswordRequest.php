@@ -4,17 +4,28 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Request\User;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\Length;
 use Symfony\Component\Validator\Constraints\NotBlank;
 
 #[OA\Schema(
-    schema: 'ChangePasswordRequest',
-    required: ['currentPassword', 'newPassword'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'currentPassword', type: 'string', example: '********'),
-        new OA\Property(property: 'newPassword', type: 'string', example: '********', maxLength: 255, minLength: 8),
+        'currentPassword' => new OA\Schema(
+            type: 'string',
+            example: '********',
+            default: '',
+        ),
+        'newPassword' => new OA\Schema(
+            type: 'string',
+            minLength: 8,
+            maxLength: 255,
+            example: '********',
+            default: '',
+        ),
     ],
+    required: ['currentPassword', 'newPassword'],
+    component: 'ChangePasswordRequest',
 )]
 final readonly class ChangePasswordRequest
 {

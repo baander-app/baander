@@ -4,26 +4,55 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Request\Admin;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[OA\Schema(
-    schema: 'AdminCreateOAuthClientRequest',
-    required: ['name', 'type'],
+    type: 'object',
     properties: [
-        new OA\Property(property: 'name', type: 'string', example: 'Living room TV', maxLength: 100),
-        new OA\Property(property: 'type', type: 'string', enum: ['device', 'public', 'confidential']),
-        new OA\Property(
-            property: 'redirectUris',
+        'name' => new OA\Schema(
+            type: 'string',
+            maxLength: 100,
+            example: 'Living room TV',
+            default: '',
+        ),
+        'type' => new OA\Schema(
+            type: 'string',
+            enum: ['device', 'public', 'confidential'],
+            default: '',
+        ),
+        'redirectUris' => new OA\Schema(
             description: 'Required for public and confidential clients (1 to 10 URIs: https, http on a loopback host, or a private-use scheme in reverse domain form; no fragment). Must be omitted or empty for device clients.',
             type: 'array',
-            items: new OA\Items(type: 'string', format: 'uri'),
+            items: new OA\Schema(type: 'string', format: 'uri'),
+            maxItems: 10,
             example: ['https://player.baander.app/callback'],
+            default: [],
         ),
-        new OA\Property(property: 'authMethod', description: 'How a confidential client authenticates; client_secret_post when omitted. Omit it for device and public clients.', type: 'string', nullable: true, enum: ['client_secret_post', 'private_key_jwt']),
-        new OA\Property(property: 'jwks', description: 'A private_key_jwt client\'s public keys as an inline JWK Set: at most 10 public asymmetric keys, each with its own `kid` when there are several, at most 64 KB. Give this or `jwksUri`.', type: 'object', nullable: true),
-        new OA\Property(property: 'jwksUri', description: 'An https URI on port 443 where a private_key_jwt client publishes its JWK Set. Give this or `jwks`.', type: 'string', format: 'uri', example: 'https://server.baander.app/jwks.json', nullable: true),
+        'authMethod' => new OA\Schema(
+            description: 'How a confidential client authenticates; client_secret_post when omitted. Omit it for device and public clients.',
+            type: 'string',
+            nullable: true,
+            enum: ['client_secret_post', 'private_key_jwt'],
+            default: null,
+        ),
+        'jwks' => new OA\Schema(
+            description: 'A private_key_jwt client\'s public keys as an inline JWK Set: at most 10 public asymmetric keys, each with its own `kid` when there are several, at most 64 KB. Give this or `jwksUri`.',
+            type: 'object',
+            nullable: true,
+            default: null,
+        ),
+        'jwksUri' => new OA\Schema(
+            description: 'An https URI on port 443 where a private_key_jwt client publishes its JWK Set. Give this or `jwks`.',
+            type: 'string',
+            format: 'uri',
+            nullable: true,
+            example: 'https://server.baander.app/jwks.json',
+            default: null,
+        ),
     ],
+    required: ['name', 'type'],
+    component: 'AdminCreateOAuthClientRequest',
 )]
 final readonly class AdminCreateOAuthClientRequest
 {

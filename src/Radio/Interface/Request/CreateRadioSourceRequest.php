@@ -4,9 +4,29 @@ declare(strict_types=1);
 
 namespace App\Radio\Interface\Request;
 
-use OpenApi\Attributes as OA;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
+#[OA\Schema(
+    type: 'object',
+    properties: [
+        'name' => new OA\Schema(type: 'string'),
+        'type' => new OA\Schema(type: 'string'),
+        'syncUrl' => new OA\Schema(type: 'string'),
+        'syncConfig' => new OA\Schema(
+            type: 'object',
+            additionalProperties: new OA\Schema(nullable: true),
+            default: new \stdClass(),
+        ),
+        'syncSchedule' => new OA\Schema(
+            type: 'string',
+            nullable: true,
+            default: null,
+        ),
+    ],
+    required: ['name', 'type', 'syncUrl'],
+    component: 'CreateRadioSourceRequest',
+)]
 final readonly class CreateRadioSourceRequest
 {
     /** @param array<string, mixed> $syncConfig */
@@ -22,7 +42,6 @@ final readonly class CreateRadioSourceRequest
         public string $syncUrl,
 
         #[Assert\Type('array')]
-        #[OA\Property(type: 'object', default: new \stdClass(), additionalProperties: new OA\AdditionalProperties(nullable: true))]
         public array $syncConfig = [],
 
         public ?string $syncSchedule = null,
