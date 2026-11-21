@@ -218,6 +218,10 @@ migration regressions. The final edits corrected five existing nullable enums
 and made the checkpoint schema assertions independent of the generated map.
 The dependency checker still reports 49 ignored local worktree inventory gaps
 and seven unchanged Swoole fork inventory findings.
+The refreshed isolated preview installed swagger-php 7.2.0 and passed one
+browser smoke. The HTTP route returned 401 anonymously and 200 after sign-in,
+and the JSON response matched the tracked document. Both preview workers and
+the web service reported ready.
 
 ## Frontend build warnings
 
