@@ -1,4 +1,5 @@
 import { captureOwnership, isCurrentOwnership, subscribeOwnership } from '@/shared/live/ownership'
+import { validatePath } from '../api/library-api'
 import { useState, useCallback, useRef, useEffect } from 'react'
 
 export function usePathValidation() {
@@ -39,7 +40,6 @@ export function usePathValidation() {
 
     setIsValidating(true)
     try {
-      const { validatePath } = await import('../api/library-api')
       if (attempt !== owner.current || !isCurrentOwnership(ownership)) return
 
       const res = await validatePath(path)

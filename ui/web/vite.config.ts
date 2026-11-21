@@ -6,8 +6,8 @@ import { build } from 'esbuild';
 import { resolve } from 'node:path';
 import { mkdirSync } from 'node:fs';
 
-const WORKER_SRC = resolve(__dirname, 'src/features/player/services/auth-stream-worker.ts');
-const WORKER_DEST = resolve(__dirname, '../../public/auth-stream-worker.js');
+const WORKER_SRC = resolve(import.meta.dirname, 'src/features/player/services/auth-stream-worker.ts');
+const WORKER_DEST = resolve(import.meta.dirname, '../../public/auth-stream-worker.js');
 const devOrigin = process.env.BAANDER_DEV_ORIGIN
   ? new URL(process.env.BAANDER_DEV_ORIGIN)
   : undefined;
@@ -18,7 +18,7 @@ if (devOrigin && (devOrigin.protocol !== 'https:' || devOrigin.username || devOr
 }
 
 function compileWorker() {
-  mkdirSync(resolve(__dirname, '../../public'), { recursive: true });
+  mkdirSync(resolve(import.meta.dirname, '../../public'), { recursive: true });
   return build({
     entryPoints: [WORKER_SRC],
     outfile: WORKER_DEST,
@@ -58,12 +58,12 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src'),
-      '@/shared': resolve(__dirname, 'src/shared'),
+      '@': resolve(import.meta.dirname, 'src'),
+      '@/shared': resolve(import.meta.dirname, 'src/shared'),
     },
   },
   build: {
-    outDir: resolve(__dirname, '../../public'),
+    outDir: resolve(import.meta.dirname, '../../public'),
     emptyOutDir: false,
     rollupOptions: {
       input: {
