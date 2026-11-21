@@ -66,6 +66,7 @@ test(
         op: 'create',
         run,
         cinema: true,
+        quality: true,
       })).receipt
       const title = `Owned playback movie ${run}`
       let sourceStart: number | null = null
@@ -181,9 +182,6 @@ test(
       await page.getByRole('option', { name: /English captions/ }).click()
       await expect(player.getByRole('combobox', { name: 'Subtitles', exact: true }))
         .toContainText('English captions')
-      await player.getByRole('combobox', { name: 'Quality', exact: true }).click()
-      await page.getByRole('option', { name: /^\d+p$/ }).first().click()
-      await expectPaused(10)
       await player.getByRole('button', { name: 'Audio timing later', exact: true }).click()
       await expect(player.getByLabel('Audio timing offset', { exact: true }))
         .toContainText('+100 ms')
@@ -200,6 +198,7 @@ test(
       })
       await expect.poll(middleCue).not.toBeNull()
       const baselineCue = (await middleCue())!
+      const baselineCueSourceStart = baselineCue.start + (sourceStart ?? 0)
       await player.getByRole('button', { name: 'Subtitle timing earlier', exact: true }).click()
       await expect.poll(async () => (await middleCue())?.start)
         .toBeCloseTo(baselineCue.start - 0.1, 3)
@@ -208,11 +207,39 @@ test(
       await expect(player.getByLabel('Subtitle timing offset', { exact: true }))
         .toContainText('-100 ms')
 
+      const quality = player.getByRole('combobox', { name: 'Quality', exact: true })
+      await quality.click()
+      await page.getByRole('option', { name: '480p', exact: true }).click()
+      await expect.poll(() => page.locator('video').evaluate(video => (
+        video instanceof HTMLVideoElement && video.readyState >= 2
+          && video.videoHeight === 480
+      )), { timeout: 90_000 }).toBe(true)
+      await expect(quality).toContainText('480p')
+      await expectPaused(10)
+      await expect(player.getByRole('combobox', { name: 'Audio track', exact: true }))
+        .toContainText('Danish tone')
+      await expect(player.getByRole('combobox', { name: 'Subtitles', exact: true }))
+        .toContainText('English captions')
+      await expect(player.getByLabel('Audio timing offset', { exact: true }))
+        .toContainText('+100 ms')
+      await expect(player.getByLabel('Subtitle timing offset', { exact: true }))
+        .toContainText('-100 ms')
+      await expect.poll(async () => {
+        const cue = await middleCue()
+        return cue === null || sourceStart === null
+          ? Number.POSITIVE_INFINITY
+          : cue.start + sourceStart
+      }).toBeCloseTo(baselineCueSourceStart - 0.1, 3)
+
       await timeline.focus()
       await timeline.press('ArrowRight')
       const soughtPosition = Number(await timeline.getAttribute('aria-valuenow'))
       expect(soughtPosition).toBe(11)
       await expectPaused(soughtPosition)
+      await expect(quality).toContainText('480p')
+      await expect.poll(() => page.locator('video').evaluate(video => (
+        video instanceof HTMLVideoElement && video.videoHeight === 480
+      ))).toBe(true)
       await expect(player.getByRole('combobox', { name: 'Audio track', exact: true }))
         .toContainText('Danish tone')
       await expect(player.getByRole('combobox', { name: 'Subtitles', exact: true }))
