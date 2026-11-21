@@ -8,7 +8,8 @@ use App\Catalog\Domain\Model\Movie;
 use App\Catalog\Domain\Model\MovieState;
 use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
-use App\Catalog\Infrastructure\Doctrine\Entity\MovieDirectorCreditEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\MoviePersonCreditEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\MoviePersonCreditStateEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Query\CatalogReadScopeQuery;
@@ -285,9 +286,9 @@ final class MovieRepository implements MovieRepositoryInterface
         $this->entityManager->remove($entity);
         $this->entityManager->flush();
 
-        // The database deletes the movie's video and director links (ON DELETE CASCADE). A link this manager
+        // The database deletes the movie's video and person credit links (ON DELETE CASCADE). A link this manager
         // still holds would point at the deleted movie and fail the next flush that writes anything.
-        foreach ([MovieVideoEntity::class, MovieDirectorCreditEntity::class] as $linkClass) {
+        foreach ([MovieVideoEntity::class, MoviePersonCreditEntity::class, MoviePersonCreditStateEntity::class] as $linkClass) {
             foreach ($this->entityManager->getUnitOfWork()->getIdentityMap()[$linkClass] ?? [] as $link) {
                 if ($link->getMovie() === $entity) {
                     $this->entityManager->detach($link);

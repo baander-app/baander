@@ -6,8 +6,9 @@ namespace App\Tests\Integration;
 
 use App\Catalog\Domain\ValueObject\DirectorCredit;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
-use App\Catalog\Infrastructure\Doctrine\Entity\MovieDirectorEntity;
-use App\Catalog\Infrastructure\Doctrine\Entity\MovieDirectorCreditEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\PersonEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\PersonExternalIdEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\MoviePersonCreditEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Repository\MovieRepository;
@@ -29,10 +30,12 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\ORM\EntityManager;
 use DoctrineMigrations\Version20261121143000;
+use DoctrineMigrations\Version20261121194500;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
 require_once dirname(__DIR__, 2) . '/migrations/Version20261121143000.php';
+require_once dirname(__DIR__, 2) . '/migrations/Version20261121194500.php';
 
 final class DirectorCreditPersistenceTest extends TestCase
 {
@@ -52,7 +55,7 @@ final class DirectorCreditPersistenceTest extends TestCase
         $this->observer = ArtistImportIdentityRace::connect('public');
         $this->observer->executeStatement('CREATE SCHEMA ' . $this->schema);
         $this->observer->executeStatement('SET search_path TO ' . $this->schema . ', public');
-        foreach (['libraries', 'movies', 'videos', 'movie_video'] as $table) {
+        foreach (['libraries', 'movies', 'videos', 'movie_video', 'person_id_aliases'] as $table) {
             ArtistImportIdentityRace::copyTableWithoutPgroonga($this->observer, $table);
         }
         $this->writer = ArtistImportIdentityRace::connect($this->schema);
@@ -66,13 +69,8 @@ final class DirectorCreditPersistenceTest extends TestCase
         $this->manager->flush();
         $this->first = $first->getId();
         $this->second = $second->getId();
-        $migration = new Version20261121143000($this->writer, new NullLogger());
-        $migration->up(new Schema());
-        $this->writer->transactional(static function (Connection $connection) use ($migration): void {
-            foreach ($migration->getSql() as $query) {
-                $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-        });
+        $this->migrate(new Version20261121143000($this->writer, new NullLogger()));
+        $this->migrate(new Version20261121194500($this->writer, new NullLogger()));
     }
 
     protected function tearDown(): void
@@ -95,26 +93,41 @@ final class DirectorCreditPersistenceTest extends TestCase
         self::assertSame([
             ['column_name' => 'id', 'data_type' => 'uuid'],
             ['column_name' => 'public_id', 'data_type' => 'text'],
-            ['column_name' => 'tmdb_id', 'data_type' => 'integer'],
             ['column_name' => 'name', 'data_type' => 'text'],
             ['column_name' => 'profile_url', 'data_type' => 'text'],
+            ['column_name' => 'image_id', 'data_type' => 'uuid'],
+            ['column_name' => 'biography', 'data_type' => 'text'],
+            ['column_name' => 'aliases', 'data_type' => 'jsonb'],
+            ['column_name' => 'birth_date', 'data_type' => 'date'],
+            ['column_name' => 'birth_precision', 'data_type' => 'smallint'],
+            ['column_name' => 'death_date', 'data_type' => 'date'],
+            ['column_name' => 'death_precision', 'data_type' => 'smallint'],
+            ['column_name' => 'is_deceased', 'data_type' => 'boolean'],
+            ['column_name' => 'birthplace', 'data_type' => 'text'],
+            ['column_name' => 'sex', 'data_type' => 'text'],
+            ['column_name' => 'gender', 'data_type' => 'text'],
+            ['column_name' => 'profile_overrides', 'data_type' => 'jsonb'],
         ], $this->observer->fetchAllAssociative(
-            "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = ? AND table_name = 'movie_directors' ORDER BY ordinal_position",
+            "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = ? AND table_name = 'people' ORDER BY ordinal_position",
             [$this->schema],
         ));
         self::assertSame([
-            'idx_movie_director_credits_director_id',
-            'movie_director_credits_pkey',
-            'movie_directors_pkey',
-            'uniq_movie_directors_public_id',
-            'uniq_movie_directors_tmdb_id',
+            'idx_movie_person_credits_person_id',
+            'idx_people_image_id',
+            'movie_person_credits_pkey',
+            'people_pkey',
+            'uniq_movie_person_credits_movie_id_credit_key',
+            'uniq_people_public_id',
         ], $this->observer->fetchFirstColumn(
             'SELECT indexname FROM pg_indexes WHERE schemaname = ? AND tablename IN (?, ?) ORDER BY indexname',
-            [$this->schema, 'movie_directors', 'movie_director_credits'],
+            [$this->schema, 'people', 'movie_person_credits'],
         ));
         self::assertSame([
-            ['conname' => 'fk_movie_director_credits_director_id', 'confdeltype' => 'c'],
-            ['conname' => 'fk_movie_director_credits_movie_id', 'confdeltype' => 'c'],
+            ['conname' => 'fk_movie_person_credit_state_movie_id', 'confdeltype' => 'c'],
+            ['conname' => 'fk_movie_person_credits_movie_id', 'confdeltype' => 'c'],
+            ['conname' => 'fk_movie_person_credits_person_id', 'confdeltype' => 'c'],
+            ['conname' => 'fk_people_image_id', 'confdeltype' => 'n'],
+            ['conname' => 'fk_person_external_ids_person_id', 'confdeltype' => 'c'],
         ], $this->observer->fetchAllAssociative(
             "SELECT conname, confdeltype FROM pg_constraint WHERE connamespace = CAST(? AS regnamespace) AND contype = 'f' ORDER BY conname",
             [$this->schema],
@@ -142,21 +155,22 @@ final class DirectorCreditPersistenceTest extends TestCase
             $this->writer->commit();
         }
         self::assertSame(['people' => 1], ArtistImportIdentityRace::finish($child, $this->observer));
-        self::assertSame(2, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM movie_director_credits'));
-        self::assertSame(1, (int) $this->observer->fetchOne('SELECT COUNT(DISTINCT director_id) FROM movie_director_credits'));
+        self::assertSame(2, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM movie_person_credits'));
+        self::assertSame(1, (int) $this->observer->fetchOne('SELECT COUNT(DISTINCT person_id) FROM movie_person_credits'));
     }
 
     public function testFiftyMovieFilmographyUsesFourQueriesAndIdCursorDoesNotHydrateMovies(): void
     {
         $library = $this->manager->find(MovieEntity::class, $this->first)->getLibrary();
-        $person = new MovieDirectorEntity(new DirectorCredit(2_000_000_091, 'Batch Director'));
+        $person = new PersonEntity('Batch Director');
+        $this->manager->persist(new PersonExternalIdEntity($person, 'tmdb_person', '2000000091', 'tmdb'));
         $this->manager->persist($person);
         $expectedVideoIds = [];
         for ($number = 1; $number <= 50; ++$number) {
             $movie = new MovieEntity(new PublicId(), $library, sprintf('Batch Movie %02d', $number));
             $video = new VideoEntity(new PublicId(), '/media/director-batch/' . $number . '.mkv', hash('xxh3', 'director-batch-' . $number));
             $expectedVideoIds[] = $video->getPublicId()->toString();
-            foreach ([$movie, $video, new MovieVideoEntity($movie, $video), new MovieDirectorCreditEntity($movie, $person)] as $entity) {
+            foreach ([$movie, $video, new MovieVideoEntity($movie, $video), MoviePersonCreditEntity::director($movie, $person)] as $entity) {
                 $this->manager->persist($entity);
             }
         }
@@ -233,12 +247,98 @@ final class DirectorCreditPersistenceTest extends TestCase
             $this->manager->clear();
         }
         self::assertNull($this->observer->fetchOne('SELECT overview FROM movies WHERE id = ?', [$this->first->toString()]));
-        self::assertSame(0, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM movie_directors'));
+        self::assertSame(0, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM people'));
         $this->writer->transactional(function () use ($repository): void {
             $repository->syncMovieDirectors($this->first, [new DirectorCredit(2_000_000_071, 'Committed Director')]);
         });
         $this->writer->executeStatement('DELETE FROM movies WHERE id = ?', [$this->first->toString()]);
-        self::assertSame(0, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM movie_director_credits'));
-        self::assertSame(1, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM movie_directors'));
+        self::assertSame(0, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM movie_person_credits'));
+        self::assertSame(1, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM people'));
     }
+
+    public function testPopulatedDirectorUpgradePreservesIdentitiesAndInitializesOnlyDirectors(): void
+    {
+        foreach (['movie_person_credits', 'movie_person_credit_state', 'person_external_ids', 'people'] as $table) {
+            $this->writer->executeStatement('DROP TABLE ' . $table);
+        }
+        $this->migrate(new Version20261121143000($this->writer, new NullLogger()));
+        $personId = Uuid::v7()->toString();
+        $publicId = new PublicId()->toString();
+        $this->writer->insert('movie_directors', [
+            'id' => $personId,
+            'public_id' => $publicId,
+            'tmdb_id' => 2_000_000_092,
+            'name' => 'Legacy Director',
+            'profile_url' => 'https://images.baander.app/legacy.jpg',
+        ]);
+        foreach ([$this->first, $this->second] as $movieId) {
+            $this->writer->insert('movie_director_credits', ['movie_id' => $movieId->toString(), 'director_id' => $personId]);
+        }
+        $this->migrate(new Version20261121194500($this->writer, new NullLogger()));
+
+        self::assertSame([
+            'id' => $personId,
+            'public_id' => $publicId,
+            'name' => 'Legacy Director',
+            'profile_url' => 'https://images.baander.app/legacy.jpg',
+        ], $this->observer->fetchAssociative('SELECT id::text, public_id, name, profile_url FROM people'));
+        self::assertSame([
+            'namespace' => 'tmdb_person',
+            'external_id' => '2000000092',
+            'person_id' => $personId,
+            'source' => 'tmdb',
+        ], $this->observer->fetchAssociative('SELECT namespace, external_id, person_id::text, source FROM person_external_ids'));
+        self::assertSame(2, (int) $this->observer->fetchOne("SELECT COUNT(*) FROM movie_person_credits WHERE category = 'crew' AND role = 'director' AND job = 'Director' AND credit_key = ?", ['director:' . $personId]));
+        self::assertSame(2, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM movie_person_credit_state WHERE directors_initialized AND NOT cast_initialized AND NOT crew_initialized'));
+        self::assertSame([7, 7], $this->observer->fetchFirstColumn('SELECT uuid_extract_version(id) FROM movie_person_credits'));
+        self::assertNull($this->observer->fetchOne("SELECT to_regclass('" . $this->schema . ".movie_directors')"));
+        $this->manager->clear();
+        $repository = new DirectorRepository($this->manager);
+        $view = $repository->findVisibleByPublicId(PublicId::fromString($publicId), LibraryReadScope::unrestricted());
+        self::assertNotNull($view);
+        self::assertSame(2, $view->movieCount);
+        self::assertSame(2_000_000_092, $view->tmdbId);
+    }
+
+    public function testTwoProviderIdsForOnePersonProduceOneDirectorCreditAndDirectoryEntry(): void
+    {
+        $person = new PersonEntity('Several Credits');
+        $movie = $this->manager->find(MovieEntity::class, $this->first);
+        foreach ([
+            $person,
+            new PersonExternalIdEntity($person, 'tmdb_person', '2000000093', 'tmdb'),
+            new PersonExternalIdEntity($person, 'tmdb_person', '2000000094', 'tmdb'),
+            new MoviePersonCreditEntity($movie, $person, 'cast', 'actor', 'Actor', 'actor-fixture'),
+        ] as $entity) {
+            $this->manager->persist($entity);
+        }
+        $this->manager->flush();
+        $repository = new DirectorRepository($this->manager);
+        $this->writer->transactional(fn (): bool => $repository->syncMovieDirectors($this->first, [
+            new DirectorCredit(2_000_000_093, 'Several Credits'),
+            new DirectorCredit(2_000_000_094, 'Several Credits'),
+        ]));
+
+        self::assertSame(1, (int) $this->observer->fetchOne("SELECT COUNT(*) FROM movie_person_credits WHERE role = 'director'"));
+        $page = $repository->searchVisible(SearchOptions::create('Several Credits'), LibraryReadScope::unrestricted());
+        self::assertSame(1, $page->getTotal());
+        self::assertCount(1, $page->getItems());
+        self::assertSame(1, $page->getItems()[0]->movieCount);
+        self::assertSame(1, $repository->searchMovieIdsVisible($person->getPublicId(), SearchOptions::create(''), LibraryReadScope::unrestricted())->getTotal());
+        $this->writer->transactional(fn (): bool => $repository->syncMovieDirectors($this->first, [], true));
+        self::assertSame(1, (int) $this->observer->fetchOne("SELECT COUNT(*) FROM movie_person_credits WHERE role = 'actor'"));
+        self::assertSame(0, $repository->searchVisible(SearchOptions::create('Several Credits'), LibraryReadScope::unrestricted())->getTotal());
+        self::assertFalse($this->writer->transactional(fn (): bool => $repository->syncMovieDirectors($this->first, [new DirectorCredit(2_000_000_093, 'Several Credits')])));
+    }
+
+    private function migrate(\Doctrine\Migrations\AbstractMigration $migration): void
+    {
+        $migration->up(new Schema());
+        $this->writer->transactional(static function (Connection $connection) use ($migration): void {
+            foreach ($migration->getSql() as $query) {
+                $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
+            }
+        });
+    }
+
 }

@@ -20,4 +20,4 @@ $connection->transactional(static function () use ($manager, $movieId, $tmdbId):
         true,
     );
 });
-echo json_encode(['people' => (int) $connection->fetchOne('SELECT COUNT(*) FROM movie_directors')], JSON_THROW_ON_ERROR);
+echo json_encode(['people' => (int) $connection->fetchOne('SELECT COUNT(*) FROM people')], JSON_THROW_ON_ERROR);

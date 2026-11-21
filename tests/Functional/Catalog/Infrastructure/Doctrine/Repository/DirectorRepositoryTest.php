@@ -7,7 +7,7 @@ namespace App\Tests\Functional\Catalog\Infrastructure\Doctrine\Repository;
 use App\Catalog\Application\Port\DirectorCredit;
 use App\Catalog\Application\Port\DirectorPortInterface;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
-use App\Catalog\Infrastructure\Doctrine\Entity\MovieDirectorEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\PersonEntity;
 use App\Catalog\Infrastructure\Doctrine\Repository\MovieRepository;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Shared\Domain\Model\PublicId;
@@ -46,7 +46,7 @@ final class DirectorRepositoryTest extends TestCase
         self::assertFalse($this->sync($directors, $allowed->getId(), [], false));
         self::assertTrue($this->sync($directors, $allowed->getId(), [$one, $two], true));
         self::assertTrue($directors->findVisibleByPublicId($id, $scope)->publicId->equals($id));
-        self::assertCount(3, $this->entityManager->getRepository(MovieDirectorEntity::class)->findAll());
+        self::assertCount(3, $this->entityManager->getRepository(PersonEntity::class)->findAll());
         self::assertTrue($this->sync($directors, $allowed->getId(), [], true));
         self::assertSame(0, $directors->searchVisible(SearchOptions::create(''), $scope)->getTotal());
         self::assertSame(2, $directors->searchVisible(SearchOptions::create(''), LibraryReadScope::unrestricted())->getTotal());
