@@ -30,9 +30,9 @@ final class PublicIdSchemaTest extends TestCase
             $property = $property->schema;
             self::assertSame('string', $property->type);
             self::assertNotSame('uuid', $property->format);
-            self::assertSame(21, $property->minLength);
-            self::assertSame(21, $property->maxLength);
-            self::assertSame('^[0-9a-zA-Z_-]{21}$', $property->pattern);
+            self::assertSame(PublicId::LENGTH, $property->minLength);
+            self::assertSame(PublicId::LENGTH, $property->maxLength);
+            self::assertSame(PublicId::SCHEMA_PATTERN, $property->pattern);
             self::assertMatchesRegularExpression('~' . $property->pattern . '~', (new PublicId())->toString());
             return;
         }
@@ -51,9 +51,9 @@ final class PublicIdSchemaTest extends TestCase
             }
             $identity = $array ? $property->schema->items : $property->schema;
             self::assertSame('string', $identity->type);
-            self::assertSame(21, $identity->minLength);
-            self::assertSame(21, $identity->maxLength);
-            self::assertSame('^[0-9a-zA-Z_-]{21}$', $identity->pattern);
+            self::assertSame(PublicId::LENGTH, $identity->minLength);
+            self::assertSame(PublicId::LENGTH, $identity->maxLength);
+            self::assertSame(PublicId::SCHEMA_PATTERN, $identity->pattern);
             return;
         }
         self::fail('Missing relationship schema: ' . $field);

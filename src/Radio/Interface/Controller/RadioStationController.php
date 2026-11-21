@@ -7,6 +7,7 @@ namespace App\Radio\Interface\Controller;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Radio\Application\Port\CountrySubscriptionPortInterface;
 use App\Radio\Application\Port\RadioStationPortInterface;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
@@ -107,16 +108,16 @@ final class RadioStationController
                                     properties: [
                                         'publicId' => new OA\Schema(
                                             type: 'string',
-                                            minLength: 21,
-                                            maxLength: 21,
-                                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                                            minLength: PublicId::LENGTH,
+                                            maxLength: PublicId::LENGTH,
+                                            pattern: PublicId::SCHEMA_PATTERN,
                                         ),
                                         'externalId' => new OA\Schema(description: 'Station identifier assigned by the external provider', type: 'string'),
                                         'sourceId' => new OA\Schema(
                                             type: 'string',
-                                            minLength: 21,
-                                            maxLength: 21,
-                                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                                            minLength: PublicId::LENGTH,
+                                            maxLength: PublicId::LENGTH,
+                                            pattern: PublicId::SCHEMA_PATTERN,
                                         ),
                                         'name' => new OA\Schema(type: 'string'),
                                         'countrycode' => new OA\Schema(type: 'string'),

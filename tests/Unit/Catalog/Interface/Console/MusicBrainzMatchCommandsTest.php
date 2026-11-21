@@ -21,6 +21,7 @@ use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtist;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
 use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use App\Tests\Unit\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchQueryFixtures;
 use PHPUnit\Framework\TestCase;
@@ -190,7 +191,7 @@ final class MusicBrainzMatchCommandsTest extends TestCase
         );
         self::assertMatchesRegularExpression('/1\s+2\s+Track 1-2\s+2:37\s+' . $duet . '\s+Track 1-2\s+2:39/', $display);
         self::assertMatchesRegularExpression(
-            '/' . $duetArtist->getPublicId()->toString() . '\s+Post Malone, Luke Combs\s+merge\s+Post Malone \(\S{21}\)\s+yes\s+' . $duet . ':credits/',
+            '/' . $duetArtist->getPublicId()->toString() . '\s+Post Malone, Luke Combs\s+merge\s+Post Malone \(' . PublicId::PATTERN . '\)\s+yes\s+' . $duet . ':credits/',
             $display,
         );
     }

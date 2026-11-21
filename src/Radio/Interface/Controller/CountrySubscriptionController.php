@@ -55,9 +55,9 @@ final class CountrySubscriptionController
                                     properties: [
                                         'sourceId' => new OA\Schema(
                                             type: 'string',
-                                            minLength: 21,
-                                            maxLength: 21,
-                                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                                            minLength: PublicId::LENGTH,
+                                            maxLength: PublicId::LENGTH,
+                                            pattern: PublicId::SCHEMA_PATTERN,
                                         ),
                                         'countryCode' => new OA\Schema(type: 'string'),
                                         'subscribedAt' => new OA\Schema(type: 'string', format: 'date-time'),
@@ -101,9 +101,9 @@ final class CountrySubscriptionController
                     properties: [
                         'sourceId' => new OA\Schema(
                             type: 'string',
-                            minLength: 21,
-                            maxLength: 21,
-                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                            minLength: PublicId::LENGTH,
+                            maxLength: PublicId::LENGTH,
+                            pattern: PublicId::SCHEMA_PATTERN,
                         ),
                         'countryCode' => new OA\Schema(type: 'string'),
                     ],
@@ -124,9 +124,9 @@ final class CountrySubscriptionController
                                 properties: [
                                     'sourceId' => new OA\Schema(
                                         type: 'string',
-                                        minLength: 21,
-                                        maxLength: 21,
-                                        pattern: '^[0-9a-zA-Z_-]{21}$',
+                                        minLength: PublicId::LENGTH,
+                                        maxLength: PublicId::LENGTH,
+                                        pattern: PublicId::SCHEMA_PATTERN,
                                     ),
                                     'countryCode' => new OA\Schema(type: 'string'),
                                 ],

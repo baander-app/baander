@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Party\Interface\Resource;
 
 use App\Party\Application\DTO\PartySessionView;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Resource\AbstractResource;
 use OpenApi\Spec as OA;
 
@@ -14,31 +15,31 @@ use OpenApi\Spec as OA;
         'publicId' => new OA\Schema(
             description: 'Public identifier',
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'hostUserId' => new OA\Schema(
             description: 'Host user public ID',
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'videoId' => new OA\Schema(
             description: 'Video public ID',
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'transcodeJobId' => new OA\Schema(
             description: 'Transcode job that the host\'s playback steers; null when none was named or the job has been deleted',
             type: 'string',
             nullable: true,
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'maxMembers' => new OA\Schema(description: 'Maximum members allowed', type: 'integer'),
         'playbackState' => new OA\Schema(

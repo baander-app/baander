@@ -8,6 +8,7 @@ use App\Auth\Domain\Model\User;
 use App\Scheduler\Application\Port\SchedulerManualOccurrenceRecorderInterface;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerManualOccurrenceRecorder;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
 use Doctrine\DBAL\Connection;
@@ -86,7 +87,7 @@ final class ManualTriggerTest extends TestCase
         self::assertSame($requestId, $first->headers->get('Idempotency-Key'));
         self::assertSame($this->publicJobs[$job->toString()], $receipt['data']['jobId']);
         self::assertNotSame($requestId, $receipt['data']['occurrenceId']);
-        self::assertSame(21, strlen($receipt['data']['occurrenceId']));
+        self::assertSame(PublicId::LENGTH, strlen($receipt['data']['occurrenceId']));
         self::assertSame(1, $this->countOccurrences());
         self::assertSame('manual', $this->database()->fetchOne('SELECT origin FROM scheduler_occurrences WHERE id = :id', ['id' => $requestId]), 'An independent connection observes committed intent before the HTTP receipt.');
 

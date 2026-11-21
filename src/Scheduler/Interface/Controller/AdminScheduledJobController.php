@@ -30,9 +30,6 @@ final class AdminScheduledJobController
 {
     use ApiResponsesTrait;
 
-    /** A job ID; anything else is no job's address and answers 404. */
-    private const string PUBLIC_ID = '[0-9a-zA-Z_-]{21}';
-
     public function __construct(
         private readonly ScheduledJobAdministrationInterface $scheduledJobService,
         private readonly SchedulerManualOccurrenceRecorderInterface $manualOccurrences,
@@ -96,7 +93,7 @@ final class AdminScheduledJobController
             ),
         ],
     )]
-    #[Route('/{id}', name: 'show', requirements: ['id' => self::PUBLIC_ID], methods: ['GET'])]
+    #[Route('/{id}', name: 'show', requirements: ['id' => PublicId::PATTERN], methods: ['GET'])]
     #[CliCounterpart('app:scheduler:show')]
     public function show(string $id): JsonResponse
     {
@@ -200,7 +197,7 @@ final class AdminScheduledJobController
             ),
         ],
     )]
-    #[Route('/{id}', name: 'update', requirements: ['id' => self::PUBLIC_ID], methods: ['PUT'])]
+    #[Route('/{id}', name: 'update', requirements: ['id' => PublicId::PATTERN], methods: ['PUT'])]
     #[CliCounterpart('app:scheduler:update')]
     public function update(string $id, #[MapRequestPayload] UpdateScheduledJobRequest $request): JsonResponse
     {
@@ -242,7 +239,7 @@ final class AdminScheduledJobController
             ),
         ],
     )]
-    #[Route('/{id}', name: 'delete', requirements: ['id' => self::PUBLIC_ID], methods: ['DELETE'])]
+    #[Route('/{id}', name: 'delete', requirements: ['id' => PublicId::PATTERN], methods: ['DELETE'])]
     #[CliCounterpart('app:scheduler:delete')]
     public function delete(string $id): JsonResponse
     {
@@ -287,7 +284,7 @@ final class AdminScheduledJobController
             ),
         ],
     )]
-    #[Route('/{id}/pause', name: 'pause', requirements: ['id' => self::PUBLIC_ID], methods: ['POST'])]
+    #[Route('/{id}/pause', name: 'pause', requirements: ['id' => PublicId::PATTERN], methods: ['POST'])]
     #[CliCounterpart('app:scheduler:pause')]
     public function pause(string $id): JsonResponse
     {
@@ -333,7 +330,7 @@ final class AdminScheduledJobController
             ),
         ],
     )]
-    #[Route('/{id}/resume', name: 'resume', requirements: ['id' => self::PUBLIC_ID], methods: ['POST'])]
+    #[Route('/{id}/resume', name: 'resume', requirements: ['id' => PublicId::PATTERN], methods: ['POST'])]
     #[CliCounterpart('app:scheduler:resume')]
     public function resume(string $id): JsonResponse
     {
@@ -408,7 +405,7 @@ final class AdminScheduledJobController
             ),
         ],
     )]
-    #[Route('/{id}/trigger', name: 'trigger', requirements: ['id' => self::PUBLIC_ID], methods: ['POST'])]
+    #[Route('/{id}/trigger', name: 'trigger', requirements: ['id' => PublicId::PATTERN], methods: ['POST'])]
     #[CliCounterpart('app:scheduler:run')]
     public function trigger(string $id, Request $request): JsonResponse
     {
@@ -469,7 +466,7 @@ final class AdminScheduledJobController
             ),
         ],
     )]
-    #[Route('/{id}/enable', name: 'enable', requirements: ['id' => self::PUBLIC_ID], methods: ['POST'])]
+    #[Route('/{id}/enable', name: 'enable', requirements: ['id' => PublicId::PATTERN], methods: ['POST'])]
     #[CliCounterpart('app:scheduler:enable')]
     public function enable(string $id): JsonResponse
     {
@@ -515,7 +512,7 @@ final class AdminScheduledJobController
             ),
         ],
     )]
-    #[Route('/{id}/disable', name: 'disable', requirements: ['id' => self::PUBLIC_ID], methods: ['POST'])]
+    #[Route('/{id}/disable', name: 'disable', requirements: ['id' => PublicId::PATTERN], methods: ['POST'])]
     #[CliCounterpart('app:scheduler:disable')]
     public function disable(string $id): JsonResponse
     {

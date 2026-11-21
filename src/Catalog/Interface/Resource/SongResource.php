@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Interface\Resource;
 
 use App\Catalog\Domain\Model\Song;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Resource\AbstractResource;
 use OpenApi\Spec as OA;
 
@@ -14,16 +15,16 @@ use OpenApi\Spec as OA;
         'publicId' => new OA\Schema(
             description: 'Public identifier',
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'albumId' => new OA\Schema(
             description: 'Album public identifier',
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'available' => new OA\Schema(
             description: 'Whether the latest scan or ingestion observation marked the source available',

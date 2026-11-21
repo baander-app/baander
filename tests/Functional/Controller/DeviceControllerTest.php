@@ -54,7 +54,7 @@ final class DeviceControllerTest extends TestCase
         $this->assertCount(1, $list['data']);
         $this->assertSame($deviceId, $list['data'][0]['deviceId']);
         $this->assertArrayNotHasKey('id', $list['data'][0]);
-        $this->assertSame(21, strlen($list['data'][0]['publicId']));
+        $this->assertSame(PublicId::LENGTH, strlen($list['data'][0]['publicId']));
         $this->assertSame('Living Room Speaker', $list['data'][0]['name']);
     }
 
@@ -102,7 +102,7 @@ final class DeviceControllerTest extends TestCase
         $this->assertCount(1, $list['data'], 'Upsert must not create a duplicate device.');
         $this->assertSame($deviceId, $list['data'][0]['deviceId']);
         $this->assertArrayNotHasKey('id', $list['data'][0]);
-        $this->assertSame(21, strlen($list['data'][0]['publicId']));
+        $this->assertSame(PublicId::LENGTH, strlen($list['data'][0]['publicId']));
         $this->assertSame('Second Name', $list['data'][0]['name'], 'Upsert must adopt the new name.');
     }
 

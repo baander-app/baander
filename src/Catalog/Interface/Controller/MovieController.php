@@ -33,7 +33,7 @@ use Symfony\Component\Routing\Attribute\Route;
     name: 'Catalog',
     description: 'Album, artist, song, movie, and genre management endpoints',
 )]
-#[Route('/api/movies', name: 'movie_', requirements: ['publicId' => '[0-9a-zA-Z_-]{21}'])]
+#[Route('/api/movies', name: 'movie_', requirements: ['publicId' => PublicId::PATTERN])]
 #[\Symfony\Component\Security\Http\Attribute\IsGranted('ROLE_ADMIN', methods: ['POST', 'PUT', 'PATCH', 'DELETE'])]
 final class MovieController
 {
@@ -140,9 +140,9 @@ final class MovieController
         required: true,
         schema: new ParameterSchema(
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
     )]
     #[Route('/{publicId}', name: 'show', methods: ['GET'])]
@@ -239,9 +239,9 @@ final class MovieController
         required: true,
         schema: new ParameterSchema(
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
     )]
     #[Route('/{publicId}', name: 'update', methods: ['PATCH'])]
@@ -300,9 +300,9 @@ final class MovieController
         required: true,
         schema: new ParameterSchema(
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
     )]
     #[Route('/{publicId}', name: 'destroy', methods: ['DELETE'])]

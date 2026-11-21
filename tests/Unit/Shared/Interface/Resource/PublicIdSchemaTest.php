@@ -38,9 +38,9 @@ final class PublicIdSchemaTest extends TestCase
             $property = $property->schema;
             self::assertSame('string', $property->type);
             self::assertNotSame('uuid', $property->format);
-            self::assertSame(21, $property->minLength);
-            self::assertSame(21, $property->maxLength);
-            self::assertSame('^[0-9a-zA-Z_-]{21}$', $property->pattern);
+            self::assertSame(PublicId::LENGTH, $property->minLength);
+            self::assertSame(PublicId::LENGTH, $property->maxLength);
+            self::assertSame(PublicId::SCHEMA_PATTERN, $property->pattern);
             self::assertSame($nullable, $property->nullable === true);
             self::assertMatchesRegularExpression('~' . $property->pattern . '~', (new PublicId())->toString());
             self::assertMatchesRegularExpression('~' . $property->pattern . '~', PublicId::fromString('0123456789abABCD_-xyz')->toString());

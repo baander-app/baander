@@ -6,6 +6,7 @@ namespace App\Catalog\Interface\Resource;
 
 use App\Catalog\Domain\Model\Genre;
 use App\Catalog\Domain\ReadModel\GenreReadView;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Resource\AbstractResource;
 use OpenApi\Spec as OA;
 
@@ -15,9 +16,9 @@ use OpenApi\Spec as OA;
         'publicId' => new OA\Schema(
             description: 'Genre public ID',
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'name' => new OA\Schema(description: 'Genre name', type: 'string'),
         'slug' => new OA\Schema(description: 'URL-safe slug', type: 'string'),
@@ -25,9 +26,9 @@ use OpenApi\Spec as OA;
             description: 'Parent genre public ID',
             type: 'string',
             nullable: true,
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'mbid' => new OA\Schema(
             description: 'MusicBrainz ID',

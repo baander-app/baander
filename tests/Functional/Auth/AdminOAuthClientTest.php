@@ -157,8 +157,8 @@ final class AdminOAuthClientTest extends TestCase
             '--type' => 'confidential',
             '--redirect-uri' => ['https://console.baander.app/callback'],
         ]), $create->getDisplay());
-        self::assertMatchesRegularExpression('/Client ID\s*:?\s*([A-Za-z0-9_-]{21})/', $create->getDisplay());
-        preg_match('/Client ID\s*:?\s*([A-Za-z0-9_-]{21})/', $create->getDisplay(), $id);
+        self::assertMatchesRegularExpression('/Client ID\s*:?\s*(' . PublicId::PATTERN . ')/', $create->getDisplay());
+        preg_match('/Client ID\s*:?\s*(' . PublicId::PATTERN . ')/', $create->getDisplay(), $id);
         preg_match('/Client secret\s*:?\s*([A-Za-z0-9_-]{43})/', $create->getDisplay(), $secret);
         self::assertCount(2, $secret, $create->getDisplay());
         $client = $this->clients()->findClientByPublicId(PublicId::fromString($id[1]));

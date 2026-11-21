@@ -7,6 +7,7 @@ namespace App\Catalog\Interface\Resource;
 use App\Catalog\Application\Query\MusicBrainzMatch\CatalogCredit;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchCreditsRow;
 use App\Catalog\Application\Query\MusicBrainzMatch\ProposedCredit;
+use App\Shared\Domain\Model\PublicId;
 use OpenApi\Spec as OA;
 
 /**
@@ -30,9 +31,9 @@ use OpenApi\Spec as OA;
             description: 'The song the credits belong to; null for an album\'s own credits',
             type: 'string',
             nullable: true,
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'current' => new OA\Schema(
             description: 'The primary and featured credits now, which an apply rechecks before it writes the row',
@@ -42,9 +43,9 @@ use OpenApi\Spec as OA;
                 properties: [
                     'artistPublicId' => new OA\Schema(
                         type: 'string',
-                        minLength: 21,
-                        maxLength: 21,
-                        pattern: '^[0-9a-zA-Z_-]{21}$',
+                        minLength: PublicId::LENGTH,
+                        maxLength: PublicId::LENGTH,
+                        pattern: PublicId::SCHEMA_PATTERN,
                     ),
                     'artistName' => new OA\Schema(type: 'string'),
                     'role' => new OA\Schema(

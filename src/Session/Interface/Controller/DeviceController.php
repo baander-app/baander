@@ -112,9 +112,9 @@ final class DeviceController
                                     properties: [
                                         'publicId' => new OA\Schema(
                                             type: 'string',
-                                            minLength: 21,
-                                            maxLength: 21,
-                                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                                            minLength: PublicId::LENGTH,
+                                            maxLength: PublicId::LENGTH,
+                                            pattern: PublicId::SCHEMA_PATTERN,
                                         ),
                                         'deviceId' => new OA\Schema(
                                             description: 'Browser-generated device token; distinct from publicId',
@@ -167,9 +167,9 @@ final class DeviceController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
         ],
@@ -261,9 +261,9 @@ final class DeviceController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
         ],

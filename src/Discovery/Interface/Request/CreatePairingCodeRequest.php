@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Discovery\Interface\Request;
 
+use App\Shared\Domain\Model\PublicId;
 use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\Choice;
@@ -13,9 +14,9 @@ use Symfony\Component\Validator\Constraints\Choice;
     properties: [
         'serverPublicId' => new OA\Schema(
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
             default: '',
         ),
         'method' => new OA\Schema(

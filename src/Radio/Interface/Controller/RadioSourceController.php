@@ -7,6 +7,7 @@ namespace App\Radio\Interface\Controller;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Radio\Application\Port\RadioSourcePortInterface;
 use App\Radio\Interface\Request\CreateRadioSourceRequest;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use OpenApi\Spec as OA;
@@ -47,9 +48,9 @@ final class RadioSourceController
                                     properties: [
                                         'publicId' => new OA\Schema(
                                             type: 'string',
-                                            minLength: 21,
-                                            maxLength: 21,
-                                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                                            minLength: PublicId::LENGTH,
+                                            maxLength: PublicId::LENGTH,
+                                            pattern: PublicId::SCHEMA_PATTERN,
                                         ),
                                         'name' => new OA\Schema(type: 'string'),
                                         'type' => new OA\Schema(type: 'string'),
@@ -122,9 +123,9 @@ final class RadioSourceController
                                 properties: [
                                     'publicId' => new OA\Schema(
                                         type: 'string',
-                                        minLength: 21,
-                                        maxLength: 21,
-                                        pattern: '^[0-9a-zA-Z_-]{21}$',
+                                        minLength: PublicId::LENGTH,
+                                        maxLength: PublicId::LENGTH,
+                                        pattern: PublicId::SCHEMA_PATTERN,
                                     ),
                                     'name' => new OA\Schema(type: 'string'),
                                     'type' => new OA\Schema(type: 'string'),

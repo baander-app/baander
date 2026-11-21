@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Activity\Interface\Resource;
 
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Resource\AbstractResource;
 use OpenApi\Spec as OA;
 
@@ -17,9 +18,9 @@ use OpenApi\Spec as OA;
         'publicId' => new OA\Schema(
             description: 'Public identifier',
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'activityType' => new OA\Schema(description: 'Type of activity', type: 'string'),
         'songAvailable' => new OA\Schema(
@@ -35,9 +36,9 @@ use OpenApi\Spec as OA;
             description: 'Song public identifier',
             type: 'string',
             nullable: true,
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'albumTitle' => new OA\Schema(
             description: 'Album title',
@@ -48,9 +49,9 @@ use OpenApi\Spec as OA;
             description: 'Album public identifier',
             type: 'string',
             nullable: true,
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'artistName' => new OA\Schema(
             description: 'Artist name',

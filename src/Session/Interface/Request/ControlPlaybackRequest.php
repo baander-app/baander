@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Session\Interface\Request;
 
+use App\Shared\Domain\Model\PublicId;
 use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -95,9 +96,9 @@ final readonly class ControlPlaybackRequest
         public string $action,
         #[Assert\PositiveOrZero]
         public ?float $position = null,
-        #[Assert\Collection(fields: ['kind' => new Assert\Choice(choices: ['song', 'video']), 'publicId' => new Assert\Regex(pattern: '/^[0-9a-zA-Z_-]{21}$/')])]
+        #[Assert\Collection(fields: ['kind' => new Assert\Choice(choices: ['song', 'video']), 'publicId' => new Assert\Regex(pattern: PublicId::REGEX)])]
         public ?array $media = null,
-        #[Assert\All(constraints: [new Assert\Regex(pattern: '/^[0-9a-zA-Z_-]{21}$/')])]
+        #[Assert\All(constraints: [new Assert\Regex(pattern: PublicId::REGEX)])]
         public ?array $queue = null,
         #[Assert\PositiveOrZero]
         public ?int $currentTrackIndex = null,

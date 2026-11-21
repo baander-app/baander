@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Transcode\Interface\Request;
 
+use App\Shared\Domain\Model\PublicId;
 use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\Choice;
@@ -13,9 +14,9 @@ use Symfony\Component\Validator\Constraints\Choice;
     properties: [
         'videoId' => new OA\Schema(
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
             example: '0123456789abABCD_-xyz',
             default: '',
         ),
@@ -74,8 +75,8 @@ final readonly class CreateTranscodeSessionRequest
 {
     public function __construct(
         #[NotBlank(message: 'Video ID is required.')]
-        #[\Symfony\Component\Validator\Constraints\Length(exactly: 21)]
-        #[\Symfony\Component\Validator\Constraints\Regex(pattern: '/^[0-9a-zA-Z_-]{21}$/D')]
+        #[\Symfony\Component\Validator\Constraints\Length(exactly: PublicId::LENGTH)]
+        #[\Symfony\Component\Validator\Constraints\Regex(pattern: PublicId::REGEX)]
         public string $videoId = '',
         #[Choice(choices: ['360p', '480p', '720p', '1080p', '1440p', '4K'])]
         public string $qualityTier = '1080p',

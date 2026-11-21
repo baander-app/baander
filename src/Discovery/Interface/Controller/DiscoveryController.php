@@ -100,9 +100,9 @@ final class DiscoveryController
                     properties: [
                         'serverPublicId' => new OA\Schema(
                             type: 'string',
-                            minLength: 21,
-                            maxLength: 21,
-                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                            minLength: PublicId::LENGTH,
+                            maxLength: PublicId::LENGTH,
+                            pattern: PublicId::SCHEMA_PATTERN,
                         ),
                         'method' => new OA\Schema(
                             type: 'string',
@@ -146,9 +146,9 @@ final class DiscoveryController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
         ],
@@ -207,9 +207,9 @@ final class DiscoveryController
                         'pairingCode' => new OA\Schema(type: 'string'),
                         'serverPublicId' => new OA\Schema(
                             type: 'string',
-                            minLength: 21,
-                            maxLength: 21,
-                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                            minLength: PublicId::LENGTH,
+                            maxLength: PublicId::LENGTH,
+                            pattern: PublicId::SCHEMA_PATTERN,
                         ),
                     ],
                     required: ['pairingCode', 'serverPublicId'],

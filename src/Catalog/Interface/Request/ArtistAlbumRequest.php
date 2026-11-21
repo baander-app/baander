@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Interface\Request;
 
 use App\Catalog\Domain\ValueObject\ArtistRole;
+use App\Shared\Domain\Model\PublicId;
 use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -14,9 +15,9 @@ use Symfony\Component\Validator\Constraints as Assert;
         'albumId' => new OA\Schema(
             description: 'Album public identifier',
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'role' => new OA\Schema(
             description: 'Artist role (primary, featured, producer, composer, conductor, remixer, djmix, other)',

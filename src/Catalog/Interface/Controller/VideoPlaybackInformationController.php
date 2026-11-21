@@ -19,7 +19,7 @@ use Symfony\Component\Routing\Attribute\Route;
     description: 'Album, artist, song, movie, and genre management endpoints',
 )]
 #[Route('/api/videos/{publicId}', name: 'video_playback_', requirements: [
-    'publicId' => '[0-9a-zA-Z_-]{21}',
+    'publicId' => PublicId::PATTERN,
 ])]
 final readonly class VideoPlaybackInformationController
 {

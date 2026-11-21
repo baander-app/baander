@@ -9,6 +9,7 @@ use App\Media\Application\Port\ImagePortInterface;
 use App\Media\Application\Port\MediaReadScopeProviderInterface;
 use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Interface\Resource\ImageResource;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use Baander\ImageProcessing\BlurHash\BlurHashGenerator;
@@ -49,9 +50,9 @@ final class ImageController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
                 example: 'aB3dE5fG7hJ9kL1mN3pQr',
             ),
@@ -117,9 +118,9 @@ final class ImageController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
                 example: 'aB3dE5fG7hJ9kL1mN3pQr',
             ),
@@ -240,9 +241,9 @@ final class ImageController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
                 example: 'aB3dE5fG7hJ9kL1mN3pQr',
             ),

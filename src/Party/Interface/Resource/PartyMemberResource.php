@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Party\Interface\Resource;
 
 use App\Party\Application\DTO\PartyMemberView;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Resource\AbstractResource;
 use OpenApi\Spec as OA;
 
@@ -13,23 +14,23 @@ use OpenApi\Spec as OA;
         'publicId' => new OA\Schema(
             description: 'Public identifier',
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'userId' => new OA\Schema(
             description: 'User public ID',
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'sessionId' => new OA\Schema(
             description: 'Session public ID',
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'role' => new OA\Schema(
             description: 'Member role',

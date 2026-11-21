@@ -8,6 +8,7 @@ use App\Catalog\Application\Query\MusicBrainzMatch\ArtistCandidate;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchCandidates;
 use App\Catalog\Application\Query\MusicBrainzMatch\RecordingCandidate;
 use App\Catalog\Application\Query\MusicBrainzMatch\ReleaseCandidate;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Resource\AbstractResource;
 use OpenApi\Spec as OA;
 
@@ -23,9 +24,9 @@ use OpenApi\Spec as OA;
         'publicId' => new OA\Schema(
             description: 'The album\'s, song\'s or artist\'s public ID',
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'title' => new OA\Schema(
             description: 'The title searched last, or for an artist the name: the item\'s own unless the request edited it, or an album\'s own title without the comma-separated list in square brackets at its end when the full title found no release',

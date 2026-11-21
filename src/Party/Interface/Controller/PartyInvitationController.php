@@ -36,9 +36,6 @@ final class PartyInvitationController
     use ApiResponsesTrait;
     use PartyMembershipTrait;
 
-    /** A user's public ID as it appears in a route: 21 characters of the public-ID alphabet. */
-    private const string PUBLIC_ID_REQUIREMENT = '[0-9a-zA-Z_-]{21}';
-
     public function __construct(
         private readonly Security $security,
         private readonly MessageBusInterface $commandBus,
@@ -61,9 +58,9 @@ final class PartyInvitationController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
         ],
@@ -140,9 +137,9 @@ final class PartyInvitationController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
             new OA\Parameter(
@@ -152,9 +149,9 @@ final class PartyInvitationController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
         ],
@@ -190,7 +187,7 @@ final class PartyInvitationController
             ),
         ],
     )]
-    #[Route('/{userPublicId}', name: 'invite', requirements: ['userPublicId' => self::PUBLIC_ID_REQUIREMENT], methods: ['PUT'])]
+    #[Route('/{userPublicId}', name: 'invite', requirements: ['userPublicId' => PublicId::PATTERN], methods: ['PUT'])]
     public function invite(string $publicId, string $userPublicId): JsonResponse
     {
         $user = $this->security->getUser();
@@ -224,9 +221,9 @@ final class PartyInvitationController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
             new OA\Parameter(
@@ -236,9 +233,9 @@ final class PartyInvitationController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
         ],
@@ -274,7 +271,7 @@ final class PartyInvitationController
             ),
         ],
     )]
-    #[Route('/{userPublicId}', name: 'revoke', requirements: ['userPublicId' => self::PUBLIC_ID_REQUIREMENT], methods: ['DELETE'])]
+    #[Route('/{userPublicId}', name: 'revoke', requirements: ['userPublicId' => PublicId::PATTERN], methods: ['DELETE'])]
     public function revoke(string $publicId, string $userPublicId): JsonResponse
     {
         $user = $this->security->getUser();

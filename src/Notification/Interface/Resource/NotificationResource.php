@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Notification\Interface\Resource;
 
 use App\Notification\Domain\Model\Notification;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Resource\AbstractResource;
 use OpenApi\Spec as OA;
 
@@ -14,9 +15,9 @@ use OpenApi\Spec as OA;
         'publicId' => new OA\Schema(
             description: 'Public notification identifier (Nanoid)',
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'category' => new OA\Schema(description: 'Notification category', type: 'string'),
         'eventType' => new OA\Schema(description: 'Event type', type: 'string'),

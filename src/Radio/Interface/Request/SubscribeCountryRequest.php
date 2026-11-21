@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Radio\Interface\Request;
 
+use App\Shared\Domain\Model\PublicId;
 use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -13,8 +14,8 @@ use Symfony\Component\Validator\Constraints as Assert;
         'sourceId' => new OA\Schema(
             type: 'string',
             nullable: true,
-            minLength: 21,
-            maxLength: 21,
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
             default: null,
         ),
         'countryCode' => new OA\Schema(
@@ -29,8 +30,8 @@ use Symfony\Component\Validator\Constraints as Assert;
 final readonly class SubscribeCountryRequest
 {
     public function __construct(
-        #[Assert\Length(exactly: 21)]
-        #[Assert\Regex(pattern: '/^[0-9a-zA-Z_-]{21}$/D')]
+        #[Assert\Length(exactly: PublicId::LENGTH)]
+        #[Assert\Regex(pattern: PublicId::REGEX)]
         public ?string $sourceId = null,
 
         #[Assert\NotBlank]

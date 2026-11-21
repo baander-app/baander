@@ -54,9 +54,9 @@ final class StarredStationController
                                     properties: [
                                         'stationId' => new OA\Schema(
                                             type: 'string',
-                                            minLength: 21,
-                                            maxLength: 21,
-                                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                                            minLength: PublicId::LENGTH,
+                                            maxLength: PublicId::LENGTH,
+                                            pattern: PublicId::SCHEMA_PATTERN,
                                         ),
                                         'name' => new OA\Schema(type: 'string'),
                                         'countryCode' => new OA\Schema(type: 'string'),
@@ -106,9 +106,9 @@ final class StarredStationController
                     properties: [
                         'stationId' => new OA\Schema(
                             type: 'string',
-                            minLength: 21,
-                            maxLength: 21,
-                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                            minLength: PublicId::LENGTH,
+                            maxLength: PublicId::LENGTH,
+                            pattern: PublicId::SCHEMA_PATTERN,
                         ),
                     ],
                     required: ['stationId'],
@@ -128,9 +128,9 @@ final class StarredStationController
                                 properties: [
                                     'stationId' => new OA\Schema(
                                         type: 'string',
-                                        minLength: 21,
-                                        maxLength: 21,
-                                        pattern: '^[0-9a-zA-Z_-]{21}$',
+                                        minLength: PublicId::LENGTH,
+                                        maxLength: PublicId::LENGTH,
+                                        pattern: PublicId::SCHEMA_PATTERN,
                                     ),
                                     'starred' => new OA\Schema(type: 'boolean'),
                                 ],
@@ -184,9 +184,9 @@ final class StarredStationController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
         ],

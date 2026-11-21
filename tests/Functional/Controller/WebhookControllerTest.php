@@ -109,7 +109,7 @@ final class WebhookControllerTest extends TestCase
         $this->assertSame('https://baander.app/hook', $data['url']);
         $this->assertArrayHasKey('secret', $data);
         $this->assertNotEmpty($data['secret']);
-        $this->assertMatchesRegularExpression('/^[0-9a-zA-Z_-]{21}$/', $data['publicId']);
+        $this->assertMatchesRegularExpression(PublicId::REGEX, $data['publicId']);
         $this->assertArrayNotHasKey('id', $data);
     }
 

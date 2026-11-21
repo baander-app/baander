@@ -11,7 +11,11 @@ use Stringable;
 
 final readonly class PublicId implements Stringable, JsonSerializable
 {
-    private const int LENGTH = 21;
+    public const int LENGTH = 21;
+    public const string PATTERN = '[0-9a-zA-Z_-]{' . self::LENGTH . '}';
+    public const string SCHEMA_PATTERN = '^' . self::PATTERN . '$';
+    public const string REGEX = '/' . self::SCHEMA_PATTERN . '/D';
+
     private const string ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-';
 
     private string $id;
@@ -64,7 +68,7 @@ final readonly class PublicId implements Stringable, JsonSerializable
             ));
         }
 
-        if (!preg_match('/^[0-9a-zA-Z_-]+$/', $id)) {
+        if (preg_match(self::REGEX, $id) !== 1) {
             throw new InvalidArgumentException(sprintf(
                 'PublicId contains invalid characters: %s',
                 $id,

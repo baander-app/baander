@@ -10,6 +10,7 @@ use App\Notification\Application\DTO\ListWebhooksQuery;
 use App\Notification\Application\DTO\RotateWebhookSecretCommand;
 use App\Notification\Application\DTO\UpdateWebhookCommand;
 use App\Notification\Interface\Resource\WebhookResource;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\DispatchesMessagesTrait;
@@ -57,9 +58,9 @@ final class WebhookController
                                     properties: [
                                         'publicId' => new OA\Schema(
                                             type: 'string',
-                                            minLength: 21,
-                                            maxLength: 21,
-                                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                                            minLength: PublicId::LENGTH,
+                                            maxLength: PublicId::LENGTH,
+                                            pattern: PublicId::SCHEMA_PATTERN,
                                         ),
                                         'url' => new OA\Schema(type: 'string'),
                                     ],
@@ -124,9 +125,9 @@ final class WebhookController
                                 properties: [
                                     'publicId' => new OA\Schema(
                                         type: 'string',
-                                        minLength: 21,
-                                        maxLength: 21,
-                                        pattern: '^[0-9a-zA-Z_-]{21}$',
+                                        minLength: PublicId::LENGTH,
+                                        maxLength: PublicId::LENGTH,
+                                        pattern: PublicId::SCHEMA_PATTERN,
                                     ),
                                     'url' => new OA\Schema(type: 'string'),
                                     'secret' => new OA\Schema(type: 'string'),
@@ -176,9 +177,9 @@ final class WebhookController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
         ],
@@ -212,9 +213,9 @@ final class WebhookController
                                 properties: [
                                     'publicId' => new OA\Schema(
                                         type: 'string',
-                                        minLength: 21,
-                                        maxLength: 21,
-                                        pattern: '^[0-9a-zA-Z_-]{21}$',
+                                        minLength: PublicId::LENGTH,
+                                        maxLength: PublicId::LENGTH,
+                                        pattern: PublicId::SCHEMA_PATTERN,
                                     ),
                                     'url' => new OA\Schema(type: 'string'),
                                 ],
@@ -276,9 +277,9 @@ final class WebhookController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
         ],
@@ -326,9 +327,9 @@ final class WebhookController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
         ],
@@ -345,9 +346,9 @@ final class WebhookController
                                 properties: [
                                     'publicId' => new OA\Schema(
                                         type: 'string',
-                                        minLength: 21,
-                                        maxLength: 21,
-                                        pattern: '^[0-9a-zA-Z_-]{21}$',
+                                        minLength: PublicId::LENGTH,
+                                        maxLength: PublicId::LENGTH,
+                                        pattern: PublicId::SCHEMA_PATTERN,
                                     ),
                                     'secret' => new OA\Schema(
                                         type: 'string',

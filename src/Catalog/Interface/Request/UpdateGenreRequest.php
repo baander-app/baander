@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Request;
 
+use App\Shared\Domain\Model\PublicId;
 use OpenApi\Spec as OA;
 
 #[OA\Schema(
@@ -24,9 +25,9 @@ use OpenApi\Spec as OA;
             description: 'Public ID of the parent genre',
             type: 'string',
             nullable: true,
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
             default: null,
         ),
         'mbid' => new OA\Schema(

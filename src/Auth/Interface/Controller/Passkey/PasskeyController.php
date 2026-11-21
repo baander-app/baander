@@ -67,9 +67,9 @@ final class PasskeyController
                                     properties: [
                                         'publicId' => new OA\Schema(
                                             type: 'string',
-                                            minLength: 21,
-                                            maxLength: 21,
-                                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                                            minLength: PublicId::LENGTH,
+                                            maxLength: PublicId::LENGTH,
+                                            pattern: PublicId::SCHEMA_PATTERN,
                                         ),
                                         'name' => new OA\Schema(type: 'string'),
                                         'createdAt' => new OA\Schema(type: 'string', format: 'date-time'),
@@ -454,9 +454,9 @@ final class PasskeyController
                                 properties: [
                                     'userId' => new OA\Schema(
                                         type: 'string',
-                                        minLength: 21,
-                                        maxLength: 21,
-                                        pattern: '^[0-9a-zA-Z_-]{21}$',
+                                        minLength: PublicId::LENGTH,
+                                        maxLength: PublicId::LENGTH,
+                                        pattern: PublicId::SCHEMA_PATTERN,
                                     ),
                                     'credentialId' => new OA\Schema(type: 'string'),
                                     'signCount' => new OA\Schema(type: 'integer'),

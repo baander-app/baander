@@ -54,6 +54,14 @@ final class PublicIdTest extends TestCase
         PublicId::fromString('!!!!!!!!!!!!!!!!!!!!!');
     }
 
+    public function testFromStringWithTrailingNewlineThrows(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('PublicId contains invalid characters:');
+
+        PublicId::fromString(str_repeat('a', 20) . "\n");
+    }
+
     public function testFromStringWithEmptyStringThrows(): void
     {
         $this->expectException(\InvalidArgumentException::class);

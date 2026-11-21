@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Favorites\Interface\Request;
 
 use App\Favorites\Domain\ValueObject\FavoriteType;
+use App\Shared\Domain\Model\PublicId;
 use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -28,14 +29,14 @@ final readonly class AddFavoriteRequest
         public string $entityType,
 
         #[Assert\NotBlank]
-        #[Assert\Regex(pattern: '/^[A-Za-z0-9_-]{21}$/D')]
+        #[Assert\Regex(pattern: PublicId::REGEX)]
         #[OA\Property(
             property: 'entityPublicId',
             schema: new OA\Schema(
                 type: 'string',
-                minLength: 21,
-                maxLength: 21,
-                pattern: '^[A-Za-z0-9_-]{21}$',
+                minLength: PublicId::LENGTH,
+                maxLength: PublicId::LENGTH,
+                pattern: PublicId::SCHEMA_PATTERN,
             ),
         )]
         public string $entityPublicId,

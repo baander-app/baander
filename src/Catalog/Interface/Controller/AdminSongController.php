@@ -8,6 +8,7 @@ use App\Catalog\Application\Command\Song\DeleteSongCommand;
 use App\Catalog\Application\Query\Song\GetSongDeletePreviewQuery;
 use App\Catalog\Interface\Resource\CatalogDeletionResource;
 use App\Catalog\Interface\Resource\SongDeletePreviewResource;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\DispatchesMessagesTrait;
@@ -44,9 +45,9 @@ final class AdminSongController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
             new OA\Parameter(
@@ -123,9 +124,9 @@ final class AdminSongController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
             new OA\Parameter(

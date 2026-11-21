@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Interface\Resource;
 
 use App\Catalog\Application\Command\MusicBrainzMatch\MatchApplyResult;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Resource\AbstractResource;
 use OpenApi\Spec as OA;
 
@@ -25,9 +26,9 @@ use OpenApi\Spec as OA;
         'publicId' => new OA\Schema(
             description: 'The album\'s, song\'s or artist\'s public ID',
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'candidateId' => new OA\Schema(
             description: 'The MusicBrainz ID applied: a release, recording or artist',

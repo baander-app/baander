@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Transcode\Interface\Resource;
 
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Resource\AbstractResource;
 use App\Transcode\Application\DTO\TranscodeJobDto;
 use OpenApi\Spec as OA;
@@ -14,16 +15,16 @@ use OpenApi\Spec as OA;
         'publicId' => new OA\Schema(
             description: 'Public identifier',
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'videoId' => new OA\Schema(
             description: 'Video public identifier',
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'qualityTier' => new OA\Schema(description: 'Quality tier name', type: 'string'),
         'status' => new OA\Schema(description: 'Job status', type: 'string'),

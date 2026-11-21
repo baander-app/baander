@@ -186,7 +186,7 @@ final class StreamSigningController
         $attachedSet = $data['attachedSet'] ?? null;
         if (
             !is_string($path) || !preg_match(
-                '~^/api/transcode/([0-9a-zA-Z_-]{21})/(?:master\.m3u8|manifest\.mpd)$~D',
+                '~^/api/transcode/(' . PublicId::PATTERN . ')/(?:master\.m3u8|manifest\.mpd)$~D',
                 $path,
                 $matches,
             )

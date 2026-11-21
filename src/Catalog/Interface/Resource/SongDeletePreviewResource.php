@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Interface\Resource;
 
 use App\Catalog\Application\Query\Song\SongDeletePreview;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Resource\AbstractResource;
 use OpenApi\Spec as OA;
 
@@ -17,9 +18,9 @@ use OpenApi\Spec as OA;
             properties: [
                 'id' => new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
                 'title' => new OA\Schema(type: 'string'),
                 'album' => new OA\Schema(
@@ -28,9 +29,9 @@ use OpenApi\Spec as OA;
                     properties: [
                         'id' => new OA\Schema(
                             type: 'string',
-                            minLength: 21,
-                            maxLength: 21,
-                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                            minLength: PublicId::LENGTH,
+                            maxLength: PublicId::LENGTH,
+                            pattern: PublicId::SCHEMA_PATTERN,
                         ),
                         'title' => new OA\Schema(type: 'string'),
                     ],

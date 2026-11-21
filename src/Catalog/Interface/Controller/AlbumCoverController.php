@@ -9,6 +9,7 @@ use App\Catalog\Application\Command\Cover\RemoveCoverCommand;
 use App\Catalog\Application\Command\Cover\SetCoverCommand;
 use App\Catalog\Interface\Resource\CoverImageResource;
 use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\DispatchesMessagesTrait;
@@ -44,9 +45,9 @@ final class AlbumCoverController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
         ],
@@ -78,9 +79,9 @@ final class AlbumCoverController
                         properties: [
                             'publicId' => new OA\Schema(
                                 type: 'string',
-                                minLength: 21,
-                                maxLength: 21,
-                                pattern: '^[0-9a-zA-Z_-]{21}$',
+                                minLength: PublicId::LENGTH,
+                                maxLength: PublicId::LENGTH,
+                                pattern: PublicId::SCHEMA_PATTERN,
                             ),
                             'url' => new OA\Schema(type: 'string'),
                             'size' => new OA\Schema(type: 'integer'),
@@ -145,9 +146,9 @@ final class AlbumCoverController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
         ],

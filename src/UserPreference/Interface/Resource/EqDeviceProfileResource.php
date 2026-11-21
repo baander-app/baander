@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Interface\Resource;
 
+use App\Shared\Domain\Model\PublicId;
 use App\UserPreference\Domain\Model\EqDeviceProfile;
 use OpenApi\Spec as OA;
 
@@ -13,9 +14,9 @@ use OpenApi\Spec as OA;
         'publicId' => new OA\Schema(
             description: 'Profile public identifier',
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'name' => new OA\Schema(description: 'Profile name', type: 'string'),
         'icon' => new OA\Schema(description: 'Icon identifier', type: 'string'),

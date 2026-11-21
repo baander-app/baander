@@ -6,6 +6,7 @@ namespace App\Tests\Functional\Auth;
 
 use App\Auth\Domain\Model\LoginBlock;
 use App\Auth\Domain\Repository\LoginBlockRepositoryInterface;
+use App\Shared\Domain\Model\PublicId;
 use App\Tests\Functional\TestCase;
 
 final class PublicIdentityTest extends TestCase
@@ -20,7 +21,7 @@ final class PublicIdentityTest extends TestCase
         self::assertArrayNotHasKey('id', $me);
         self::assertStringNotContainsString($user->getId()->toString(), json_encode($me, JSON_THROW_ON_ERROR));
         $client = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/oauth/clients/', $user, ['name' => 'Public identity']), 201)['data'];
-        self::assertMatchesRegularExpression('/^[A-Za-z0-9_-]{21}$/D', $client['publicId']);
+        self::assertMatchesRegularExpression(PublicId::REGEX, $client['publicId']);
         self::assertArrayNotHasKey('uuid', $client);
         self::assertArrayNotHasKey('id', $client);
     }

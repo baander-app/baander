@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Interface\Resource;
 
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchFieldRow;
+use App\Shared\Domain\Model\PublicId;
 use OpenApi\Spec as OA;
 
 /**
@@ -48,9 +49,9 @@ use OpenApi\Spec as OA;
             description: 'The album\'s song the row belongs to; null for a row of the item itself',
             type: 'string',
             nullable: true,
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'current' => new OA\Schema(
             description: 'The value the item holds now, which an apply rechecks before it writes the row; null when the field is empty. The cover row holds true when the album has a cover.',

@@ -19,7 +19,7 @@ use Symfony\Component\Routing\Attribute\Route;
 
 #[OA\Tag(name: 'Streaming', description: 'HLS/DASH streaming endpoints')]
 #[Route('/api/transcode/artifacts/{jobPublicId}/{generation}', name: 'stream_artifact_', requirements: [
-    'jobPublicId' => '[0-9a-zA-Z_-]{21}',
+    'jobPublicId' => PublicId::PATTERN,
     'generation' => '[1-9][0-9]*',
     'track' => 'video|audio',
 ])]

@@ -337,9 +337,9 @@ final class OpenApiSpecTest extends KernelTestCase
     {
         self::assertSame('string', $schema['type']);
         self::assertArrayNotHasKey('format', $schema);
-        self::assertSame(21, $schema['minLength']);
-        self::assertSame(21, $schema['maxLength']);
-        self::assertSame('^[0-9a-zA-Z_-]{21}$', $schema['pattern']);
+        self::assertSame(PublicId::LENGTH, $schema['minLength']);
+        self::assertSame(PublicId::LENGTH, $schema['maxLength']);
+        self::assertSame(PublicId::SCHEMA_PATTERN, $schema['pattern']);
         self::assertMatchesRegularExpression('~' . $schema['pattern'] . '~', (new PublicId())->toString());
     }
 

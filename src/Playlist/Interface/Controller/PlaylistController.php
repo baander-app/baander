@@ -60,9 +60,6 @@ final class PlaylistController
         'LEAVE' => 'Only a collaborator may leave this playlist.',
     ];
 
-    /** A user's public id as it appears in a route: 21 characters of the public-id alphabet. */
-    private const string PUBLIC_ID_REQUIREMENT = '[0-9a-zA-Z_-]{21}';
-
     public function __construct(
         private readonly Security $security,
         private readonly PlaylistPortInterface $playlistService,
@@ -211,9 +208,9 @@ final class PlaylistController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
         ],
@@ -230,25 +227,25 @@ final class PlaylistController
                                 properties: [
                                     'publicId' => new OA\Schema(
                                         type: 'string',
-                                        minLength: 21,
-                                        maxLength: 21,
-                                        pattern: '^[0-9a-zA-Z_-]{21}$',
+                                        minLength: PublicId::LENGTH,
+                                        maxLength: PublicId::LENGTH,
+                                        pattern: PublicId::SCHEMA_PATTERN,
                                         example: 'aB3dE5fG7hJ9kL1mN3pQr',
                                     ),
                                     'ownerPublicId' => new OA\Schema(
                                         type: 'string',
-                                        minLength: 21,
-                                        maxLength: 21,
-                                        pattern: '^[0-9a-zA-Z_-]{21}$',
+                                        minLength: PublicId::LENGTH,
+                                        maxLength: PublicId::LENGTH,
+                                        pattern: PublicId::SCHEMA_PATTERN,
                                         example: 'oWn3rPubL1cIdExampl_1',
                                     ),
                                     'collaboratorPublicIds' => new OA\Schema(
                                         type: 'array',
                                         items: new OA\Schema(
                                             type: 'string',
-                                            minLength: 21,
-                                            maxLength: 21,
-                                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                                            minLength: PublicId::LENGTH,
+                                            maxLength: PublicId::LENGTH,
+                                            pattern: PublicId::SCHEMA_PATTERN,
                                         ),
                                     ),
                                     'name' => new OA\Schema(type: 'string', example: 'My Favorites'),
@@ -281,16 +278,16 @@ final class PlaylistController
                                             properties: [
                                                 'publicId' => new OA\Schema(
                                                     type: 'string',
-                                                    minLength: 21,
-                                                    maxLength: 21,
-                                                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                                                    minLength: PublicId::LENGTH,
+                                                    maxLength: PublicId::LENGTH,
+                                                    pattern: PublicId::SCHEMA_PATTERN,
                                                 ),
                                                 'albumId' => new OA\Schema(
                                                     description: 'Album public identifier',
                                                     type: 'string',
-                                                    minLength: 21,
-                                                    maxLength: 21,
-                                                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                                                    minLength: PublicId::LENGTH,
+                                                    maxLength: PublicId::LENGTH,
+                                                    pattern: PublicId::SCHEMA_PATTERN,
                                                 ),
                                                 'position' => new OA\Schema(
                                                     description: 'Stored playlist position',
@@ -423,9 +420,9 @@ final class PlaylistController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
         ],
@@ -537,9 +534,9 @@ final class PlaylistController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
         ],
@@ -597,9 +594,9 @@ final class PlaylistController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
         ],
@@ -612,9 +609,9 @@ final class PlaylistController
                     properties: [
                         'songId' => new OA\Schema(
                             type: 'string',
-                            minLength: 21,
-                            maxLength: 21,
-                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                            minLength: PublicId::LENGTH,
+                            maxLength: PublicId::LENGTH,
+                            pattern: PublicId::SCHEMA_PATTERN,
                         ),
                     ],
                     required: ['songId'],
@@ -631,9 +628,9 @@ final class PlaylistController
                         properties: [
                             'songId' => new OA\Schema(
                                 type: 'string',
-                                minLength: 21,
-                                maxLength: 21,
-                                pattern: '^[0-9a-zA-Z_-]{21}$',
+                                minLength: PublicId::LENGTH,
+                                maxLength: PublicId::LENGTH,
+                                pattern: PublicId::SCHEMA_PATTERN,
                                 example: 'aB3dE5fG7hJ9kL1mN3pQr',
                             ),
                             'position' => new OA\Schema(type: 'integer', example: 0),
@@ -732,9 +729,9 @@ final class PlaylistController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
             new OA\Parameter(
@@ -744,9 +741,9 @@ final class PlaylistController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
         ],
@@ -819,9 +816,9 @@ final class PlaylistController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
             new OA\Parameter(
@@ -831,9 +828,9 @@ final class PlaylistController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
         ],
@@ -876,7 +873,7 @@ final class PlaylistController
             ),
         ],
     )]
-    #[Route('/{publicId}/collaborators/{userPublicId}', name: 'add_collaborator', requirements: ['userPublicId' => self::PUBLIC_ID_REQUIREMENT], methods: ['PUT'])]
+    #[Route('/{publicId}/collaborators/{userPublicId}', name: 'add_collaborator', requirements: ['userPublicId' => PublicId::PATTERN], methods: ['PUT'])]
     public function addCollaborator(string $publicId, string $userPublicId): JsonResponse
     {
         $playlist = $this->resolvePlaylist($publicId);
@@ -917,9 +914,9 @@ final class PlaylistController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
             new OA\Parameter(
@@ -929,9 +926,9 @@ final class PlaylistController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
         ],
@@ -960,7 +957,7 @@ final class PlaylistController
             ),
         ],
     )]
-    #[Route('/{publicId}/collaborators/{userPublicId}', name: 'remove_collaborator', requirements: ['userPublicId' => self::PUBLIC_ID_REQUIREMENT], methods: ['DELETE'])]
+    #[Route('/{publicId}/collaborators/{userPublicId}', name: 'remove_collaborator', requirements: ['userPublicId' => PublicId::PATTERN], methods: ['DELETE'])]
     public function removeCollaborator(string $publicId, string $userPublicId): JsonResponse
     {
         $playlist = $this->resolvePlaylist($publicId);
@@ -1001,9 +998,9 @@ final class PlaylistController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
         ],
@@ -1026,9 +1023,9 @@ final class PlaylistController
                             type: 'array',
                             items: new OA\Schema(
                                 type: 'string',
-                                minLength: 21,
-                                maxLength: 21,
-                                pattern: '^[0-9a-zA-Z_-]{21}$',
+                                minLength: PublicId::LENGTH,
+                                maxLength: PublicId::LENGTH,
+                                pattern: PublicId::SCHEMA_PATTERN,
                             ),
                         ),
                     ],

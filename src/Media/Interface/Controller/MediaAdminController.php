@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Media\Interface\Controller;
 
 use App\Media\Application\Port\MediaAdminPortInterface;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use OpenApi\Spec as OA;
@@ -133,9 +134,9 @@ final class MediaAdminController
                                             properties: [
                                                 'publicId' => new OA\Schema(
                                                     type: 'string',
-                                                    minLength: 21,
-                                                    maxLength: 21,
-                                                    pattern: '^[A-Za-z0-9_-]{21}$',
+                                                    minLength: PublicId::LENGTH,
+                                                    maxLength: PublicId::LENGTH,
+                                                    pattern: PublicId::SCHEMA_PATTERN,
                                                 ),
                                                 'path' => new OA\Schema(type: 'string'),
                                                 'type' => new OA\Schema(type: 'string'),

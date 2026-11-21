@@ -11922,7 +11922,7 @@
                                                                 "type": "string",
                                                                 "minLength": 21,
                                                                 "maxLength": 21,
-                                                                "pattern": "^[A-Za-z0-9_-]{21}$"
+                                                                "pattern": "^[0-9a-zA-Z_-]{21}$"
                                                             },
                                                             "path": {
                                                                 "type": "string"
@@ -26264,7 +26264,7 @@
                         "type": "string",
                         "minLength": 21,
                         "maxLength": 21,
-                        "pattern": "^[A-Za-z0-9_-]{21}$"
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
                     }
                 },
                 "required": [

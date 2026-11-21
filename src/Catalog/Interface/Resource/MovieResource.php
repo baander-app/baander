@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Interface\Resource;
 
 use App\Catalog\Domain\Model\Movie;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Resource\AbstractResource;
 use OpenApi\Spec as OA;
 
@@ -14,9 +15,9 @@ use OpenApi\Spec as OA;
         'publicId' => new OA\Schema(
             description: 'Public identifier',
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'title' => new OA\Schema(description: 'Movie title', type: 'string'),
         'year' => new OA\Schema(
@@ -90,9 +91,9 @@ use OpenApi\Spec as OA;
             type: 'array',
             items: new OA\Schema(
                 type: 'string',
-                minLength: 21,
-                maxLength: 21,
-                pattern: '^[0-9a-zA-Z_-]{21}$',
+                minLength: PublicId::LENGTH,
+                maxLength: PublicId::LENGTH,
+                pattern: PublicId::SCHEMA_PATTERN,
             ),
         ),
         'posterImage' => new OA\Schema(

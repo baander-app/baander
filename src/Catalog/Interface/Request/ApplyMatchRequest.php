@@ -11,6 +11,7 @@ use App\Catalog\Application\Command\MusicBrainzMatch\SeenField;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchField;
 use App\Catalog\Interface\Resource\MatchComparisonResource;
 use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Domain\Model\PublicId;
 use OpenApi\Spec as OA;
 
 /**
@@ -74,9 +75,9 @@ use OpenApi\Spec as OA;
                             properties: [
                                 'artistPublicId' => new OA\Schema(
                                     type: 'string',
-                                    minLength: 21,
-                                    maxLength: 21,
-                                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                                    minLength: PublicId::LENGTH,
+                                    maxLength: PublicId::LENGTH,
+                                    pattern: PublicId::SCHEMA_PATTERN,
                                 ),
                                 'role' => new OA\Schema(type: 'string', nullable: true),
                                 'creditedName' => new OA\Schema(type: 'string'),

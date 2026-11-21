@@ -26,8 +26,8 @@ final class RecommendationAdministrationTest extends TestCase
     {
         $generate = $this->command('app:recommendation:generate');
         self::assertSame(Command::SUCCESS, $generate->execute(['--mode' => 'incremental']), $generate->getDisplay());
-        self::assertSame(1, preg_match('/Recommendation job\s*:?\s*([A-Za-z0-9_-]{21})/', $generate->getDisplay(), $job), $generate->getDisplay());
-        self::assertSame(1, preg_match('/Job monitor ID\s*:?\s*([A-Za-z0-9_-]{21})/', $generate->getDisplay(), $monitor), $generate->getDisplay());
+        self::assertSame(1, preg_match('/Recommendation job\s*:?\s*(' . PublicId::PATTERN . ')/', $generate->getDisplay(), $job), $generate->getDisplay());
+        self::assertSame(1, preg_match('/Job monitor ID\s*:?\s*(' . PublicId::PATTERN . ')/', $generate->getDisplay(), $monitor), $generate->getDisplay());
 
         $list = $this->command('app:recommendation:job:list');
         self::assertSame(Command::SUCCESS, $list->execute(['--json' => true]));
@@ -62,7 +62,7 @@ final class RecommendationAdministrationTest extends TestCase
         $cancelled = $this->cancelledJob();
         $cli = $this->command('app:recommendation:job:requeue');
         self::assertSame(Command::SUCCESS, $cli->execute(['publicId' => $cancelled]), $cli->getDisplay());
-        self::assertSame(1, preg_match('/Recommendation job\s*:?\s*([A-Za-z0-9_-]{21})/', $cli->getDisplay(), $job), $cli->getDisplay());
+        self::assertSame(1, preg_match('/Recommendation job\s*:?\s*(' . PublicId::PATTERN . ')/', $cli->getDisplay(), $job), $cli->getDisplay());
         $show = $this->command('app:recommendation:job:show');
         self::assertSame(Command::SUCCESS, $show->execute(['publicId' => $job[1], '--json' => true]));
         $shown = json_decode($show->getDisplay(), true, flags: JSON_THROW_ON_ERROR);

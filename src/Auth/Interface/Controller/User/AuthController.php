@@ -539,9 +539,9 @@ final class AuthController
                                             'publicId' => new OA\Schema(
                                                 description: 'Public identifier',
                                                 type: 'string',
-                                                minLength: 21,
-                                                maxLength: 21,
-                                                pattern: '^[0-9a-zA-Z_-]{21}$',
+                                                minLength: PublicId::LENGTH,
+                                                maxLength: PublicId::LENGTH,
+                                                pattern: PublicId::SCHEMA_PATTERN,
                                             ),
                                             'name' => new OA\Schema(description: 'Display name', type: 'string'),
                                             'email' => new OA\Schema(

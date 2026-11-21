@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Session\Interface\Validator;
 
+use App\Shared\Domain\Model\PublicId;
 use Attribute;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -21,7 +22,7 @@ final class PlaybackCheckpoint extends Assert\Compound
             'revision' => [new Assert\Type('integer'), new Assert\PositiveOrZero()],
             'media' => [new Assert\AtLeastOneOf(constraints: [new Assert\IsNull(), new Assert\Collection(fields: [
                 'kind' => [new Assert\Choice(choices: ['song', 'video'])],
-                'publicId' => [new Assert\Regex(pattern: '/^[0-9a-zA-Z_-]{21}$/D')],
+                'publicId' => [new Assert\Regex(pattern: PublicId::REGEX)],
             ])])],
             'currentTrackIndex' => [new Assert\Type('integer'), new Assert\PositiveOrZero()],
             'position' => [new Assert\Type('numeric'), new Assert\PositiveOrZero()],

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Interface\Resource;
 
 use App\Catalog\Application\Query\MusicBrainzMatch\PredictedArtist;
+use App\Shared\Domain\Model\PublicId;
 use OpenApi\Spec as OA;
 
 /**
@@ -20,9 +21,9 @@ use OpenApi\Spec as OA;
             description: 'The artist\'s public ID; null for an artist the match would create',
             type: 'string',
             nullable: true,
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'name' => new OA\Schema(description: 'The artist\'s name, or the name a new artist would get', type: 'string'),
         'takesId' => new OA\Schema(

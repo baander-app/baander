@@ -6,6 +6,7 @@ namespace App\Catalog\Interface\Resource;
 
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchArtistAction;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchComparison;
+use App\Shared\Domain\Model\PublicId;
 use OpenApi\Spec as OA;
 
 /**
@@ -27,9 +28,9 @@ use OpenApi\Spec as OA;
         'artistPublicId' => new OA\Schema(
             description: 'The artist merged or removed, which an apply names the action by',
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
         ),
         'artistName' => new OA\Schema(type: 'string'),
         'target' => new OA\Schema(

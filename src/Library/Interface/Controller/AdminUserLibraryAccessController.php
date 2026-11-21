@@ -8,6 +8,7 @@ use App\Library\Application\Command\GrantLibraryAccessCommand;
 use App\Library\Application\Command\RevokeLibraryAccessCommand;
 use App\Library\Application\Query\ListLibraryAccessQuery;
 use App\Library\Interface\Resource\LibraryAccessResource;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\DispatchesMessagesTrait;
@@ -23,7 +24,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  * Application messages. Admins see every library regardless of these grants.
  */
 #[OA\Tag(name: 'Admin / Users', description: 'User management for administrators')]
-#[Route('/api/admin/users/{userId}/libraries', name: 'admin_user_libraries_', requirements: ['userId' => '[0-9A-Za-z_-]{21}'])]
+#[Route('/api/admin/users/{userId}/libraries', name: 'admin_user_libraries_', requirements: ['userId' => PublicId::PATTERN])]
 #[IsGranted('ROLE_ADMIN')]
 final class AdminUserLibraryAccessController
 {
@@ -45,9 +46,9 @@ final class AdminUserLibraryAccessController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
         ],
@@ -102,9 +103,9 @@ final class AdminUserLibraryAccessController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
             new OA\Parameter(
@@ -113,9 +114,9 @@ final class AdminUserLibraryAccessController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
         ],
@@ -167,9 +168,9 @@ final class AdminUserLibraryAccessController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
             new OA\Parameter(
@@ -178,9 +179,9 @@ final class AdminUserLibraryAccessController
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    minLength: 21,
-                    maxLength: 21,
-                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
                 ),
             ),
         ],

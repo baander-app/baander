@@ -23,7 +23,7 @@ use Symfony\Component\Routing\Attribute\Route;
     name: 'Catalog',
     description: 'Album, artist, song, movie, and genre management endpoints',
 )]
-#[Route('/api/movies/directors', name: 'movie_director_', requirements: ['publicId' => '[0-9a-zA-Z_-]{21}'])]
+#[Route('/api/movies/directors', name: 'movie_director_', requirements: ['publicId' => PublicId::PATTERN])]
 final class MovieDirectorController
 {
     use ApiResponsesTrait;
@@ -118,7 +118,7 @@ final class MovieDirectorController
         name: 'publicId',
         in: 'path',
         required: true,
-        schema: new ParameterSchema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$'),
+        schema: new ParameterSchema(type: 'string', pattern: PublicId::SCHEMA_PATTERN),
     )]
     #[Route('/{publicId}', name: 'show', methods: ['GET'])]
     public function show(string $publicId): JsonResponse
@@ -160,7 +160,7 @@ final class MovieDirectorController
         name: 'publicId',
         in: 'path',
         required: true,
-        schema: new ParameterSchema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$'),
+        schema: new ParameterSchema(type: 'string', pattern: PublicId::SCHEMA_PATTERN),
     )]
     #[Parameter(
         name: 'page',

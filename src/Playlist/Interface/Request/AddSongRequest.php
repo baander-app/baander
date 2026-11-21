@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Playlist\Interface\Request;
 
+use App\Shared\Domain\Model\PublicId;
 use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 
@@ -13,9 +14,9 @@ use Symfony\Component\Validator\Constraints\NotBlank;
         'songId' => new OA\Schema(
             description: 'Public ID of the song to add',
             type: 'string',
-            minLength: 21,
-            maxLength: 21,
-            pattern: '^[0-9a-zA-Z_-]{21}$',
+            minLength: PublicId::LENGTH,
+            maxLength: PublicId::LENGTH,
+            pattern: PublicId::SCHEMA_PATTERN,
             example: 'aB3dE5fG7hJ9kL1mN3pQr',
             default: '',
         ),
