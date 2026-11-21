@@ -112,6 +112,8 @@ flowchart TD
 - Files: `SpansSection.tsx`; new `SpanInspector.tsx`, `SpanResults.tsx`, `SpanFilters.tsx` and focused component tests in the diagnostics directory; `ui/web/src/features/admin/pages/__tests__/ServerDiagnosticsPage.test.tsx` where integration expectations change; new `ui/web/tests/e2e/admin/spans.spec.ts`. Component boundaries may be consolidated if this removes duplication.
 - Approach: Request all 500 retained spans; add labeled search/filter/sort controls, explicit refresh and clear, virtualized rows, waterfall navigation and readable details. Preserve selected identity on refresh and show retention limits and missing-data states. Reuse existing primitives and mutation tools.
 - Test scenarios: Search-to-details interaction; filters compose and reset; invalid duration inputs; waterfall selection; keyboard activation; load/retry; no spans versus no matches; refresh with retained/evicted selection; clear success/failure; large lists; hostile-looking attribute text stays inert; long values and mobile layout.
+- Selection must use the current `--color-highlight` theme token; the removed `--color-accent` alias cannot provide a visible selection background. Browser checks cover selection in light and dark themes.
+- Filter, metadata, action and detail layouts must use the prescribed spacing scale; use `--space-md` for their gaps. Browser checks cover the resulting desktop and narrow layouts.
 - Verification: Focused component and existing diagnostics page tests; web typecheck, lint and production build; browser checks at desktop and narrow widths against the isolated preview.
 
 ### U3. Operator guidance and acceptance record

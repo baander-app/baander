@@ -39,6 +39,16 @@ The command prints one row per span:
 
 A span records the method, route name, status and duration only. It never holds the URL, query string or headers, so tokens and signed-URL signatures do not reach the buffer. When the buffer is empty, the command prints `No spans recorded.`
 
+### Inspecting spans in the admin panel
+
+Open **Admin → Diagnostics → Recent spans** to search the retained buffer. Search matches operation names, services, trace and span IDs, and attribute names or values. Combine it with service, error and duration filters, or sort by the slowest requests. Duration filters use milliseconds; an error means a telemetry error or an HTTP response of 400 or higher.
+
+Select a result to inspect its IDs, timing, status and attributes. The trace waterfall shows retained spans with the same trace ID; select a row to inspect that span. Source locations appear when a span supplies them. The current HTTP capture produces one independent root span per request, so ordinary requests have a one-span waterfall.
+
+Search covers at most 500 completed spans from this server instance. New traffic overwrites older spans, and restarting the server loses the buffer. Missing parents are identified in the waterfall; a retained trace may be incomplete. This view does not provide historical search or reconstruct unrecorded child spans, events or logs.
+
+The page samples spans every ten seconds while it is active. **Refresh** requests a new snapshot immediately. A selected span keeps its identity across refreshes; the inspector reports when it is no longer retained. **Clear** empties the shared buffer and dismisses the selected details after the request succeeds. Diagnostic requests can themselves produce new spans, so clearing need not leave the list empty.
+
 ### Enabling capture
 
 `diagnostics.spans_enabled` defaults to `true` only with `APP_ENV=dev`. It defaults to `false` in staging, production and test environments. A super administrator can change **Admin → Settings → Diagnostics → HTTP request spans**, or use the settings commands:

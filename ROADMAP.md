@@ -4,6 +4,35 @@ Updated: 2026-11-21. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
+## Admin span inspection
+
+The [span inspector plan](docs/plans/2026-11-21-1002-feat-admin-span-inspector-plan.md)
+adds search across the retained span buffer, service/error/duration filters,
+newest and slowest ordering, a trace waterfall, and complete span details to
+**Admin → Diagnostics → Recent spans**. Results and trace rows support keyboard
+navigation and virtualize large collections. Refresh preserves selection by ID;
+eviction and failed reads remain visible, and successful clear dismisses details.
+
+Search covers the current instance's last 500 completed spans. The current HTTP
+capture records independent root spans; the viewer shows related spans only when
+the returned data contains them. The [operator guide](docs-book/part-1-operator-guide/commands/app-server-spans.md#inspecting-spans-in-the-admin-panel)
+describes retention, capture and refresh behavior.
+
+Verification on 2026-11-21: the frontend CI image passes all 3,712 web tests in
+302 files and lint with no errors. After correcting three test-selector type
+errors, the 27 focused model, inspector and diagnostics-page tests pass, and the
+production build passes both TypeScript configurations. Simplification removed
+repeated timestamp formatting and an unnecessary fragment; selected rows now use
+the current theme token. Five independent review passes completed; the one
+confirmed finding, spacing outside the prescribed scale, is fixed. Final focused
+tests, lint and production build pass in the CI image; lint reports 12 warnings
+and no errors. All four authenticated preview browser scenarios pass at desktop
+and mobile widths, covering light/dark selection, inert diagnostic text,
+refresh/clear failures, eviction and keyboard navigation through 500-row results
+and waterfalls. Documentation prose audits and `git diff --check` pass; added
+audit tokens describe the new controls, retention limits and verified design
+requirements. No acceptance items remain open for this plan.
+
 ## Audio metadata import
 
 The [audio format plan](docs/plans/2026-11-21-audio-metadata-formats-plan.md)
