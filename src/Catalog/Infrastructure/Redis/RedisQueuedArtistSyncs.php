@@ -146,7 +146,8 @@ final readonly class RedisQueuedArtistSyncs implements QueuedArtistSyncsInterfac
 
     private function answerKey(Uuid $artistId, string $musicbrainzId): string
     {
-        return sprintf('%s:answered:%s:%s', $this->keyPrefix, $artistId->toString(), strtolower(trim($musicbrainzId)));
+        // Older answers did not include identity relationships needed by Person reconciliation.
+        return sprintf('%s:profile-answered:%s:%s', $this->keyPrefix, $artistId->toString(), strtolower(trim($musicbrainzId)));
     }
 
     private function paceKey(): string

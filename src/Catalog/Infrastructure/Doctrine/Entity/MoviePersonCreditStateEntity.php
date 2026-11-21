@@ -6,7 +6,7 @@ namespace App\Catalog\Infrastructure\Doctrine\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
 
-#[ORM\Entity]
+#[ORM\Entity(readOnly: true)]
 #[ORM\Table(name: 'movie_person_credit_state')]
 class MoviePersonCreditStateEntity
 {
@@ -23,21 +23,6 @@ class MoviePersonCreditStateEntity
 
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
     private bool $directorsInitialized = false;
-
-    public function __construct(MovieEntity $movie)
-    {
-        $this->movie = $movie;
-    }
-
-    public function initializeDirectors(): void
-    {
-        $this->directorsInitialized = true;
-    }
-
-    public function directorsInitialized(): bool
-    {
-        return $this->directorsInitialized;
-    }
 
     public function getMovie(): MovieEntity
     {

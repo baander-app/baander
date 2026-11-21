@@ -71,7 +71,18 @@ final class RedisQueuedArtistSyncsTest extends TestCase
         self::assertNull($this->syncs->reserve($artistId, self::MBID, self::SPACING_MS, self::GRACE_SECONDS));
         self::assertNotNull($this->syncs->reserve($artistId, '2b1d4a4e-7c0f-4d6e-9a1b-3c5d7e9f1a02', self::SPACING_MS, self::GRACE_SECONDS));
         self::assertFalse($this->syncs->isAnswered(Uuid::v7(), self::MBID));
-        self::assertEqualsWithDelta(30 * 86_400, $this->ttl('answered:' . $artistId->toString() . ':' . self::MBID), 1);
+        self::assertEqualsWithDelta(30 * 86_400, $this->ttl('profile-answered:' . $artistId->toString() . ':' . self::MBID), 1);
+    }
+
+    public function testAnEarlierDetailsOnlyAnswerDoesNotSuppressPersonReconciliation(): void
+    {
+        $artistId = Uuid::v7();
+        $this->redis->borrow(static function (\Redis $redis) use ($artistId): void {
+            $redis->setex(self::PREFIX . ':answered:' . $artistId . ':' . self::MBID, 3600, '1');
+        });
+
+        self::assertFalse($this->syncs->isAnswered($artistId, self::MBID));
+        self::assertNotNull($this->syncs->reserve($artistId, self::MBID, self::SPACING_MS, self::GRACE_SECONDS));
     }
 
     public function testASyncQueuedAgainWaitsItsPauseKeepsItsMarkAndStepsTheSyncsAfterIt(): void

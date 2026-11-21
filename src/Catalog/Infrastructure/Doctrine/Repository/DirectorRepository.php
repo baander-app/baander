@@ -7,7 +7,6 @@ namespace App\Catalog\Infrastructure\Doctrine\Repository;
 use App\Catalog\Domain\ReadModel\DirectorReadView;
 use App\Catalog\Domain\Repository\DirectorRepositoryInterface;
 use App\Catalog\Infrastructure\Doctrine\Entity\MoviePersonCreditEntity;
-use App\Catalog\Infrastructure\Doctrine\Entity\MoviePersonCreditStateEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\PersonEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\PersonExternalIdEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\PersonIdAliasEntity;
@@ -109,22 +108,13 @@ final readonly class DirectorRepository implements DirectorRepositoryInterface
         if ($movie === null) {
             throw new LogicException('Cannot credit a movie that has not been persisted.');
         }
-        $state = $this->entityManager->createQueryBuilder()
-            ->select('state')
-            ->from(MoviePersonCreditStateEntity::class, 'state')
-            ->where('IDENTITY(state.movie) = :movieId')
-            ->setParameter('movieId', $movieId, 'uuid')
-            ->getQuery()
-            ->setHint(Query::HINT_REFRESH, true)
-            ->getOneOrNullResult();
-        if ($state !== null) {
-            $this->entityManager->refresh($state);
-            if (!$forceUpdate && $state->directorsInitialized()) {
-                return false;
-            }
-        } else {
-            $state = new MoviePersonCreditStateEntity($movie);
-            $this->entityManager->persist($state);
+        $connection = $this->entityManager->getConnection();
+        $directorsInitialized = $connection->fetchOne(
+            'SELECT directors_initialized FROM movie_person_credit_state WHERE movie_id = :movie',
+            ['movie' => $movieId->toString()],
+        );
+        if (!$forceUpdate && (bool) $directorsInitialized) {
+            return false;
         }
         $existing = $this->entityManager->getRepository(MoviePersonCreditEntity::class)->findBy([
             'movie' => $movie,
@@ -169,8 +159,17 @@ final readonly class DirectorRepository implements DirectorRepositoryInterface
                 $this->entityManager->remove($link);
             }
         }
-        $state->initializeDirectors();
         $this->entityManager->flush();
+        // The same partition state is written by the cast/crew import. The upsert
+        // updates the director flag without replacing its other partition flags.
+        $connection->executeStatement(
+            <<<'SQL'
+                INSERT INTO movie_person_credit_state (movie_id, directors_initialized)
+                VALUES (:movie, TRUE)
+                ON CONFLICT (movie_id) DO UPDATE SET directors_initialized = TRUE
+                SQL,
+            ['movie' => $movieId->toString()],
+        );
 
         return true;
     }
