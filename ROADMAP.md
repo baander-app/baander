@@ -4,6 +4,38 @@ Updated: 2026-11-21. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
+## Browser test devices
+
+The [browser device cleanup plan](docs/plans/2026-11-21-fix-browser-test-device-cleanup-plan.md)
+gives each shared-administrator browser context a recorded UUID before navigation.
+Suite teardown removes only that account's device rows matching the run's tokens,
+after browsers and fixture executors close. Target checks bind ownership and cleanup
+to this worktree's managed preview. Cleanup failure retains the manifest and fails
+the run; an interrupted process can leave owned registrations. The 428 historical
+administrator device rows remain because their ownership is ambiguous. The
+[browser-test guide](ui/web/tests/e2e/README.md#saved-browser-devices)
+describes context ownership and manifest retention.
+
+Verification on 2026-11-21: the CI backend fixture checks pass all four tests with
+15 assertions, and all eight Node lifecycle tests pass. The full web rerun with
+`--maxWorkers=2` passes all 3,733 tests in 305 files. The toast case that hit its
+5,000 ms timeout passes both its eleven-test focused rerun and the full rerun. Lint reports
+no errors and 12 existing warnings. Both application TypeScript configurations and
+the explicit nine-file browser harness TypeScript check pass in the CI image.
+Simplification found no behavior change to make. The focused correctness review
+and independent adversarial review reported no defects; no code changed afterwards.
+
+Live preview acceptance passes nine checks with one opt-in check skipped out of
+ten defined. A separate fixture-backed administration form check passes and
+verifies executor ordering. A forced authenticated test failure exits with status
+1, and cleanup leaves the exact 428 baseline device IDs unchanged. A combined
+test failure and injected cleanup failure also exits with status 1 and reports
+both errors; it retains the manifest and exactly one owned device row while
+preserving all 428 baseline IDs. Recovery using that exact manifest removes the
+owned row and manifest; the final device IDs match the original 428 byte for byte,
+and no ownership manifests remain. All browser cleanup acceptance checks are
+complete.
+
 ## Admin span inspection
 
 The [span inspector plan](docs/plans/2026-11-21-1002-feat-admin-span-inspector-plan.md)

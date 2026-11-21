@@ -18,6 +18,30 @@ The [audio graph guide](audio-graph/README.md) describes its native playback and
 offline-rendering cases. Offline rendering and mocked player unit tests do not
 play sound.
 
+## Saved browser devices
+
+Checks that sign into the shared seeded administrator record a fresh browser
+device token for each context before the app can register it. The token stays
+stable across reloads within that context. Before using this fixture, the harness
+checks that `E2E_BASE_URL` matches this worktree's managed preview.
+
+The shared `test` fixture owns its context automatically. `authenticate(page)`
+also owns manually created contexts before its first navigation. If a manual
+context navigates earlier, call `ownBrowserContext(context, baseURL)` first.
+
+Suite teardown invokes the test-only device fixture after the browsers close,
+including when a test fails or logs out. Cleanup deletes only device rows belonging
+to the seeded administrator whose tokens appear in the run's ownership manifest.
+Existing saved devices, historical rows without ownership evidence, and playback
+destinations remain untouched. Disposable fixture accounts keep their existing
+user-deletion lifecycle.
+
+Cleanup failure fails the run and retains its ownership manifest. A process killed
+before teardown can also leave registered devices and a retained manifest; the
+harness does not sweep older runs by user agent or registration time. See
+`fixtures.ts` and `helpers/browser-device-lifecycle.ts` for the lifecycle. Manifests
+live in `var/browser-devices/run-*/` and are removed after successful cleanup.
+
 ## Application styling checks
 
 Start this worktree's preview, then pass its URL explicitly:

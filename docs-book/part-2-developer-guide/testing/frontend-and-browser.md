@@ -34,6 +34,14 @@ the `baander.app` fixture rule for this application browser workflow. Scripted
 browser-auth and DSP suites retain their own disposable servers.
 See [Frontend Development](../development/frontend-development.md) for more details.
 
+Checks that use the shared seeded administrator assign a fresh browser device
+token to each context and remove only that run's device registrations after the
+browsers close. The fixture verifies that `E2E_BASE_URL` matches this worktree's
+managed preview. Cleanup also runs after test failure or logout; a cleanup failure
+fails the run and retains its ownership manifest. Existing saved devices and
+historical rows remain untouched. The lifecycle is described in the
+[browser-test guide](../../../ui/web/tests/e2e/README.md#saved-browser-devices).
+
 For focused styling checks against that preview, run:
 
 ```bash
