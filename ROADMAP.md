@@ -1,8 +1,38 @@
 # Baander roadmap
 
-Updated: 2026-11-20. This roadmap selects future work and records unresolved
+Updated: 2026-11-21. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
+
+## Audio metadata import
+
+The [audio format plan](docs/plans/2026-11-21-audio-metadata-formats-plan.md)
+adds MP4 audio (AAC and ALAC), WMA/ASF, AIFF/AIFC and tagged ADTS AAC readers.
+WAV now reads embedded ID3 and ordinary sixteen-byte PCM format chunks while
+seeking past audio data. Its INFO reader accepts both track-number spellings,
+including FFmpeg's `IPRT`. Shared ID3 parsing preserves MusicBrainz recording and
+release IDs in MP3, WAV, AIFF and AAC.
+
+Discovery, both audio classification filters and catalog MIME mapping accept
+`.mp4a`, `.m4b`, `.wave`, `.oga`, `.aif`, `.aiff` and `.aifc`.
+The [package reference](packages/baander-media-metadata/README.md) lists supported
+tags and reader behavior. Import uses the existing catalog persistence path and
+audio probe; source files are unchanged.
+
+Verification on 2026-11-21: the CI image passes 329 focused package, import,
+catalog-handler and command tests with 1,659 assertions, plus five functional
+CLI/API parity tests with 30 assertions. The eleven import cases use committed
+FFmpeg-generated files and verify scanning, extraction, persisted titles, artist
+credits, numbering, MIME types and source hashes. Full-project PHPStan and Symfony
+container lint pass in the CI image. All 25 changed PHP files pass syntax checks;
+documentation links, prose audits and `git diff --check` pass. The prose audit's
+added tokens and table rows describe the new formats; no existing requirements
+were removed. Independent review's one correctness finding, dropped embedded-ID3
+recording and release IDs, is fixed and covered by four regression cases.
+
+Raw AAC duration and bitrate remain with the audio probe. APE, WavPack and DSD
+remain outside this change, as scoped in the plan; no source-tag editing was
+requested or added.
 
 ## Documentation readability
 

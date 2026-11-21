@@ -1,6 +1,6 @@
 # Metadata
 
-The Metadata context enriches catalog entities with data from external music and movie APIs: Discogs, Last.fm, Spotify, MusicBrainz, TasteDive, CoverArtArchive, and TMDB (`TmdbAdapter` and `MovieMetadataEnricher`). It handles metadata matching (pairing scanned files with external records), cover art retrieval, and audio file tag parsing (FLAC, ID3, OGG Vorbis and Opus, WAV).
+The Metadata context enriches catalog entities with data from external music and movie APIs: Discogs, Last.fm, Spotify, MusicBrainz, TasteDive, CoverArtArchive, and TMDB (`TmdbAdapter` and `MovieMetadataEnricher`). It handles metadata matching (pairing scanned files with external records), cover art retrieval, and audio file tag parsing through the [media metadata package](../../../packages/baander-media-metadata/README.md).
 
 ## Domain Models
 
@@ -128,8 +128,16 @@ MusicBrainz answers the lookup of an ID it merged into another record with a per
 | `Id3Reader` / `Id3Parser` | MP3 (ID3v2 tags) |
 | `OggReader` / `OggParser` | OGG Vorbis and Opus |
 | `WavReader` | WAV |
+| `Mp4Reader` / `Mp4Parser` | MP4 audio, including AAC and ALAC |
+| `AsfReader` / `AsfParser` | WMA/ASF |
+| `AiffReader` | AIFF and AIFC |
+| `AacReader` | Raw ADTS AAC with leading ID3 |
 
 A `FormatDetector` selects the reader from the magic bytes of the file's header, and from the file extension when those match no format.
+The package accepts `.mp4a`, `.m4b`, `.wave`, `.oga`, `.aif` and `.aifc` aliases; library discovery and both audio classification filters accept them too.
+WAV and AIFF prefer populated embedded ID3 fields over container text, and preserve embedded artwork.
+Catalog's `FilesDiscoveredHandler` persists the parsed tags through its existing ports and takes technical stream properties from the audio probe.
+Source files are not rewritten. The real-file [import tests](../../../tests/Unit/Catalog/Application/CommandHandler/AudioMetadataImportTest.php) cover discovery, extraction, catalog persistence and source hashes.
 
 ### Matching
 
