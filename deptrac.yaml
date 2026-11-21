@@ -46,7 +46,7 @@ deptrac:
         Party: ['Party Domain', 'Party Application', 'Party Infrastructure', 'Party Resources', 'Party Interface']
         Playlist: ['Playlist Live Audience Contract', 'Playlist Deletion Preview Contract', 'Playlist Album Merge Contract', 'Playlist Domain', 'Playlist Application', 'Playlist Infrastructure', 'Playlist Resources', 'Playlist Interface']
         Recommendation: ['Recommendation Artist Merge Contract', 'Recommendation Domain', 'Recommendation Application', 'Recommendation Infrastructure', 'Recommendation Resources', 'Recommendation Interface']
-        Transcode: ['Transcode Playback Access Contract', 'Transcode Audio Rendition Contract', 'Transcode Delivery Contract', 'Transcode Probe Contract', 'Transcode Domain', 'Transcode Application', 'Transcode Infrastructure', 'Transcode Resources', 'Transcode Interface']
+        Transcode: ['Transcode Timeline Preview Contract', 'Transcode Playback Access Contract', 'Transcode Audio Rendition Contract', 'Transcode Delivery Contract', 'Transcode Probe Contract', 'Transcode Domain', 'Transcode Application', 'Transcode Infrastructure', 'Transcode Resources', 'Transcode Interface']
         UserPreference: ['UserPreference Settings Contract', 'UserPreference Domain', 'UserPreference Application', 'UserPreference Infrastructure', 'UserPreference Resources', 'UserPreference Interface']
         Discovery: ['Discovery Domain', 'Discovery Application', 'Discovery Infrastructure', 'Discovery Resources', 'Discovery Interface']
         Favorites: ['Favorites Artist Merge Contract', 'Favorites Album Merge Contract', 'Favorites Domain', 'Favorites Application', 'Favorites Infrastructure', 'Favorites Resources', 'Favorites Interface']
@@ -738,6 +738,11 @@ deptrac:
         - type: classLike
           value: '^App\\Transcode\\Application\\(Port\\(Audio|Video)ProbePortInterface|DTO\\AudioProbeResult)$'
 
+    - name: 'Transcode Timeline Preview Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Transcode\\Application\\(Port\\VideoTimelinePreviewPort|Command\\PrepareTimelinePreview)$'
+
     - name: 'Transcode Application'
       collectors:
         - type: bool
@@ -747,6 +752,8 @@ deptrac:
           must_not:
             - type: classLike
               value: '^App\\Transcode\\Application\\Port\\PlaybackAccessInterface$'
+            - type: classLike
+              value: '^App\\Transcode\\Application\\(Port\\VideoTimelinePreviewPort|Command\\PrepareTimelinePreview)$'
             - type: classLike
               value: '^App\\Transcode\\Application\\(Port\\AudioRendition(PortInterface|Format)?|Exception\\AudioRendition(Failed|Busy)Exception|Settings\\TranscodeSettingDefinitions)$'
             - type: classLike
@@ -1310,6 +1317,7 @@ deptrac:
       - 'Shared Application'
     'Catalog Infrastructure':
       - Core
+      - 'Transcode Timeline Preview Contract'
       - 'Activity Artist Merge Contract'
       - 'Activity Album Merge Contract'
       - 'Favorites Artist Merge Contract'
@@ -1721,8 +1729,12 @@ deptrac:
     'Transcode Domain':
       - Core
       - 'Shared Domain'
+    'Transcode Timeline Preview Contract':
+      - Core
+      - 'Catalog Video Contract'
     'Transcode Application':
       - Core
+      - 'Transcode Timeline Preview Contract'
       - 'Transcode Probe Contract'
       - 'Transcode Playback Access Contract'
       - 'Transcode Audio Rendition Contract'
@@ -1733,6 +1745,7 @@ deptrac:
       - 'Shared Application'
     'Transcode Infrastructure':
       - Core
+      - 'Transcode Timeline Preview Contract'
       - 'Catalog Video Contract'
       - 'Media Playback Access Contract'
       - 'Transcode Probe Contract'

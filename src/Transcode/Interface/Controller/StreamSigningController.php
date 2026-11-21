@@ -6,7 +6,6 @@ namespace App\Transcode\Interface\Controller;
 
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Transcode\Application\DTO\TranscodeRenditionSet;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -44,19 +43,134 @@ final class StreamSigningController
             content: new OA\JsonContent(
                 required: ['path', 'requestId'],
                 properties: [
-                    new OA\Property(property: 'path', type: 'string', example: '/api/transcode/0123456789abABCD_-xyz/master.m3u8'),
+                    new OA\Property(
+                        property: 'path',
+                        type: 'string',
+                        example: '/api/transcode/0123456789abABCD_-xyz/master.m3u8',
+                    ),
                     new OA\Property(property: 'expiresInSeconds', type: 'int', example: 86400),
-                    new OA\Property(property: 'refresh', description: 'Read current playback state without creating another admission', type: 'boolean'),
-                    new OA\Property(property: 'requestId', description: 'Stable playback client session identifier, retained across reloads and reconnects', type: 'string', format: 'uuid'),
-                    new OA\Property(property: 'jobIds', description: 'Exact admitted jobs; required for refresh and omitted for new admission', type: 'array', items: new OA\Items(type: 'string'), maxItems: 3, minItems: 1, uniqueItems: true),
-                    new OA\Property(property: 'attachedSet', description: 'Rendition set the player has attached, as returned in renditionSet; refresh only. A rendition named here stays in the signed set on a smaller published lead than one that still has to join', type: 'string', example: '0123456789abABCD_-xyz.3'),
+                    new OA\Property(
+                        property: 'refresh',
+                        description: 'Read current playback state without creating another admission',
+                        type: 'boolean',
+                    ),
+                    new OA\Property(
+                        property: 'audioStreamIndex',
+                        description: 'Absolute source audio stream index; null selects the source default',
+                        type: 'integer',
+                        minimum: 0,
+                        nullable: true,
+                    ),
+                    new OA\Property(
+                        property: 'audioOffsetMs',
+                        description: 'Source audio correction in milliseconds; positive plays later',
+                        type: 'integer',
+                        maximum: 10000,
+                        minimum: -10000,
+                        default: 0,
+                    ),
+                    new OA\Property(
+                        property: 'requestId',
+                        description: 'Stable playback client session identifier, retained across reloads and reconnects',
+                        type: 'string',
+                        format: 'uuid',
+                    ),
+                    new OA\Property(
+                        property: 'jobIds',
+                        description: 'Exact admitted jobs; required for refresh and omitted for new admission',
+                        type: 'array',
+                        items: new OA\Items(type: 'string'),
+                        maxItems: 3,
+                        minItems: 1,
+                        uniqueItems: true,
+                    ),
+                    new OA\Property(
+                        property: 'attachedSet',
+                        description: 'Rendition set the player has attached, as returned in renditionSet; refresh only. A rendition named here stays in the signed set on a smaller published lead than one that still has to join',
+                        type: 'string',
+                        example: '0123456789abABCD_-xyz.3',
+                    ),
                 ],
             ),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Signed URL generated', content: new OA\JsonContent(properties: [new OA\Property(property: 'jobIds', type: 'array', items: new OA\Items(type: 'string')), new OA\Property(property: 'requestId', type: 'string', format: 'uuid'), new OA\Property(property: 'url', type: 'string', nullable: true), new OA\Property(property: 'sig', type: 'string'), new OA\Property(property: 'exp', type: 'integer'), new OA\Property(property: 'generation', type: 'integer'), new OA\Property(property: 'jobId', type: 'string'), new OA\Property(property: 'sessionId', type: 'string', nullable: true), new OA\Property(property: 'revision', type: 'integer'), new OA\Property(property: 'ready', type: 'boolean'), new OA\Property(property: 'position', type: 'number'), new OA\Property(property: 'status', type: 'string'), new OA\Property(property: 'startTime', type: 'number', nullable: true), new OA\Property(property: 'duration', type: 'number', nullable: true), new OA\Property(property: 'renditionSet', type: 'string')])),
+            new OA\Response(
+                response: '200',
+                description: 'Signed URL generated',
+                content: new OA\JsonContent(properties: [
+                    new OA\Property(
+                        property: 'jobIds',
+                        type: 'array',
+                        items: new OA\Items(type: 'string'),
+                    ),
+                    new OA\Property(
+                        property: 'requestId',
+                        type: 'string',
+                        format: 'uuid',
+                    ),
+                    new OA\Property(
+                        property: 'url',
+                        type: 'string',
+                        nullable: true,
+                    ),
+                    new OA\Property(
+                        property: 'sig',
+                        type: 'string',
+                    ),
+                    new OA\Property(
+                        property: 'exp',
+                        type: 'integer',
+                    ),
+                    new OA\Property(
+                        property: 'generation',
+                        type: 'integer',
+                    ),
+                    new OA\Property(
+                        property: 'jobId',
+                        type: 'string',
+                    ),
+                    new OA\Property(
+                        property: 'sessionId',
+                        type: 'string',
+                        nullable: true,
+                    ),
+                    new OA\Property(
+                        property: 'revision',
+                        type: 'integer',
+                    ),
+                    new OA\Property(
+                        property: 'ready',
+                        type: 'boolean',
+                    ),
+                    new OA\Property(
+                        property: 'position',
+                        type: 'number',
+                    ),
+                    new OA\Property(
+                        property: 'status',
+                        type: 'string',
+                    ),
+                    new OA\Property(
+                        property: 'startTime',
+                        type: 'number',
+                        nullable: true,
+                    ),
+                    new OA\Property(
+                        property: 'duration',
+                        type: 'number',
+                        nullable: true,
+                    ),
+                    new OA\Property(
+                        property: 'renditionSet',
+                        type: 'string',
+                    ),
+                ]),
+            ),
             new OA\Response(response: '400', description: 'Invalid request'),
-            new OA\Response(response: '410', description: 'A refresh named only sessions that have ended. Sessions that expired may be started again; failed or cancelled ones may not', content: new OA\JsonContent(required: ['error', 'reason'], properties: [
+            new OA\Response(response: '410', description: 'A refresh named only sessions that have ended. Sessions that expired may be started again; failed or cancelled ones may not', content: new OA\JsonContent(required: [
+                'error',
+                'reason',
+            ], properties: [
                 new OA\Property(property: 'error', type: 'string'),
                 new OA\Property(property: 'reason', type: 'string', enum: ['expired', 'failed', 'cancelled']),
             ])),
@@ -73,17 +187,34 @@ final class StreamSigningController
         } catch (\Symfony\Component\HttpFoundation\Exception\JsonException) {
             return $this->errorResponse('Expected a JSON object.', 400);
         }
+        $audioStreamIndex = $data['audioStreamIndex'] ?? null;
+        $audioOffsetMs = array_key_exists('audioOffsetMs', $data) ? $data['audioOffsetMs'] : 0;
+        if (
+            ($audioStreamIndex !== null && (!is_int($audioStreamIndex) || $audioStreamIndex < 0))
+            || !is_int($audioOffsetMs) || $audioOffsetMs < -10000 || $audioOffsetMs > 10000
+        ) {
+            return $this->errorResponse('Invalid source audio selection.', 400);
+        }
         $path = $data['path'] ?? null;
         $requestId = $data['requestId'] ?? null;
         $jobIdentifiers = array_key_exists('jobIds', $data) ? $data['jobIds'] : [];
         $refresh = array_key_exists('refresh', $data) ? $data['refresh'] : false;
         $expiresInSeconds = array_key_exists('expiresInSeconds', $data) ? $data['expiresInSeconds'] : 86400;
         $attachedSet = $data['attachedSet'] ?? null;
-        if (!is_string($path) || !preg_match('~^/api/transcode/([0-9a-zA-Z_-]{21})/(?:master\.m3u8|manifest\.mpd)$~D', $path, $matches)
+        if (
+            !is_string($path) || !preg_match(
+                '~^/api/transcode/([0-9a-zA-Z_-]{21})/(?:master\.m3u8|manifest\.mpd)$~D',
+                $path,
+                $matches,
+            )
             || !is_string($requestId) || !is_bool($refresh) || !is_int($expiresInSeconds) || $expiresInSeconds < 1 || $expiresInSeconds > 86400
             || !is_array($jobIdentifiers) || !array_is_list($jobIdentifiers) || count($jobIdentifiers) > 3
-            || ($refresh && $jobIdentifiers === []) || (!$refresh && $jobIdentifiers !== [])) {
-            return $this->errorResponse('Expected a video manifest path, a client session UUID, a lifetime from 1 to 86400 seconds, and exact job IDs when refreshing.', 400);
+            || ($refresh && $jobIdentifiers === []) || (!$refresh && $jobIdentifiers !== [])
+        ) {
+            return $this->errorResponse(
+                'Expected a video manifest path, a client session UUID, a lifetime from 1 to 86400 seconds, and exact job IDs when refreshing.',
+                400,
+            );
         }
         if ($attachedSet !== null && (!is_string($attachedSet) || !$refresh)) {
             return $this->errorResponse('An attached rendition set is a string and belongs to a refresh.', 400);
@@ -121,14 +252,17 @@ final class StreamSigningController
                 ], 410, ['Cache-Control' => 'no-store']);
             }
         } else {
-            $sessions = $this->playback->start($videoId, $requestId);
+            $sessions = $this->playback->start($videoId, $requestId, $audioStreamIndex, $audioOffsetMs);
         }
         if ($sessions === []) {
             return new JsonResponse(['error' => 'Owned media execution is unavailable'], 503, ['Retry-After' => '2']);
         }
         $this->playback->touchSessions(array_values($sessions));
         // The attached set is the client's word; it counts only for jobs its own sessions hold.
-        $attached = array_values(array_filter($attached, static fn (array $pair): bool => isset($sessions[$pair['jobId']])));
+        $attached = array_values(array_filter(
+            $attached,
+            static fn(array $pair): bool => isset($sessions[$pair['jobId']]),
+        ));
         $state = $this->streaming->getPlaybackState($videoId, array_keys($sessions), $attached);
         if ($state === null || !isset($sessions[$state['jobId']])) {
             return new JsonResponse(['error' => 'Media execution is unavailable'], 503, ['Retry-After' => '2']);
@@ -138,7 +272,7 @@ final class StreamSigningController
         $state['jobIds'] = array_keys($sessions);
         $result = ['url' => null];
         if ($state['ready']) {
-            $path .= '?'.http_build_query(['set' => $state['renditionSet']]);
+            $path .= '?' . http_build_query(['set' => $state['renditionSet']]);
             $result = $this->streamAuth->signUrl($path, $expiresInSeconds);
         }
 

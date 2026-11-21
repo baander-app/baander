@@ -24,16 +24,39 @@ final readonly class CreateTranscodeSessionCommand
         private SessionPriority $priority = SessionPriority::Normal,
         private array $audioLanguages = [],
         ?string $requestId = null,
+        public ?int $audioStreamIndex = null,
+        public int $audioOffsetMs = 0,
     ) {
+        if (($audioStreamIndex !== null && $audioStreamIndex < 0) || $audioOffsetMs < -10000 || $audioOffsetMs > 10000) {
+            throw new \InvalidArgumentException('Invalid source audio selection.');
+        }
         $this->requestId = $requestId ?? Uuid::generate()->toString();
     }
 
-    public function getUserId(): Uuid { return $this->userId; }
-    public function getVideoId(): Uuid { return $this->videoId; }
-    public function getQualityTier(): QualityTier { return $this->qualityTier; }
-    public function getAudioProfile(): AudioProfile { return $this->audioProfile; }
-    public function getPriority(): SessionPriority { return $this->priority; }
+    public function getUserId(): Uuid
+    {
+        return $this->userId;
+    }
+    public function getVideoId(): Uuid
+    {
+        return $this->videoId;
+    }
+    public function getQualityTier(): QualityTier
+    {
+        return $this->qualityTier;
+    }
+    public function getAudioProfile(): AudioProfile
+    {
+        return $this->audioProfile;
+    }
+    public function getPriority(): SessionPriority
+    {
+        return $this->priority;
+    }
 
     /** @return string[] */
-    public function getAudioLanguages(): array { return $this->audioLanguages; }
+    public function getAudioLanguages(): array
+    {
+        return $this->audioLanguages;
+    }
 }

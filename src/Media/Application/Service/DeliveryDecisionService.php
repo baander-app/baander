@@ -54,7 +54,10 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
             if ($defaultAudio === null || (($stream['isDefault'] ?? false) && !($defaultAudio['isDefault'] ?? false))) {
                 $defaultAudio = $stream;
             }
-            if ($destination->audioStreamIndex !== null && ($stream['streamIndex'] ?? null) === $destination->audioStreamIndex) {
+            if (
+                $destination->audioStreamIndex !== null
+                && ($stream['streamIndex'] ?? null) === $destination->audioStreamIndex
+            ) {
                 $selected = $stream;
             }
         }
@@ -80,13 +83,26 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
             hasSubtitles: $source->hasSubtitles,
         );
         $decision = $this->compatibility->decide($media, $destination);
-        if ($decision->kind === DeliveryKind::Original || $destination->subtitleBurnIn || $destination->sourcePlaybackFailed) {
+        if (
+            $decision->kind === DeliveryKind::Original
+            || $destination->subtitleBurnIn
+            || $destination->sourcePlaybackFailed
+            || $destination->audioOffsetMs !== 0
+        ) {
             return $decision;
         }
-        $artifacts = $media->videoStreamIndex === null ? [] : $this->videoArtifacts->findComplete($owner, $source->videoId, $source->hash, $media->videoStreamIndex, $media->audioStreamIndex);
+        $artifacts = $media->videoStreamIndex === null ? [] : $this->videoArtifacts->findComplete(
+            $owner,
+            $source->videoId,
+            $source->hash,
+            $media->videoStreamIndex,
+            $media->audioStreamIndex,
+        );
         foreach ($artifacts as $artifact) {
-            if ($artifact->sourceVideoStreamIndex !== $media->videoStreamIndex || $artifact->sourceAudioStreamIndex !== $media->audioStreamIndex
-                || !in_array($artifact->transport, $destination->transports, true)) {
+            if (
+                $artifact->sourceVideoStreamIndex !== $media->videoStreamIndex || $artifact->sourceAudioStreamIndex !== $media->audioStreamIndex
+                || !in_array($artifact->transport, $destination->transports, true)
+            ) {
                 continue;
             }
             $candidate = new DeliverySource(
@@ -100,18 +116,42 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
                 $artifact->height,
                 bitDepth: $artifact->bitDepth,
                 hdr: $artifact->hdr,
-                pixelFormat: $artifact->pixelFormat
+                pixelFormat: $artifact->pixelFormat,
             );
             if ($this->compatibility->isCompatible($candidate, $destination)) {
-                return new DeliveryDecision(DeliveryKind::Cached, selection: new DeliverySelection($artifact->container, $artifact->sourceVideoStreamIndex, $artifact->sourceAudioStreamIndex, $artifact->transport), url: $artifact->url, artifact: $artifact);
+                return new DeliveryDecision(
+                    DeliveryKind::Cached,
+                    selection: new DeliverySelection(
+                        $artifact->container,
+                        $artifact->sourceVideoStreamIndex,
+                        $artifact->sourceAudioStreamIndex,
+                        $artifact->transport,
+                    ),
+                    url: $artifact->url,
+                    artifact: $artifact,
+                );
             }
         }
         if ($decision->kind === DeliveryKind::Copy && $decision->selection !== null && $requestId !== null) {
-            $presentation = $this->copyPresentations->start(new CopyPresentationInput($owner, $source->videoId, $source->hash, $decision->selection->videoStreamIndex,
-                $decision->selection->audioStreamIndex, $decision->selection->container, $source->width, $source->height, $requestId));
+            $presentation = $this->copyPresentations->start(new CopyPresentationInput(
+                $owner,
+                $source->videoId,
+                $source->hash,
+                $decision->selection->videoStreamIndex,
+                $decision->selection->audioStreamIndex,
+                $decision->selection->container,
+                $source->width,
+                $source->height,
+                $requestId,
+            ));
             $manifest = $decision->selection->transport === 'dash' ? 'manifest.mpd' : 'master.m3u8';
-            return new DeliveryDecision(DeliveryKind::Copy, selection: $decision->selection,
-                url: '/api/transcode/' . $id->toString() . '/' . $manifest, requestId: $requestId, jobId: $presentation->jobId->toString());
+            return new DeliveryDecision(
+                DeliveryKind::Copy,
+                selection: $decision->selection,
+                url: '/api/transcode/' . $id->toString() . '/' . $manifest,
+                requestId: $requestId,
+                jobId: $presentation->jobId->toString(),
+            );
         }
         return $decision;
     }
@@ -141,7 +181,26 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
         if (preg_match('/(?:p|gray|gbrp)(9|10|12|14|16)(?:le|be)?$/D', $format, $matches) === 1) {
             return (int) $matches[1];
         }
-        return in_array($format, ['yuv420p', 'yuv422p', 'yuv444p', 'yuvj420p', 'yuvj422p', 'yuvj444p', 'nv12', 'nv21', 'rgb24', 'bgr24', 'rgba', 'bgra', 'gbrp', 'gray'], true) ? 8 : null;
+        return in_array(
+            $format,
+            [
+                'yuv420p',
+                'yuv422p',
+                'yuv444p',
+                'yuvj420p',
+                'yuvj422p',
+                'yuvj444p',
+                'nv12',
+                'nv21',
+                'rgb24',
+                'bgr24',
+                'rgba',
+                'bgra',
+                'gbrp',
+                'gray',
+            ],
+            true,
+        ) ? 8 : null;
     }
 
     /** @param array<string, mixed>|null $colorSpace */
@@ -168,13 +227,18 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
             $source->codec,
             $source->streamIndex,
             $source->channels,
-            video: false
+            video: false,
         ), $destination);
         if ($decision->kind === DeliveryKind::Original) {
             return $decision;
         }
         if ($decision->kind === DeliveryKind::Copy) {
-            if ($source->sourceHash === null || $source->streamIndex === null || $source->codec !== 'aac' || $decision->selection?->container !== 'mp4') {
+            if (
+                $source->sourceHash === null
+                || $source->streamIndex === null
+                || $source->codec !== 'aac'
+                || $decision->selection?->container !== 'mp4'
+            ) {
                 return new DeliveryDecision(DeliveryKind::Incompatible, 'source_stream_metadata_unavailable');
             }
             $cached = $this->audio->findCompleteCopy($id->toString(), $path, $source->sourceHash, $source->streamIndex);
@@ -182,7 +246,10 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
                 'format' => 'aac', 'mode' => 'copy', 'container' => 'mp4', 'index' => $source->streamIndex]);
             return $cached === null ? $decision->withUrl($url) : new DeliveryDecision(DeliveryKind::Cached, url: $url);
         }
-        if ($this->policy->permits(MediaOperation::AudioEncode) && $this->settings->get(TranscodeSettingDefinitions::ENABLED) !== true) {
+        if (
+            $this->policy->permits(MediaOperation::AudioEncode)
+            && $this->settings->get(TranscodeSettingDefinitions::ENABLED) !== true
+        ) {
             return $decision->kind === DeliveryKind::Encoded
                 ? new DeliveryDecision(DeliveryKind::Incompatible, 'audio_transcoding_disabled') : $decision;
         }
@@ -192,13 +259,34 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
         $bitrate = (int) $this->settings->get(TranscodeSettingDefinitions::MAX_BITRATE) * 1000;
         foreach (AudioRenditionFormat::cases() as $format) {
             $container = match ($format) {
-                AudioRenditionFormat::Mp3 => 'mp3', AudioRenditionFormat::Aac => 'aac', AudioRenditionFormat::Opus => 'ogg'
+                AudioRenditionFormat::Mp3 => 'mp3', AudioRenditionFormat::Aac => 'aac', AudioRenditionFormat::Opus => 'ogg',
             };
-            if ($this->compatibility->decide(new DeliverySource($container, null, null, $format->value, null, $source->channels, video: false), $destination)->kind !== DeliveryKind::Original) {
+            if (
+                $this->compatibility->decide(
+                    new DeliverySource(
+                        $container,
+                        null,
+                        null,
+                        $format->value,
+                        null,
+                        $source->channels,
+                        video: false,
+                    ),
+                    $destination,
+                )->kind !== DeliveryKind::Original
+            ) {
                 continue;
             }
             if ($this->audio->findComplete($id->toString(), $path, $format, $bitrate) !== null) {
-                return new DeliveryDecision(DeliveryKind::Cached, url: '/api/stream/original/track?' . http_build_query(['id' => $id->toString(), 'owner' => $owner->toString(), 'format' => $format->value, 'bitrate' => $bitrate]));
+                return new DeliveryDecision(
+                    DeliveryKind::Cached,
+                    url: '/api/stream/original/track?' . http_build_query([
+                        'id' => $id->toString(),
+                        'owner' => $owner->toString(),
+                        'format' => $format->value,
+                        'bitrate' => $bitrate,
+                    ]),
+                );
             }
         }
         return $decision;

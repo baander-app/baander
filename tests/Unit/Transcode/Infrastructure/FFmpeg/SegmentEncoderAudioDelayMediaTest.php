@@ -47,6 +47,7 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
         int $startSegment,
         float $audioDelay = 8.0,
         bool $encodedSourceAudio = false,
+        int $audioOffsetMs = 0,
     ): void {
         $this->artifactName = sprintf(
             'audio-delay-%s-%s-%d-%s-%s',
@@ -73,11 +74,20 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
         $sourceAudio = $this->packets($source, 'a:0');
         self::assertNotEmpty($sourceAudio);
         if ($encodedSourceAudio) {
-            self::assertLessThan(0.0, (float) $sourceAudio[0]['pts_time'], 'The AAC source must exercise negative codec priming.');
+            self::assertLessThan(
+                0.0,
+                (float) $sourceAudio[0]['pts_time'],
+                'The AAC source must exercise negative codec priming.',
+            );
         } else {
             self::assertEqualsWithDelta($audioDelay, (float) $sourceAudio[0]['pts_time'], 0.002);
         }
-        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software($encoderName));
+        $encoder = new SegmentEncoder(
+            new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()),
+            $this->createStub(FFmpegPortInterface::class),
+            $this->createStub(TranscodeStoragePortInterface::class),
+            EncoderProfile::software($encoderName),
+        );
         $tier = new QualityTier(
             'fixture',
             64,
@@ -103,6 +113,7 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
             sourceFrameRate: $probe->framerate,
             sourceTimestampOrigin: $probe->sourceTimestampOrigin,
             sourceDuration: $probe->videoEnd ?? 0.0,
+            audioOffsetMs: $audioOffsetMs,
         ));
 
         $presentation = (new PublishedPresentationReader())->read($output);
@@ -111,7 +122,7 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
         self::assertSame(['video', 'audio'], array_keys($presentation->tracks));
         $sourceStart = $startSegment * SegmentEncoder::getSegmentDuration();
         $remaining = 30.0 - $sourceStart;
-        $expectedDelay = max(0.0, $audioDelay - $sourceStart);
+        $expectedDelay = max(0.0, $audioDelay + $audioOffsetMs / 1000 - $sourceStart);
         $codecFrameDuration = $profile->codec === 'opus' ? 0.02 : 1024 / $profile->sampleRate;
         $markers = [];
         $timestamps = [];
@@ -130,9 +141,15 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
                     self::assertSame($previousEnd, $segment->start, 'Native fragments must form a continuous track.');
                 }
                 $previousEnd = $segment->start + $segment->duration;
-                $segments[$segment->ordinal] = ['url' => $segment->file, 'duration' => $segment->duration / $track->timescale];
+                $segments[$segment->ordinal] = [
+                    'url' => $segment->file,
+                    'duration' => $segment->duration / $track->timescale,
+                ];
                 $combined = $this->directory . '/' . $track->kind->value . '-' . $segment->ordinal . '.mp4';
-                file_put_contents($combined, file_get_contents($output . '/' . $track->initFile) . file_get_contents($output . '/' . $segment->file));
+                file_put_contents(
+                    $combined,
+                    file_get_contents($output . '/' . $track->initFile) . file_get_contents($output . '/' . $segment->file),
+                );
                 $raw = $this->probe($combined);
                 self::assertCount(1, $raw['streams']);
                 self::assertSame($track->kind->value, $raw['streams'][0]['codec_type']);
@@ -160,7 +177,11 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
                         }
                         $timestamps[] = $pts;
                     }
-                    self::assertSame([], $unexplainedShifts, 'FFprobe timestamps must differ only by its signed-composition decode shift.');
+                    self::assertSame(
+                        [],
+                        $unexplainedShifts,
+                        'FFprobe timestamps must differ only by its signed-composition decode shift.',
+                    );
                     $this->observation(['track' => 'video', 'ordinal' => $segment->ordinal,
                         'binaryClock' => $clock, 'timescale' => $track->timescale,
                         'ffprobeShift' => $ffprobeShift, 'firstFfprobePts' => $packets[0]['pts_time']]);
@@ -179,11 +200,28 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
                     $localDelay = max(0.0, $expectedDelay - $localStart);
                     $silentDuration = min($decodedDuration, max(0.0, $localDelay - 0.1));
                     if ($silentDuration > 0.1) {
-                        self::assertLessThan(0.0005, $this->rms($pcm, 0, $silentDuration), 'Fragments before the intended onset must contain real silence.');
+                        self::assertLessThan(
+                            0.0005,
+                            $this->rms($pcm, 0, $silentDuration),
+                            'Fragments before the intended onset must contain real silence.',
+                        );
                     }
                     if (!$paddingOnlyTail && $localDelay + 0.3 < $decodedDuration) {
-                        self::assertGreaterThan(0.005, $this->rms($pcm, $localDelay + 0.2, 0.1), 'Audible fragments must retain the tone after its intended onset.');
-                        self::assertGreaterThan(0.005, $this->rms($pcm, $decodedDuration - 0.2, 0.1), 'Audible fragments must retain their tail.');
+                        self::assertGreaterThan(
+                            0.005,
+                            $this->rms($pcm, $localDelay + 0.2, 0.1),
+                            'Audible fragments must retain the tone after its intended onset.',
+                        );
+                        if (
+                            $audioOffsetMs >= 0
+                            || $localStart + $decodedDuration - 0.2 < $remaining + $audioOffsetMs / 1000
+                        ) {
+                            self::assertGreaterThan(
+                                0.005,
+                                $this->rms($pcm, $decodedDuration - 0.2, 0.1),
+                                'Audible fragments must retain their tail.',
+                            );
+                        }
                     }
                     $audioFirst ??= (float) $packets[0]['pts_time'];
                     $last = $packets[array_key_last($packets)];
@@ -192,7 +230,10 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
                 }
                 $prefix = (new ManifestGenerator())->generateMediaManifest($track->initFile, $segments, false);
                 self::assertStringContainsString("#EXT-X-TARGETDURATION:7\n", $prefix);
-                file_put_contents($output . '/' . $track->kind->value . '-prefix-' . $segment->ordinal . '.m3u8', $prefix);
+                file_put_contents(
+                    $output . '/' . $track->kind->value . '-prefix-' . $segment->ordinal . '.m3u8',
+                    $prefix,
+                );
                 $this->observation(['track' => $track->kind->value, 'ordinal' => $segment->ordinal,
                     'start' => $segment->start, 'duration' => $segment->duration / $track->timescale,
                     'firstPacket' => $packets[0], 'lastPacket' => $packets[array_key_last($packets)]]);
@@ -203,18 +244,36 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
             self::assertStringContainsString('#EXT-X-ENDLIST', $manifest);
             file_put_contents($playlist, $manifest);
             if ($track->kind === MediaTrack::Video) {
-                self::assertEqualsWithDelta($remaining, $track->end(), 0.002, 'The complete integer-duration source tail must survive publication.');
-                self::assertSame($markers, $this->decodeVideo($playlist), 'HLS must decode the same held frames as independent fragments.');
+                self::assertEqualsWithDelta(
+                    $remaining,
+                    $track->end(),
+                    0.002,
+                    'The complete integer-duration source tail must survive publication.',
+                );
+                self::assertSame(
+                    $markers,
+                    $this->decodeVideo($playlist),
+                    'HLS must decode the same held frames as independent fragments.',
+                );
             } else {
-                self::assertEqualsWithDelta(0.0, $audioFirst, 0.05, 'Materialized leading silence must begin on the local presentation timeline.');
+                self::assertEqualsWithDelta(
+                    0.0,
+                    $audioFirst,
+                    0.05,
+                    'Materialized leading silence must begin on the local presentation timeline.',
+                );
                 self::assertEqualsWithDelta($remaining, $audioEnd, 0.05);
                 self::assertEqualsWithDelta($remaining, $track->end(), 0.05);
                 self::assertEqualsWithDelta($remaining, $pcmSeconds, 0.15);
                 $playlistPcm = $this->decodeAudio($playlist);
                 self::assertGreaterThan(0, strlen($playlistPcm));
-                $this->assertAudioTimeline($playlistPcm, $expectedDelay, $remaining);
-                if ($encodedSourceAudio) {
-                    $this->assertSourceAlignment($this->decodeAudio($source), $playlistPcm, $sourceStart);
+                $this->assertAudioTimeline($playlistPcm, $expectedDelay, $remaining, $audioOffsetMs < 0);
+                if ($encodedSourceAudio || $audioOffsetMs !== 0) {
+                    $this->assertSourceAlignment(
+                        $this->decodeAudio($source),
+                        $playlistPcm,
+                        $sourceStart - $audioOffsetMs / 1000,
+                    );
                 }
             }
         }
@@ -230,7 +289,11 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
             $expectedMarkers[] = min(2, (int) floor(($sourceStart + $index / 25) * 0.1 + 0.00001));
         }
         self::assertSame([], $badTimestamps, 'Every output packet must use the zero-based 25 fps presentation grid.');
-        self::assertSame($expectedMarkers, $markers, 'Each tick must show the covering source frame, including the final hold.');
+        self::assertSame(
+            $expectedMarkers,
+            $markers,
+            'Each tick must show the covering source frame, including the final hold.',
+        );
         $this->observation(['sourceStart' => $sourceStart, 'sourceDuration' => 30.0,
             'timestamps' => $timestamps, 'markers' => $markers, 'expectedMarkers' => $expectedMarkers]);
     }
@@ -249,6 +312,18 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
         yield 'matched PCM source fresh' => ['libx264', 'streaming_stereo', 0, 0.0];
         yield 'matched AAC source fresh' => ['libx264', 'streaming_stereo', 0, 0.0, true];
         yield 'matched AAC source restart' => ['libx264', 'streaming_stereo', 1, 0.0, true];
+        foreach ([0, 1] as $start) {
+            foreach ([-750, 750] as $offset) {
+                yield 'source correction ' . $offset . ' restart ' . $start => [
+                    'libx264',
+                    'streaming_stereo',
+                    $start,
+                    0.0,
+                    false,
+                    $offset,
+                ];
+            }
+        }
     }
 
     private function createSource(float $audioDelay, bool $encodedAudio): string
@@ -315,12 +390,20 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
         $offset = $elst['start'];
         $version = $this->word($data, $offset, $elst['end']) >> 24;
         self::assertContains($version, [0, 1]);
-        self::assertSame(1, $this->word($data, $offset, $elst['end']), 'The video init must contain one unshifted presentation edit.');
+        self::assertSame(
+            1,
+            $this->word($data, $offset, $elst['end']),
+            'The video init must contain one unshifted presentation edit.',
+        );
         $offset += $version === 1 ? 8 : 4;
         if ($version === 1) {
             self::assertSame(0, $this->word($data, $offset, $elst['end']));
         }
-        self::assertSame(0, $this->word($data, $offset, $elst['end']), 'A video edit must not hide a presentation timestamp offset.');
+        self::assertSame(
+            0,
+            $this->word($data, $offset, $elst['end']),
+            'A video edit must not hide a presentation timestamp offset.',
+        );
         self::assertSame(0x00010000, $this->word($data, $offset, $elst['end']));
         self::assertSame($elst['end'], $offset);
     }
@@ -350,7 +433,11 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
         $version = $this->word($data, $offset, $tfdt['end']) >> 24;
         self::assertContains($version, [0, 1]);
         if ($version === 1) {
-            self::assertSame(0, $this->word($data, $offset, $tfdt['end']), 'The bounded fixture clock must fit within 32 bits.');
+            self::assertSame(
+                0,
+                $this->word($data, $offset, $tfdt['end']),
+                'The bounded fixture clock must fit within 32 bits.',
+            );
         }
         $dts = $this->word($data, $offset, $tfdt['end']);
         self::assertSame($tfdt['end'], $offset);
@@ -367,7 +454,10 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
         $offset += ($flags & 1) !== 0 ? 4 : 0;
         $offset += ($flags & 4) !== 0 ? 4 : 0;
         if (($flags & 0x100) === 0) {
-            self::assertNotNull($defaultDuration, 'Sample duration must be explicit in tfhd or trun; trex-only defaults are outside this fixture layout.');
+            self::assertNotNull(
+                $defaultDuration,
+                'Sample duration must be explicit in tfhd or trun; trex-only defaults are outside this fixture layout.',
+            );
         }
         $samples = [];
         for ($index = 0; $index < $count; ++$index) {
@@ -476,8 +566,12 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
         return $pcm;
     }
 
-    private function assertAudioTimeline(string $pcm, float $expectedDelay, float $expectedDuration): void
-    {
+    private function assertAudioTimeline(
+        string $pcm,
+        float $expectedDelay,
+        float $expectedDuration,
+        bool $silentTail = false,
+    ): void {
         $duration = strlen($pcm) / 4 / 48_000;
         $onset = null;
         // AAC priming and independent codec packet padding fit within the 100ms onset tolerance.
@@ -493,14 +587,32 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
         $this->observation(['track' => 'audio', 'decode' => 'HLS', 'decodedDuration' => $duration,
             'expectedDuration' => $expectedDuration, 'toneOnset' => $onset, 'expectedOnset' => $expectedDelay,
             'beforeOnsetRms' => $beforeRms, 'afterOnsetRms' => $afterRms, 'tailRms' => $tailRms]);
-        self::assertEqualsWithDelta($expectedDuration, $duration, 0.15, 'HLS audio must contain the complete presentation, including leading silence.');
+        self::assertEqualsWithDelta(
+            $expectedDuration,
+            $duration,
+            0.15,
+            'HLS audio must contain the complete presentation, including leading silence.',
+        );
         self::assertNotNull($onset, 'The decoded HLS track must contain the source tone.');
-        self::assertEqualsWithDelta($expectedDelay, $onset, 0.1, 'HLS must preserve the actual audible onset without relying on an MP4 edit list.');
+        self::assertEqualsWithDelta(
+            $expectedDelay,
+            $onset,
+            0.1,
+            'HLS must preserve the actual audible onset without relying on an MP4 edit list.',
+        );
         if ($beforeRms !== null) {
             self::assertLessThan(0.0005, $beforeRms, 'HLS samples before the source tone must be silent.');
         }
         self::assertGreaterThan(0.005, $afterRms, 'HLS must contain the tone after its intended onset.');
-        self::assertGreaterThan(0.005, $tailRms, 'HLS must preserve audible content through the source tail.');
+        if ($silentTail) {
+            self::assertLessThan(
+                0.0005,
+                $tailRms,
+                'Advancing audio must pad the exhausted source with silence through the video end.',
+            );
+        } else {
+            self::assertGreaterThan(0.005, $tailRms, 'HLS must preserve audible content through the source tail.');
+        }
     }
 
     private function rms(string $pcm, float $position, float $duration): float
@@ -519,7 +631,16 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
     /** @return array<string, mixed> */
     private function probe(string $path): array
     {
-        $json = $this->runMedia(['/usr/bin/ffprobe', '-v', 'error', '-show_streams', '-show_format', '-of', 'json', $path]);
+        $json = $this->runMedia([
+            '/usr/bin/ffprobe',
+            '-v',
+            'error',
+            '-show_streams',
+            '-show_format',
+            '-of',
+            'json',
+            $path,
+        ]);
         file_put_contents($path . '.probe.json', $json);
         return json_decode($json, true, 512, JSON_THROW_ON_ERROR);
     }
@@ -536,13 +657,24 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
     /** @param array<string, mixed> $observation */
     private function observation(array $observation): void
     {
-        file_put_contents($this->directory . '/decode-observations.jsonl', json_encode($observation, JSON_THROW_ON_ERROR) . "\n", FILE_APPEND);
+        file_put_contents(
+            $this->directory . '/decode-observations.jsonl',
+            json_encode(
+                $observation,
+                JSON_THROW_ON_ERROR,
+            ) . "\n",
+            FILE_APPEND,
+        );
     }
 
     /** @param list<string> $arguments */
     private function runMedia(array $arguments): string
     {
-        file_put_contents($this->directory . '/commands.jsonl', json_encode($arguments, JSON_THROW_ON_ERROR) . "\n", FILE_APPEND);
+        file_put_contents(
+            $this->directory . '/commands.jsonl',
+            json_encode($arguments, JSON_THROW_ON_ERROR) . "\n",
+            FILE_APPEND,
+        );
         $process = new Process($arguments);
         $process->setTimeout(30);
         $process->run();

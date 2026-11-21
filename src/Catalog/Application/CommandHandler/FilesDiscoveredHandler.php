@@ -129,13 +129,22 @@ final class FilesDiscoveredHandler
         /** @var array<string, true> $committedPaths */
         $committedPaths = [];
 
-        $audioFiles = array_values(array_filter($files, static fn (DiscoveredFile $file): bool => $file->isAudio()));
+        $audioFiles = array_values(array_filter($files, static fn(DiscoveredFile $file): bool => $file->isAudio()));
         // What each file becomes: a repair of the stored song its content belongs to; else an update
         // of the song stored at its path; else a new song in the album its tags name.
         $targets = $this->knownSongs($audioFiles);
-        $retagged = $this->retaggedSongs($libraryId, array_values(array_filter($audioFiles, static fn (DiscoveredFile $file): bool => !isset($targets[$file->absolutePath]))));
+        $retagged = $this->retaggedSongs(
+            $libraryId,
+            array_values(array_filter(
+                $audioFiles,
+                static fn(DiscoveredFile $file): bool => !isset($targets[$file->absolutePath]),
+            )),
+        );
         $targets += $retagged;
-        $newFiles = array_values(array_filter($audioFiles, static fn (DiscoveredFile $file): bool => !isset($targets[$file->absolutePath])));
+        $newFiles = array_values(array_filter(
+            $audioFiles,
+            static fn(DiscoveredFile $file): bool => !isset($targets[$file->absolutePath]),
+        ));
         $album = null;
         if ($newFiles !== []) {
             $resolved = $this->resolveAlbum($libraryId, $message->directory, $newFiles);
@@ -153,7 +162,10 @@ final class FilesDiscoveredHandler
                 $targets[$file->absolutePath] = $album;
             }
         }
-        $audioFiles = array_values(array_filter($audioFiles, static fn (DiscoveredFile $file): bool => isset($targets[$file->absolutePath])));
+        $audioFiles = array_values(array_filter(
+            $audioFiles,
+            static fn(DiscoveredFile $file): bool => isset($targets[$file->absolutePath]),
+        ));
 
         // The albums the message touched, and the album-artist credit of each file whose tags were
         // read, by album and path.
@@ -166,7 +178,10 @@ final class FilesDiscoveredHandler
                 try {
                     $target = $targets[$file->absolutePath];
                     $song = match (true) {
-                        isset($retagged[$file->absolutePath]) => $this->readRetaggedSong($retagged[$file->absolutePath], $file),
+                        isset($retagged[$file->absolutePath]) => $this->readRetaggedSong(
+                            $retagged[$file->absolutePath],
+                            $file,
+                        ),
                         $target instanceof Song => $this->readKnownSong($target, $file),
                         default => $this->readNewSong($target, $file),
                     };
@@ -192,7 +207,10 @@ final class FilesDiscoveredHandler
                     $libraryId,
                     $message->libraryType,
                     $message->directory,
-                    array_values(array_filter($audioFiles, static fn (DiscoveredFile $file): bool => !isset($committedPaths[$file->absolutePath]))),
+                    array_values(array_filter(
+                        $audioFiles,
+                        static fn(DiscoveredFile $file): bool => !isset($committedPaths[$file->absolutePath]),
+                    )),
                 );
                 break;
             }
@@ -277,7 +295,13 @@ final class FilesDiscoveredHandler
             return [];
         }
 
-        return $this->songService->findByPathsInLibrary($libraryId, array_map(static fn (DiscoveredFile $file): string => $file->absolutePath, $files));
+        return $this->songService->findByPathsInLibrary(
+            $libraryId,
+            array_map(
+                static fn(DiscoveredFile $file): string => $file->absolutePath,
+                $files,
+            ),
+        );
     }
 
     /**
@@ -298,8 +322,15 @@ final class FilesDiscoveredHandler
         $song = [
             'file' => $file,
             'song' => $stored,
-            'credit' => $metadata === null ? null : $this->songCredit($metadata->getArtists(), $metadata->getIndividualArtists(), $metadata->getMbArtistIds()),
-            'albumArtist' => $metadata === null ? null : $this->taggedCredit($metadata->getAlbumArtists(), $metadata->getMbAlbumArtistIds()),
+            'credit' => $metadata === null ? null : $this->songCredit(
+                $metadata->getArtists(),
+                $metadata->getIndividualArtists(),
+                $metadata->getMbArtistIds(),
+            ),
+            'albumArtist' => $metadata === null ? null : $this->taggedCredit(
+                $metadata->getAlbumArtists(),
+                $metadata->getMbAlbumArtistIds(),
+            ),
             'genres' => [],
             'known' => true,
             'probe' => $this->probeKnownFile($file),
@@ -348,7 +379,11 @@ final class FilesDiscoveredHandler
             'albumArtist' => $tags['albumArtist'],
             'genres' => [],
             'known' => true,
-            'retag' => ['fields' => $tags['fields'], 'tagged' => $tags['tagged'], 'probe' => $this->audioProbe->probeAudio($file->absolutePath)],
+            'retag' => [
+                'fields' => $tags['fields'],
+                'tagged' => $tags['tagged'],
+                'probe' => $this->audioProbe->probeAudio($file->absolutePath),
+            ],
         ];
     }
 
@@ -420,12 +455,21 @@ final class FilesDiscoveredHandler
                 'year' => $metadata->getYear(),
                 'comment' => $metadata->getComment(),
             ],
-            'tagged' => self::taggedFields($title, $metadata->getTrackNumber(), $metadata->getDiscNumber(), $metadata->getYear()),
-            'credit' => $this->songCredit($metadata->getArtists(), $metadata->getIndividualArtists(), $metadata->getMbArtistIds()),
+            'tagged' => self::taggedFields(
+                $title,
+                $metadata->getTrackNumber(),
+                $metadata->getDiscNumber(),
+                $metadata->getYear(),
+            ),
+            'credit' => $this->songCredit(
+                $metadata->getArtists(),
+                $metadata->getIndividualArtists(),
+                $metadata->getMbArtistIds(),
+            ),
             'albumArtist' => $this->taggedCredit($metadata->getAlbumArtists(), $metadata->getMbAlbumArtistIds()),
             'genres' => array_values(array_filter(
                 array_map(trim(...), $metadata->getGenre()),
-                static fn (string $genre): bool => $genre !== '',
+                static fn(string $genre): bool => $genre !== '',
             )),
         ];
     }
@@ -446,7 +490,7 @@ final class FilesDiscoveredHandler
         ]
             |> array_filter(...)
             |> array_keys(...)
-            |> (static fn (array $fields): array => array_map(MatchedSongField::from(...), $fields));
+            |> (static fn(array $fields): array => array_map(MatchedSongField::from(...), $fields));
     }
 
     /**
@@ -477,12 +521,16 @@ final class FilesDiscoveredHandler
         }
 
         $identities = array_map(
-            static fn (string $name, MusicbrainzId $id): ArtistIdentity => new ArtistIdentity($name, [$id->toString()]),
+            static fn(string $name, MusicbrainzId $id): ArtistIdentity => new ArtistIdentity($name, [$id->toString()]),
             $names,
             $ids,
         );
 
-        return ['identity' => array_shift($identities), 'creditedName' => $credit['creditedName'], 'featured' => $identities];
+        return [
+            'identity' => array_shift($identities),
+            'creditedName' => $credit['creditedName'],
+            'featured' => $identities,
+        ];
     }
 
     /**
@@ -517,9 +565,9 @@ final class FilesDiscoveredHandler
      */
     private static function names(array $values): array
     {
-        $names = array_map(static fn (string $value): string => str_replace("\0", '', $value) |> trim(...), $values);
+        $names = array_map(static fn(string $value): string => str_replace("\0", '', $value) |> trim(...), $values);
 
-        return array_filter($names, static fn (string $name): bool => $name !== '') |> array_values(...);
+        return array_filter($names, static fn(string $name): bool => $name !== '') |> array_values(...);
     }
 
     /**
@@ -553,9 +601,13 @@ final class FilesDiscoveredHandler
         }
 
         ksort($albumArtists, SORT_STRING);
-        $albumArtist = array_find($albumArtists, static fn (?array $credit): bool => $credit !== null)
+        $albumArtist = array_find($albumArtists, static fn(?array $credit): bool => $credit !== null)
             ?? $this->storedAlbumArtist($albumId, $albumArtists);
-        $this->albumService->creditArtistIfUncredited($albumId, $albumArtist['identity'] ?? null, $albumArtist['creditedName'] ?? null);
+        $this->albumService->creditArtistIfUncredited(
+            $albumId,
+            $albumArtist['identity'] ?? null,
+            $albumArtist['creditedName'] ?? null,
+        );
     }
 
     /**
@@ -568,14 +620,20 @@ final class FilesDiscoveredHandler
      */
     private function storedAlbumArtist(Uuid $albumId, array $read): ?array
     {
-        $paths = array_map(static fn (Song $song): string => $song->getPath(), $this->songService->findByAlbumSortedByTrack($albumId));
+        $paths = array_map(
+            static fn(Song $song): string => $song->getPath(),
+            $this->songService->findByAlbumSortedByTrack($albumId),
+        );
         sort($paths, SORT_STRING);
         foreach ($paths as $path) {
             if (array_key_exists($path, $read)) {
                 continue;
             }
             $metadata = $this->metadataReader->readMetadata($path);
-            $credit = $metadata === null ? null : $this->taggedCredit($metadata->getAlbumArtists(), $metadata->getMbAlbumArtistIds());
+            $credit = $metadata === null ? null : $this->taggedCredit(
+                $metadata->getAlbumArtists(),
+                $metadata->getMbAlbumArtistIds(),
+            );
             if ($credit !== null) {
                 return $credit;
             }
@@ -610,7 +668,7 @@ final class FilesDiscoveredHandler
             }
 
             $hashes = $this->mediaFiles->lockAvailableHashesByPathsForImport($libraryId, array_map(
-                static fn (array $song): string => $song['file']->absolutePath,
+                static fn(array $song): string => $song['file']->absolutePath,
                 $songs,
             ));
             $current = [];
@@ -651,7 +709,15 @@ final class FilesDiscoveredHandler
                     } elseif ($song['known']) {
                         $song['repaired'] = $this->repairSong($song, $artistIds);
                     } else {
-                        $this->writeSong($song['song'], $song['credit'], $artistIds, array_map(static fn (string $name): Uuid => $genreIds[$name], $song['genres']));
+                        $this->writeSong(
+                            $song['song'],
+                            $song['credit'],
+                            $artistIds,
+                            array_map(
+                                static fn(string $name): Uuid => $genreIds[$name],
+                                $song['genres'],
+                            ),
+                        );
                     }
                     $written[] = $song;
                 } catch (\Throwable $e) {
@@ -711,7 +777,7 @@ final class FilesDiscoveredHandler
      */
     private function withRetaggedSongsLocked(array $songs, array &$failures): array
     {
-        $retagged = array_filter($songs, static fn (array $song): bool => isset($song['retag']));
+        $retagged = array_filter($songs, static fn(array $song): bool => isset($song['retag']));
         if ($retagged === []) {
             return $songs;
         }
@@ -719,7 +785,7 @@ final class FilesDiscoveredHandler
         $this->songService->lockForRetag(
             self::creditedIdentities($songs),
             self::genreNames($songs),
-            array_map(static fn (array $song): Uuid => $song['song']->getId(), $retagged) |> array_values(...),
+            array_map(static fn(array $song): Uuid => $song['song']->getId(), $retagged) |> array_values(...),
         );
         foreach ($retagged as $index => $song) {
             try {
@@ -771,7 +837,11 @@ final class FilesDiscoveredHandler
     private function freshRetaggedSong(array $song): ?array
     {
         $fresh = $this->songService->findFreshByUuid($song['song']->getId());
-        if ($fresh === null || $fresh->getPath() !== $song['file']->absolutePath || $fresh->getHash() !== $song['song']->getHash()) {
+        if (
+            $fresh === null
+            || $fresh->getPath() !== $song['file']->absolutePath
+            || $fresh->getHash() !== $song['song']->getHash()
+        ) {
             return null;
         }
         $song['song'] = $fresh;
@@ -792,7 +862,14 @@ final class FilesDiscoveredHandler
         }
 
         return ($verdicts[$previousPath] ?? null) === LibraryMediaFileVerdict::Missing
-            && in_array($verdicts[$file->absolutePath] ?? null, [LibraryMediaFileVerdict::Deletable, LibraryMediaFileVerdict::DirectoryNotWritable], true);
+            && in_array(
+                $verdicts[$file->absolutePath] ?? null,
+                [
+                    LibraryMediaFileVerdict::Deletable,
+                    LibraryMediaFileVerdict::DirectoryNotWritable,
+                ],
+                true,
+            );
     }
 
     /**
@@ -806,13 +883,16 @@ final class FilesDiscoveredHandler
      */
     private function withTagCreditsOfUncreditedSongsOnly(array $songs): array
     {
-        $known = array_filter($songs, static fn (array $song): bool => $song['known'] && !isset($song['retag']) && $song['credit'] !== null);
+        $known = array_filter(
+            $songs,
+            static fn(array $song): bool => $song['known'] && !isset($song['retag']) && $song['credit'] !== null,
+        );
         if ($known === []) {
             return $songs;
         }
 
         $credited = array_flip($this->songService->findCreditedSongIds(array_values(array_map(
-            static fn (array $song): Uuid => $song['song']->getId(),
+            static fn(array $song): Uuid => $song['song']->getId(),
             $known,
         ))));
         foreach (array_keys($known) as $index) {
@@ -844,7 +924,11 @@ final class FilesDiscoveredHandler
         $gainedLength = false;
         $probe = $song['probe'] ?? null;
         if ($probe !== null) {
-            if ($stored->getContainerFormat() === null || $stored->getStreamIndex() === null || $stored->getCodec() === null) {
+            if (
+                $stored->getContainerFormat() === null
+                || $stored->getStreamIndex() === null
+                || $stored->getCodec() === null
+            ) {
                 $this->applyAudioProbe($stored, $probe);
                 $changed = true;
             }
@@ -885,7 +969,14 @@ final class FilesDiscoveredHandler
     {
         $stored = $song['song'];
         $fields = $retag['fields'];
-        $stored->updateFromTags(title: $fields['title'], track: $fields['track'], disc: $fields['disc'], year: $fields['year'], comment: $fields['comment'], tagged: $retag['tagged']);
+        $stored->updateFromTags(
+            title: $fields['title'],
+            track: $fields['track'],
+            disc: $fields['disc'],
+            year: $fields['year'],
+            comment: $fields['comment'],
+            tagged: $retag['tagged'],
+        );
         $stored->updateAudioMetadata(size: $song['file']->size, hash: $song['file']->hash);
         $this->applyAudioProbe($stored, $retag['probe']);
         $length = $retag['probe']->length();
@@ -911,9 +1002,14 @@ final class FilesDiscoveredHandler
 
     private function applyAudioProbe(Song $song, AudioProbeResult $probe): void
     {
-        $song->updateAudioMetadata(bitrate: $probe->bitrate, sampleRate: $probe->sampleRate,
-            channels: $probe->channels, codec: $probe->codec,
-            containerFormat: $probe->containerFormat, streamIndex: $probe->streamIndex);
+        $song->updateAudioMetadata(
+            bitrate: $probe->bitrate,
+            sampleRate: $probe->sampleRate,
+            channels: $probe->channels,
+            codec: $probe->codec,
+            containerFormat: $probe->containerFormat,
+            streamIndex: $probe->streamIndex,
+        );
     }
 
     /**
@@ -973,7 +1069,7 @@ final class FilesDiscoveredHandler
     private static function genreNames(array $songs): array
     {
         return array_column($songs, 'genres')
-            |> (static fn (array $genres): array => array_merge(...$genres))
+            |> (static fn(array $genres): array => array_merge(...$genres))
             |> array_unique(...)
             |> array_values(...);
     }
@@ -1005,9 +1101,19 @@ final class FilesDiscoveredHandler
      */
     private function creditArtists(Uuid $songId, array $credit, array $artistIds): void
     {
-        $this->songService->addArtistCredit($songId, $artistIds[$credit['identity']->key()], ArtistRole::Primary->value, $credit['creditedName']);
+        $this->songService->addArtistCredit(
+            $songId,
+            $artistIds[$credit['identity']->key()],
+            ArtistRole::Primary->value,
+            $credit['creditedName'],
+        );
         foreach ($credit['featured'] as $featured) {
-            $this->songService->addArtistCredit($songId, $artistIds[$featured->key()], ArtistRole::Featured->value, $featured->name);
+            $this->songService->addArtistCredit(
+                $songId,
+                $artistIds[$featured->key()],
+                ArtistRole::Featured->value,
+                $featured->name,
+            );
         }
     }
 
@@ -1027,7 +1133,7 @@ final class FilesDiscoveredHandler
     {
         $failures = [];
         $committedPaths = [];
-        $videoFiles = array_values(array_filter($files, static fn (DiscoveredFile $file): bool => $file->isVideo()));
+        $videoFiles = array_values(array_filter($files, static fn(DiscoveredFile $file): bool => $file->isVideo()));
         foreach (array_chunk($videoFiles, self::BATCH_SIZE) as $batch) {
             $prepared = [];
             foreach ($this->currentFiles($message->libraryId, $batch) as $file) {
@@ -1061,10 +1167,13 @@ final class FilesDiscoveredHandler
                     return null;
                 }
                 $hashes = $this->mediaFiles->lockAvailableHashesByPathsForImport($message->libraryId, array_map(
-                    static fn (array $entry): string => $entry['file']->absolutePath,
+                    static fn(array $entry): string => $entry['file']->absolutePath,
                     $prepared,
                 ));
-                $current = array_filter($prepared, static fn (array $entry): bool => ($hashes[$entry['file']->absolutePath] ?? null) === $entry['file']->hash);
+                $current = array_filter(
+                    $prepared,
+                    static fn(array $entry): bool => ($hashes[$entry['file']->absolutePath] ?? null) === $entry['file']->hash,
+                );
                 if ($current === []) {
                     return [];
                 }
@@ -1083,8 +1192,10 @@ final class FilesDiscoveredHandler
                         }
                         if (!$entry['isNew'] && $entry['probe'] !== null) {
                             $video = $this->videoRepository->findFreshByUuid($video->getId());
-                            if ($video === null || $video->getHash() !== $entry['file']->hash
-                                || $video->getPath() !== $entry['file']->absolutePath) {
+                            if (
+                                $video === null || $video->getHash() !== $entry['file']->hash
+                                || $video->getPath() !== $entry['file']->absolutePath
+                            ) {
                                 continue;
                             }
                             $video->updateProbe($entry['probe']->jsonSerialize());
@@ -1105,8 +1216,14 @@ final class FilesDiscoveredHandler
                 return $written;
             });
             if ($written === null) {
-                $this->requeueWhileHeld(new FilesDiscovered($message->libraryId, $message->libraryType, $message->directory,
-                    array_values(array_filter($files, static fn (DiscoveredFile $file): bool => !isset($committedPaths[$file->absolutePath]))),
+                $this->requeueWhileHeld(new FilesDiscovered(
+                    $message->libraryId,
+                    $message->libraryType,
+                    $message->directory,
+                    array_values(array_filter(
+                        $files,
+                        static fn(DiscoveredFile $file): bool => !isset($committedPaths[$file->absolutePath]),
+                    )),
                 ));
 
                 return;
@@ -1123,7 +1240,7 @@ final class FilesDiscoveredHandler
     private function videoNeedsProbe(Video $video): bool
     {
         $probe = $video->getProbe();
-        if (!isset($probe['containerFormat'], $probe['videoStreamIndex'])) {
+        if (!array_key_exists('chapters', $probe) || !isset($probe['containerFormat'], $probe['videoStreamIndex'])) {
             return true;
         }
         foreach ($probe['audioStreams'] ?? [] as $stream) {
@@ -1141,7 +1258,7 @@ final class FilesDiscoveredHandler
      */
     private function resolveAlbum(Uuid $libraryId, string $directory, array &$files): ?array
     {
-        $candidates = array_values(array_filter($files, static fn (DiscoveredFile $file): bool => $file->isAudio()));
+        $candidates = array_values(array_filter($files, static fn(DiscoveredFile $file): bool => $file->isAudio()));
         while ($candidates !== []) {
             $anchor = $candidates[0];
             $metadata = null;
@@ -1157,15 +1274,25 @@ final class FilesDiscoveredHandler
                 return [null];
             }
             $current = [];
-            $resolved = $this->transaction->run(function () use ($libraryId, $candidates, $anchor, $metadata, $title, &$current): ?array {
+            $resolved = $this->transaction->run(function () use (
+                $libraryId,
+                $candidates,
+                $anchor,
+                $metadata,
+                $title,
+                &$current
+            ): ?array {
                 if ($this->mediaFiles->isHeldByDeleteForImport($libraryId)) {
                     return null;
                 }
                 $hashes = $this->mediaFiles->lockAvailableHashesByPathsForImport($libraryId, array_map(
-                    static fn (DiscoveredFile $file): string => $file->absolutePath,
+                    static fn(DiscoveredFile $file): string => $file->absolutePath,
                     $candidates,
                 ));
-                $current = array_values(array_filter($candidates, static fn (DiscoveredFile $file): bool => ($hashes[$file->absolutePath] ?? null) === $file->hash));
+                $current = array_values(array_filter(
+                    $candidates,
+                    static fn(DiscoveredFile $file): bool => ($hashes[$file->absolutePath] ?? null) === $file->hash,
+                ));
                 if (($hashes[$anchor->absolutePath] ?? null) !== $anchor->hash) {
                     return [null];
                 }
@@ -1238,7 +1365,7 @@ final class FilesDiscoveredHandler
         }
         $missing = $this->mediaFiles->markMissingUnavailable(
             $message->libraryId,
-            array_map(static fn (DiscoveredFile $file): string => $file->absolutePath, $files),
+            array_map(static fn(DiscoveredFile $file): string => $file->absolutePath, $files),
         );
         if ($missing === []) {
             return $files;
@@ -1251,7 +1378,10 @@ final class FilesDiscoveredHandler
 
         $missingByPath = array_flip($missing);
 
-        return array_values(array_filter($files, static fn (DiscoveredFile $file): bool => !isset($missingByPath[$file->absolutePath])));
+        return array_values(array_filter(
+            $files,
+            static fn(DiscoveredFile $file): bool => !isset($missingByPath[$file->absolutePath]),
+        ));
     }
 
     /** @param list<DiscoveredFile> $files
@@ -1260,11 +1390,14 @@ final class FilesDiscoveredHandler
     private function currentFiles(Uuid $libraryId, array $files): array
     {
         $hashes = $this->mediaFiles->findAvailableHashesByPaths($libraryId, array_map(
-            static fn (DiscoveredFile $file): string => $file->absolutePath,
+            static fn(DiscoveredFile $file): string => $file->absolutePath,
             $files,
         ));
 
-        return array_values(array_filter($files, static fn (DiscoveredFile $file): bool => ($hashes[$file->absolutePath] ?? null) === $file->hash));
+        return array_values(array_filter(
+            $files,
+            static fn(DiscoveredFile $file): bool => ($hashes[$file->absolutePath] ?? null) === $file->hash,
+        ));
     }
 
     private function detectMimeType(string $extension): string
@@ -1314,7 +1447,7 @@ final class FilesDiscoveredHandler
     private function buildFailureMessage(array $failures): string
     {
         $details = array_map(
-            static fn (array $failure): string => sprintf('%s: %s', $failure['path'], $failure['error']),
+            static fn(array $failure): string => sprintf('%s: %s', $failure['path'], $failure['error']),
             $failures,
         );
 
@@ -1341,7 +1474,7 @@ final class FilesDiscoveredHandler
         } catch (\Throwable $e) {
             $this->logger->error('Could not request MusicBrainz matches for {count} album(s); a rescan or a library metadata sync from the admin panel requests them again.', [
                 'count' => count($albumIds),
-                'album_ids' => array_map(static fn (Uuid $id): string => $id->toString(), $albumIds),
+                'album_ids' => array_map(static fn(Uuid $id): string => $id->toString(), $albumIds),
                 'exception' => $e,
             ]);
         }
@@ -1368,7 +1501,7 @@ final class FilesDiscoveredHandler
         } catch (\Throwable $e) {
             $this->logger->error('Could not request lyrics for {count} song(s); they stay pending until the next flush.', [
                 'count' => count($songIds),
-                'song_ids' => array_map(static fn (Uuid $id): string => $id->toString(), $songIds),
+                'song_ids' => array_map(static fn(Uuid $id): string => $id->toString(), $songIds),
                 'exception' => $e,
             ]);
 

@@ -102,5 +102,6 @@
   "tests/Unit/Transcode/Infrastructure/Swoole/SegmentAvailabilityTableTest.php": "native shared table/channel/process-pool wrapper",
   "tests/Unit/Transcode/Infrastructure/Swoole/SwooleLoopLockRenewalTimerTest.php": "native coroutine/reactor/server",
   "tests/Unit/Transcode/Infrastructure/Worker/MediaWorkerBootstrapTest.php": "Owns executable media children and signal lifecycle.",
-  "tests/Unit/Transcode/Infrastructure/Worker/MediaWorkerRunnerTest.php": "Owns executable media children and signal lifecycle."
+  "tests/Unit/Transcode/Infrastructure/Worker/MediaWorkerRunnerTest.php": "Owns executable media children and signal lifecycle.",
+  "tests/Unit/Transcode/Infrastructure/Preview/VideoTimelinePreviewTest.php": "Owns real FFmpeg contact-sheet generation and cache cleanup locks."
 }

@@ -1727,6 +1727,16 @@ services:
     App\Catalog\Application\Port\VideoPortInterface:
         alias: App\Catalog\Infrastructure\VideoService
 
+    App\Catalog\Application\Port\VideoPlaybackInformationPort:
+        alias: App\Catalog\Infrastructure\VideoPlaybackInformationService
+
+    App\Transcode\Application\Port\VideoTimelinePreviewPort:
+        alias: App\Transcode\Infrastructure\Preview\VideoTimelinePreview
+
+    App\Transcode\Infrastructure\Preview\VideoTimelinePreview:
+        arguments:
+            $cacheDirectory: '%env(CONVERT_STORAGE_PATH)%/timeline-previews'
+
     App\Transcode\Application\Port\TranscodePublicViewInterface:
         alias: App\Transcode\Infrastructure\TranscodePublicView
 

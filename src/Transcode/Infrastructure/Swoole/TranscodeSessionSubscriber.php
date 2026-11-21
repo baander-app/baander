@@ -59,7 +59,8 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
         private readonly AacImplementationProbe $aacProbe,
         private readonly LoopLockRenewalTimerInterface $renewalTimer = new SwooleLoopLockRenewalTimer(),
         private readonly ?StreamAdmissionPortInterface $admission = null,
-    ) {}
+    ) {
+    }
 
     public function run(TranscodeExecutionClaim $claim, callable $stopRequested): void
     {
@@ -116,8 +117,10 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                     $this->ownership->observe($active, 'cancelled');
                     return;
                 }
-                if ($latest->runtime->desiredRevision === $active->runtime->desiredRevision
-                    && $latest->runtime->generation === $active->runtime->generation) {
+                if (
+                    $latest->runtime->desiredRevision === $active->runtime->desiredRevision
+                    && $latest->runtime->generation === $active->runtime->generation
+                ) {
                     return;
                 }
                 $active = $latest;
@@ -128,8 +131,10 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
             }
             $source = $video->getPath();
             if ($copy) {
-                if ($job->getPresentationSelection()?->canonicalKey() !== $selection->canonicalKey()
-                    || $video->getHash() !== $selection->sourceHash) {
+                if (
+                    $job->getPresentationSelection()?->canonicalKey() !== $selection->canonicalKey()
+                    || $video->getHash() !== $selection->sourceHash
+                ) {
                     throw new RuntimeException('The admitted copy source identity changed.');
                 }
                 $this->verifySource($source, $selection->sourceHash, $active, $local, $stopRequested);
@@ -148,7 +153,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                         throw new RuntimeException('Video probe helper failed: ' . $result['data']);
                     }
                     $rawProbe = json_decode($result['data'], true, 512, JSON_THROW_ON_ERROR);
-                    $probe = VideoProbeResult::fromProbeOutput($rawProbe);
+                    $probe = VideoProbeResult::fromProbeOutput($rawProbe)->withSelectedAudioStream($selection?->audioStreamIndex);
                     $copyTiming = $copy ? CopySourceTiming::fromProbe($rawProbe, $selection) : null;
                     $duration = $copyTiming === null ? $probe->duration : $copyTiming->duration;
                     $hasAudio = $copy ? $selection->audioStreamIndex !== null : $probe->hasAudio();
@@ -161,8 +166,18 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
             } while (true);
             $active = $this->refresh($active, $local, $stopRequested);
             if ($copyTiming !== null) {
-                $keyframes = $this->processPool->probeCopyKeyframes($job, $source, $selection->videoStreamIndex, $active->runtime->generation);
-                $copyFrames = json_decode($this->awaitHelper($keyframes, $active, $local, $stopRequested), true, 512, JSON_THROW_ON_ERROR)['frames'] ?? [];
+                $keyframes = $this->processPool->probeCopyKeyframes(
+                    $job,
+                    $source,
+                    $selection->videoStreamIndex,
+                    $active->runtime->generation,
+                );
+                $copyFrames = json_decode(
+                    $this->awaitHelper($keyframes, $active, $local, $stopRequested),
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR,
+                )['frames'] ?? [];
                 $targetDuration = $copyTiming->targetDuration($copyFrames);
             }
             $total = (int) ceil($duration / SegmentEncoder::getSegmentDuration());
@@ -192,16 +207,27 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                         $this->ownership->observe($active, 'cancelled');
                         return;
                     }
-                    $playbackSegment = min(max(0, $total - 1), (int) floor($latest->runtime->desired->position / SegmentEncoder::getSegmentDuration()));
+                    $playbackSegment = min(
+                        max(0, $total - 1),
+                        (int) floor($latest->runtime->desired->position / SegmentEncoder::getSegmentDuration()),
+                    );
                     if ($generation !== $latest->runtime->generation) {
                         // Reap the captured process before advancing the write fence.
                         $this->streamManager->stopStream($jobId);
                         $this->processPool->shutdown();
-                        $subtitleQueue = array_values(array_filter($probe->subtitleStreams, static fn (SubtitleTrackInfo $track): bool => $track->isText()));
+                        $subtitleQueue = array_values(array_filter(
+                            $probe->subtitleStreams,
+                            static fn(SubtitleTrackInfo $track): bool => $track->isText(),
+                        ));
                         $subtitleActive = [];
                         $subtitleDeadline = hrtime(true) + 30_000_000_000;
                         $active = $latest;
-                        $scoped = $this->storage->forGeneration($job->getVideoId(), $tier, $active->runtime->generation, $job->getId());
+                        $scoped = $this->storage->forGeneration(
+                            $job->getVideoId(),
+                            $tier,
+                            $active->runtime->generation,
+                            $job->getId(),
+                        );
                         $output = $scoped->resolveJobDirectory($job->getVideoId(), $tier);
                         $this->assertCurrent($active, $local, $stopRequested);
                         if (!is_dir($output) && !mkdir($output, 0755, true) && !is_dir($output)) {
@@ -214,9 +240,24 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                         }
                         $startTime = $copyTiming === null ? $start * SegmentEncoder::getSegmentDuration() : $sourceBoundary - $copyTiming->origin;
                         $actualSelection = $copy ? $selection : ($selection === null ? null : EncodePresentationIdentity::derive(
-                            $video->getHash(), $probe, $tier, $active->runtime->desired->audioProfile,
-                            $active->runtime->desired->audioLanguages, $this->encoder()));
-                        $this->writeMetadata($output, $active, $probe, $startTime, $duration, $targetDuration, $actualSelection, $source);
+                            $video->getHash(),
+                            $probe,
+                            $tier,
+                            $active->runtime->desired->audioProfile,
+                            $active->runtime->desired->audioLanguages,
+                            $this->encoder(),
+                            $selection->audioOffsetMs,
+                        ));
+                        $this->writeMetadata(
+                            $output,
+                            $active,
+                            $probe,
+                            $startTime,
+                            $duration,
+                            $targetDuration,
+                            $actualSelection,
+                            $source,
+                        );
                         $estimated = (int) ceil(($duration - $startTime) / SegmentEncoder::getSegmentDuration());
                         $this->persist($active, function (TranscodeJob $fresh) use ($output, $probe, $estimated): void {
                             $state = $fresh->getState();
@@ -235,11 +276,39 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                             $fresh->setTotalSegments($estimated);
                         });
                         $filters = $copy ? '' : $this->encoder()->buildVideoFilters($probe, $tier);
-                        $audioFilters = $copy ? '' : $this->encoder()->buildAudioFiltersForProfile($probe, $active->runtime->desired->audioProfile);
+                        $audioFilters = $copy ? '' : $this->encoder()->buildAudioFiltersForProfile(
+                            $probe,
+                            $active->runtime->desired->audioProfile,
+                        );
                         $this->assertCurrent($active, $local, $stopRequested);
                         $sourceAudioCodec = $probe->selectedAudioStream()?->codec;
-                        $this->assertAacImplementationAvailable($active->runtime->desired, $copy, $hasAudio, $sourceAudioCodec);
-                        $this->streamManager->startStream($job, $source, $tier, $filters, $start, $output, $active->runtime->desired->audioProfile, $audioFilters, $active->runtime->generation, $hasAudio, $probe->framerate, $probe->sourceTimestampOrigin, audioStreamOrdinal: $probe->selectedAudioStreamOrdinal() ?? 0, presentationSelection: $copy ? $selection : null, sourceBoundary: $sourceBoundary, sourceDuration: $probe->videoEnd ?? 0.0, aacImplementation: $active->runtime->desired->aacImplementation, sourceAudioCodec: $sourceAudioCodec);
+                        $this->assertAacImplementationAvailable(
+                            $active->runtime->desired,
+                            $copy,
+                            $hasAudio,
+                            $sourceAudioCodec,
+                        );
+                        $this->streamManager->startStream(
+                            $job,
+                            $source,
+                            $tier,
+                            $filters,
+                            $start,
+                            $output,
+                            $active->runtime->desired->audioProfile,
+                            $audioFilters,
+                            $active->runtime->generation,
+                            $hasAudio,
+                            $probe->framerate,
+                            $probe->sourceTimestampOrigin,
+                            audioStreamOrdinal: $probe->selectedAudioStreamOrdinal() ?? 0,
+                            presentationSelection: $copy ? $selection : null,
+                            sourceBoundary: $sourceBoundary,
+                            sourceDuration: $probe->videoEnd ?? 0.0,
+                            aacImplementation: $active->runtime->desired->aacImplementation,
+                            sourceAudioCodec: $sourceAudioCodec,
+                            audioOffsetMs: $selection->audioOffsetMs ?? 0,
+                        );
                         $this->assertCurrent($active, $local, $stopRequested);
                         $generation = $active->runtime->generation;
                         $paused = $throttled = $ready = $finished = false;
@@ -271,14 +340,26 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                     if ($output === null || $scoped === null) {
                         throw new RuntimeException('Generation output has not initialized.');
                     }
-                    $this->pollSubtitles($active, $job, $source, $scoped, $startTime, $probe->sourceTimestampOrigin, $subtitleQueue, $subtitleActive, $subtitleDeadline);
+                    $this->pollSubtitles(
+                        $active,
+                        $job,
+                        $source,
+                        $scoped,
+                        $startTime,
+                        $probe->sourceTimestampOrigin,
+                        $subtitleQueue,
+                        $subtitleActive,
+                        $subtitleDeadline,
+                    );
                     $publication = $this->streamManager->publication($jobId);
                     if ($admitted) {
                         $work = $this->streamManager->encoderWork($jobId);
                         $this->admission?->observe($jobId, $work);
                     }
-                    if (!$nativeClockCaptured && $publication !== null && !$publication->complete
-                        && isset($publication->mpdAttributes['availabilityStartTime'])) {
+                    if (
+                        !$nativeClockCaptured && $publication !== null && !$publication->complete
+                        && isset($publication->mpdAttributes['availabilityStartTime'])
+                    ) {
                         $this->captureNativeClock($output, $publication->mpdAttributes['availabilityStartTime']);
                         $nativeClockCaptured = true;
                     }
@@ -297,15 +378,22 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                         $this->persist($active, function (TranscodeJob $fresh) use ($new, $init): void {
                             $fresh->setInitSegmentPath($init);
                             foreach ($new as $index => $segment) {
-                                $fresh->markSegmentCompleted($index, $segment['path'], $segment['size'], $segment['duration']);
+                                $fresh->markSegmentCompleted(
+                                    $index,
+                                    $segment['path'],
+                                    $segment['size'],
+                                    $segment['duration'],
+                                );
                             }
                         });
                         foreach ($new as $index => $segment) {
                             $seen[$index] = true;
                         }
                     }
-                    if ((!$ready || $appliedRevision !== $active->runtime->desiredRevision)
-                        && $cursorCovered && $subtitleQueue === [] && $subtitleActive === []) {
+                    if (
+                        (!$ready || $appliedRevision !== $active->runtime->desiredRevision)
+                        && $cursorCovered && $subtitleQueue === [] && $subtitleActive === []
+                    ) {
                         if ($desiredPaused && !$paused && !$finished) {
                             $this->streamManager->pauseStream($jobId);
                             $paused = true;
@@ -327,15 +415,31 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                         // completion persists; the retry then records the sealed generation again
                         // instead of judging a publication whose stream has already stopped.
                         if ($sealedSegments === null) {
-                            if (!$ready || $publication === null || !$publication->complete || $videoTrack === null
-                                || ($hasAudio && $publication->track(MediaTrack::Audio) === null)) {
+                            if (
+                                !$ready || $publication === null || !$publication->complete || $videoTrack === null
+                                || ($hasAudio && $publication->track(MediaTrack::Audio) === null)
+                            ) {
                                 throw new RuntimeException('Encoder exited before publishing complete playable tracks.');
                             }
                             $this->assertCurrent($active, $local, $stopRequested);
                             $this->streamManager->stopStream($jobId);
                             if ($selection !== null) {
-                                $outputProbeKey = $this->processPool->probeVideo($job, $output . '/manifest.mpd', $active->runtime->generation);
-                                $outputProbe = VideoProbeResult::fromProbeOutput(json_decode($this->awaitHelper($outputProbeKey, $active, $local, $stopRequested), true, 512, JSON_THROW_ON_ERROR));
+                                $outputProbeKey = $this->processPool->probeVideo(
+                                    $job,
+                                    $output . '/manifest.mpd',
+                                    $active->runtime->generation,
+                                );
+                                $outputProbe = VideoProbeResult::fromProbeOutput(json_decode(
+                                    $this->awaitHelper(
+                                        $outputProbeKey,
+                                        $active,
+                                        $local,
+                                        $stopRequested,
+                                    ),
+                                    true,
+                                    512,
+                                    JSON_THROW_ON_ERROR,
+                                ));
                                 $this->publishOutputMetadata($output, $outputProbe);
                             }
                             $this->sealCompletedGeneration($output);
@@ -392,8 +496,15 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                 $sourceCodec = $probe === null ? '' : $probe->videoCodec;
                 $cleanup[] = function () use ($jobId, $tier, $sourceHeight, $sourceCodec): void {
                     $work = $this->streamManager->takeEncoderWork($jobId);
-                    $this->admission?->complete($jobId, $tier->name, $tier->videoBitrate, $sourceHeight, $sourceCodec,
-                        $this->encoder()->getEncoderProfile()->isHardware(), $work);
+                    $this->admission?->complete(
+                        $jobId,
+                        $tier->name,
+                        $tier->videoBitrate,
+                        $sourceHeight,
+                        $sourceCodec,
+                        $this->encoder()->getEncoderProfile()->isHardware(),
+                        $work,
+                    );
                 };
             }
             foreach ($cleanup as $operation) {
@@ -403,7 +514,13 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                     if ($error instanceof NativeExecutionException) {
                         $nativeFailure ??= $error;
                     }
-                    $this->logger->error('Video execution cleanup failed', ['jobId' => $jobId->toString(), 'exception' => $error]);
+                    $this->logger->error(
+                        'Video execution cleanup failed',
+                        [
+                            'jobId' => $jobId->toString(),
+                            'exception' => $error,
+                        ],
+                    );
                 }
             }
             if ($nativeFailure !== null) {
@@ -413,8 +530,13 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
     }
 
     /** @param callable(): bool $stopRequested */
-    private function verifySource(string $path, string $expected, TranscodeExecutionClaim $claim, TranscodeLoopOwnership $local, callable $stopRequested): void
-    {
+    private function verifySource(
+        string $path,
+        string $expected,
+        TranscodeExecutionClaim $claim,
+        TranscodeLoopOwnership $local,
+        callable $stopRequested,
+    ): void {
         $stream = fopen($path, 'rb');
         if ($stream === false) {
             throw new RuntimeException('The admitted source cannot be read.');
@@ -451,8 +573,12 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
     }
 
     /** An encode that would use the session's AAC implementation fails before the spawn when the binary lacks it. */
-    private function assertAacImplementationAvailable(DesiredTranscodeState $desired, bool $copy, bool $hasAudio, ?string $sourceAudioCodec): void
-    {
+    private function assertAacImplementationAvailable(
+        DesiredTranscodeState $desired,
+        bool $copy,
+        bool $hasAudio,
+        ?string $sourceAudioCodec,
+    ): void {
         $implementation = $desired->aacImplementation;
         if ($copy || !$hasAudio || $implementation === null) {
             return;
@@ -463,8 +589,12 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
     }
 
     /** @param callable(): bool $stopRequested */
-    private function awaitHelper(string $key, TranscodeExecutionClaim $claim, TranscodeLoopOwnership $local, callable $stopRequested): string
-    {
+    private function awaitHelper(
+        string $key,
+        TranscodeExecutionClaim $claim,
+        TranscodeLoopOwnership $local,
+        callable $stopRequested,
+    ): string {
         do {
             $this->refresh($claim, $local, $stopRequested);
             $result = $this->processPool->readResult($key);
@@ -478,8 +608,11 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
         } while (true);
     }
 
-    private function startRenewal(TranscodeLoopOwnership $local, TranscodeExecutionClaim $claim, callable $stopRequested): int
-    {
+    private function startRenewal(
+        TranscodeLoopOwnership $local,
+        TranscodeExecutionClaim $claim,
+        callable $stopRequested,
+    ): int {
         $jobId = $claim->runtime->jobId;
         $nextRenewal = hrtime(true) + 3_000_000_000;
         return $this->renewalTimer->tick(250, function () use ($local, $jobId, $stopRequested, &$nextRenewal): void {
@@ -511,10 +644,16 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
         return $fresh;
     }
 
-    private function assertCurrent(TranscodeExecutionClaim $claim, TranscodeLoopOwnership $local, callable $stopRequested): void
-    {
+    private function assertCurrent(
+        TranscodeExecutionClaim $claim,
+        TranscodeLoopOwnership $local,
+        callable $stopRequested,
+    ): void {
         $fresh = $this->refresh($claim, $local, $stopRequested);
-        if ($fresh->runtime->generation !== $claim->runtime->generation || $fresh->runtime->desiredRevision !== $claim->runtime->desiredRevision) {
+        if (
+            $fresh->runtime->generation !== $claim->runtime->generation
+            || $fresh->runtime->desiredRevision !== $claim->runtime->desiredRevision
+        ) {
             throw new TranscodeStreamReplaced();
         }
     }
@@ -522,42 +661,54 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
     /** @param callable(TranscodeJob): void $operation */
     private function persist(TranscodeExecutionClaim $claim, callable $operation): void
     {
-        if (!$this->ownership->withOwnership($claim, function () use ($claim, $operation): void {
-            $fresh = $this->jobPort->findByUuid($claim->runtime->jobId);
-            if ($fresh === null) {
-                throw new RuntimeException('Transcode job disappeared.');
-            }
-            $operation($fresh);
-            $this->jobPort->save($fresh);
-        })) {
+        if (
+            !$this->ownership->withOwnership($claim, function () use ($claim, $operation): void {
+                $fresh = $this->jobPort->findByUuid($claim->runtime->jobId);
+                if ($fresh === null) {
+                    throw new RuntimeException('Transcode job disappeared.');
+                }
+                $operation($fresh);
+                $this->jobPort->save($fresh);
+            })
+        ) {
             throw new TranscodeStreamReplaced();
         }
     }
 
     private function persistSessionReady(TranscodeExecutionClaim $claim): void
     {
-        if (!$this->ownership->withOwnership($claim, function () use ($claim): void {
-            $session = $this->sessionPort->findByUuid($claim->runtime->sessionId);
-            if ($session === null) {
-                return;
-            }
-            if ($session->getSessionState() === SessionState::Pending) {
-                $session->markPreparing();
-            }
-            if ($session->getSessionState() === SessionState::Preparing) {
-                $session->markActive();
-                if ($claim->runtime->desired->status === 'paused') {
-                    $session->markPaused();
+        if (
+            !$this->ownership->withOwnership($claim, function () use ($claim): void {
+                $session = $this->sessionPort->findByUuid($claim->runtime->sessionId);
+                if ($session === null) {
+                    return;
                 }
-                $this->sessionPort->save($session);
-            }
-        })) {
+                if ($session->getSessionState() === SessionState::Pending) {
+                    $session->markPreparing();
+                }
+                if ($session->getSessionState() === SessionState::Preparing) {
+                    $session->markActive();
+                    if ($claim->runtime->desired->status === 'paused') {
+                        $session->markPaused();
+                    }
+                    $this->sessionPort->save($session);
+                }
+            })
+        ) {
             throw new TranscodeStreamReplaced();
         }
     }
 
-    private function writeMetadata(string $output, TranscodeExecutionClaim $claim, VideoProbeResult $probe, float $startTime, float $duration, float $targetDuration, ?PresentationSelection $actualSelection, string $source): void
-    {
+    private function writeMetadata(
+        string $output,
+        TranscodeExecutionClaim $claim,
+        VideoProbeResult $probe,
+        float $startTime,
+        float $duration,
+        float $targetDuration,
+        ?PresentationSelection $actualSelection,
+        string $source,
+    ): void {
         $selection = $claim->runtime->desired->presentationSelection;
         $copy = $selection?->mode === 'copy';
         $encoder = $copy ? 'copy' : $this->encoder()->getEncoderProfile()->encoder;
@@ -587,7 +738,11 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
         $path = $output . '/generation.json';
         $metadata = json_decode((string) file_get_contents($path), true, 32, JSON_THROW_ON_ERROR);
         $metadata['complete'] = true;
-        $this->publishMetadata($path, json_encode($metadata, JSON_THROW_ON_ERROR), 'Unable to seal the completed presentation.');
+        $this->publishMetadata(
+            $path,
+            json_encode($metadata, JSON_THROW_ON_ERROR),
+            'Unable to seal the completed presentation.',
+        );
     }
 
     private function publishOutputMetadata(string $output, VideoProbeResult $probe): void
@@ -595,12 +750,20 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
         $path = $output . '/generation.json';
         $metadata = json_decode((string) file_get_contents($path), true, 32, JSON_THROW_ON_ERROR);
         $metadata['pixelFormat'] = $probe->pixFmt;
-        $metadata['bitDepth'] = $probe->pixFmt === null ? null : (preg_match('/(?:p|gray|gbrp)(9|10|12|14|16)(?:le|be)?$/D', $probe->pixFmt, $match) === 1 ? (int) $match[1] : 8);
+        $metadata['bitDepth'] = $probe->pixFmt === null ? null : (preg_match(
+            '/(?:p|gray|gbrp)(9|10|12|14|16)(?:le|be)?$/D',
+            $probe->pixFmt,
+            $match,
+        ) === 1 ? (int) $match[1] : 8);
         $metadata['hdr'] = $probe->colorSpace === null ? null : $probe->isHdr();
         $metadata['audioChannels'] = $probe->hasAudio() ? $probe->audioChannels : null;
         $metadata['videoCodec'] = $probe->videoCodec;
         $metadata['audioCodec'] = $probe->hasAudio() ? $probe->audioCodec : null;
-        $this->publishMetadata($path, json_encode($metadata, JSON_THROW_ON_ERROR), 'Unable to publish verified output metadata.');
+        $this->publishMetadata(
+            $path,
+            json_encode($metadata, JSON_THROW_ON_ERROR),
+            'Unable to publish verified output metadata.',
+        );
     }
 
     private function copyAudioChannels(VideoProbeResult $probe, ?int $index): ?int
@@ -618,7 +781,11 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
         $path = $output . '/generation.json';
         $metadata = json_decode((string) file_get_contents($path), true, 32, JSON_THROW_ON_ERROR);
         $metadata['nativeAvailabilityStartTime'] = $availabilityStartTime;
-        $this->publishMetadata($path, json_encode($metadata, JSON_THROW_ON_ERROR), 'Unable to publish the native presentation clock.');
+        $this->publishMetadata(
+            $path,
+            json_encode($metadata, JSON_THROW_ON_ERROR),
+            'Unable to publish the native presentation clock.',
+        );
     }
 
     private function publishMetadata(string $path, string $contents, string $error): void
@@ -633,11 +800,27 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
      * @param list<SubtitleTrackInfo> $queue
      * @param array<string, SubtitleTrackInfo> $active
      */
-    private function pollSubtitles(TranscodeExecutionClaim $claim, TranscodeJob $job, string $source, TranscodeStoragePortInterface $storage, float $startTime, ?float $sourceTimestampOrigin, array &$queue, array &$active, int $deadline): void
-    {
+    private function pollSubtitles(
+        TranscodeExecutionClaim $claim,
+        TranscodeJob $job,
+        string $source,
+        TranscodeStoragePortInterface $storage,
+        float $startTime,
+        ?float $sourceTimestampOrigin,
+        array &$queue,
+        array &$active,
+        int $deadline,
+    ): void {
         if (($queue !== [] || $active !== []) && hrtime(true) >= $deadline) {
             $this->processPool->shutdown();
-            $this->logger->warning('Subtitle startup deadline expired; unfinished tracks omitted', ['jobId' => $job->getId()->toString(), 'generation' => $claim->runtime->generation, 'tracks' => count($queue) + count($active)]);
+            $this->logger->warning(
+                'Subtitle startup deadline expired; unfinished tracks omitted',
+                [
+                    'jobId' => $job->getId()->toString(),
+                    'generation' => $claim->runtime->generation,
+                    'tracks' => count($queue) + count($active),
+                ],
+            );
             $queue = $active = [];
             return;
         }
@@ -648,14 +831,29 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
             }
             unset($active[$key]);
             if ($result['status'] !== 'ok') {
-                $this->logger->warning('Subtitle extraction failed; track omitted', ['jobId' => $job->getId()->toString(), 'track' => $track->trackKey(), 'error' => $result['data']]);
+                $this->logger->warning(
+                    'Subtitle extraction failed; track omitted',
+                    [
+                        'jobId' => $job->getId()->toString(),
+                        'track' => $track->trackKey(),
+                        'error' => $result['data'],
+                    ],
+                );
             }
         }
         // A video client's native allowance holds its encoder and one helper, so tracks extract one at a time.
         while ($active === [] && $queue !== []) {
             $track = array_shift($queue);
             $path = $storage->resolveSubtitleSegmentPath($job->getVideoId(), $track->trackKey(), 'full');
-            $key = $this->processPool->extractSubtitles($job, $source, $track->index, $path, $claim->runtime->generation, $startTime, $sourceTimestampOrigin);
+            $key = $this->processPool->extractSubtitles(
+                $job,
+                $source,
+                $track->index,
+                $path,
+                $claim->runtime->generation,
+                $startTime,
+                $sourceTimestampOrigin,
+            );
             $active[$key] = $track;
         }
     }

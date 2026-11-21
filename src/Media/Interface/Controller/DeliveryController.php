@@ -39,9 +39,19 @@ final readonly class DeliveryController
     #[OA\Post(
         path: '/api/stream/delivery',
         summary: 'Choose compatible delivery for the destination before loading media',
-        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: DeliveryRequest::class))),
-        responses: [new OA\Response(response: '200', description: 'Delivery choice, or a terminal compatibility reason', content: new OA\JsonContent(ref: new Model(type: DeliveryResource::class))),
-            new OA\Response(response: '400', description: 'Invalid capabilities or media identifier'), new OA\Response(response: '401', description: 'Authentication required')]
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(ref: new Model(type: DeliveryRequest::class)),
+        ),
+        responses: [new OA\Response(
+            response: '200',
+            description: 'Delivery choice, or a terminal compatibility reason',
+            content: new OA\JsonContent(ref: new Model(type: DeliveryResource::class)),
+        ),
+            new OA\Response(response: '400', description: 'Invalid capabilities or media identifier'), new OA\Response(
+                response: '401',
+                description: 'Authentication required',
+            )],
     )]
     #[Route('/api/stream/delivery', name: 'stream_delivery', methods: ['POST'])]
     public function decide(#[MapRequestPayload] DeliveryRequest $request): JsonResponse
@@ -69,6 +79,7 @@ final readonly class DeliveryController
                 $request->supportsHdr,
                 $request->pixelFormats,
                 $request->sourcePlaybackFailed,
+                $request->audioOffsetMs,
             );
         } catch (\InvalidArgumentException $error) {
             return $this->errorResponse($error->getMessage());
@@ -80,6 +91,7 @@ final readonly class DeliveryController
             $decision->url !== null
             && ($decision->kind === DeliveryKind::Cached
                 || ($request->kind === 'track' && $decision->kind === DeliveryKind::Copy))
+
         ) {
             $signed = $this->signing->signUrl($decision->url);
             if ($request->kind === 'video') {
@@ -92,7 +104,10 @@ final readonly class DeliveryController
         }
         if ($decision->kind === DeliveryKind::Original) {
             $path = $request->kind === 'video' ? '/api/stream/video' : '/api/stream/original/track';
-            $decision = $decision->withUrl($this->signing->signUrl($path . '?' . http_build_query(['id' => $id->toString(), 'owner' => $owner->toString()]))['url']);
+            $decision = $decision->withUrl($this->signing->signUrl($path . '?' . http_build_query([
+                'id' => $id->toString(),
+                'owner' => $owner->toString(),
+            ]))['url']);
         }
         return $this->json(DeliveryResource::from($decision), headers: ['Cache-Control' => 'private, no-store']);
     }

@@ -43,7 +43,13 @@ final class EncodePresentationAdapterTest extends TestCase
         $snapshots = new WorkerEncoderCapabilitiesSnapshotStore($this->snapshotPath);
         $snapshots->publish(EncoderProfile::software(), 1.0, 'worker-one');
         $adapter = $this->adapter($video, $snapshots);
-        $command = fn(string $requestId) => new CreateTranscodeSessionCommand(Uuid::generate(), $video->getId(), QualityTier::p720(), AudioProfile::streamingStereo(), requestId: $requestId);
+        $command = fn(string $requestId) => new CreateTranscodeSessionCommand(
+            Uuid::generate(),
+            $video->getId(),
+            QualityTier::p720(),
+            AudioProfile::streamingStereo(),
+            requestId: $requestId,
+        );
         $first = $adapter->select($command('client-one'));
         $snapshots->publish(EncoderProfile::software(), 1.0, 'worker-two');
         self::assertSame($first->canonicalKey(), $adapter->select($command('client-two'))->canonicalKey());
@@ -51,12 +57,33 @@ final class EncodePresentationAdapterTest extends TestCase
         self::assertNotSame($first->canonicalKey(), $adapter->select($command('client-two'))->canonicalKey());
     }
 
+    public function testUnavailableAudioSelectionIsRejectedBeforeAdmission(): void
+    {
+        $video = $this->video();
+        $snapshots = new WorkerEncoderCapabilitiesSnapshotStore($this->snapshotPath);
+        $snapshots->publish(EncoderProfile::software(), 1.0, 'worker');
+        $command = new CreateTranscodeSessionCommand(
+            Uuid::generate(),
+            $video->getId(),
+            QualityTier::p720(),
+            AudioProfile::streamingStereo(),
+            audioStreamIndex: 0,
+        );
+        $this->expectException(\App\Shared\Application\Exception\InvalidInputException::class);
+        $this->adapter($video, $snapshots)->select($command);
+    }
+
     public function testMissingWorkerObservationRejectsUnverifiablePresentation(): void
     {
         $video = $this->video();
         $adapter = $this->adapter($video, new WorkerEncoderCapabilitiesSnapshotStore($this->snapshotPath));
         $this->expectException(TranscodeStartupUnavailableException::class);
-        $adapter->select(new CreateTranscodeSessionCommand(Uuid::generate(), $video->getId(), QualityTier::p720(), AudioProfile::streamingStereo()));
+        $adapter->select(new CreateTranscodeSessionCommand(
+            Uuid::generate(),
+            $video->getId(),
+            QualityTier::p720(),
+            AudioProfile::streamingStereo(),
+        ));
     }
 
     public function testMissingScanMetadataRejectsUnverifiablePresentation(): void
@@ -65,22 +92,47 @@ final class EncodePresentationAdapterTest extends TestCase
         $snapshots = new WorkerEncoderCapabilitiesSnapshotStore($this->snapshotPath);
         $snapshots->publish(EncoderProfile::software(), 1.0, 'worker');
         $this->expectException(TranscodeStartupUnavailableException::class);
-        $this->adapter($video, $snapshots)->select(new CreateTranscodeSessionCommand(Uuid::generate(), $video->getId(), QualityTier::p720(), AudioProfile::streamingStereo()));
+        $this->adapter($video, $snapshots)->select(new CreateTranscodeSessionCommand(
+            Uuid::generate(),
+            $video->getId(),
+            QualityTier::p720(),
+            AudioProfile::streamingStereo(),
+        ));
     }
 
     private function adapter(Video $video, WorkerEncoderCapabilitiesSnapshotStore $snapshots): EncodePresentationAdapter
     {
         $videos = $this->createStub(VideoPortInterface::class);
         $videos->method('findByUuid')->willReturn($video);
-        return new EncodePresentationAdapter($videos, $snapshots, new MediaExecutionPolicy(new DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class));
+        return new EncodePresentationAdapter(
+            $videos,
+            $snapshots,
+            new MediaExecutionPolicy(new DeploymentProfile()),
+            $this->createStub(FFmpegPortInterface::class),
+            $this->createStub(TranscodeStoragePortInterface::class),
+        );
     }
 
     private function video(): Video
     {
         $video = Video::create('/media/source.mkv', 'source-hash');
         $video->updateProbe(VideoProbeResult::fromProbeOutput(['streams' => [
-            ['codec_type' => 'video', 'index' => 3, 'codec_name' => 'h264', 'width' => 1920, 'height' => 1080, 'avg_frame_rate' => '24/1'],
-            ['codec_type' => 'audio', 'index' => 7, 'codec_name' => 'aac', 'channels' => 2, 'sample_rate' => 48000, 'disposition' => ['default' => 1]],
+            [
+                'codec_type' => 'video',
+                'index' => 3,
+                'codec_name' => 'h264',
+                'width' => 1920,
+                'height' => 1080,
+                'avg_frame_rate' => '24/1',
+            ],
+            [
+                'codec_type' => 'audio',
+                'index' => 7,
+                'codec_name' => 'aac',
+                'channels' => 2,
+                'sample_rate' => 48000,
+                'disposition' => ['default' => 1],
+            ],
         ], 'format' => ['duration' => '12']])->jsonSerialize());
         return $video;
     }

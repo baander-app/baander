@@ -13,17 +13,21 @@ final class FFprobeArgumentsTest extends TestCase
 {
     public function testAudioProbeReadsContainerAndAbsoluteStreamMetadata(): void
     {
-        self::assertSame(['/custom/ffprobe', '-threads', '2', '-v', 'quiet', '-print_format', 'json',
-            '-show_format', '-show_streams', '/audio with spaces.aac'],
-            FFprobeArguments::audio('/audio with spaces.aac', '/custom/ffprobe'));
+        self::assertSame(
+            ['/custom/ffprobe', '-threads', '2', '-v', 'quiet', '-print_format', 'json',
+                '-show_format', '-show_streams', '/audio with spaces.aac'],
+            FFprobeArguments::audio('/audio with spaces.aac', '/custom/ffprobe'),
+        );
     }
 
     public function testVideoProbeKeepsMetadataAndBoundsPacketEvidence(): void
     {
-        self::assertSame(['/custom/ffprobe', '-threads', '2', '-v', 'quiet', '-print_format', 'json',
-            '-show_format', '-show_streams', '-show_packets', '-read_intervals', '%+#128',
-            '-show_entries', 'packet=stream_index,pts_time,flags', '/movie with spaces.mkv'],
-            FFprobeArguments::video('/movie with spaces.mkv', '/custom/ffprobe'));
+        self::assertSame(
+            ['/custom/ffprobe', '-threads', '2', '-v', 'quiet', '-print_format', 'json',
+                '-show_format', '-show_streams', '-show_chapters', '-show_packets', '-read_intervals', '%+#128',
+                '-show_entries', 'packet=stream_index,pts_time,flags', '/movie with spaces.mkv'],
+            FFprobeArguments::video('/movie with spaces.mkv', '/custom/ffprobe'),
+        );
         self::assertSame('/usr/bin/ffprobe', FFprobeArguments::video('/movie.mkv')[0]);
     }
 
@@ -37,9 +41,11 @@ final class FFprobeArgumentsTest extends TestCase
 
     public function testSubtitleOriginUsesOneCommonOffsetWithoutSeekRebasing(): void
     {
-        self::assertSame(['/usr/bin/ffmpeg', '-nostdin', '-y', '-threads', '2', '-copyts', '-itsoffset', '-4.000000',
-            '-i', '/movie.mkv', '-map', '0:3', '-vn', '-an', '-c:s', 'webvtt', '-f', 'webvtt', '/subtitle.vtt.part'],
-            FFmpegArguments::subtitleExtraction('/movie.mkv', 3, '/subtitle.vtt.part', 4.0));
+        self::assertSame(
+            ['/usr/bin/ffmpeg', '-nostdin', '-y', '-threads', '2', '-copyts', '-itsoffset', '-4.000000',
+                '-i', '/movie.mkv', '-map', '0:3', '-vn', '-an', '-c:s', 'webvtt', '-f', 'webvtt', '/subtitle.vtt.part'],
+            FFmpegArguments::subtitleExtraction('/movie.mkv', 3, '/subtitle.vtt.part', 4.0),
+        );
     }
 
     #[DataProvider('invalidOrigins')]

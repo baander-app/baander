@@ -8638,6 +8638,77 @@
                 }
             }
         },
+        "/api/videos/{publicId}/playback-information": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "Get available video tracks, chapters and timeline previews",
+                "operationId": "get_video_playback_information",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "[0-9a-zA-Z_-]{21}"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Playback information",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/VideoPlaybackInformationResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Video unavailable"
+                    }
+                }
+            }
+        },
+        "/api/videos/{publicId}/timeline-preview": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "Get an authorized video timeline contact sheet",
+                "operationId": "get_video_playback_preview",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "[0-9a-zA-Z_-]{21}"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Timeline contact sheet",
+                        "content": {
+                            "image/jpeg": {}
+                        }
+                    },
+                    "404": {
+                        "description": "Video or preview unavailable"
+                    }
+                }
+            }
+        },
         "/api/discovery/register": {
             "post": {
                 "tags": [
@@ -11955,7 +12026,7 @@
                                         "data": {
                                             "properties": {
                                                 "format": {
-                                                    "description": "Detected file format (mp3, m4a, flac, ogg, opus or wav)",
+                                                    "description": "Detected file format (mp3, m4a, flac, ogg, opus, wav, wma, aiff or aac)",
                                                     "type": "string",
                                                     "example": "flac"
                                                 },
@@ -21771,6 +21842,19 @@
                                         "description": "Read current playback state without creating another admission",
                                         "type": "boolean"
                                     },
+                                    "audioStreamIndex": {
+                                        "description": "Absolute source audio stream index; null selects the source default",
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0
+                                    },
+                                    "audioOffsetMs": {
+                                        "description": "Source audio correction in milliseconds; positive plays later",
+                                        "type": "integer",
+                                        "default": 0,
+                                        "maximum": 10000,
+                                        "minimum": -10000
+                                    },
                                     "requestId": {
                                         "description": "Stable playback client session identifier, retained across reloads and reconnects",
                                         "type": "string",
@@ -26065,6 +26149,12 @@
                     "sourcePlaybackFailed": {
                         "type": "boolean",
                         "default": false
+                    },
+                    "audioOffsetMs": {
+                        "type": "integer",
+                        "default": 0,
+                        "maximum": 10000,
+                        "minimum": -10000
                     }
                 },
                 "type": "object"
@@ -26911,9 +27001,12 @@
                         },
                         "default": []
                     },
-                    "channel": {
-                        "type": "string",
-                        "nullable": true
+                    "channels": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": []
                     },
                     "correlationId": {
                         "type": "string",
@@ -27025,6 +27118,20 @@
                             "hifi_stereo",
                             "opus_stereo"
                         ]
+                    },
+                    "audioStreamIndex": {
+                        "description": "Absolute source audio stream index; null selects the source default",
+                        "type": "integer",
+                        "nullable": true,
+                        "default": null,
+                        "minimum": 0
+                    },
+                    "audioOffsetMs": {
+                        "description": "Source audio correction in milliseconds; positive plays later",
+                        "type": "integer",
+                        "default": 0,
+                        "maximum": 10000,
+                        "minimum": -10000
                     },
                     "priority": {
                         "type": "string",
@@ -29801,6 +29908,119 @@
                             }
                         },
                         "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "VideoPlaybackInformationResource": {
+                "required": [
+                    "audioTracks",
+                    "subtitleTracks",
+                    "chapters",
+                    "preview"
+                ],
+                "properties": {
+                    "audioTracks": {
+                        "type": "array",
+                        "items": {
+                            "properties": {
+                                "index": {
+                                    "type": "integer",
+                                    "nullable": true
+                                },
+                                "language": {
+                                    "type": "string"
+                                },
+                                "title": {
+                                    "type": "string"
+                                },
+                                "codec": {
+                                    "type": "string"
+                                },
+                                "channels": {
+                                    "type": "integer"
+                                },
+                                "isDefault": {
+                                    "type": "boolean"
+                                }
+                            }
+                        }
+                    },
+                    "subtitleTracks": {
+                        "type": "array",
+                        "items": {
+                            "properties": {
+                                "index": {
+                                    "type": "integer"
+                                },
+                                "language": {
+                                    "type": "string"
+                                },
+                                "title": {
+                                    "type": "string"
+                                },
+                                "codec": {
+                                    "type": "string"
+                                },
+                                "isDefault": {
+                                    "type": "boolean"
+                                },
+                                "isForced": {
+                                    "type": "boolean"
+                                },
+                                "isText": {
+                                    "type": "boolean"
+                                }
+                            }
+                        }
+                    },
+                    "chapters": {
+                        "type": "array",
+                        "items": {
+                            "properties": {
+                                "start": {
+                                    "type": "number"
+                                },
+                                "end": {
+                                    "type": "number"
+                                },
+                                "title": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "preview": {
+                        "properties": {
+                            "state": {
+                                "type": "string",
+                                "enum": [
+                                    "pending",
+                                    "ready",
+                                    "failed",
+                                    "unavailable"
+                                ]
+                            },
+                            "url": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "interval": {
+                                "type": "number"
+                            },
+                            "width": {
+                                "type": "integer"
+                            },
+                            "height": {
+                                "type": "integer"
+                            },
+                            "columns": {
+                                "type": "integer"
+                            },
+                            "count": {
+                                "type": "integer"
+                            }
+                        }
                     }
                 },
                 "type": "object"

@@ -94,6 +94,7 @@ final class TranscodeStreamManager
         float $sourceDuration = 0.0,
         ?AacImplementation $aacImplementation = null,
         ?string $sourceAudioCodec = null,
+        int $audioOffsetMs = 0,
     ): string {
         $tierName = is_string($tier) ? $tier : $tier->name;
         $jobId = $job->getId();
@@ -115,21 +116,22 @@ final class TranscodeStreamManager
         $command = $presentationSelection?->mode === 'copy'
             ? $this->copyArguments->build($sourcePath, $presentationSelection, $outputDir, $sourceBoundary)
             : $this->encoder()->buildStreamArgs(
-            $sourcePath,
-            $tier,
-            $videoFilters,
-            $outputDir,
-            $startSegment,
-            audioStreamIndex: $audioStreamOrdinal,
-            audioProfile: $audioProfile,
-            audioFilters: $audioFilters,
-            hasAudio: $hasAudio,
-            sourceFrameRate: $sourceFrameRate,
-            sourceTimestampOrigin: $sourceTimestampOrigin,
-            sourceDuration: $sourceDuration,
-            aacImplementation: $aacImplementation,
-            sourceAudioCodec: $sourceAudioCodec,
-        );
+                $sourcePath,
+                $tier,
+                $videoFilters,
+                $outputDir,
+                $startSegment,
+                audioStreamIndex: $audioStreamOrdinal,
+                audioProfile: $audioProfile,
+                audioFilters: $audioFilters,
+                hasAudio: $hasAudio,
+                sourceFrameRate: $sourceFrameRate,
+                sourceTimestampOrigin: $sourceTimestampOrigin,
+                sourceDuration: $sourceDuration,
+                aacImplementation: $aacImplementation,
+                sourceAudioCodec: $sourceAudioCodec,
+                audioOffsetMs: $audioOffsetMs,
+            );
 
         $this->logger->info('Starting long-lived video stream', [
             'jobId' => $jobKey,
@@ -206,7 +208,10 @@ final class TranscodeStreamManager
                 $this->assertStreamIdentity($jobKey, $entry['identity']);
                 if ($exitCode !== 0) {
                     throw new FFmpegProcessFailedException(
-                        $exitCode === -1 ? 'FFmpeg exited without a confirmed exit status.' : sprintf('FFmpeg exited with code %d.', $exitCode),
+                        $exitCode === -1 ? 'FFmpeg exited without a confirmed exit status.' : sprintf(
+                            'FFmpeg exited with code %d.',
+                            $exitCode,
+                        ),
                         $status['stderr'],
                         $exitCode,
                     );
@@ -259,8 +264,10 @@ final class TranscodeStreamManager
                 $cpuSeconds = max($cpuSeconds, $this->spawner->close($entry['handle']));
             } finally {
                 $retired = $this->retiredWork[$jobKey] ?? new EncoderWork(0.0, 0.0);
-                $this->retiredWork[$jobKey] = new EncoderWork($retired->cpuSeconds + $cpuSeconds,
-                    $retired->outputSeconds + self::outputSeconds($entry['publication']));
+                $this->retiredWork[$jobKey] = new EncoderWork(
+                    $retired->cpuSeconds + $cpuSeconds,
+                    $retired->outputSeconds + self::outputSeconds($entry['publication']),
+                );
             }
         }
     }
@@ -279,8 +286,10 @@ final class TranscodeStreamManager
             return $work;
         }
 
-        return new EncoderWork($work->cpuSeconds + $entry['cpu_seconds'],
-            $work->outputSeconds + self::outputSeconds($entry['publication']));
+        return new EncoderWork(
+            $work->cpuSeconds + $entry['cpu_seconds'],
+            $work->outputSeconds + self::outputSeconds($entry['publication']),
+        );
     }
 
     /**
@@ -389,8 +398,12 @@ final class TranscodeStreamManager
                 if (isset($entry['marked'][$key])) {
                     continue;
                 }
-                $this->availability->markReady($jobId, $entry['availability_tier'] . '/' . $track->kind->value,
-                    $segment->ordinal, $entry['output_dir'] . '/' . $segment->file);
+                $this->availability->markReady(
+                    $jobId,
+                    $entry['availability_tier'] . '/' . $track->kind->value,
+                    $segment->ordinal,
+                    $entry['output_dir'] . '/' . $segment->file,
+                );
                 $this->assertStreamIdentity($jobKey, $entry['identity']);
                 $entry['marked'][$key] = true;
             }

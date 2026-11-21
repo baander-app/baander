@@ -28,8 +28,17 @@ final readonly class DeliveryDestination
         public bool $supportsHdr = false,
         public array $pixelFormats = ['yuv420p', 'yuvj420p', 'nv12'],
         public bool $sourcePlaybackFailed = false,
+        public int $audioOffsetMs = 0,
     ) {
-        if ($transports === [] || array_diff($transports, ['file', 'hls', 'dash']) !== [] || $maxBitDepth < 8 || $maxBitDepth > 16) {
+        if ($audioOffsetMs < -10000 || $audioOffsetMs > 10000) {
+            throw new \InvalidArgumentException('Audio offset must be between -10000 and 10000 milliseconds.');
+        }
+        if (
+            $transports === []
+            || array_diff($transports, ['file', 'hls', 'dash']) !== []
+            || $maxBitDepth < 8
+            || $maxBitDepth > 16
+        ) {
             throw new \InvalidArgumentException('Invalid destination transport or bit depth.');
         }
         if ($containers === [] || count($containers) > 32 || count($videoCodecs) > 32 || count($audioCodecs) > 32) {

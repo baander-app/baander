@@ -38,7 +38,8 @@ final class SegmentEncoder
         ),
         private readonly float $bitrateMultiplier = 1.0,
         private readonly string $ffmpegPath = '/usr/bin/ffmpeg',
-    ) {}
+    ) {
+    }
 
     /**
      * Encode the init segment for a job.
@@ -94,8 +95,11 @@ final class SegmentEncoder
     }
 
     /** @param array<string, mixed> $measuredLoudness */
-    public function buildAudioFiltersForProfile(VideoProbeResult $probe, AudioProfile $profile, array $measuredLoudness = []): string
-    {
+    public function buildAudioFiltersForProfile(
+        VideoProbeResult $probe,
+        AudioProfile $profile,
+        array $measuredLoudness = [],
+    ): string {
         if (!$probe->hasAudio()) {
             return '';
         }
@@ -148,7 +152,11 @@ final class SegmentEncoder
         float $sourceDuration = 0.0,
         ?AacImplementation $aacImplementation = null,
         ?string $sourceAudioCodec = null,
+        int $audioOffsetMs = 0,
     ): array {
+        if ($audioOffsetMs < -10000 || $audioOffsetMs > 10000 || (!$hasAudio && $audioOffsetMs !== 0)) {
+            throw new \InvalidArgumentException('Invalid source audio correction.');
+        }
         $this->executionPolicy->assertAllowed(MediaOperation::VideoEncode);
         if ($sourceTimestampOrigin !== null && (!is_finite($sourceTimestampOrigin) || $sourceTimestampOrigin < 0.0)) {
             throw new \InvalidArgumentException('Invalid source timestamp origin.');
@@ -184,7 +192,11 @@ final class SegmentEncoder
         if ($sparse && $this->encoderProfile->encoder === 'libx265') {
             $x265Limits .= ':rc-lookahead=0';
         }
-        $encoderFlags = str_replace(['log-level=error', 'fast-decode=1'], [$x265Limits, 'lp=2:fast-decode=1'], $encoderFlags);
+        $encoderFlags = str_replace(
+            ['log-level=error', 'fast-decode=1'],
+            [$x265Limits, 'lp=2:fast-decode=1'],
+            $encoderFlags,
+        );
         $segmentDuration = (int) ceil(self::SEGMENT_DURATION);
 
         $args = [
@@ -203,7 +215,17 @@ final class SegmentEncoder
 
         $seekInput = $seeking && !($sourceTimestampOrigin !== null && $sparse && $sourceStart < 1 / $sourceFrameRate);
         if ($sourceTimestampOrigin !== null) {
-            array_push($args, '-copyts', '-seek_timestamp', '1', '-itsoffset', sprintf('%.6f', -($sourceTimestampOrigin + $sourceStart)));
+            array_push(
+                $args,
+                '-copyts',
+                '-seek_timestamp',
+                '1',
+                '-itsoffset',
+                sprintf(
+                    '%.6f',
+                    -($sourceTimestampOrigin + $sourceStart),
+                ),
+            );
         }
         if ($seekInput) {
             $args[] = '-ss';
@@ -220,12 +242,25 @@ final class SegmentEncoder
         // video cues can follow newer audio packets, so retain one frame interval
         // of audio preroll without changing the generation's clock.
         if ($hasAudio) {
-            $audioStart = $sparse && $seeking ? max(0.0, $sourceStart - 1 / $sourceFrameRate) : $sourceStart;
+            // Seek the audio source before applying its source-clock correction.
+            // Positive correction retains the preceding content at a video seek;
+            // only a source-start clamp introduces leading silence.
+            $audioOffset = $audioOffsetMs / 1000;
+            $audioStart = max(0.0, $sourceStart - $audioOffset - ($sparse && $seeking ? 1 / $sourceFrameRate : 0.0));
             array_push($args, '-threads', '2', '-vn', '-sn', '-dn');
             if ($sourceTimestampOrigin !== null) {
-                array_push($args, '-seek_timestamp', '1', '-itsoffset', sprintf('%.6f', -($sourceTimestampOrigin + $sourceStart)));
-            } elseif ($audioStart < $sourceStart) {
-                array_push($args, '-itsoffset', sprintf('%.6f', -($sourceStart - $audioStart)));
+                array_push(
+                    $args,
+                    '-seek_timestamp',
+                    '1',
+                    '-itsoffset',
+                    sprintf(
+                        '%.6f',
+                        -($sourceTimestampOrigin + $sourceStart) + $audioOffset,
+                    ),
+                );
+            } elseif ($audioStart - $sourceStart + $audioOffset !== 0.0) {
+                array_push($args, '-itsoffset', sprintf('%.6f', $audioStart - $sourceStart + $audioOffset));
             }
             if ($audioStart > 0.0) {
                 array_push($args, '-ss', sprintf('%.6f', ($sourceTimestampOrigin ?? 0.0) + $audioStart));

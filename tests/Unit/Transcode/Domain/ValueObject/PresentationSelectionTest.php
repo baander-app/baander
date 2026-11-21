@@ -15,7 +15,10 @@ final class PresentationSelectionTest extends TestCase
     public function testIdentityIncludesSourceStreamsContainerAndEncodingConfiguration(): void
     {
         $copy = new PresentationSelection('copy', 'source-hash', 2, 4, 'mp4');
-        self::assertSame($copy->canonicalKey(), PresentationSelection::fromArray($copy->jsonSerialize())->canonicalKey());
+        self::assertSame(
+            $copy->canonicalKey(),
+            PresentationSelection::fromArray($copy->jsonSerialize())->canonicalKey(),
+        );
         foreach ([
             new PresentationSelection('copy', 'different-source', 2, 4, 'mp4'),
             new PresentationSelection('copy', 'source-hash', 3, 4, 'mp4'),
@@ -32,6 +35,18 @@ final class PresentationSelectionTest extends TestCase
         );
     }
 
+    public function testAudioCorrectionRoundTripsAndChangesPresentationIdentity(): void
+    {
+        $base = new PresentationSelection('encode', 'hash', 0, 2, 'mp4', 'configuration');
+        foreach ([-10000, -750, 750, 10000] as $offset) {
+            $selection = new PresentationSelection('encode', 'hash', 0, 2, 'mp4', 'configuration', $offset);
+            self::assertSame($offset, PresentationSelection::fromArray($selection->jsonSerialize())->audioOffsetMs);
+            self::assertNotSame($base->canonicalKey(), $selection->canonicalKey());
+        }
+        $this->expectException(\InvalidArgumentException::class);
+        PresentationSelection::fromArray([...$base->jsonSerialize(), 'audioOffsetMs' => 0.5]);
+    }
+
     public function testCopyJobRetainsSourceDimensionsWithoutAQualityTier(): void
     {
         $selection = new PresentationSelection('copy', 'source-hash', 2, null, 'mp4');
@@ -43,8 +58,14 @@ final class PresentationSelectionTest extends TestCase
     }
 
     #[DataProvider('invalidSelections')]
-    public function testInvalidSelectionsAreRejected(string $mode, string $hash, ?int $video, ?int $audio, string $container, ?string $configuration): void
-    {
+    public function testInvalidSelectionsAreRejected(
+        string $mode,
+        string $hash,
+        ?int $video,
+        ?int $audio,
+        string $container,
+        ?string $configuration,
+    ): void {
         $this->expectException(\InvalidArgumentException::class);
         new PresentationSelection($mode, $hash, $video, $audio, $container, $configuration);
     }

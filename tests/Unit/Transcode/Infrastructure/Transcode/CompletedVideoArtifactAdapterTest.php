@@ -23,6 +23,43 @@ use PHPUnit\Framework\TestCase;
 
 final class CompletedVideoArtifactAdapterTest extends TestCase
 {
+    public function testCorrectedAudioArtifactCannotReplaceUncorrectedPlayback(): void
+    {
+        $video = Video::create('/media/source.mkv', 'source-hash');
+        $video->updateProbe(['subtitleStreams' => []]);
+        $owner = Uuid::generate();
+        $selection = new PresentationSelection(
+            'encode',
+            'source-hash',
+            3,
+            7,
+            'mp4',
+            'encoding-settings',
+            750,
+        );
+        $job = TranscodeJob::create(
+            $video->getId(),
+            \App\Transcode\Domain\ValueObject\QualityTier::p720(),
+            '/cache',
+            $owner,
+            presentationSelection: $selection,
+        );
+        $videos = $this->createStub(VideoPortInterface::class);
+        $videos->method('findByUuid')->willReturn($video);
+        $jobs = $this->createStub(TranscodeJobRepositoryInterface::class);
+        $jobs->method('findActiveByOwnerAndVideo')->willReturn([$job]);
+        $runtime = $this->createMock(TranscodeExecutionOwnershipPort::class);
+        $runtime->expects(self::never())->method('find');
+        $lookup = new CompletedVideoArtifactAdapter(
+            $jobs,
+            $videos,
+            $runtime,
+            new TranscodeFileStorage(new SegmentFileResolver('/cache')),
+            new PublishedPresentationReader(),
+        );
+        self::assertSame([], $lookup->findComplete($owner, $video->getId(), 'source-hash', 3, 7));
+    }
+
     public function testOnlyCompleteCurrentSourceGenerationsCanBeReused(): void
     {
         $root = sys_get_temp_dir() . '/baander-copy-artifact-' . bin2hex(random_bytes(8));
@@ -48,10 +85,26 @@ final class CompletedVideoArtifactAdapterTest extends TestCase
             $jobs->method('findActiveByOwnerAndVideo')->willReturn([$job]);
             $jobs->expects(self::never())->method('save');
             $runtime = $this->createMock(TranscodeExecutionOwnershipPort::class);
-            $runtime->method('find')->willReturn(new TranscodeRuntimeSnapshot($job->getId(), Uuid::generate(), Uuid::generate()->toString(),
-                new DesiredTranscodeState(AudioProfile::streamingStereo(), presentationSelection: $selection), 1, 1, 1, 'complete', $directory, null));
+            $runtime->method('find')->willReturn(new TranscodeRuntimeSnapshot(
+                $job->getId(),
+                Uuid::generate(),
+                Uuid::generate()->toString(),
+                new DesiredTranscodeState(AudioProfile::streamingStereo(), presentationSelection: $selection),
+                1,
+                1,
+                1,
+                'complete',
+                $directory,
+                null,
+            ));
             $runtime->expects(self::never())->method('admit');
-            $lookup = new CompletedVideoArtifactAdapter($jobs, $videos, $runtime, $storage, new PublishedPresentationReader());
+            $lookup = new CompletedVideoArtifactAdapter(
+                $jobs,
+                $videos,
+                $runtime,
+                $storage,
+                new PublishedPresentationReader(),
+            );
             $complete = $lookup->findComplete($owner, $video->getId(), 'source-hash', 3, null);
             self::assertCount(1, $complete);
             self::assertSame('hls', $complete[0]->transport);
@@ -63,7 +116,13 @@ final class CompletedVideoArtifactAdapterTest extends TestCase
             unlink($directory . '/track-0-seg-00001.m4s');
             self::assertSame([], $lookup->findComplete($owner, $video->getId(), 'source-hash', 3, null));
         } finally {
-            $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST);
+            $files = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator(
+                    $root,
+                    \FilesystemIterator::SKIP_DOTS,
+                ),
+                \RecursiveIteratorIterator::CHILD_FIRST,
+            );
             foreach ($files as $file) {
                 $file->isDir() ? rmdir($file->getPathname()) : unlink($file->getPathname());
             }

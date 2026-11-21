@@ -62,19 +62,76 @@ final class TranscodeSessionController
                 schema: new OA\Schema(
                     required: ['videoId', 'requestId'],
                     properties: [
-                        new OA\Property(property: 'videoId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21),
-                        new OA\Property(property: 'requestId', description: 'Stable playback client session identifier', type: 'string', format: 'uuid'),
-                        new OA\Property(property: 'qualityTier', type: 'string', enum: ['360p', '480p', '720p', '1080p', '1440p', '4K']),
-                        new OA\Property(property: 'audioProfile', type: 'string', enum: ['mobile_mono', 'mobile_stereo', 'streaming_stereo', 'streaming_5.1', 'broadcast_stereo', 'broadcast_5.1', 'hifi_stereo', 'opus_stereo']),
-                        new OA\Property(property: 'priority', type: 'string', enum: ['critical', 'high', 'normal', 'low', 'bulk']),
+                        new OA\Property(
+                            property: 'videoId',
+                            type: 'string',
+                            pattern: '^[0-9a-zA-Z_-]{21}$',
+                            maxLength: 21,
+                            minLength: 21,
+                        ),
+                        new OA\Property(
+                            property: 'requestId',
+                            description: 'Stable playback client session identifier',
+                            type: 'string',
+                            format: 'uuid',
+                        ),
+                        new OA\Property(
+                            property: 'qualityTier',
+                            type: 'string',
+                            enum: [
+                                '360p',
+                                '480p',
+                                '720p',
+                                '1080p',
+                                '1440p',
+                                '4K',
+                            ],
+                        ),
+                        new OA\Property(
+                            property: 'audioProfile',
+                            type: 'string',
+                            enum: [
+                                'mobile_mono',
+                                'mobile_stereo',
+                                'streaming_stereo',
+                                'streaming_5.1',
+                                'broadcast_stereo',
+                                'broadcast_5.1',
+                                'hifi_stereo',
+                                'opus_stereo',
+                            ],
+                        ),
+                        new OA\Property(
+                            property: 'priority',
+                            type: 'string',
+                            enum: [
+                                'critical',
+                                'high',
+                                'normal',
+                                'low',
+                                'bulk',
+                            ],
+                        ),
                     ],
                 ),
             ),
         ),
         responses: [
-            new OA\Response(response: '201', description: 'Created', content: new OA\JsonContent(ref: new Model(type: TranscodeSessionResource::class))),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '201',
+                description: 'Created',
+                content: new OA\JsonContent(ref: new Model(type: TranscodeSessionResource::class)),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class)),
+            ),
             new OA\Response(response: '503', description: 'Transcode startup is temporarily unavailable', headers: [
                 new OA\Header(header: 'Retry-After', schema: new OA\Schema(type: 'integer', example: 2)),
             ], content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
@@ -99,6 +156,8 @@ final class TranscodeSessionController
             audioProfile: AudioProfile::fromString($payload->audioProfile),
             priority: SessionPriority::from($payload->priority),
             requestId: Uuid::fromString($payload->requestId)->toString(),
+            audioStreamIndex: $payload->audioStreamIndex,
+            audioOffsetMs: $payload->audioOffsetMs,
         ));
 
         $stamp = $envelope->last(HandledStamp::class);
@@ -111,8 +170,29 @@ final class TranscodeSessionController
         path: '/api/transcode/sessions/',
         summary: 'List active transcode sessions for the authenticated user',
         responses: [
-            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'publicId', type: 'string'), new OA\Property(property: 'status', type: 'string')]))])),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Success',
+                content: new OA\JsonContent(properties: [new OA\Property(
+                    property: 'data',
+                    type: 'array',
+                    items: new OA\Items(properties: [
+                        new OA\Property(
+                            property: 'publicId',
+                            type: 'string',
+                        ),
+                        new OA\Property(
+                            property: 'status',
+                            type: 'string',
+                        ),
+                    ]),
+                )]),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
@@ -126,18 +206,56 @@ final class TranscodeSessionController
 
         $sessions = $this->sessionPort->findActiveByUser(Uuid::fromString($user->getId()));
 
-        return $this->successResponse(array_map(fn ($session) => TranscodeSessionResource::from($this->publicView->session($session)), $sessions));
+        return $this->successResponse(array_map(
+            fn($session) => TranscodeSessionResource::from($this->publicView->session($session)),
+            $sessions,
+        ));
     }
 
     #[OA\Get(
         path: '/api/transcode/sessions/{publicId}',
         summary: 'Get a transcode session by public identifier',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Session public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                description: 'Session public identifier',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    maxLength: 21,
+                    minLength: 21,
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'publicId', type: 'string'), new OA\Property(property: 'status', type: 'string'), new OA\Property(property: 'qualityTier', type: 'string')])])),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Success',
+                content: new OA\JsonContent(properties: [new OA\Property(
+                    property: 'data',
+                    properties: [
+                        new OA\Property(
+                            property: 'publicId',
+                            type: 'string',
+                        ),
+                        new OA\Property(
+                            property: 'status',
+                            type: 'string',
+                        ),
+                        new OA\Property(
+                            property: 'qualityTier',
+                            type: 'string',
+                        ),
+                    ],
+                )]),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'show', methods: ['GET'])]
@@ -153,11 +271,33 @@ final class TranscodeSessionController
         path: '/api/transcode/sessions/{publicId}/pause',
         summary: 'Pause a transcode session',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Session public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                description: 'Session public identifier',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    maxLength: 21,
+                    minLength: 21,
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Paused', content: new OA\JsonContent(properties: [new OA\Property(property: 'message', type: 'string')])),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Paused',
+                content: new OA\JsonContent(properties: [new OA\Property(
+                    property: 'message',
+                    type: 'string',
+                )]),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ),
         ],
     )]
     #[Route('/{publicId}/pause', name: 'pause', methods: ['PATCH'])]
@@ -175,11 +315,33 @@ final class TranscodeSessionController
         path: '/api/transcode/sessions/{publicId}/resume',
         summary: 'Resume a paused transcode session',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Session public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                description: 'Session public identifier',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    maxLength: 21,
+                    minLength: 21,
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Resumed', content: new OA\JsonContent(properties: [new OA\Property(property: 'message', type: 'string')])),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Resumed',
+                content: new OA\JsonContent(properties: [new OA\Property(
+                    property: 'message',
+                    type: 'string',
+                )]),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ),
         ],
     )]
     #[Route('/{publicId}/resume', name: 'resume', methods: ['PATCH'])]
@@ -197,11 +359,33 @@ final class TranscodeSessionController
         path: '/api/transcode/sessions/{publicId}',
         summary: 'Cancel a transcode session',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Session public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                description: 'Session public identifier',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    maxLength: 21,
+                    minLength: 21,
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Cancelled', content: new OA\JsonContent(properties: [new OA\Property(property: 'message', type: 'string')])),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Cancelled',
+                content: new OA\JsonContent(properties: [new OA\Property(
+                    property: 'message',
+                    type: 'string',
+                )]),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'cancel', methods: ['DELETE'])]
@@ -224,25 +408,60 @@ final class TranscodeSessionController
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     properties: [
-                        new OA\Property(property: 'audioProfile', type: 'string', enum: ['mobile_mono', 'mobile_stereo', 'streaming_stereo', 'streaming_5.1', 'broadcast_stereo', 'broadcast_5.1', 'hifi_stereo', 'opus_stereo']),
+                        new OA\Property(
+                            property: 'audioProfile',
+                            type: 'string',
+                            enum: [
+                                'mobile_mono',
+                                'mobile_stereo',
+                                'streaming_stereo',
+                                'streaming_5.1',
+                                'broadcast_stereo',
+                                'broadcast_5.1',
+                                'hifi_stereo',
+                                'opus_stereo',
+                            ],
+                        ),
                     ],
                 ),
             ),
         ),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Session public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                description: 'Session public identifier',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    maxLength: 21,
+                    minLength: 21,
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Updated', content: new OA\JsonContent(properties: [new OA\Property(property: 'status', type: 'string')])),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Updated',
+                content: new OA\JsonContent(properties: [new OA\Property(
+                    property: 'status',
+                    type: 'string',
+                )]),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Not found',
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'update', methods: ['PATCH'])]
     public function update(
         string $publicId,
-        #[MapRequestPayload] UpdateTranscodeSessionRequest $request,
-    ): JsonResponse
-    {
+        #[MapRequestPayload]
+        UpdateTranscodeSessionRequest $request,
+    ): JsonResponse {
         $sessionId = $this->requireOwnedSession($publicId);
         $session = $this->sessionPort->findByUuid($sessionId) ?? throw new NotFoundHttpException('Session not found.');
 
@@ -259,7 +478,11 @@ final class TranscodeSessionController
         summary: 'List all transcode sessions for the authenticated user',
         responses: [
             new OA\Response(response: '200', description: 'Success'),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated',
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ),
         ],
     )]
     #[Route('/list', name: 'list', methods: ['GET'], priority: 1)]
@@ -283,27 +506,87 @@ final class TranscodeSessionController
                 schema: new OA\Schema(
                     properties: [
                         new OA\Property(property: 'position', type: 'number', format: 'float'),
-                        new OA\Property(property: 'action', type: 'string', enum: ['seek', 'pause', 'resume', 'progress']),
-                        new OA\Property(property: 'generation', description: 'Required for progress; optional for seek to fence native events to the attached generation', type: 'integer', minimum: 1),
-                        new OA\Property(property: 'revision', description: 'Required for progress; desired revision currently attached by the player', type: 'integer', minimum: 1),
-                        new OA\Property(property: 'requestId', description: 'Optional control identity; reuse across retries of the same command', type: 'string', format: 'uuid'),
+                        new OA\Property(
+                            property: 'action',
+                            type: 'string',
+                            enum: [
+                                'seek',
+                                'pause',
+                                'resume',
+                                'progress',
+                            ],
+                        ),
+                        new OA\Property(
+                            property: 'generation',
+                            description: 'Required for progress; optional for seek to fence native events to the attached generation',
+                            type: 'integer',
+                            minimum: 1,
+                        ),
+                        new OA\Property(
+                            property: 'revision',
+                            description: 'Required for progress; desired revision currently attached by the player',
+                            type: 'integer',
+                            minimum: 1,
+                        ),
+                        new OA\Property(
+                            property: 'requestId',
+                            description: 'Optional control identity; reuse across retries of the same command',
+                            type: 'string',
+                            format: 'uuid',
+                        ),
                     ],
                 ),
             ),
         ),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Session public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', maxLength: 21, minLength: 21)),
+            new OA\Parameter(
+                name: 'publicId',
+                description: 'Session public identifier',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    pattern: '^[0-9a-zA-Z_-]{21}$',
+                    maxLength: 21,
+                    minLength: 21,
+                ),
+            ),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Command processed; fences or replay may leave state unchanged. Read current session state separately for execution progress.', content: new OA\JsonContent(properties: [new OA\Property(property: 'status', type: 'string', enum: ['ok']), new OA\Property(property: 'position', type: 'number'), new OA\Property(property: 'requestId', description: 'Echoed when supplied in the request', type: 'string', format: 'uuid'), new OA\Property(property: 'acceptedGeneration', description: 'Resulting generation of a fresh accepted seek; absent for replayed, stale, terminal or non-seek commands', type: 'integer', minimum: 1)])),
+            new OA\Response(
+                response: '200',
+                description: 'Command processed; fences or replay may leave state unchanged. Read current session state separately for execution progress.',
+                content: new OA\JsonContent(properties: [
+                    new OA\Property(
+                        property: 'status',
+                        type: 'string',
+                        enum: ['ok'],
+                    ),
+                    new OA\Property(
+                        property: 'position',
+                        type: 'number',
+                    ),
+                    new OA\Property(
+                        property: 'requestId',
+                        description: 'Echoed when supplied in the request',
+                        type: 'string',
+                        format: 'uuid',
+                    ),
+                    new OA\Property(
+                        property: 'acceptedGeneration',
+                        description: 'Resulting generation of a fresh accepted seek; absent for replayed, stale, terminal or non-seek commands',
+                        type: 'integer',
+                        minimum: 1,
+                    ),
+                ]),
+            ),
         ],
     )]
     #[Route('/{publicId}/position', name: 'position', methods: ['POST'])]
     public function updatePosition(
         string $publicId,
         Request $request,
-    ): JsonResponse
-    {
+    ): JsonResponse {
         $sessionId = $this->requireOwnedSession($publicId);
         try {
             $payload = $request->toArray();
@@ -314,9 +597,14 @@ final class TranscodeSessionController
         $action = $payload['action'] ?? 'seek';
         $generation = $payload['generation'] ?? null;
         $revision = $payload['revision'] ?? null;
-        if ((!is_int($position) && !is_float($position)) || !is_finite((float) $position) || $position < 0
-            || !in_array($action, ['seek', 'pause', 'resume', 'progress'], true)) {
-            return $this->errorResponse('Position must be a nonnegative number and action must be seek, pause, resume, or progress.', 422);
+        if (
+            (!is_int($position) && !is_float($position)) || !is_finite((float) $position) || $position < 0
+            || !in_array($action, ['seek', 'pause', 'resume', 'progress'], true)
+        ) {
+            return $this->errorResponse(
+                'Position must be a nonnegative number and action must be seek, pause, resume, or progress.',
+                422,
+            );
         }
         if ($action === 'seek' && array_key_exists('generation', $payload) && (!is_int($generation) || $generation < 1)) {
             return $this->errorResponse('Seek generation must be a positive integer when provided.', 422);

@@ -13,11 +13,20 @@ use App\Transcode\Domain\ValueObject\VideoProbeResult;
 final class EncodePresentationIdentity
 {
     /** @param list<string> $audioLanguages */
-    public static function derive(string $sourceHash, VideoProbeResult $probe, QualityTier $tier, AudioProfile $audioProfile, array $audioLanguages, SegmentEncoder $encoder): PresentationSelection
-    {
+    public static function derive(
+        string $sourceHash,
+        VideoProbeResult $probe,
+        QualityTier $tier,
+        AudioProfile $audioProfile,
+        array $audioLanguages,
+        SegmentEncoder $encoder,
+        int $audioOffsetMs = 0,
+    ): PresentationSelection {
         $audio = $probe->selectedAudioStream();
-        if ($sourceHash === '' || $probe->videoStreamIndex === null
-            || ($probe->hasAudio() && ($audio === null || $audio->streamIndex === null))) {
+        if (
+            $sourceHash === '' || $probe->videoStreamIndex === null
+            || ($probe->hasAudio() && ($audio === null || $audio->streamIndex === null))
+        ) {
             throw new TranscodeStartupUnavailableException();
         }
         $arguments = $encoder->buildStreamArgs(
@@ -32,12 +41,21 @@ final class EncodePresentationIdentity
             sourceFrameRate: $probe->framerate,
             sourceTimestampOrigin: $probe->sourceTimestampOrigin,
             sourceDuration: $probe->videoEnd ?? 0.0,
+            audioOffsetMs: $audioOffsetMs,
         );
         $fingerprint = json_encode([
             'arguments' => $arguments,
             'audioProfile' => $audioProfile->jsonSerialize(),
             'audioLanguages' => $audioLanguages,
-        ], JSON_THROW_ON_ERROR) |> (static fn (string $json): string => hash('sha256', $json));
-        return new PresentationSelection('encode', $sourceHash, $probe->videoStreamIndex, $audio?->streamIndex, 'mp4', $fingerprint);
+        ], JSON_THROW_ON_ERROR) |> (static fn(string $json): string => hash('sha256', $json));
+        return new PresentationSelection(
+            'encode',
+            $sourceHash,
+            $probe->videoStreamIndex,
+            $audio?->streamIndex,
+            'mp4',
+            $fingerprint,
+            $audioOffsetMs,
+        );
     }
 }

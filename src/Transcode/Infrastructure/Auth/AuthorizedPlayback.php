@@ -51,9 +51,9 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         $sql = 'SELECT 1 FROM videos v WHERE v.id = :videoId';
         if (!$this->security->isGranted('ROLE_ADMIN')) {
             $sql .= ' AND EXISTS (SELECT 1 FROM movie_video mv'
-                .' JOIN movies m ON m.id = mv.movie_id'
-                .' JOIN user_library_access a ON a.library_id = m.library_id'
-                .' WHERE mv.video_id = v.id AND a.user_id = :userId)';
+                . ' JOIN movies m ON m.id = mv.movie_id'
+                . ' JOIN user_library_access a ON a.library_id = m.library_id'
+                . ' WHERE mv.video_id = v.id AND a.user_id = :userId)';
             $params['userId'] = $user->getId();
         }
         if ($this->connection->fetchOne($sql, $params) === false) {
@@ -63,14 +63,25 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
 
     public function findTranscodeJobVideoId(Uuid $jobId): ?Uuid
     {
-        $videoId = $this->connection->fetchOne('SELECT video_id FROM transcode_jobs WHERE id = :jobId', ['jobId' => $jobId->toString()]);
+        $videoId = $this->connection->fetchOne(
+            'SELECT video_id FROM transcode_jobs WHERE id = :jobId',
+            ['jobId' => $jobId->toString()],
+        );
 
         return is_string($videoId) ? Uuid::fromString($videoId) : null;
     }
 
     public function findSessions(Uuid $videoId, string $requestId, array $jobIds): array
     {
-        return $this->sessionsForJobs($videoId, $requestId, array_map(static fn (PublicId $id): string => $id->toString(), $jobIds), false);
+        return $this->sessionsForJobs(
+            $videoId,
+            $requestId,
+            array_map(
+                static fn(PublicId $id): string => $id->toString(),
+                $jobIds,
+            ),
+            false,
+        );
     }
 
     /**
@@ -89,14 +100,14 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         $selection = $internalIds ? ' AND j.id IN (:jobs)' : ' AND j.public_id IN (:jobs)';
         $rows = $this->connection->fetchAllAssociative(
             'SELECT j.public_id AS job_id, s.public_id AS session_id FROM transcode_sessions s'
-            .' JOIN transcode_jobs j ON j.id = s.job_id'
-            .' JOIN transcode_runtime_state r ON r.session_id = s.id AND r.job_id = j.id'
-            .' WHERE s.user_id = :user AND j.owner_user_id = :user AND s.video_id = :video AND j.video_id = :video'
-            .' AND j.request_id = :request AND r.request_id = :request'
-            .$selection
+            . ' JOIN transcode_jobs j ON j.id = s.job_id'
+            . ' JOIN transcode_runtime_state r ON r.session_id = s.id AND r.job_id = j.id'
+            . ' WHERE s.user_id = :user AND j.owner_user_id = :user AND s.video_id = :video AND j.video_id = :video'
+            . ' AND j.request_id = :request AND r.request_id = :request'
+            . $selection
             // An ended session is not held, also between its expiry and the removal of its job.
-            ." AND j.status IN ('pending', 'in_progress', 'completed') AND s.state NOT IN ('cancelled', 'failed')"
-            .' ORDER BY j.height, j.public_id',
+            . " AND j.status IN ('pending', 'in_progress', 'completed') AND s.state NOT IN ('cancelled', 'failed')"
+            . ' ORDER BY j.height, j.public_id',
             ['user' => $user->getId(), 'video' => $videoId->toString(), 'request' => $requestId, 'jobs' => $jobIds],
             ['jobs' => ArrayParameterType::STRING],
         );
@@ -115,18 +126,18 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         }
         $rows = $jobIds === [] ? [] : $this->connection->fetchAllAssociative(
             'SELECT j.status AS job_status, r.outcome, s.state FROM transcode_jobs j'
-            .' LEFT JOIN transcode_runtime_state r ON r.job_id = j.id AND r.request_id = :request'
-            .' LEFT JOIN transcode_sessions s ON s.id = r.session_id AND s.user_id = :user'
-            .' WHERE j.public_id IN (:jobs) AND j.owner_user_id = :user AND j.video_id = :video AND j.request_id = :request',
+            . ' LEFT JOIN transcode_runtime_state r ON r.job_id = j.id AND r.request_id = :request'
+            . ' LEFT JOIN transcode_sessions s ON s.id = r.session_id AND s.user_id = :user'
+            . ' WHERE j.public_id IN (:jobs) AND j.owner_user_id = :user AND j.video_id = :video AND j.request_id = :request',
             ['user' => $user->getId(), 'video' => $videoId->toString(), 'request' => $requestId,
-                'jobs' => array_map(static fn (PublicId $id): string => $id->toString(), $jobIds)],
+                'jobs' => array_map(static fn(PublicId $id): string => $id->toString(), $jobIds)],
             ['jobs' => ArrayParameterType::STRING],
         );
-        $failed = static fn (array $row): bool => $row['job_status'] === 'failed' || $row['state'] === 'failed'
+        $failed = static fn(array $row): bool => $row['job_status'] === 'failed' || $row['state'] === 'failed'
             || in_array($row['outcome'], ['failed', 'refused'], true);
         // Expiry releases a job without cancelling it and never ends the session of a finished
         // presentation, so a cancelled job, or a cancelled session on a finished one, was cancelled on purpose.
-        $cancelled = static fn (array $row): bool => $row['job_status'] === 'cancelled'
+        $cancelled = static fn(array $row): bool => $row['job_status'] === 'cancelled'
             || ($row['job_status'] === 'completed' && $row['state'] === 'cancelled');
         return match (true) {
             array_any($rows, $failed) => PlaybackEndReason::Failed,
@@ -151,29 +162,39 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         // signing takes no row lock beside a running playback control.
         $this->connection->executeStatement(
             'UPDATE transcode_sessions SET updated_at = :now'
-            .' WHERE public_id IN (:sessions) AND user_id = :user AND updated_at < :aged',
+            . ' WHERE public_id IN (:sessions) AND user_id = :user AND updated_at < :aged',
             [
                 'now' => $now,
                 'aged' => $now->modify(sprintf('-%d seconds', self::SIGN_OF_LIFE_INTERVAL_SECONDS)),
-                'sessions' => array_map(static fn (PublicId $id): string => $id->toString(), $sessionIds),
+                'sessions' => array_map(static fn(PublicId $id): string => $id->toString(), $sessionIds),
                 'user' => $user->getId(),
             ],
-            ['now' => Types::DATETIME_IMMUTABLE, 'aged' => Types::DATETIME_IMMUTABLE, 'sessions' => ArrayParameterType::STRING],
+            [
+                'now' => Types::DATETIME_IMMUTABLE,
+                'aged' => Types::DATETIME_IMMUTABLE,
+                'sessions' => ArrayParameterType::STRING,
+            ],
         );
     }
 
-    public function start(Uuid $videoId, string $requestId): array
+    public function start(Uuid $videoId, string $requestId, ?int $audioStreamIndex = null, int $audioOffsetMs = 0): array
     {
         $this->assertAccess($videoId);
         $user = $this->security->getUser();
         if ($user === null || !method_exists($user, 'getId')) {
             throw new AccessDeniedException('Authentication required.');
         }
-        $sourceHeight = $this->connection->fetchOne('SELECT height FROM videos WHERE id = :videoId', ['videoId' => $videoId->toString()]);
+        $sourceHeight = $this->connection->fetchOne(
+            'SELECT height FROM videos WHERE id = :videoId',
+            ['videoId' => $videoId->toString()],
+        );
         if ($sourceHeight === false) {
             throw new TranscodeStartupUnavailableException();
         }
-        $tiers = array_filter([QualityTier::p360(), QualityTier::p720(), QualityTier::p1080()], static fn (QualityTier $tier): bool => $tier->height <= (int) $sourceHeight);
+        $tiers = array_filter(
+            [QualityTier::p360(), QualityTier::p720(), QualityTier::p1080()],
+            static fn(QualityTier $tier): bool => $tier->height <= (int) $sourceHeight,
+        );
         if ($tiers === []) {
             $tiers = [QualityTier::p360()];
         }
@@ -185,7 +206,9 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
                 qualityTier: $tier,
                 audioProfile: AudioProfile::streamingStereo(),
                 priority: SessionPriority::Normal,
-                audioLanguages: ['en'],
+                audioLanguages: [],
+                audioStreamIndex: $audioStreamIndex,
+                audioOffsetMs: $audioOffsetMs,
                 requestId: $requestId,
             ));
             $session = $envelope->last(HandledStamp::class)?->getResult();

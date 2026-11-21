@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Catalog\Application\Dto\VideoSourceMetadata;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Transcode\Domain\ValueObject\VideoProbeResult;
+use App\Transcode\Infrastructure\Preview\VideoTimelinePreview;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
@@ -23,7 +25,8 @@ final class PlaybackVideoFixture
         private readonly string $root,
         private readonly string $mediaRoot,
         private readonly string $convertRoot,
-    ) {}
+    ) {
+    }
 
     /** @param array<string, mixed> $command
      * @return array<string, mixed>
@@ -35,7 +38,7 @@ final class PlaybackVideoFixture
             throw new InvalidArgumentException('Invalid video fixture run.');
         }
         return match ($command['op'] ?? '') {
-            'create' => $this->create($run, $command['delivery'] ?? 'encoded'),
+            'create' => $this->create($run, $command['delivery'] ?? 'encoded', ($command['cinema'] ?? false) === true),
             'cleanup' => $this->cleanup($run),
             'inspect' => $this->inspect($run),
             default => throw new InvalidArgumentException('Unknown video fixture operation.'),
@@ -43,43 +46,66 @@ final class PlaybackVideoFixture
     }
 
     /** @return array<string, mixed> */
-    private function create(string $run, string $delivery): array
+    private function create(string $run, string $delivery, bool $cinema): array
     {
         if (!in_array($delivery, ['encoded', 'original', 'copy'], true)) {
             throw new InvalidArgumentException('Unknown fixture delivery mode.');
         }
         $manifest = $this->base->execute(['op' => 'create', 'run' => $run]);
-        $manifest['movie'] = ['id' => (string) new Uuid(), 'publicId' => (string) new PublicId()];
-        $extension = $delivery === 'copy' ? 'mkv' : 'mp4';
-        $manifest['video'] = ['id' => (string) new Uuid(), 'publicId' => (string) new PublicId(), 'path' => $this->mediaRoot . '/' . $run . '/owned.' . $extension];
+        $manifest['movie'] = [
+            'id' => (string) new Uuid(),
+            'publicId' => (string) new PublicId(),
+        ];
+        $extension = $delivery === 'copy' || $cinema ? 'mkv' : 'mp4';
+        $manifest['video'] = [
+            'id' => (string) new Uuid(),
+            'publicId' => (string) new PublicId(),
+            'path' => $this->mediaRoot . '/' . $run . '/owned.' . $extension,
+        ];
         $manifest['movieVideoId'] = (string) new Uuid();
         // Persist exact ownership before creating files or rows, including failed runs.
         $this->save($run, $manifest);
-        $process = new Process([
-            '/usr/bin/ffmpeg', '-nostdin', '-v', 'error', '-y', '-filter_threads', '1',
-            '-f', 'lavfi', '-i', 'color=c=black:size=320x180:rate=24',
-            '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo', '-t', '30',
-            '-c:v', $delivery === 'encoded' ? 'mpeg4' : 'libx264', '-threads', '1',
-            ...($delivery === 'encoded' ? [] : ['-preset', 'ultrafast']),
-            '-pix_fmt', 'yuv420p',
-            '-g', '24', '-c:a', 'aac',
-            ...($extension === 'mp4' ? ['-movflags', '+faststart'] : []),
-            // Tag frames in the filter graph: FFmpeg 7 ignores encoder-side colour options.
-            ...($delivery === 'encoded' ? [] : ['-vf', 'setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709']),
-            '-metadata', 'title=Owned playback ' . $run,
-            $manifest['video']['path'],
-        ], timeout: 60);
-        $process->mustRun();
+        if ($cinema) {
+            $this->generateCinemaSource($run, $manifest['video']['path']);
+        } else {
+            $this->generateSource($run, $manifest['video']['path'], $delivery, $extension);
+        }
         if (!chmod($manifest['video']['path'], 0644)) {
             throw new RuntimeException('Cannot publish the owned video to source workers.');
         }
-        $probe = new Process(['/usr/bin/ffprobe', '-v', 'error', '-show_format', '-show_streams', '-of', 'json', $manifest['video']['path']], timeout: 30);
+        $probe = new Process([
+            '/usr/bin/ffprobe', '-v', 'error',
+            '-show_format', '-show_streams', '-show_chapters',
+            '-of', 'json', $manifest['video']['path'],
+        ], timeout: 30);
         $probe->mustRun();
-        $metadata = VideoProbeResult::fromProbeOutput(json_decode($probe->getOutput(), true, flags: JSON_THROW_ON_ERROR));
+        $metadata = VideoProbeResult::fromProbeOutput(
+            json_decode($probe->getOutput(), true, flags: JSON_THROW_ON_ERROR),
+        );
         $hash = hash_file('xxh3', $manifest['video']['path']);
         if (!is_string($hash)) {
             throw new RuntimeException('Cannot hash the owned video.');
         }
+        $manifest['previewIdentity'] = VideoTimelinePreview::cacheIdentity(new VideoSourceMetadata(
+            videoId: Uuid::fromString($manifest['video']['id']),
+            publicId: $manifest['video']['publicId'],
+            filePath: $manifest['video']['path'],
+            filename: basename($manifest['video']['path']),
+            size: (int) filesize($manifest['video']['path']),
+            mimeType: $extension === 'mkv' ? 'video/x-matroska' : 'video/mp4',
+            hash: $hash,
+            containerFormat: $metadata->containerFormat,
+            videoCodec: $metadata->videoCodec,
+            videoStreamIndex: $metadata->videoStreamIndex,
+            audioStreams: [],
+            width: $metadata->width,
+            height: $metadata->height,
+            framerate: $metadata->framerate,
+            duration: $metadata->duration,
+            containerStartTime: $metadata->containerStartTime,
+            sourceTimestampOrigin: $metadata->sourceTimestampOrigin,
+        ));
+        $this->save($run, $manifest);
         $now = (new DateTimeImmutable())->format('Y-m-d H:i:s.uP');
         $this->connection->transactional(function () use ($manifest, $metadata, $hash, $now): void {
             $this->connection->update('libraries', ['type' => 'movie'], ['id' => $manifest['library']['id']]);
@@ -103,10 +129,110 @@ final class PlaybackVideoFixture
         return $manifest;
     }
 
+    private function generateSource(string $run, string $path, string $delivery, string $extension): void
+    {
+        $process = new Process([
+            '/usr/bin/ffmpeg', '-nostdin', '-v', 'error', '-y', '-filter_threads', '1',
+            '-f', 'lavfi', '-i', 'color=c=black:size=320x180:rate=24',
+            '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo', '-t', '30',
+            '-c:v', $delivery === 'encoded' ? 'mpeg4' : 'libx264', '-threads', '1',
+            ...($delivery === 'encoded' ? [] : ['-preset', 'ultrafast']),
+            '-pix_fmt', 'yuv420p',
+            '-g', '24', '-c:a', 'aac',
+            ...($extension === 'mp4' ? ['-movflags', '+faststart'] : []),
+            // Tag frames in the filter graph: FFmpeg 7 ignores encoder-side colour options.
+            ...($delivery === 'encoded' ? [] : [
+                '-vf',
+                'setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709',
+            ]),
+            '-metadata', 'title=Owned playback ' . $run,
+            $path,
+        ], timeout: 60);
+        $process->mustRun();
+    }
+
+    private function generateCinemaSource(string $run, string $path): void
+    {
+        $subtitles = $this->root . '/' . $run . '/cinema.srt';
+        $chapters = $this->root . '/' . $run . '/cinema.ffmetadata';
+        try {
+            $this->writeSourceInput($subtitles, <<<'SRT'
+                1
+                00:00:00,000 --> 00:00:09,500
+                Opening caption
+
+                2
+                00:00:10,000 --> 00:00:19,500
+                Middle caption
+
+                3
+                00:00:20,000 --> 00:00:29,500
+                Final caption
+
+                SRT);
+
+            $this->writeSourceInput($chapters, <<<'METADATA'
+                ;FFMETADATA1
+                [CHAPTER]
+                TIMEBASE=1/1000
+                START=0
+                END=10000
+                title=Opening
+                [CHAPTER]
+                TIMEBASE=1/1000
+                START=10000
+                END=20000
+                title=Middle
+                [CHAPTER]
+                TIMEBASE=1/1000
+                START=20000
+                END=30000
+                title=Finale
+
+                METADATA);
+
+            $process = new Process([
+                '/usr/bin/ffmpeg', '-nostdin', '-v', 'error', '-y', '-filter_threads', '1',
+                '-f', 'lavfi', '-i', 'testsrc2=size=320x180:rate=24',
+                '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000',
+                '-f', 'lavfi', '-i', 'sine=frequency=880:sample_rate=48000',
+                '-i', $subtitles, '-f', 'ffmetadata', '-i', $chapters,
+                '-map', '0:v:0', '-map', '1:a:0', '-map', '2:a:0', '-map', '3:s:0',
+                '-map_metadata', '4', '-map_chapters', '4', '-t', '30',
+                '-vf', "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:text='%{pts\\:hms}':x=10:y=10:fontsize=24:fontcolor=white:box=1:boxcolor=black",
+                '-c:v', 'mpeg4', '-threads', '1', '-pix_fmt', 'yuv420p', '-g', '24',
+                '-c:a', 'aac', '-c:s', 'srt',
+                '-metadata:s:a:0', 'language=eng', '-metadata:s:a:0', 'title=English tone',
+                '-metadata:s:a:1', 'language=dan', '-metadata:s:a:1', 'title=Danish tone',
+                '-disposition:a:0', 'default', '-disposition:a:1', '0',
+                '-metadata:s:s:0', 'language=eng', '-metadata:s:s:0', 'title=English captions',
+                '-metadata', 'title=Owned playback ' . $run, $path,
+            ], timeout: 60);
+            $process->mustRun();
+        } finally {
+            foreach ([$subtitles, $chapters] as $input) {
+                if (is_file($input) && !unlink($input)) {
+                    throw new RuntimeException('Cannot remove an owned cinema source input.');
+                }
+            }
+        }
+    }
+
+    private function writeSourceInput(string $path, string $contents): void
+    {
+        if (file_put_contents($path, $contents) !== strlen($contents)) {
+            throw new RuntimeException('Cannot write an owned cinema source input.');
+        }
+    }
+
     /** @return array<string, mixed> */
     private function inspect(string $run): array
     {
-        $manifest = json_decode((string) file_get_contents($this->root . '/' . $run . '/manifest.json'), true, flags: JSON_THROW_ON_ERROR);
+        $manifest = json_decode(
+            (string) file_get_contents($this->root . '/' . $run . '/manifest.json'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
         $video = $manifest['video'] ?? throw new RuntimeException('The fixture has no video identity.');
         return [
             'sampledAt' => (new DateTimeImmutable())->format(DateTimeInterface::RFC3339_EXTENDED),
@@ -127,12 +253,22 @@ SQL, ['video' => $video['id']]),
     /** @return array<string, mixed> */
     private function cleanup(string $run): array
     {
-        $manifest = json_decode((string) file_get_contents($this->root . '/' . $run . '/manifest.json'), true, flags: JSON_THROW_ON_ERROR);
+        $manifest = json_decode(
+            (string) file_get_contents($this->root . '/' . $run . '/manifest.json'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
         if (isset($manifest['video'])) {
             $path = $manifest['video']['path'];
             $basePath = $this->mediaRoot . '/' . $run . '/owned.';
             if (!in_array($path, [$basePath . 'mp4', $basePath . 'mkv'], true)) {
                 throw new RuntimeException('Video ownership path does not match its fixture scope.');
+            }
+            if (isset($manifest['previewIdentity'])) {
+                VideoTimelinePreview::removeCachedSource(
+                    $this->convertRoot . '/timeline-previews',
+                    $manifest['previewIdentity'],
+                );
             }
             $videoId = $manifest['video']['id'];
             $this->connection->executeStatement(<<<'SQL'
@@ -157,8 +293,14 @@ SQL, ['video' => $videoId]);
             }
             $this->connection->transactional(function () use ($manifest, $videoId): void {
                 $this->connection->fetchOne('SELECT id FROM videos WHERE id = ? FOR UPDATE', [$videoId]);
-                $this->connection->fetchFirstColumn('SELECT r.job_id FROM transcode_runtime_state r JOIN transcode_jobs j ON j.id = r.job_id WHERE j.video_id = ? FOR UPDATE OF r', [$videoId]);
-                $live = (int) $this->connection->fetchOne('SELECT count(*) FROM transcode_runtime_state r JOIN transcode_jobs j ON j.id = r.job_id WHERE j.video_id = ? AND r.claim_token IS NOT NULL AND r.lease_expires_at > clock_timestamp()', [$videoId]);
+                $this->connection->fetchFirstColumn(
+                    'SELECT r.job_id FROM transcode_runtime_state r JOIN transcode_jobs j ON j.id = r.job_id WHERE j.video_id = ? FOR UPDATE OF r',
+                    [$videoId],
+                );
+                $live = (int) $this->connection->fetchOne(
+                    'SELECT count(*) FROM transcode_runtime_state r JOIN transcode_jobs j ON j.id = r.job_id WHERE j.video_id = ? AND r.claim_token IS NOT NULL AND r.lease_expires_at > clock_timestamp()',
+                    [$videoId],
+                );
                 if ($live > 0) {
                     throw new RuntimeException('An owned encoder reclaimed work during cleanup; manifest retained.');
                 }
@@ -173,6 +315,12 @@ SQL, ['video' => $videoId]);
                 throw new RuntimeException('Invalid owned video cache identity.');
             }
             $this->removeDirectory($this->convertRoot . '/' . $videoId);
+        }
+        foreach (['cinema.srt', 'cinema.ffmetadata'] as $name) {
+            $input = $this->root . '/' . $run . '/' . $name;
+            if (is_file($input) && !unlink($input)) {
+                throw new RuntimeException('Cannot remove an owned cinema source input.');
+            }
         }
         return $this->base->execute(['op' => 'cleanup', 'run' => $run, 'waitMs' => 30_000]);
     }
@@ -206,8 +354,10 @@ SQL, ['video' => $videoId]);
     {
         $path = $this->root . '/' . $run . '/manifest.json';
         $json = json_encode($manifest, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT);
-        if (file_put_contents($path . '.tmp', $json) !== strlen($json)
-            || !chmod($path . '.tmp', 0600) || !rename($path . '.tmp', $path)) {
+        if (
+            file_put_contents($path . '.tmp', $json) !== strlen($json)
+            || !chmod($path . '.tmp', 0600) || !rename($path . '.tmp', $path)
+        ) {
             throw new RuntimeException('Cannot persist video fixture ownership.');
         }
     }

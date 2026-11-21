@@ -42,6 +42,9 @@ final readonly class VideoProbeResult implements JsonSerializable
         public ?string $videoTimeBase = null,
         /** Selected video end relative to the source clock origin when the video stream itself states it; null when only the container duration is known. */
         public ?float $videoEnd = null,
+        public ?int $selectedAudioStreamIndex = null,
+        /** @var list<array{start: float, end: float, title: string}> */
+        public array $chapters = [],
     ) {
         $selected = $this->selectedAudioStream();
         $this->audioChannels = $selected->channels ?? $audioChannels;
@@ -53,12 +56,26 @@ final readonly class VideoProbeResult implements JsonSerializable
     public function selectedAudioStreamOrdinal(): ?int
     {
         foreach (array_values($this->audioStreams) as $ordinal => $stream) {
+            if ($this->selectedAudioStreamIndex !== null) {
+                if ($stream->streamIndex === $this->selectedAudioStreamIndex) {
+                    return $ordinal;
+                }
+                continue;
+            }
             if ($stream->isDefault) {
                 return $ordinal;
             }
         }
 
+        if ($this->selectedAudioStreamIndex !== null) {
+            throw new \InvalidArgumentException('The requested source audio stream is unavailable.');
+        }
         return $this->audioStreams === [] ? null : 0;
+    }
+
+    public function withSelectedAudioStream(?int $index): self
+    {
+        return self::fromSerialized([...$this->jsonSerialize(), 'selectedAudioStreamIndex' => $index]);
     }
 
     public function selectedAudioStream(): ?AudioStreamInfo
@@ -102,8 +119,10 @@ final readonly class VideoProbeResult implements JsonSerializable
         }
 
         // Fallback: if no codec_type, use index-based heuristic
-        if (empty($videoStream) && isset($streams[0]) && !isset($streams[0]['codec_type'])
-            && empty($streams[0]['disposition']['attached_pic'])) {
+        if (
+            empty($videoStream) && isset($streams[0]) && !isset($streams[0]['codec_type'])
+            && empty($streams[0]['disposition']['attached_pic'])
+        ) {
             $videoStream = $streams[0];
         }
         if (empty($audioStream) && isset($streams[1])) {
@@ -154,6 +173,11 @@ final readonly class VideoProbeResult implements JsonSerializable
             videoStartTime: is_numeric($videoStream['start_time'] ?? null) ? (float) $videoStream['start_time'] : null,
             videoTimeBase: $videoStream['time_base'] ?? null,
             videoEnd: $videoEnd,
+            chapters: self::normalizeChapters(
+                $raw['chapters'] ?? [],
+                $sourceTimestampOrigin ?? (float) ($format['start_time'] ?? 0.0),
+                $videoEnd ?? (float) ($format['duration'] ?? 0.0) - ($sourceTimestampOrigin ?? 0.0),
+            ),
         );
     }
 
@@ -211,6 +235,8 @@ final readonly class VideoProbeResult implements JsonSerializable
             videoStartTime: isset($data['videoStartTime']) ? (float) $data['videoStartTime'] : null,
             videoTimeBase: $data['videoTimeBase'] ?? null,
             videoEnd: self::positiveEnd($data['videoEnd'] ?? null),
+            selectedAudioStreamIndex: $data['selectedAudioStreamIndex'] ?? null,
+            chapters: $data['chapters'] ?? [],
         );
     }
 
@@ -224,12 +250,14 @@ final readonly class VideoProbeResult implements JsonSerializable
         $rate = self::streamFramerate($videoStream);
         $start = self::nonnegativeTimestamp($format['start_time'] ?? null);
         $end = self::nonnegativeTimestamp($format['duration'] ?? null);
-        if (!is_string($formatName) || !in_array('matroska', explode(',', $formatName), true)
+        if (
+            !is_string($formatName) || !in_array('matroska', explode(',', $formatName), true)
             || ($videoStream['codec_type'] ?? null) !== 'video'
             || ($videoStream['codec_name'] ?? null) !== 'h264' || ($videoStream['has_b_frames'] ?? null) !== 0
             || !is_finite($rate) || $rate <= 0.0 || $rate >= 1.0
             || !is_int($videoStream['index'] ?? null) || $videoStream['index'] < 0 || $start === null || $end === null
-            || !is_array($packets) || !array_is_list($packets) || count($packets) > 128) {
+            || !is_array($packets) || !array_is_list($packets) || count($packets) > 128
+        ) {
             return null;
         }
         foreach ($packets as $packet) {
@@ -238,8 +266,10 @@ final readonly class VideoProbeResult implements JsonSerializable
             }
             $origin = self::nonnegativeTimestamp($packet['pts_time'] ?? null);
             $flags = $packet['flags'] ?? null;
-            if ($origin === null || !is_string($flags) || !str_contains($flags, 'K') || str_contains($flags, 'D')
-                || $end <= $origin || $start < $origin || ($start === $origin && $origin === 0.0)) {
+            if (
+                $origin === null || !is_string($flags) || !str_contains($flags, 'K') || str_contains($flags, 'D')
+                || $end <= $origin || $start < $origin || ($start === $origin && $origin === 0.0)
+            ) {
                 return null;
             }
             return $origin;
@@ -272,7 +302,14 @@ final readonly class VideoProbeResult implements JsonSerializable
             // FFmpeg's Matroska track tag records the presentation end, while
             // stream duration may have been inferred from the entire container.
             $tag = is_array($video['tags'] ?? null) ? ($video['tags']['DURATION'] ?? null) : null;
-            if (!is_string($tag) || preg_match('/^([0-9]{2,}):([0-5][0-9]):([0-5][0-9])(?:\.([0-9]{1,9}))?$/D', $tag, $parts) !== 1) {
+            if (
+                !is_string($tag)
+                || preg_match(
+                    '/^([0-9]{2,}):([0-5][0-9]):([0-5][0-9])(?:\.([0-9]{1,9}))?$/D',
+                    $tag,
+                    $parts,
+                ) !== 1
+            ) {
                 return null;
             }
             $end = (float) $parts[1] * 3600 + (float) $parts[2] * 60 + (float) $parts[3];
@@ -302,9 +339,11 @@ final readonly class VideoProbeResult implements JsonSerializable
         }
         $ticks = $stream[$ticksKey];
         $base = $stream['time_base'] ?? null;
-        if ((!is_int($ticks) && !is_string($ticks)) || filter_var($ticks, FILTER_VALIDATE_INT) === false
+        if (
+            (!is_int($ticks) && !is_string($ticks)) || filter_var($ticks, FILTER_VALIDATE_INT) === false
             || !is_string($base) || preg_match('/^([1-9][0-9]*)\/([1-9][0-9]*)$/D', $base, $parts) !== 1
-            || filter_var($parts[1], FILTER_VALIDATE_INT) === false || filter_var($parts[2], FILTER_VALIDATE_INT) === false) {
+            || filter_var($parts[1], FILTER_VALIDATE_INT) === false || filter_var($parts[2], FILTER_VALIDATE_INT) === false
+        ) {
             return null;
         }
         $rational = (float) $ticks * (float) $parts[1] / (float) $parts[2];
@@ -314,6 +353,36 @@ final readonly class VideoProbeResult implements JsonSerializable
         }
 
         return $rational;
+    }
+
+    /**
+     * @param mixed $chapters
+     * @return list<array{start: float, end: float, title: string}>
+     */
+    private static function normalizeChapters(mixed $chapters, float $origin, float $duration): array
+    {
+        if (!is_array($chapters) || !is_finite($duration) || $duration <= 0.0) {
+            return [];
+        }
+        $result = [];
+        foreach (array_slice($chapters, 0, 1000) as $chapter) {
+            if (!is_array($chapter)) {
+                continue;
+            }
+            $start = self::finiteTimestamp($chapter['start_time'] ?? null);
+            $end = self::finiteTimestamp($chapter['end_time'] ?? null);
+            if ($start === null || $end === null || $end <= $start || $end <= $origin || $start - $origin >= $duration) {
+                continue;
+            }
+            $result[] = [
+                'start' => max(0.0, $start - $origin),
+                'end' => min($duration, $end - $origin),
+                'title' => is_string($chapter['tags']['title'] ?? null) ? $chapter['tags']['title'] : '',
+            ];
+        }
+        usort($result, static fn(array $a, array $b): int => $a['start'] <=> $b['start']);
+
+        return $result;
     }
 
     private static function finiteTimestamp(mixed $value): ?float
@@ -406,7 +475,7 @@ final readonly class VideoProbeResult implements JsonSerializable
      */
     public function getAvailableAudioLanguages(): array
     {
-        return array_map(static fn (AudioStreamInfo $s) => $s->language, $this->audioStreams);
+        return array_map(static fn(AudioStreamInfo $s) => $s->language, $this->audioStreams);
     }
 
     /**
@@ -414,7 +483,7 @@ final readonly class VideoProbeResult implements JsonSerializable
      */
     public function getAvailableSubtitleLanguages(): array
     {
-        return array_map(static fn (SubtitleTrackInfo $s) => $s->language, $this->subtitleStreams);
+        return array_map(static fn(SubtitleTrackInfo $s) => $s->language, $this->subtitleStreams);
     }
 
     public function hasAudioLanguage(string $language): bool
@@ -440,6 +509,8 @@ final readonly class VideoProbeResult implements JsonSerializable
             'videoStartTime' => $this->videoStartTime,
             'videoTimeBase' => $this->videoTimeBase,
             'videoEnd' => $this->videoEnd,
+            'selectedAudioStreamIndex' => $this->selectedAudioStreamIndex,
+            'chapters' => $this->chapters,
             'sourceTimestampOrigin' => $this->sourceTimestampOrigin,
             'width' => $this->width,
             'height' => $this->height,
@@ -459,8 +530,11 @@ final readonly class VideoProbeResult implements JsonSerializable
             'audioSampleRate' => $this->audioSampleRate,
             'isHdr' => $this->isHdr(),
             'isInterlaced' => $this->isInterlaced,
-            'audioStreams' => array_map(static fn (AudioStreamInfo $s) => $s->jsonSerialize(), $this->audioStreams),
-            'subtitleStreams' => array_map(static fn (SubtitleTrackInfo $s) => $s->jsonSerialize(), $this->subtitleStreams),
+            'audioStreams' => array_map(static fn(AudioStreamInfo $s) => $s->jsonSerialize(), $this->audioStreams),
+            'subtitleStreams' => array_map(
+                static fn(SubtitleTrackInfo $s) => $s->jsonSerialize(),
+                $this->subtitleStreams,
+            ),
         ];
     }
 }

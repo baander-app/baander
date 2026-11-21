@@ -14,42 +14,82 @@ use App\Transcode\Application\Port\MediaExecutionPolicyInterface;
 
 final readonly class DeliveryCompatibility
 {
-    public function __construct(private MediaExecutionPolicyInterface $policy)
-    {
+    public function __construct(
+        private MediaExecutionPolicyInterface $policy,
+    ) {
     }
 
     public function decide(DeliverySource $source, DeliveryDestination $destination): DeliveryDecision
     {
+        if ($destination->audioOffsetMs !== 0) {
+            return new DeliveryDecision(
+                $source->video
+                    && $source->audioStreamIndex !== null
+                    && $this->policy->permits(MediaOperation::VideoEncode)
+                    ? DeliveryKind::Encoded
+                    : DeliveryKind::Incompatible,
+                'audio_timing_correction_required',
+            );
+        }
         if ($destination->sourcePlaybackFailed) {
-            return new DeliveryDecision(!$source->audioSelectionRequiresRemux && $this->policy->permits($source->video ? MediaOperation::VideoEncode : MediaOperation::AudioEncode)
-                ? DeliveryKind::Encoded : DeliveryKind::Incompatible, 'browser_rejected_source');
+            return new DeliveryDecision(
+                $this->policy->permits($source->video ? MediaOperation::VideoEncode : MediaOperation::AudioEncode)
+                    ? DeliveryKind::Encoded
+                    : DeliveryKind::Incompatible,
+                'browser_rejected_source',
+            );
         }
         if ($source->hasSubtitles && array_intersect(['hls', 'dash'], $destination->transports) === []) {
             return new DeliveryDecision(DeliveryKind::Incompatible, 'subtitle_delivery_unsupported');
         }
         $reason = $this->encodingReason($source, $destination);
         if ($reason !== null) {
-            return new DeliveryDecision(!$source->audioSelectionRequiresRemux && $this->policy->permits($source->video ? MediaOperation::VideoEncode : MediaOperation::AudioEncode)
-                ? DeliveryKind::Encoded : DeliveryKind::Incompatible, $reason);
+            return new DeliveryDecision(
+                $this->policy->permits($source->video ? MediaOperation::VideoEncode : MediaOperation::AudioEncode)
+                    ? DeliveryKind::Encoded
+                    : DeliveryKind::Incompatible,
+                $reason,
+            );
         }
-        if (!$source->audioSelectionRequiresRemux && !$source->hasSubtitles && in_array('file', $destination->transports, true) && $source->container !== null && in_array($source->container, $destination->containers, true)) {
+        if (
+            !$source->audioSelectionRequiresRemux
+            && !$source->hasSubtitles
+            && in_array('file', $destination->transports, true)
+            && $source->container !== null
+            && in_array($source->container, $destination->containers, true)
+        ) {
             return new DeliveryDecision(DeliveryKind::Original);
         }
-        if (($source->video && $source->videoStreamIndex === null) || ($source->audioCodec !== null && $source->audioStreamIndex === null)) {
+        if (
+            ($source->video && $source->videoStreamIndex === null)
+            || ($source->audioCodec !== null && $source->audioStreamIndex === null)
+        ) {
             return new DeliveryDecision(DeliveryKind::Incompatible, 'source_stream_metadata_unavailable');
         }
         foreach ($destination->containers as $container) {
-            if ($this->canMux($container, $source) && (!$source->video || array_intersect(['hls', 'dash'], $destination->transports) !== [])
-                && $this->policy->permits($source->video ? MediaOperation::VideoStreamCopy : MediaOperation::AudioStreamCopy)) {
+            if (
+                $this->canMux($container, $source)
+                && (!$source->video || array_intersect(['hls', 'dash'], $destination->transports) !== [])
+                && $this->policy->permits($source->video ? MediaOperation::VideoStreamCopy : MediaOperation::AudioStreamCopy)
+            ) {
                 $transport = $source->video ? (in_array('hls', $destination->transports, true) ? 'hls' : 'dash') : 'file';
-                return new DeliveryDecision(DeliveryKind::Copy, selection: new DeliverySelection($container, $source->videoStreamIndex, $source->audioStreamIndex, $transport));
+                return new DeliveryDecision(
+                    DeliveryKind::Copy,
+                    selection: new DeliverySelection(
+                        $container,
+                        $source->videoStreamIndex,
+                        $source->audioStreamIndex,
+                        $transport,
+                    ),
+                );
             }
         }
-        if ($source->audioSelectionRequiresRemux) {
-            return new DeliveryDecision(DeliveryKind::Incompatible, 'audio_stream_selection_requires_remux');
-        }
-        return new DeliveryDecision($this->policy->permits($source->video ? MediaOperation::VideoEncode : MediaOperation::AudioEncode)
-            ? DeliveryKind::Encoded : DeliveryKind::Incompatible, 'container_unsupported');
+        return new DeliveryDecision(
+            $this->policy->permits($source->video ? MediaOperation::VideoEncode : MediaOperation::AudioEncode)
+                ? DeliveryKind::Encoded
+                : DeliveryKind::Incompatible,
+            'container_unsupported',
+        );
     }
 
     public function isCompatible(DeliverySource $source, DeliveryDestination $destination): bool
@@ -76,18 +116,34 @@ final readonly class DeliveryCompatibility
         if ($destination->subtitleBurnIn) {
             return 'subtitle_burn_in_required';
         }
-        if ($source->video && ($source->videoCodec === null || !in_array($source->videoCodec, $destination->videoCodecs, true))) {
+        if (
+            $source->video
+            && ($source->videoCodec === null
+            || !in_array(
+                $source->videoCodec,
+                $destination->videoCodecs,
+                true,
+            ))
+        ) {
             return 'video_codec_unsupported';
         }
-        if ($source->video && (($destination->maxWidth !== null && ($source->width === null || $source->width > $destination->maxWidth))
-            || ($destination->maxHeight !== null && ($source->height === null || $source->height > $destination->maxHeight)))) {
+        if (
+            $source->video && (($destination->maxWidth !== null
+            && ($source->width === null
+            || $source->width > $destination->maxWidth))
+            || ($destination->maxHeight !== null
+                && ($source->height === null
+                || $source->height > $destination->maxHeight)))
+        ) {
             return 'video_dimensions_unsupported';
         }
         if ($source->audioCodec !== null && !in_array($source->audioCodec, $destination->audioCodecs, true)) {
             return 'audio_codec_unsupported';
         }
-        if ($source->audioCodec !== null && $destination->maxAudioChannels !== null
-            && ($source->audioChannels === null || $source->audioChannels > $destination->maxAudioChannels)) {
+        if (
+            $source->audioCodec !== null && $destination->maxAudioChannels !== null
+            && ($source->audioChannels === null || $source->audioChannels > $destination->maxAudioChannels)
+        ) {
             return 'audio_channels_unsupported';
         }
         if (!$source->video && $source->audioCodec === null) {

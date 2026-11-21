@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Transcode\Infrastructure\Transcode;
 
 use App\Catalog\Application\Port\VideoPortInterface;
+use App\Shared\Application\Exception\InvalidInputException;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\Exception\TranscodeStartupUnavailableException;
 use App\Transcode\Application\Port\EncodePresentationPort;
@@ -25,7 +26,8 @@ final readonly class EncodePresentationAdapter implements EncodePresentationPort
         private VideoPortInterface $videos,
         private WorkerEncoderCapabilitiesSnapshotStore $snapshots,
         private MediaExecutionPolicy $policy,
-        #[Autowire(lazy: true)] private FFmpegPortInterface $ffmpeg,
+        #[Autowire(lazy: true)]
+        private FFmpegPortInterface $ffmpeg,
         private TranscodeStoragePortInterface $storage,
     ) {
     }
@@ -37,14 +39,29 @@ final readonly class EncodePresentationAdapter implements EncodePresentationPort
         if ($video === null || $snapshot === null || $video->getProbe() === []) {
             throw new TranscodeStartupUnavailableException();
         }
-        $encoder = new SegmentEncoder($this->policy, $this->ffmpeg, $this->storage, $snapshot->profile, $snapshot->bitrateMultiplier);
+        try {
+            $probe = VideoProbeResult::fromSerialized($video->getProbe())->withSelectedAudioStream($command->audioStreamIndex);
+        } catch (\InvalidArgumentException $error) {
+            throw new InvalidInputException($error->getMessage(), previous: $error);
+        }
+        if (!$probe->hasAudio() && $command->audioOffsetMs !== 0) {
+            throw new InvalidInputException('Audio correction requires an audio stream.');
+        }
+        $encoder = new SegmentEncoder(
+            $this->policy,
+            $this->ffmpeg,
+            $this->storage,
+            $snapshot->profile,
+            $snapshot->bitrateMultiplier,
+        );
         return EncodePresentationIdentity::derive(
             $video->getHash(),
-            VideoProbeResult::fromSerialized($video->getProbe()),
+            $probe,
             QualityTier::fromString($command->getQualityTier()->name),
             $command->getAudioProfile(),
             array_values($command->getAudioLanguages()),
             $encoder,
+            $command->audioOffsetMs,
         );
     }
 }

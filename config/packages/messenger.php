@@ -14,29 +14,114 @@ return static function (ContainerConfigurator $container): void {
 
     // Resource classes describe the work; capacity reservations remain worker policy.
     $workloads = [
-        \App\Catalog\Application\Command\BatchExtractCoversCommand::class => ['transport' => 'async', 'resource_class' => 'coordination', 'default' => true],
-        \App\Catalog\Application\Message\DrainAlbumMatchesMessage::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => true],
-        \App\Library\Application\Command\ScanLibraryCommand::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => true],
-        \App\Library\Application\Message\FilesDiscovered::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => true],
-        \App\Metadata\Application\Command\ExtractAlbumCoverCommand::class => ['transport' => 'async', 'resource_class' => 'cpu', 'default' => true],
-        \App\Metadata\Application\Message\SyncSongMessage::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => true],
-        \App\Metadata\Application\Message\SyncAlbumMessage::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => true],
-        \App\Metadata\Application\Message\SyncLibraryMessage::class => ['transport' => 'async', 'resource_class' => 'coordination', 'default' => true],
-        \App\Metadata\Application\Message\SyncArtistsMessage::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => true],
-        \App\Metadata\Application\Message\SyncArtistMessage::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => true],
-        \App\Notification\Application\DTO\SendEmailCommand::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => true],
-        \App\Notification\Application\DTO\SendPushCommand::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => true],
-        \App\Media\Application\Command\PruneMissingImagesCommand::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => true],
-        \App\Radio\Application\Command\SyncCountryStationsCommand::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => true],
-        \App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand::class => ['transport' => 'scheduler', 'resource_class' => 'coordination', 'default' => true],
-        \App\Shared\Domain\Event\Outbox\RelayOutboxCommand::class => ['transport' => 'async', 'resource_class' => 'coordination', 'default' => true],
-        \App\Recommendation\Application\Command\ExecuteRecommendationJobCommand::class => ['transport' => 'async', 'resource_class' => 'cpu', 'default' => true],
-        \App\Media\Application\Command\GenerateImageDerivativeCommand::class => ['transport' => 'async', 'resource_class' => 'cpu', 'default' => true],
-        \App\Notification\Application\DTO\SendWebhookCommand::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => false],
+        \App\Catalog\Application\Command\BatchExtractCoversCommand::class => [
+            'transport' => 'async',
+            'resource_class' => 'coordination',
+            'default' => true,
+        ],
+        \App\Catalog\Application\Message\DrainAlbumMatchesMessage::class => [
+            'transport' => 'async',
+            'resource_class' => 'io',
+            'default' => true,
+        ],
+        \App\Library\Application\Command\ScanLibraryCommand::class => [
+            'transport' => 'async',
+            'resource_class' => 'io',
+            'default' => true,
+        ],
+        \App\Library\Application\Message\FilesDiscovered::class => [
+            'transport' => 'async',
+            'resource_class' => 'io',
+            'default' => true,
+        ],
+        \App\Metadata\Application\Command\ExtractAlbumCoverCommand::class => [
+            'transport' => 'async',
+            'resource_class' => 'cpu',
+            'default' => true,
+        ],
+        \App\Metadata\Application\Message\SyncSongMessage::class => [
+            'transport' => 'async',
+            'resource_class' => 'io',
+            'default' => true,
+        ],
+        \App\Metadata\Application\Message\SyncAlbumMessage::class => [
+            'transport' => 'async',
+            'resource_class' => 'io',
+            'default' => true,
+        ],
+        \App\Metadata\Application\Message\SyncLibraryMessage::class => [
+            'transport' => 'async',
+            'resource_class' => 'coordination',
+            'default' => true,
+        ],
+        \App\Metadata\Application\Message\SyncArtistsMessage::class => [
+            'transport' => 'async',
+            'resource_class' => 'io',
+            'default' => true,
+        ],
+        \App\Metadata\Application\Message\SyncArtistMessage::class => [
+            'transport' => 'async',
+            'resource_class' => 'io',
+            'default' => true,
+        ],
+        \App\Notification\Application\DTO\SendEmailCommand::class => [
+            'transport' => 'async',
+            'resource_class' => 'io',
+            'default' => true,
+        ],
+        \App\Notification\Application\DTO\SendPushCommand::class => [
+            'transport' => 'async',
+            'resource_class' => 'io',
+            'default' => true,
+        ],
+        \App\Media\Application\Command\PruneMissingImagesCommand::class => [
+            'transport' => 'async',
+            'resource_class' => 'io',
+            'default' => true,
+        ],
+        \App\Radio\Application\Command\SyncCountryStationsCommand::class => [
+            'transport' => 'async',
+            'resource_class' => 'io',
+            'default' => true,
+        ],
+        \App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand::class => [
+            'transport' => 'scheduler',
+            'resource_class' => 'coordination',
+            'default' => true,
+        ],
+        \App\Shared\Domain\Event\Outbox\RelayOutboxCommand::class => [
+            'transport' => 'async',
+            'resource_class' => 'coordination',
+            'default' => true,
+        ],
+        \App\Recommendation\Application\Command\ExecuteRecommendationJobCommand::class => [
+            'transport' => 'async',
+            'resource_class' => 'cpu',
+            'default' => true,
+        ],
+        \App\Media\Application\Command\GenerateImageDerivativeCommand::class => [
+            'transport' => 'async',
+            'resource_class' => 'cpu',
+            'default' => true,
+        ],
+        \App\Transcode\Application\Command\PrepareTimelinePreview::class => [
+            'transport' => 'async',
+            'resource_class' => 'cpu',
+            'default' => true,
+        ],
+        \App\Notification\Application\DTO\SendWebhookCommand::class => [
+            'transport' => 'async',
+            'resource_class' => 'io',
+            'default' => false,
+        ],
         FetchLyricsCommand::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => false],
     ];
     if ($container->env() === 'test') {
-        $workloads[FailureTransportProbe::class] = ['transport' => 'async', 'resource_class' => 'coordination', 'default' => true];
+        $workloads[FailureTransportProbe::class] = [
+            'transport' => 'async',
+            'resource_class' => 'coordination',
+            'default' => true,
+        ];
     }
     $retry = ['max_retries' => 3, 'delay' => 1000, 'multiplier' => 2, 'max_delay' => 60000];
     $policies = ['async' => $retry, 'scheduler' => $retry];

@@ -17,7 +17,7 @@ final class FFprobeArguments
     public static function video(string $sourcePath, string $ffprobePath = '/usr/bin/ffprobe'): array
     {
         return [$ffprobePath, '-threads', '2', '-v', 'quiet', '-print_format', 'json',
-            '-show_format', '-show_streams', '-show_packets', '-read_intervals', '%+#128',
+            '-show_format', '-show_streams', '-show_chapters', '-show_packets', '-read_intervals', '%+#128',
             '-show_entries', 'packet=stream_index,pts_time,flags', $sourcePath];
     }
 }

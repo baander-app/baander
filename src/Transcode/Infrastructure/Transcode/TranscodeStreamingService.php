@@ -53,7 +53,8 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         private readonly StreamAuthPortInterface $streamAuth,
         private readonly TranscodeExecutionOwnershipPort $ownership,
         private readonly PublishedPresentationReader $presentationReader,
-    ) {}
+    ) {
+    }
 
     public function getPlaybackState(Uuid $videoId, array $allowedJobPublicIds, array $attachedRenditions = []): ?array
     {
@@ -87,11 +88,21 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         $pairs = [];
         // The session's primary rendition alone decides readiness, by covering the cursor.
         if ($canonical !== null && $this->coversCursor($canonical)) {
-            $pairs[] = ['jobId' => $primary->getPublicId()->toString(), 'generation' => $canonical['runtime']->generation];
+            $pairs[] = [
+                'jobId' => $primary->getPublicId()->toString(),
+                'generation' => $canonical['runtime']->generation,
+            ];
             $attached = array_column($attachedRenditions, 'generation', 'jobId');
             foreach ($siblings as $job) {
                 $context = $contexts[$job->getId()->toString()] ?? null;
-                if ($context === null || !$this->compatible($canonical, $context) || !$this->canMerge($canonical, $context)) {
+                if (
+                    $context === null
+                    || !$this->compatible($canonical, $context)
+                    || !$this->canMerge(
+                        $canonical,
+                        $context,
+                    )
+                ) {
                     continue;
                 }
                 $generation = $context['runtime']->generation;
@@ -122,27 +133,59 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         $primaryContext = $primary['context'];
         $audio = $primaryContext['presentation']->track(MediaTrack::Audio);
         $audioGroups = $audio === null ? [] : [[
-            'language' => VideoProbeResult::fromSerialized($primaryJob->getProbeData())->selectedAudioStream()->language ?? 'und',
+            'language' => $this->selectedAudio($primaryJob)->language ?? 'und',
             'name' => 'Audio', 'groupId' => 'audio', 'isDefault' => true,
             'channels' => (string) ($primaryJob->getPresentationSelection()?->mode === 'copy'
                 ? ($this->selectedAudio($primaryJob) === null ? 2 : $this->selectedAudio($primaryJob)->channels) : $primaryContext['runtime']->desired->audioProfile->channelCount),
-            'uri' => $this->trackUrl($primaryJob, MediaTrack::Audio, 'media.m3u8', $primaryContext['runtime']->generation, $expiresAt),
+            'uri' => $this->trackUrl(
+                $primaryJob,
+                MediaTrack::Audio,
+                'media.m3u8',
+                $primaryContext['runtime']->generation,
+                $expiresAt,
+            ),
         ]];
         $urls = $codecs = $bandwidths = $dimensions = [];
         foreach ($contexts as $entry) {
-            $job = $entry['job']; $context = $entry['context'];
+            $job = $entry['job'];
+            $context = $entry['context'];
             $tier = $job->getPresentationSelection()?->mode === 'copy' ? null : QualityTier::fromString($job->getQualityTierName());
             $video = $context['presentation']->track(MediaTrack::Video);
             if ($video === null) {
                 return $this->manifestGenerator->generateMasterManifest([]);
             }
             $name = $job->getQualityTierName();
-            $urls[$name] = $this->trackUrl($job, MediaTrack::Video, 'media.m3u8', $context['runtime']->generation, $expiresAt, ['tier' => $name]);
+            $urls[$name] = $this->trackUrl(
+                $job,
+                MediaTrack::Video,
+                'media.m3u8',
+                $context['runtime']->generation,
+                $expiresAt,
+                ['tier' => $name],
+            );
             $codecs[$name] = $video->codec . ($audio === null ? '' : ',' . $audio->codec);
-            $bandwidths[$name] = $tier === null ? $this->copyBandwidth($context) : $this->bandwidth($context, $tier, $audio !== null);
-            $dimensions[$name] = ['width' => $tier === null ? $job->getWidth() : $tier->width, 'height' => $tier === null ? $job->getHeight() : $tier->height];
+            $bandwidths[$name] = $tier === null ? $this->copyBandwidth($context) : $this->bandwidth(
+                $context,
+                $tier,
+                $audio !== null,
+            );
+            $dimensions[$name] = [
+                'width' => $tier === null ? $job->getWidth() : $tier->width,
+                'height' => $tier === null ? $job->getHeight() : $tier->height,
+            ];
         }
-        return $this->manifestGenerator->generateMasterManifest($urls, $audioGroups, $this->subtitleGroups($primaryJob, $primaryContext, $expiresAt), $codecs, $bandwidths, $dimensions);
+        return $this->manifestGenerator->generateMasterManifest(
+            $urls,
+            $audioGroups,
+            $this->subtitleGroups(
+                $primaryJob,
+                $primaryContext,
+                $expiresAt,
+            ),
+            $codecs,
+            $bandwidths,
+            $dimensions,
+        );
     }
 
     public function getMediaManifest(PublicId $jobPublicId, MediaTrack $track, int $generation, int $expiresAt): string
@@ -156,11 +199,23 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         $segments = [];
         foreach ($published->segments as $segment) {
             $segments[$segment->ordinal] = ['duration' => $segment->duration / $published->timescale,
-                'url' => $this->trackUrl($job, $track, 'segment.m4s', $generation, $expiresAt, ['index' => $segment->ordinal])];
+                'url' => $this->trackUrl(
+                    $job,
+                    $track,
+                    'segment.m4s',
+                    $generation,
+                    $expiresAt,
+                    ['index' => $segment->ordinal],
+                )];
         }
         return $this->manifestGenerator->generateMediaManifest(
-            $this->trackUrl($job, $track, 'init.mp4', $generation, $expiresAt), $segments, $context['presentation']->complete,
-            targetDuration: max($context['metadata']['hlsTargetDuration'], ceil(max(array_column($segments, 'duration') ?: [1.0]))),
+            $this->trackUrl($job, $track, 'init.mp4', $generation, $expiresAt),
+            $segments,
+            $context['presentation']->complete,
+            targetDuration: max(
+                $context['metadata']['hlsTargetDuration'],
+                ceil(max(array_column($segments, 'duration') ?: [1.0])),
+            ),
         );
     }
 
@@ -175,8 +230,12 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         return $this->resolveSegmentAvailability($jobPublicId, $track, $segmentIndex, $generation)['path'] ?? null;
     }
 
-    public function resolveSegmentAvailability(PublicId $jobPublicId, MediaTrack $track, int $segmentIndex, int $generation): ?array
-    {
+    public function resolveSegmentAvailability(
+        PublicId $jobPublicId,
+        MediaTrack $track,
+        int $segmentIndex,
+        int $generation,
+    ): ?array {
         $job = $this->jobRepository->findByPublicId($jobPublicId);
         $context = $job === null ? null : $this->context($job, $generation);
         $published = $context === null ? null : $context['presentation']->track($track);
@@ -184,8 +243,8 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         if ($segment === null || $segment->ordinal !== $segmentIndex) {
             return null;
         }
-        return ['jobId' => $job->getId(), 'tierKey' => $job->getQualityTierName().'/generation-'.$generation.'/'.$track->value,
-            'path' => $context['directory'].'/'.$segment->file];
+        return ['jobId' => $job->getId(), 'tierKey' => $job->getQualityTierName() . '/generation-' . $generation . '/' . $track->value,
+            'path' => $context['directory'] . '/' . $segment->file];
     }
 
     public function getInitSegment(PublicId $jobPublicId, MediaTrack $track, int $generation): ?string
@@ -199,7 +258,7 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         $job = $this->jobRepository->findByPublicId($jobPublicId);
         $context = $job === null ? null : $this->context($job, $generation);
         $published = $context === null ? null : $context['presentation']->track($track);
-        return $published === null ? null : $context['directory'].'/'.$published->initFile;
+        return $published === null ? null : $context['directory'] . '/' . $published->initFile;
     }
 
     public function getDashManifest(Uuid $videoId, array $renditions, int $expiresAt): string
@@ -211,7 +270,8 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         $primary = $contexts[0];
         $representations = [];
         foreach ($contexts as $entry) {
-            $job = $entry['job']; $context = $entry['context'];
+            $job = $entry['job'];
+            $context = $entry['context'];
             $track = $context['presentation']->track(MediaTrack::Video);
             if ($track === null) {
                 return $this->dashManifestGenerator->generate([]);
@@ -223,8 +283,13 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
             ];
         }
         $audioTrack = $primary['context']['presentation']->track(MediaTrack::Audio);
-        $audio = $audioTrack === null ? null : $this->dashTrack($primary['job'], $primary['context'], $audioTrack, $expiresAt) + [
-            'language' => VideoProbeResult::fromSerialized($primary['job']->getProbeData())->selectedAudioStream()->language ?? 'und',
+        $audio = $audioTrack === null ? null : $this->dashTrack(
+            $primary['job'],
+            $primary['context'],
+            $audioTrack,
+            $expiresAt,
+        ) + [
+            'language' => $this->selectedAudio($primary['job'])->language ?? 'und',
             'bandwidth' => $primary['context']['runtime']->desired->audioProfile->bitrate,
             'sample_rate' => $primary['context']['runtime']->desired->audioProfile->sampleRate,
             'channels' => $primary['job']->getPresentationSelection()?->mode === 'copy'
@@ -241,9 +306,26 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         $generation = $context['runtime']->generation;
         $urls = [];
         foreach ($track->segments as $segment) {
-            $urls[$segment->ordinal] = $this->trackUrl($job, $track->kind, 'segment.m4s', $generation, $expiresAt, ['index' => $segment->ordinal]);
+            $urls[$segment->ordinal] = $this->trackUrl(
+                $job,
+                $track->kind,
+                'segment.m4s',
+                $generation,
+                $expiresAt,
+                ['index' => $segment->ordinal],
+            );
         }
-        return ['track' => $track, 'init_url' => $this->trackUrl($job, $track->kind, 'init.mp4', $generation, $expiresAt), 'segment_urls' => $urls];
+        return [
+            'track' => $track,
+            'init_url' => $this->trackUrl(
+                $job,
+                $track->kind,
+                'init.mp4',
+                $generation,
+                $expiresAt,
+            ),
+            'segment_urls' => $urls,
+        ];
     }
 
     public function getQualityLadderForVideo(Uuid $videoId, array $allowedJobPublicIds): array
@@ -272,7 +354,11 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         $segments = [];
         if ($context !== null && $this->subtitlePath($job, $context['storage'], $language, 'full') !== null) {
             $segments[] = ['segmentName' => 'full', 'duration' => $context['metadata']['duration'] - $context['metadata']['startTime'],
-                'url' => $this->signed('/api/transcode/'.$jobPublicId.'/subtitles/'.$language.'/full.vtt', $generation, $expiresAt)];
+                'url' => $this->signed(
+                    '/api/transcode/' . $jobPublicId . '/subtitles/' . $language . '/full.vtt',
+                    $generation,
+                    $expiresAt,
+                )];
         }
         if ($context !== null) {
             $runtime = $this->ownership->find($job->getId());
@@ -289,8 +375,12 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         return $path === null ? null : $this->read($path);
     }
 
-    public function getSubtitleSegmentPath(PublicId $jobPublicId, string $language, string $segmentName, int $generation): ?string
-    {
+    public function getSubtitleSegmentPath(
+        PublicId $jobPublicId,
+        string $language,
+        string $segmentName,
+        int $generation,
+    ): ?string {
         $job = $this->jobRepository->findByPublicId($jobPublicId);
         $context = $job === null ? null : $this->context($job, $generation);
         return $context === null ? null : $this->subtitlePath($job, $context['storage'], $language, $segmentName);
@@ -301,23 +391,35 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
      */
     private function subtitleGroups(TranscodeJob $job, array $context, int $expiresAt): array
     {
-        $groups = []; $hasDefault = false;
+        $groups = [];
+        $hasDefault = false;
         foreach ($job->getProbeData()['subtitleStreams'] ?? [] as $data) {
             $track = SubtitleTrackInfo::fromSerialized($data);
-            if (!$track->isText() || $this->subtitlePath($job, $context['storage'], $track->trackKey(), 'full') === null) {
+            if (
+                !$track->isText()
+                || $this->subtitlePath($job, $context['storage'], $track->trackKey(), 'full') === null
+            ) {
                 continue;
             }
             $default = $track->isDefault && !$hasDefault;
             $hasDefault = $hasDefault || $default;
-            $groups[] = ['language' => $track->language, 'name' => $track->getDisplayName().' ('.$track->trackKey().')',
-                'uri' => $this->signed('/api/transcode/'.$job->getPublicId().'/subtitles/'.$track->trackKey().'/media.m3u8', $context['runtime']->generation, $expiresAt),
+            $groups[] = ['language' => $track->language, 'name' => $track->getDisplayName() . ' (' . $track->trackKey() . ')',
+                'uri' => $this->signed(
+                    '/api/transcode/' . $job->getPublicId() . '/subtitles/' . $track->trackKey() . '/media.m3u8',
+                    $context['runtime']->generation,
+                    $expiresAt,
+                ),
                 'isDefault' => $default, 'isForced' => $track->isForced, 'groupId' => 'subs'];
         }
         return $groups;
     }
 
-    private function subtitlePath(TranscodeJob $job, TranscodeStoragePortInterface $storage, string $language, string $segmentName): ?string
-    {
+    private function subtitlePath(
+        TranscodeJob $job,
+        TranscodeStoragePortInterface $storage,
+        string $language,
+        string $segmentName,
+    ): ?string {
         if (preg_match('/^s[0-9]+$/D', $language) !== 1 || $segmentName !== 'full') {
             return null;
         }
@@ -350,7 +452,7 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
      */
     private function ids(array $jobs): array
     {
-        return array_map(static fn (TranscodeJob $job): Uuid => $job->getId(), $jobs);
+        return array_map(static fn(TranscodeJob $job): Uuid => $job->getId(), $jobs);
     }
 
     /**
@@ -371,7 +473,11 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
             $key = $job->getId()->toString();
             $runtime = $admitted[$key] ?? null;
             $generation = $generations[$key] ?? ($runtime === null ? 0 : $runtime->generation);
-            $published[$key] = $runtime === null || $generation < 1 ? null : $this->publication($job, $generation, $runtime);
+            $published[$key] = $runtime === null || $generation < 1 ? null : $this->publication(
+                $job,
+                $generation,
+                $runtime,
+            );
         }
         return $published;
     }
@@ -397,27 +503,45 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
     private function publication(TranscodeJob $job, int $generation, TranscodeRuntimeSnapshot $runtime): ?array
     {
         try {
-            $storage = $this->storage->forGeneration($job->getVideoId(), $job->getQualityTierName(), $generation, $job->getId());
+            $storage = $this->storage->forGeneration(
+                $job->getVideoId(),
+                $job->getQualityTierName(),
+                $generation,
+                $job->getId(),
+            );
             $directory = $storage->resolveJobDirectory($job->getVideoId(), $job->getQualityTierName());
             if (!$this->readable($runtime, $generation, $directory)) {
                 return null;
             }
-            $path = $directory.'/generation.json';
+            $path = $directory . '/generation.json';
             if (!$storage->exists($path) || !is_file($path) || is_link($path)) {
                 return null;
             }
             $metadata = json_decode((string) file_get_contents($path), true, 32, JSON_THROW_ON_ERROR);
-            if (!is_array($metadata) || ($metadata['schemaVersion'] ?? null) !== 2 || ($metadata['generation'] ?? null) !== $generation
+            if (
+                !is_array($metadata) || ($metadata['schemaVersion'] ?? null) !== 2 || ($metadata['generation'] ?? null) !== $generation
                 || !in_array($metadata['videoCodec'] ?? null, ['h264', 'hevc', 'av1'], true)
-                || !is_string($metadata['videoEncoder'] ?? null) || !array_key_exists('audioCodec', $metadata) || ($metadata['audioCodec'] !== null && !is_string($metadata['audioCodec']))
-                || !is_array($metadata['audioProfile'] ?? null) || $metadata['audioProfile'] !== json_decode(json_encode($runtime->desired->audioProfile, JSON_THROW_ON_ERROR), true, 32, JSON_THROW_ON_ERROR)
+                || !is_string($metadata['videoEncoder'] ?? null) || !array_key_exists('audioCodec', $metadata) || ($metadata['audioCodec'] !== null
+                    && !is_string($metadata['audioCodec']))
+                || !is_array($metadata['audioProfile'] ?? null) || $metadata['audioProfile'] !== json_decode(
+                    json_encode(
+                        $runtime->desired->audioProfile,
+                        JSON_THROW_ON_ERROR,
+                    ),
+                    true,
+                    32,
+                    JSON_THROW_ON_ERROR,
+                )
                 || (!is_int($metadata['startTime'] ?? null) && !is_float($metadata['startTime'] ?? null)) || !is_finite((float) $metadata['startTime']) || $metadata['startTime'] < 0
-                || (!is_int($metadata['duration'] ?? null) && !is_float($metadata['duration'] ?? null)) || !is_finite((float) $metadata['duration']) || $metadata['duration'] <= $metadata['startTime']) {
+                || (!is_int($metadata['duration'] ?? null) && !is_float($metadata['duration'] ?? null)) || !is_finite((float) $metadata['duration']) || $metadata['duration'] <= $metadata['startTime']
+            ) {
                 return null;
             }
             $presentation = $this->presentationReader->read($directory);
-            if ($presentation === null || $presentation->track(MediaTrack::Video) === null
-                || (($metadata['audioCodec'] !== null) !== ($presentation->track(MediaTrack::Audio) !== null))) {
+            if (
+                $presentation === null || $presentation->track(MediaTrack::Video) === null
+                || (($metadata['audioCodec'] !== null) !== ($presentation->track(MediaTrack::Audio) !== null))
+            ) {
                 return null;
             }
             return ['runtime' => $runtime, 'storage' => $storage, 'directory' => $directory, 'presentation' => $presentation,
@@ -440,8 +564,10 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
     private function fence(array $context, ?TranscodeRuntimeSnapshot $latest): ?array
     {
         // Position telemetry advances revisions without replacing the encoded media.
-        if ($latest === null || !$this->readable($latest, $context['runtime']->generation, $context['directory'])
-            || $latest->desired->audioProfile->jsonSerialize() !== $context['runtime']->desired->audioProfile->jsonSerialize()) {
+        if (
+            $latest === null || !$this->readable($latest, $context['runtime']->generation, $context['directory'])
+            || $latest->desired->audioProfile->jsonSerialize() !== $context['runtime']->desired->audioProfile->jsonSerialize()
+        ) {
             return null;
         }
         return ['runtime' => $latest] + $context;
@@ -452,10 +578,15 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
      */
     private function allowedJobs(Uuid $videoId, array $allowedJobPublicIds): array
     {
-        if ($allowedJobPublicIds === [] || count($allowedJobPublicIds) > 3 || count(array_unique($allowedJobPublicIds)) !== count($allowedJobPublicIds)) {
+        if (
+            $allowedJobPublicIds === []
+            || count($allowedJobPublicIds) > 3
+            || count(array_unique($allowedJobPublicIds)) !== count($allowedJobPublicIds)
+        ) {
             return [];
         }
-        $jobs = []; $owner = null;
+        $jobs = [];
+        $owner = null;
         foreach ($allowedJobPublicIds as $publicId) {
             $job = $this->jobRepository->findByPublicId(PublicId::fromString($publicId));
             if ($job === null || !$job->getVideoId()->equals($videoId) || $job->getOwnerUserId() === null) {
@@ -467,7 +598,10 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
             }
             $jobs[] = $job;
         }
-        usort($jobs, static fn (TranscodeJob $left, TranscodeJob $right): int => $left->getHeight() <=> $right->getHeight());
+        usort(
+            $jobs,
+            static fn(TranscodeJob $left, TranscodeJob $right): int => $left->getHeight() <=> $right->getHeight(),
+        );
         return $jobs;
     }
 
@@ -486,11 +620,27 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         foreach ($jobs as $job) {
             $generations[$job->getId()->toString()] = $pinned[$job->getPublicId()->toString()];
         }
-        $contexts = $this->fenced($jobs, $this->published($jobs, $this->ownership->findGroup($this->ids($jobs)), $generations));
-        $entries = []; $first = null;
+        $contexts = $this->fenced(
+            $jobs,
+            $this->published(
+                $jobs,
+                $this->ownership->findGroup($this->ids($jobs)),
+                $generations,
+            ),
+        );
+        $entries = [];
+        $first = null;
         foreach ($jobs as $job) {
             $context = $contexts[$job->getId()->toString()];
-            if ($context === null || ($first !== null && (!$this->compatible($first, $context) || !$this->canMerge($first, $context)))) {
+            if (
+                $context === null
+                || ($first !== null
+                && (!$this->compatible($first, $context)
+                || !$this->canMerge(
+                    $first,
+                    $context,
+                )))
+            ) {
                 return null;
             }
             $first ??= $context;
@@ -535,7 +685,11 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
     private function coversCursor(array $context): bool
     {
         $position = $context['runtime']->desired->position - $context['metadata']['startTime'];
-        return $context['presentation']->covers($position, $context['metadata']['audioCodec'] !== null, $context['metadata']['duration'] - $context['metadata']['startTime']);
+        return $context['presentation']->covers(
+            $position,
+            $context['metadata']['audioCodec'] !== null,
+            $context['metadata']['duration'] - $context['metadata']['startTime'],
+        );
     }
 
     /**
@@ -584,7 +738,12 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
             $attributes['minimumUpdatePeriod'] ??= 'PT1S';
             unset($attributes['mediaPresentationDuration']);
         }
-        return new PublishedPresentation($complete, $attributes, $primary['presentation']->periodAttributes, $primary['presentation']->tracks);
+        return new PublishedPresentation(
+            $complete,
+            $attributes,
+            $primary['presentation']->periodAttributes,
+            $primary['presentation']->tracks,
+        );
     }
 
     private function origin(PublishedPresentation $presentation): ?float
@@ -629,15 +788,29 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
     }
 
     /** @param array<string, int|string> $query */
-    private function trackUrl(TranscodeJob $job, MediaTrack $track, string $resource, int $generation, int $expiresAt, array $query = []): string
-    {
-        return $this->signed('/api/transcode/'.$job->getPublicId().'/tracks/'.$track->value.'/'.$resource, $generation, $expiresAt, $query);
+    private function trackUrl(
+        TranscodeJob $job,
+        MediaTrack $track,
+        string $resource,
+        int $generation,
+        int $expiresAt,
+        array $query = [],
+    ): string {
+        return $this->signed(
+            '/api/transcode/' . $job->getPublicId() . '/tracks/' . $track->value . '/' . $resource,
+            $generation,
+            $expiresAt,
+            $query,
+        );
     }
 
     /** @param array<string, int|string> $query */
     private function signed(string $path, int $generation, int $expiresAt, array $query = []): string
     {
-        return $this->streamAuth->signUrlUntil($path.'?'.http_build_query($query + ['generation' => $generation]), $expiresAt)['url'];
+        return $this->streamAuth->signUrlUntil(
+            $path . '?' . http_build_query($query + ['generation' => $generation]),
+            $expiresAt,
+        )['url'];
     }
 
     private function read(string $path): ?string

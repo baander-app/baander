@@ -17,22 +17,36 @@ final readonly class DeliveryRequest
      * @param list<string> $pixelFormats
      */
     public function __construct(
-        #[Assert\Choice(choices: ['track', 'video'])] public string $kind,
-        #[Assert\NotBlank] public string $id,
-        #[Assert\Count(min: 1, max: 32)] public array $containers,
-        #[Assert\Count(max: 32)] public array $videoCodecs = [],
-        #[Assert\Count(max: 32)] public array $audioCodecs = [],
-        #[Assert\Positive] public ?int $maxWidth = null,
-        #[Assert\Positive] public ?int $maxHeight = null,
-        #[Assert\Positive] public ?int $maxAudioChannels = null,
-        #[Assert\PositiveOrZero] public ?int $audioStreamIndex = null,
+        #[Assert\Choice(choices: ['track', 'video'])]
+        public string $kind,
+        #[Assert\NotBlank]
+        public string $id,
+        #[Assert\Count(min: 1, max: 32)]
+        public array $containers,
+        #[Assert\Count(max: 32)]
+        public array $videoCodecs = [],
+        #[Assert\Count(max: 32)]
+        public array $audioCodecs = [],
+        #[Assert\Positive]
+        public ?int $maxWidth = null,
+        #[Assert\Positive]
+        public ?int $maxHeight = null,
+        #[Assert\Positive]
+        public ?int $maxAudioChannels = null,
+        #[Assert\PositiveOrZero]
+        public ?int $audioStreamIndex = null,
         public bool $subtitleBurnIn = false,
         public array $transports = ['file'],
-        #[Assert\Range(min: 8, max: 16)] public int $maxBitDepth = 8,
+        #[Assert\Range(min: 8, max: 16)]
+        public int $maxBitDepth = 8,
         public bool $supportsHdr = false,
-        #[Assert\Count(max: 32)] public array $pixelFormats = ['yuv420p', 'yuvj420p', 'nv12'],
-        #[Assert\Uuid] public ?string $requestId = null,
+        #[Assert\Count(max: 32)]
+        public array $pixelFormats = ['yuv420p', 'yuvj420p', 'nv12'],
+        #[Assert\Uuid]
+        public ?string $requestId = null,
         public bool $sourcePlaybackFailed = false,
+        #[Assert\Range(min: -10000, max: 10000)]
+        public int $audioOffsetMs = 0,
     ) {
     }
 }
