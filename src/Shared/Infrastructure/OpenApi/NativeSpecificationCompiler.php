@@ -8,6 +8,7 @@ use LogicException;
 use OpenApi\Assembler;
 use OpenApi\Augmenter;
 use OpenApi\Compiler\OpenApi30Compiler;
+use OpenApi\Contracts\MergerInterface;
 use OpenApi\Loggers\CollectingLogger;
 use OpenApi\Merge;
 use OpenApi\Resolver;
@@ -26,10 +27,10 @@ final class NativeSpecificationCompiler
         $resolver = new Resolver();
         $resolver->setLogger($logger);
         $resolver->resolve($assembler);
+        /** @var TypedList<MergerInterface> $mergers */
         $mergers = new TypedList([new Merge\Tags(), new Merge\LastWins()]);
         $pipeline = new Pipeline(
             [
-                new Augmenter\TypeAliases(),
                 new Augmenter\Inheritance(),
                 new Augmenter\OperationTags(),
                 new Augmenter\ImpliedSchemas(),
@@ -39,15 +40,12 @@ final class NativeSpecificationCompiler
                 new Augmenter\DefaultMediaType(),
                 new Augmenter\SecurityRequirements(),
                 new Augmenter\PathItems(),
-                new Augmenter\Types(),
                 new Augmenter\Properties(),
                 new Augmenter\Refs(),
                 new Augmenter\Parameters(),
                 new Augmenter\Merge($mergers),
                 new Augmenter\PathFilter(),
-                new Augmenter\Cleanup(),
                 new Augmenter\MediaTypes(),
-                new Augmenter\Docblocks(),
                 new Augmenter\OperationIdTemplates(),
                 new Augmenter\OperationIds(),
                 new Augmenter\Tags(),

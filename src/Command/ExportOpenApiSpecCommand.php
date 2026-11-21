@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Command;
 
-use Nelmio\ApiDocBundle\Render\RenderOpenApi;
+use App\Shared\Application\Port\OpenApiExporterInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -20,7 +20,7 @@ use Symfony\Component\Filesystem\Filesystem;
 final class ExportOpenApiSpecCommand extends Command
 {
     public function __construct(
-        private readonly RenderOpenApi $renderOpenApi,
+        private readonly OpenApiExporterInterface $renderOpenApi,
     ) {
         parent::__construct();
     }
@@ -47,7 +47,7 @@ final class ExportOpenApiSpecCommand extends Command
         }
 
         try {
-            $content = $this->renderOpenApi->render($format, 'default');
+            $content = $this->renderOpenApi->render($format);
         } catch (\Throwable $e) {
             $io->error('Failed to generate OpenAPI specification: ' . $e->getMessage());
 

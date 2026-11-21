@@ -9,6 +9,9 @@ use InvalidArgumentException;
 use OpenApi\Assembler;
 use ReflectionClass;
 use ReflectionMethod;
+use ReflectionNamedType;
+use Symfony\Component\HttpKernel\Attribute\MapQueryString;
+use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Yaml\Yaml;
 
@@ -26,9 +29,12 @@ final readonly class NativeOpenApiExporter implements OpenApiExporterInterface
             throw new InvalidArgumentException('Format must be "json" or "yaml".');
         }
         $assembler = new Assembler();
-        $assembler->collect(new ReflectionClass(NativeOpenApiDefinition::class));
+        /** @var ReflectionClass<object> $definition */
+        $definition = new ReflectionClass(NativeOpenApiDefinition::class);
+        $assembler->collect($definition);
         $classes = [];
         $routes = [];
+        $methods = [];
         foreach ($this->router->getRouteCollection() as $name => $route) {
             if ($name === 'app.swagger' || !preg_match('~^/api(?!/doc$)~', $route->getPath())) {
                 continue;
@@ -44,10 +50,29 @@ final readonly class NativeOpenApiExporter implements OpenApiExporterInterface
                 continue;
             }
             $classes[$class] = new ReflectionClass($class);
-            $routes[$class . '::' . $method][] = [$name, $route];
+            $key = $class . '::' . $method;
+            $routes[$key][] = [$name, $route];
+            $methods[$key] = new ReflectionMethod($class, $method);
         }
         foreach ($classes as $class) {
             $assembler->collect($class);
+        }
+        $requests = [];
+        foreach ($methods as $method) {
+            foreach ($method->getParameters() as $parameter) {
+                if ($parameter->getAttributes(MapRequestPayload::class) === []
+                    && $parameter->getAttributes(MapQueryString::class) === []
+                ) {
+                    continue;
+                }
+                $type = $parameter->getType();
+                if ($type instanceof ReflectionNamedType && !$type->isBuiltin()) {
+                    $requests[$type->getName()] = new ReflectionClass($type->getName());
+                }
+            }
+        }
+        foreach ($requests as $request) {
+            $assembler->collect($request);
         }
         $specification = $assembler->getSpecification();
         $operations = $specification->operations;
@@ -75,7 +100,12 @@ final readonly class NativeOpenApiExporter implements OpenApiExporterInterface
 
         return match ($format) {
             'json' => json_encode($document, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
-            'yaml' => Yaml::dump($document, 20, 2),
+            'yaml' => Yaml::dump(
+                $document,
+                10,
+                2,
+                Yaml::DUMP_OBJECT_AS_MAP | Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE,
+            ),
         };
     }
 }

@@ -35,9 +35,6 @@ final class NativeRouteMetadata
                 }
             }
         }
-        if ($operation->requestBody !== null) {
-            return;
-        }
         foreach ($method->getParameters() as $parameter) {
             if ($parameter->getAttributes(MapRequestPayload::class) === []) {
                 continue;
@@ -46,10 +43,15 @@ final class NativeRouteMetadata
             if (!$type instanceof ReflectionNamedType || $type->isBuiltin()) {
                 continue;
             }
-            $operation->requestBody = new RequestBody(
-                required: !$parameter->isDefaultValueAvailable(),
-                content: new Json(ref: $type->getName()),
-            );
+            $required = !$parameter->isDefaultValueAvailable() && !$type->allowsNull();
+            if ($operation->requestBody !== null) {
+                $operation->requestBody->required ??= $required;
+            } else {
+                $operation->requestBody = new RequestBody(
+                    required: $required,
+                    content: new Json(ref: $type->getName()),
+                );
+            }
         }
     }
 

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Command;
 
 use App\Command\ExportOpenApiSpecCommand;
-use Nelmio\ApiDocBundle\Render\RenderOpenApi;
+use App\Shared\Application\Port\OpenApiExporterInterface;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -14,11 +14,11 @@ use Symfony\Component\Console\Tester\CommandTester;
 
 final class ExportOpenApiSpecCommandTest extends TestCase
 {
-    private RenderOpenApi&Stub $renderOpenApi;
+    private OpenApiExporterInterface&Stub $renderOpenApi;
 
     protected function setUp(): void
     {
-        $this->renderOpenApi = $this->createStub(RenderOpenApi::class);
+        $this->renderOpenApi = $this->createStub(OpenApiExporterInterface::class);
     }
 
     public function testConfigureSetsNameAndDescription(): void
@@ -45,13 +45,13 @@ final class ExportOpenApiSpecCommandTest extends TestCase
 
     public function testExecuteWritesJsonSpecToConfiguredPath(): void
     {
-        $this->renderOpenApi = $this->createMock(RenderOpenApi::class);
+        $this->renderOpenApi = $this->createMock(OpenApiExporterInterface::class);
 
         $outputFile = $this->tempPath('.json');
         $this->renderOpenApi
             ->expects($this->once())
             ->method('render')
-            ->with('json', 'default')
+            ->with('json')
             ->willReturn('{"openapi":"3.0.0"}');
 
         $tester = new CommandTester(new ExportOpenApiSpecCommand($this->renderOpenApi));
@@ -65,13 +65,13 @@ final class ExportOpenApiSpecCommandTest extends TestCase
 
     public function testExecuteWritesYamlSpecWhenFormatRequested(): void
     {
-        $this->renderOpenApi = $this->createMock(RenderOpenApi::class);
+        $this->renderOpenApi = $this->createMock(OpenApiExporterInterface::class);
 
         $outputFile = $this->tempPath('.yaml');
         $this->renderOpenApi
             ->expects($this->once())
             ->method('render')
-            ->with('yaml', 'default')
+            ->with('yaml')
             ->willReturn("openapi: 3.0.0\n");
 
         $tester = new CommandTester(new ExportOpenApiSpecCommand($this->renderOpenApi));
@@ -94,7 +94,7 @@ final class ExportOpenApiSpecCommandTest extends TestCase
 
     public function testExecuteFailsWhenRendererThrows(): void
     {
-        $this->renderOpenApi = $this->createMock(RenderOpenApi::class);
+        $this->renderOpenApi = $this->createMock(OpenApiExporterInterface::class);
 
         $this->renderOpenApi
             ->expects($this->once())

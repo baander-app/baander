@@ -1364,6 +1364,164 @@ export interface ApiError {
   error: ApiErrorError;
 }
 
+export interface TranscodeMetricsResource {
+  /**
+     * Public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId: string;
+  /**
+     * Video public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  videoId: string;
+  /** Quality tier name */
+  qualityTier: string;
+  /** Job status */
+  status: string;
+  /** Progress from 0 to 1 */
+  progress: number;
+  /** Total segments */
+  totalSegments: number;
+  /** Completed segments */
+  completedSegments: number;
+  /** Creation timestamp */
+  createdAt: string;
+  /** Last update timestamp */
+  updatedAt: string;
+}
+
+/**
+ * Session state
+ */
+export type TranscodeSessionResourceState = typeof TranscodeSessionResourceState[keyof typeof TranscodeSessionResourceState];
+
+
+export const TranscodeSessionResourceState = {
+  pending: 'pending',
+  preparing: 'preparing',
+  active: 'active',
+  paused: 'paused',
+  completed: 'completed',
+  failed: 'failed',
+  cancelled: 'cancelled',
+} as const;
+
+/**
+ * Session priority
+ */
+export type TranscodeSessionResourcePriority = typeof TranscodeSessionResourcePriority[keyof typeof TranscodeSessionResourcePriority];
+
+
+export const TranscodeSessionResourcePriority = {
+  critical: 'critical',
+  high: 'high',
+  normal: 'normal',
+  low: 'low',
+  bulk: 'bulk',
+} as const;
+
+/**
+ * Audio profile configuration
+ */
+export type TranscodeSessionResourceAudioProfile = { [key: string]: unknown };
+
+/**
+ * Current durable execution generation, readiness, desired position/status and signed manifest URL
+ * @nullable
+ */
+export type TranscodeSessionResourcePlayback = { [key: string]: unknown } | null;
+
+/**
+ * Session metrics
+ * @nullable
+ */
+export type TranscodeSessionResourceMetrics = { [key: string]: unknown } | null;
+
+export interface TranscodeSessionResource {
+  /**
+     * Public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId: string;
+  /**
+     * User public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  userId: string;
+  /**
+     * Transcode job public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  jobId: string;
+  /**
+     * Video public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  videoId: string;
+  /** Session state */
+  state: TranscodeSessionResourceState;
+  /** Session priority */
+  priority: TranscodeSessionResourcePriority;
+  /** Audio profile configuration */
+  audioProfile: TranscodeSessionResourceAudioProfile;
+  /**
+     * Current segment being processed
+     * @nullable
+     */
+  currentSegmentIndex?: number | null;
+  /**
+     * Wall clock offset
+     * @nullable
+     */
+  wallClockOffset?: number | null;
+  /**
+     * Current durable execution generation, readiness, desired position/status and signed manifest URL
+     * @nullable
+     */
+  playback?: TranscodeSessionResourcePlayback;
+  /**
+     * Session metrics
+     * @nullable
+     */
+  metrics?: TranscodeSessionResourceMetrics;
+  /** Creation timestamp */
+  createdAt: string;
+  /** Last update timestamp */
+  updatedAt: string;
+}
+
+/**
+ * Field-level validation errors
+ */
+export type ValidationErrorErrorDetails = { [key: string]: unknown };
+
+export type ValidationErrorError = {
+  message?: string;
+  code?: number;
+  /** Field-level validation errors */
+  details?: ValidationErrorErrorDetails;
+};
+
+/**
+ * Validation error response
+ */
+export interface ValidationError {
+  error: ValidationErrorError;
+}
+
 export interface ActivityResource {
   /**
      * Public identifier
@@ -1436,25 +1594,6 @@ export interface ActivityResource {
   lastPlayer?: string | null;
   /** Creation timestamp */
   createdAt: string;
-}
-
-/**
- * Field-level validation errors
- */
-export type ValidationErrorErrorDetails = { [key: string]: unknown };
-
-export type ValidationErrorError = {
-  message?: string;
-  code?: number;
-  /** Field-level validation errors */
-  details?: ValidationErrorErrorDetails;
-};
-
-/**
- * Validation error response
- */
-export interface ValidationError {
-  error: ValidationErrorError;
 }
 
 /**
@@ -1690,6 +1829,30 @@ export interface AdminUserSettingResource {
   source: AdminUserSettingResourceSource;
 }
 
+export type LiveRecoveryResourceVersion = typeof LiveRecoveryResourceVersion[keyof typeof LiveRecoveryResourceVersion];
+
+
+export const LiveRecoveryResourceVersion = {
+  NUMBER_1: 1,
+} as const;
+
+export type LiveRecoveryResourceHealthState = typeof LiveRecoveryResourceHealthState[keyof typeof LiveRecoveryResourceHealthState];
+
+
+export const LiveRecoveryResourceHealthState = {
+  current: 'current',
+  degraded: 'degraded',
+} as const;
+
+export type LiveRecoveryResourceHealth = {
+  state: LiveRecoveryResourceHealthState;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  oldestPendingAgeMs: number | null;
+};
+
 export type LiveFamily = typeof LiveFamily[keyof typeof LiveFamily];
 
 
@@ -1716,30 +1879,6 @@ export const LiveFamily = {
   'admin-media': 'admin-media',
   'deployment-definitions': 'deployment-definitions',
 } as const;
-
-export type LiveRecoveryResourceVersion = typeof LiveRecoveryResourceVersion[keyof typeof LiveRecoveryResourceVersion];
-
-
-export const LiveRecoveryResourceVersion = {
-  NUMBER_1: 1,
-} as const;
-
-export type LiveRecoveryResourceHealthState = typeof LiveRecoveryResourceHealthState[keyof typeof LiveRecoveryResourceHealthState];
-
-
-export const LiveRecoveryResourceHealthState = {
-  current: 'current',
-  degraded: 'degraded',
-} as const;
-
-export type LiveRecoveryResourceHealth = {
-  state: LiveRecoveryResourceHealthState;
-  /**
-     * @minimum 0
-     * @nullable
-     */
-  oldestPendingAgeMs: number | null;
-};
 
 export interface LiveRecoveryResource {
   version: LiveRecoveryResourceVersion;
@@ -1972,34 +2111,6 @@ export interface WebSocketTicketResource {
   expiresAt: string;
 }
 
-export type FileDeletionPreviewResourceFilesItemVerdict = typeof FileDeletionPreviewResourceFilesItemVerdict[keyof typeof FileDeletionPreviewResourceFilesItemVerdict];
-
-
-export const FileDeletionPreviewResourceFilesItemVerdict = {
-  deletable: 'deletable',
-  missing: 'missing',
-  outside_root: 'outside_root',
-  directory_not_writable: 'directory_not_writable',
-} as const;
-
-export type FileDeletionPreviewResourceFilesItem = {
-  path?: string;
-  verdict?: FileDeletionPreviewResourceFilesItemVerdict;
-  /**
-     * The directory the server cannot write, for directory_not_writable
-     * @nullable
-     */
-  directory?: string | null;
-};
-
-export interface FileDeletionPreviewResource {
-  /** The delete with files would go ahead */
-  allowed: boolean;
-  /** A scan or another delete with files holds the library, which refuses the delete */
-  libraryBusy: boolean;
-  files: FileDeletionPreviewResourceFilesItem[];
-}
-
 export type AlbumDeletePreviewResourceAlbum = {
   /**
      * @minLength 21
@@ -2032,6 +2143,34 @@ export type AlbumDeletePreviewResourceAffected = {
   playlists?: number;
   playlistNames?: string[];
 };
+
+export type FileDeletionPreviewResourceFilesItemVerdict = typeof FileDeletionPreviewResourceFilesItemVerdict[keyof typeof FileDeletionPreviewResourceFilesItemVerdict];
+
+
+export const FileDeletionPreviewResourceFilesItemVerdict = {
+  deletable: 'deletable',
+  missing: 'missing',
+  outside_root: 'outside_root',
+  directory_not_writable: 'directory_not_writable',
+} as const;
+
+export type FileDeletionPreviewResourceFilesItem = {
+  path?: string;
+  verdict?: FileDeletionPreviewResourceFilesItemVerdict;
+  /**
+     * The directory the server cannot write, for directory_not_writable
+     * @nullable
+     */
+  directory?: string | null;
+};
+
+export interface FileDeletionPreviewResource {
+  /** The delete with files would go ahead */
+  allowed: boolean;
+  /** A scan or another delete with files holds the library, which refuses the delete */
+  libraryBusy: boolean;
+  files: FileDeletionPreviewResourceFilesItem[];
+}
 
 export interface AlbumDeletePreviewResource {
   album: AlbumDeletePreviewResourceAlbum;
@@ -2210,6 +2349,24 @@ export interface SongResource {
   createdAt: string;
 }
 
+export type DuplicateGroupResourceAlbumsItem = { [key: string]: unknown };
+
+export interface DuplicateGroupResource {
+  /**
+     * List of album public identifiers in this duplicate group
+     * @items.minLength 21
+     * @items.maxLength 21
+     * @items.pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  albumIds: string[];
+  /** Confidence score between 0 and 1 */
+  confidence: number;
+  /** Number of albums in the group */
+  albumCount: number;
+  /** Album data for each duplicate */
+  albums: DuplicateGroupResourceAlbumsItem[];
+}
+
 export interface AlbumResource {
   /**
      * Public identifier
@@ -2261,24 +2418,6 @@ export interface AlbumResource {
   lockedFields: string[];
   /** Creation timestamp */
   createdAt: string;
-}
-
-export type DuplicateGroupResourceAlbumsItem = { [key: string]: unknown };
-
-export interface DuplicateGroupResource {
-  /**
-     * List of album public identifiers in this duplicate group
-     * @items.minLength 21
-     * @items.maxLength 21
-     * @items.pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  albumIds: string[];
-  /** Confidence score between 0 and 1 */
-  confidence: number;
-  /** Number of albums in the group */
-  albumCount: number;
-  /** Album data for each duplicate */
-  albums: DuplicateGroupResourceAlbumsItem[];
 }
 
 export interface ArtistResource {
@@ -2471,6 +2610,18 @@ export interface DirectorResource {
 }
 
 /**
+ * What was searched for: an album matches a release, a song a recording, an artist an artist
+ */
+export type MatchCandidatesResourceType = typeof MatchCandidatesResourceType[keyof typeof MatchCandidatesResourceType];
+
+
+export const MatchCandidatesResourceType = {
+  album: 'album',
+  song: 'song',
+  artist: 'artist',
+} as const;
+
+/**
  * A MusicBrainz release (one edition of an album) an album may match
  */
 export interface MatchReleaseCandidateResource {
@@ -2627,18 +2778,6 @@ export interface MatchArtistCandidateResource {
   ended: boolean;
 }
 
-/**
- * What was searched for: an album matches a release, a song a recording, an artist an artist
- */
-export type MatchCandidatesResourceType = typeof MatchCandidatesResourceType[keyof typeof MatchCandidatesResourceType];
-
-
-export const MatchCandidatesResourceType = {
-  album: 'album',
-  song: 'song',
-  artist: 'artist',
-} as const;
-
 export interface MatchCandidatesResource {
   /** What was searched for: an album matches a release, a song a recording, an artist an artist */
   type: MatchCandidatesResourceType;
@@ -2659,6 +2798,18 @@ export interface MatchCandidatesResource {
   /** At most five candidates, best fit first: releases for an album, recordings for a song, artists for an artist */
   candidates: (MatchReleaseCandidateResource | MatchRecordingCandidateResource | MatchArtistCandidateResource)[];
 }
+
+/**
+ * What is compared: an album with a release, a song with a recording, an artist with an artist
+ */
+export type MatchComparisonResourceType = typeof MatchComparisonResourceType[keyof typeof MatchComparisonResourceType];
+
+
+export const MatchComparisonResourceType = {
+  album: 'album',
+  song: 'song',
+  artist: 'artist',
+} as const;
 
 /**
  * The field the row sets
@@ -2715,6 +2866,22 @@ export interface MatchFieldRowResource {
   changes: boolean;
 }
 
+export type MatchCreditsRowResourceCurrentItemRole = typeof MatchCreditsRowResourceCurrentItemRole[keyof typeof MatchCreditsRowResourceCurrentItemRole];
+
+
+export const MatchCreditsRowResourceCurrentItemRole = {
+  primary: 'primary',
+  featured: 'featured',
+} as const;
+
+export type MatchCreditsRowResourceProposedItemRole = typeof MatchCreditsRowResourceProposedItemRole[keyof typeof MatchCreditsRowResourceProposedItemRole];
+
+
+export const MatchCreditsRowResourceProposedItemRole = {
+  primary: 'primary',
+  featured: 'featured',
+} as const;
+
 /**
  * The library artist a MusicBrainz credit would go to if the match were applied now, or the artist the match would create
  */
@@ -2733,14 +2900,6 @@ export interface MatchPredictedArtistResource {
   takesId: boolean;
 }
 
-export type MatchCreditsRowResourceCurrentItemRole = typeof MatchCreditsRowResourceCurrentItemRole[keyof typeof MatchCreditsRowResourceCurrentItemRole];
-
-
-export const MatchCreditsRowResourceCurrentItemRole = {
-  primary: 'primary',
-  featured: 'featured',
-} as const;
-
 export type MatchCreditsRowResourceCurrentItem = {
   /**
      * @minLength 21
@@ -2753,14 +2912,6 @@ export type MatchCreditsRowResourceCurrentItem = {
   /** The name the item is credited under, such as "Post Malone, Luke Combs" */
   creditedName: string;
 };
-
-export type MatchCreditsRowResourceProposedItemRole = typeof MatchCreditsRowResourceProposedItemRole[keyof typeof MatchCreditsRowResourceProposedItemRole];
-
-
-export const MatchCreditsRowResourceProposedItemRole = {
-  primary: 'primary',
-  featured: 'featured',
-} as const;
 
 export type MatchCreditsRowResourceProposedItem = {
   role: MatchCreditsRowResourceProposedItemRole;
@@ -2902,18 +3053,6 @@ export interface MatchArtistActionResource {
   /** Whether the action is ticked by default */
   ticked: boolean;
 }
-
-/**
- * What is compared: an album with a release, a song with a recording, an artist with an artist
- */
-export type MatchComparisonResourceType = typeof MatchComparisonResourceType[keyof typeof MatchComparisonResourceType];
-
-
-export const MatchComparisonResourceType = {
-  album: 'album',
-  song: 'song',
-  artist: 'artist',
-} as const;
 
 export interface MatchComparisonResource {
   /** What is compared: an album with a release, a song with a recording, an artist with an artist */
@@ -3734,6 +3873,98 @@ export interface ScheduledJobResource {
   updatedAt: string;
 }
 
+export type PlaybackSnapshotResourceSchemaVersion = typeof PlaybackSnapshotResourceSchemaVersion[keyof typeof PlaybackSnapshotResourceSchemaVersion];
+
+
+export const PlaybackSnapshotResourceSchemaVersion = {
+  NUMBER_1: 1,
+} as const;
+
+export type PlaybackSnapshotResourcePlaybackState = typeof PlaybackSnapshotResourcePlaybackState[keyof typeof PlaybackSnapshotResourcePlaybackState];
+
+
+export const PlaybackSnapshotResourcePlaybackState = {
+  playing: 'playing',
+  paused: 'paused',
+  stopped: 'stopped',
+} as const;
+
+export type PlaybackSnapshotResourceDesiredState = typeof PlaybackSnapshotResourceDesiredState[keyof typeof PlaybackSnapshotResourceDesiredState];
+
+
+export const PlaybackSnapshotResourceDesiredState = {
+  playing: 'playing',
+  paused: 'paused',
+  stopped: 'stopped',
+} as const;
+
+export type PlaybackSnapshotResourceObservedState = typeof PlaybackSnapshotResourceObservedState[keyof typeof PlaybackSnapshotResourceObservedState];
+
+
+export const PlaybackSnapshotResourceObservedState = {
+  playing: 'playing',
+  paused: 'paused',
+  stopped: 'stopped',
+  unknown: 'unknown',
+} as const;
+
+export type PlaybackSnapshotResourceRecoveryResultOutcome = typeof PlaybackSnapshotResourceRecoveryResultOutcome[keyof typeof PlaybackSnapshotResourceRecoveryResultOutcome];
+
+
+export const PlaybackSnapshotResourceRecoveryResultOutcome = {
+  recovered: 'recovered',
+} as const;
+
+/**
+ * @nullable
+ */
+export type PlaybackSnapshotResourceRecoveryResult = {
+  /** The recovered endpoint incarnation, as the recovery request named it; the server issued it when that endpoint registered. */
+  incarnationId: string;
+  outcome: PlaybackSnapshotResourceRecoveryResultOutcome;
+  /** @minimum 0 */
+  revision: number;
+} | null;
+
+export type PlaybackSnapshotResourceTransferResultState = typeof PlaybackSnapshotResourceTransferResultState[keyof typeof PlaybackSnapshotResourceTransferResultState];
+
+
+export const PlaybackSnapshotResourceTransferResultState = {
+  preparing: 'preparing',
+  quiescing: 'quiescing',
+  starting: 'starting',
+  committed: 'committed',
+  failed: 'failed',
+  uncertain: 'uncertain',
+} as const;
+
+/**
+ * @nullable
+ */
+export type PlaybackSnapshotResourceTransferResult = {
+  /** The client-generated request identifier, echoed for correlation. */
+  requestId: string;
+  /** Transfer attempt identifier. */
+  attemptId: string;
+  state: PlaybackSnapshotResourceTransferResultState;
+  /** @nullable */
+  rejectionReason: string | null;
+} | null;
+
+/**
+ * @nullable
+ */
+export type PlaybackSnapshotResourceRequestResult = {
+  /** The client-generated request identifier, echoed for correlation. */
+  requestId: string;
+  /** Identifier of the command the request produced. */
+  commandId: string;
+  /** @nullable */
+  outcome: string | null;
+  /** @nullable */
+  rejectionReason: string | null;
+} | null;
+
 export type PlaybackMediaResourceKind = typeof PlaybackMediaResourceKind[keyof typeof PlaybackMediaResourceKind];
 
 
@@ -3924,98 +4155,6 @@ export interface PlaybackEndpointResource {
      */
   capability?: string | null;
 }
-
-export type PlaybackSnapshotResourceSchemaVersion = typeof PlaybackSnapshotResourceSchemaVersion[keyof typeof PlaybackSnapshotResourceSchemaVersion];
-
-
-export const PlaybackSnapshotResourceSchemaVersion = {
-  NUMBER_1: 1,
-} as const;
-
-export type PlaybackSnapshotResourcePlaybackState = typeof PlaybackSnapshotResourcePlaybackState[keyof typeof PlaybackSnapshotResourcePlaybackState];
-
-
-export const PlaybackSnapshotResourcePlaybackState = {
-  playing: 'playing',
-  paused: 'paused',
-  stopped: 'stopped',
-} as const;
-
-export type PlaybackSnapshotResourceDesiredState = typeof PlaybackSnapshotResourceDesiredState[keyof typeof PlaybackSnapshotResourceDesiredState];
-
-
-export const PlaybackSnapshotResourceDesiredState = {
-  playing: 'playing',
-  paused: 'paused',
-  stopped: 'stopped',
-} as const;
-
-export type PlaybackSnapshotResourceObservedState = typeof PlaybackSnapshotResourceObservedState[keyof typeof PlaybackSnapshotResourceObservedState];
-
-
-export const PlaybackSnapshotResourceObservedState = {
-  playing: 'playing',
-  paused: 'paused',
-  stopped: 'stopped',
-  unknown: 'unknown',
-} as const;
-
-export type PlaybackSnapshotResourceRecoveryResultOutcome = typeof PlaybackSnapshotResourceRecoveryResultOutcome[keyof typeof PlaybackSnapshotResourceRecoveryResultOutcome];
-
-
-export const PlaybackSnapshotResourceRecoveryResultOutcome = {
-  recovered: 'recovered',
-} as const;
-
-/**
- * @nullable
- */
-export type PlaybackSnapshotResourceRecoveryResult = {
-  /** The recovered endpoint incarnation, as the recovery request named it; the server issued it when that endpoint registered. */
-  incarnationId: string;
-  outcome: PlaybackSnapshotResourceRecoveryResultOutcome;
-  /** @minimum 0 */
-  revision: number;
-} | null;
-
-export type PlaybackSnapshotResourceTransferResultState = typeof PlaybackSnapshotResourceTransferResultState[keyof typeof PlaybackSnapshotResourceTransferResultState];
-
-
-export const PlaybackSnapshotResourceTransferResultState = {
-  preparing: 'preparing',
-  quiescing: 'quiescing',
-  starting: 'starting',
-  committed: 'committed',
-  failed: 'failed',
-  uncertain: 'uncertain',
-} as const;
-
-/**
- * @nullable
- */
-export type PlaybackSnapshotResourceTransferResult = {
-  /** The client-generated request identifier, echoed for correlation. */
-  requestId: string;
-  /** Transfer attempt identifier. */
-  attemptId: string;
-  state: PlaybackSnapshotResourceTransferResultState;
-  /** @nullable */
-  rejectionReason: string | null;
-} | null;
-
-/**
- * @nullable
- */
-export type PlaybackSnapshotResourceRequestResult = {
-  /** The client-generated request identifier, echoed for correlation. */
-  requestId: string;
-  /** Identifier of the command the request produced. */
-  commandId: string;
-  /** @nullable */
-  outcome: string | null;
-  /** @nullable */
-  rejectionReason: string | null;
-} | null;
 
 export interface PlaybackSnapshotResource {
   schemaVersion: PlaybackSnapshotResourceSchemaVersion;
@@ -4261,145 +4400,6 @@ export interface FailedMessageResource {
      * @minimum 0
      */
   retryCount: number;
-}
-
-export interface TranscodeMetricsResource {
-  /**
-     * Public identifier
-     * @minLength 21
-     * @maxLength 21
-     * @pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  publicId: string;
-  /**
-     * Video public identifier
-     * @minLength 21
-     * @maxLength 21
-     * @pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  videoId: string;
-  /** Quality tier name */
-  qualityTier: string;
-  /** Job status */
-  status: string;
-  /** Progress from 0 to 1 */
-  progress: number;
-  /** Total segments */
-  totalSegments: number;
-  /** Completed segments */
-  completedSegments: number;
-  /** Creation timestamp */
-  createdAt: string;
-  /** Last update timestamp */
-  updatedAt: string;
-}
-
-/**
- * Session state
- */
-export type TranscodeSessionResourceState = typeof TranscodeSessionResourceState[keyof typeof TranscodeSessionResourceState];
-
-
-export const TranscodeSessionResourceState = {
-  pending: 'pending',
-  preparing: 'preparing',
-  active: 'active',
-  paused: 'paused',
-  completed: 'completed',
-  failed: 'failed',
-  cancelled: 'cancelled',
-} as const;
-
-/**
- * Session priority
- */
-export type TranscodeSessionResourcePriority = typeof TranscodeSessionResourcePriority[keyof typeof TranscodeSessionResourcePriority];
-
-
-export const TranscodeSessionResourcePriority = {
-  critical: 'critical',
-  high: 'high',
-  normal: 'normal',
-  low: 'low',
-  bulk: 'bulk',
-} as const;
-
-/**
- * Audio profile configuration
- */
-export type TranscodeSessionResourceAudioProfile = { [key: string]: unknown };
-
-/**
- * Current durable execution generation, readiness, desired position/status and signed manifest URL
- * @nullable
- */
-export type TranscodeSessionResourcePlayback = { [key: string]: unknown } | null;
-
-/**
- * Session metrics
- * @nullable
- */
-export type TranscodeSessionResourceMetrics = { [key: string]: unknown } | null;
-
-export interface TranscodeSessionResource {
-  /**
-     * Public identifier
-     * @minLength 21
-     * @maxLength 21
-     * @pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  publicId: string;
-  /**
-     * User public identifier
-     * @minLength 21
-     * @maxLength 21
-     * @pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  userId: string;
-  /**
-     * Transcode job public identifier
-     * @minLength 21
-     * @maxLength 21
-     * @pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  jobId: string;
-  /**
-     * Video public identifier
-     * @minLength 21
-     * @maxLength 21
-     * @pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  videoId: string;
-  /** Session state */
-  state: TranscodeSessionResourceState;
-  /** Session priority */
-  priority: TranscodeSessionResourcePriority;
-  /** Audio profile configuration */
-  audioProfile: TranscodeSessionResourceAudioProfile;
-  /**
-     * Current segment being processed
-     * @nullable
-     */
-  currentSegmentIndex?: number | null;
-  /**
-     * Wall clock offset
-     * @nullable
-     */
-  wallClockOffset?: number | null;
-  /**
-     * Current durable execution generation, readiness, desired position/status and signed manifest URL
-     * @nullable
-     */
-  playback?: TranscodeSessionResourcePlayback;
-  /**
-     * Session metrics
-     * @nullable
-     */
-  metrics?: TranscodeSessionResourceMetrics;
-  /** Creation timestamp */
-  createdAt: string;
-  /** Last update timestamp */
-  updatedAt: string;
 }
 
 export type SaveAudioPreferencesRequestPayloadBandsItem = {
@@ -4677,6 +4677,185 @@ export interface UserSettingResource {
  * Read only at registration: the supported language the browser ranks highest (`en`, `da` or `th`) becomes the new user's email language when it differs from the server default. Response messages are in English.
  */
 export type AcceptLanguageParameter = string;
+
+export type GetTranscodeJobIndex200DataItem = {
+  publicId?: string;
+  status?: string;
+  qualityTier?: string;
+};
+
+export type GetTranscodeJobIndex200 = {
+  data?: GetTranscodeJobIndex200DataItem[];
+};
+
+export type GetTranscodeJobShow200Data = {
+  publicId?: string;
+  status?: string;
+  qualityTier?: string;
+};
+
+export type GetTranscodeJobShow200 = {
+  data?: GetTranscodeJobShow200Data;
+};
+
+export type PostTranscodeJobCleanup200Data = {
+  expired?: number;
+  cleaned?: number;
+};
+
+export type PostTranscodeJobCleanup200 = {
+  data?: PostTranscodeJobCleanup200Data;
+};
+
+export type PostTranscodeSessionCreateBodyQualityTier = typeof PostTranscodeSessionCreateBodyQualityTier[keyof typeof PostTranscodeSessionCreateBodyQualityTier];
+
+
+export const PostTranscodeSessionCreateBodyQualityTier = {
+  '360p': '360p',
+  '480p': '480p',
+  '720p': '720p',
+  '1080p': '1080p',
+  '1440p': '1440p',
+  '4K': '4K',
+} as const;
+
+export type PostTranscodeSessionCreateBodyAudioProfile = typeof PostTranscodeSessionCreateBodyAudioProfile[keyof typeof PostTranscodeSessionCreateBodyAudioProfile];
+
+
+export const PostTranscodeSessionCreateBodyAudioProfile = {
+  mobile_mono: 'mobile_mono',
+  mobile_stereo: 'mobile_stereo',
+  streaming_stereo: 'streaming_stereo',
+  streaming_51: 'streaming_5.1',
+  broadcast_stereo: 'broadcast_stereo',
+  broadcast_51: 'broadcast_5.1',
+  hifi_stereo: 'hifi_stereo',
+  opus_stereo: 'opus_stereo',
+} as const;
+
+export type PostTranscodeSessionCreateBodyPriority = typeof PostTranscodeSessionCreateBodyPriority[keyof typeof PostTranscodeSessionCreateBodyPriority];
+
+
+export const PostTranscodeSessionCreateBodyPriority = {
+  critical: 'critical',
+  high: 'high',
+  normal: 'normal',
+  low: 'low',
+  bulk: 'bulk',
+} as const;
+
+export type PostTranscodeSessionCreateBody = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  videoId: string;
+  /** Stable playback client session identifier */
+  requestId: string;
+  qualityTier?: PostTranscodeSessionCreateBodyQualityTier;
+  audioProfile?: PostTranscodeSessionCreateBodyAudioProfile;
+  priority?: PostTranscodeSessionCreateBodyPriority;
+};
+
+export type GetTranscodeSessionIndex200DataItem = {
+  publicId?: string;
+  status?: string;
+};
+
+export type GetTranscodeSessionIndex200 = {
+  data?: GetTranscodeSessionIndex200DataItem[];
+};
+
+export type GetTranscodeSessionShow200Data = {
+  publicId?: string;
+  status?: string;
+  qualityTier?: string;
+};
+
+export type GetTranscodeSessionShow200 = {
+  data?: GetTranscodeSessionShow200Data;
+};
+
+export type DeleteTranscodeSessionCancel200 = {
+  message?: string;
+};
+
+export type PatchTranscodeSessionUpdateBodyAudioProfile = typeof PatchTranscodeSessionUpdateBodyAudioProfile[keyof typeof PatchTranscodeSessionUpdateBodyAudioProfile];
+
+
+export const PatchTranscodeSessionUpdateBodyAudioProfile = {
+  mobile_mono: 'mobile_mono',
+  mobile_stereo: 'mobile_stereo',
+  streaming_stereo: 'streaming_stereo',
+  streaming_51: 'streaming_5.1',
+  broadcast_stereo: 'broadcast_stereo',
+  broadcast_51: 'broadcast_5.1',
+  hifi_stereo: 'hifi_stereo',
+  opus_stereo: 'opus_stereo',
+} as const;
+
+export type PatchTranscodeSessionUpdateBody = {
+  audioProfile?: PatchTranscodeSessionUpdateBodyAudioProfile;
+};
+
+export type PatchTranscodeSessionUpdate200 = {
+  status?: string;
+};
+
+export type PatchTranscodeSessionPause200 = {
+  message?: string;
+};
+
+export type PatchTranscodeSessionResume200 = {
+  message?: string;
+};
+
+export type PostTranscodeSessionPositionBodyAction = typeof PostTranscodeSessionPositionBodyAction[keyof typeof PostTranscodeSessionPositionBodyAction];
+
+
+export const PostTranscodeSessionPositionBodyAction = {
+  seek: 'seek',
+  pause: 'pause',
+  resume: 'resume',
+  progress: 'progress',
+} as const;
+
+export type PostTranscodeSessionPositionBody = {
+  position?: number;
+  action?: PostTranscodeSessionPositionBodyAction;
+  /**
+     * Required for progress; optional for seek to fence native events to the attached generation
+     * @minimum 1
+     */
+  generation?: number;
+  /**
+     * Required for progress; desired revision currently attached by the player
+     * @minimum 1
+     */
+  revision?: number;
+  /** Optional control identity; reuse across retries of the same command */
+  requestId?: string;
+};
+
+export type PostTranscodeSessionPosition200Status = typeof PostTranscodeSessionPosition200Status[keyof typeof PostTranscodeSessionPosition200Status];
+
+
+export const PostTranscodeSessionPosition200Status = {
+  ok: 'ok',
+} as const;
+
+export type PostTranscodeSessionPosition200 = {
+  status?: PostTranscodeSessionPosition200Status;
+  position?: number;
+  /** Echoed when supplied in the request */
+  requestId?: string;
+  /**
+     * Resulting generation of a fresh accepted seek; absent for replayed, stale, terminal or non-seek commands
+     * @minimum 1
+     */
+  acceptedGeneration?: number;
+};
 
 export type GetAdminActivitySummaryParams = {
   /** First day counted (Y-m-d), from its start in the server time zone. Defaults to 30 days before now. */
@@ -5568,10 +5747,6 @@ export type GetAlbumShow200 = {
   data?: GetAlbumShow200Data;
 };
 
-export type DeleteAlbumDestroy200 = {
-  data?: CatalogDeletionResource;
-};
-
 export type PatchAlbumUpdateBody = {
   /** @nullable */
   title?: string | null;
@@ -5597,6 +5772,10 @@ export type PatchAlbumUpdateBody = {
 
 export type PatchAlbumUpdate200 = {
   data?: AlbumResource;
+};
+
+export type DeleteAlbumDestroy200 = {
+  data?: CatalogDeletionResource;
 };
 
 export type PostAlbumCoverUploadBody = {
@@ -5639,6 +5818,26 @@ export type GetAdminAlbumsDuplicates200 = {
   data?: DuplicateGroupResource[];
 };
 
+export type PostArtistStoreBody = {
+  name?: string;
+  /** @nullable */
+  country?: string | null;
+  /** @nullable */
+  gender?: string | null;
+  /** @nullable */
+  type?: string | null;
+  /** @nullable */
+  disambiguation?: string | null;
+  /** @nullable */
+  sortName?: string | null;
+  /** @nullable */
+  biography?: string | null;
+};
+
+export type PostArtistStore201 = {
+  data?: ArtistResource;
+};
+
 export type GetArtistIndexParams = {
   /** Page number */
   page?: number;
@@ -5662,32 +5861,8 @@ export const GetArtistIndexOrder = {
   desc: 'desc',
 } as const;
 
-export type PostArtistStoreBody = {
-  name?: string;
-  /** @nullable */
-  country?: string | null;
-  /** @nullable */
-  gender?: string | null;
-  /** @nullable */
-  type?: string | null;
-  /** @nullable */
-  disambiguation?: string | null;
-  /** @nullable */
-  sortName?: string | null;
-  /** @nullable */
-  biography?: string | null;
-};
-
-export type PostArtistStore201 = {
-  data?: ArtistResource;
-};
-
 export type GetArtistShow200 = {
   data?: ArtistResource;
-};
-
-export type DeleteArtistDestroy200 = {
-  data?: CatalogDeletionResource;
 };
 
 export type PatchArtistUpdateBody = {
@@ -5709,6 +5884,10 @@ export type PatchArtistUpdateBody = {
 
 export type PatchArtistUpdate200 = {
   data?: ArtistResource;
+};
+
+export type DeleteArtistDestroy200 = {
+  data?: CatalogDeletionResource;
 };
 
 export type PostArtistAddSongBody = {
@@ -5875,10 +6054,6 @@ export type GetMovieShow200 = {
   data?: MovieResource;
 };
 
-export type DeleteMovieDestroy200 = {
-  data?: CatalogDeletionResource;
-};
-
 export type PatchMovieUpdateBody = {
   /** @nullable */
   title?: string | null;
@@ -5890,6 +6065,10 @@ export type PatchMovieUpdateBody = {
 
 export type PatchMovieUpdate200 = {
   data?: MovieResource;
+};
+
+export type DeleteMovieDestroy200 = {
+  data?: CatalogDeletionResource;
 };
 
 export type GetMovieDirectorIndexParams = {
@@ -6056,10 +6235,6 @@ export type GetSongShow200 = {
   data?: SongResource;
 };
 
-export type DeleteSongDestroy200 = {
-  data?: CatalogDeletionResource;
-};
-
 export type PatchSongUpdateBody = {
   /** @nullable */
   title?: string | null;
@@ -6079,6 +6254,10 @@ export type PatchSongUpdateBody = {
 
 export type PatchSongUpdate200 = {
   data?: SongResource;
+};
+
+export type DeleteSongDestroy200 = {
+  data?: CatalogDeletionResource;
 };
 
 export type GetVideoPlaybackInformation200 = {
@@ -6244,10 +6423,6 @@ export type GetLibraryShow200 = {
   data?: LibraryResource;
 };
 
-export type DeleteLibraryDelete200 = {
-  data?: unknown;
-};
-
 export type PatchLibraryUpdateBody = {
   /** @nullable */
   name?: string | null;
@@ -6257,6 +6432,10 @@ export type PatchLibraryUpdateBody = {
 
 export type PatchLibraryUpdate200 = {
   data?: LibraryResource;
+};
+
+export type DeleteLibraryDelete200 = {
+  data?: unknown;
 };
 
 export type PostLibraryScan202 = {
@@ -7112,6 +7291,10 @@ export type PostPartyMemberTransferHost200 = {
   data?: PostPartyMemberTransferHost200Data;
 };
 
+export type PostPartySessionCreate201 = {
+  data?: PartySessionResource;
+};
+
 export type GetPartySessionIndex200DataItem = {
   /**
      * @minLength 21
@@ -7123,10 +7306,6 @@ export type GetPartySessionIndex200DataItem = {
 
 export type GetPartySessionIndex200 = {
   data?: GetPartySessionIndex200DataItem[];
-};
-
-export type PostPartySessionCreate201 = {
-  data?: PartySessionResource;
 };
 
 export type GetPartySessionShow200DataMembersItem = {
@@ -7893,6 +8072,14 @@ export type GetAdminSchedulerCommands200 = {
   data?: GetAdminSchedulerCommands200Data;
 };
 
+export type PostDeviceRegister200Data = {
+  message?: string;
+};
+
+export type PostDeviceRegister200 = {
+  data?: PostDeviceRegister200Data;
+};
+
 export type GetDeviceList200DataItem = {
   /**
      * @minLength 21
@@ -7909,14 +8096,6 @@ export type GetDeviceList200DataItem = {
 
 export type GetDeviceList200 = {
   data?: GetDeviceList200DataItem[];
-};
-
-export type PostDeviceRegister200Data = {
-  message?: string;
-};
-
-export type PostDeviceRegister200 = {
-  data?: PostDeviceRegister200Data;
 };
 
 export type PutDeviceRenameBody = {
@@ -8796,185 +8975,6 @@ export type PostStreamSigningSign410 = {
   reason: PostStreamSigningSign410Reason;
 };
 
-export type GetTranscodeJobIndex200DataItem = {
-  publicId?: string;
-  status?: string;
-  qualityTier?: string;
-};
-
-export type GetTranscodeJobIndex200 = {
-  data?: GetTranscodeJobIndex200DataItem[];
-};
-
-export type GetTranscodeJobShow200Data = {
-  publicId?: string;
-  status?: string;
-  qualityTier?: string;
-};
-
-export type GetTranscodeJobShow200 = {
-  data?: GetTranscodeJobShow200Data;
-};
-
-export type PostTranscodeJobCleanup200Data = {
-  expired?: number;
-  cleaned?: number;
-};
-
-export type PostTranscodeJobCleanup200 = {
-  data?: PostTranscodeJobCleanup200Data;
-};
-
-export type GetTranscodeSessionIndex200DataItem = {
-  publicId?: string;
-  status?: string;
-};
-
-export type GetTranscodeSessionIndex200 = {
-  data?: GetTranscodeSessionIndex200DataItem[];
-};
-
-export type PostTranscodeSessionCreateBodyQualityTier = typeof PostTranscodeSessionCreateBodyQualityTier[keyof typeof PostTranscodeSessionCreateBodyQualityTier];
-
-
-export const PostTranscodeSessionCreateBodyQualityTier = {
-  '360p': '360p',
-  '480p': '480p',
-  '720p': '720p',
-  '1080p': '1080p',
-  '1440p': '1440p',
-  '4K': '4K',
-} as const;
-
-export type PostTranscodeSessionCreateBodyAudioProfile = typeof PostTranscodeSessionCreateBodyAudioProfile[keyof typeof PostTranscodeSessionCreateBodyAudioProfile];
-
-
-export const PostTranscodeSessionCreateBodyAudioProfile = {
-  mobile_mono: 'mobile_mono',
-  mobile_stereo: 'mobile_stereo',
-  streaming_stereo: 'streaming_stereo',
-  streaming_51: 'streaming_5.1',
-  broadcast_stereo: 'broadcast_stereo',
-  broadcast_51: 'broadcast_5.1',
-  hifi_stereo: 'hifi_stereo',
-  opus_stereo: 'opus_stereo',
-} as const;
-
-export type PostTranscodeSessionCreateBodyPriority = typeof PostTranscodeSessionCreateBodyPriority[keyof typeof PostTranscodeSessionCreateBodyPriority];
-
-
-export const PostTranscodeSessionCreateBodyPriority = {
-  critical: 'critical',
-  high: 'high',
-  normal: 'normal',
-  low: 'low',
-  bulk: 'bulk',
-} as const;
-
-export type PostTranscodeSessionCreateBody = {
-  /**
-     * @minLength 21
-     * @maxLength 21
-     * @pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  videoId: string;
-  /** Stable playback client session identifier */
-  requestId: string;
-  qualityTier?: PostTranscodeSessionCreateBodyQualityTier;
-  audioProfile?: PostTranscodeSessionCreateBodyAudioProfile;
-  priority?: PostTranscodeSessionCreateBodyPriority;
-};
-
-export type GetTranscodeSessionShow200Data = {
-  publicId?: string;
-  status?: string;
-  qualityTier?: string;
-};
-
-export type GetTranscodeSessionShow200 = {
-  data?: GetTranscodeSessionShow200Data;
-};
-
-export type DeleteTranscodeSessionCancel200 = {
-  message?: string;
-};
-
-export type PatchTranscodeSessionUpdateBodyAudioProfile = typeof PatchTranscodeSessionUpdateBodyAudioProfile[keyof typeof PatchTranscodeSessionUpdateBodyAudioProfile];
-
-
-export const PatchTranscodeSessionUpdateBodyAudioProfile = {
-  mobile_mono: 'mobile_mono',
-  mobile_stereo: 'mobile_stereo',
-  streaming_stereo: 'streaming_stereo',
-  streaming_51: 'streaming_5.1',
-  broadcast_stereo: 'broadcast_stereo',
-  broadcast_51: 'broadcast_5.1',
-  hifi_stereo: 'hifi_stereo',
-  opus_stereo: 'opus_stereo',
-} as const;
-
-export type PatchTranscodeSessionUpdateBody = {
-  audioProfile?: PatchTranscodeSessionUpdateBodyAudioProfile;
-};
-
-export type PatchTranscodeSessionUpdate200 = {
-  status?: string;
-};
-
-export type PatchTranscodeSessionPause200 = {
-  message?: string;
-};
-
-export type PatchTranscodeSessionResume200 = {
-  message?: string;
-};
-
-export type PostTranscodeSessionPositionBodyAction = typeof PostTranscodeSessionPositionBodyAction[keyof typeof PostTranscodeSessionPositionBodyAction];
-
-
-export const PostTranscodeSessionPositionBodyAction = {
-  seek: 'seek',
-  pause: 'pause',
-  resume: 'resume',
-  progress: 'progress',
-} as const;
-
-export type PostTranscodeSessionPositionBody = {
-  position?: number;
-  action?: PostTranscodeSessionPositionBodyAction;
-  /**
-     * Required for progress; optional for seek to fence native events to the attached generation
-     * @minimum 1
-     */
-  generation?: number;
-  /**
-     * Required for progress; desired revision currently attached by the player
-     * @minimum 1
-     */
-  revision?: number;
-  /** Optional control identity; reuse across retries of the same command */
-  requestId?: string;
-};
-
-export type PostTranscodeSessionPosition200Status = typeof PostTranscodeSessionPosition200Status[keyof typeof PostTranscodeSessionPosition200Status];
-
-
-export const PostTranscodeSessionPosition200Status = {
-  ok: 'ok',
-} as const;
-
-export type PostTranscodeSessionPosition200 = {
-  status?: PostTranscodeSessionPosition200Status;
-  position?: number;
-  /** Echoed when supplied in the request */
-  requestId?: string;
-  /**
-     * Resulting generation of a fresh accepted seek; absent for replayed, stale, terminal or non-seek commands
-     * @minimum 1
-     */
-  acceptedGeneration?: number;
-};
-
 export type GetAccentColorIndex200 = {
   color?: string;
 };
@@ -9309,6 +9309,383 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   return result;
 };
 
+export const getGetTranscodeJobIndexUrl = () => {
+
+
+
+
+  return `/api/transcode/jobs/`
+}
+
+/**
+ * @summary List orphaned transcode jobs in accessible libraries
+ */
+export const getTranscodeJobIndex = async ( options?: Parameters<typeof customInstance>[1]): Promise<GetTranscodeJobIndex200> => {
+
+  return customInstance<GetTranscodeJobIndex200>(getGetTranscodeJobIndexUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTranscodeJobIndexQueryKey = () => {
+    return [
+    `/api/transcode/jobs/`
+    ] as const;
+    }
+
+
+export const getGetTranscodeJobIndexQueryOptions = <TData = Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTranscodeJobIndexQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTranscodeJobIndex>>> = ({ signal }) => getTranscodeJobIndex({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetTranscodeJobIndexQueryResult = NonNullable<Awaited<ReturnType<typeof getTranscodeJobIndex>>>
+export type GetTranscodeJobIndexQueryError = ErrorType<unknown>
+
+
+export function useGetTranscodeJobIndex<TData = Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTranscodeJobIndex>>,
+          TError,
+          Awaited<ReturnType<typeof getTranscodeJobIndex>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTranscodeJobIndex<TData = Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTranscodeJobIndex>>,
+          TError,
+          Awaited<ReturnType<typeof getTranscodeJobIndex>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTranscodeJobIndex<TData = Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List orphaned transcode jobs in accessible libraries
+ */
+
+export function useGetTranscodeJobIndex<TData = Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetTranscodeJobIndexQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetTranscodeJobShowUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/transcode/jobs/${publicId}`
+}
+
+/**
+ * @summary Get a transcode job by public ID
+ */
+export const getTranscodeJobShow = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetTranscodeJobShow200> => {
+
+  return customInstance<GetTranscodeJobShow200>(getGetTranscodeJobShowUrl(publicId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTranscodeJobShowQueryKey = (publicId: string,) => {
+    return [
+    `/api/transcode/jobs/${publicId}`
+    ] as const;
+    }
+
+
+export const getGetTranscodeJobShowQueryOptions = <TData = Awaited<ReturnType<typeof getTranscodeJobShow>>, TError = ErrorType<ApiError>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTranscodeJobShowQueryKey(publicId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTranscodeJobShow>>> = ({ signal }) => getTranscodeJobShow(publicId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobShow>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetTranscodeJobShowQueryResult = NonNullable<Awaited<ReturnType<typeof getTranscodeJobShow>>>
+export type GetTranscodeJobShowQueryError = ErrorType<ApiError>
+
+
+export function useGetTranscodeJobShow<TData = Awaited<ReturnType<typeof getTranscodeJobShow>>, TError = ErrorType<ApiError>>(
+ publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobShow>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTranscodeJobShow>>,
+          TError,
+          Awaited<ReturnType<typeof getTranscodeJobShow>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTranscodeJobShow<TData = Awaited<ReturnType<typeof getTranscodeJobShow>>, TError = ErrorType<ApiError>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobShow>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTranscodeJobShow>>,
+          TError,
+          Awaited<ReturnType<typeof getTranscodeJobShow>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTranscodeJobShow<TData = Awaited<ReturnType<typeof getTranscodeJobShow>>, TError = ErrorType<ApiError>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get a transcode job by public ID
+ */
+
+export function useGetTranscodeJobShow<TData = Awaited<ReturnType<typeof getTranscodeJobShow>>, TError = ErrorType<ApiError>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetTranscodeJobShowQueryOptions(publicId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPostTranscodeJobCleanupUrl = () => {
+
+
+
+
+  return `/api/transcode/jobs/cleanup`
+}
+
+/**
+ * @summary Expire stale transcode sessions and clean up orphaned transcode jobs (no active sessions)
+ */
+export const postTranscodeJobCleanup = async ( options?: Parameters<typeof customInstance>[1]): Promise<PostTranscodeJobCleanup200> => {
+
+  return customInstance<PostTranscodeJobCleanup200>(getPostTranscodeJobCleanupUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getPostTranscodeJobCleanupMutationKey = () => ['postTranscodeJobCleanup'] as const;
+
+export const getPostTranscodeJobCleanupMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeJobCleanup>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postTranscodeJobCleanup>>, TError,void, TContext> => {
+
+const mutationKey = getPostTranscodeJobCleanupMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postTranscodeJobCleanup>>, void> = () => {
+
+
+          return  postTranscodeJobCleanup(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostTranscodeJobCleanupMutationResult = NonNullable<Awaited<ReturnType<typeof postTranscodeJobCleanup>>>
+
+    export type PostTranscodeJobCleanupMutationError = ErrorType<ApiError>
+
+
+    /**
+ * @summary Expire stale transcode sessions and clean up orphaned transcode jobs (no active sessions)
+ */
+export const usePostTranscodeJobCleanup = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeJobCleanup>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postTranscodeJobCleanup>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getPostTranscodeJobCleanupMutationOptions(options), queryClient);
+    }
+
+export const getGetTranscodeJobMetricsUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/transcode/jobs/${publicId}/metrics`
+}
+
+/**
+ * @summary Get transcode job metrics
+ */
+export const getTranscodeJobMetrics = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<TranscodeMetricsResource> => {
+
+  return customInstance<TranscodeMetricsResource>(getGetTranscodeJobMetricsUrl(publicId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTranscodeJobMetricsQueryKey = (publicId: string,) => {
+    return [
+    `/api/transcode/jobs/${publicId}/metrics`
+    ] as const;
+    }
+
+
+export const getGetTranscodeJobMetricsQueryOptions = <TData = Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError = ErrorType<ApiError>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTranscodeJobMetricsQueryKey(publicId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTranscodeJobMetrics>>> = ({ signal }) => getTranscodeJobMetrics(publicId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetTranscodeJobMetricsQueryResult = NonNullable<Awaited<ReturnType<typeof getTranscodeJobMetrics>>>
+export type GetTranscodeJobMetricsQueryError = ErrorType<ApiError>
+
+
+export function useGetTranscodeJobMetrics<TData = Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError = ErrorType<ApiError>>(
+ publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTranscodeJobMetrics>>,
+          TError,
+          Awaited<ReturnType<typeof getTranscodeJobMetrics>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTranscodeJobMetrics<TData = Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError = ErrorType<ApiError>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTranscodeJobMetrics>>,
+          TError,
+          Awaited<ReturnType<typeof getTranscodeJobMetrics>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTranscodeJobMetrics<TData = Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError = ErrorType<ApiError>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get transcode job metrics
+ */
+
+export function useGetTranscodeJobMetrics<TData = Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError = ErrorType<ApiError>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetTranscodeJobMetricsQueryOptions(publicId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetTranscodeJobListUrl = () => {
 
 
@@ -9410,6 +9787,607 @@ export function useGetTranscodeJobList<TData = Awaited<ReturnType<typeof getTran
 
 
 
+export const getPostTranscodeSessionCreateUrl = () => {
+
+
+
+
+  return `/api/transcode/sessions/`
+}
+
+/**
+ * @summary Create a new transcode session
+ */
+export const postTranscodeSessionCreate = async (postTranscodeSessionCreateBody: PostTranscodeSessionCreateBody, options?: Parameters<typeof customInstance>[1]): Promise<TranscodeSessionResource> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<TranscodeSessionResource>(getPostTranscodeSessionCreateUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(postTranscodeSessionCreateBody)
+  }
+);}
+
+
+
+
+
+export const getPostTranscodeSessionCreateMutationKey = () => ['postTranscodeSessionCreate'] as const;
+
+export const getPostTranscodeSessionCreateMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionCreate>>, TError,PostTranscodeSessionCreateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionCreate>>, TError,PostTranscodeSessionCreateMutationVariables, TContext> => {
+
+const mutationKey = getPostTranscodeSessionCreateMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postTranscodeSessionCreate>>, PostTranscodeSessionCreateMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  postTranscodeSessionCreate(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostTranscodeSessionCreateMutationResult = NonNullable<Awaited<ReturnType<typeof postTranscodeSessionCreate>>>
+    export type PostTranscodeSessionCreateMutationBody = BodyType<PostTranscodeSessionCreateBody>
+    export type PostTranscodeSessionCreateMutationError = ErrorType<ApiError | ValidationError>
+    export type PostTranscodeSessionCreateMutationVariables = {data: BodyType<PostTranscodeSessionCreateBody>}
+
+    /**
+ * @summary Create a new transcode session
+ */
+export const usePostTranscodeSessionCreate = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionCreate>>, TError,PostTranscodeSessionCreateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postTranscodeSessionCreate>>,
+        TError,
+        PostTranscodeSessionCreateMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostTranscodeSessionCreateMutationOptions(options), queryClient);
+    }
+
+export const getGetTranscodeSessionIndexUrl = () => {
+
+
+
+
+  return `/api/transcode/sessions/`
+}
+
+/**
+ * @summary List active transcode sessions for the authenticated user
+ */
+export const getTranscodeSessionIndex = async ( options?: Parameters<typeof customInstance>[1]): Promise<GetTranscodeSessionIndex200> => {
+
+  return customInstance<GetTranscodeSessionIndex200>(getGetTranscodeSessionIndexUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTranscodeSessionIndexQueryKey = () => {
+    return [
+    `/api/transcode/sessions/`
+    ] as const;
+    }
+
+
+export const getGetTranscodeSessionIndexQueryOptions = <TData = Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError = ErrorType<ApiError>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTranscodeSessionIndexQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTranscodeSessionIndex>>> = ({ signal }) => getTranscodeSessionIndex({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetTranscodeSessionIndexQueryResult = NonNullable<Awaited<ReturnType<typeof getTranscodeSessionIndex>>>
+export type GetTranscodeSessionIndexQueryError = ErrorType<ApiError>
+
+
+export function useGetTranscodeSessionIndex<TData = Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError = ErrorType<ApiError>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTranscodeSessionIndex>>,
+          TError,
+          Awaited<ReturnType<typeof getTranscodeSessionIndex>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTranscodeSessionIndex<TData = Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError = ErrorType<ApiError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTranscodeSessionIndex>>,
+          TError,
+          Awaited<ReturnType<typeof getTranscodeSessionIndex>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTranscodeSessionIndex<TData = Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError = ErrorType<ApiError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List active transcode sessions for the authenticated user
+ */
+
+export function useGetTranscodeSessionIndex<TData = Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError = ErrorType<ApiError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetTranscodeSessionIndexQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetTranscodeSessionShowUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/transcode/sessions/${publicId}`
+}
+
+/**
+ * @summary Get a transcode session by public identifier
+ */
+export const getTranscodeSessionShow = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetTranscodeSessionShow200> => {
+
+  return customInstance<GetTranscodeSessionShow200>(getGetTranscodeSessionShowUrl(publicId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTranscodeSessionShowQueryKey = (publicId: string,) => {
+    return [
+    `/api/transcode/sessions/${publicId}`
+    ] as const;
+    }
+
+
+export const getGetTranscodeSessionShowQueryOptions = <TData = Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError = ErrorType<ApiError>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTranscodeSessionShowQueryKey(publicId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTranscodeSessionShow>>> = ({ signal }) => getTranscodeSessionShow(publicId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetTranscodeSessionShowQueryResult = NonNullable<Awaited<ReturnType<typeof getTranscodeSessionShow>>>
+export type GetTranscodeSessionShowQueryError = ErrorType<ApiError>
+
+
+export function useGetTranscodeSessionShow<TData = Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError = ErrorType<ApiError>>(
+ publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTranscodeSessionShow>>,
+          TError,
+          Awaited<ReturnType<typeof getTranscodeSessionShow>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTranscodeSessionShow<TData = Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError = ErrorType<ApiError>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTranscodeSessionShow>>,
+          TError,
+          Awaited<ReturnType<typeof getTranscodeSessionShow>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTranscodeSessionShow<TData = Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError = ErrorType<ApiError>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get a transcode session by public identifier
+ */
+
+export function useGetTranscodeSessionShow<TData = Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError = ErrorType<ApiError>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetTranscodeSessionShowQueryOptions(publicId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getDeleteTranscodeSessionCancelUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/transcode/sessions/${publicId}`
+}
+
+/**
+ * @summary Cancel a transcode session
+ */
+export const deleteTranscodeSessionCancel = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<DeleteTranscodeSessionCancel200> => {
+
+  return customInstance<DeleteTranscodeSessionCancel200>(getDeleteTranscodeSessionCancelUrl(publicId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteTranscodeSessionCancelMutationKey = () => ['deleteTranscodeSessionCancel'] as const;
+
+export const getDeleteTranscodeSessionCancelMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTranscodeSessionCancel>>, TError,DeleteTranscodeSessionCancelMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteTranscodeSessionCancel>>, TError,DeleteTranscodeSessionCancelMutationVariables, TContext> => {
+
+const mutationKey = getDeleteTranscodeSessionCancelMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTranscodeSessionCancel>>, DeleteTranscodeSessionCancelMutationVariables> = (props) => {
+          const {publicId} = props ?? {};
+
+          return  deleteTranscodeSessionCancel(publicId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteTranscodeSessionCancelMutationResult = NonNullable<Awaited<ReturnType<typeof deleteTranscodeSessionCancel>>>
+
+    export type DeleteTranscodeSessionCancelMutationError = ErrorType<ApiError>
+    export type DeleteTranscodeSessionCancelMutationVariables = {publicId: string}
+
+    /**
+ * @summary Cancel a transcode session
+ */
+export const useDeleteTranscodeSessionCancel = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTranscodeSessionCancel>>, TError,DeleteTranscodeSessionCancelMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteTranscodeSessionCancel>>,
+        TError,
+        DeleteTranscodeSessionCancelMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteTranscodeSessionCancelMutationOptions(options), queryClient);
+    }
+
+export const getPatchTranscodeSessionUpdateUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/transcode/sessions/${publicId}`
+}
+
+/**
+ * @summary Update a transcode session
+ */
+export const patchTranscodeSessionUpdate = async (publicId: string,
+    patchTranscodeSessionUpdateBody: PatchTranscodeSessionUpdateBody, options?: Parameters<typeof customInstance>[1]): Promise<PatchTranscodeSessionUpdate200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<PatchTranscodeSessionUpdate200>(getPatchTranscodeSessionUpdateUrl(publicId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(patchTranscodeSessionUpdateBody)
+  }
+);}
+
+
+
+
+
+export const getPatchTranscodeSessionUpdateMutationKey = () => ['patchTranscodeSessionUpdate'] as const;
+
+export const getPatchTranscodeSessionUpdateMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionUpdate>>, TError,PatchTranscodeSessionUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionUpdate>>, TError,PatchTranscodeSessionUpdateMutationVariables, TContext> => {
+
+const mutationKey = getPatchTranscodeSessionUpdateMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchTranscodeSessionUpdate>>, PatchTranscodeSessionUpdateMutationVariables> = (props) => {
+          const {publicId,data} = props ?? {};
+
+          return  patchTranscodeSessionUpdate(publicId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PatchTranscodeSessionUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof patchTranscodeSessionUpdate>>>
+    export type PatchTranscodeSessionUpdateMutationBody = BodyType<PatchTranscodeSessionUpdateBody>
+    export type PatchTranscodeSessionUpdateMutationError = ErrorType<ApiError>
+    export type PatchTranscodeSessionUpdateMutationVariables = {publicId: string;data: BodyType<PatchTranscodeSessionUpdateBody>}
+
+    /**
+ * @summary Update a transcode session
+ */
+export const usePatchTranscodeSessionUpdate = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionUpdate>>, TError,PatchTranscodeSessionUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof patchTranscodeSessionUpdate>>,
+        TError,
+        PatchTranscodeSessionUpdateMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPatchTranscodeSessionUpdateMutationOptions(options), queryClient);
+    }
+
+export const getPatchTranscodeSessionPauseUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/transcode/sessions/${publicId}/pause`
+}
+
+/**
+ * @summary Pause a transcode session
+ */
+export const patchTranscodeSessionPause = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<PatchTranscodeSessionPause200> => {
+
+  return customInstance<PatchTranscodeSessionPause200>(getPatchTranscodeSessionPauseUrl(publicId),
+  {
+    ...options,
+    method: 'PATCH'
+
+
+  }
+);}
+
+
+
+
+
+export const getPatchTranscodeSessionPauseMutationKey = () => ['patchTranscodeSessionPause'] as const;
+
+export const getPatchTranscodeSessionPauseMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionPause>>, TError,PatchTranscodeSessionPauseMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionPause>>, TError,PatchTranscodeSessionPauseMutationVariables, TContext> => {
+
+const mutationKey = getPatchTranscodeSessionPauseMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchTranscodeSessionPause>>, PatchTranscodeSessionPauseMutationVariables> = (props) => {
+          const {publicId} = props ?? {};
+
+          return  patchTranscodeSessionPause(publicId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PatchTranscodeSessionPauseMutationResult = NonNullable<Awaited<ReturnType<typeof patchTranscodeSessionPause>>>
+
+    export type PatchTranscodeSessionPauseMutationError = ErrorType<ApiError>
+    export type PatchTranscodeSessionPauseMutationVariables = {publicId: string}
+
+    /**
+ * @summary Pause a transcode session
+ */
+export const usePatchTranscodeSessionPause = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionPause>>, TError,PatchTranscodeSessionPauseMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof patchTranscodeSessionPause>>,
+        TError,
+        PatchTranscodeSessionPauseMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPatchTranscodeSessionPauseMutationOptions(options), queryClient);
+    }
+
+export const getPatchTranscodeSessionResumeUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/transcode/sessions/${publicId}/resume`
+}
+
+/**
+ * @summary Resume a paused transcode session
+ */
+export const patchTranscodeSessionResume = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<PatchTranscodeSessionResume200> => {
+
+  return customInstance<PatchTranscodeSessionResume200>(getPatchTranscodeSessionResumeUrl(publicId),
+  {
+    ...options,
+    method: 'PATCH'
+
+
+  }
+);}
+
+
+
+
+
+export const getPatchTranscodeSessionResumeMutationKey = () => ['patchTranscodeSessionResume'] as const;
+
+export const getPatchTranscodeSessionResumeMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionResume>>, TError,PatchTranscodeSessionResumeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionResume>>, TError,PatchTranscodeSessionResumeMutationVariables, TContext> => {
+
+const mutationKey = getPatchTranscodeSessionResumeMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchTranscodeSessionResume>>, PatchTranscodeSessionResumeMutationVariables> = (props) => {
+          const {publicId} = props ?? {};
+
+          return  patchTranscodeSessionResume(publicId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PatchTranscodeSessionResumeMutationResult = NonNullable<Awaited<ReturnType<typeof patchTranscodeSessionResume>>>
+
+    export type PatchTranscodeSessionResumeMutationError = ErrorType<ApiError>
+    export type PatchTranscodeSessionResumeMutationVariables = {publicId: string}
+
+    /**
+ * @summary Resume a paused transcode session
+ */
+export const usePatchTranscodeSessionResume = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionResume>>, TError,PatchTranscodeSessionResumeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof patchTranscodeSessionResume>>,
+        TError,
+        PatchTranscodeSessionResumeMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPatchTranscodeSessionResumeMutationOptions(options), queryClient);
+    }
+
 export const getGetTranscodeSessionListUrl = () => {
 
 
@@ -9510,6 +10488,95 @@ export function useGetTranscodeSessionList<TData = Awaited<ReturnType<typeof get
 
 
 
+
+export const getPostTranscodeSessionPositionUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/transcode/sessions/${publicId}/position`
+}
+
+/**
+ * @summary Update transcode session playback position
+ */
+export const postTranscodeSessionPosition = async (publicId: string,
+    postTranscodeSessionPositionBody: PostTranscodeSessionPositionBody, options?: Parameters<typeof customInstance>[1]): Promise<PostTranscodeSessionPosition200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<PostTranscodeSessionPosition200>(getPostTranscodeSessionPositionUrl(publicId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(postTranscodeSessionPositionBody)
+  }
+);}
+
+
+
+
+
+export const getPostTranscodeSessionPositionMutationKey = () => ['postTranscodeSessionPosition'] as const;
+
+export const getPostTranscodeSessionPositionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionPosition>>, TError,PostTranscodeSessionPositionMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionPosition>>, TError,PostTranscodeSessionPositionMutationVariables, TContext> => {
+
+const mutationKey = getPostTranscodeSessionPositionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postTranscodeSessionPosition>>, PostTranscodeSessionPositionMutationVariables> = (props) => {
+          const {publicId,data} = props ?? {};
+
+          return  postTranscodeSessionPosition(publicId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostTranscodeSessionPositionMutationResult = NonNullable<Awaited<ReturnType<typeof postTranscodeSessionPosition>>>
+    export type PostTranscodeSessionPositionMutationBody = BodyType<PostTranscodeSessionPositionBody>
+    export type PostTranscodeSessionPositionMutationError = ErrorType<unknown>
+    export type PostTranscodeSessionPositionMutationVariables = {publicId: string;data: BodyType<PostTranscodeSessionPositionBody>}
+
+    /**
+ * @summary Update transcode session playback position
+ */
+export const usePostTranscodeSessionPosition = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionPosition>>, TError,PostTranscodeSessionPositionMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postTranscodeSessionPosition>>,
+        TError,
+        PostTranscodeSessionPositionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostTranscodeSessionPositionMutationOptions(options), queryClient);
+    }
 
 export const getGetAdminActivitySummaryUrl = (params?: GetAdminActivitySummaryParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -11306,80 +12373,6 @@ export const usePostAdminUsersCreate = <TError = ErrorType<ApiError | Validation
       return useMutation(getPostAdminUsersCreateMutationOptions(options), queryClient);
     }
 
-export const getDeleteAdminUsersDeleteUrl = (publicId: string,) => {
-
-
-
-
-  return `/api/admin/users/${publicId}`
-}
-
-/**
- * @summary Delete a user
- */
-export const deleteAdminUsersDelete = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
-
-  return customInstance<void>(getDeleteAdminUsersDeleteUrl(publicId),
-  {
-    ...options,
-    method: 'DELETE'
-
-
-  }
-);}
-
-
-
-
-
-export const getDeleteAdminUsersDeleteMutationKey = () => ['deleteAdminUsersDelete'] as const;
-
-export const getDeleteAdminUsersDeleteMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUsersDelete>>, TError,DeleteAdminUsersDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUsersDelete>>, TError,DeleteAdminUsersDeleteMutationVariables, TContext> => {
-
-const mutationKey = getDeleteAdminUsersDeleteMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAdminUsersDelete>>, DeleteAdminUsersDeleteMutationVariables> = (props) => {
-          const {publicId} = props ?? {};
-
-          return  deleteAdminUsersDelete(publicId,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type DeleteAdminUsersDeleteMutationResult = NonNullable<Awaited<ReturnType<typeof deleteAdminUsersDelete>>>
-
-    export type DeleteAdminUsersDeleteMutationError = ErrorType<ApiError>
-    export type DeleteAdminUsersDeleteMutationVariables = {publicId: string}
-
-    /**
- * @summary Delete a user
- */
-export const useDeleteAdminUsersDelete = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUsersDelete>>, TError,DeleteAdminUsersDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof deleteAdminUsersDelete>>,
-        TError,
-        DeleteAdminUsersDeleteMutationVariables,
-        TContext
-      > => {
-      return useMutation(getDeleteAdminUsersDeleteMutationOptions(options), queryClient);
-    }
-
 export const getPatchAdminUsersUpdateUrl = (publicId: string,) => {
 
 
@@ -11468,6 +12461,80 @@ export const usePatchAdminUsersUpdate = <TError = ErrorType<ApiError | Validatio
         TContext
       > => {
       return useMutation(getPatchAdminUsersUpdateMutationOptions(options), queryClient);
+    }
+
+export const getDeleteAdminUsersDeleteUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/admin/users/${publicId}`
+}
+
+/**
+ * @summary Delete a user
+ */
+export const deleteAdminUsersDelete = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
+
+  return customInstance<void>(getDeleteAdminUsersDeleteUrl(publicId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteAdminUsersDeleteMutationKey = () => ['deleteAdminUsersDelete'] as const;
+
+export const getDeleteAdminUsersDeleteMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUsersDelete>>, TError,DeleteAdminUsersDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUsersDelete>>, TError,DeleteAdminUsersDeleteMutationVariables, TContext> => {
+
+const mutationKey = getDeleteAdminUsersDeleteMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAdminUsersDelete>>, DeleteAdminUsersDeleteMutationVariables> = (props) => {
+          const {publicId} = props ?? {};
+
+          return  deleteAdminUsersDelete(publicId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteAdminUsersDeleteMutationResult = NonNullable<Awaited<ReturnType<typeof deleteAdminUsersDelete>>>
+
+    export type DeleteAdminUsersDeleteMutationError = ErrorType<ApiError>
+    export type DeleteAdminUsersDeleteMutationVariables = {publicId: string}
+
+    /**
+ * @summary Delete a user
+ */
+export const useDeleteAdminUsersDelete = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUsersDelete>>, TError,DeleteAdminUsersDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteAdminUsersDelete>>,
+        TError,
+        DeleteAdminUsersDeleteMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteAdminUsersDeleteMutationOptions(options), queryClient);
     }
 
 export const getPostAdminUsersAssignRolesUrl = (publicId: string,) => {
@@ -15943,80 +17010,6 @@ export function useGetAlbumShow<TData = Awaited<ReturnType<typeof getAlbumShow>>
 
 
 
-export const getDeleteAlbumDestroyUrl = (publicId: string,) => {
-
-
-
-
-  return `/api/albums/${publicId}`
-}
-
-/**
- * @summary Delete an album
- */
-export const deleteAlbumDestroy = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<DeleteAlbumDestroy200> => {
-
-  return customInstance<DeleteAlbumDestroy200>(getDeleteAlbumDestroyUrl(publicId),
-  {
-    ...options,
-    method: 'DELETE'
-
-
-  }
-);}
-
-
-
-
-
-export const getDeleteAlbumDestroyMutationKey = () => ['deleteAlbumDestroy'] as const;
-
-export const getDeleteAlbumDestroyMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAlbumDestroy>>, TError,DeleteAlbumDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteAlbumDestroy>>, TError,DeleteAlbumDestroyMutationVariables, TContext> => {
-
-const mutationKey = getDeleteAlbumDestroyMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAlbumDestroy>>, DeleteAlbumDestroyMutationVariables> = (props) => {
-          const {publicId} = props ?? {};
-
-          return  deleteAlbumDestroy(publicId,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type DeleteAlbumDestroyMutationResult = NonNullable<Awaited<ReturnType<typeof deleteAlbumDestroy>>>
-
-    export type DeleteAlbumDestroyMutationError = ErrorType<ApiError | ValidationError>
-    export type DeleteAlbumDestroyMutationVariables = {publicId: string}
-
-    /**
- * @summary Delete an album
- */
-export const useDeleteAlbumDestroy = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAlbumDestroy>>, TError,DeleteAlbumDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof deleteAlbumDestroy>>,
-        TError,
-        DeleteAlbumDestroyMutationVariables,
-        TContext
-      > => {
-      return useMutation(getDeleteAlbumDestroyMutationOptions(options), queryClient);
-    }
-
 export const getPatchAlbumUpdateUrl = (publicId: string,) => {
 
 
@@ -16104,6 +17097,80 @@ export const usePatchAlbumUpdate = <TError = ErrorType<ApiError | ValidationErro
         TContext
       > => {
       return useMutation(getPatchAlbumUpdateMutationOptions(options), queryClient);
+    }
+
+export const getDeleteAlbumDestroyUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/albums/${publicId}`
+}
+
+/**
+ * @summary Delete an album
+ */
+export const deleteAlbumDestroy = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<DeleteAlbumDestroy200> => {
+
+  return customInstance<DeleteAlbumDestroy200>(getDeleteAlbumDestroyUrl(publicId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteAlbumDestroyMutationKey = () => ['deleteAlbumDestroy'] as const;
+
+export const getDeleteAlbumDestroyMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAlbumDestroy>>, TError,DeleteAlbumDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteAlbumDestroy>>, TError,DeleteAlbumDestroyMutationVariables, TContext> => {
+
+const mutationKey = getDeleteAlbumDestroyMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAlbumDestroy>>, DeleteAlbumDestroyMutationVariables> = (props) => {
+          const {publicId} = props ?? {};
+
+          return  deleteAlbumDestroy(publicId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteAlbumDestroyMutationResult = NonNullable<Awaited<ReturnType<typeof deleteAlbumDestroy>>>
+
+    export type DeleteAlbumDestroyMutationError = ErrorType<ApiError | ValidationError>
+    export type DeleteAlbumDestroyMutationVariables = {publicId: string}
+
+    /**
+ * @summary Delete an album
+ */
+export const useDeleteAlbumDestroy = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAlbumDestroy>>, TError,DeleteAlbumDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteAlbumDestroy>>,
+        TError,
+        DeleteAlbumDestroyMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteAlbumDestroyMutationOptions(options), queryClient);
     }
 
 export const getGetAlbumCoverUrl = (publicId: string,) => {
@@ -16655,6 +17722,94 @@ export function useGetAdminAlbumsDuplicates<TData = Awaited<ReturnType<typeof ge
 
 
 
+export const getPostArtistStoreUrl = () => {
+
+
+
+
+  return `/api/artists/`
+}
+
+/**
+ * @summary Create a new artist
+ */
+export const postArtistStore = async (postArtistStoreBody: PostArtistStoreBody, options?: Parameters<typeof customInstance>[1]): Promise<PostArtistStore201> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<PostArtistStore201>(getPostArtistStoreUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(postArtistStoreBody)
+  }
+);}
+
+
+
+
+
+export const getPostArtistStoreMutationKey = () => ['postArtistStore'] as const;
+
+export const getPostArtistStoreMutationOptions = <TError = ErrorType<ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postArtistStore>>, TError,PostArtistStoreMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postArtistStore>>, TError,PostArtistStoreMutationVariables, TContext> => {
+
+const mutationKey = getPostArtistStoreMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postArtistStore>>, PostArtistStoreMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  postArtistStore(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostArtistStoreMutationResult = NonNullable<Awaited<ReturnType<typeof postArtistStore>>>
+    export type PostArtistStoreMutationBody = BodyType<PostArtistStoreBody>
+    export type PostArtistStoreMutationError = ErrorType<ValidationError>
+    export type PostArtistStoreMutationVariables = {data: BodyType<PostArtistStoreBody>}
+
+    /**
+ * @summary Create a new artist
+ */
+export const usePostArtistStore = <TError = ErrorType<ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postArtistStore>>, TError,PostArtistStoreMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postArtistStore>>,
+        TError,
+        PostArtistStoreMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostArtistStoreMutationOptions(options), queryClient);
+    }
+
 export const getGetArtistIndexUrl = (params?: GetArtistIndexParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -16763,94 +17918,6 @@ export function useGetArtistIndex<TData = Awaited<ReturnType<typeof getArtistInd
 
 
 
-export const getPostArtistStoreUrl = () => {
-
-
-
-
-  return `/api/artists/`
-}
-
-/**
- * @summary Create a new artist
- */
-export const postArtistStore = async (postArtistStoreBody: PostArtistStoreBody, options?: Parameters<typeof customInstance>[1]): Promise<PostArtistStore201> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostArtistStore201>(getPostArtistStoreUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(postArtistStoreBody)
-  }
-);}
-
-
-
-
-
-export const getPostArtistStoreMutationKey = () => ['postArtistStore'] as const;
-
-export const getPostArtistStoreMutationOptions = <TError = ErrorType<ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postArtistStore>>, TError,PostArtistStoreMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postArtistStore>>, TError,PostArtistStoreMutationVariables, TContext> => {
-
-const mutationKey = getPostArtistStoreMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postArtistStore>>, PostArtistStoreMutationVariables> = (props) => {
-          const {data} = props ?? {};
-
-          return  postArtistStore(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type PostArtistStoreMutationResult = NonNullable<Awaited<ReturnType<typeof postArtistStore>>>
-    export type PostArtistStoreMutationBody = BodyType<PostArtistStoreBody>
-    export type PostArtistStoreMutationError = ErrorType<ValidationError>
-    export type PostArtistStoreMutationVariables = {data: BodyType<PostArtistStoreBody>}
-
-    /**
- * @summary Create a new artist
- */
-export const usePostArtistStore = <TError = ErrorType<ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postArtistStore>>, TError,PostArtistStoreMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postArtistStore>>,
-        TError,
-        PostArtistStoreMutationVariables,
-        TContext
-      > => {
-      return useMutation(getPostArtistStoreMutationOptions(options), queryClient);
-    }
-
 export const getGetArtistShowUrl = (publicId: string,) => {
 
 
@@ -16952,80 +18019,6 @@ export function useGetArtistShow<TData = Awaited<ReturnType<typeof getArtistShow
 
 
 
-export const getDeleteArtistDestroyUrl = (publicId: string,) => {
-
-
-
-
-  return `/api/artists/${publicId}`
-}
-
-/**
- * @summary Delete an artist
- */
-export const deleteArtistDestroy = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<DeleteArtistDestroy200> => {
-
-  return customInstance<DeleteArtistDestroy200>(getDeleteArtistDestroyUrl(publicId),
-  {
-    ...options,
-    method: 'DELETE'
-
-
-  }
-);}
-
-
-
-
-
-export const getDeleteArtistDestroyMutationKey = () => ['deleteArtistDestroy'] as const;
-
-export const getDeleteArtistDestroyMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteArtistDestroy>>, TError,DeleteArtistDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteArtistDestroy>>, TError,DeleteArtistDestroyMutationVariables, TContext> => {
-
-const mutationKey = getDeleteArtistDestroyMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteArtistDestroy>>, DeleteArtistDestroyMutationVariables> = (props) => {
-          const {publicId} = props ?? {};
-
-          return  deleteArtistDestroy(publicId,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type DeleteArtistDestroyMutationResult = NonNullable<Awaited<ReturnType<typeof deleteArtistDestroy>>>
-
-    export type DeleteArtistDestroyMutationError = ErrorType<ApiError | ValidationError>
-    export type DeleteArtistDestroyMutationVariables = {publicId: string}
-
-    /**
- * @summary Delete an artist
- */
-export const useDeleteArtistDestroy = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteArtistDestroy>>, TError,DeleteArtistDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof deleteArtistDestroy>>,
-        TError,
-        DeleteArtistDestroyMutationVariables,
-        TContext
-      > => {
-      return useMutation(getDeleteArtistDestroyMutationOptions(options), queryClient);
-    }
-
 export const getPatchArtistUpdateUrl = (publicId: string,) => {
 
 
@@ -17113,6 +18106,80 @@ export const usePatchArtistUpdate = <TError = ErrorType<ApiError | ValidationErr
         TContext
       > => {
       return useMutation(getPatchArtistUpdateMutationOptions(options), queryClient);
+    }
+
+export const getDeleteArtistDestroyUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/artists/${publicId}`
+}
+
+/**
+ * @summary Delete an artist
+ */
+export const deleteArtistDestroy = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<DeleteArtistDestroy200> => {
+
+  return customInstance<DeleteArtistDestroy200>(getDeleteArtistDestroyUrl(publicId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteArtistDestroyMutationKey = () => ['deleteArtistDestroy'] as const;
+
+export const getDeleteArtistDestroyMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteArtistDestroy>>, TError,DeleteArtistDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteArtistDestroy>>, TError,DeleteArtistDestroyMutationVariables, TContext> => {
+
+const mutationKey = getDeleteArtistDestroyMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteArtistDestroy>>, DeleteArtistDestroyMutationVariables> = (props) => {
+          const {publicId} = props ?? {};
+
+          return  deleteArtistDestroy(publicId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteArtistDestroyMutationResult = NonNullable<Awaited<ReturnType<typeof deleteArtistDestroy>>>
+
+    export type DeleteArtistDestroyMutationError = ErrorType<ApiError | ValidationError>
+    export type DeleteArtistDestroyMutationVariables = {publicId: string}
+
+    /**
+ * @summary Delete an artist
+ */
+export const useDeleteArtistDestroy = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteArtistDestroy>>, TError,DeleteArtistDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteArtistDestroy>>,
+        TError,
+        DeleteArtistDestroyMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteArtistDestroyMutationOptions(options), queryClient);
     }
 
 export const getPostArtistAddSongUrl = (publicId: string,) => {
@@ -18150,80 +19217,6 @@ export function useGetGenreShow<TData = Awaited<ReturnType<typeof getGenreShow>>
 
 
 
-export const getDeleteGenreDestroyUrl = (slug: string,) => {
-
-
-
-
-  return `/api/genres/${slug}`
-}
-
-/**
- * @summary Delete a genre
- */
-export const deleteGenreDestroy = async (slug: string, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
-
-  return customInstance<void>(getDeleteGenreDestroyUrl(slug),
-  {
-    ...options,
-    method: 'DELETE'
-
-
-  }
-);}
-
-
-
-
-
-export const getDeleteGenreDestroyMutationKey = () => ['deleteGenreDestroy'] as const;
-
-export const getDeleteGenreDestroyMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteGenreDestroy>>, TError,DeleteGenreDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteGenreDestroy>>, TError,DeleteGenreDestroyMutationVariables, TContext> => {
-
-const mutationKey = getDeleteGenreDestroyMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteGenreDestroy>>, DeleteGenreDestroyMutationVariables> = (props) => {
-          const {slug} = props ?? {};
-
-          return  deleteGenreDestroy(slug,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type DeleteGenreDestroyMutationResult = NonNullable<Awaited<ReturnType<typeof deleteGenreDestroy>>>
-
-    export type DeleteGenreDestroyMutationError = ErrorType<ApiError>
-    export type DeleteGenreDestroyMutationVariables = {slug: string}
-
-    /**
- * @summary Delete a genre
- */
-export const useDeleteGenreDestroy = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteGenreDestroy>>, TError,DeleteGenreDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof deleteGenreDestroy>>,
-        TError,
-        DeleteGenreDestroyMutationVariables,
-        TContext
-      > => {
-      return useMutation(getDeleteGenreDestroyMutationOptions(options), queryClient);
-    }
-
 export const getPatchGenreUpdateUrl = (slug: string,) => {
 
 
@@ -18311,6 +19304,80 @@ export const usePatchGenreUpdate = <TError = ErrorType<ApiError | ValidationErro
         TContext
       > => {
       return useMutation(getPatchGenreUpdateMutationOptions(options), queryClient);
+    }
+
+export const getDeleteGenreDestroyUrl = (slug: string,) => {
+
+
+
+
+  return `/api/genres/${slug}`
+}
+
+/**
+ * @summary Delete a genre
+ */
+export const deleteGenreDestroy = async (slug: string, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
+
+  return customInstance<void>(getDeleteGenreDestroyUrl(slug),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteGenreDestroyMutationKey = () => ['deleteGenreDestroy'] as const;
+
+export const getDeleteGenreDestroyMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteGenreDestroy>>, TError,DeleteGenreDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteGenreDestroy>>, TError,DeleteGenreDestroyMutationVariables, TContext> => {
+
+const mutationKey = getDeleteGenreDestroyMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteGenreDestroy>>, DeleteGenreDestroyMutationVariables> = (props) => {
+          const {slug} = props ?? {};
+
+          return  deleteGenreDestroy(slug,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteGenreDestroyMutationResult = NonNullable<Awaited<ReturnType<typeof deleteGenreDestroy>>>
+
+    export type DeleteGenreDestroyMutationError = ErrorType<ApiError>
+    export type DeleteGenreDestroyMutationVariables = {slug: string}
+
+    /**
+ * @summary Delete a genre
+ */
+export const useDeleteGenreDestroy = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteGenreDestroy>>, TError,DeleteGenreDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteGenreDestroy>>,
+        TError,
+        DeleteGenreDestroyMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteGenreDestroyMutationOptions(options), queryClient);
     }
 
 export const getPostGenreAddSongUrl = (slug: string,) => {
@@ -18852,80 +19919,6 @@ export function useGetMovieShow<TData = Awaited<ReturnType<typeof getMovieShow>>
 
 
 
-export const getDeleteMovieDestroyUrl = (publicId: string,) => {
-
-
-
-
-  return `/api/movies/${publicId}`
-}
-
-/**
- * @summary Delete a movie
- */
-export const deleteMovieDestroy = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<DeleteMovieDestroy200> => {
-
-  return customInstance<DeleteMovieDestroy200>(getDeleteMovieDestroyUrl(publicId),
-  {
-    ...options,
-    method: 'DELETE'
-
-
-  }
-);}
-
-
-
-
-
-export const getDeleteMovieDestroyMutationKey = () => ['deleteMovieDestroy'] as const;
-
-export const getDeleteMovieDestroyMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMovieDestroy>>, TError,DeleteMovieDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteMovieDestroy>>, TError,DeleteMovieDestroyMutationVariables, TContext> => {
-
-const mutationKey = getDeleteMovieDestroyMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteMovieDestroy>>, DeleteMovieDestroyMutationVariables> = (props) => {
-          const {publicId} = props ?? {};
-
-          return  deleteMovieDestroy(publicId,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type DeleteMovieDestroyMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMovieDestroy>>>
-
-    export type DeleteMovieDestroyMutationError = ErrorType<ApiError | ValidationError>
-    export type DeleteMovieDestroyMutationVariables = {publicId: string}
-
-    /**
- * @summary Delete a movie
- */
-export const useDeleteMovieDestroy = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMovieDestroy>>, TError,DeleteMovieDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof deleteMovieDestroy>>,
-        TError,
-        DeleteMovieDestroyMutationVariables,
-        TContext
-      > => {
-      return useMutation(getDeleteMovieDestroyMutationOptions(options), queryClient);
-    }
-
 export const getPatchMovieUpdateUrl = (publicId: string,) => {
 
 
@@ -19013,6 +20006,80 @@ export const usePatchMovieUpdate = <TError = ErrorType<ApiError | ValidationErro
         TContext
       > => {
       return useMutation(getPatchMovieUpdateMutationOptions(options), queryClient);
+    }
+
+export const getDeleteMovieDestroyUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/movies/${publicId}`
+}
+
+/**
+ * @summary Delete a movie
+ */
+export const deleteMovieDestroy = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<DeleteMovieDestroy200> => {
+
+  return customInstance<DeleteMovieDestroy200>(getDeleteMovieDestroyUrl(publicId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteMovieDestroyMutationKey = () => ['deleteMovieDestroy'] as const;
+
+export const getDeleteMovieDestroyMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMovieDestroy>>, TError,DeleteMovieDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteMovieDestroy>>, TError,DeleteMovieDestroyMutationVariables, TContext> => {
+
+const mutationKey = getDeleteMovieDestroyMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteMovieDestroy>>, DeleteMovieDestroyMutationVariables> = (props) => {
+          const {publicId} = props ?? {};
+
+          return  deleteMovieDestroy(publicId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteMovieDestroyMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMovieDestroy>>>
+
+    export type DeleteMovieDestroyMutationError = ErrorType<ApiError | ValidationError>
+    export type DeleteMovieDestroyMutationVariables = {publicId: string}
+
+    /**
+ * @summary Delete a movie
+ */
+export const useDeleteMovieDestroy = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMovieDestroy>>, TError,DeleteMovieDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteMovieDestroy>>,
+        TError,
+        DeleteMovieDestroyMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteMovieDestroyMutationOptions(options), queryClient);
     }
 
 export const getGetMovieDirectorIndexUrl = (params?: GetMovieDirectorIndexParams,) => {
@@ -20000,80 +21067,6 @@ export function useGetSongShow<TData = Awaited<ReturnType<typeof getSongShow>>, 
 
 
 
-export const getDeleteSongDestroyUrl = (publicId: string,) => {
-
-
-
-
-  return `/api/songs/${publicId}`
-}
-
-/**
- * @summary Delete a song
- */
-export const deleteSongDestroy = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<DeleteSongDestroy200> => {
-
-  return customInstance<DeleteSongDestroy200>(getDeleteSongDestroyUrl(publicId),
-  {
-    ...options,
-    method: 'DELETE'
-
-
-  }
-);}
-
-
-
-
-
-export const getDeleteSongDestroyMutationKey = () => ['deleteSongDestroy'] as const;
-
-export const getDeleteSongDestroyMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSongDestroy>>, TError,DeleteSongDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteSongDestroy>>, TError,DeleteSongDestroyMutationVariables, TContext> => {
-
-const mutationKey = getDeleteSongDestroyMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteSongDestroy>>, DeleteSongDestroyMutationVariables> = (props) => {
-          const {publicId} = props ?? {};
-
-          return  deleteSongDestroy(publicId,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type DeleteSongDestroyMutationResult = NonNullable<Awaited<ReturnType<typeof deleteSongDestroy>>>
-
-    export type DeleteSongDestroyMutationError = ErrorType<ApiError | ValidationError>
-    export type DeleteSongDestroyMutationVariables = {publicId: string}
-
-    /**
- * @summary Delete a song
- */
-export const useDeleteSongDestroy = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSongDestroy>>, TError,DeleteSongDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof deleteSongDestroy>>,
-        TError,
-        DeleteSongDestroyMutationVariables,
-        TContext
-      > => {
-      return useMutation(getDeleteSongDestroyMutationOptions(options), queryClient);
-    }
-
 export const getPatchSongUpdateUrl = (publicId: string,) => {
 
 
@@ -20161,6 +21154,80 @@ export const usePatchSongUpdate = <TError = ErrorType<ApiError | ValidationError
         TContext
       > => {
       return useMutation(getPatchSongUpdateMutationOptions(options), queryClient);
+    }
+
+export const getDeleteSongDestroyUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/songs/${publicId}`
+}
+
+/**
+ * @summary Delete a song
+ */
+export const deleteSongDestroy = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<DeleteSongDestroy200> => {
+
+  return customInstance<DeleteSongDestroy200>(getDeleteSongDestroyUrl(publicId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteSongDestroyMutationKey = () => ['deleteSongDestroy'] as const;
+
+export const getDeleteSongDestroyMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSongDestroy>>, TError,DeleteSongDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteSongDestroy>>, TError,DeleteSongDestroyMutationVariables, TContext> => {
+
+const mutationKey = getDeleteSongDestroyMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteSongDestroy>>, DeleteSongDestroyMutationVariables> = (props) => {
+          const {publicId} = props ?? {};
+
+          return  deleteSongDestroy(publicId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteSongDestroyMutationResult = NonNullable<Awaited<ReturnType<typeof deleteSongDestroy>>>
+
+    export type DeleteSongDestroyMutationError = ErrorType<ApiError | ValidationError>
+    export type DeleteSongDestroyMutationVariables = {publicId: string}
+
+    /**
+ * @summary Delete a song
+ */
+export const useDeleteSongDestroy = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSongDestroy>>, TError,DeleteSongDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteSongDestroy>>,
+        TError,
+        DeleteSongDestroyMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteSongDestroyMutationOptions(options), queryClient);
     }
 
 export const getGetVideoPlaybackInformationUrl = (publicId: string,) => {
@@ -21552,80 +22619,6 @@ export function useGetLibraryShow<TData = Awaited<ReturnType<typeof getLibrarySh
 
 
 
-export const getDeleteLibraryDeleteUrl = (id: string,) => {
-
-
-
-
-  return `/api/libraries/${id}`
-}
-
-/**
- * @summary Delete a library (admin)
- */
-export const deleteLibraryDelete = async (id: string, options?: Parameters<typeof customInstance>[1]): Promise<DeleteLibraryDelete200> => {
-
-  return customInstance<DeleteLibraryDelete200>(getDeleteLibraryDeleteUrl(id),
-  {
-    ...options,
-    method: 'DELETE'
-
-
-  }
-);}
-
-
-
-
-
-export const getDeleteLibraryDeleteMutationKey = () => ['deleteLibraryDelete'] as const;
-
-export const getDeleteLibraryDeleteMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteLibraryDelete>>, TError,DeleteLibraryDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteLibraryDelete>>, TError,DeleteLibraryDeleteMutationVariables, TContext> => {
-
-const mutationKey = getDeleteLibraryDeleteMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteLibraryDelete>>, DeleteLibraryDeleteMutationVariables> = (props) => {
-          const {id} = props ?? {};
-
-          return  deleteLibraryDelete(id,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type DeleteLibraryDeleteMutationResult = NonNullable<Awaited<ReturnType<typeof deleteLibraryDelete>>>
-
-    export type DeleteLibraryDeleteMutationError = ErrorType<ApiError>
-    export type DeleteLibraryDeleteMutationVariables = {id: string}
-
-    /**
- * @summary Delete a library (admin)
- */
-export const useDeleteLibraryDelete = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteLibraryDelete>>, TError,DeleteLibraryDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof deleteLibraryDelete>>,
-        TError,
-        DeleteLibraryDeleteMutationVariables,
-        TContext
-      > => {
-      return useMutation(getDeleteLibraryDeleteMutationOptions(options), queryClient);
-    }
-
 export const getPatchLibraryUpdateUrl = (id: string,) => {
 
 
@@ -21713,6 +22706,80 @@ export const usePatchLibraryUpdate = <TError = ErrorType<ApiError | ValidationEr
         TContext
       > => {
       return useMutation(getPatchLibraryUpdateMutationOptions(options), queryClient);
+    }
+
+export const getDeleteLibraryDeleteUrl = (id: string,) => {
+
+
+
+
+  return `/api/libraries/${id}`
+}
+
+/**
+ * @summary Delete a library (admin)
+ */
+export const deleteLibraryDelete = async (id: string, options?: Parameters<typeof customInstance>[1]): Promise<DeleteLibraryDelete200> => {
+
+  return customInstance<DeleteLibraryDelete200>(getDeleteLibraryDeleteUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteLibraryDeleteMutationKey = () => ['deleteLibraryDelete'] as const;
+
+export const getDeleteLibraryDeleteMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteLibraryDelete>>, TError,DeleteLibraryDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteLibraryDelete>>, TError,DeleteLibraryDeleteMutationVariables, TContext> => {
+
+const mutationKey = getDeleteLibraryDeleteMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteLibraryDelete>>, DeleteLibraryDeleteMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteLibraryDelete(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteLibraryDeleteMutationResult = NonNullable<Awaited<ReturnType<typeof deleteLibraryDelete>>>
+
+    export type DeleteLibraryDeleteMutationError = ErrorType<ApiError>
+    export type DeleteLibraryDeleteMutationVariables = {id: string}
+
+    /**
+ * @summary Delete a library (admin)
+ */
+export const useDeleteLibraryDelete = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteLibraryDelete>>, TError,DeleteLibraryDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteLibraryDelete>>,
+        TError,
+        DeleteLibraryDeleteMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteLibraryDeleteMutationOptions(options), queryClient);
     }
 
 export const getPostLibraryScanUrl = (id: string,) => {
@@ -26717,6 +27784,94 @@ export const usePostPartyMemberTransferHost = <TError = ErrorType<ApiError>,
       return useMutation(getPostPartyMemberTransferHostMutationOptions(options), queryClient);
     }
 
+export const getPostPartySessionCreateUrl = () => {
+
+
+
+
+  return `/api/party/sessions/`
+}
+
+/**
+ * @summary Create a new watch party session
+ */
+export const postPartySessionCreate = async (createPartySessionRequest: CreatePartySessionRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPartySessionCreate201> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<PostPartySessionCreate201>(getPostPartySessionCreateUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createPartySessionRequest)
+  }
+);}
+
+
+
+
+
+export const getPostPartySessionCreateMutationKey = () => ['postPartySessionCreate'] as const;
+
+export const getPostPartySessionCreateMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionCreate>>, TError,PostPartySessionCreateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postPartySessionCreate>>, TError,PostPartySessionCreateMutationVariables, TContext> => {
+
+const mutationKey = getPostPartySessionCreateMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPartySessionCreate>>, PostPartySessionCreateMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  postPartySessionCreate(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostPartySessionCreateMutationResult = NonNullable<Awaited<ReturnType<typeof postPartySessionCreate>>>
+    export type PostPartySessionCreateMutationBody = BodyType<CreatePartySessionRequest>
+    export type PostPartySessionCreateMutationError = ErrorType<ApiError | ValidationError>
+    export type PostPartySessionCreateMutationVariables = {data: BodyType<CreatePartySessionRequest>}
+
+    /**
+ * @summary Create a new watch party session
+ */
+export const usePostPartySessionCreate = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionCreate>>, TError,PostPartySessionCreateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postPartySessionCreate>>,
+        TError,
+        PostPartySessionCreateMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostPartySessionCreateMutationOptions(options), queryClient);
+    }
+
 export const getGetPartySessionIndexUrl = () => {
 
 
@@ -26818,94 +27973,6 @@ export function useGetPartySessionIndex<TData = Awaited<ReturnType<typeof getPar
 
 
 
-
-export const getPostPartySessionCreateUrl = () => {
-
-
-
-
-  return `/api/party/sessions/`
-}
-
-/**
- * @summary Create a new watch party session
- */
-export const postPartySessionCreate = async (createPartySessionRequest: CreatePartySessionRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPartySessionCreate201> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostPartySessionCreate201>(getPostPartySessionCreateUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(createPartySessionRequest)
-  }
-);}
-
-
-
-
-
-export const getPostPartySessionCreateMutationKey = () => ['postPartySessionCreate'] as const;
-
-export const getPostPartySessionCreateMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionCreate>>, TError,PostPartySessionCreateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postPartySessionCreate>>, TError,PostPartySessionCreateMutationVariables, TContext> => {
-
-const mutationKey = getPostPartySessionCreateMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPartySessionCreate>>, PostPartySessionCreateMutationVariables> = (props) => {
-          const {data} = props ?? {};
-
-          return  postPartySessionCreate(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type PostPartySessionCreateMutationResult = NonNullable<Awaited<ReturnType<typeof postPartySessionCreate>>>
-    export type PostPartySessionCreateMutationBody = BodyType<CreatePartySessionRequest>
-    export type PostPartySessionCreateMutationError = ErrorType<ApiError | ValidationError>
-    export type PostPartySessionCreateMutationVariables = {data: BodyType<CreatePartySessionRequest>}
-
-    /**
- * @summary Create a new watch party session
- */
-export const usePostPartySessionCreate = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionCreate>>, TError,PostPartySessionCreateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postPartySessionCreate>>,
-        TError,
-        PostPartySessionCreateMutationVariables,
-        TContext
-      > => {
-      return useMutation(getPostPartySessionCreateMutationOptions(options), queryClient);
-    }
 
 export const getGetPartySessionShowUrl = (publicId: string,) => {
 
@@ -27612,80 +28679,6 @@ export function useGetPlaylistShow<TData = Awaited<ReturnType<typeof getPlaylist
 
 
 
-export const getDeletePlaylistDestroyUrl = (publicId: string,) => {
-
-
-
-
-  return `/api/playlists/${publicId}`
-}
-
-/**
- * @summary Delete a playlist
- */
-export const deletePlaylistDestroy = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
-
-  return customInstance<void>(getDeletePlaylistDestroyUrl(publicId),
-  {
-    ...options,
-    method: 'DELETE'
-
-
-  }
-);}
-
-
-
-
-
-export const getDeletePlaylistDestroyMutationKey = () => ['deletePlaylistDestroy'] as const;
-
-export const getDeletePlaylistDestroyMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePlaylistDestroy>>, TError,DeletePlaylistDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof deletePlaylistDestroy>>, TError,DeletePlaylistDestroyMutationVariables, TContext> => {
-
-const mutationKey = getDeletePlaylistDestroyMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deletePlaylistDestroy>>, DeletePlaylistDestroyMutationVariables> = (props) => {
-          const {publicId} = props ?? {};
-
-          return  deletePlaylistDestroy(publicId,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type DeletePlaylistDestroyMutationResult = NonNullable<Awaited<ReturnType<typeof deletePlaylistDestroy>>>
-
-    export type DeletePlaylistDestroyMutationError = ErrorType<ApiError>
-    export type DeletePlaylistDestroyMutationVariables = {publicId: string}
-
-    /**
- * @summary Delete a playlist
- */
-export const useDeletePlaylistDestroy = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePlaylistDestroy>>, TError,DeletePlaylistDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof deletePlaylistDestroy>>,
-        TError,
-        DeletePlaylistDestroyMutationVariables,
-        TContext
-      > => {
-      return useMutation(getDeletePlaylistDestroyMutationOptions(options), queryClient);
-    }
-
 export const getPatchPlaylistUpdateUrl = (publicId: string,) => {
 
 
@@ -27773,6 +28766,80 @@ export const usePatchPlaylistUpdate = <TError = ErrorType<ApiError | ValidationE
         TContext
       > => {
       return useMutation(getPatchPlaylistUpdateMutationOptions(options), queryClient);
+    }
+
+export const getDeletePlaylistDestroyUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/playlists/${publicId}`
+}
+
+/**
+ * @summary Delete a playlist
+ */
+export const deletePlaylistDestroy = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
+
+  return customInstance<void>(getDeletePlaylistDestroyUrl(publicId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeletePlaylistDestroyMutationKey = () => ['deletePlaylistDestroy'] as const;
+
+export const getDeletePlaylistDestroyMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePlaylistDestroy>>, TError,DeletePlaylistDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deletePlaylistDestroy>>, TError,DeletePlaylistDestroyMutationVariables, TContext> => {
+
+const mutationKey = getDeletePlaylistDestroyMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deletePlaylistDestroy>>, DeletePlaylistDestroyMutationVariables> = (props) => {
+          const {publicId} = props ?? {};
+
+          return  deletePlaylistDestroy(publicId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeletePlaylistDestroyMutationResult = NonNullable<Awaited<ReturnType<typeof deletePlaylistDestroy>>>
+
+    export type DeletePlaylistDestroyMutationError = ErrorType<ApiError>
+    export type DeletePlaylistDestroyMutationVariables = {publicId: string}
+
+    /**
+ * @summary Delete a playlist
+ */
+export const useDeletePlaylistDestroy = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePlaylistDestroy>>, TError,DeletePlaylistDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deletePlaylistDestroy>>,
+        TError,
+        DeletePlaylistDestroyMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeletePlaylistDestroyMutationOptions(options), queryClient);
     }
 
 export const getPostPlaylistAddSongUrl = (publicId: string,) => {
@@ -32172,6 +33239,94 @@ export function useGetAdminSchedulerCommands<TData = Awaited<ReturnType<typeof g
 
 
 
+export const getPostDeviceRegisterUrl = () => {
+
+
+
+
+  return `/api/devices`
+}
+
+/**
+ * @summary Register or touch a device (upsert)
+ */
+export const postDeviceRegister = async (registerDeviceRequest: RegisterDeviceRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostDeviceRegister200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<PostDeviceRegister200>(getPostDeviceRegisterUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(registerDeviceRequest)
+  }
+);}
+
+
+
+
+
+export const getPostDeviceRegisterMutationKey = () => ['postDeviceRegister'] as const;
+
+export const getPostDeviceRegisterMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDeviceRegister>>, TError,PostDeviceRegisterMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postDeviceRegister>>, TError,PostDeviceRegisterMutationVariables, TContext> => {
+
+const mutationKey = getPostDeviceRegisterMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postDeviceRegister>>, PostDeviceRegisterMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  postDeviceRegister(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostDeviceRegisterMutationResult = NonNullable<Awaited<ReturnType<typeof postDeviceRegister>>>
+    export type PostDeviceRegisterMutationBody = BodyType<RegisterDeviceRequest>
+    export type PostDeviceRegisterMutationError = ErrorType<ApiError | ValidationError>
+    export type PostDeviceRegisterMutationVariables = {data: BodyType<RegisterDeviceRequest>}
+
+    /**
+ * @summary Register or touch a device (upsert)
+ */
+export const usePostDeviceRegister = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDeviceRegister>>, TError,PostDeviceRegisterMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postDeviceRegister>>,
+        TError,
+        PostDeviceRegisterMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostDeviceRegisterMutationOptions(options), queryClient);
+    }
+
 export const getGetDeviceListUrl = () => {
 
 
@@ -32272,94 +33427,6 @@ export function useGetDeviceList<TData = Awaited<ReturnType<typeof getDeviceList
 
 
 
-
-export const getPostDeviceRegisterUrl = () => {
-
-
-
-
-  return `/api/devices`
-}
-
-/**
- * @summary Register or touch a device (upsert)
- */
-export const postDeviceRegister = async (registerDeviceRequest: RegisterDeviceRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostDeviceRegister200> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostDeviceRegister200>(getPostDeviceRegisterUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(registerDeviceRequest)
-  }
-);}
-
-
-
-
-
-export const getPostDeviceRegisterMutationKey = () => ['postDeviceRegister'] as const;
-
-export const getPostDeviceRegisterMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDeviceRegister>>, TError,PostDeviceRegisterMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postDeviceRegister>>, TError,PostDeviceRegisterMutationVariables, TContext> => {
-
-const mutationKey = getPostDeviceRegisterMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postDeviceRegister>>, PostDeviceRegisterMutationVariables> = (props) => {
-          const {data} = props ?? {};
-
-          return  postDeviceRegister(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type PostDeviceRegisterMutationResult = NonNullable<Awaited<ReturnType<typeof postDeviceRegister>>>
-    export type PostDeviceRegisterMutationBody = BodyType<RegisterDeviceRequest>
-    export type PostDeviceRegisterMutationError = ErrorType<ApiError | ValidationError>
-    export type PostDeviceRegisterMutationVariables = {data: BodyType<RegisterDeviceRequest>}
-
-    /**
- * @summary Register or touch a device (upsert)
- */
-export const usePostDeviceRegister = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDeviceRegister>>, TError,PostDeviceRegisterMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postDeviceRegister>>,
-        TError,
-        PostDeviceRegisterMutationVariables,
-        TContext
-      > => {
-      return useMutation(getPostDeviceRegisterMutationOptions(options), queryClient);
-    }
 
 export const getPutDeviceRenameUrl = (deviceId: string,) => {
 
@@ -38015,1073 +39082,6 @@ export const usePostStreamSigningSign = <TError = ErrorType<void | PostStreamSig
         TContext
       > => {
       return useMutation(getPostStreamSigningSignMutationOptions(options), queryClient);
-    }
-
-export const getGetTranscodeJobIndexUrl = () => {
-
-
-
-
-  return `/api/transcode/jobs/`
-}
-
-/**
- * @summary List orphaned transcode jobs in accessible libraries
- */
-export const getTranscodeJobIndex = async ( options?: Parameters<typeof customInstance>[1]): Promise<GetTranscodeJobIndex200> => {
-
-  return customInstance<GetTranscodeJobIndex200>(getGetTranscodeJobIndexUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetTranscodeJobIndexQueryKey = () => {
-    return [
-    `/api/transcode/jobs/`
-    ] as const;
-    }
-
-
-export const getGetTranscodeJobIndexQueryOptions = <TData = Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetTranscodeJobIndexQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTranscodeJobIndex>>> = ({ signal }) => getTranscodeJobIndex({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetTranscodeJobIndexQueryResult = NonNullable<Awaited<ReturnType<typeof getTranscodeJobIndex>>>
-export type GetTranscodeJobIndexQueryError = ErrorType<unknown>
-
-
-export function useGetTranscodeJobIndex<TData = Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError = ErrorType<unknown>>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getTranscodeJobIndex>>,
-          TError,
-          Awaited<ReturnType<typeof getTranscodeJobIndex>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetTranscodeJobIndex<TData = Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getTranscodeJobIndex>>,
-          TError,
-          Awaited<ReturnType<typeof getTranscodeJobIndex>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetTranscodeJobIndex<TData = Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List orphaned transcode jobs in accessible libraries
- */
-
-export function useGetTranscodeJobIndex<TData = Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetTranscodeJobIndexQueryOptions(options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
-export const getGetTranscodeJobShowUrl = (publicId: string,) => {
-
-
-
-
-  return `/api/transcode/jobs/${publicId}`
-}
-
-/**
- * @summary Get a transcode job by public ID
- */
-export const getTranscodeJobShow = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetTranscodeJobShow200> => {
-
-  return customInstance<GetTranscodeJobShow200>(getGetTranscodeJobShowUrl(publicId),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetTranscodeJobShowQueryKey = (publicId: string,) => {
-    return [
-    `/api/transcode/jobs/${publicId}`
-    ] as const;
-    }
-
-
-export const getGetTranscodeJobShowQueryOptions = <TData = Awaited<ReturnType<typeof getTranscodeJobShow>>, TError = ErrorType<ApiError>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetTranscodeJobShowQueryKey(publicId);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTranscodeJobShow>>> = ({ signal }) => getTranscodeJobShow(publicId, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobShow>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetTranscodeJobShowQueryResult = NonNullable<Awaited<ReturnType<typeof getTranscodeJobShow>>>
-export type GetTranscodeJobShowQueryError = ErrorType<ApiError>
-
-
-export function useGetTranscodeJobShow<TData = Awaited<ReturnType<typeof getTranscodeJobShow>>, TError = ErrorType<ApiError>>(
- publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobShow>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getTranscodeJobShow>>,
-          TError,
-          Awaited<ReturnType<typeof getTranscodeJobShow>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetTranscodeJobShow<TData = Awaited<ReturnType<typeof getTranscodeJobShow>>, TError = ErrorType<ApiError>>(
- publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobShow>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getTranscodeJobShow>>,
-          TError,
-          Awaited<ReturnType<typeof getTranscodeJobShow>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetTranscodeJobShow<TData = Awaited<ReturnType<typeof getTranscodeJobShow>>, TError = ErrorType<ApiError>>(
- publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get a transcode job by public ID
- */
-
-export function useGetTranscodeJobShow<TData = Awaited<ReturnType<typeof getTranscodeJobShow>>, TError = ErrorType<ApiError>>(
- publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetTranscodeJobShowQueryOptions(publicId,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
-export const getPostTranscodeJobCleanupUrl = () => {
-
-
-
-
-  return `/api/transcode/jobs/cleanup`
-}
-
-/**
- * @summary Expire stale transcode sessions and clean up orphaned transcode jobs (no active sessions)
- */
-export const postTranscodeJobCleanup = async ( options?: Parameters<typeof customInstance>[1]): Promise<PostTranscodeJobCleanup200> => {
-
-  return customInstance<PostTranscodeJobCleanup200>(getPostTranscodeJobCleanupUrl(),
-  {
-    ...options,
-    method: 'POST'
-
-
-  }
-);}
-
-
-
-
-
-export const getPostTranscodeJobCleanupMutationKey = () => ['postTranscodeJobCleanup'] as const;
-
-export const getPostTranscodeJobCleanupMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeJobCleanup>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postTranscodeJobCleanup>>, TError,void, TContext> => {
-
-const mutationKey = getPostTranscodeJobCleanupMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postTranscodeJobCleanup>>, void> = () => {
-
-
-          return  postTranscodeJobCleanup(requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type PostTranscodeJobCleanupMutationResult = NonNullable<Awaited<ReturnType<typeof postTranscodeJobCleanup>>>
-
-    export type PostTranscodeJobCleanupMutationError = ErrorType<ApiError>
-
-
-    /**
- * @summary Expire stale transcode sessions and clean up orphaned transcode jobs (no active sessions)
- */
-export const usePostTranscodeJobCleanup = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeJobCleanup>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postTranscodeJobCleanup>>,
-        TError,
-        void,
-        TContext
-      > => {
-      return useMutation(getPostTranscodeJobCleanupMutationOptions(options), queryClient);
-    }
-
-export const getGetTranscodeJobMetricsUrl = (publicId: string,) => {
-
-
-
-
-  return `/api/transcode/jobs/${publicId}/metrics`
-}
-
-/**
- * @summary Get transcode job metrics
- */
-export const getTranscodeJobMetrics = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<TranscodeMetricsResource> => {
-
-  return customInstance<TranscodeMetricsResource>(getGetTranscodeJobMetricsUrl(publicId),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetTranscodeJobMetricsQueryKey = (publicId: string,) => {
-    return [
-    `/api/transcode/jobs/${publicId}/metrics`
-    ] as const;
-    }
-
-
-export const getGetTranscodeJobMetricsQueryOptions = <TData = Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError = ErrorType<ApiError>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetTranscodeJobMetricsQueryKey(publicId);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTranscodeJobMetrics>>> = ({ signal }) => getTranscodeJobMetrics(publicId, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetTranscodeJobMetricsQueryResult = NonNullable<Awaited<ReturnType<typeof getTranscodeJobMetrics>>>
-export type GetTranscodeJobMetricsQueryError = ErrorType<ApiError>
-
-
-export function useGetTranscodeJobMetrics<TData = Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError = ErrorType<ApiError>>(
- publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getTranscodeJobMetrics>>,
-          TError,
-          Awaited<ReturnType<typeof getTranscodeJobMetrics>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetTranscodeJobMetrics<TData = Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError = ErrorType<ApiError>>(
- publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getTranscodeJobMetrics>>,
-          TError,
-          Awaited<ReturnType<typeof getTranscodeJobMetrics>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetTranscodeJobMetrics<TData = Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError = ErrorType<ApiError>>(
- publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get transcode job metrics
- */
-
-export function useGetTranscodeJobMetrics<TData = Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError = ErrorType<ApiError>>(
- publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetTranscodeJobMetricsQueryOptions(publicId,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
-export const getGetTranscodeSessionIndexUrl = () => {
-
-
-
-
-  return `/api/transcode/sessions/`
-}
-
-/**
- * @summary List active transcode sessions for the authenticated user
- */
-export const getTranscodeSessionIndex = async ( options?: Parameters<typeof customInstance>[1]): Promise<GetTranscodeSessionIndex200> => {
-
-  return customInstance<GetTranscodeSessionIndex200>(getGetTranscodeSessionIndexUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetTranscodeSessionIndexQueryKey = () => {
-    return [
-    `/api/transcode/sessions/`
-    ] as const;
-    }
-
-
-export const getGetTranscodeSessionIndexQueryOptions = <TData = Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError = ErrorType<ApiError>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetTranscodeSessionIndexQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTranscodeSessionIndex>>> = ({ signal }) => getTranscodeSessionIndex({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetTranscodeSessionIndexQueryResult = NonNullable<Awaited<ReturnType<typeof getTranscodeSessionIndex>>>
-export type GetTranscodeSessionIndexQueryError = ErrorType<ApiError>
-
-
-export function useGetTranscodeSessionIndex<TData = Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError = ErrorType<ApiError>>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getTranscodeSessionIndex>>,
-          TError,
-          Awaited<ReturnType<typeof getTranscodeSessionIndex>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetTranscodeSessionIndex<TData = Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError = ErrorType<ApiError>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getTranscodeSessionIndex>>,
-          TError,
-          Awaited<ReturnType<typeof getTranscodeSessionIndex>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetTranscodeSessionIndex<TData = Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError = ErrorType<ApiError>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List active transcode sessions for the authenticated user
- */
-
-export function useGetTranscodeSessionIndex<TData = Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError = ErrorType<ApiError>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetTranscodeSessionIndexQueryOptions(options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
-export const getPostTranscodeSessionCreateUrl = () => {
-
-
-
-
-  return `/api/transcode/sessions/`
-}
-
-/**
- * @summary Create a new transcode session
- */
-export const postTranscodeSessionCreate = async (postTranscodeSessionCreateBody: PostTranscodeSessionCreateBody, options?: Parameters<typeof customInstance>[1]): Promise<TranscodeSessionResource> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<TranscodeSessionResource>(getPostTranscodeSessionCreateUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(postTranscodeSessionCreateBody)
-  }
-);}
-
-
-
-
-
-export const getPostTranscodeSessionCreateMutationKey = () => ['postTranscodeSessionCreate'] as const;
-
-export const getPostTranscodeSessionCreateMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionCreate>>, TError,PostTranscodeSessionCreateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionCreate>>, TError,PostTranscodeSessionCreateMutationVariables, TContext> => {
-
-const mutationKey = getPostTranscodeSessionCreateMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postTranscodeSessionCreate>>, PostTranscodeSessionCreateMutationVariables> = (props) => {
-          const {data} = props ?? {};
-
-          return  postTranscodeSessionCreate(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type PostTranscodeSessionCreateMutationResult = NonNullable<Awaited<ReturnType<typeof postTranscodeSessionCreate>>>
-    export type PostTranscodeSessionCreateMutationBody = BodyType<PostTranscodeSessionCreateBody>
-    export type PostTranscodeSessionCreateMutationError = ErrorType<ApiError | ValidationError>
-    export type PostTranscodeSessionCreateMutationVariables = {data: BodyType<PostTranscodeSessionCreateBody>}
-
-    /**
- * @summary Create a new transcode session
- */
-export const usePostTranscodeSessionCreate = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionCreate>>, TError,PostTranscodeSessionCreateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postTranscodeSessionCreate>>,
-        TError,
-        PostTranscodeSessionCreateMutationVariables,
-        TContext
-      > => {
-      return useMutation(getPostTranscodeSessionCreateMutationOptions(options), queryClient);
-    }
-
-export const getGetTranscodeSessionShowUrl = (publicId: string,) => {
-
-
-
-
-  return `/api/transcode/sessions/${publicId}`
-}
-
-/**
- * @summary Get a transcode session by public identifier
- */
-export const getTranscodeSessionShow = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetTranscodeSessionShow200> => {
-
-  return customInstance<GetTranscodeSessionShow200>(getGetTranscodeSessionShowUrl(publicId),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetTranscodeSessionShowQueryKey = (publicId: string,) => {
-    return [
-    `/api/transcode/sessions/${publicId}`
-    ] as const;
-    }
-
-
-export const getGetTranscodeSessionShowQueryOptions = <TData = Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError = ErrorType<ApiError>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetTranscodeSessionShowQueryKey(publicId);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTranscodeSessionShow>>> = ({ signal }) => getTranscodeSessionShow(publicId, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetTranscodeSessionShowQueryResult = NonNullable<Awaited<ReturnType<typeof getTranscodeSessionShow>>>
-export type GetTranscodeSessionShowQueryError = ErrorType<ApiError>
-
-
-export function useGetTranscodeSessionShow<TData = Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError = ErrorType<ApiError>>(
- publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getTranscodeSessionShow>>,
-          TError,
-          Awaited<ReturnType<typeof getTranscodeSessionShow>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetTranscodeSessionShow<TData = Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError = ErrorType<ApiError>>(
- publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getTranscodeSessionShow>>,
-          TError,
-          Awaited<ReturnType<typeof getTranscodeSessionShow>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetTranscodeSessionShow<TData = Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError = ErrorType<ApiError>>(
- publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get a transcode session by public identifier
- */
-
-export function useGetTranscodeSessionShow<TData = Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError = ErrorType<ApiError>>(
- publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetTranscodeSessionShowQueryOptions(publicId,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
-export const getDeleteTranscodeSessionCancelUrl = (publicId: string,) => {
-
-
-
-
-  return `/api/transcode/sessions/${publicId}`
-}
-
-/**
- * @summary Cancel a transcode session
- */
-export const deleteTranscodeSessionCancel = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<DeleteTranscodeSessionCancel200> => {
-
-  return customInstance<DeleteTranscodeSessionCancel200>(getDeleteTranscodeSessionCancelUrl(publicId),
-  {
-    ...options,
-    method: 'DELETE'
-
-
-  }
-);}
-
-
-
-
-
-export const getDeleteTranscodeSessionCancelMutationKey = () => ['deleteTranscodeSessionCancel'] as const;
-
-export const getDeleteTranscodeSessionCancelMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTranscodeSessionCancel>>, TError,DeleteTranscodeSessionCancelMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteTranscodeSessionCancel>>, TError,DeleteTranscodeSessionCancelMutationVariables, TContext> => {
-
-const mutationKey = getDeleteTranscodeSessionCancelMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTranscodeSessionCancel>>, DeleteTranscodeSessionCancelMutationVariables> = (props) => {
-          const {publicId} = props ?? {};
-
-          return  deleteTranscodeSessionCancel(publicId,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type DeleteTranscodeSessionCancelMutationResult = NonNullable<Awaited<ReturnType<typeof deleteTranscodeSessionCancel>>>
-
-    export type DeleteTranscodeSessionCancelMutationError = ErrorType<ApiError>
-    export type DeleteTranscodeSessionCancelMutationVariables = {publicId: string}
-
-    /**
- * @summary Cancel a transcode session
- */
-export const useDeleteTranscodeSessionCancel = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTranscodeSessionCancel>>, TError,DeleteTranscodeSessionCancelMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof deleteTranscodeSessionCancel>>,
-        TError,
-        DeleteTranscodeSessionCancelMutationVariables,
-        TContext
-      > => {
-      return useMutation(getDeleteTranscodeSessionCancelMutationOptions(options), queryClient);
-    }
-
-export const getPatchTranscodeSessionUpdateUrl = (publicId: string,) => {
-
-
-
-
-  return `/api/transcode/sessions/${publicId}`
-}
-
-/**
- * @summary Update a transcode session
- */
-export const patchTranscodeSessionUpdate = async (publicId: string,
-    patchTranscodeSessionUpdateBody: PatchTranscodeSessionUpdateBody, options?: Parameters<typeof customInstance>[1]): Promise<PatchTranscodeSessionUpdate200> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PatchTranscodeSessionUpdate200>(getPatchTranscodeSessionUpdateUrl(publicId),
-  {
-    ...options,
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(patchTranscodeSessionUpdateBody)
-  }
-);}
-
-
-
-
-
-export const getPatchTranscodeSessionUpdateMutationKey = () => ['patchTranscodeSessionUpdate'] as const;
-
-export const getPatchTranscodeSessionUpdateMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionUpdate>>, TError,PatchTranscodeSessionUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionUpdate>>, TError,PatchTranscodeSessionUpdateMutationVariables, TContext> => {
-
-const mutationKey = getPatchTranscodeSessionUpdateMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchTranscodeSessionUpdate>>, PatchTranscodeSessionUpdateMutationVariables> = (props) => {
-          const {publicId,data} = props ?? {};
-
-          return  patchTranscodeSessionUpdate(publicId,data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type PatchTranscodeSessionUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof patchTranscodeSessionUpdate>>>
-    export type PatchTranscodeSessionUpdateMutationBody = BodyType<PatchTranscodeSessionUpdateBody>
-    export type PatchTranscodeSessionUpdateMutationError = ErrorType<ApiError>
-    export type PatchTranscodeSessionUpdateMutationVariables = {publicId: string;data: BodyType<PatchTranscodeSessionUpdateBody>}
-
-    /**
- * @summary Update a transcode session
- */
-export const usePatchTranscodeSessionUpdate = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionUpdate>>, TError,PatchTranscodeSessionUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof patchTranscodeSessionUpdate>>,
-        TError,
-        PatchTranscodeSessionUpdateMutationVariables,
-        TContext
-      > => {
-      return useMutation(getPatchTranscodeSessionUpdateMutationOptions(options), queryClient);
-    }
-
-export const getPatchTranscodeSessionPauseUrl = (publicId: string,) => {
-
-
-
-
-  return `/api/transcode/sessions/${publicId}/pause`
-}
-
-/**
- * @summary Pause a transcode session
- */
-export const patchTranscodeSessionPause = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<PatchTranscodeSessionPause200> => {
-
-  return customInstance<PatchTranscodeSessionPause200>(getPatchTranscodeSessionPauseUrl(publicId),
-  {
-    ...options,
-    method: 'PATCH'
-
-
-  }
-);}
-
-
-
-
-
-export const getPatchTranscodeSessionPauseMutationKey = () => ['patchTranscodeSessionPause'] as const;
-
-export const getPatchTranscodeSessionPauseMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionPause>>, TError,PatchTranscodeSessionPauseMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionPause>>, TError,PatchTranscodeSessionPauseMutationVariables, TContext> => {
-
-const mutationKey = getPatchTranscodeSessionPauseMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchTranscodeSessionPause>>, PatchTranscodeSessionPauseMutationVariables> = (props) => {
-          const {publicId} = props ?? {};
-
-          return  patchTranscodeSessionPause(publicId,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type PatchTranscodeSessionPauseMutationResult = NonNullable<Awaited<ReturnType<typeof patchTranscodeSessionPause>>>
-
-    export type PatchTranscodeSessionPauseMutationError = ErrorType<ApiError>
-    export type PatchTranscodeSessionPauseMutationVariables = {publicId: string}
-
-    /**
- * @summary Pause a transcode session
- */
-export const usePatchTranscodeSessionPause = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionPause>>, TError,PatchTranscodeSessionPauseMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof patchTranscodeSessionPause>>,
-        TError,
-        PatchTranscodeSessionPauseMutationVariables,
-        TContext
-      > => {
-      return useMutation(getPatchTranscodeSessionPauseMutationOptions(options), queryClient);
-    }
-
-export const getPatchTranscodeSessionResumeUrl = (publicId: string,) => {
-
-
-
-
-  return `/api/transcode/sessions/${publicId}/resume`
-}
-
-/**
- * @summary Resume a paused transcode session
- */
-export const patchTranscodeSessionResume = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<PatchTranscodeSessionResume200> => {
-
-  return customInstance<PatchTranscodeSessionResume200>(getPatchTranscodeSessionResumeUrl(publicId),
-  {
-    ...options,
-    method: 'PATCH'
-
-
-  }
-);}
-
-
-
-
-
-export const getPatchTranscodeSessionResumeMutationKey = () => ['patchTranscodeSessionResume'] as const;
-
-export const getPatchTranscodeSessionResumeMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionResume>>, TError,PatchTranscodeSessionResumeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionResume>>, TError,PatchTranscodeSessionResumeMutationVariables, TContext> => {
-
-const mutationKey = getPatchTranscodeSessionResumeMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchTranscodeSessionResume>>, PatchTranscodeSessionResumeMutationVariables> = (props) => {
-          const {publicId} = props ?? {};
-
-          return  patchTranscodeSessionResume(publicId,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type PatchTranscodeSessionResumeMutationResult = NonNullable<Awaited<ReturnType<typeof patchTranscodeSessionResume>>>
-
-    export type PatchTranscodeSessionResumeMutationError = ErrorType<ApiError>
-    export type PatchTranscodeSessionResumeMutationVariables = {publicId: string}
-
-    /**
- * @summary Resume a paused transcode session
- */
-export const usePatchTranscodeSessionResume = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionResume>>, TError,PatchTranscodeSessionResumeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof patchTranscodeSessionResume>>,
-        TError,
-        PatchTranscodeSessionResumeMutationVariables,
-        TContext
-      > => {
-      return useMutation(getPatchTranscodeSessionResumeMutationOptions(options), queryClient);
-    }
-
-export const getPostTranscodeSessionPositionUrl = (publicId: string,) => {
-
-
-
-
-  return `/api/transcode/sessions/${publicId}/position`
-}
-
-/**
- * @summary Update transcode session playback position
- */
-export const postTranscodeSessionPosition = async (publicId: string,
-    postTranscodeSessionPositionBody: PostTranscodeSessionPositionBody, options?: Parameters<typeof customInstance>[1]): Promise<PostTranscodeSessionPosition200> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostTranscodeSessionPosition200>(getPostTranscodeSessionPositionUrl(publicId),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(postTranscodeSessionPositionBody)
-  }
-);}
-
-
-
-
-
-export const getPostTranscodeSessionPositionMutationKey = () => ['postTranscodeSessionPosition'] as const;
-
-export const getPostTranscodeSessionPositionMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionPosition>>, TError,PostTranscodeSessionPositionMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionPosition>>, TError,PostTranscodeSessionPositionMutationVariables, TContext> => {
-
-const mutationKey = getPostTranscodeSessionPositionMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postTranscodeSessionPosition>>, PostTranscodeSessionPositionMutationVariables> = (props) => {
-          const {publicId,data} = props ?? {};
-
-          return  postTranscodeSessionPosition(publicId,data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type PostTranscodeSessionPositionMutationResult = NonNullable<Awaited<ReturnType<typeof postTranscodeSessionPosition>>>
-    export type PostTranscodeSessionPositionMutationBody = BodyType<PostTranscodeSessionPositionBody>
-    export type PostTranscodeSessionPositionMutationError = ErrorType<unknown>
-    export type PostTranscodeSessionPositionMutationVariables = {publicId: string;data: BodyType<PostTranscodeSessionPositionBody>}
-
-    /**
- * @summary Update transcode session playback position
- */
-export const usePostTranscodeSessionPosition = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionPosition>>, TError,PostTranscodeSessionPositionMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postTranscodeSessionPosition>>,
-        TError,
-        PostTranscodeSessionPositionMutationVariables,
-        TContext
-      > => {
-      return useMutation(getPostTranscodeSessionPositionMutationOptions(options), queryClient);
     }
 
 export const getGetAccentColorIndexUrl = () => {

@@ -855,8 +855,18 @@ deptrac:
     # =============================================
     - name: 'Command Utility'
       collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Command\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Command\\ExportOpenApiSpecCommand$'
+
+    - name: 'OpenAPI Export Command'
+      collectors:
         - type: classLike
-          value: '^App\\Command\\'
+          value: '^App\\Command\\ExportOpenApiSpecCommand$'
 
     # =============================================
     # Discovery bounded context
@@ -1946,6 +1956,9 @@ deptrac:
     'Command Utility':
       - Core
       - 'Shared Domain'
+    'OpenAPI Export Command':
+      - Core
+      - 'Shared Application'
 
     'Radio Domain':
       - Core

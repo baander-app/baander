@@ -7,7 +7,7 @@ namespace App\Tests\Integration;
 use App\Kernel;
 use App\Transcode\Application\Exception\TranscodeStartupUnavailableException;
 use App\Transcode\Interface\EventListener\TranscodeStartupUnavailableListener;
-use Nelmio\ApiDocBundle\Render\RenderOpenApi;
+use App\Shared\Application\Port\OpenApiExporterInterface;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
@@ -37,8 +37,8 @@ final class TranscodeStartupUnavailableTest extends TestCase
             self::assertContains([$listener, '__invoke'], $dispatcher->getListeners(KernelEvents::EXCEPTION));
             self::assertSame(20, $dispatcher->getListenerPriority(KernelEvents::EXCEPTION, [$listener, '__invoke']));
             $renderer = $container->get('transcode.startup.openapi');
-            self::assertInstanceOf(RenderOpenApi::class, $renderer);
-            $spec = json_decode($renderer->render('json', 'default'), true, 512, JSON_THROW_ON_ERROR);
+            self::assertInstanceOf(OpenApiExporterInterface::class, $renderer);
+            $spec = json_decode($renderer->render('json'), true, 512, JSON_THROW_ON_ERROR);
             self::assertIsArray($spec);
             foreach (['/api/transcode/sessions/', '/api/stream/sign'] as $path) {
                 $responseSchema = $spec['paths'][$path]['post']['responses']['503'];
@@ -58,8 +58,12 @@ final class TranscodeStartupUnavailableTest extends TestCase
                 self::fail('The real message bus must wrap the startup refusal.');
             } catch (HandlerFailedException $failure) {
                 self::assertCount(1, $failure->getWrappedExceptions(TranscodeStartupUnavailableException::class));
-                $event = new ExceptionEvent($kernel, Request::create('https://baander.app/api/stream/sign', 'POST'),
-                    HttpKernelInterface::MAIN_REQUEST, $failure);
+                $event = new ExceptionEvent(
+                    $kernel,
+                    Request::create('https://baander.app/api/stream/sign', 'POST'),
+                    HttpKernelInterface::MAIN_REQUEST,
+                    $failure,
+                );
                 $dispatcher->dispatch($event, KernelEvents::EXCEPTION);
                 $response = $event->getResponse();
                 self::assertNotNull($response);
@@ -67,8 +71,10 @@ final class TranscodeStartupUnavailableTest extends TestCase
                 self::assertSame('2', $response->headers->get('Retry-After'));
                 self::assertTrue($response->headers->hasCacheControlDirective('no-store'));
                 self::assertFalse($response->headers->hasCacheControlDirective('public'));
-                self::assertSame(['error' => ['message' => 'Transcode startup is temporarily unavailable. Please retry.', 'code' => 503]],
-                    json_decode($response->getContent() ?: '', true, 32, JSON_THROW_ON_ERROR));
+                self::assertSame(
+                    ['error' => ['message' => 'Transcode startup is temporarily unavailable. Please retry.', 'code' => 503]],
+                    json_decode($response->getContent() ?: '', true, 32, JSON_THROW_ON_ERROR),
+                );
             }
         } finally {
             $kernel->shutdown();
@@ -77,9 +83,7 @@ final class TranscodeStartupUnavailableTest extends TestCase
     }
 }
 
-final class TranscodeStartupUnavailableProbe
-{
-}
+final class TranscodeStartupUnavailableProbe {}
 
 final class TranscodeStartupUnavailableProbeHandler
 {
@@ -96,19 +100,30 @@ final class TranscodeStartupUnavailableKernel extends Kernel
         parent::__construct('prod', false);
     }
 
-    public function getProjectDir(): string { return dirname(__DIR__, 2); }
-    public function getCacheDir(): string { return $this->temporaryDirectory . '/cache'; }
-    public function getLogDir(): string { return $this->temporaryDirectory . '/log'; }
+    public function getProjectDir(): string
+    {
+        return dirname(__DIR__, 2);
+    }
+    public function getCacheDir(): string
+    {
+        return $this->temporaryDirectory . '/cache';
+    }
+    public function getLogDir(): string
+    {
+        return $this->temporaryDirectory . '/log';
+    }
 
     protected function build(ContainerBuilder $container): void
     {
         parent::build($container);
         $container->setAlias('transcode.startup.listener', TranscodeStartupUnavailableListener::class)->setPublic(true);
         $container->setAlias('transcode.startup.bus', 'messenger.bus.default')->setPublic(true);
-        $container->setAlias('transcode.startup.openapi', RenderOpenApi::class)->setPublic(true);
-        $container->setDefinition(TranscodeStartupUnavailableProbeHandler::class,
+        $container->setAlias('transcode.startup.openapi', OpenApiExporterInterface::class)->setPublic(true);
+        $container->setDefinition(
+            TranscodeStartupUnavailableProbeHandler::class,
             (new Definition(TranscodeStartupUnavailableProbeHandler::class))->addTag('messenger.message_handler', [
                 'bus' => 'messenger.bus.default',
-            ]));
+            ]),
+        );
     }
 }

@@ -746,9 +746,8 @@ services:
     App\Catalog\Domain\Repository\AlbumMatchStateRepositoryInterface:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\AlbumMatchStateRepository
 
-    App\Shared\Infrastructure\OpenApi\SpecParameterRouteDescriber:
-        tags:
-            - { name: nelmio_api_doc.route_describer, priority: 0 }
+    App\Shared\Application\Port\OpenApiExporterInterface:
+        alias: App\Shared\Infrastructure\OpenApi\NativeOpenApiExporter
 
     # --- Catalog Application Port Aliases ---
     App\Catalog\Application\Port\ArtistPortInterface:
@@ -1153,10 +1152,6 @@ services:
             $appEnv: '%kernel.environment%'
 
     # --- OpenAPI ---
-    Nelmio\ApiDocBundle\OpenApiGenerator:
-        alias: nelmio_api_doc.open_api.generator
-    Nelmio\ApiDocBundle\Render\RenderOpenApi:
-        alias: nelmio_api_doc.render_docs
 
     # --- Transcode Domain Repository Aliases ---
     App\Transcode\Domain\Repository\TranscodeJobRepositoryInterface:

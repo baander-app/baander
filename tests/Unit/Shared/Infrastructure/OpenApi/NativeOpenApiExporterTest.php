@@ -9,6 +9,8 @@ use OpenApi\Spec as OA;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
+use stdClass;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Yaml\Yaml;
@@ -104,6 +106,62 @@ final class NativeOpenApiExporterTest extends TestCase
         self::assertSame($document, Yaml::parse($exporter->render('yaml')));
     }
 
+    public function testExplicitInlineBodyRetainsTheMappedRequestComponent(): void
+    {
+        $routes = new RouteCollection();
+        $routes->add('playback_inline', new RoutingRoute(
+            '/api/playback/inline',
+            ['_controller' => NativePlaybackFixture::class . '::inline'],
+            methods: ['POST'],
+        ));
+        $router = $this->createStub(RouterInterface::class);
+        $router->method('getRouteCollection')->willReturn($routes);
+        $document = json_decode(new NativeOpenApiExporter($router)->render(), true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertArrayHasKey('schemas', $document['components']);
+        self::assertArrayHasKey('NativeInlinePayload', $document['components']['schemas']);
+        self::assertArrayHasKey('Accept-Language', $document['components']['parameters']);
+        self::assertArrayHasKey('oauth2AuthCode', $document['components']['securitySchemes']);
+        $body = $document['paths']['/api/playback/inline']['post']['requestBody'];
+        self::assertTrue($body['required'] ?? false);
+        self::assertSame('object', $body['content']['application/json']['schema']['type']);
+        self::assertArrayNotHasKey('$ref', $body['content']['application/json']['schema']);
+    }
+
+    public function testYamlPreservesEmptyObjectAndArraySemantics(): void
+    {
+        $routes = new RouteCollection();
+        $routes->add('playback_control', new RoutingRoute(
+            '/api/playback/{publicId}',
+            ['_controller' => NativePlaybackFixture::class . '::control'],
+            methods: ['POST'],
+        ));
+        $router = $this->createStub(RouterInterface::class);
+        $router->method('getRouteCollection')->willReturn($routes);
+        $document = Yaml::parse(new NativeOpenApiExporter($router)->render('yaml'), Yaml::PARSE_OBJECT_FOR_MAP);
+
+        self::assertInstanceOf(stdClass::class, $document->components->schemas->NativeControl->properties->opaque);
+        self::assertInstanceOf(stdClass::class, $document->components->schemas->NativeControl->properties->options->default);
+        self::assertSame([], $document->security[0]->bearerAuth);
+    }
+
+    public function testBinaryMediaTypeWithNoSchemaSerializesAsAnObject(): void
+    {
+        $routes = new RouteCollection();
+        $routes->add('video_preview', new RoutingRoute(
+            '/api/videos/{publicId}/timeline-preview',
+            ['_controller' => NativeBinaryFixture::class . '::preview'],
+            methods: ['GET'],
+        ));
+        $router = $this->createStub(RouterInterface::class);
+        $router->method('getRouteCollection')->willReturn($routes);
+        $document = json_decode(new NativeOpenApiExporter($router)->render(), flags: JSON_THROW_ON_ERROR);
+        $mediaType = $document->paths->{'/api/videos/{publicId}/timeline-preview'}->get->responses->{'200'}->content->{'image/jpeg'};
+
+        self::assertInstanceOf(stdClass::class, $mediaType);
+        self::assertSame([], get_object_vars($mediaType));
+    }
+
     #[RunInSeparateProcess]
     #[PreserveGlobalState(false)]
     public function testRealNativeExporterDoesNotLoadDeprecatedOpenApiPipeline(): void
@@ -121,7 +179,9 @@ final class NativeOpenApiExporterTest extends TestCase
         $deprecated = array_filter(
             get_declared_classes(),
             static function (string $class): bool {
-                return str_starts_with($class, 'OpenApi\\Annotations\\')
+                return (str_starts_with($class, 'OpenApi\\')
+                        && str_contains(new ReflectionClass($class)->getDocComment() ?: '', '@deprecated'))
+                    || str_starts_with($class, 'OpenApi\\Annotations\\')
                     || str_starts_with($class, 'OpenApi\\Attributes\\')
                     || in_array($class, [
                         'OpenApi\\Context',
@@ -206,6 +266,22 @@ final class NativePlaybackFixture
         ],
     )]
     public function control(#[MapRequestPayload] NativeControlFixture $payload): void {}
+
+    #[OA\Operation\Post(
+        requestBody: new OA\RequestBody(
+            content: new OA\MediaType\Json(
+                type: 'object',
+                properties: [
+                    'title' => new OA\Schema(type: 'string'),
+                ],
+            ),
+        ),
+        responses: [
+            new OA\Response(response: 204, description: 'Accepted'),
+        ],
+    )]
+    public function inline(#[MapRequestPayload] NativeInlinePayloadFixture $payload): void {}
+
 }
 
 #[OA\Schema(
@@ -238,12 +314,18 @@ final class NativePlaybackFixture
             additionalProperties: false,
         ),
         'version' => new OA\Schema(type: 'integer', minimum: 0),
+        'opaque' => new OA\Schema(),
+        'options' => new OA\Schema(
+            type: 'object',
+            default: new stdClass(),
+        ),
     ],
     required: ['action', 'payload', 'version'],
     component: 'NativeControl',
 )]
 final readonly class NativeControlFixture
 {
+    /** @param array<string, mixed> $payload */
     public function __construct(
         public array $payload = [],
         public int $version = 0,
@@ -256,4 +338,32 @@ enum NativeActionFixture: string
 {
     case Play = 'play';
     case Pause = 'pause';
+}
+
+
+#[OA\Schema(
+    type: 'object',
+    properties: [
+        'title' => new OA\Schema(type: 'string'),
+    ],
+    component: 'NativeInlinePayload',
+)]
+final readonly class NativeInlinePayloadFixture
+{
+    public function __construct(public string $title) {}
+}
+
+
+final class NativeBinaryFixture
+{
+    #[OA\Operation\Get(
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'JPEG contact sheet',
+                content: new OA\MediaType(mediaType: 'image/jpeg'),
+            ),
+        ],
+    )]
+    public function preview(): void {}
 }

@@ -9,9 +9,13 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\CursorPaginatedResponse;
 use App\Shared\Interface\DTO\PaginatedResponse;
-use Nelmio\ApiDocBundle\Render\RenderOpenApi;
+use App\Shared\Application\Port\OpenApiExporterInterface;
+use App\Shared\Interface\Controller\OpenApiController;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Routing\RouterInterface;
 
@@ -22,14 +26,58 @@ final class OpenApiSpecTest extends KernelTestCase
     {
         self::bootKernel();
 
-        /** @var RenderOpenApi $renderOpenApi */
-        $renderOpenApi = self::getContainer()->get(RenderOpenApi::class);
-        $content = $renderOpenApi->render('json', 'default');
+        /** @var OpenApiExporterInterface $renderOpenApi */
+        $renderOpenApi = self::getContainer()->get(OpenApiExporterInterface::class);
+        $content = $renderOpenApi->render('json');
 
         /** @var array<string, mixed> $spec */
         $spec = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
 
         return $spec;
+    }
+
+    public function test_json_route_uses_the_same_native_exporter_as_the_command(): void
+    {
+        self::bootKernel();
+        $container = self::getContainer();
+        $router = $container->get(RouterInterface::class);
+        self::assertInstanceOf(RouterInterface::class, $router);
+        $route = $router->match('/api/doc.json');
+        self::assertSame('app.swagger', $route['_route']);
+        self::assertSame(OpenApiController::class, $route['_controller']);
+        $controller = $container->get(OpenApiController::class);
+        self::assertInstanceOf(OpenApiController::class, $controller);
+        $exporter = $container->get(OpenApiExporterInterface::class);
+        self::assertInstanceOf(OpenApiExporterInterface::class, $exporter);
+        $response = $controller();
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('application/json', $response->headers->get('Content-Type'));
+        self::assertSame($exporter->render(), $response->getContent());
+    }
+
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function test_actual_application_export_loads_no_deprecated_openapi_classes(): void
+    {
+        $spec = $this->getSpec();
+        self::assertNotEmpty($spec['paths']);
+        $deprecated = array_filter(
+            get_declared_classes(),
+            static function (string $class): bool {
+                return (str_starts_with($class, 'OpenApi\\')
+                        && str_contains(new ReflectionClass($class)->getDocComment() ?: '', '@deprecated'))
+                    || str_starts_with($class, 'OpenApi\\Annotations\\')
+                    || str_starts_with($class, 'OpenApi\\Attributes\\')
+                    || in_array($class, [
+                        'OpenApi\\Context',
+                        'OpenApi\\Serializer',
+                        'OpenApi\\Generator',
+                        'OpenApi\\Analysis',
+                        'OpenApi\\Builder\\Mode',
+                    ], true);
+            },
+        );
+        self::assertSame([], array_values($deprecated));
     }
 
     public function test_every_api_route_operation_is_documented(): void
@@ -41,7 +89,7 @@ final class OpenApiSpecTest extends KernelTestCase
 
         foreach ($router->getRouteCollection() as $name => $route) {
             $path = $route->getPath();
-            // The documentation endpoint itself is provided by Nelmio.
+            // The document endpoint is excluded from the API it describes.
             if (!str_starts_with($path, '/api/') || $name === 'app.swagger') {
                 continue;
             }
@@ -212,9 +260,9 @@ final class OpenApiSpecTest extends KernelTestCase
     public function test_configuration_object_defaults_match_their_schema_type(): void
     {
         self::bootKernel();
-        $renderer = self::getContainer()->get(RenderOpenApi::class);
-        self::assertInstanceOf(RenderOpenApi::class, $renderer);
-        $spec = json_decode($renderer->render('json', 'default'), false, 512, JSON_THROW_ON_ERROR);
+        $renderer = self::getContainer()->get(OpenApiExporterInterface::class);
+        self::assertInstanceOf(OpenApiExporterInterface::class, $renderer);
+        $spec = json_decode($renderer->render('json'), false, 512, JSON_THROW_ON_ERROR);
 
         foreach ([
             'CreateRadioSourceRequest' => 'syncConfig',
@@ -328,9 +376,9 @@ final class OpenApiSpecTest extends KernelTestCase
     public function test_spec_is_valid_json(): void
     {
         self::bootKernel();
-        $renderer = self::getContainer()->get(RenderOpenApi::class);
-        self::assertInstanceOf(RenderOpenApi::class, $renderer);
-        self::assertJson($renderer->render('json', 'default'));
+        $renderer = self::getContainer()->get(OpenApiExporterInterface::class);
+        self::assertInstanceOf(OpenApiExporterInterface::class, $renderer);
+        self::assertJson($renderer->render('json'));
     }
 
     public function test_spec_is_openapi_3(): void
