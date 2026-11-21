@@ -54,6 +54,9 @@ vi.mock('@/features/catalog/hooks/use-video-playback-information', () => ({
     isError: false
   })
 }))
+vi.mock('@/features/catalog/components/WorkPeople', () => ({
+  WorkPeople: () => <section aria-label="Credits" />
+}))
 vi.mock('@/features/catalog/components/MovieMetadata', () => ({
   MovieMetadata: () => <p>Movie metadata</p>
 }))

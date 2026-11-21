@@ -7,6 +7,27 @@ import { protectedRoutes } from '@/features/layout/routes'
 
 describe('route structure', () => {
   it.each([
+    { url: '/people', path: '/people', params: {} },
+    {
+      url: '/people/abcdefghijklmnopqrstu',
+      path: '/people/:publicId',
+      params: { publicId: 'abcdefghijklmnopqrstu' },
+    },
+    {
+      url: '/tv/series/abcdefghijklmnopqrstu',
+      path: '/tv/series/:publicId',
+      params: { publicId: 'abcdefghijklmnopqrstu' },
+    },
+    {
+      url: '/tv/episodes/abcdefghijklmnopqrstu',
+      path: '/tv/episodes/:publicId',
+      params: { publicId: 'abcdefghijklmnopqrstu' },
+    },
+    {
+      url: '/music/songs/abcdefghijklmnopqrstu',
+      path: '/music/songs/:publicId',
+      params: { publicId: 'abcdefghijklmnopqrstu' },
+    },
     {
       url: '/movies/directors',
       path: '/movies/directors',

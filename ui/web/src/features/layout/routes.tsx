@@ -1,4 +1,4 @@
-import { ParamRedirect, MediaPlaceholder } from './components/route-elements'
+import { ParamRedirect } from './components/route-elements'
 import { type RouteObject, Navigate } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
 import { ProtectedRoute } from '../auth/components/ProtectedRoute'
@@ -15,6 +15,7 @@ import { AlbumDetailPage } from '../catalog/pages/AlbumDetailPage'
 import { ArtistDetailPage } from '../catalog/pages/ArtistDetailPage'
 import { ArtistsPage } from '../catalog/pages/ArtistsPage'
 import { SongsPage } from '../catalog/pages/SongsPage'
+import { SongDetailPage } from '../catalog/pages/SongDetailPage'
 import { CatalogShell } from '../catalog/CatalogShell'
 import { GenresPage } from '../catalog/pages/GenresPage'
 import { SearchPage } from '../catalog/pages/SearchPage'
@@ -24,7 +25,10 @@ import { MoviesBrowsePage } from '../catalog/pages/MoviesBrowsePage'
 import { MovieDetailPage } from '../catalog/pages/MovieDetailPage'
 import { DirectorsPage } from '../catalog/pages/DirectorsPage'
 import { DirectorDetailPage } from '../catalog/pages/DirectorDetailPage'
-import { TVHomePage } from '../tv/pages/TVHomePage'
+import { TVSeriesPage } from '../tv/pages/TVSeriesPage'
+import { TVSeriesDetailPage, TVEpisodeDetailPage } from '../tv/pages/TVDetailPage'
+import { PeoplePage } from '../catalog/pages/PeoplePage'
+import { PersonDetailPage } from '../catalog/pages/PersonDetailPage'
 import { PodcastsHomePage } from '../podcasts/pages/PodcastsHomePage'
 import { ConcertsHomePage } from '../concerts/pages/ConcertsHomePage'
 import { EbooksHomePage } from '../ebooks/pages/EbooksHomePage'
@@ -70,6 +74,7 @@ export const protectedRoutes: RouteObject[] = [
           { path: '/music/artists', element: <ArtistsPage /> },
           { path: '/music/artists/:publicId', element: <ArtistDetailPage /> },
           { path: '/music/songs', element: <SongsPage /> },
+          { path: '/music/songs/:publicId', element: <SongDetailPage /> },
           { path: '/music/genres', element: <GenresPage /> },
           { path: '/music/browse', element: <CatalogShell /> },
           { path: '/music/playlists', element: <PlaylistsPage /> },
@@ -84,8 +89,11 @@ export const protectedRoutes: RouteObject[] = [
           { path: '/movies/:publicId', element: <MovieDetailPage /> },
 
           // -- TV routes --
-          { path: '/tv', element: <TVHomePage /> },
-          { path: '/tv/browse', element: <MediaPlaceholder title="TV Browser" /> },
+          { path: '/tv', element: <TVSeriesPage /> },
+          { path: '/tv/shows', element: <TVSeriesPage /> },
+          { path: '/tv/series/:publicId', element: <TVSeriesDetailPage /> },
+          { path: '/tv/episodes/:publicId', element: <TVEpisodeDetailPage /> },
+          { path: '/tv/browse', element: <TVSeriesPage /> },
 
           // -- Podcasts routes --
           { path: '/podcasts', element: <PodcastsHomePage /> },
@@ -97,6 +105,8 @@ export const protectedRoutes: RouteObject[] = [
           { path: '/ebooks', element: <EbooksHomePage /> },
 
           // -- Global routes --
+          { path: '/people', element: <PeoplePage /> },
+          { path: '/people/:publicId', element: <PersonDetailPage /> },
           { path: '/search', element: <SearchPage /> },
           { path: '/equalizer', element: <EqualizerPage /> },
           { path: '/settings', element: <SettingsPage /> },

@@ -70,7 +70,7 @@ describe('sidebar schemas', () => {
           if (item.type === 'page_link' && item.config?.route) {
             const route = item.config.route as string
             const isMediaRoute = route.startsWith(`/${mt}`)
-            const isGlobalRoute = ['/search', '/settings', '/equalizer'].includes(route)
+            const isGlobalRoute = ['/people', '/search', '/settings', '/equalizer'].includes(route)
             expect(
               isMediaRoute || isGlobalRoute,
               `Route ${route} in ${mt} schema is neither a media route nor global`

@@ -12,6 +12,7 @@ import { usePlaybackSession } from '@/features/session/hooks/use-playback-sessio
 import { useVideoPresentation } from '../stores/video-presentation-store'
 import { useVideoPresentationError } from '../hooks/use-video-presentation-error'
 import { MoviePlayerOverlay } from '../components/MoviePlayerOverlay'
+import { WorkPeople } from '../components/WorkPeople'
 import { textRole } from '@/shared/theme'
 
 const CenterMessage = styled.div`
@@ -102,6 +103,7 @@ export function MovieDetailPage() {
         />
         {error ? <ErrorText role="alert">{error}</ErrorText> : null}
         <MovieMetadata movie={movie} />
+        <WorkPeople key={publicId} kind="movie" publicId={publicId!} />
       </PageContainer>
       {isPlaying && video ? (
         <MoviePlayerOverlay

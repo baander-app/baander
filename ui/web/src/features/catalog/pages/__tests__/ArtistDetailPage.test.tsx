@@ -8,6 +8,10 @@ const testTheme = resolveTheme('dark', 'violet')
 
 // --- Mocks ---
 
+vi.mock('@/features/catalog/components/WorkPeople', () => ({
+  ArtistPersonLink: () => null,
+}))
+
 const mockNavigate = vi.fn()
 const mockSetSelectedItem = vi.fn()
 const mockPlayTrack = vi.fn()

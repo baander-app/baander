@@ -12,6 +12,7 @@ import { useContextPanelStore } from '@/features/layout/stores/context-panel-sto
 import { usePlayerStore, type Track } from '@/features/player/stores/player-store'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { textRole } from '@/shared/theme'
+import { ArtistPersonLink } from '../components/WorkPeople'
 import { ContentText } from '@/shared/typography'
 
 const PageContainer = styled.div`
@@ -248,6 +249,8 @@ export function ArtistDetailPage() {
             {albumCount} {albumCount === 1 ? 'album' : 'albums'}
           </AlbumCount>
         )}
+
+        <ArtistPersonLink publicId={publicId} />
 
         <Spacer />
 

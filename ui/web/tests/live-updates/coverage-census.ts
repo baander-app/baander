@@ -73,7 +73,7 @@ export function findConsumers(file: string, text: string): QueryConsumer[] {
           : undefined
         result.push({ file, call: binding.name, variant: key && ts.isPropertyAssignment(key) ? keyVariant(key.initializer) : key && ts.isShorthandPropertyAssignment(key) ? keyVariant(key.name) : options ? compact(options, source) : 'unknown', kind: 'query' })
       }
-      if (binding?.module.includes('/gen/endpoints') && (/^useGet/.test(binding.name) || /^get(?!Get)/.test(binding.name))) {
+      if (binding?.module.includes('/gen/endpoints') && (/^use(?!Post|Put|Patch|Delete)[A-Z]/.test(binding.name) || /^get(?!Get)/.test(binding.name))) {
         const overrides: string[] = []
         function inspect(argument: ts.Node) {
           if (ts.isPropertyAssignment(argument) && argument.name.getText(source) === 'queryKey') overrides.push(keyVariant(argument.initializer))

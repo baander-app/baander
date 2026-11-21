@@ -18,6 +18,7 @@ export const moviesSidebar: MediaSidebarSchema = {
       type: 'navigation',
       items: [
         { id: 'movies-items', type: 'page_link', label: 'Movies', icon: '_disc', config: { route: '/movies' } },
+        { id: 'movies-people', type: 'page_link', label: 'People', icon: 'mic-2', config: { route: '/people' } },
         { id: 'movies-directors', type: 'page_link', label: 'Directors', icon: 'mic-2', config: { route: '/movies/directors' } },
         { id: 'movies-genres', type: 'page_link', label: 'Genres', icon: 'tag', config: { route: '/movies/genres' } },
       ],

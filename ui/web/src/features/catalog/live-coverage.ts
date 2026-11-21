@@ -69,6 +69,7 @@ export const catalogLiveCoverage = [
       'src/features/catalog/components/SearchResults.tsx#useGetArtistIndex:generated',
       'src/features/catalog/components/SearchResults.tsx#useGetSongIndex:generated',
       'src/features/catalog/components/metadata/InfoPanel.tsx#useGetSongShow:generated',
+      'src/features/catalog/pages/SongDetailPage.tsx#useGetSongShow:generated',
       'src/features/catalog/components/metadata/InfoPanel.tsx#useGetAlbumShow:generated',
       'src/features/catalog/components/metadata/InfoPanel.tsx#useGetArtistShow:generated',
       'src/features/catalog/components/panels/SongPreviewPanel.tsx#useGetSongShow:generated',
@@ -105,6 +106,46 @@ export const catalogLiveCoverage = [
     }
   },
   {
+    id: 'catalog.people-and-tv',
+    family: 'catalog',
+    policy: {
+      kind: 'sampled',
+      intervalMs: 30000,
+      reason:
+        'Person identities, screen credits and registered TV titles refresh while visible and after catalog hints.'
+    },
+    audiences: ['library'],
+    sourceTables: ['movies', 'songs', 'albums', 'artists', 'user_library_access'],
+    deploymentTables: [],
+    sources: [
+      '/api/people',
+      '/api/people/{publicId}/credits',
+      '/api/movies/{publicId}/credits',
+      '/api/artists/{publicId}/person',
+      '/api/tv/series',
+      '/api/tv/episodes/{publicId}'
+    ],
+    keyVariants: ['Generated People and television query keys with filter and page parameters'],
+    dependentFamilies: [],
+    mirrors: [],
+    responseCaches: ['authoritative-read'],
+    consumers: [
+      'src/features/catalog/pages/PeoplePage.tsx#usePersonIndex:generated',
+      'src/features/catalog/pages/PersonDetailPage.tsx#usePersonShow:generated',
+      'src/features/catalog/pages/PersonDetailPage.tsx#usePersonCredits:generated',
+      'src/features/catalog/components/WorkPeople.tsx#usePersonArtist:generated',
+      'src/features/catalog/components/WorkPeople.tsx#useQuery:queries[kind](publicId,params,options)',
+      'src/features/tv/pages/TVSeriesPage.tsx#useTvSeriesIndex:generated',
+      'src/features/tv/pages/TVDetailPage.tsx#useTvSeriesShow:generated',
+      'src/features/tv/pages/TVDetailPage.tsx#useTvSeriesEpisodes:generated',
+      'src/features/tv/pages/TVDetailPage.tsx#useTvEpisodeShow:generated'
+    ],
+    coverageVerification: ['tests/live-updates/coverage.test.ts'],
+    behaviorVerification: {
+      unitProofs: ['tests/live-updates/people.test.tsx']
+    }
+  },
+  {
     id: 'catalog.directors',
     family: 'catalog',
     policy: {
@@ -117,7 +158,7 @@ export const catalogLiveCoverage = [
     sourceTables: ['movies', 'movie_video', 'user_library_access'],
     deploymentTables: [],
     sources: [
-      'movie_directors and movie_director_credits with accessible movies',
+      'Person identities and directing credits with accessible movies',
       '/api/movies/directors',
       '/api/movies/directors/{publicId}',
       '/api/movies/directors/{publicId}/movies'

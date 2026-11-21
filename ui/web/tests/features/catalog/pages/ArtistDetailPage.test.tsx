@@ -6,6 +6,7 @@ import { cleanup, render as renderUI, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
 vi.mock('@/shared/api-client/gen/endpoints', () => ({
+  usePersonArtist: () => ({ data: undefined, isError: false }),
   useGetArtistShow: () => ({
     data: { publicId: 'artist_1', name: 'Test Artist' },
     isLoading: false,

@@ -16,6 +16,17 @@ describe('live query coverage census', () => {
     ])
   })
 
+  it('detects generated read hooks named by native operation IDs', () => {
+    const consumers = findConsumers('src/features/catalog/Page.tsx', `
+      import { usePersonShow as useProfile, useTvSeriesIndex } from '@/shared/api-client/gen/endpoints'
+      export function View() { useTvSeriesIndex(); return useProfile('person') }
+    `)
+    expect(unclassified(consumers, [])).toEqual([
+      'src/features/catalog/Page.tsx#useTvSeriesIndex:generated',
+      'src/features/catalog/Page.tsx#usePersonShow:generated',
+    ])
+  })
+
   it('distinguishes filtered and infinite keys and list/count variants', () => {
     const consumers = findConsumers('src/features/catalog/hooks.ts', `
       import { useQuery, useInfiniteQuery } from '@tanstack/react-query'

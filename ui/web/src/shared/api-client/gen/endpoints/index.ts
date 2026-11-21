@@ -761,7 +761,7 @@ export interface AddFavoriteRequest {
   /**
      * @minLength 21
      * @maxLength 21
-     * @pattern ^[A-Za-z0-9_-]{21}$
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   entityPublicId: string;
 }
@@ -3242,6 +3242,94 @@ export interface MatchApplyResultResource {
   removedArtists: string[];
 }
 
+export interface PersonResource {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId: string;
+  name: string;
+  /** @nullable */
+  profileUrl: string | null;
+  /** @nullable */
+  biography: string | null;
+  aliases: string[];
+  /** @nullable */
+  birthDate: string | null;
+  /** @nullable */
+  deathDate: string | null;
+  /** @nullable */
+  birthplace: string | null;
+  /** @nullable */
+  sex: string | null;
+  /** @nullable */
+  gender: string | null;
+  /** @nullable */
+  age: number | null;
+  isDeceased: boolean;
+  movieCount: number;
+  seriesCount: number;
+  episodeCount: number;
+  songCount: number;
+  albumCount: number;
+}
+
+export type PersonWorkResourceKind = typeof PersonWorkResourceKind[keyof typeof PersonWorkResourceKind];
+
+
+export const PersonWorkResourceKind = {
+  movie: 'movie',
+  series: 'series',
+  episode: 'episode',
+  song: 'song',
+  album: 'album',
+} as const;
+
+export interface CreditRoleResource {
+  role: string;
+  job: string;
+  /** @nullable */
+  characterName: string | null;
+  /** @nullable */
+  department: string | null;
+  /** @nullable */
+  creditedName: string | null;
+  /** @nullable */
+  billingOrder: number | null;
+}
+
+export interface PersonWorkResource {
+  kind: PersonWorkResourceKind;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId: string;
+  title: string;
+  roles: CreditRoleResource[];
+}
+
+export interface WorkPersonResource {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId: string;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  personPublicId: string;
+  name: string;
+  /** @nullable */
+  profileUrl: string | null;
+  role: CreditRoleResource;
+}
+
 export type CursorPaginatedResponseMeta = {
   /** @nullable */
   next_cursor: string | null;
@@ -3257,6 +3345,45 @@ export type CursorPaginatedResponseMeta = {
 export interface CursorPaginatedResponse {
   data: unknown[];
   meta: CursorPaginatedResponseMeta;
+}
+
+export interface TvSeriesResource {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId: string;
+  name: string;
+  /** @nullable */
+  overview: string | null;
+  /** @nullable */
+  posterUrl: string | null;
+}
+
+export interface TvEpisodeResource {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId: string;
+  name: string;
+  /** @nullable */
+  overview: string | null;
+  /** @nullable */
+  stillUrl: string | null;
+  /** @nullable */
+  airDate: string | null;
+  seasonNumber: number;
+  episodeNumber: number;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  seriesPublicId: string;
+  seriesName: string;
 }
 
 export type VideoPlaybackInformationResourceQualityChoicesItem = {
@@ -6411,6 +6538,73 @@ export type PostAdminMetadataMatchApply200 = {
   data?: MatchApplyResultResource;
 };
 
+export type PersonIndexParams = {
+  /** @minimum 1 */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  q?: string;
+  role?: string;
+};
+
+export type PersonIndex200 = PaginatedResponse & {
+  data: PersonResource[];
+};
+
+export type PersonShow200 = {
+  data: PersonResource;
+};
+
+export type PersonCreditsParams = {
+  /** @minimum 1 */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  q?: string;
+  kind?: PersonCreditsKind;
+  role?: string;
+};
+
+export type PersonCreditsKind = typeof PersonCreditsKind[keyof typeof PersonCreditsKind];
+
+
+export const PersonCreditsKind = {
+  movie: 'movie',
+  series: 'series',
+  episode: 'episode',
+  song: 'song',
+  album: 'album',
+} as const;
+
+export type PersonCredits200 = PaginatedResponse & {
+  data: PersonWorkResource[];
+};
+
+export type PersonMovieCreditsParams = {
+  /** @minimum 1 */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  q?: string;
+};
+
+export type PersonMovieCredits200 = PaginatedResponse & {
+  data: WorkPersonResource[];
+};
+
+export type PersonArtist200 = {
+  data: PersonResource;
+};
+
 export type GetSongIndexParams = {
   /** Cursor for pagination (base64-encoded) */
   cursor?: string;
@@ -6488,6 +6682,74 @@ export type PatchSongUpdate200 = {
 
 export type DeleteSongDestroy200 = {
   data?: CatalogDeletionResource;
+};
+
+export type TvSeriesIndexParams = {
+  /** @minimum 1 */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  q?: string;
+};
+
+export type TvSeriesIndex200 = PaginatedResponse & {
+  data: TvSeriesResource[];
+};
+
+export type TvSeriesShow200 = {
+  data: TvSeriesResource;
+};
+
+export type TvSeriesEpisodesParams = {
+  /** @minimum 1 */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  q?: string;
+};
+
+export type TvSeriesEpisodes200 = PaginatedResponse & {
+  data: TvEpisodeResource[];
+};
+
+export type TvEpisodeShow200 = {
+  data: TvEpisodeResource;
+};
+
+export type TvSeriesCreditsParams = {
+  /** @minimum 1 */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  q?: string;
+};
+
+export type TvSeriesCredits200 = PaginatedResponse & {
+  data: WorkPersonResource[];
+};
+
+export type TvEpisodeCreditsParams = {
+  /** @minimum 1 */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  q?: string;
+};
+
+export type TvEpisodeCredits200 = PaginatedResponse & {
+  data: WorkPersonResource[];
 };
 
 export type GetVideoPlaybackInformation200 = {
@@ -6906,7 +7168,7 @@ export type GetAdminMediaMissingCheck200DataMissingImagesItem = {
   /**
      * @minLength 21
      * @maxLength 21
-     * @pattern ^[A-Za-z0-9_-]{21}$
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   publicId?: string;
   path?: string;
@@ -21117,6 +21379,548 @@ export const usePostAdminMetadataMatchApply = <TError = ErrorType<ApiError>,
       return useMutation(getPostAdminMetadataMatchApplyMutationOptions(options), queryClient);
     }
 
+export const getPersonIndexUrl = (params?: PersonIndexParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/people?${stringifiedParams}` : `/api/people`
+}
+
+/**
+ * @summary List people with accessible credits
+ */
+export const personIndex = async (params?: PersonIndexParams, options?: Parameters<typeof customInstance>[1]): Promise<PersonIndex200> => {
+
+  return customInstance<PersonIndex200>(getPersonIndexUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getPersonIndexQueryKey = (params?: PersonIndexParams,) => {
+    return [
+    `/api/people`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getPersonIndexQueryOptions = <TData = Awaited<ReturnType<typeof personIndex>>, TError = ErrorType<void>>(params?: PersonIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getPersonIndexQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof personIndex>>> = ({ signal }) => personIndex(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof personIndex>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type PersonIndexQueryResult = NonNullable<Awaited<ReturnType<typeof personIndex>>>
+export type PersonIndexQueryError = ErrorType<void>
+
+
+export function usePersonIndex<TData = Awaited<ReturnType<typeof personIndex>>, TError = ErrorType<void>>(
+ params: undefined |  PersonIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof personIndex>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof personIndex>>,
+          TError,
+          Awaited<ReturnType<typeof personIndex>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePersonIndex<TData = Awaited<ReturnType<typeof personIndex>>, TError = ErrorType<void>>(
+ params?: PersonIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personIndex>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof personIndex>>,
+          TError,
+          Awaited<ReturnType<typeof personIndex>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePersonIndex<TData = Awaited<ReturnType<typeof personIndex>>, TError = ErrorType<void>>(
+ params?: PersonIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List people with accessible credits
+ */
+
+export function usePersonIndex<TData = Awaited<ReturnType<typeof personIndex>>, TError = ErrorType<void>>(
+ params?: PersonIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getPersonIndexQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPersonShowUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/people/${publicId}`
+}
+
+/**
+ * @summary Get a person with accessible credits
+ */
+export const personShow = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<PersonShow200> => {
+
+  return customInstance<PersonShow200>(getPersonShowUrl(publicId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getPersonShowQueryKey = (publicId: string,) => {
+    return [
+    `/api/people/${publicId}`
+    ] as const;
+    }
+
+
+export const getPersonShowQueryOptions = <TData = Awaited<ReturnType<typeof personShow>>, TError = ErrorType<void>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getPersonShowQueryKey(publicId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof personShow>>> = ({ signal }) => personShow(publicId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof personShow>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type PersonShowQueryResult = NonNullable<Awaited<ReturnType<typeof personShow>>>
+export type PersonShowQueryError = ErrorType<void>
+
+
+export function usePersonShow<TData = Awaited<ReturnType<typeof personShow>>, TError = ErrorType<void>>(
+ publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof personShow>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof personShow>>,
+          TError,
+          Awaited<ReturnType<typeof personShow>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePersonShow<TData = Awaited<ReturnType<typeof personShow>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personShow>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof personShow>>,
+          TError,
+          Awaited<ReturnType<typeof personShow>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePersonShow<TData = Awaited<ReturnType<typeof personShow>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get a person with accessible credits
+ */
+
+export function usePersonShow<TData = Awaited<ReturnType<typeof personShow>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getPersonShowQueryOptions(publicId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPersonCreditsUrl = (publicId: string,
+    params?: PersonCreditsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/people/${publicId}/credits?${stringifiedParams}` : `/api/people/${publicId}/credits`
+}
+
+/**
+ * @summary List accessible works credited to a person
+ */
+export const personCredits = async (publicId: string,
+    params?: PersonCreditsParams, options?: Parameters<typeof customInstance>[1]): Promise<PersonCredits200> => {
+
+  return customInstance<PersonCredits200>(getPersonCreditsUrl(publicId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getPersonCreditsQueryKey = (publicId: string,
+    params?: PersonCreditsParams,) => {
+    return [
+    `/api/people/${publicId}/credits`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getPersonCreditsQueryOptions = <TData = Awaited<ReturnType<typeof personCredits>>, TError = ErrorType<void>>(publicId: string,
+    params?: PersonCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getPersonCreditsQueryKey(publicId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof personCredits>>> = ({ signal }) => personCredits(publicId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof personCredits>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type PersonCreditsQueryResult = NonNullable<Awaited<ReturnType<typeof personCredits>>>
+export type PersonCreditsQueryError = ErrorType<void>
+
+
+export function usePersonCredits<TData = Awaited<ReturnType<typeof personCredits>>, TError = ErrorType<void>>(
+ publicId: string,
+    params: undefined |  PersonCreditsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof personCredits>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof personCredits>>,
+          TError,
+          Awaited<ReturnType<typeof personCredits>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePersonCredits<TData = Awaited<ReturnType<typeof personCredits>>, TError = ErrorType<void>>(
+ publicId: string,
+    params?: PersonCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personCredits>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof personCredits>>,
+          TError,
+          Awaited<ReturnType<typeof personCredits>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePersonCredits<TData = Awaited<ReturnType<typeof personCredits>>, TError = ErrorType<void>>(
+ publicId: string,
+    params?: PersonCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List accessible works credited to a person
+ */
+
+export function usePersonCredits<TData = Awaited<ReturnType<typeof personCredits>>, TError = ErrorType<void>>(
+ publicId: string,
+    params?: PersonCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getPersonCreditsQueryOptions(publicId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPersonMovieCreditsUrl = (publicId: string,
+    params?: PersonMovieCreditsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/movies/${publicId}/credits?${stringifiedParams}` : `/api/movies/${publicId}/credits`
+}
+
+/**
+ * @summary List people credited to an accessible movie
+ */
+export const personMovieCredits = async (publicId: string,
+    params?: PersonMovieCreditsParams, options?: Parameters<typeof customInstance>[1]): Promise<PersonMovieCredits200> => {
+
+  return customInstance<PersonMovieCredits200>(getPersonMovieCreditsUrl(publicId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getPersonMovieCreditsQueryKey = (publicId: string,
+    params?: PersonMovieCreditsParams,) => {
+    return [
+    `/api/movies/${publicId}/credits`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getPersonMovieCreditsQueryOptions = <TData = Awaited<ReturnType<typeof personMovieCredits>>, TError = ErrorType<void>>(publicId: string,
+    params?: PersonMovieCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personMovieCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getPersonMovieCreditsQueryKey(publicId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof personMovieCredits>>> = ({ signal }) => personMovieCredits(publicId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof personMovieCredits>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type PersonMovieCreditsQueryResult = NonNullable<Awaited<ReturnType<typeof personMovieCredits>>>
+export type PersonMovieCreditsQueryError = ErrorType<void>
+
+
+export function usePersonMovieCredits<TData = Awaited<ReturnType<typeof personMovieCredits>>, TError = ErrorType<void>>(
+ publicId: string,
+    params: undefined |  PersonMovieCreditsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof personMovieCredits>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof personMovieCredits>>,
+          TError,
+          Awaited<ReturnType<typeof personMovieCredits>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePersonMovieCredits<TData = Awaited<ReturnType<typeof personMovieCredits>>, TError = ErrorType<void>>(
+ publicId: string,
+    params?: PersonMovieCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personMovieCredits>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof personMovieCredits>>,
+          TError,
+          Awaited<ReturnType<typeof personMovieCredits>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePersonMovieCredits<TData = Awaited<ReturnType<typeof personMovieCredits>>, TError = ErrorType<void>>(
+ publicId: string,
+    params?: PersonMovieCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personMovieCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List people credited to an accessible movie
+ */
+
+export function usePersonMovieCredits<TData = Awaited<ReturnType<typeof personMovieCredits>>, TError = ErrorType<void>>(
+ publicId: string,
+    params?: PersonMovieCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personMovieCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getPersonMovieCreditsQueryOptions(publicId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPersonArtistUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/artists/${publicId}/person`
+}
+
+/**
+ * @summary Get the person linked to an accessible artist
+ */
+export const personArtist = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<PersonArtist200> => {
+
+  return customInstance<PersonArtist200>(getPersonArtistUrl(publicId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getPersonArtistQueryKey = (publicId: string,) => {
+    return [
+    `/api/artists/${publicId}/person`
+    ] as const;
+    }
+
+
+export const getPersonArtistQueryOptions = <TData = Awaited<ReturnType<typeof personArtist>>, TError = ErrorType<void>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personArtist>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getPersonArtistQueryKey(publicId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof personArtist>>> = ({ signal }) => personArtist(publicId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof personArtist>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type PersonArtistQueryResult = NonNullable<Awaited<ReturnType<typeof personArtist>>>
+export type PersonArtistQueryError = ErrorType<void>
+
+
+export function usePersonArtist<TData = Awaited<ReturnType<typeof personArtist>>, TError = ErrorType<void>>(
+ publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof personArtist>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof personArtist>>,
+          TError,
+          Awaited<ReturnType<typeof personArtist>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePersonArtist<TData = Awaited<ReturnType<typeof personArtist>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personArtist>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof personArtist>>,
+          TError,
+          Awaited<ReturnType<typeof personArtist>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePersonArtist<TData = Awaited<ReturnType<typeof personArtist>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personArtist>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get the person linked to an accessible artist
+ */
+
+export function usePersonArtist<TData = Awaited<ReturnType<typeof personArtist>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personArtist>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getPersonArtistQueryOptions(publicId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetSongIndexUrl = (params?: GetSongIndexParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -21488,6 +22292,664 @@ export const useDeleteSongDestroy = <TError = ErrorType<ApiError | ValidationErr
       > => {
       return useMutation(getDeleteSongDestroyMutationOptions(options), queryClient);
     }
+
+export const getTvSeriesIndexUrl = (params?: TvSeriesIndexParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/tv/series?${stringifiedParams}` : `/api/tv/series`
+}
+
+/**
+ * @summary List accessible television series
+ */
+export const tvSeriesIndex = async (params?: TvSeriesIndexParams, options?: Parameters<typeof customInstance>[1]): Promise<TvSeriesIndex200> => {
+
+  return customInstance<TvSeriesIndex200>(getTvSeriesIndexUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getTvSeriesIndexQueryKey = (params?: TvSeriesIndexParams,) => {
+    return [
+    `/api/tv/series`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getTvSeriesIndexQueryOptions = <TData = Awaited<ReturnType<typeof tvSeriesIndex>>, TError = ErrorType<void>>(params?: TvSeriesIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getTvSeriesIndexQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof tvSeriesIndex>>> = ({ signal }) => tvSeriesIndex(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof tvSeriesIndex>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type TvSeriesIndexQueryResult = NonNullable<Awaited<ReturnType<typeof tvSeriesIndex>>>
+export type TvSeriesIndexQueryError = ErrorType<void>
+
+
+export function useTvSeriesIndex<TData = Awaited<ReturnType<typeof tvSeriesIndex>>, TError = ErrorType<void>>(
+ params: undefined |  TvSeriesIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesIndex>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof tvSeriesIndex>>,
+          TError,
+          Awaited<ReturnType<typeof tvSeriesIndex>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useTvSeriesIndex<TData = Awaited<ReturnType<typeof tvSeriesIndex>>, TError = ErrorType<void>>(
+ params?: TvSeriesIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesIndex>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof tvSeriesIndex>>,
+          TError,
+          Awaited<ReturnType<typeof tvSeriesIndex>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useTvSeriesIndex<TData = Awaited<ReturnType<typeof tvSeriesIndex>>, TError = ErrorType<void>>(
+ params?: TvSeriesIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List accessible television series
+ */
+
+export function useTvSeriesIndex<TData = Awaited<ReturnType<typeof tvSeriesIndex>>, TError = ErrorType<void>>(
+ params?: TvSeriesIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getTvSeriesIndexQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getTvSeriesShowUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/tv/series/${publicId}`
+}
+
+/**
+ * @summary Get an accessible television series
+ */
+export const tvSeriesShow = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<TvSeriesShow200> => {
+
+  return customInstance<TvSeriesShow200>(getTvSeriesShowUrl(publicId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getTvSeriesShowQueryKey = (publicId: string,) => {
+    return [
+    `/api/tv/series/${publicId}`
+    ] as const;
+    }
+
+
+export const getTvSeriesShowQueryOptions = <TData = Awaited<ReturnType<typeof tvSeriesShow>>, TError = ErrorType<void>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getTvSeriesShowQueryKey(publicId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof tvSeriesShow>>> = ({ signal }) => tvSeriesShow(publicId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof tvSeriesShow>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type TvSeriesShowQueryResult = NonNullable<Awaited<ReturnType<typeof tvSeriesShow>>>
+export type TvSeriesShowQueryError = ErrorType<void>
+
+
+export function useTvSeriesShow<TData = Awaited<ReturnType<typeof tvSeriesShow>>, TError = ErrorType<void>>(
+ publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesShow>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof tvSeriesShow>>,
+          TError,
+          Awaited<ReturnType<typeof tvSeriesShow>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useTvSeriesShow<TData = Awaited<ReturnType<typeof tvSeriesShow>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesShow>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof tvSeriesShow>>,
+          TError,
+          Awaited<ReturnType<typeof tvSeriesShow>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useTvSeriesShow<TData = Awaited<ReturnType<typeof tvSeriesShow>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get an accessible television series
+ */
+
+export function useTvSeriesShow<TData = Awaited<ReturnType<typeof tvSeriesShow>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getTvSeriesShowQueryOptions(publicId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getTvSeriesEpisodesUrl = (publicId: string,
+    params?: TvSeriesEpisodesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/tv/series/${publicId}/episodes?${stringifiedParams}` : `/api/tv/series/${publicId}/episodes`
+}
+
+/**
+ * @summary List registered episodes of an accessible series
+ */
+export const tvSeriesEpisodes = async (publicId: string,
+    params?: TvSeriesEpisodesParams, options?: Parameters<typeof customInstance>[1]): Promise<TvSeriesEpisodes200> => {
+
+  return customInstance<TvSeriesEpisodes200>(getTvSeriesEpisodesUrl(publicId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getTvSeriesEpisodesQueryKey = (publicId: string,
+    params?: TvSeriesEpisodesParams,) => {
+    return [
+    `/api/tv/series/${publicId}/episodes`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getTvSeriesEpisodesQueryOptions = <TData = Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError = ErrorType<void>>(publicId: string,
+    params?: TvSeriesEpisodesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getTvSeriesEpisodesQueryKey(publicId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof tvSeriesEpisodes>>> = ({ signal }) => tvSeriesEpisodes(publicId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type TvSeriesEpisodesQueryResult = NonNullable<Awaited<ReturnType<typeof tvSeriesEpisodes>>>
+export type TvSeriesEpisodesQueryError = ErrorType<void>
+
+
+export function useTvSeriesEpisodes<TData = Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError = ErrorType<void>>(
+ publicId: string,
+    params: undefined |  TvSeriesEpisodesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof tvSeriesEpisodes>>,
+          TError,
+          Awaited<ReturnType<typeof tvSeriesEpisodes>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useTvSeriesEpisodes<TData = Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError = ErrorType<void>>(
+ publicId: string,
+    params?: TvSeriesEpisodesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof tvSeriesEpisodes>>,
+          TError,
+          Awaited<ReturnType<typeof tvSeriesEpisodes>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useTvSeriesEpisodes<TData = Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError = ErrorType<void>>(
+ publicId: string,
+    params?: TvSeriesEpisodesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List registered episodes of an accessible series
+ */
+
+export function useTvSeriesEpisodes<TData = Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError = ErrorType<void>>(
+ publicId: string,
+    params?: TvSeriesEpisodesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getTvSeriesEpisodesQueryOptions(publicId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getTvEpisodeShowUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/tv/episodes/${publicId}`
+}
+
+/**
+ * @summary Get an accessible television episode
+ */
+export const tvEpisodeShow = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<TvEpisodeShow200> => {
+
+  return customInstance<TvEpisodeShow200>(getTvEpisodeShowUrl(publicId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getTvEpisodeShowQueryKey = (publicId: string,) => {
+    return [
+    `/api/tv/episodes/${publicId}`
+    ] as const;
+    }
+
+
+export const getTvEpisodeShowQueryOptions = <TData = Awaited<ReturnType<typeof tvEpisodeShow>>, TError = ErrorType<void>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getTvEpisodeShowQueryKey(publicId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof tvEpisodeShow>>> = ({ signal }) => tvEpisodeShow(publicId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeShow>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type TvEpisodeShowQueryResult = NonNullable<Awaited<ReturnType<typeof tvEpisodeShow>>>
+export type TvEpisodeShowQueryError = ErrorType<void>
+
+
+export function useTvEpisodeShow<TData = Awaited<ReturnType<typeof tvEpisodeShow>>, TError = ErrorType<void>>(
+ publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeShow>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof tvEpisodeShow>>,
+          TError,
+          Awaited<ReturnType<typeof tvEpisodeShow>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useTvEpisodeShow<TData = Awaited<ReturnType<typeof tvEpisodeShow>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeShow>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof tvEpisodeShow>>,
+          TError,
+          Awaited<ReturnType<typeof tvEpisodeShow>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useTvEpisodeShow<TData = Awaited<ReturnType<typeof tvEpisodeShow>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get an accessible television episode
+ */
+
+export function useTvEpisodeShow<TData = Awaited<ReturnType<typeof tvEpisodeShow>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getTvEpisodeShowQueryOptions(publicId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getTvSeriesCreditsUrl = (publicId: string,
+    params?: TvSeriesCreditsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/tv/series/${publicId}/credits?${stringifiedParams}` : `/api/tv/series/${publicId}/credits`
+}
+
+/**
+ * @summary List people credited to an accessible series
+ */
+export const tvSeriesCredits = async (publicId: string,
+    params?: TvSeriesCreditsParams, options?: Parameters<typeof customInstance>[1]): Promise<TvSeriesCredits200> => {
+
+  return customInstance<TvSeriesCredits200>(getTvSeriesCreditsUrl(publicId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getTvSeriesCreditsQueryKey = (publicId: string,
+    params?: TvSeriesCreditsParams,) => {
+    return [
+    `/api/tv/series/${publicId}/credits`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getTvSeriesCreditsQueryOptions = <TData = Awaited<ReturnType<typeof tvSeriesCredits>>, TError = ErrorType<void>>(publicId: string,
+    params?: TvSeriesCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getTvSeriesCreditsQueryKey(publicId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof tvSeriesCredits>>> = ({ signal }) => tvSeriesCredits(publicId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof tvSeriesCredits>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type TvSeriesCreditsQueryResult = NonNullable<Awaited<ReturnType<typeof tvSeriesCredits>>>
+export type TvSeriesCreditsQueryError = ErrorType<void>
+
+
+export function useTvSeriesCredits<TData = Awaited<ReturnType<typeof tvSeriesCredits>>, TError = ErrorType<void>>(
+ publicId: string,
+    params: undefined |  TvSeriesCreditsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesCredits>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof tvSeriesCredits>>,
+          TError,
+          Awaited<ReturnType<typeof tvSeriesCredits>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useTvSeriesCredits<TData = Awaited<ReturnType<typeof tvSeriesCredits>>, TError = ErrorType<void>>(
+ publicId: string,
+    params?: TvSeriesCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesCredits>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof tvSeriesCredits>>,
+          TError,
+          Awaited<ReturnType<typeof tvSeriesCredits>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useTvSeriesCredits<TData = Awaited<ReturnType<typeof tvSeriesCredits>>, TError = ErrorType<void>>(
+ publicId: string,
+    params?: TvSeriesCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List people credited to an accessible series
+ */
+
+export function useTvSeriesCredits<TData = Awaited<ReturnType<typeof tvSeriesCredits>>, TError = ErrorType<void>>(
+ publicId: string,
+    params?: TvSeriesCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getTvSeriesCreditsQueryOptions(publicId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getTvEpisodeCreditsUrl = (publicId: string,
+    params?: TvEpisodeCreditsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/tv/episodes/${publicId}/credits?${stringifiedParams}` : `/api/tv/episodes/${publicId}/credits`
+}
+
+/**
+ * @summary List people credited to an accessible episode
+ */
+export const tvEpisodeCredits = async (publicId: string,
+    params?: TvEpisodeCreditsParams, options?: Parameters<typeof customInstance>[1]): Promise<TvEpisodeCredits200> => {
+
+  return customInstance<TvEpisodeCredits200>(getTvEpisodeCreditsUrl(publicId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getTvEpisodeCreditsQueryKey = (publicId: string,
+    params?: TvEpisodeCreditsParams,) => {
+    return [
+    `/api/tv/episodes/${publicId}/credits`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getTvEpisodeCreditsQueryOptions = <TData = Awaited<ReturnType<typeof tvEpisodeCredits>>, TError = ErrorType<void>>(publicId: string,
+    params?: TvEpisodeCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getTvEpisodeCreditsQueryKey(publicId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof tvEpisodeCredits>>> = ({ signal }) => tvEpisodeCredits(publicId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeCredits>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type TvEpisodeCreditsQueryResult = NonNullable<Awaited<ReturnType<typeof tvEpisodeCredits>>>
+export type TvEpisodeCreditsQueryError = ErrorType<void>
+
+
+export function useTvEpisodeCredits<TData = Awaited<ReturnType<typeof tvEpisodeCredits>>, TError = ErrorType<void>>(
+ publicId: string,
+    params: undefined |  TvEpisodeCreditsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeCredits>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof tvEpisodeCredits>>,
+          TError,
+          Awaited<ReturnType<typeof tvEpisodeCredits>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useTvEpisodeCredits<TData = Awaited<ReturnType<typeof tvEpisodeCredits>>, TError = ErrorType<void>>(
+ publicId: string,
+    params?: TvEpisodeCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeCredits>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof tvEpisodeCredits>>,
+          TError,
+          Awaited<ReturnType<typeof tvEpisodeCredits>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useTvEpisodeCredits<TData = Awaited<ReturnType<typeof tvEpisodeCredits>>, TError = ErrorType<void>>(
+ publicId: string,
+    params?: TvEpisodeCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List people credited to an accessible episode
+ */
+
+export function useTvEpisodeCredits<TData = Awaited<ReturnType<typeof tvEpisodeCredits>>, TError = ErrorType<void>>(
+ publicId: string,
+    params?: TvEpisodeCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getTvEpisodeCreditsQueryOptions(publicId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetVideoPlaybackInformationUrl = (publicId: string,) => {
 

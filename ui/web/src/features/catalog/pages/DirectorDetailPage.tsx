@@ -75,6 +75,11 @@ export function DirectorDetailPage() {
       searchLabel="Search this director’s movies"
       onSearch={search}
     >
+      {!notFound && !director.isError && director.data ? (
+        <Link to={`/people/${publicId}`} state={location.state}>
+          Full profile and credits
+        </Link>
+      ) : null}
       {notFound ? (
         <DirectorBrowseEmpty>This director is unavailable.</DirectorBrowseEmpty>
       ) : director.isError || movies.isError ? (

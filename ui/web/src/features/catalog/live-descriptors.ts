@@ -4,6 +4,8 @@ import {
   type LiveQueryDescriptor
 } from '@/shared/live/descriptor-types'
 
+const peopleQueryPath = /^\/api\/(?:people(?:\/[^/]+(?:\/credits)?)?|(?:movies|artists)\/[^/]+\/(?:credits|person)|tv\/(?:series|episodes)(?:\/[^/]+(?:\/(?:credits|episodes))?)?)$/
+
 const directorQueryPath = /^\/api\/movies\/directors(?:\/[^/]+(?:\/movies)?)?$/
 
 export const catalogLiveDescriptors: readonly LiveQueryDescriptor[] = [
@@ -25,7 +27,7 @@ export const catalogLiveDescriptors: readonly LiveQueryDescriptor[] = [
     family: 'catalog',
     refreshPolicy: 'sampled',
     sampleIntervalMs: 30000,
-    matches: (key) => firstKeyMatches(key, directorQueryPath)
+    matches: (key) => firstKeyMatches(key, directorQueryPath) || firstKeyMatches(key, peopleQueryPath)
   },
   {
     family: 'catalog',
