@@ -70,11 +70,13 @@ that all standard I/O or process execution is safe under every runtime mode.
 ## PHP formatting
 
 Write readable PHP from the first draft, including tests. Follow the project's
-formatter and four-space indentation. Expand long constructor signatures, calls,
-associative arrays and conditions across lines; keep each statement on its own
-line. Do not compress control flow or test setup to save space. Run the applicable
-formatter on touched files, then inspect their readability before handing off
-work. Passing syntax checks or static analysis does not replace this review.
+formatter and four-space indentation. Keep named arguments in declared parameter
+order; verify the actual function, method or constructor signature when writing
+or changing a call. Expand long constructor signatures, calls, associative arrays
+and conditions across lines; keep each statement on its own line. Do not compress
+control flow or test setup to save space. Run the applicable formatter on touched
+files, then inspect their readability before handing off work. Passing syntax
+checks or static analysis does not replace this review.
 
 ## Companion rules
 
