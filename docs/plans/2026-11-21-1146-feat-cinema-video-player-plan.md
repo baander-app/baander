@@ -454,7 +454,7 @@ Host-based qualification staging must likewise derive its fixture `.env` from `.
 
 **Goal:** Replace the deprecated parameter attributes in the two movie controllers with the user's exact requested `OpenApi\Spec\Parameter` class while preserving the generated API contract.
 
-**Current status — superseded bridge:** The user rejected the deprecated serializer, context and annotation classes introduced by the implemented adapter, overriding the earlier approval of its legacy boundary. The scope, approach and checks below record the superseded design and do not authorize its continuation. Replacement through a native Spec pipeline is separate planning work; its architecture, migration scope and verification belong in the dedicated plan once authored. The historical export proof below does not establish acceptance of that replacement.
+**Current status — superseded bridge:** The user rejected the deprecated serializer, context and annotation classes introduced by the implemented adapter, overriding the earlier approval of its legacy boundary. The scope, approach and checks below record the superseded design and do not authorize its continuation. Replacement follows the reviewed [Native Spec OpenAPI plan](2026-11-21-1517-refactor-native-spec-openapi-plan.md), which owns the native pipeline, migration scope and verification. Its implementation remains separate work. The historical export proof below does not establish acceptance of that replacement.
 
 **Original requirements and authority (historical):** The user's explicit parameter-class request extends U10's controller work. Preserve all parameter names, locations, descriptions, required flags, defaults, limits and schemas, along with existing operations, responses and model references. No application-facing API behavior changes.
 
@@ -644,7 +644,8 @@ races, rollback, genre identity and scoped queries. Final PHPStan passes all
 4,073 files, and Deptrac reports no violations, warnings or errors. The original
 five director review findings are resolved; seven bounded follow-up passes report
 no findings. That review preceded the user's rejection of the adapter's deprecated
-boundary. Replacement design, review and verification remain open.
+boundary. The replacement plan has passed document review; implementation and verification
+remain open.
 Runtime acceptance for the player and director features is complete: all six original player browser
 scenarios pass in one explicit run, and director navigation passes in a separate
 rerun after the test selected Movies. All seven intended cases pass across those
@@ -671,4 +672,4 @@ review also reports no findings. Lifecycle proof coverage remains unchanged.
 The warning correction is saved in local commit `fc8d9305`. Runtime, director,
 viewport-fit, environment and browser work is delivered and verified at the
 checkpoints above. The rejected parameter bridge remains a superseded checkpoint;
-its native Spec replacement continues as separate planning work.
+its native Spec replacement continues as separate work under the reviewed plan.

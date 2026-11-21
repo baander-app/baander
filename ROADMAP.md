@@ -166,9 +166,10 @@ PHPStan passed all 4,068 files before the separate Spec parameter integration.
 The prior parameter bridge migrated fourteen definitions in the two movie/director
 controllers to the exact Spec parameter class. Its acceptance checkpoint is now
 superseded: the user rejected the deprecated serializer, context and annotation
-classes introduced by the adapter. The proper Spec pipeline is under research;
-no replacement design or whole-repository migration is assumed. The prior real
-export was structurally equal to its baseline across 279 paths and 172 component
+classes introduced by the adapter. Replacement follows the reviewed
+[Native Spec OpenAPI plan](docs/plans/2026-11-21-1517-refactor-native-spec-openapi-plan.md);
+its implementation and acceptance remain separate work. The prior real export
+was structurally equal to its baseline across 279 paths and 172 component
 schemas, and regenerated Orval client output is byte-identical. Five host tests
 pass with 54 assertions, and all five simplification lenses report no actionable
 findings. Affected final CI passes 51 tests with 2,748 assertions across ten files:
@@ -178,8 +179,8 @@ baseline and cover actual OpenAPI export, metadata races, rollback, genre identi
 and scoped queries. Final PHPStan passes all 4,073 files, and Deptrac reports no
 violations, warnings or errors. Seven bounded source-review follow-ups report no
 findings and close the five original director defects. That review preceded the
-user's rejection of the parameter adapter's deprecated boundary. Its replacement
-design, review and verification remain open. Runtime acceptance for the player
+user's rejection of the parameter adapter's deprecated boundary. The replacement
+plan has passed document review; implementation and verification remain open. Runtime acceptance for the player
 and director features is complete: the six original player scenarios pass in one
 explicit browser run, and the director navigation scenario passes in a separate
 rerun after correcting the test to select Movies. All seven intended cases pass
