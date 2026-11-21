@@ -1246,6 +1246,36 @@ services:
         arguments:
             $bearerToken: '%env(TMDB_BEARER_TOKEN)%'
 
+    App\Catalog\Application\Port\PeopleReadPortInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\PeopleReadRepository
+
+    App\Catalog\Application\Port\PersonPortraitAccessPortInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\PeopleReadRepository
+
+    App\Catalog\Application\Port\PersonIdentityPortInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\PersonIdentityRepository
+
+    App\Catalog\Application\Port\PersonArtistLinkPortInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\PersonArtistLinkRepository
+
+    App\Catalog\Application\Port\PersonCreditPortInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\PersonCreditRepository
+
+    App\Catalog\Application\Port\PersonAdministrationPortInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\PersonAdministrationRepository
+
+    App\Catalog\Application\Port\TvCatalogPortInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\TvCatalogRepository
+
+    App\Metadata\Application\Port\TvMetadataPortInterface:
+        alias: App\Metadata\Infrastructure\Tv\TvMetadataProvider
+
+    App\Metadata\Application\Port\TmdbPersonLookupInterface:
+        alias: App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter
+
+    App\Metadata\Application\Port\ImdbPersonLookupInterface:
+        alias: App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter
+
     # --- Hardware Acceleration Prober ---
     App\Transcode\Infrastructure\FFmpeg\HardwareCapabilitiesProber:
         arguments:

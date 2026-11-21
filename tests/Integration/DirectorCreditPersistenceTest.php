@@ -31,11 +31,13 @@ use Doctrine\DBAL\Schema\Schema;
 use Doctrine\ORM\EntityManager;
 use DoctrineMigrations\Version20261121143000;
 use DoctrineMigrations\Version20261121194500;
+use DoctrineMigrations\Version20261121194800;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
 require_once dirname(__DIR__, 2) . '/migrations/Version20261121143000.php';
 require_once dirname(__DIR__, 2) . '/migrations/Version20261121194500.php';
+require_once dirname(__DIR__, 2) . '/migrations/Version20261121194800.php';
 
 final class DirectorCreditPersistenceTest extends TestCase
 {
@@ -71,6 +73,7 @@ final class DirectorCreditPersistenceTest extends TestCase
         $this->second = $second->getId();
         $this->migrate(new Version20261121143000($this->writer, new NullLogger()));
         $this->migrate(new Version20261121194500($this->writer, new NullLogger()));
+        $this->migrate(new Version20261121194800($this->writer, new NullLogger()));
     }
 
     protected function tearDown(): void
@@ -275,6 +278,7 @@ final class DirectorCreditPersistenceTest extends TestCase
             $this->writer->insert('movie_director_credits', ['movie_id' => $movieId->toString(), 'director_id' => $personId]);
         }
         $this->migrate(new Version20261121194500($this->writer, new NullLogger()));
+        $this->migrate(new Version20261121194800($this->writer, new NullLogger()));
 
         self::assertSame([
             'id' => $personId,

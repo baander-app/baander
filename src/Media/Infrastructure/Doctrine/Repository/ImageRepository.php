@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Media\Infrastructure\Doctrine\Repository;
 
+use App\Catalog\Application\Port\PersonPortraitAccessPortInterface;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity;
 use App\Media\Domain\Model\Image;
@@ -24,6 +25,7 @@ final class ImageRepository implements ImageRepositoryInterface
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
+        private readonly ?PersonPortraitAccessPortInterface $personPortraits = null,
     ) {
     }
 
@@ -42,7 +44,6 @@ final class ImageRepository implements ImageRepositoryInterface
             ->leftJoin('i.playlist', 'image_playlist')
             ->where('i.publicId = :publicId')
             ->setParameter('publicId', $publicId);
-        $this->applyReadScope($qb, $scope);
         if ($scope->isUnrestricted()) {
             $qb->addSelect('1 AS albumVisible', '1 AS artistVisible', '1 AS playlistVisible');
         } else {
@@ -54,16 +55,19 @@ final class ImageRepository implements ImageRepositoryInterface
                 $qb->addSelect(
                     'CASE WHEN ' . $album . ' THEN 1 ELSE 0 END AS albumVisible',
                     'CASE WHEN ' . $artist . ' THEN 1 ELSE 0 END AS artistVisible',
-                );
+                )->setParameter('image_libraries', $scope->getLibraries()->getLibraryIds(), ArrayParameterType::STRING);
             }
             if ($scope->getActorId() === null) {
                 $qb->addSelect('0 AS playlistVisible');
             } else {
                 $qb->addSelect(
                     'CASE WHEN ' . $this->playlistVisibility('owner_playlist') . ' THEN 1 ELSE 0 END AS playlistVisible',
-                );
+                )->setParameter('image_actor', $scope->getActorId());
             }
         }
+
+        $normalVisibility = clone $qb;
+        $this->applyReadScope($normalVisibility, $scope);
 
         /** @var array{
          *     id: Uuid, publicId: PublicId, path: string, extension: string, mimeType: string,
@@ -73,7 +77,13 @@ final class ImageRepository implements ImageRepositoryInterface
          *     albumVisible: int, artistVisible: int, playlistVisible: int
          * }|null $row
          */
-        $row = $qb->getQuery()->getOneOrNullResult();
+        $normalVisibility = clone $qb;
+        $this->applyReadScope($normalVisibility, $scope);
+        $row = $normalVisibility->getQuery()->getOneOrNullResult();
+        if ($row === null && $scope->getActorId() !== null
+            && $this->personPortraits?->canReadPortrait($publicId, $scope->getLibraries())) {
+            $row = $qb->getQuery()->getOneOrNullResult();
+        }
         if ($row === null) {
             return null;
         }

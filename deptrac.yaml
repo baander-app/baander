@@ -36,12 +36,12 @@ deptrac:
         Shared: ['Shared Domain', 'Shared Application', 'Shared Infrastructure', 'Shared Live Snapshot Infrastructure', 'Shared Interface']
         Activity: ['Activity Artist Merge Contract', 'Activity Album Merge Contract', 'Activity Domain', 'Activity Application', 'Activity Infrastructure', 'Activity Resources', 'Activity Interface']
         Auth: ['Auth Live Authority Contract', 'Auth Domain', 'Auth Identity Contract', 'Auth User Identifier Contract', 'Auth Device Approval Event Contract', 'Auth WebSocket Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
-        Catalog: ['Catalog Video Contract', 'Catalog Song Availability Contract', 'Catalog Song Lookup Contract', 'Catalog Movie Contract', 'Catalog Director Contract', 'Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Resources', 'Catalog Interface']
+        Catalog: ['Catalog Video Contract', 'Catalog Song Availability Contract', 'Catalog Song Lookup Contract', 'Catalog Movie Contract', 'Catalog Director Contract', 'Catalog Person Contract', 'Catalog TV Contract', 'Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Persistence Associations', 'Catalog Resources', 'Catalog Interface']
         Filesystem: ['Filesystem Infrastructure', 'Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
         Library: ['Library Live Audience Contract', 'Library File Availability Contract', 'Library Read Scope Contract', 'Library Content Stats Contract', 'Library Files Discovered Contract', 'Library Provisioning Contract', 'Library Media Files Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
         Lyrics: ['Lyrics Fetch Request Contract', 'Lyrics Album Merge Contract', 'Lyrics Domain', 'Lyrics Application', 'Lyrics Infrastructure', 'Lyrics Resources', 'Lyrics Interface']
         Media: ['Media Video Quality Contract', 'Media Playback Access Contract', 'Media Image Contract', 'Media Domain', 'Media Application', 'Media Infrastructure', 'Media Resources', 'Media Interface']
-        Metadata: ['Metadata Sync Contract', 'Metadata MusicBrainz Lookup Contract', 'Metadata Domain', 'Metadata Application', 'Metadata Infrastructure', 'Metadata Interface']
+        Metadata: ['Metadata Sync Contract', 'Metadata MusicBrainz Lookup Contract', 'Metadata Person Provider Contract', 'Metadata Domain', 'Metadata Application', 'Metadata Infrastructure', 'Metadata Interface']
         Notification: ['Notification Domain', 'Notification Application', 'Notification Infrastructure', 'Notification Resources', 'Notification Interface']
         Party: ['Party Domain', 'Party Application', 'Party Infrastructure', 'Party Resources', 'Party Interface']
         Playlist: ['Playlist Live Audience Contract', 'Playlist Deletion Preview Contract', 'Playlist Album Merge Contract', 'Playlist Domain', 'Playlist Application', 'Playlist Infrastructure', 'Playlist Resources', 'Playlist Interface']
@@ -300,6 +300,16 @@ deptrac:
         - type: classLike
           value: '^App\\Catalog\\Application\\Port\\(DirectorPortInterface|DirectorCredit)$'
 
+    - name: 'Catalog Person Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Catalog\\Application\\Port\\(PersonCreditInput|PersonCreditPortInterface|PersonIdentityPortInterface|PersonPortraitAccessPortInterface)$'
+
+    - name: 'Catalog TV Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Catalog\\Application\\(Port\\TvCatalogPortInterface|DTO\\TvTitleRecord|Command\\Tv\\RegisterTv(Series|Episode)Command)$'
+
     - name: 'Catalog Application'
       collectors:
         - type: bool
@@ -316,10 +326,26 @@ deptrac:
             - type: classLike
               value: '^App\\Catalog\\Application\\Port\\(MoviePortInterface|DirectorPortInterface|DirectorCredit)$'
 
-    - name: 'Catalog Infrastructure'
+            - type: classLike
+              value: '^App\\Catalog\\Application\\Port\\(PersonCreditInput|PersonCreditPortInterface|PersonIdentityPortInterface|PersonPortraitAccessPortInterface)$'
+            - type: classLike
+              value: '^App\\Catalog\\Application\\(Port\\TvCatalogPortInterface|DTO\\TvTitleRecord|Command\\Tv\\RegisterTv(Series|Episode)Command)$'
+
+    # These mappings reference the foreign rows targeted by the catalog's persistent FKs.
+    - name: 'Catalog Persistence Associations'
       collectors:
         - type: classLike
-          value: '^App\\Catalog\\Infrastructure\\'
+          value: '^App\\Catalog\\Infrastructure\\Doctrine\\(Entity\\(PersonEntity|TvSeriesEntity)|Repository\\(PersonAdministrationRepository|TvCatalogRepository))$'
+
+    - name: 'Catalog Infrastructure'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Catalog\\Infrastructure\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Catalog\\Infrastructure\\Doctrine\\(Entity\\(PersonEntity|TvSeriesEntity)|Repository\\(PersonAdministrationRepository|TvCatalogRepository))$'
 
     - name: 'Catalog Resources'
       collectors:
@@ -560,6 +586,11 @@ deptrac:
         - type: classLike
           value: '^App\\Metadata\\Application\\(Port\\MusicBrainzLookupInterface$|DTO\\MusicBrainz\\)'
 
+    - name: 'Metadata Person Provider Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Metadata\\Application\\(Port\\(ImdbPersonLookupInterface|TvMetadataPortInterface|PersonProfileSyncRequestInterface)|DTO\\TvTitleMetadata|Message\\SyncPeopleMessage)$'
+
     - name: 'Metadata Application'
       collectors:
         - type: bool
@@ -571,6 +602,9 @@ deptrac:
               value: '^App\\Metadata\\Application\\(Message\\(SyncAlbumMessage|SyncArtistsMessage|SyncArtistMessage)|Settings\\MetadataSettingDefinitions)$'
             - type: classLike
               value: '^App\\Metadata\\Application\\(Port\\MusicBrainzLookupInterface$|DTO\\MusicBrainz\\)'
+
+            - type: classLike
+              value: '^App\\Metadata\\Application\\(Port\\(ImdbPersonLookupInterface|TvMetadataPortInterface|PersonProfileSyncRequestInterface)|DTO\\TvTitleMetadata|Message\\SyncPeopleMessage)$'
 
     - name: 'Metadata Infrastructure'
       collectors:
@@ -1363,7 +1397,18 @@ deptrac:
       - Core
       - 'Catalog Domain'
       - 'Shared Domain'
+    'Catalog Person Contract':
+      - 'Shared Domain'
+    'Catalog TV Contract':
+      - 'Metadata Person Provider Contract'
+      - 'Shared Domain'
+      - 'Catalog Domain'
     'Catalog Application':
+      - 'Library Application'
+      - 'Library Type Contract'
+      - 'Catalog Person Contract'
+      - 'Catalog TV Contract'
+      - 'Metadata Person Provider Contract'
       - 'Catalog Artist Role Contract'
       - 'Catalog Movie Contract'
       - 'Catalog Director Contract'
@@ -1384,7 +1429,20 @@ deptrac:
       - 'Catalog Domain'
       - 'Shared Domain'
       - 'Shared Application'
+    'Catalog Persistence Associations':
+      - Core
+      - 'Catalog Domain'
+      - 'Catalog Infrastructure'
+      - 'Catalog TV Contract'
+      - 'Library Infrastructure'
+      - 'Media Infrastructure'
+      - 'Metadata Person Provider Contract'
+      - 'Shared Application'
+      - 'Shared Domain'
     'Catalog Infrastructure':
+      - 'Catalog Persistence Associations'
+      - 'Catalog Person Contract'
+      - 'Catalog TV Contract'
       - 'Catalog Artist Role Contract'
       - 'Catalog Movie Contract'
       - 'Catalog Director Contract'
@@ -1418,6 +1476,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Catalog Interface':
+      - 'Catalog TV Contract'
       - 'Catalog Artist Role Contract'
       - 'Catalog Movie Contract'
       - 'Catalog Director Contract'
@@ -1567,6 +1626,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Media Infrastructure':
+      - 'Catalog Person Contract'
       - Core
       - 'Image Processing'
       - 'Media Image Contract'
@@ -1610,7 +1670,12 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Metadata MusicBrainz Lookup Contract': []
+    'Metadata Person Provider Contract':
+      - 'Catalog Person Contract'
     'Metadata Application':
+      - 'Catalog Person Contract'
+      - 'Catalog TV Contract'
+      - 'Metadata Person Provider Contract'
       - 'Catalog Movie Contract'
       - 'Catalog Director Contract'
       - Core
@@ -1621,6 +1686,8 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Metadata Infrastructure':
+      - 'Catalog Person Contract'
+      - 'Metadata Person Provider Contract'
       - Core
       - 'Public HTTP Client'
       - 'Rate Limiter Contracts'
@@ -1634,6 +1701,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Metadata Interface':
+      - 'Metadata Person Provider Contract'
       - Core
       - 'Auth Identity Contract'
       - 'Metadata Application'

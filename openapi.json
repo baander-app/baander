@@ -9285,6 +9285,348 @@
                 }
             }
         },
+        "/api/people": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "List people with accessible credits",
+                "operationId": "personIndex",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 50
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "role",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Accessible catalog data",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/PaginatedResponse"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/PersonResource"
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "data"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Resource not found"
+                    }
+                }
+            }
+        },
+        "/api/people/{publicId}": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "Get a person with accessible credits",
+                "operationId": "personShow",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Accessible catalog data",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PersonResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Resource not found"
+                    }
+                }
+            }
+        },
+        "/api/people/{publicId}/credits": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "List accessible works credited to a person",
+                "operationId": "personCredits",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 50
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "kind",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "movie",
+                                "series",
+                                "episode",
+                                "song",
+                                "album"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "role",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Accessible catalog data",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/PaginatedResponse"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/PersonWorkResource"
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "data"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Resource not found"
+                    }
+                }
+            }
+        },
+        "/api/movies/{publicId}/credits": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "List people credited to an accessible movie",
+                "operationId": "personMovieCredits",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 50
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Accessible catalog data",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/PaginatedResponse"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/WorkPersonResource"
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "data"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Resource not found"
+                    }
+                }
+            }
+        },
+        "/api/artists/{publicId}/person": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "Get the person linked to an accessible artist",
+                "operationId": "personArtist",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Accessible catalog data",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PersonResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Resource not found"
+                    }
+                }
+            }
+        },
         "/api/songs/": {
             "get": {
                 "tags": [
@@ -9612,6 +9954,399 @@
                                 }
                             }
                         }
+                    }
+                }
+            }
+        },
+        "/api/tv/series": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "List accessible television series",
+                "operationId": "tvSeriesIndex",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 50
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Accessible catalog data",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/PaginatedResponse"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/TvSeriesResource"
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "data"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Resource not found"
+                    }
+                }
+            }
+        },
+        "/api/tv/series/{publicId}": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "Get an accessible television series",
+                "operationId": "tvSeriesShow",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Accessible catalog data",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/TvSeriesResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Resource not found"
+                    }
+                }
+            }
+        },
+        "/api/tv/series/{publicId}/episodes": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "List registered episodes of an accessible series",
+                "operationId": "tvSeriesEpisodes",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 50
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Accessible catalog data",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/PaginatedResponse"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/TvEpisodeResource"
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "data"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Resource not found"
+                    }
+                }
+            }
+        },
+        "/api/tv/episodes/{publicId}": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "Get an accessible television episode",
+                "operationId": "tvEpisodeShow",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Accessible catalog data",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/TvEpisodeResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Resource not found"
+                    }
+                }
+            }
+        },
+        "/api/tv/series/{publicId}/credits": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "List people credited to an accessible series",
+                "operationId": "tvSeriesCredits",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 50
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Accessible catalog data",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/PaginatedResponse"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/WorkPersonResource"
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "data"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Resource not found"
+                    }
+                }
+            }
+        },
+        "/api/tv/episodes/{publicId}/credits": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "List people credited to an accessible episode",
+                "operationId": "tvEpisodeCredits",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 50
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Accessible catalog data",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/PaginatedResponse"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/WorkPersonResource"
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "data"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Resource not found"
                     }
                 }
             }
@@ -29732,6 +30467,165 @@
                     "removedArtists"
                 ]
             },
+            "PersonResource": {
+                "type": "object",
+                "properties": {
+                    "publicId": {
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "profileUrl": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "biography": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "aliases": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "birthDate": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "deathDate": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "birthplace": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "sex": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "gender": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "age": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "isDeceased": {
+                        "type": "boolean"
+                    },
+                    "movieCount": {
+                        "type": "integer"
+                    },
+                    "seriesCount": {
+                        "type": "integer"
+                    },
+                    "episodeCount": {
+                        "type": "integer"
+                    },
+                    "songCount": {
+                        "type": "integer"
+                    },
+                    "albumCount": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "publicId",
+                    "name",
+                    "profileUrl",
+                    "biography",
+                    "aliases",
+                    "birthDate",
+                    "deathDate",
+                    "birthplace",
+                    "sex",
+                    "gender",
+                    "age",
+                    "isDeceased",
+                    "movieCount",
+                    "seriesCount",
+                    "episodeCount",
+                    "songCount",
+                    "albumCount"
+                ]
+            },
+            "PersonWorkResource": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "movie",
+                            "series",
+                            "episode",
+                            "song",
+                            "album"
+                        ]
+                    },
+                    "publicId": {
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "roles": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CreditRoleResource"
+                        }
+                    }
+                },
+                "required": [
+                    "kind",
+                    "publicId",
+                    "title",
+                    "roles"
+                ]
+            },
+            "WorkPersonResource": {
+                "type": "object",
+                "properties": {
+                    "publicId": {
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "personPublicId": {
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "profileUrl": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "role": {
+                        "$ref": "#/components/schemas/CreditRoleResource"
+                    }
+                },
+                "required": [
+                    "publicId",
+                    "personPublicId",
+                    "name",
+                    "profileUrl",
+                    "role"
+                ]
+            },
             "CursorPaginatedResponse": {
                 "type": "object",
                 "properties": {
@@ -29780,6 +30674,86 @@
                 "required": [
                     "data",
                     "meta"
+                ]
+            },
+            "TvSeriesResource": {
+                "type": "object",
+                "properties": {
+                    "publicId": {
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "overview": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "posterUrl": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "publicId",
+                    "name",
+                    "overview",
+                    "posterUrl"
+                ]
+            },
+            "TvEpisodeResource": {
+                "type": "object",
+                "properties": {
+                    "publicId": {
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "overview": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "stillUrl": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "airDate": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "seasonNumber": {
+                        "type": "integer"
+                    },
+                    "episodeNumber": {
+                        "type": "integer"
+                    },
+                    "seriesPublicId": {
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "seriesName": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "publicId",
+                    "name",
+                    "overview",
+                    "stillUrl",
+                    "airDate",
+                    "seasonNumber",
+                    "episodeNumber",
+                    "seriesPublicId",
+                    "seriesName"
                 ]
             },
             "VideoPlaybackInformationResource": {
@@ -32737,6 +33711,41 @@
                     "target",
                     "requiredRows",
                     "ticked"
+                ]
+            },
+            "CreditRoleResource": {
+                "type": "object",
+                "properties": {
+                    "role": {
+                        "type": "string"
+                    },
+                    "job": {
+                        "type": "string"
+                    },
+                    "characterName": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "department": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "creditedName": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "billingOrder": {
+                        "type": "integer",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "role",
+                    "job",
+                    "characterName",
+                    "department",
+                    "creditedName",
+                    "billingOrder"
                 ]
             },
             "PlaybackMediaResource": {
