@@ -17,6 +17,18 @@ services:
     Baander\MediaMetadata\Reader\WavReader:
         arguments:
             $logger: '@monolog.logger.metadata'
+    Baander\MediaMetadata\Reader\Mp4Reader:
+        arguments:
+            $logger: '@monolog.logger.metadata'
+    Baander\MediaMetadata\Reader\AsfReader:
+        arguments:
+            $logger: '@monolog.logger.metadata'
+    Baander\MediaMetadata\Reader\AiffReader:
+        arguments:
+            $logger: '@monolog.logger.metadata'
+    Baander\MediaMetadata\Reader\AacReader:
+        arguments:
+            $logger: '@monolog.logger.metadata'
     Baander\MediaMetadata\MetadataContentReader: ~
 
     Baander\ImageProcessing\GdImageConverter: ~

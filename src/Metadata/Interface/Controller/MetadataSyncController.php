@@ -50,7 +50,7 @@ final class MetadataSyncController
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'format', description: 'Detected file format (mp3, m4a, flac, ogg, opus or wav)', type: 'string', example: 'flac'),
+                            new OA\Property(property: 'format', description: 'Detected file format (mp3, m4a, flac, ogg, opus, wav, wma, aiff or aac)', type: 'string', example: 'flac'),
                             new OA\Property(property: 'metadata', properties: [
                                 new OA\Property(property: 'title', type: 'string', nullable: true),
                                 new OA\Property(property: 'artist', type: 'string', nullable: true),

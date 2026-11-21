@@ -43,7 +43,7 @@ final readonly class MediaFile
     public function isAudio(): bool
     {
         return match ($this->extension) {
-            'mp3', 'flac', 'ogg', 'wav', 'aac', 'm4a', 'wma', 'opus' => true,
+            'mp3', 'flac', 'ogg', 'oga', 'wav', 'wave', 'aac', 'm4a', 'mp4a', 'm4b', 'wma', 'opus', 'aif', 'aiff', 'aifc' => true,
             default => false,
         };
     }

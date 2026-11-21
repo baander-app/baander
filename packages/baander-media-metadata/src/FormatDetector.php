@@ -18,7 +18,7 @@ final readonly class FormatDetector
     /**
      * Detect the audio format of a file.
      *
-     * Returns 'mp3', 'flac', 'ogg', 'm4a', 'wav', or null if the format
+     * Returns a canonical container name, or null if the format
      * cannot be determined.
      */
     public function detect(string $path): ?string
@@ -33,8 +33,14 @@ final readonly class FormatDetector
             return null;
         }
 
-        $header = fread($handle, 12);
-        fclose($handle);
+        try {
+            $header = fread($handle, 16);
+            if ($header !== false && str_starts_with($header, 'ID3')) {
+                return $this->detectAfterId3($handle, $header, $path);
+            }
+        } finally {
+            fclose($handle);
+        }
 
         if ($header === false || strlen($header) < 4) {
             return $this->detectByExtension($path);
@@ -42,9 +48,12 @@ final readonly class FormatDetector
 
         $signature4 = substr($header, 0, 4);
 
-        // ID3v2 tag header: "ID3"
-        if (str_starts_with($header, 'ID3')) {
-            return 'mp3';
+        if ($header === "\x30\x26\xB2\x75\x8E\x66\xCF\x11\xA6\xD9\x00\xAA\x00\x62\xCE\x6C") {
+            return 'wma';
+        }
+
+        if ($this->isAdts($header)) {
+            return 'aac';
         }
 
         // FLAC: "fLaC"
@@ -72,7 +81,39 @@ final readonly class FormatDetector
             return 'wav';
         }
 
+        if ($signature4 === 'FORM' && in_array(substr($header, 8, 4), ['AIFF', 'AIFC'], true)) {
+            return 'aiff';
+        }
+
         return $this->detectByExtension($path);
+    }
+
+    /** @param resource $handle */
+    private function detectAfterId3($handle, string $header, string $path): string
+    {
+        if (strlen($header) >= 10 && (ord($header[6]) | ord($header[7]) | ord($header[8]) | ord($header[9])) < 128) {
+            $tagSize = (ord($header[6]) << 21) | (ord($header[7]) << 14) | (ord($header[8]) << 7) | ord($header[9]);
+            $footerSize = ord($header[3]) === 4 && (ord($header[5]) & 0x10) !== 0 ? 10 : 0;
+            if (fseek($handle, 10 + $tagSize + $footerSize) === 0) {
+                $audioHeader = fread($handle, 7);
+                if ($audioHeader !== false && $this->isAdts($audioHeader)) {
+                    return 'aac';
+                }
+                if ($audioHeader !== false && strlen($audioHeader) >= 2 && $audioHeader[0] === "\xFF" && (ord($audioHeader[1]) & 0xE6) === 0xE2) {
+                    return 'mp3';
+                }
+            }
+        }
+
+        return $this->detectByExtension($path) === 'aac' ? 'aac' : 'mp3';
+    }
+
+    private function isAdts(string $header): bool
+    {
+        return strlen($header) >= 7
+            && $header[0] === "\xFF"
+            && (ord($header[1]) & 0xF6) === 0xF0
+            && ((ord($header[2]) >> 2) & 0x0F) < 13;
     }
 
     private function detectByExtension(string $path): ?string
@@ -84,8 +125,11 @@ final readonly class FormatDetector
             'flac' => 'flac',
             'ogg', 'oga' => 'ogg',
             'opus' => 'opus',
-            'm4a', 'mp4', 'aac' => 'm4a',
+            'm4a', 'mp4', 'mp4a', 'm4b' => 'm4a',
             'wav', 'wave' => 'wav',
+            'wma' => 'wma',
+            'aif', 'aiff', 'aifc' => 'aiff',
+            'aac' => 'aac',
             default => null,
         };
     }

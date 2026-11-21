@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Baander\MediaMetadata\Tests;
 
 use Baander\MediaMetadata\FormatDetector;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class FormatDetectorTest extends TestCase
@@ -59,6 +60,42 @@ final class FormatDetectorTest extends TestCase
         $file = $this->tempFile("RIFF\x00\x00\x00\x00WAVE" . "\x00\x00\x00\x00");
 
         $this->assertSame('wav', $this->detector->detect($file));
+    }
+
+    #[DataProvider('additionalFormats')]
+    public function testDetectsAdditionalContainers(string $header, string $format): void
+    {
+        self::assertSame($format, $this->detector->detect($this->tempFile($header, 'renamed.bin')));
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function additionalFormats(): iterable
+    {
+        yield 'ASF' => [hex2bin('3026b2758e66cf11a6d900aa0062ce6c'), 'wma'];
+        yield 'AIFF' => ['FORM' . pack('N', 4) . 'AIFF', 'aiff'];
+        yield 'AIFC' => ['FORM' . pack('N', 4) . 'AIFC', 'aiff'];
+        yield 'ADTS' => ["\xff\xf1\x50\x80\x01\x7f\xfc", 'aac'];
+        yield 'ID3 before ADTS' => ["ID3\x04\x00\x00\x00\x00\x00\x00\xff\xf1\x50\x80\x01\x7f\xfc", 'aac'];
+    }
+
+    #[DataProvider('extensionAliases')]
+    public function testRecognizesAudioExtensionAliases(string $extension, string $format): void
+    {
+        self::assertSame($format, $this->detector->detect($this->tempFile('', 'track.' . $extension)));
+    }
+
+    /** @return iterable<array{string, string}> */
+    public static function extensionAliases(): iterable
+    {
+        yield ['mp4a', 'm4a'];
+        yield ['M4B', 'm4a'];
+        yield ['wma', 'wma'];
+        yield ['aac', 'aac'];
+        yield ['aif', 'aiff'];
+        yield ['AIFF', 'aiff'];
+        yield ['aifc', 'aiff'];
+        yield ['wave', 'wav'];
+        yield ['oga', 'ogg'];
     }
 
     public function testFallsBackToExtensionForFlac(): void

@@ -13,7 +13,7 @@ use SplFileInfo;
 final class DirectoryScanner implements DirectoryScannerPortInterface
 {
     /** Audio file extensions to discover. */
-    private const array AUDIO_EXTENSIONS = ['mp3', 'flac', 'ogg', 'wav', 'aac', 'm4a', 'wma', 'opus', 'wma'];
+    private const array AUDIO_EXTENSIONS = ['mp3', 'flac', 'ogg', 'oga', 'wav', 'wave', 'aac', 'm4a', 'mp4a', 'm4b', 'wma', 'opus', 'aif', 'aiff', 'aifc'];
 
     /** Video file extensions to discover. */
     private const array VIDEO_EXTENSIONS = ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'webm', 'm4v'];
