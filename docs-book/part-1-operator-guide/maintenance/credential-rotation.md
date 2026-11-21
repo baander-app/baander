@@ -69,10 +69,11 @@ clears the token cache. Keep all instances stopped through retries and installat
 of the bundle's two `OAUTH_*` configuration values. Restart and verify fresh
 authentication before resuming traffic. Never retry invalidation after resuming.
 
-The command retains active files unchanged and prints no new secret. Preserve the
-old configuration for startup recovery; restoring keys cannot restore deleted
-grants. This procedure requires downtime. Replacing the signing key alone does
-not provide a zero-downtime transition for existing tokens.
+The command leaves active key files in place and prints the replacement bundle's
+configuration path. This procedure requires downtime. If you suspect the old
+private key was exposed, keep service offline until every instance starts with a
+trusted replacement. Follow the [runbook's recovery table](../commands/app-auth-rotate-secrets.md#failure-and-recovery)
+if configuration or startup fails.
 
 ## Rotating Redis Password
 

@@ -4,6 +4,28 @@ Updated: 2026-11-21. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
+## Password rehash and emergency OAuth rotation
+
+The [authentication plan](docs/plans/2026-11-21-feat-password-rehash-and-emergency-oauth-rotation-plan.md)
+adds hash upgrades to successful password logins. The upgrade uses the configured
+hasher and commits with the new session. It preserves the credential epoch,
+existing sessions and password reset links. The session issuance lock still
+refuses a login that verified a password before a concurrent change.
+
+The [offline rotation runbook](docs-book/part-1-operator-guide/commands/app-auth-rotate-secrets.md)
+now covers recovery when the previous signing key may have been exposed.
+`OAuthKeyRotationAcceptanceTest` runs the maintenance command and restarts the
+production firewall with new key paths. It checks the replacement key in JWKS,
+rejects the old access and refresh tokens, and confirms that a user can sign in
+again. `OAuthTokenInvalidationTest` verifies deletion of outstanding authorization
+and device codes along with the session grants and token metadata.
+
+Verification on 2026-11-21: the CI image passed 190 tests with 1,869 assertions
+across the focused unit, functional and integration suites. PHPStan and container
+lint passed, and Deptrac reported zero violations. The broader Auth unit run
+identified four `ScopeRouteInventoryTest` failures for existing movie, video and
+admin log routes. The same failures reproduce on `master`.
+
 ## Cinema video player
 
 The [cinema player plan](docs/plans/2026-11-21-1146-feat-cinema-video-player-plan.md)

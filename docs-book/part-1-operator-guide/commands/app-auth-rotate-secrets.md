@@ -35,7 +35,7 @@ private while investigating.
 Provision these values through the deployment's secret provider. The paths must
 resolve to the same validated files in every application instance; container
 deployments must mount them at those paths. Preserve the old configuration and
-files securely before changing anything.
+files securely if the previous private key is still trusted.
 
 ## Offline cutover
 
@@ -58,7 +58,7 @@ files securely before changing anything.
 3. After success, install both values from `oauth.env` while applications
    remain stopped. Deploy the same bundle to every instance.
 4. Restart every instance, verify fresh authentication and protected API access,
-   then resume traffic. Existing clients must authenticate again. Never repeat
+   then resume traffic. Users must sign in again. Never repeat
    `invalidate` after service resumes: it would delete newly issued grants.
 
 This procedure requires downtime. Database deletion, cache cleanup, and installing
@@ -72,11 +72,13 @@ Replacing a signing key alone does not preserve tokens signed by the old key.
 | Bundle preparation or validation fails | No token invalidation was attempted. Inspect permissions and files; use a new directory for another preparation. |
 | Token invalidation is unconfirmed | Keep all instances offline. A lost commit acknowledgement may mean deletion committed. Restore database connectivity and repeat invalidation with the same validated bundle. |
 | Database committed, cache cleanup unconfirmed | Keep all instances offline. Restore cache connectivity and repeat invalidation with the same bundle. A zero-row retry still clears the token cache. |
-| Configuration installation or restart fails | Keep traffic drained. Correct the configuration or restore the retained old configuration and key files consistently across all instances. Deleted grants cannot be recovered by restoring keys; clients still need fresh authentication. |
+| Configuration installation or restart fails | Keep traffic drained and fix the replacement configuration on every instance. Restore the previous configuration and key files only if the previous private key is still trusted. Users still need to sign in again because invalidation deleted their grants. |
 
-Offline retries are safe only while no process can issue new grants. Do not switch
-configuration or resume service after an unconfirmed invalidation. Retain the old
-bundle according to your secret-retention policy after verifying recovery.
+Offline retries are safe only while no process can issue new grants. Wait for
+confirmed invalidation before switching configuration or resuming service. If
+you suspect exposure, keep all instances offline until they can start with a
+trusted replacement. Retain old key material according to your secret-retention
+policy after verifying recovery.
 
 Exit status is `0` for a confirmed successful action, `1` for an operational
 failure, and `2` for an invalid action or options. Every action requires
