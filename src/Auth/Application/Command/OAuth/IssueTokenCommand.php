@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Application\Command\OAuth;
 
+use App\Auth\Application\DTO\PasswordHashUpgrade;
 use App\Shared\Domain\Model\Uuid;
 
 /**
@@ -33,6 +34,7 @@ final readonly class IssueTokenCommand
         private ?string $userAgent = null,
         private ?string $clientFingerprint = null,
         private ?int $totpStep = null,
+        private ?PasswordHashUpgrade $passwordHashUpgrade = null,
     ) {
     }
 
@@ -87,5 +89,10 @@ final readonly class IssueTokenCommand
     public function getTotpStep(): ?int
     {
         return $this->totpStep;
+    }
+
+    public function getPasswordHashUpgrade(): ?PasswordHashUpgrade
+    {
+        return $this->passwordHashUpgrade;
     }
 }

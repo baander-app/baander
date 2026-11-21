@@ -27,6 +27,7 @@ final readonly class VerifiedPasswordLogin
         public string $nextNonce,
         public ?int $totpStep,
         public int $credentialEpoch,
+        public ?PasswordHashUpgrade $passwordHashUpgrade = null,
     ) {
     }
 }

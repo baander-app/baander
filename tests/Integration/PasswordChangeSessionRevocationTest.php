@@ -239,6 +239,9 @@ final class PasswordChangeSessionRevocationTest extends TestCase
 
         self::assertSame(401, $answer['status'], json_encode($answer, JSON_THROW_ON_ERROR));
         self::assertSame(0, $this->liveAccessTokens(), 'The login issued no session.');
+        $storedHash = $this->connection->fetchOne('SELECT password FROM users WHERE id = ?', [$this->user->getId()->toString()]);
+        self::assertIsString($storedHash);
+        self::assertTrue(password_verify('changed-during-login-5', $storedHash), 'The pending hash upgrade must preserve the concurrently changed password.');
         $this->signIn($this->user, 'changed-during-login-5');
     }
 

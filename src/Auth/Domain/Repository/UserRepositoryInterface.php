@@ -37,6 +37,12 @@ interface UserRepositoryInterface
     public function count(?string $roleFilter = null, ?bool $disabledFilter = null): int;
 
     /**
+     * Upgrades the hash if it still matches the one verified at login. Call under the
+     * credential epoch lock. A hash upgrade preserves the credentials and reset links.
+     */
+    public function upgradePasswordHash(Uuid $id, string $verifiedHash, string $replacementHash): void;
+
+    /**
      * Spends a TOTP time step: records it as the user's last used step when it is later than
      * the recorded one, in one conditional statement. Returns false when that step or a later
      * one was already spent, so each code is accepted once, also by concurrent requests.

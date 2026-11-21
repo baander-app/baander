@@ -304,6 +304,9 @@ final class PasswordAuthenticatorTest extends TestCase
     {
         $this->userRepository->method('findByEmail')->willReturn($this->createUser('sealed-secret'));
         $this->passwordHasher->method('verify')->willReturn(true);
+        $this->passwordHasher->method('needsRehash')->willReturnCallback(
+            static fn (): never => self::fail('Password rehashing must wait until the second factor is verified.'),
+        );
         $this->totpVerifier->method('matchEnrolledStep')->willReturn(null);
 
         $this->expectException(BadCredentialsException::class);

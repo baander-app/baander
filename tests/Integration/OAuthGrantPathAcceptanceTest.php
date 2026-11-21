@@ -9,13 +9,16 @@ use App\Auth\Domain\Event\PasswordChanged;
 use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
+use App\Auth\Infrastructure\Repository\PasswordResetTokenRepository;
 use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Event\Outbox\OutboxRepository;
 use App\Tests\Fixtures\Auth\GrantPathOAuthKernel;
+use App\Tests\Fixtures\Auth\IssuanceFaults;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
 use App\Tests\Fixtures\Auth\WebAuthnTestCredential;
+use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\ORM\EntityManagerInterface;
@@ -197,6 +200,104 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         $claims = self::claims($login['accessToken']);
         self::assertSame(['jkt' => $key->thumbprint()], $claims['cnf'] ?? null);
         self::assertSame($key->thumbprint(), $this->storedBinding($claims['jti']));
+    }
+
+    public function testPasswordLoginUpgradesTheHashAndPreservesSessionsAndResetLinks(): void
+    {
+        $existingKey = new SignedDpopProof();
+        $existing = $this->login($existingKey);
+        $oldHash = password_hash(self::PASSWORD, PASSWORD_BCRYPT);
+        $this->connection->executeStatement(
+            'UPDATE users SET password = ? WHERE id = ?',
+            [$oldHash, $this->user->getId()->toString()],
+        );
+        $this->manager->clear();
+        $epoch = $this->connection->fetchOne('SELECT credential_epoch FROM users WHERE id = ?', [$this->user->getId()->toString()]);
+        $resetToken = bin2hex(random_bytes(32));
+        (new PasswordResetTokenRepository($this->connection))->issue(
+            $this->user->getId(),
+            $resetToken,
+            new DateTimeImmutable('+1 hour'),
+        );
+
+        $this->login(new SignedDpopProof());
+
+        $upgradedHash = $this->storedPassword();
+        self::assertNotSame($oldHash, $upgradedHash);
+        self::assertSame('argon2id', password_get_info($upgradedHash)['algoName']);
+        self::assertTrue(password_verify(self::PASSWORD, $upgradedHash));
+        self::assertSame($epoch, $this->connection->fetchOne(
+            'SELECT credential_epoch FROM users WHERE id = ?',
+            [$this->user->getId()->toString()],
+        ));
+        self::assertSame(200, $this->me($existing['accessToken'], $existingKey)->getStatusCode());
+        $refresh = $this->refresh($existing['refreshToken'], $existingKey, $existing['nonce']);
+        self::assertSame(200, $refresh->getStatusCode(), (string) $refresh->getContent());
+        $reset = $this->send('POST', '/api/auth/password/reset', json: [
+            'token' => $resetToken,
+            'password' => 'password-after-rehash-reset',
+        ]);
+        self::assertSame(200, $reset->getStatusCode(), (string) $reset->getContent());
+    }
+
+    public function testPasswordLoginKeepsACurrentHash(): void
+    {
+        $this->login(new SignedDpopProof());
+        $currentHash = $this->storedPassword();
+
+        $this->login(new SignedDpopProof());
+
+        self::assertSame($currentHash, $this->storedPassword());
+    }
+
+    public function testAWrongPasswordLeavesAnObsoleteHashUntouched(): void
+    {
+        $oldHash = $this->storedPassword();
+        $key = new SignedDpopProof();
+
+        $response = $this->send('POST', '/api/auth/login', json: [
+            'email' => $this->user->getEmail(),
+            'password' => 'incorrect-password',
+        ], headers: [
+            'DPoP' => $key->createWithNonce('POST', self::ORIGIN . '/api/auth/login', $this->nonce()),
+        ]);
+
+        self::assertSame(401, $response->getStatusCode(), (string) $response->getContent());
+        self::assertSame($oldHash, $this->storedPassword());
+    }
+
+    public function testASigningFailureRollsBackThePasswordHashUpgrade(): void
+    {
+        $oldHash = $this->storedPassword();
+        $key = new SignedDpopProof();
+        $nonce = $this->nonce();
+        $faultDirectory = self::$sharedDirectory . '/rehash-signing-fault-' . bin2hex(random_bytes(8));
+        self::assertTrue(mkdir($faultDirectory, 0700));
+        self::assertTrue(touch(IssuanceFaults::path($faultDirectory, IssuanceFaults::SIGN_FAIL_ONCE)));
+        $previousFaultDirectory = getenv(IssuanceFaults::ENVIRONMENT_VARIABLE);
+        putenv(IssuanceFaults::ENVIRONMENT_VARIABLE . '=' . $faultDirectory);
+
+        try {
+            $response = $this->send('POST', '/api/auth/login', json: [
+                'email' => $this->user->getEmail(),
+                'password' => self::PASSWORD,
+            ], headers: [
+                'DPoP' => $key->createWithNonce('POST', self::ORIGIN . '/api/auth/login', $nonce),
+            ]);
+
+            self::assertSame(500, $response->getStatusCode(), (string) $response->getContent());
+            self::assertFalse(IssuanceFaults::isSet($faultDirectory, IssuanceFaults::SIGN_FAIL_ONCE));
+            self::assertSame($oldHash, $this->storedPassword());
+            self::assertSame(0, (int) $this->connection->fetchOne(
+                'SELECT count(*) FROM oauth_access_tokens WHERE user_id = ?',
+                [$this->user->getId()->toString()],
+            ));
+        } finally {
+            putenv($previousFaultDirectory === false
+                ? IssuanceFaults::ENVIRONMENT_VARIABLE
+                : IssuanceFaults::ENVIRONMENT_VARIABLE . '=' . $previousFaultDirectory);
+            (new Filesystem())->remove($faultDirectory);
+        }
     }
 
     public function testRefreshRejectsAProofSignedByAnotherKey(): void
@@ -1195,6 +1296,14 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
     private function passkeyLogin(array $assertion, ?string $proof): Response
     {
         return $this->send('POST', '/api/auth/login/passkey', json: $assertion, headers: $proof === null ? [] : ['DPoP' => $proof]);
+    }
+
+    private function storedPassword(): string
+    {
+        $hash = $this->connection->fetchOne('SELECT password FROM users WHERE id = ?', [$this->user->getId()->toString()]);
+        self::assertIsString($hash);
+
+        return $hash;
     }
 
     private function storedBinding(string $tokenId): ?string

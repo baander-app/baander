@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Infrastructure\Security\User;
 
+use App\Auth\Application\DTO\PasswordHashUpgrade;
 use App\Auth\Application\DTO\VerifiedPasswordLogin;
 use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use App\Auth\Application\Exception\TotpSecretUnavailableException;
@@ -138,12 +139,16 @@ final class PasswordAuthenticator extends AbstractAuthenticator
 
         // The epoch comes from the same read as the password hash just checked, so a password
         // change committed after that read makes issuance refuse the login.
+        $verifiedHash = $user->getPassword();
         $request->attributes->set(VerifiedPasswordLogin::class, new VerifiedPasswordLogin(
             $user->getId(),
             $proofKey,
             $nextNonce,
             $totpStep,
             $user->getCredentialEpoch(),
+            $this->passwordHasher->needsRehash($verifiedHash)
+                ? new PasswordHashUpgrade($verifiedHash, $this->passwordHasher->hash($password))
+                : null,
         ));
 
         return new SelfValidatingPassport(

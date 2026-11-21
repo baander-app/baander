@@ -113,6 +113,7 @@ final class LoginController
                 userAgent: $request->headers->get('User-Agent'),
                 clientFingerprint: $request->headers->get(BaanderHeader::ClientFingerprint->value),
                 totpStep: $login->totpStep,
+                passwordHashUpgrade: $login->passwordHashUpgrade,
             ));
         } catch (HandlerFailedException $exception) {
             $cause = HandlerFailure::cause($exception);

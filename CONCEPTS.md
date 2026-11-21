@@ -116,6 +116,10 @@ A per-user counter that every change to the user's credentials advances, such as
 
 Tokens are issued only while the recorded epoch matches the user's current one, so nothing verified before a credential change can produce a session after it. A password change that keeps the requesting session moves that session's chain to the new epoch.
 
+### Password hash upgrade
+
+A successful password login can replace an obsolete hash with one made using the current password hashing settings. The user keeps the same password, credential epoch, sessions, and reset links.
+
 ### Consumed refresh token
 
 A refresh token that a rotation has already used. It stays stored, marked with the instant it was consumed, so a later presentation can be judged: a lost-response grace or a reuse.

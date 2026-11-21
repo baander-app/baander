@@ -18,7 +18,7 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  *
  * The Symfony authenticators verify the user's credentials; this handler mints a
  * DPoP-bound access token and a refresh token that starts a new rotation chain, and
- * spends the TOTP step a password login matched in the same transaction. The
+ * spends the TOTP step and upgrades an obsolete password hash in the same transaction. The
  * credential epoch the login captured must still be the user's when the tokens are
  * stored (CredentialsChangedException otherwise).
  * The authorization code and device code grants issue through the same
@@ -59,26 +59,29 @@ final readonly class IssueTokenHandler
             clientFingerprint: $command->getClientFingerprint(),
             userAgent: $command->getUserAgent(),
             ipAddress: $command->getIpAddress(),
-            persistWithTokens: $this->spendTotpStep($command),
+            persistWithTokens: $this->persistPasswordLogin($command),
         );
     }
 
     /**
-     * The login's TOTP step is spent in the transaction that stores the tokens: when another
-     * request spent it first, no row matches and the tokens roll back with it.
-     *
      * @return (callable(): void)|null
      */
-    private function spendTotpStep(IssueTokenCommand $command): ?callable
+    private function persistPasswordLogin(IssueTokenCommand $command): ?callable
     {
         $step = $command->getTotpStep();
-        if ($step === null) {
+        $upgrade = $command->getPasswordHashUpgrade();
+        if ($step === null && $upgrade === null) {
             return null;
         }
 
-        return function () use ($command, $step): void {
-            if (!$this->userRepository->spendTotpStep($command->getUserId(), $step)) {
+        $userId = $command->getUserId();
+
+        return function () use ($userId, $step, $upgrade): void {
+            if ($step !== null && !$this->userRepository->spendTotpStep($userId, $step)) {
                 throw new TotpStepAlreadySpentException();
+            }
+            if ($upgrade !== null) {
+                $this->userRepository->upgradePasswordHash($userId, $upgrade->verifiedHash, $upgrade->replacementHash);
             }
         };
     }

@@ -30,8 +30,8 @@ final class UserRepository implements UserRepositoryInterface
         $entity = $this->findEntityOrCreate($user);
 
         // A reset token was issued for the credentials the account had then. Any change of
-        // address or password hash ends it, as Django's reset tokens do; that includes a
-        // rehash on login, which is harmless because the user has just proven the password.
+        // address or password saved through the aggregate ends it. Login can upgrade the hash
+        // separately while keeping the same credentials.
         // Revoking before the flush means a failed save can only cost an outstanding token.
         if ($this->entityManager->contains($entity)
             && ($entity->getEmail() !== $user->getEmail() || $entity->getPassword() !== $user->getPassword())) {
@@ -163,6 +163,24 @@ final class UserRepository implements UserRepositoryInterface
         $conn = $this->entityManager->getConnection();
 
         return (int) $conn->executeQuery($sql, $params, $types)->fetchOne();
+    }
+
+    public function upgradePasswordHash(
+        Uuid $id,
+        #[\SensitiveParameter] string $verifiedHash,
+        #[\SensitiveParameter] string $replacementHash,
+    ): void {
+        // Update only the verified hash. A concurrent login may have upgraded it already.
+        $this->entityManager->getConnection()->executeStatement(
+            'UPDATE users SET password = :replacementHash WHERE id = :id AND password = :verifiedHash',
+            ['id' => $id->toString(), 'verifiedHash' => $verifiedHash, 'replacementHash' => $replacementHash],
+        );
+
+        // Login loaded the user before taking the lock. Keep the managed entity current.
+        $entity = $this->entityManager->find(UserEntity::class, $id);
+        if ($entity !== null) {
+            $this->entityManager->refresh($entity);
+        }
     }
 
     public function spendTotpStep(Uuid $id, int $step): bool
