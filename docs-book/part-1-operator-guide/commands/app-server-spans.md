@@ -1,6 +1,6 @@
 # app:server:spans
 
-List the recent request spans of the running web server, or empty the span buffer with `--clear`. Listing does what `GET /api/debug/spans` does in the admin API, and `--clear` what `DELETE /api/debug/spans` does; the admin Server Diagnostics page shows the same spans under Recent spans. Both read the server through its control socket.
+List the recent request spans of the running web server, or empty the span buffer with `--clear`. Listing does what `GET /api/debug/spans` does in the admin API, and `--clear` what `DELETE /api/debug/spans` does; the admin Spans page shows the same retained spans. Both read the server through its control socket.
 
 ## Quick start
 
@@ -41,7 +41,7 @@ A span records the method, route name, status and duration only. It never holds 
 
 ### Inspecting spans in the admin panel
 
-Open **Admin → Diagnostics → Recent spans** to search the retained buffer. Search matches operation names, services, trace and span IDs, and attribute names or values. Combine it with service, error and duration filters, or sort by the slowest requests. Duration filters use milliseconds; an error means a telemetry error or an HTTP response of 400 or higher.
+Open **Admin → Spans** to search the retained buffer, or follow **Open spans** from Diagnostics. The dedicated page uses the available admin content height; rows and inline details scroll inside its timeline. Search matches operation names, services, trace and span IDs, and attribute names or values. Combine it with service, error and duration filters, or sort by the slowest requests. Duration filters use milliseconds; an error means a telemetry error or an HTTP response of 400 or higher.
 
 **All spans** shows matching spans on a shared timeline immediately. Operation, service and trace labels stay fixed while duration bars show when requests started and how long they ran. The axis measures elapsed milliseconds from the displayed origin. Sharing this axis does not make independent requests part of one trace.
 

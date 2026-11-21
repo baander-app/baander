@@ -7,7 +7,7 @@ milestones and their verification evidence remain in Git history.
 ## Admin span inspection
 
 The [span inspector plan](docs/plans/2026-11-21-1002-feat-admin-span-inspector-plan.md)
-adds a full-width span timeline to **Admin → Diagnostics → Recent spans**.
+adds a full-height span workspace at **Admin → Spans**, linked from Diagnostics.
 Search, service/error/duration filters, and newest or slowest ordering narrow
 the retained buffer. **All spans** compares independent requests on one time
 axis; opening a result shows its trace summary, overview strip and collapsible
@@ -61,6 +61,25 @@ have tooltips. Focused follow-up review found no further defect. The clear/Live
 regression failed before the fix and passes afterward; remount and late-response
 cases also pass. Documentation prose audits and `git diff --check` pass; added
 audit tokens record the new controls, test counts and reviewed corrections.
+
+The dedicated `/admin/spans` route now replaces embedded inspection in Diagnostics.
+Its sidebar entry and direct route retain super-admin access. The workspace uses
+the remaining admin height, bounds its controls on short screens and scrolls the
+timeline internally. Browser checks at 1280×900 and 390×640 verify that visible-row
+selection, long inline expansion and closing details preserve row position and
+outer scroll offsets; keyboard navigation reveals rows inside the timeline.
+Diagnostics links to the page without fetching spans, and direct reload works.
+The CI image passes 3,725 web tests in 304 files. All ten preview browser scenarios
+pass, including backward-scroll selection, returning to an old selection and
+collapsing/reopening a branch. Five independent review lenses completed. The
+confirmed finding exposed 1,198 pixels of stale off-screen detail height; separate
+expanded/closed measurement keys and explicit header anchoring fix it. The
+regression failed before the fix and passes afterward; focused follow-up review
+found no further defect. After the fix, all 36 focused tests in five files pass;
+lint reports no errors and 12 warnings, and the production build passes both
+TypeScript configurations. Documentation prose audits and `git diff --check`
+pass; their added tokens record the dedicated route, viewport sizes, test counts
+and reproduced stale-height defect.
 
 ## Audio metadata import
 
