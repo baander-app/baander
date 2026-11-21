@@ -77,8 +77,6 @@ final class ImageRepository implements ImageRepositoryInterface
          *     albumVisible: int, artistVisible: int, playlistVisible: int
          * }|null $row
          */
-        $normalVisibility = clone $qb;
-        $this->applyReadScope($normalVisibility, $scope);
         $row = $normalVisibility->getQuery()->getOneOrNullResult();
         if ($row === null && $scope->getActorId() !== null
             && $this->personPortraits?->canReadPortrait($publicId, $scope->getLibraries())) {
