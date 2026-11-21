@@ -173,3 +173,13 @@ export function buildTraceWaterfall(snapshot: readonly Span[], traceId: string):
 
   return { rows, startTimeUs, durationUs }
 }
+
+export function spanKey(span: Span): string {
+  return `${span.trace_id}:${span.span_id}`
+}
+export function spanStartTime(startUs: number): string {
+  const milliseconds = Math.floor(startUs / 1000)
+  const date = new Date(milliseconds)
+  if (!Number.isFinite(date.getTime())) return `${startUs} µs since epoch`
+  return date.toISOString().replace(/\.\d{3}Z$/, `.${String(Math.floor(startUs % 1_000_000)).padStart(6, '0')}Z`)
+}
