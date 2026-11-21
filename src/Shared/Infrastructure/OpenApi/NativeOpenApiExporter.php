@@ -49,10 +49,10 @@ final readonly class NativeOpenApiExporter implements OpenApiExporterInterface
             if (!class_exists($class) || !method_exists($class, $method)) {
                 continue;
             }
-            $classes[$class] = new ReflectionClass($class);
+            $classes[$class] ??= new ReflectionClass($class);
             $key = $class . '::' . $method;
             $routes[$key][] = [$name, $route];
-            $methods[$key] = new ReflectionMethod($class, $method);
+            $methods[$key] ??= new ReflectionMethod($class, $method);
         }
         foreach ($classes as $class) {
             $assembler->collect($class);
@@ -67,7 +67,7 @@ final readonly class NativeOpenApiExporter implements OpenApiExporterInterface
                 }
                 $type = $parameter->getType();
                 if ($type instanceof ReflectionNamedType && !$type->isBuiltin()) {
-                    $requests[$type->getName()] = new ReflectionClass($type->getName());
+                    $requests[$type->getName()] ??= new ReflectionClass($type->getName());
                 }
             }
         }
@@ -84,13 +84,14 @@ final readonly class NativeOpenApiExporter implements OpenApiExporterInterface
             }
             $key = $reflector->getDeclaringClass()->getName() . '::' . $reflector->getName();
             foreach ($routes[$key] ?? [] as [$name, $route]) {
-                $methods = $route->getMethods() ?: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD', 'TRACE'];
-                foreach ($methods as $method) {
-                    if ($operation->method !== null && $operation->method !== strtolower($method)) {
+                $routeMethods = $route->getMethods() ?: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD', 'TRACE'];
+                foreach ($routeMethods as $routeMethod) {
+                    $methodName = strtolower($routeMethod);
+                    if ($operation->method !== null && $operation->method !== $methodName) {
                         continue;
                     }
                     $copy = $operation->copy();
-                    $copy->method = strtolower($method);
+                    $copy->method = $methodName;
                     $this->routeMetadata->apply($copy, $name, $route, $reflector);
                     $specification->add($copy);
                 }

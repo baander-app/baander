@@ -31,7 +31,7 @@ final class NativeSpecificationCompiler
         $mergers = new TypedList([new Merge\Tags(), new Merge\LastWins()]);
         $pipeline = new Pipeline(
             [
-                new Augmenter\Inheritance(),
+                new Augmenter\Inheritance($factory),
                 new Augmenter\OperationTags(),
                 new Augmenter\ImpliedSchemas(),
                 new Augmenter\Names(),
@@ -56,13 +56,12 @@ final class NativeSpecificationCompiler
             defaultGroup: Augmenter\Group::Augment,
             logger: $logger,
         );
-        $pipeline->get(Augmenter\Inheritance::class)?->setAttributeFactory($factory);
         $pipeline->process($specification);
         $compiler = new OpenApi30Compiler($logger);
-        $diagnostics = $compiler->validate($specification);
+        $compiler->validate($specification);
         $document = $compiler->compile($specification);
         $failures = array_filter(
-            [...$logger->entries(), ...$diagnostics],
+            $logger->entries(),
             static fn(array $entry): bool => in_array($entry['level'], ['warning', 'error', 'critical', 'alert', 'emergency'], true),
         );
         if ($failures !== []) {
