@@ -1,4 +1,4 @@
-import { screen, within, waitFor } from '@testing-library/react'
+import { screen, within, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -20,8 +20,16 @@ function mount() {
   render(<QueryClientProvider client={client}><SpansSection /></QueryClientProvider>)
   return client
 }
+function rowCount(grid: HTMLElement) {
+  return within(grid).queryAllByRole('row', { selected: false }).length + within(grid).queryAllByRole('row', { selected: true }).length
+}
+async function openTrace(operation = /GET albums/) {
+  await userEvent.click(await screen.findByRole('row', { name: operation }))
+  return screen.findByRole('treegrid', { name: 'Trace waterfall' })
+}
 async function chooseParent() {
-  await userEvent.click(await screen.findByRole('option', { name: /GET albums/ }))
+  const trace = await openTrace()
+  await userEvent.click(within(trace).getByRole('row', { name: /GET albums/ }))
   return screen.getByRole('region', { name: 'Span inspector' })
 }
 beforeEach(() => {
@@ -32,39 +40,66 @@ beforeEach(() => {
   vi.mocked(clearSpans).mockReset().mockResolvedValue(undefined)
 })
 describe('span inspection', () => {
-  it('requests the full ring and renders all fields as inert text', async () => {
+  it('requests the full ring and renders all fields as inert text inline', async () => {
     mount()
     const inspector = await chooseParent()
     expect(getSpans).toHaveBeenCalledWith(500, expect.any(AbortSignal))
     expect(within(inspector).getByText('<img src=x onerror=alert(1)>')).toBeInTheDocument()
     expect(inspector.querySelector('img')).toBeNull()
-    expect(within(inspector).getByText('server')).toBeInTheDocument()
-    expect(within(inspector).getAllByText('2026-09-21T14:13:20.123456Z')[0]).toBeInTheDocument()
-    expect(within(inspector).getByText('/app/Albums.php:42')).toBeInTheDocument()
+    await userEvent.click(within(inspector).getByText('Span metadata'))
+    expect(within(inspector).getByText('server')).toBeVisible()
+    expect(within(inspector).getByText('2026-09-21T14:13:20.123456Z')).toBeVisible()
+    expect(within(inspector).getByText('/app/Albums.php:42')).toBeVisible()
+    expect(screen.getByRole('treegrid', { name: 'Trace waterfall' })).toContainElement(inspector)
   })
-  it('filters results while preserving the whole trace and allows keyboard waterfall selection', async () => {
+  it('preserves the whole trace and restores search after focused keyboard inspection', async () => {
     mount()
-    await screen.findByRole('listbox', { name: 'Spans' })
+    await screen.findByRole('treegrid', { name: 'Spans' })
     await userEvent.type(screen.getByRole('textbox', { name: 'Search spans' }), 'Read albums')
-    await userEvent.click(screen.getByRole('option', { name: /Read albums/ }))
-    const waterfall = screen.getByRole('listbox', { name: 'Trace waterfall' })
-    expect(within(waterfall).getAllByRole('option')).toHaveLength(2)
-    expect(within(waterfall).getByText(/Missing parent/)).toBeInTheDocument()
-    waterfall.focus()
+    const trace = await openTrace(/Read albums/)
+    expect(rowCount(trace)).toBe(2)
+    expect(within(trace).getByText('Missing parent')).toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Search spans' })).not.toBeInTheDocument()
+    within(trace).getByRole('row', { name: /Read albums/ }).focus()
     await userEvent.keyboard('{Home}{Enter}')
-    expect(within(screen.getByRole('region', { name: 'Span inspector' })).getByText('Selected span is hidden by the current filters.')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Span inspector' })).getByRole('heading', { name: 'GET albums' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Back to results' }))
+    expect(screen.getByRole('textbox', { name: 'Search spans' })).toHaveValue('Read albums')
+    expect(rowCount(screen.getByRole('treegrid', { name: 'Spans' }))).toBe(1)
+  })
+  it('compares independent requests and opens only the chosen trace with a retained summary', async () => {
+    vi.mocked(getSpans).mockResolvedValue([parent, { ...child, trace_id: 'other-trace' }])
+    mount()
+    expect(rowCount(await screen.findByRole('treegrid', { name: 'Spans' }))).toBe(2)
+    expect(rowCount(await openTrace())).toBe(1)
+    expect(screen.getByRole('img', { name: 'Trace overview' })).toBeInTheDocument()
+    const summary = screen.getByLabelText('Retained trace summary')
+    expect(within(summary).getByText('Services').nextElementSibling).toHaveTextContent('1')
+    expect(within(summary).getByText('Depth').nextElementSibling).toHaveTextContent('1')
+    expect(within(summary).getByText('Spans').nextElementSibling).toHaveTextContent('1')
+    await userEvent.click(screen.getByRole('button', { name: 'Back to results' }))
+    expect(rowCount(screen.getByRole('treegrid', { name: 'Spans' }))).toBe(2)
   })
   it('validates duration ranges and resets combined filters', async () => {
     mount()
-    await screen.findByRole('listbox', { name: 'Spans' })
+    await screen.findByRole('treegrid', { name: 'Spans' })
     await userEvent.type(screen.getByLabelText('Minimum duration (ms)'), '10')
-    expect(screen.getAllByRole('option')).toHaveLength(1)
+    expect(rowCount(screen.getByRole('treegrid', { name: 'Spans' }))).toBe(1)
     await userEvent.type(screen.getByLabelText('Maximum duration (ms)'), '2')
     expect(screen.getByText('Maximum duration must be at least the minimum duration.')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Reset filters' }))
-    expect(screen.getAllByRole('option')).toHaveLength(2)
+    expect(rowCount(screen.getByRole('treegrid', { name: 'Spans' }))).toBe(2)
   })
-  it('keeps details on refresh errors and explains eviction after a successful snapshot', async () => {
+  it('identifies a missing root without inventing a complete trace', async () => {
+    vi.mocked(getSpans).mockResolvedValue([child])
+    mount()
+    const trace = await openTrace(/Read albums/)
+    expect(screen.getByText('Root span unavailable in the retained snapshot; showing the entry span.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'storage: Read albums' })).toBeInTheDocument()
+    expect(rowCount(trace)).toBe(1)
+    expect(within(trace).getByText('Missing parent')).toBeInTheDocument()
+  })
+  it('keeps details on refresh errors and returns to results when a refreshed selection is evicted', async () => {
     mount()
     await chooseParent()
     vi.mocked(getSpans).mockRejectedValueOnce(new Error('unavailable'))
@@ -75,8 +110,10 @@ describe('span inspection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Refresh' }))
     expect(await screen.findByText('The selected span is no longer retained.')).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Span inspector' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Back to results' })).not.toBeInTheDocument()
+    expect(screen.getByRole('treegrid', { name: 'Spans' })).toBeInTheDocument()
   })
-  it('preserves details after failed clear and dismisses them after successful clear', async () => {
+  it('preserves details after failed clear and empties the displayed snapshot after successful clear', async () => {
     mount()
     await chooseParent()
     vi.mocked(clearSpans).mockRejectedValueOnce(new Error('denied'))
@@ -84,14 +121,16 @@ describe('span inspection', () => {
     expect(await screen.findByText('Failed to clear spans.')).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Span inspector' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Clear' }))
-    await waitFor(() => expect(screen.queryByRole('region', { name: 'Span inspector' })).not.toBeInTheDocument())
+    expect(await screen.findByText('No spans recorded.')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Span inspector' })).not.toBeInTheDocument()
   })
   it('distinguishes an empty ring from no search matches', async () => {
-    const client = mount()
-    await screen.findByRole('listbox', { name: 'Spans' })
+    mount()
+    await screen.findByRole('treegrid', { name: 'Spans' })
     await userEvent.type(screen.getByRole('textbox', { name: 'Search spans' }), 'missing')
     expect(screen.getByText('No spans match the current filters.')).toBeInTheDocument()
-    client.setQueryData(['debug', 'spans', 500], [])
+    vi.mocked(getSpans).mockResolvedValue([])
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh' }))
     expect(await screen.findByText('No spans recorded.')).toBeInTheDocument()
   })
   it('retries an initial read failure', async () => {
@@ -99,43 +138,47 @@ describe('span inspection', () => {
     mount()
     expect(await screen.findByText('Failed to load spans.')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
-    expect(await screen.findByRole('listbox', { name: 'Spans' })).toBeInTheDocument()
+    expect(await screen.findByRole('treegrid', { name: 'Spans' })).toBeInTheDocument()
   })
-  it('shows updated details for the selected identity after refresh', async () => {
-    mount()
-    await chooseParent()
+  it('holds the selected snapshot through background arrivals and adopts an explicit refresh', async () => {
+    const client = mount()
+    const inspector = await chooseParent()
+    await userEvent.click(within(inspector).getByText('Span metadata'))
+    act(() => client.setQueryData(['debug', 'spans', 500], [child]))
+    expect(screen.getByRole('region', { name: 'Span inspector' })).toBeInTheDocument()
+    expect(screen.queryByText('The selected span is no longer retained.')).not.toBeInTheDocument()
     vi.mocked(getSpans).mockResolvedValue([{ ...parent, status_message: 'Updated snapshot' }, child])
     await userEvent.click(screen.getByRole('button', { name: 'Refresh' }))
-    expect(await screen.findByText('Updated snapshot')).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'Span inspector' })).getByText('parent')).toBeInTheDocument()
+    expect(await screen.findByText('Updated snapshot')).toBeVisible()
+    expect(within(screen.getByRole('region', { name: 'Span inspector' })).getByText('parent')).toBeVisible()
   })
-  it('closes with Escape and restores result keyboard focus', async () => {
+  it('closes inline details with Escape and restores the span header focus', async () => {
     mount()
     const inspector = await chooseParent()
     within(inspector).getByRole('button', { name: 'Close inspector' }).focus()
     await userEvent.keyboard('{Escape}')
     expect(screen.queryByRole('region', { name: 'Span inspector' })).not.toBeInTheDocument()
-    expect(screen.getByRole('listbox', { name: 'Spans' })).toHaveFocus()
+    const trace = screen.getByRole('treegrid', { name: 'Trace waterfall' })
+    await waitFor(() => expect(within(trace).getByRole('row', { name: /GET albums/ })).toHaveFocus())
     await userEvent.keyboard('{End}{Enter}')
     expect(screen.getByRole('region', { name: 'Span inspector' })).toBeInTheDocument()
   })
   it('combines service and status controls', async () => {
     vi.mocked(getSpans).mockResolvedValue([parent, { ...child, status_code: 'Error' }])
     mount()
-    await screen.findByRole('listbox', { name: 'Spans' })
+    await screen.findByRole('treegrid', { name: 'Spans' })
     await userEvent.click(screen.getByRole('combobox', { name: 'Service' }))
     await userEvent.click(screen.getByRole('option', { name: 'storage' }))
-    expect(within(screen.getByRole('listbox', { name: 'Spans' })).getAllByRole('option')).toHaveLength(1)
+    expect(rowCount(screen.getByRole('treegrid', { name: 'Spans' }))).toBe(1)
     await userEvent.click(screen.getByRole('combobox', { name: 'Status' }))
     await userEvent.click(screen.getByRole('option', { name: 'Non-error' }))
     expect(screen.getByText('No spans match the current filters.')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Reset filters' }))
-    expect(within(screen.getByRole('listbox', { name: 'Spans' })).getAllByRole('option')).toHaveLength(2)
+    expect(rowCount(screen.getByRole('treegrid', { name: 'Spans' }))).toBe(2)
   })
-
   it('keeps an active service filter readable when its spans leave the snapshot', async () => {
     mount()
-    await screen.findByRole('listbox', { name: 'Spans' })
+    await screen.findByRole('treegrid', { name: 'Spans' })
     await userEvent.click(screen.getByRole('combobox', { name: 'Service' }))
     await userEvent.click(screen.getByRole('option', { name: 'storage' }))
     vi.mocked(getSpans).mockResolvedValue([parent])
@@ -143,5 +186,4 @@ describe('span inspection', () => {
     expect(await screen.findByText('No spans match the current filters.')).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'Service' })).toHaveTextContent('storage')
   })
-
 })

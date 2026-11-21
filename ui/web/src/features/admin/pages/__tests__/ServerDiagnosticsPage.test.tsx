@@ -268,8 +268,9 @@ describe('ServerDiagnosticsPage', () => {
 
     const spans = await screen.findByRole('region', { name: 'Recent spans' })
     expect(await within(spans).findByText('GET api_albums_index')).toBeInTheDocument()
-    expect(within(spans).getByText('200')).toBeInTheDocument()
-    expect(within(spans).getByText('12.3 ms')).toBeInTheDocument()
+    const spanRow = within(spans).getByRole('row', { name: /GET api_albums_index/ })
+    expect(within(spanRow).getByText('200')).toBeInTheDocument()
+    expect(within(spanRow).getByText('12.3 ms')).toBeInTheDocument()
     expect(mockSpans).toHaveBeenCalledWith(500, expect.any(AbortSignal))
 
     await userEvent.click(within(spans).getByRole('button', { name: 'Clear' }))

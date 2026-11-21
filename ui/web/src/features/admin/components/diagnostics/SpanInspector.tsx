@@ -1,26 +1,50 @@
-import { useEffect, useMemo, useRef, type KeyboardEvent } from 'react'
+import type { KeyboardEvent } from 'react'
 import styled from 'styled-components'
 import { Button } from '@/shared/components/ui/button'
-import { textRole } from '@/shared/theme'
+import { focusVisibleRing, textRole } from '@/shared/theme'
 import type { Span } from '../../api/debug-api'
-import { buildTraceWaterfall, getHttpStatus, spanKey, spanStartTime } from './span-inspector'
-import { SpanResults } from './SpanResults'
+import { getHttpStatus, spanStartTime } from './span-inspector'
 import { DetailGrid, Notice } from './span-inspector-styles'
 import { formatDurationMs } from './format'
 
 const Region = styled.section`
   min-width: 0;
-  max-height: 48rem;
-  overflow: auto;
-  border: 1px solid var(--color-border);
-  border-radius: ${({ theme }) => theme.radii.md};
-  padding: var(--space-sm);
+  padding: var(--space-md);
   overflow-wrap: anywhere;
   ${textRole('body-sm')}
 `
+const Header = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+`
 const Heading = styled.h3`
-  margin: var(--space-sm) 0;
+  margin: 0;
+  min-width: 0;
   ${textRole('body')}
+`
+const Summary = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+  color: var(--color-muted-foreground);
+`
+const Timing = styled.span`
+  ${textRole('mono-sm')}
+`
+const Disclosure = styled.details`
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border);
+  min-width: 0;
+  & > summary {
+    cursor: pointer;
+    ${textRole('body-sm')}
+    ${focusVisibleRing}
+  }
 `
 function spanKind(kind: string): string {
   const names: Record<string, string> = { '0': 'internal', '1': 'client', '2': 'server', '3': 'producer', '4': 'consumer' }
@@ -33,15 +57,13 @@ interface Props {
   span: Span
   hidden: boolean
   onClose: () => void
+  offsetUs?: number
 }
-export function SpanInspector({ span, hidden, onClose }: Props) {
-  const regionRef = useRef<HTMLElement>(null)
-  useEffect(() => {
-    if (window.innerWidth <= 767) regionRef.current?.scrollIntoView?.({ block: 'nearest' })
-  }, [span.trace_id, span.span_id])
+export function SpanInspector({ span, hidden, onClose, offsetUs }: Props) {
   function onKeyDown(event: KeyboardEvent) {
     if (event.key === 'Escape') {
       event.preventDefault()
+      event.stopPropagation()
       onClose()
     }
   }
@@ -55,31 +77,27 @@ export function SpanInspector({ span, hidden, onClose }: Props) {
     ['Source', span.file_path === null ? 'Not available' : `${span.file_path}${span.line_number === null ? '' : `:${span.line_number}`}`],
   ]
   return (
-    <Region ref={regionRef} aria-label="Span inspector" onKeyDown={onKeyDown}>
-      <Button variant="ghost" size="sm" onClick={onClose}>Close inspector</Button>
+    <Region aria-label="Span inspector" onKeyDown={onKeyDown}>
+      <Header>
+        <Heading>{span.operation_name}</Heading>
+        <Summary>
+          <span>Service: {span.service}</span>
+          <Timing>Duration: {formatDurationMs(span.duration_us)}</Timing>
+          {offsetUs !== undefined && <Timing>Start offset: {formatDurationMs(offsetUs)}</Timing>}
+          <Button variant="ghost" size="sm" onClick={onClose}>Close inspector</Button>
+        </Summary>
+      </Header>
       {hidden && <Notice>Selected span is hidden by the current filters.</Notice>}
-      <Heading>Span details</Heading>
-      <DetailGrid>{fields.map(([label, value]) => <div key={label} style={{ display: 'contents' }}><dt>{label}</dt><dd>{value}</dd></div>)}</DetailGrid>
-      <Heading>Attributes</Heading>
-      {Object.keys(span.attributes).length ? (
-        <DetailGrid>{Object.entries(span.attributes).map(([key, value]) => <div key={key} style={{ display: 'contents' }}><dt>{key}</dt><dd>{attributeText(value)}</dd></div>)}</DetailGrid>
-      ) : <Notice>No attributes recorded.</Notice>}
+      <Disclosure open>
+        <summary>Attributes</summary>
+        {Object.keys(span.attributes).length ? (
+          <DetailGrid>{Object.entries(span.attributes).map(([key, value]) => <div key={key} style={{ display: 'contents' }}><dt>{key}</dt><dd>{attributeText(value)}</dd></div>)}</DetailGrid>
+        ) : <Notice>No attributes recorded.</Notice>}
+      </Disclosure>
+      <Disclosure>
+        <summary>Span metadata</summary>
+        <DetailGrid>{fields.map(([label, value]) => <div key={label} style={{ display: 'contents' }}><dt>{label}</dt><dd>{value}</dd></div>)}</DetailGrid>
+      </Disclosure>
     </Region>
-  )
-}
-
-interface TraceProps {
-  span: Span
-  snapshot: readonly Span[]
-  onSelect: (span: Span) => void
-}
-export function SpanTrace({ span, snapshot, onSelect }: TraceProps) {
-  const trace = useMemo(() => buildTraceWaterfall(snapshot, span.trace_id), [snapshot, span.trace_id])
-  return (
-    <div>
-      <Heading>Retained trace</Heading>
-      <Notice>Only retained spans are shown; this trace may be incomplete. Start: {spanStartTime(trace.startTimeUs)}. Retained bounds: +0 to +{formatDurationMs(trace.durationUs)}.</Notice>
-      <SpanResults spans={trace.rows.map((row) => row.span)} timeline={trace.rows} selectedKey={spanKey(span)} onSelect={onSelect} />
-    </div>
   )
 }
