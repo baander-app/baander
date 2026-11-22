@@ -22,7 +22,6 @@ use App\Shared\Infrastructure\Pagination\CursorCodec;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\DispatchesMessagesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\DTO\CursorPaginatedResponse;
 use App\Shared\Interface\Exception\InvalidQueryParameter;
 use App\Shared\Interface\Request\QueryParameters;
@@ -44,7 +43,6 @@ final class SongController
 {
     use ApiResponsesTrait;
     use DispatchesMessagesTrait;
-    use TranslatorTrait;
     public function __construct(
         private readonly SongPortInterface $songService,
         private readonly LibraryReadScopeProviderInterface $libraryReadScopeProvider,
@@ -235,8 +233,9 @@ final class SongController
         $scope = $this->libraryReadScopeProvider->current();
         try {
             $resolvedPublicId = PublicId::fromString($publicId);
-        } catch (\Throwable) {
-            return $this->errorResponse($this->trans('errors.invalid_public_id'));
+        } catch (\InvalidArgumentException) {
+            // No song has a malformed public ID.
+            return $this->notFound();
         }
 
         $song = $this->songService->findVisibleByPublicId($resolvedPublicId, $scope);

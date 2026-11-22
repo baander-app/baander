@@ -26,7 +26,6 @@ use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\DispatchesMessagesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\DTO\PaginatedResponse;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -46,7 +45,6 @@ final class ArtistController
 {
     use ApiResponsesTrait;
     use DispatchesMessagesTrait;
-    use TranslatorTrait;
     public function __construct(
         private readonly ArtistPortInterface $artistService,
         private readonly LibraryReadScopeProviderInterface $libraryReadScopeProvider,
@@ -269,8 +267,9 @@ final class ArtistController
         $scope = $this->libraryReadScopeProvider->current();
         try {
             $resolvedPublicId = PublicId::fromString($publicId);
-        } catch (\Throwable) {
-            return $this->errorResponse($this->trans('errors.invalid_public_id'));
+        } catch (\InvalidArgumentException) {
+            // No artist has a malformed public ID.
+            return $this->notFound();
         }
 
         $artist = $this->artistService->findVisibleByPublicId($resolvedPublicId, $scope);

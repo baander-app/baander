@@ -21,6 +21,7 @@ use App\Catalog\Interface\Resource\DuplicateGroupResource;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\DispatchesMessagesTrait;
@@ -282,13 +283,7 @@ final class AlbumController
     public function show(string $publicId, Request $request): JsonResponse
     {
         $scope = $this->libraryReadScopeProvider->current();
-        try {
-            $resolvedPublicId = PublicId::fromString($publicId);
-        } catch (Throwable) {
-            return $this->errorResponse($this->trans('errors.invalid_public_id'));
-        }
-
-        $album = $this->albumService->findVisibleByPublicId($resolvedPublicId, $scope);
+        $album = $this->findVisibleAlbum($publicId, $scope);
 
         if ($album === null) {
             return $this->notFound();
@@ -356,14 +351,7 @@ final class AlbumController
     #[Route('/{publicId}/cover', name: 'cover', methods: ['GET'])]
     public function cover(string $publicId, Request $request): \Symfony\Component\HttpFoundation\RedirectResponse|\Symfony\Component\HttpFoundation\JsonResponse
     {
-        $scope = $this->libraryReadScopeProvider->current();
-        try {
-            $resolvedPublicId = PublicId::fromString($publicId);
-        } catch (Throwable) {
-            return $this->errorResponse($this->trans('errors.invalid_public_id'), 404);
-        }
-
-        $album = $this->albumService->findVisibleByPublicId($resolvedPublicId, $scope);
+        $album = $this->findVisibleAlbum($publicId, $this->libraryReadScopeProvider->current());
 
         if ($album === null) {
             return $this->notFound();
@@ -436,13 +424,7 @@ final class AlbumController
     public function duplicates(string $publicId): JsonResponse
     {
         $scope = $this->libraryReadScopeProvider->current();
-        try {
-            $resolvedPublicId = PublicId::fromString($publicId);
-        } catch (Throwable) {
-            return $this->errorResponse($this->trans('errors.invalid_public_id'), 404);
-        }
-
-        $album = $this->albumService->findVisibleByPublicId($resolvedPublicId, $scope);
+        $album = $this->findVisibleAlbum($publicId, $scope);
 
         if ($album === null) {
             return $this->notFound();
@@ -687,5 +669,17 @@ final class AlbumController
         $result = $this->dispatch(new DeleteAlbumCommand(publicId: $publicId));
 
         return $this->successResponse(CatalogDeletionResource::from($result));
+    }
+
+    /** No album has a malformed public ID, so the lookup answers it as an unknown one. */
+    private function findVisibleAlbum(string $publicId, LibraryReadScope $scope): ?Album
+    {
+        try {
+            $resolvedPublicId = PublicId::fromString($publicId);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+
+        return $this->albumService->findVisibleByPublicId($resolvedPublicId, $scope);
     }
 }
