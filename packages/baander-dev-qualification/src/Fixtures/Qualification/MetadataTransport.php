@@ -15,6 +15,8 @@ final class MetadataTransport
     private const int AUDIT_LIMIT = 8 * 1024 * 1024;
     /** The parts of a release the application asks its lookup to include. */
     private const string RELEASE_INCLUDES = 'recordings+artist-credits+labels+release-groups+genres';
+    /** The parts of an artist the application asks its lookup by ID to include. */
+    private const string ARTIST_INCLUDES = 'aliases+url-rels';
     /** A quoted phrase of a Lucene query, capturing its text; a backslash escapes the character after it. */
     private const string PHRASE = '"((?:[^"\\\\]|\\\\.)*)"';
 
@@ -196,7 +198,8 @@ final class MetadataTransport
         if (str_starts_with($path, '/ws/2/release/') && ($query['inc'] ?? null) === self::RELEASE_INCLUDES && array_diff(array_keys($query), ['fmt', 'inc']) === []) {
             return self::releaseLookup(substr($path, strlen('/ws/2/release/')), $releases);
         }
-        if (array_keys($query) === ['fmt'] && preg_match('#\A/ws/2/artist/([^/]+)\z#', $path, $segment) === 1) {
+        if (($query['inc'] ?? null) === self::ARTIST_INCLUDES && array_diff(array_keys($query), ['fmt', 'inc']) === []
+            && preg_match('#\A/ws/2/artist/([^/]+)\z#', $path, $segment) === 1) {
             return self::artistLookup($segment[1], $artists);
         }
         foreach (['recording' => ['recordings', $recordings], 'release-group' => ['release-groups', $albums], 'artist' => ['artists', $artists]] as $kind => [$key, $entries]) {
@@ -258,9 +261,10 @@ final class MetadataTransport
     }
 
     /**
-     * An artist lookup by ID with no includes. An artist the releases credit is answered without
-     * the score a search adds and the tags only an include adds. Any other ID answers 404, as
-     * MusicBrainz answers an ID it does not know; that answer records no identity.
+     * An artist lookup by ID with the application's aliases and URL relationship includes. An artist
+     * the releases credit is answered without the score a search adds and the tags another include
+     * adds; it has no aliases or URL relationships. Any other ID answers 404, as MusicBrainz answers
+     * an ID it does not know; that answer records no identity.
      *
      * @param array<string,array<string,mixed>> $artists
      * @return array{0: array<string,mixed>, 1: ?string, 2?: int}
