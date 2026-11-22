@@ -1649,6 +1649,9 @@ export interface ValidationError {
   error: ValidationErrorError;
 }
 
+/**
+ * An activity of the viewer. The fields that name its song, album, artist or movie are null when that item was deleted or lies outside the viewer's current library access.
+ */
 export interface ActivityResource {
   /**
      * Public identifier
@@ -1666,10 +1669,10 @@ export interface ActivityResource {
   userId: string;
   /** Type of activity */
   activityType: string;
-  /** Whether the latest scan or ingestion observation marked the song source available */
+  /** Whether the latest scan or ingestion observation marked the song source available; false when the song lies outside the viewer's current library access */
   songAvailable: boolean;
   /**
-     * Song public ID
+     * Song public ID; null when the song was deleted or lies outside the viewer's current library access
      * @minLength 21
      * @maxLength 21
      * @nullable
@@ -1677,7 +1680,7 @@ export interface ActivityResource {
      */
   songId?: string | null;
   /**
-     * Album public ID
+     * Album public ID; null when the album was deleted or lies outside the viewer's current library access
      * @minLength 21
      * @maxLength 21
      * @nullable
@@ -1685,7 +1688,7 @@ export interface ActivityResource {
      */
   albumId?: string | null;
   /**
-     * Artist public ID
+     * Artist public ID; null when the artist was deleted or the activity names no song, album or movie inside the viewer's current library access
      * @minLength 21
      * @maxLength 21
      * @nullable
@@ -1693,7 +1696,7 @@ export interface ActivityResource {
      */
   artistId?: string | null;
   /**
-     * Movie public ID
+     * Movie public ID; null when the movie was deleted or lies outside the viewer's current library access
      * @minLength 21
      * @maxLength 21
      * @nullable
@@ -2436,7 +2439,7 @@ export interface SongResource {
      */
   year?: number | null;
   /**
-     * File path
+     * File path; only administrators read it
      * @nullable
      */
   path?: string | null;
@@ -3627,8 +3630,8 @@ export interface LibraryResource {
   name: string;
   /** URL-friendly slug */
   slug: string;
-  /** Filesystem path */
-  path: string;
+  /** Filesystem path of the library root; only administrators read it */
+  path?: string;
   /** Library type */
   type: LibraryResourceType;
   /** Filesystem type */

@@ -60,3 +60,14 @@ describe('album language', () => {
     expect(asAlbumFromData({ data: { publicId: 'album-1', title: '直', language: 'Japanese' } })?.language).toBe('Japanese')
   })
 })
+
+describe('song file path', () => {
+  it('keeps the file path an administrator receives and leaves it out for a member', () => {
+    const songs = asSongs({ data: [
+      { publicId: 'song-1', title: 'Admin view', path: '/media/music/song-1.flac' },
+      { publicId: 'song-2', title: 'Member view' },
+    ] })
+
+    expect(songs.map((song) => song.path)).toEqual(['/media/music/song-1.flac', undefined])
+  })
+})

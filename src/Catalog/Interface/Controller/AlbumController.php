@@ -35,6 +35,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 use Throwable;
 
 #[OA\Tag(
@@ -57,6 +58,7 @@ final class AlbumController
         private readonly AlbumMergePortInterface $mergePort,
         private readonly MessageBusInterface $bus,
         private readonly SongAvailabilityPortInterface $availability,
+        private readonly AuthorizationCheckerInterface $authorization,
     ) {
     }
 
@@ -297,6 +299,10 @@ final class AlbumController
         $songs = [];
         if ($result !== null) {
             $songs = SongResource::collectionWithMeta($result[1], [], [], $this->availability->forSongs($result[1]));
+            if (!$this->authorization->isGranted('ROLE_ADMIN')) {
+                // Only administrators read the file paths of songs.
+                $songs = array_map(SongResource::forMember(...), $songs);
+            }
         }
 
         $coverImage = null;

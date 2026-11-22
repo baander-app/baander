@@ -52,7 +52,7 @@ use OpenApi\Spec as OA;
             nullable: true,
         ),
         'path' => new OA\Schema(
-            description: 'File path',
+            description: 'File path; only administrators read it',
             type: 'string',
             nullable: true,
         ),
@@ -134,6 +134,20 @@ final class SongResource extends AbstractResource
             'lockedFields' => $song->getLockedFields(),
             'createdAt' => $song->getCreatedAt()->format(\DateTimeInterface::ATOM),
         ];
+    }
+
+    /**
+     * The song a member reads: the full projection without the file path, which only
+     * administrators and the console see.
+     *
+     * @param array<string, mixed> $song a projection built by fromWithMeta()
+     * @return array<string, mixed>
+     */
+    public static function forMember(array $song): array
+    {
+        unset($song['path']);
+
+        return $song;
     }
 
     /**

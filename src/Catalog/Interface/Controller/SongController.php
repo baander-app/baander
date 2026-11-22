@@ -32,6 +32,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 
 #[OA\Tag(
     name: 'Catalog',
@@ -50,6 +51,7 @@ final class SongController
         private readonly CursorCodec $cursorCodec,
         private readonly MessageBusInterface $bus,
         private readonly SongAvailabilityPortInterface $availability,
+        private readonly AuthorizationCheckerInterface $authorization,
     ) {
     }
 
@@ -178,7 +180,11 @@ final class SongController
         $artistNames = $this->songService->getVisibleArtistNamesForSongs($songIds, $scope);
         [$albumTitles, $albumLanguages] = SongResource::albumMaps($this->songService->getVisibleAlbumTitlesAndLanguagesByIds($albumIds, $scope));
 
-        return $this->cursorPaginatedResponse(CursorPaginatedResponse::fromPage($page, SongResource::collectionWithMeta($songs, $artistNames, $albumTitles, $this->availability->forSongs($songs), $albumLanguages)));
+        $resources = SongResource::collectionWithMeta($songs, $artistNames, $albumTitles, $this->availability->forSongs($songs), $albumLanguages);
+
+        return $this->cursorPaginatedResponse(CursorPaginatedResponse::fromPage($page, $this->readsFilePaths()
+            ? $resources
+            : array_map(SongResource::forMember(...), $resources)));
     }
 
     /**
@@ -241,8 +247,9 @@ final class SongController
 
         $artistNames = $this->songService->getVisibleArtistNamesForSongs([$song->getId()], $scope);
         [$albumTitles, $albumLanguages] = SongResource::albumMaps($this->songService->getVisibleAlbumTitlesAndLanguagesByIds([$song->getAlbumId()], $scope));
+        $resource = SongResource::fromWithMeta($song, $artistNames, $albumTitles, $this->availability->forSongs([$song]), $albumLanguages);
 
-        return $this->successResponse(SongResource::fromWithMeta($song, $artistNames, $albumTitles, $this->availability->forSongs([$song]), $albumLanguages));
+        return $this->successResponse($this->readsFilePaths() ? $resource : SongResource::forMember($resource));
     }
 
     /**
@@ -442,5 +449,11 @@ final class SongController
         }
 
         return $options;
+    }
+
+    /** Only administrators read the file paths of songs; members read the rest. */
+    private function readsFilePaths(): bool
+    {
+        return $this->authorization->isGranted('ROLE_ADMIN');
     }
 }

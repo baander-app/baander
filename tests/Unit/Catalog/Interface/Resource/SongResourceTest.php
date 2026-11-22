@@ -78,6 +78,24 @@ final class SongResourceTest extends TestCase
         self::assertNull($data['mbid']);
     }
 
+    public function testTheFullProjectionCarriesTheFilePath(): void
+    {
+        self::assertSame('/music/song.flac', SongResource::from($this->song())['path']);
+    }
+
+    public function testAMemberReadsEveryFieldExceptTheFilePath(): void
+    {
+        $song = $this->song();
+        $album = $song->getAlbumId()->toString();
+        $full = SongResource::fromWithMeta($song, albumTitles: [$album => 'Album'], albumLanguages: [$album => 'jpn']);
+
+        $member = SongResource::forMember($full);
+
+        self::assertArrayNotHasKey('path', $member);
+        self::assertStringNotContainsString('/music/song.flac', json_encode($member, JSON_THROW_ON_ERROR));
+        self::assertSame(array_diff_key($full, ['path' => true]), $member);
+    }
+
     private function song(): Song
     {
         $song = Song::create(new Uuid(), 'Song', '/music/song.flac', 1, 'audio/flac');

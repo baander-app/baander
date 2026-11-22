@@ -339,7 +339,7 @@ function EditLibraryForm({ library, onClose, onSubmit, isPending, unavailable, u
 
           {draft.status !== 'unavailable' && <InfoBox>
             <p>Slug: <MonoValue>/{library.slug}</MonoValue></p>
-            <p>Path: <ContentText textRole="mono-sm" text={library.path} /></p>
+            <p>Path: <ContentText textRole="mono-sm" text={library.path ?? ''} /></p>
             <p>Type: <span className="capitalize">{library.type.replace('_', ' ')}</span></p>
           </InfoBox>}
 

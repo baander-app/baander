@@ -28649,6 +28649,7 @@
             },
             "ActivityResource": {
                 "type": "object",
+                "description": "An activity of the viewer. The fields that name its song, album, artist or movie are null when that item was deleted or lies outside the viewer's current library access.",
                 "properties": {
                     "publicId": {
                         "type": "string",
@@ -28670,11 +28671,11 @@
                     },
                     "songAvailable": {
                         "type": "boolean",
-                        "description": "Whether the latest scan or ingestion observation marked the song source available"
+                        "description": "Whether the latest scan or ingestion observation marked the song source available; false when the song lies outside the viewer's current library access"
                     },
                     "songId": {
                         "type": "string",
-                        "description": "Song public ID",
+                        "description": "Song public ID; null when the song was deleted or lies outside the viewer's current library access",
                         "nullable": true,
                         "minLength": 21,
                         "maxLength": 21,
@@ -28682,7 +28683,7 @@
                     },
                     "albumId": {
                         "type": "string",
-                        "description": "Album public ID",
+                        "description": "Album public ID; null when the album was deleted or lies outside the viewer's current library access",
                         "nullable": true,
                         "minLength": 21,
                         "maxLength": 21,
@@ -28690,7 +28691,7 @@
                     },
                     "artistId": {
                         "type": "string",
-                        "description": "Artist public ID",
+                        "description": "Artist public ID; null when the artist was deleted or the activity names no song, album or movie inside the viewer's current library access",
                         "nullable": true,
                         "minLength": 21,
                         "maxLength": 21,
@@ -28698,7 +28699,7 @@
                     },
                     "movieId": {
                         "type": "string",
-                        "description": "Movie public ID",
+                        "description": "Movie public ID; null when the movie was deleted or lies outside the viewer's current library access",
                         "nullable": true,
                         "minLength": 21,
                         "maxLength": 21,
@@ -29940,7 +29941,7 @@
                     },
                     "path": {
                         "type": "string",
-                        "description": "File path",
+                        "description": "File path; only administrators read it",
                         "nullable": true
                     },
                     "length": {
@@ -31192,7 +31193,7 @@
                     },
                     "path": {
                         "type": "string",
-                        "description": "Filesystem path"
+                        "description": "Filesystem path of the library root; only administrators read it"
                     },
                     "type": {
                         "type": "string",
@@ -31242,7 +31243,6 @@
                     "publicId",
                     "name",
                     "slug",
-                    "path",
                     "type",
                     "filesystemType",
                     "sortOrder",

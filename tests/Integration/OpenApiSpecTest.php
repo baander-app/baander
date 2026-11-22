@@ -269,6 +269,17 @@ final class OpenApiSpecTest extends KernelTestCase
         }
     }
 
+    public function test_server_paths_are_optional_because_only_administrators_read_them(): void
+    {
+        $schemas = $this->getSpec()['components']['schemas'];
+
+        foreach (['LibraryResource', 'SongResource'] as $name) {
+            self::assertArrayHasKey('path', $schemas[$name]['properties'], $name);
+            self::assertNotContains('path', $schemas[$name]['required'], $name);
+            self::assertStringContainsString('administrators', $schemas[$name]['properties']['path']['description'], $name);
+        }
+    }
+
     public function test_discovery_inline_public_identifiers_match_runtime_identifiers(): void
     {
         $paths = $this->getSpec()['paths'];

@@ -14,9 +14,14 @@ use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Port\SongAvailabilityPortInterface;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Media\Application\Port\ImagePortInterface;
+use App\Shared\Domain\Model\Uuid;
 
 /**
  * Shared service for enriching activity items with song titles, album covers, and artist names.
+ *
+ * Only items inside the viewer's current library access are named. An activity whose song,
+ * album or movie lies outside it keeps its own fields, while that item's identifier, title,
+ * cover and poster stay null and the song counts as unavailable.
  */
 final class ActivityEnrichmentService
 {
@@ -39,6 +44,9 @@ final class ActivityEnrichmentService
      */
     public function enrich(array $activities, string $baseUrl): array
     {
+        $scope = $this->libraryScopes->current();
+        $inScope = static fn (object $item): bool => $scope->allows($item->getLibraryId());
+
         // Collect all referenced song and album UUIDs
         $songIds = [];
         $albumIds = [];
@@ -63,8 +71,14 @@ final class ActivityEnrichmentService
             }
         }
 
-        // Batch-resolve albums
-        $albums = $albumIds !== [] ? $this->albumService->findByUuids(array_values($albumIds)) : [];
+        // Batch-resolve albums, keeping those in the viewer's libraries and the songs on them
+        $albums = $albumIds !== []
+            ? array_filter($this->albumService->findByUuids(array_values($albumIds)), $inScope)
+            : [];
+        $songs = array_filter(
+            $songs,
+            static fn (object $song): bool => isset($albums[$song->getAlbumId()->toString()]),
+        );
 
         // Batch-resolve cover images
         $coverImageIds = [];
@@ -76,9 +90,11 @@ final class ActivityEnrichmentService
         }
         $images = $coverImageIds !== [] ? $this->imageService->findByUuids(array_values($coverImageIds)) : [];
 
-        // Batch-resolve artist names for all albums
-        $albumArtists = $albumIds !== []
-            ? $this->albumService->getArtistNamesForAlbums(array_values($albumIds))
+        // Batch-resolve artist names for the readable albums
+        $albumArtists = $albums !== []
+            ? $this->albumService->getArtistNamesForAlbums(
+                array_map(static fn (object $album): Uuid => $album->getId(), array_values($albums)),
+            )
             : [];
 
         // Batch-resolve movie titles for activities with movieId
@@ -92,7 +108,7 @@ final class ActivityEnrichmentService
         foreach ($movieIds as $movieId) {
             try {
                 $movie = $this->movieService->findByUuid($movieId);
-                if ($movie !== null) {
+                if ($movie !== null && $inScope($movie)) {
                     $movies[$movie->getId()->toString()] = $movie;
                 }
             } catch (\Throwable $e) {
@@ -111,15 +127,7 @@ final class ActivityEnrichmentService
             }
         }
 
-        $scope = $this->libraryScopes->current();
-        $readableSongs = [];
-        foreach ($songs as $song) {
-            $album = $albums[$song->getAlbumId()->toString()] ?? null;
-            if ($album !== null && $scope->allows($album->getLibraryId())) {
-                $readableSongs[] = $song;
-            }
-        }
-        $availability = $readableSongs === [] ? [] : $this->availability->forSongs($readableSongs);
+        $availability = $songs === [] ? [] : $this->availability->forSongs(array_values($songs));
 
         // Build enriched response
         $enriched = array_map(
@@ -129,7 +137,9 @@ final class ActivityEnrichmentService
                     $userPublicIds[$activity->getUserId()->toString()],
                     $activity->getSongId() === null ? null : ($songs[$activity->getSongId()->toString()] ?? null)?->getPublicId(),
                     $activity->getAlbumId() === null ? null : ($albums[$activity->getAlbumId()->toString()] ?? null)?->getPublicId(),
-                    $activity->getArtistId() === null ? null : ($artists[$activity->getArtistId()->toString()] ?? null),
+                    $activity->getArtistId() === null || !self::namesReadableItem($activity, $songs, $albums, $movies)
+                        ? null
+                        : ($artists[$activity->getArtistId()->toString()] ?? null),
                     $activity->getMovieId() === null ? null : ($movies[$activity->getMovieId()->toString()] ?? null)?->getPublicId(),
                 ),
                 $songs,
@@ -158,5 +168,26 @@ final class ActivityEnrichmentService
         }
 
         return $enriched;
+    }
+
+    /**
+     * Whether the activity's song, album or movie is one the viewer may read. Its artist is named
+     * only alongside such an item, since the artist's own libraries are not resolved here.
+     *
+     * @param array<string, mixed> $songs  readable songs keyed by UUID
+     * @param array<string, mixed> $albums readable albums keyed by UUID
+     * @param array<string, mixed> $movies readable movies keyed by UUID
+     */
+    private static function namesReadableItem(MediaActivity $activity, array $songs, array $albums, array $movies): bool
+    {
+        return self::isAmong($activity->getSongId(), $songs)
+            || self::isAmong($activity->getAlbumId(), $albums)
+            || self::isAmong($activity->getMovieId(), $movies);
+    }
+
+    /** @param array<string, mixed> $items keyed by UUID */
+    private static function isAmong(?Uuid $id, array $items): bool
+    {
+        return $id !== null && isset($items[$id->toString()]);
     }
 }

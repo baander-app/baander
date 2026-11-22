@@ -197,7 +197,7 @@ export function LibraryCard({ library, isScanning, onEdit, onDelete, onScan, onV
               <LibraryName textRole="body" text={library.name} element="p" />
               <ScanStatusBadge status={library.scanStatus} />
             </NameRow>
-            <PathText textRole="mono-sm" text={library.path} element="p" />
+            <PathText textRole="mono-sm" text={library.path ?? ''} element="p" />
           </InfoArea>
           <TypeBadge type={library.type} />
         </HeaderRow>

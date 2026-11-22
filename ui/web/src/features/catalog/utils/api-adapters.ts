@@ -137,7 +137,7 @@ function asSong(raw: unknown): SongSummary {
     publicId: asString(item.publicId),
     albumId: asString(item.albumId),
     title: asString(item.title),
-    path: asString(item.path),
+    path: typeof item.path === 'string' ? item.path : undefined,
     available: item.available === true,
     length: asNumber(item.length ?? item.duration) ?? null,
     track: asNumber(item.track) ?? null,

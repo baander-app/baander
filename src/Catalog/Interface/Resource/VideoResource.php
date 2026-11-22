@@ -18,7 +18,10 @@ use OpenApi\Spec as OA;
             maxLength: PublicId::LENGTH,
             pattern: PublicId::SCHEMA_PATTERN,
         ),
-        'path' => new OA\Schema(description: 'File path', type: 'string'),
+        'path' => new OA\Schema(
+            description: 'File path; only administrators read it',
+            type: 'string',
+        ),
         'duration' => new OA\Schema(
             description: 'Duration in seconds',
             type: 'number',
@@ -62,5 +65,19 @@ final class VideoResource extends AbstractResource
             'videoBitrate' => $source->getVideoBitrate(),
             'createdAt' => $source->getCreatedAt()->format(\DateTimeInterface::ATOM),
         ];
+    }
+
+    /**
+     * The video a member reads: every field except the file path, which only administrators
+     * and the console see.
+     *
+     * @return array<string, mixed>
+     */
+    public static function forMember(Video $video): array
+    {
+        $resource = self::from($video);
+        unset($resource['path']);
+
+        return $resource;
     }
 }

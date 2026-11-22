@@ -52,7 +52,8 @@ export interface SongSummary {
   albumId: string
   title: string
   available?: boolean
-  path: string
+  /** File path; only administrators receive it. */
+  path?: string
   length: number | null
   track: number | null
   disc: number | null

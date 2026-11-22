@@ -129,6 +129,20 @@ final class LibraryResourceTest extends TestCase
         $this->assertCount(11, $result);
     }
 
+    public function testAMemberReadsEveryFieldExceptTheServerPath(): void
+    {
+        $library = $this->createLibrary();
+
+        $member = LibraryResource::forMember($library);
+
+        self::assertArrayNotHasKey('path', $member);
+        self::assertStringNotContainsString('/media/music', json_encode($member, JSON_THROW_ON_ERROR));
+        self::assertSame(
+            array_diff_key(LibraryResource::from($library), ['path' => true]),
+            $member,
+        );
+    }
+
     public function testCollectionTransformsMultipleLibraries(): void
     {
         $libraries = [

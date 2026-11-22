@@ -395,8 +395,9 @@ final class PlaylistController
             if ($song === null) {
                 continue;
             }
-            $data = SongResource::fromWithMeta($song, $artistNames, $albumTitles, $availability, $albumLanguages);
-            unset($data['path']);
+            // A playlist names its songs without their file paths, for every viewer.
+            $data = SongResource::fromWithMeta($song, $artistNames, $albumTitles, $availability, $albumLanguages)
+                |> SongResource::forMember(...);
             $songs[] = array_merge(['position' => $playlistSong->getPosition()], $data);
         }
 

@@ -7,7 +7,8 @@ export interface Library {
   publicId: string
   name: string
   slug: string
-  path: string
+  /** Filesystem path of the library root; only administrators receive it. */
+  path?: string
   type: LibraryType
   sortOrder: number
   lastScan: string | null
