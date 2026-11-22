@@ -175,7 +175,7 @@ final class FilesDiscoveredCurrentObservationTest extends TestCase
     {
         $file = $this->file('source', 'mkv');
         $video = Video::create($file->absolutePath, $file->hash, 1, 100, 100, 1000, 24);
-        $video->updateProbe(['containerFormat' => 'matroska', 'videoStreamIndex' => 0, 'audioStreams' => []]);
+        $video->updateProbe(['containerFormat' => 'matroska', 'videoStreamIndex' => 0, 'audioStreams' => [], 'chapters' => []]);
         $this->videos->expects($this->once())->method('findByHash')->willReturnCallback(function () use ($file, $video): Video {
             self::assertFalse($this->transaction->active);
             $this->availableHashes[$file->absolutePath] = 'replacement';
