@@ -851,6 +851,12 @@ Open:
 
 ### Master CI repair
 
+The Composer normalization fix passed validation, the normalization dry run,
+PHPStan and Deptrac in the CI image. The backend coverage run selected 14,195
+tests across four lanes. It was stopped during the ordinary lane, before any
+lane reported a result. Full coverage acceptance remains open.
+[CI target](Makefile#L141).
+
 The last recorded complete quality gate passed on `44e315ee3` (13,028 tests in
 2,276 seconds); that run then failed the obsolete private-image check, removed
 in `9e7d164bd`. A later all-green hosted CI run is not recorded here. The separate
@@ -1098,5 +1104,5 @@ then read one with `git show 707dd55c24e073ea902fe42a92c830d77b777b37:<path>`. E
 remain available at the revisions named in that roadmap.
 
 The 2026-11-22 cleanup retired 13 delivered plans. The 12 retained plans match
-the pinned revision. All 44 local roadmap links and six incoming fragment links
+the pinned revision. All 45 local roadmap links and six incoming fragment links
 resolve.
