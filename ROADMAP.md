@@ -41,6 +41,28 @@ failed in the other lane. The corrected Director and Redis selection passed
 [Person identity persistence](tests/Integration/PersonIdentityPersistenceTest.php),
 [Scoped People reads](tests/Integration/PeopleReadRepositoryTest.php).
 
+## Composer normalization
+
+Composer 2.11.1 and `ergebnis/composer-normalize` 2.56.0 reordered the root
+requirements and development autoload maps. The manifest values and all 250
+locked package records match the base. Composer regenerated the lockfile content
+hash for the new ordering.
+[Normalization plan](docs/plans/2026-11-22-fix-composer-normalization-gate-plan.md).
+
+`make ci` passed Composer validation, normalization, PHPStan, and Deptrac in
+the CI image. Composer validation reported its existing constraint warnings.
+Deptrac reported zero violations. At this checkpoint the backend coverage run
+had selected 14,195 tests across four lanes and was still running.
+[CI target](Makefile#L141).
+
+The local dependency checker returned exit code 2 on both `8692af0bb` and the
+normalized branch. Both runs reported seven Swoole fork source files that differ
+from the reviewed inventory and a validation evidence gap for the Redis rate
+limiter package. The fork review and the checker's interpretation of Composer
+output are separate follow-ups.
+[Fork inventory](packages/swoole-bundle/upstream-review.json),
+[Composer evidence collector](packages/baander-dev-dependencies/src/Php/ComposerEvidence.php).
+
 ## Shared identifier patterns
 
 `PublicId` now supplies the length and patterns used by PHP validators, route
