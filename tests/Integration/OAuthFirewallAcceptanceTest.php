@@ -296,7 +296,7 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         self::assertInstanceOf(UserEntity::class, $adminEntity);
         $client = match ($kind) {
             'first-party' => FirstPartyOAuthClient::entity($this->kernel->getContainer(), $this->manager),
-            'personal-access' => new ClientEntity(new PublicId(), 'Administrator scripts', '[]', personalAccessClient: true, firstParty: true),
+            'personal-access' => new ClientEntity(new PublicId(), 'Administrator scripts', '[]', personalAccessClient: true),
             'third-party' => new ClientEntity(new PublicId(), 'Third-party player', json_encode(['https://baander.app/callback'], JSON_THROW_ON_ERROR)),
         };
         $token = new AccessTokenEntity((new Uuid())->toString(), $client, $adminEntity, scopes: $kind === 'first-party' ? [] : ['library', 'playlist'], expiresAt: new \DateTimeImmutable('+1 hour'));

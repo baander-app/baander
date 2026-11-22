@@ -10,6 +10,7 @@ use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\ScopeAllowlist;
 use App\Auth\Domain\Model\OAuth\AuthCode;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\ClientType;
 use App\Auth\Domain\Model\OAuth\PushedAuthorizationRequest;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\ValueObject\RedirectUri;
@@ -23,9 +24,9 @@ use Psr\Clock\ClockInterface;
  * Validates authorization requests (RFC 6749 section 4.1.1) in two steps.
  *
  * When a client pushes a request (RFC 9126), every check that needs no user runs: the
- * redirect URI, the response type, the device-client exclusion, PKCE and the scope
- * allowlist. PKCE is mandatory for every client and only S256 is accepted (RFC 9700
- * section 2.1.1). Errors at that step answer the client directly.
+ * redirect URI, the response type, the exclusion of device clients and of the first-party
+ * client, PKCE and the scope allowlist. PKCE is mandatory for every client and only S256
+ * is accepted (RFC 9700 section 2.1.1). Errors at that step answer the client directly.
  *
  * When the signed-in user's consent page looks the request up or decides on it, the
  * pushed request is resolved from its request URI, and only the checks that depend on
@@ -66,6 +67,9 @@ final readonly class AuthorizationRequestValidator
         }
         if ($client->isDeviceClient()) {
             throw OAuthProtocolException::unauthorizedClient('Device clients use the device authorization grant.');
+        }
+        if ($client->getType() === ClientType::FirstParty) {
+            throw OAuthProtocolException::unauthorizedClient('The first-party client signs in through password and passkey login.');
         }
         if ($codeChallenge === null || $codeChallenge === '') {
             throw OAuthProtocolException::invalidRequest('PKCE code_challenge is required.');
@@ -142,7 +146,7 @@ final readonly class AuthorizationRequestValidator
     /** @throws OAuthProtocolException without a redirect URI, which the caller attaches */
     private function validateForUser(Uuid $userId, Client $client, PushedAuthorizationRequest $pushedRequest): ValidatedAuthorizationRequest
     {
-        // A personal access client acts for its owner alone, who needs no consent screen.
+        // A personal access client acts for its owner alone, who still decides on each request.
         if ($client->isPersonalAccessClient() && !$client->isOwnedBy($userId)) {
             throw OAuthProtocolException::unauthorizedClient('A personal access client serves only the user who created it.');
         }

@@ -12,8 +12,8 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 /**
  * Describes a pushed authorization request for the consent page, from the pushed parameters alone.
  *
- * Baander keeps no record of earlier consent, so every client except a
- * first-party one needs the user's explicit approval each time.
+ * Baander keeps no record of earlier consent, so every request, a personal access
+ * client's included, needs the user's explicit decision each time.
  */
 final readonly class GetAuthorizationRequestHandler
 {
@@ -33,7 +33,6 @@ final readonly class GetAuthorizationRequestHandler
             clientType: $request->client->getType()->value,
             scopes: $request->effectiveScopes(),
             redirectUri: $request->pushedRequest->getRedirectUri(),
-            consentRequired: !$request->client->isFirstParty(),
         );
     }
 }

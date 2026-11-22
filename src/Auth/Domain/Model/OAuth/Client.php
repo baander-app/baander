@@ -158,14 +158,14 @@ final class Client
     }
 
     /**
-     * Create a personal access client (non-confidential, first-party).
+     * Create a personal access client: public, not first-party, serving only its owner, who
+     * decides on each of its requests on the consent page.
      */
     public static function createPersonalAccess(string $name, ?Uuid $userId = null): self
     {
         return self::create(
             name: $name,
             redirectUris: ['http://localhost'],
-            firstParty: true,
             personalAccessClient: true,
             userId: $userId,
         );

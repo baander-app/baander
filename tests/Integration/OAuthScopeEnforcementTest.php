@@ -291,7 +291,7 @@ final class OAuthScopeEnforcementTest extends TestCase
 
     private function personalAccessClient(): ClientEntity
     {
-        return $this->persist(new ClientEntity(new PublicId(), 'Administrator scripts', '[]', personalAccessClient: true, firstParty: true));
+        return $this->persist(new ClientEntity(new PublicId(), 'Administrator scripts', '[]', personalAccessClient: true));
     }
 
     /** @param list<string> $scopes */

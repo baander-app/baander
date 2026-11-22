@@ -835,6 +835,55 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
     }
 
     /**
+     * Baander's own client never starts an authorization request: while its user is signed
+     * in, an anonymous push naming it with the pusher's key is refused and stores nothing
+     * that a consent page could approve.
+     */
+    public function testAnAnonymousPushNamingTheFirstPartyClientIsRefusedAndStoresNothing(): void
+    {
+        $this->login(new SignedDpopProof());
+        $pushedBefore = $this->pushedRequestsOf($this->spaClientId());
+
+        $response = $this->send('POST', '/api/oauth/par', form: [
+            ...$this->pushParameters($this->spaClientId(), self::pkcePair()[1], 'pusher-state'),
+            'dpop_jkt' => (new SignedDpopProof())->thumbprint(),
+        ]);
+
+        self::assertSame(400, $response->getStatusCode(), (string) $response->getContent());
+        $error = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('unauthorized_client', $error['error']);
+        self::assertArrayNotHasKey('request_uri', $error);
+        self::assertSame($pushedBefore, $this->pushedRequestsOf($this->spaClientId()), 'No pushed request is stored for the first-party client.');
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function tokenEndpointGrants(): iterable
+    {
+        yield 'refresh token' => ['refresh_token'];
+        yield 'authorization code' => ['authorization_code'];
+        yield 'device code' => ['urn:ietf:params:oauth:grant-type:device_code'];
+    }
+
+    /** The first-party client refreshes at /api/auth/refresh only; the token endpoint refuses it every grant. */
+    #[DataProvider('tokenEndpointGrants')]
+    public function testTheTokenEndpointRefusesTheFirstPartyClientEveryGrant(string $grantType): void
+    {
+        $key = new SignedDpopProof();
+        $login = $this->login($key);
+        [$verifier] = self::pkcePair();
+        $form = match ($grantType) {
+            'refresh_token' => ['refresh_token' => $login['refreshToken']],
+            'authorization_code' => ['code' => str_repeat('c', 80), 'redirect_uri' => self::REDIRECT, 'code_verifier' => $verifier],
+            default => ['device_code' => str_repeat('d', 80)],
+        };
+
+        [$answer] = $this->tokenRequest($key, $login['nonce'], ['grant_type' => $grantType, 'client_id' => $this->spaClientId(), ...$form]);
+
+        self::assertSame(['unauthorized_client', 400], [$answer['error'] ?? null, $answer['status']], json_encode($answer, JSON_THROW_ON_ERROR));
+        self::assertArrayNotHasKey('access_token', $answer);
+    }
+
+    /**
      * Authorization code with mandatory S256 PKCE from a pushed request, through the production
      * firewall: the client pushes the request with a proof from its key, the web app's consent
      * page looks it up, sends the approval and navigates to the returned URI, and the client
@@ -858,7 +907,6 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
             'client_type' => 'public',
             'scopes' => ['library'],
             'redirect_uri' => self::REDIRECT,
-            'consent_required' => true,
         ], json_decode((string) $check->getContent(), true, flags: JSON_THROW_ON_ERROR));
         self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM oauth_auth_codes WHERE user_id = ?', [$this->user->getId()->toString()]), 'Checking issues no code.');
 
@@ -1131,6 +1179,23 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
             'newPassword' => 'grant-path-changed-password',
         ]);
         self::assertSame(200, $change->getStatusCode(), (string) $change->getContent());
+    }
+
+    /** Pushed authorization requests stored for the client with the given public ID. */
+    private function pushedRequestsOf(string $clientId): int
+    {
+        return (int) $this->connection->fetchOne(
+            'SELECT count(*) FROM oauth_pushed_authorization_requests r JOIN oauth_clients c ON c.id = r.client_id WHERE c.public_id = ?',
+            [$clientId],
+        );
+    }
+
+    private function spaClientId(): string
+    {
+        $spaClientId = $this->kernel->getContainer()->getParameter('auth.spa_client_id');
+        self::assertIsString($spaClientId);
+
+        return $spaClientId;
     }
 
     /** Access tokens issued to the client with the given public ID. */

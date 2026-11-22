@@ -26,7 +26,6 @@ const REQUEST = {
   client_type: 'public',
   scopes: ['library', 'playlist'],
   redirect_uri: REDIRECT_URI,
-  consent_required: true,
 }
 
 function axiosError(status: number, data: unknown) {
@@ -56,7 +55,6 @@ describe('authorization endpoint API', () => {
         clientType: 'public',
         scopes: ['library', 'playlist'],
         redirectUri: REDIRECT_URI,
-        consentRequired: true,
       },
     })
     const [url, config] = mockGet.mock.calls[0]

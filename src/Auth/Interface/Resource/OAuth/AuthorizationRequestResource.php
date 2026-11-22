@@ -16,7 +16,7 @@ use OpenApi\Spec as OA;
         'client_name' => new OA\Schema(type: 'string', example: 'Baander Player'),
         'client_type' => new OA\Schema(
             type: 'string',
-            enum: ['public', 'confidential', 'first_party', 'personal_access'],
+            enum: ['public', 'confidential', 'personal_access'],
         ),
         'scopes' => new OA\Schema(
             description: 'The scopes an approval grants: the requested scopes Baander allows, or the default scopes when none are left',
@@ -29,12 +29,8 @@ use OpenApi\Spec as OA;
             type: 'string',
             format: 'uri',
         ),
-        'consent_required' => new OA\Schema(
-            description: 'False only for first-party clients, whose requests the page may approve without asking',
-            type: 'boolean',
-        ),
     ],
-    required: ['client_id', 'client_name', 'client_type', 'scopes', 'redirect_uri', 'consent_required'],
+    required: ['client_id', 'client_name', 'client_type', 'scopes', 'redirect_uri'],
     component: 'AuthorizationRequestResource',
 )]
 final class AuthorizationRequestResource extends AbstractResource
@@ -49,7 +45,6 @@ final class AuthorizationRequestResource extends AbstractResource
             'client_type' => $source->clientType,
             'scopes' => $source->scopes,
             'redirect_uri' => $source->redirectUri,
-            'consent_required' => $source->consentRequired,
         ];
     }
 }

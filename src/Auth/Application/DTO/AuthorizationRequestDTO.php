@@ -16,7 +16,6 @@ final readonly class AuthorizationRequestDTO
         public string $clientType,
         public array $scopes,
         public string $redirectUri,
-        public bool $consentRequired,
     ) {
     }
 }

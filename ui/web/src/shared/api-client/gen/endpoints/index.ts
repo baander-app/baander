@@ -2040,7 +2040,6 @@ export type AuthorizationRequestResourceClientType = typeof AuthorizationRequest
 export const AuthorizationRequestResourceClientType = {
   public: 'public',
   confidential: 'confidential',
-  first_party: 'first_party',
   personal_access: 'personal_access',
 } as const;
 
@@ -2055,8 +2054,6 @@ export interface AuthorizationRequestResource {
   scopes: string[];
   /** The validated redirect URI the answer goes to */
   redirect_uri: string;
-  /** False only for first-party clients, whose requests the page may approve without asking */
-  consent_required: boolean;
 }
 
 export type AuthorizationErrorResourceError = typeof AuthorizationErrorResourceError[keyof typeof AuthorizationErrorResourceError];
@@ -14377,7 +14374,7 @@ export const getPostOauthParUrl = () => {
 }
 
 /**
- * Every authorization request is pushed here first. The client authenticates as at the token endpoint and binds the request to its DPoP key (RFC 9449 section 10.1) with a `DPoP` proof header carrying a server-issued nonce, the `dpop_jkt` parameter, or both naming the same key; the authorization code is later bound to that key. A proof is checked as at the token endpoint: `use_dpop_nonce` and `invalid_dpop_proof` answers carry a `DPoP-Nonce` header, and every answer to a verified proof carries the next nonce. Send the browser to the authorization endpoint with only `client_id` and the returned `request_uri`. Parameters may be form-encoded (RFC 9126) or JSON. Answers carry `Cache-Control: no-store`.
+ * Every authorization request is pushed here first. The client authenticates as at the token endpoint and binds the request to its DPoP key (RFC 9449 section 10.1) with a `DPoP` proof header carrying a server-issued nonce, the `dpop_jkt` parameter, or both naming the same key; the authorization code is later bound to that key. A proof is checked as at the token endpoint: `use_dpop_nonce` and `invalid_dpop_proof` answers carry a `DPoP-Nonce` header, and every answer to a verified proof carries the next nonce. Send the browser to the authorization endpoint with only `client_id` and the returned `request_uri`. Baander's first-party client gets `unauthorized_client`. Parameters may be form-encoded (RFC 9126) or JSON. Answers carry `Cache-Control: no-store`.
  * @summary Push an authorization request (RFC 9126 section 2)
  */
 export const postOauthPar = async (postOauthParBody: PostOauthParBody, options?: Parameters<typeof customInstance>[1]): Promise<PushedAuthorizationRequestResource> => {
@@ -14466,7 +14463,7 @@ export const getPostOauthTokenUrl = () => {
 }
 
 /**
- * Requires a DPoP proof carrying a server-issued nonce. A missing or invalid proof is answered with `invalid_dpop_proof`, a proof without a fresh nonce with `use_dpop_nonce`; both carry a `DPoP-Nonce` header. Every answer carries the nonce for the next proof and `Cache-Control: no-store`. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded (RFC 6749) or JSON. Every request names its client in `client_id` or in an HTTP Basic `Authorization` header. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`, or `client_assertion` with `client_assertion_type`, by the one method they were registered with. A secret client sends its secret in the body or, with its client ID, in HTTP Basic (`client_secret_basic`, each part form-urlencoded first), never both; a failed Basic authentication is answered with a `WWW-Authenticate: Basic` challenge. A client assertion (RFC 7523 as updated by RFC 10070) is a JWT signed with one of the client's registered keys: `iss` and `sub` are the `client_id`, `aud` is the issuer identifier as its sole value, `exp` and `jti` are required, it lives at most 300 seconds by default, and its `jti` is accepted once. Its `typ` header is `client-authentication+jwt` or absent.
+ * Requires a DPoP proof carrying a server-issued nonce. A missing or invalid proof is answered with `invalid_dpop_proof`, a proof without a fresh nonce with `use_dpop_nonce`; both carry a `DPoP-Nonce` header. Every answer carries the nonce for the next proof and `Cache-Control: no-store`. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded (RFC 6749) or JSON. Every request names its client in `client_id` or in an HTTP Basic `Authorization` header. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`, or `client_assertion` with `client_assertion_type`, by the one method they were registered with. Baander's first-party client gets `unauthorized_client` for every grant; it refreshes at `/api/auth/refresh`. A secret client sends its secret in the body or, with its client ID, in HTTP Basic (`client_secret_basic`, each part form-urlencoded first), never both; a failed Basic authentication is answered with a `WWW-Authenticate: Basic` challenge. A client assertion (RFC 7523 as updated by RFC 10070) is a JWT signed with one of the client's registered keys: `iss` and `sub` are the `client_id`, `aud` is the issuer identifier as its sole value, `exp` and `jti` are required, it lives at most 300 seconds by default, and its `jti` is accepted once. Its `typ` header is `client-authentication+jwt` or absent.
  * @summary OAuth 2.0 token endpoint (RFC 6749 section 3.2)
  */
 export const postOauthToken = async (postOauthTokenBody: PostOauthTokenBody, options?: Parameters<typeof customInstance>[1]): Promise<OAuthTokenResource> => {

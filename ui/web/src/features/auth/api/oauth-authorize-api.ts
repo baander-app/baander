@@ -20,13 +20,11 @@ export type AuthorizationDecision = 'approve' | 'deny'
 /** What the user is asked to allow. */
 export interface AuthorizationRequestDetails {
   clientName: string
-  /** `public` or `confidential` when consent is asked; the page names other types generically. */
+  /** `public`, `confidential` or `personal_access`; the page labels these and shows no label for another type. */
   clientType: string
   scopes: string[]
-  /** The validated redirect URI the decision's answer must return to. */
+  /** The validated redirect URI the decision's answer must return to; a loopback URI carries its port. */
   redirectUri: string
-  /** False for the first-party client and the user's own personal access clients, approved without asking. */
-  consentRequired: boolean
 }
 
 /**
@@ -81,18 +79,15 @@ function rejectionFrom(body: unknown): AuthorizationRejected | null {
 function detailsFrom(body: unknown): AuthorizationRequestDetails | null {
   if (!isRecord(body)) return null
 
-  const { client_name, client_type, scopes, redirect_uri, consent_required } = body
+  const { client_name, client_type, scopes, redirect_uri } = body
   if (typeof client_name !== 'string' || typeof client_type !== 'string') return null
-  if (!isStringArray(scopes) || typeof redirect_uri !== 'string' || typeof consent_required !== 'boolean') {
-    return null
-  }
+  if (!isStringArray(scopes) || typeof redirect_uri !== 'string') return null
 
   return {
     clientName: client_name,
     clientType: client_type,
     scopes,
     redirectUri: redirect_uri,
-    consentRequired: consent_required,
   }
 }
 

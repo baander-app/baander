@@ -105,8 +105,10 @@
       "requestIntro": "{{client}} wants to use your Bånder account.",
       "clientType": {
         "public": "App on your device",
-        "confidential": "Web service"
+        "confidential": "Web service",
+        "personal_access": "Your personal access client"
       },
+      "loopbackRedirect": "Returns to {{redirect}} on this device.",
       "trustHint": "Allow access only if you started this sign-in and trust this app.",
       "allow": "Allow",
       "deny": "Deny",

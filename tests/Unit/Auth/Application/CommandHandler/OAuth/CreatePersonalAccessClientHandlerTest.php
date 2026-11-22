@@ -31,6 +31,7 @@ final class CreatePersonalAccessClientHandlerTest extends TestCase
         self::assertSame('Library player', $client->getName());
         self::assertTrue($client->isOwnedBy($owner));
         self::assertTrue($client->isPersonalAccessClient());
+        self::assertFalse($client->isFirstParty(), 'A personal access client is not first-party, so its requests need consent.');
         self::assertFalse($client->isConfidential());
         self::assertNull($client->getSecretHash());
         self::assertFalse($client->isRevoked());

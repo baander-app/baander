@@ -21,12 +21,24 @@ import { ClientRequestIntro } from './ClientRequestIntro'
 import { ScopeList } from './ScopeList'
 import { ErrorAlert, Form, FullWidthButton, Hint, Notice } from './auth-form-styles'
 
-const KNOWN_CLIENT_TYPES = new Set(['public', 'confidential'])
+const KNOWN_CLIENT_TYPES = new Set(['public', 'confidential', 'personal_access'])
+
+/** A personal access client receives the answer at a loopback address of the user's own device. */
+const LOOPBACK_CLIENT_TYPE = 'personal_access'
+
+/** Stands in for the redirect URI in the translated sentence, so the URI renders as its own element. */
+const REDIRECT_SLOT = '\u0001'
 
 const ClientType = styled.p`
   margin-top: 0.25rem;
   ${textRole('caption')}
   color: var(--color-muted-foreground);
+`
+
+const RedirectAddress = styled.code`
+  ${textRole('mono-sm')}
+  color: var(--color-foreground);
+  overflow-wrap: anywhere;
 `
 
 const Actions = styled.div`
@@ -65,6 +77,20 @@ function rejectionMessageKey(error: string) {
     default:
       return 'auth.consent.invalidRequest'
   }
+}
+
+/** The local address, port included, where the answer goes, so the user can tell which program asks. */
+function LoopbackRedirect({ redirectUri }: { redirectUri: string }) {
+  const { t } = useTranslation()
+  const [before, after = ''] = t('auth.consent.loopbackRedirect', { redirect: REDIRECT_SLOT }).split(REDIRECT_SLOT)
+
+  return (
+    <ClientType>
+      {before}
+      <RedirectAddress>{redirectUri}</RedirectAddress>
+      {after}
+    </ClientType>
+  )
 }
 
 interface OAuthConsentProps {
@@ -136,17 +162,6 @@ export function OAuthConsent({ query }: OAuthConsentProps) {
     leaveAppFor(target)
   }, [target])
 
-  // The first-party client and the user's own personal access clients need no consent: approve
-  // once without asking.
-  const autoApproved = useRef(false)
-  const approveWithoutConsent = details !== null && !details.consentRequired
-  useEffect(() => {
-    if (!approveWithoutConsent || autoApproved.current) return
-
-    autoApproved.current = true
-    decide('approve')
-  }, [approveWithoutConsent, decide])
-
   const waiting = secondsLeft > 0
 
   switch (view.name) {
@@ -202,7 +217,7 @@ export function OAuthConsent({ query }: OAuthConsentProps) {
     }
 
     case 'consent': {
-      if (details === null || !details.consentRequired) {
+      if (details === null) {
         return (
           <Form as="div">
             <Notice role="status">{t('auth.consent.loading')}</Notice>
@@ -219,6 +234,9 @@ export function OAuthConsent({ query }: OAuthConsentProps) {
             <ClientRequestIntro messageKey="auth.consent.requestIntro" clientName={details.clientName} />
             {KNOWN_CLIENT_TYPES.has(details.clientType) && (
               <ClientType>{t(`auth.consent.clientType.${details.clientType}`)}</ClientType>
+            )}
+            {details.clientType === LOOPBACK_CLIENT_TYPE && (
+              <LoopbackRedirect redirectUri={details.redirectUri} />
             )}
           </div>
           <ScopeList scopes={details.scopes} />

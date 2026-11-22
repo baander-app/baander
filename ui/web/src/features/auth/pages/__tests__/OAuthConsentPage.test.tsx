@@ -18,15 +18,14 @@ const REDIRECT_URI = 'https://app.baander.app/callback'
 const REQUEST_URI = 'urn:ietf:params:oauth:request_uri:6esc_11ACC5bwc014ltc14eY22c'
 const QUERY = new URLSearchParams({ client_id: 'tv-app', request_uri: REQUEST_URI }).toString()
 
-function consent(consentRequired = true) {
+function consent(clientType = 'public', redirectUri = REDIRECT_URI) {
   return {
     data: {
       client_id: 'tv-app',
       client_name: 'Bånder TV',
-      client_type: consentRequired ? 'public' : 'first_party',
+      client_type: clientType,
       scopes: ['library', 'playlist'],
-      redirect_uri: REDIRECT_URI,
-      consent_required: consentRequired,
+      redirect_uri: redirectUri,
     },
   }
 }
@@ -195,16 +194,25 @@ describe('OAuthConsentPage', () => {
     expect(mockLeave).not.toHaveBeenCalled()
   })
 
-  it('approves once without asking when no consent is needed', async () => {
-    mockGet.mockResolvedValue(consent(false))
-    const approved = `${REDIRECT_URI}?code=c0de&state=af0ifjsldkj`
+  it('asks about a personal access client\'s request, naming its type and local address, before approving anything', async () => {
+    const loopback = 'http://localhost:53682'
+    mockGet.mockResolvedValue(consent('personal_access', loopback))
+    const approved = `${loopback}/?code=c0de&state=af0ifjsldkj`
     mockPost.mockResolvedValue({ data: { redirect_uri: approved } })
     mount()
+
+    const allow = await screen.findByRole('button', { name: 'Allow' })
+    expect(screen.getByText('Your personal access client')).toBeInTheDocument()
+    expect(screen.getByText(loopback).parentElement).toHaveTextContent(`Returns to ${loopback} on this device.`)
+    expect(mockPost).not.toHaveBeenCalled()
+    expect(mockLeave).not.toHaveBeenCalled()
+
+    const user = userEvent.setup()
+    await user.click(allow)
 
     await waitFor(() => expect(mockLeave).toHaveBeenCalledWith(approved))
     expect(mockPost).toHaveBeenCalledTimes(1)
     expect(mockPost).toHaveBeenCalledWith('/api/oauth/authorize', decisionBody('approve'))
-    expect(screen.queryByRole('button', { name: 'Allow' })).not.toBeInTheDocument()
   })
 
   it('refuses a decision answer that matches the URL\'s redirect URI but not the server\'s', async () => {

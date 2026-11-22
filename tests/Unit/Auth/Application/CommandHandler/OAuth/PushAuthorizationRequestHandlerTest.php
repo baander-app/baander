@@ -175,6 +175,28 @@ final class PushAuthorizationRequestHandlerTest extends TestCase
         $this->assertRejected('unauthorized_client', fn () => $this->push(clientId: $device->getPublicId()->toString(), proofJkt: self::KEY_ONE));
     }
 
+    public function testTheFirstPartyClientCannotPushAuthorizationRequests(): void
+    {
+        $firstParty = $this->register(Client::create('Baander', [self::REDIRECT], firstParty: true, passwordClient: true));
+
+        $this->assertRejected('unauthorized_client', fn () => $this->push(clientId: $firstParty->getPublicId()->toString(), dpopJkt: self::KEY_ONE));
+    }
+
+    /** The validator refuses the first-party client on its own, whatever authenticated it. */
+    public function testThePushChecksRefuseTheFirstPartyClient(): void
+    {
+        $firstParty = Client::create('Baander', [self::REDIRECT], firstParty: true, passwordClient: true);
+
+        $this->assertRejected('unauthorized_client', fn () => $this->validator()->validatePush(
+            client: $firstParty,
+            responseType: 'code',
+            redirectUri: self::REDIRECT,
+            codeChallenge: self::CHALLENGE,
+            codeChallengeMethod: 'S256',
+            scopes: ['library'],
+        ));
+    }
+
     /** @return iterable<string, array{?string, ?string}> */
     public static function invalidPkceRequests(): iterable
     {
@@ -267,13 +289,7 @@ final class PushAuthorizationRequestHandlerTest extends TestCase
     ): PushedAuthorizationRequestDTO {
         $handler = new PushAuthorizationRequestHandler(
             $this->clientAuthenticator(),
-            new AuthorizationRequestValidator(
-                $this->clientAuthenticator(),
-                $this->createStub(UserRepositoryInterface::class),
-                new ScopeAllowlist(['profile', 'email', 'library', 'playlist']),
-                $this->pushedRequests(),
-                $this->clock,
-            ),
+            $this->validator(),
             $this->pushedRequests(),
             $this->clientThrottle(),
             $this->clock,
@@ -292,6 +308,17 @@ final class PushAuthorizationRequestHandlerTest extends TestCase
             dpopJkt: $dpopJkt,
             ipAddress: '198.51.100.7',
         ));
+    }
+
+    private function validator(): AuthorizationRequestValidator
+    {
+        return new AuthorizationRequestValidator(
+            $this->clientAuthenticator(),
+            $this->createStub(UserRepositoryInterface::class),
+            new ScopeAllowlist(['profile', 'email', 'library', 'playlist']),
+            $this->pushedRequests(),
+            $this->clock,
+        );
     }
 
     private function pushedRequests(): PushedAuthorizationRequestRepositoryInterface

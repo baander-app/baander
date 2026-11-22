@@ -10,6 +10,7 @@ use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Port\ClientAssertionVerifierInterface;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\ClientAuthMethod;
+use App\Auth\Domain\Model\OAuth\ClientType;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Shared\Domain\Model\PublicId;
 use InvalidArgumentException;
@@ -25,6 +26,12 @@ use InvalidArgumentException;
  * presents any other method, or more than one, such as a secret both in HTTP Basic
  * and in the body, fails (RFC 6749 section 2.3). Unknown, malformed and revoked clients fail alike, so
  * the response does not reveal which it was.
+ *
+ * Baander's first-party client is never an OAuth client: its apps sign in through password and
+ * passkey login and refresh at the first-party endpoint. On the back channel it authenticates by
+ * its ID and is then refused with unauthorized_client; on the consent page's front channel it is
+ * refused with invalid_client, which is never redirected. A signed-in first-party session still
+ * decides on other clients' requests, because those endpoints authenticate the user, not a client.
  */
 final readonly class OAuthClientAuthenticator
 {
@@ -35,12 +42,12 @@ final readonly class OAuthClientAuthenticator
     }
 
     /**
-     * @throws OAuthProtocolException invalid_client
+     * @throws OAuthProtocolException invalid_client, or unauthorized_client for the first-party client
      * @throws DpopStoreUnavailableException when an assertion's single use cannot be checked
      */
     public function authenticate(ClientCredentials $credentials): Client
     {
-        $client = $this->identify($credentials->clientId);
+        $client = $this->find($credentials->clientId);
 
         $authenticated = match ($client->getAuthMethod()) {
             ClientAuthMethod::None => !$credentials->presentsSecret() && !$credentials->presentsAssertion(),
@@ -50,6 +57,9 @@ final readonly class OAuthClientAuthenticator
         };
         if (!$authenticated) {
             throw OAuthProtocolException::invalidClient();
+        }
+        if (self::isFirstParty($client)) {
+            throw OAuthProtocolException::unauthorizedClient('The first-party client signs in and refreshes through its own endpoints.');
         }
 
         return $client;
@@ -65,9 +75,29 @@ final readonly class OAuthClientAuthenticator
     /**
      * Resolves a client named in a front-channel request, which carries no secret.
      *
-     * @throws OAuthProtocolException invalid_client
+     * @throws OAuthProtocolException invalid_client, also for the first-party client
      */
     public function identify(string $clientId): Client
+    {
+        $client = $this->find($clientId);
+        if (self::isFirstParty($client)) {
+            throw OAuthProtocolException::invalidClient('The first-party client makes no authorization requests.');
+        }
+
+        return $client;
+    }
+
+    private static function isFirstParty(Client $client): bool
+    {
+        return $client->getType() === ClientType::FirstParty;
+    }
+
+    /**
+     * The usable client with this public ID.
+     *
+     * @throws OAuthProtocolException invalid_client for an unknown, malformed or revoked client
+     */
+    private function find(string $clientId): Client
     {
         try {
             $publicId = PublicId::fromString($clientId);
