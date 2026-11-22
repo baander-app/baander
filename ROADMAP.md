@@ -16,6 +16,18 @@ Read [AGENTS.md](AGENTS.md) for workflow, [CONCEPTS.md](CONCEPTS.md) for shared 
 and the [testing guide](docs-book/part-2-developer-guide/testing/README.md) for current
 runners and verification boundaries. Historical suite counts apply to their own trees.
 
+## Typed roles, permissions and scopes
+
+Decided 2026-11-22, to be planned with `ce-plan` as its own refactor after the
+security review findings branch (`fix/security-review-findings`) merges. Replace
+the string references with enums for roles (`ROLE_USER`, `ROLE_ADMIN`,
+`ROLE_SUPER_ADMIN`; 151 uses in 68 source files and 74 test files on that
+branch), the voters' permission attributes, the OAuth scopes and the
+authentication attributes such as `IS_AUTHENTICATED_FULLY`, and add builders for
+permission paths. `security.yaml` keeps its YAML strings, held to the enums by a
+test. What the permission-path builders cover is to be settled when the plan
+starts.
+
 ## Person credits and catalog follow-ups
 
 The current Person profile lists credits for cataloged works. TV file scanning,
