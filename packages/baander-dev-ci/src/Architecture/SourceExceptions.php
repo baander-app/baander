@@ -346,7 +346,7 @@ require $launcher;',
         [
             'path' => 'packages/baander-dev-ci/tests/Backend/BackendCoordinatorTest.php',
             'rule' => 'application-root',
-            'anchor' => '            self::assertStringContainsString("tar -xf /tmp/checkout.tar -C \'/srv/baander\'", $provision[array_key_last($provision)]);
+            'anchor' => '            self::assertStringContainsString("cp \'/srv/baander\'/.env.example \'/srv/baander\'/.env", $provision[array_key_last($provision)]);
             self::assertStringNotContainsString(\'/var/www/html\', $provision[array_key_last($provision)]);',
             'count' => 1,
             'reason' => 'Explicit canonical-layout assertion or fixture response tests the configured layout contract.',
