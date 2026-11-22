@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Auth\Application\CommandHandler\User;
 
 use App\Auth\Application\Command\User\ResetPasswordCommand;
+use App\Auth\Application\DTO\RevokedSessions;
 use App\Auth\Application\Exception\PasswordPolicyException;
 use App\Auth\Application\Exception\PasswordResetException;
 use App\Auth\Application\Port\PasswordResetTokenRepositoryInterface;
+use App\Auth\Application\Service\CredentialChangeRevoker;
 use App\Auth\Application\Service\PasswordChanger;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
@@ -27,7 +29,8 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  *
  * The new password is checked against the policy and hashed before the transaction opens,
  * so a password the policy refuses leaves the token redeemable; redemption and the change
- * then run in one transaction, so nothing is half-claimed. Redemptions are limited per IP,
+ * then run in one transaction, so nothing is half-claimed. The ended sessions' WebSocket
+ * connections close once that transaction has committed. Redemptions are limited per IP,
  * which bounds the hashing an invalid token costs.
  */
 final readonly class ResetPasswordHandler
@@ -36,6 +39,7 @@ final readonly class ResetPasswordHandler
         private PasswordResetTokenRepositoryInterface $passwordResetTokenRepository,
         private UserRepositoryInterface $userRepository,
         private PasswordChanger $passwordChanger,
+        private CredentialChangeRevoker $credentialChangeRevoker,
         private PasskeyRepositoryInterface $passkeyRepository,
         private TransactionPortInterface $transaction,
     ) {
@@ -50,25 +54,26 @@ final readonly class ResetPasswordHandler
     {
         $password = $this->passwordChanger->hash($command->password);
 
-        $reset = $this->transaction->run(function () use ($command, $password): bool {
+        $sessions = $this->transaction->run(function () use ($command, $password): ?RevokedSessions {
             // An unusable token is still deleted: the transaction commits and the caller is told
             // only that it is invalid.
             $userId = $this->passwordResetTokenRepository->redeem($command->token, new \DateTimeImmutable());
             $user = $userId === null ? null : $this->userRepository->findByUuid($userId);
 
             if ($user === null || $user->isDisabled()) {
-                return false;
+                return null;
             }
 
-            $this->passwordChanger->change($user, $password);
+            $sessions = $this->passwordChanger->change($user, $password);
             $user->isEmailVerified() ? $this->dropPendingEmail($user) : $this->claim($user);
 
-            return true;
+            return $sessions;
         });
 
-        if (!$reset) {
+        if ($sessions === null) {
             throw PasswordResetException::invalidToken();
         }
+        $this->credentialChangeRevoker->closeConnections($sessions);
     }
 
     private function dropPendingEmail(User $user): void

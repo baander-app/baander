@@ -18,6 +18,7 @@ errors:
   password_reset_failed: "Linket til nulstilling af adgangskode er ugyldigt eller udløbet."
   current_password_incorrect: "Den nuværende adgangskode er forkert."
   step_up_failed: "Adgangskoden eller koden er forkert."
+  credentials_changed: "Denne session er logget ud. Log ind igen, og gentag ændringen."
   email_unverified: "Bekræft din e-mailadresse først."
   invalid_credentials: "Ugyldige loginoplysninger."
   account_disabled: "Denne konto er deaktiveret."

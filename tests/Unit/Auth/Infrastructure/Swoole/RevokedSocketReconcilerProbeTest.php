@@ -43,7 +43,8 @@ final class TickRepository implements App\Auth\Domain\Repository\OAuth\AccessTok
     public function findTokenIdsByChainId(App\Auth\Domain\Model\OAuth\ValueObject\ChainId $chainId): array { return []; }
     public function revokeByChainId(App\Auth\Domain\Model\OAuth\ValueObject\ChainId $chainId): void {}
     public function revokeByIds(array $ids): int { return 0; }
-    public function revokeForUser(App\Shared\Domain\Model\Uuid $userId, ?App\Auth\Domain\Model\OAuth\AccessToken $keep = null): void {}
+    public function revokeForUser(App\Shared\Domain\Model\Uuid $userId, ?App\Auth\Domain\Model\OAuth\AccessToken $keep = null): array { return []; }
+    public function isSessionCurrent(App\Auth\Domain\Model\OAuth\AccessToken $token, int $credentialEpoch): bool { return false; }
     public function revokeByClientId(App\Shared\Domain\Model\Uuid $clientId): void {}
     public function currentCredentialEpoch(App\Auth\Domain\Model\OAuth\TokenId $tokenId): ?int { return 0; }
     public function restampCredentialEpoch(App\Auth\Domain\Model\OAuth\AccessToken $keep, int $credentialEpoch): void {}

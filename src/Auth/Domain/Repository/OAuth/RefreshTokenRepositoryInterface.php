@@ -84,7 +84,7 @@ interface RefreshTokenRepositoryInterface
 
     /**
      * Stamps the refresh tokens issued with $keep or in its chain with the credential epoch a
-     * password change moved the user to, so the session that changed it keeps refreshing.
+     * credential change moved the user to, so the session that made the change keeps refreshing.
      */
     public function restampCredentialEpoch(AccessToken $keep, int $credentialEpoch): void;
 

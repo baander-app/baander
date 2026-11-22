@@ -20,10 +20,11 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 /**
  * Closes every WebSocket connection whose token chain is dead, whatever revoked it.
  *
- * A logout, a revoke or a reuse verdict closes the chain's sockets at once from the request
- * that revoked it. This tick is the backstop for everything else: a close that request could
- * not finish, a user disabled from a console process in another container, a password change,
- * a client revocation, or an access token that simply expired while its socket stayed open.
+ * A logout, a revoke, a reuse verdict or a credential change such as a password change closes
+ * the sockets of the chains it ended at once from the request that ended them. This tick is the
+ * backstop for everything else: a close that request could not finish, a user disabled or a
+ * credential changed from a console process in another container, a client revocation, or an
+ * access token that simply expired while its socket stayed open.
  * Each run lists the distinct access token ids of every registered connection, asks the
  * database which of them belong to a chain that still has a live access token, and closes
  * the connections of the rest in-process through the server control channel. The chain is

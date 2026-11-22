@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Auth\Application\Command\User\ChangePasswordCommand;
 use App\Auth\Application\Command\User\SetUserPasswordCommand;
 use App\Auth\Application\Port\PasswordResetTokenRepositoryInterface;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
+use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
+use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Tests\Fixtures\Auth\PasswordChangeOAuthKernel;
+use App\Tests\Fixtures\Auth\RecordingLiveConnections;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
@@ -29,7 +33,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
 /**
  * Every way of changing a password ends the sessions the old password started, through the
  * production firewall with real PostgreSQL and Redis. Only a user's own change keeps the
- * session that made it.
+ * session that made it, and only while no other change has ended that session first.
  */
 final class PasswordChangeSessionRevocationTest extends TestCase
 {
@@ -42,6 +46,8 @@ final class PasswordChangeSessionRevocationTest extends TestCase
     private UserRepositoryInterface $users;
     /** @var list<User> */
     private array $created = [];
+    /** @var list<string> ids of the third-party clients a test registered */
+    private array $createdClients = [];
     private User $user;
     private string $ip;
     private Connection $observer;
@@ -114,6 +120,9 @@ final class PasswordChangeSessionRevocationTest extends TestCase
             $this->connection->executeStatement('DELETE FROM oauth_access_tokens WHERE user_id = ?', [$userId]);
             $this->connection->executeStatement('DELETE FROM users WHERE id = ?', [$userId]);
         }
+        foreach ($this->createdClients as $clientId) {
+            $this->connection->executeStatement('DELETE FROM oauth_clients WHERE id = ?', [$clientId]);
+        }
         if (isset($this->observer)) {
             $this->observer->close();
         }
@@ -125,12 +134,10 @@ final class PasswordChangeSessionRevocationTest extends TestCase
     {
         [$current, $currentKey] = $this->signIn($this->user);
         [$other, $otherKey] = $this->signIn($this->user);
+        $pairedDevice = $this->issueDelegatedToken();
         $this->issueResetToken();
 
-        $response = $this->send('PUT', '/api/auth/me/password', $current['accessToken'], $currentKey, [
-            'currentPassword' => self::PASSWORD,
-            'newPassword' => 'changed-by-owner-1',
-        ]);
+        $response = $this->changeOwnPassword($current['accessToken'], $currentKey, 'changed-by-owner-1');
         self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
 
         self::assertSame(200, $this->me($current['accessToken'], $currentKey)->getStatusCode());
@@ -140,7 +147,138 @@ final class PasswordChangeSessionRevocationTest extends TestCase
         self::assertSame(200, $this->me($rotated['accessToken'], $currentKey)->getStatusCode(), 'The rotated access token authenticates.');
         self::assertSame(200, $this->refresh($rotated['refreshToken'], $currentKey)->getStatusCode(), 'The rotated chain refreshes again.');
         $this->assertSignedOut($other, $otherKey);
+        self::assertTrue($this->accessTokenRevoked($pairedDevice), "The paired device's token is revoked too.");
         $this->assertNoResetToken();
+    }
+
+    /**
+     * The change closes the WebSocket connections of every session it ended as soon as it
+     * commits, without waiting for the reconciliation: every access token of each ended
+     * chain, including one a rotation replaced while its socket stayed open, and the paired
+     * device's token. The kept session's connections stay open.
+     */
+    public function testTheChangeClosesTheConnectionsOfTheSessionsItEndsWhenItCommits(): void
+    {
+        [$current, $currentKey] = $this->signIn($this->user);
+        [$other, $otherKey] = $this->signIn($this->user);
+        $rotated = $this->refresh($other['refreshToken'], $otherKey);
+        self::assertSame(200, $rotated->getStatusCode(), (string) $rotated->getContent());
+        $otherRotated = json_decode((string) $rotated->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
+        $pairedDevice = $this->issueDelegatedToken();
+        $offset = RecordingLiveConnections::size(self::$sharedDirectory);
+
+        $response = $this->changeOwnPassword($current['accessToken'], $currentKey, 'changed-by-owner-7');
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+
+        $closes = RecordingLiveConnections::closedAccessTokens(self::$sharedDirectory, (int) getmypid(), $offset);
+        self::assertCount(1, $closes, 'One close request carries every ended session.');
+        self::assertEqualsCanonicalizing(
+            [self::tokenId($other['accessToken']), self::tokenId($otherRotated['accessToken']), $pairedDevice],
+            $closes[0],
+        );
+        self::assertSame(200, $this->me($current['accessToken'], $currentKey)->getStatusCode());
+    }
+
+    /**
+     * A close the web server could not carry out does not fail the change: the sessions stay
+     * ended, and one error names the user and how many connections were meant to close,
+     * never a token.
+     */
+    public function testAChangeWhoseSocketCloseFailedStillCommitsAndLogsTheUser(): void
+    {
+        [$current, $currentKey] = $this->signIn($this->user);
+        [$other, $otherKey] = $this->signIn($this->user);
+        $fault = RecordingLiveConnections::closeFaultPath(self::$sharedDirectory);
+        self::assertNotFalse(file_put_contents($fault, '1'));
+
+        try {
+            $response = $this->changeOwnPassword($current['accessToken'], $currentKey, 'changed-by-owner-8');
+        } finally {
+            self::assertTrue(unlink($fault));
+        }
+
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+        $this->assertSignedOut($other, $otherKey);
+        $this->signIn($this->user, 'changed-by-owner-8');
+        $errors = array_values(array_filter(
+            $this->prodLogRecords(),
+            fn (array $record): bool => ($record['context']['user'] ?? null) === $this->user->getId()->toString()
+                && str_contains((string) $record['message'], 'did not close'),
+        ));
+        self::assertCount(1, $errors, 'One error records the close the web server did not finish.');
+        self::assertSame('ERROR', $errors[0]['level_name']);
+        self::assertSame(1, $errors[0]['context']['connections'] ?? null);
+        self::assertStringNotContainsString(self::tokenId($other['accessToken']), json_encode($errors[0], JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * Session B asks for a change while a change from session A holds the account's row. B
+     * waits, A's change commits and ends B, and B's change is then refused: it changes
+     * nothing, so A stays signed in and A's password stands.
+     */
+    public function testAChangeFromASessionThatAConcurrentChangeEndedIsRefusedAndChangesNothing(): void
+    {
+        $this->assertReadCommitted();
+        [$current, $currentKey] = $this->signIn($this->user);
+        [$other, $otherKey, $otherKeyPath] = $this->signInWithExportedKey();
+        $epochBefore = $this->credentialEpoch();
+
+        $this->connection->beginTransaction();
+        try {
+            $this->changePasswordInThisTransaction($current['accessToken'], 'changed-by-owner-9');
+            $late = $this->startSessionRequest($otherKeyPath, $other['accessToken'], 'PUT', '/api/auth/me/password', [
+                'currentPassword' => self::PASSWORD,
+                'newPassword' => 'changed-by-ended-session',
+            ]);
+            $this->awaitWaitOnThisSession($late);
+            $this->connection->commit();
+        } catch (\Throwable $failure) {
+            $this->connection->rollBack();
+            throw $failure;
+        }
+
+        $answer = $this->finish($late);
+
+        self::assertSame(401, $answer['status'], json_encode($answer, JSON_THROW_ON_ERROR));
+        self::assertSame('credentials_changed', $answer['body']['error']['details']['reason'] ?? null);
+        self::assertSame($epochBefore + 1, $this->credentialEpoch(), 'Only the first change advanced the epoch.');
+        self::assertTrue(password_verify('changed-by-owner-9', $this->storedPasswordHash()), "The first change's password stands.");
+        $kept = $this->me($current['accessToken'], $currentKey);
+        self::assertSame(200, $kept->getStatusCode(), 'The session that changed it stays signed in.');
+        self::assertSame(200, $this->refresh($current['refreshToken'], $currentKey)->getStatusCode());
+        $this->assertSignedOut($other, $otherKey);
+    }
+
+    /**
+     * Two tabs of one session each change the password: the second waits for the first, finds
+     * its own session moved to the new credential epoch, and goes through. The session stays
+     * signed in and the second password stands.
+     */
+    public function testTwoChangesFromOneSessionBothSucceed(): void
+    {
+        $this->assertReadCommitted();
+        [$session, $key, $keyPath] = $this->signInWithExportedKey();
+
+        $this->connection->beginTransaction();
+        try {
+            $this->changePasswordInThisTransaction($session['accessToken'], 'changed-in-first-tab');
+            $secondTab = $this->startSessionRequest($keyPath, $session['accessToken'], 'PUT', '/api/auth/me/password', [
+                'currentPassword' => self::PASSWORD,
+                'newPassword' => 'changed-in-second-tab',
+            ]);
+            $this->awaitWaitOnThisSession($secondTab);
+            $this->connection->commit();
+        } catch (\Throwable $failure) {
+            $this->connection->rollBack();
+            throw $failure;
+        }
+
+        $answer = $this->finish($secondTab);
+
+        self::assertSame(200, $answer['status'], json_encode($answer, JSON_THROW_ON_ERROR));
+        self::assertTrue(password_verify('changed-in-second-tab', $this->storedPasswordHash()));
+        self::assertSame(200, $this->me($session['accessToken'], $key)->getStatusCode());
+        self::assertSame(200, $this->refresh($session['refreshToken'], $key)->getStatusCode());
     }
 
     public function testRedeemingAResetTokenEndsEverySession(): void
@@ -344,10 +482,43 @@ final class PasswordChangeSessionRevocationTest extends TestCase
         $bus->dispatch(new SetUserPasswordCommand($this->user->getEmail(), $password));
     }
 
+    /**
+     * The user's own password change from the session of this access token, through the
+     * command bus inside the transaction this test holds open, as the endpoint dispatches it.
+     */
+    private function changePasswordInThisTransaction(string $accessToken, string $password): void
+    {
+        $bus = $this->kernel->getContainer()->get('oauth.acceptance.bus');
+        self::assertInstanceOf(MessageBusInterface::class, $bus);
+        $bus->dispatch(new ChangePasswordCommand(
+            userId: $this->user->getId()->toString(),
+            currentPassword: self::PASSWORD,
+            newPassword: $password,
+            currentAccessTokenId: self::tokenId($accessToken),
+        ));
+    }
+
     /** @return array{process: resource, output: resource, application: string} */
     private function startLogin(string $password): array
     {
         return $this->startChild('totp-login-race.php', [$this->ip, $this->user->getEmail(), $password, '']);
+    }
+
+    /**
+     * @param array<string, mixed> $json
+     *
+     * @return array{process: resource, output: resource, application: string}
+     */
+    private function startSessionRequest(string $keyPath, string $accessToken, string $method, string $path, array $json): array
+    {
+        return $this->startChild('session-request-race.php', [
+            $this->ip,
+            $keyPath,
+            $accessToken,
+            $method,
+            $path,
+            json_encode($json, JSON_THROW_ON_ERROR),
+        ]);
     }
 
     /** @return array{process: resource, output: resource, application: string} */
@@ -450,6 +621,93 @@ final class PasswordChangeSessionRevocationTest extends TestCase
         );
     }
 
+    private function accessTokenRevoked(string $tokenId): bool
+    {
+        $revoked = $this->connection->fetchOne('SELECT revoked FROM oauth_access_tokens WHERE token_id = ?', [$tokenId]);
+        self::assertNotFalse($revoked, 'The access token must be stored.');
+
+        return (bool) $revoked;
+    }
+
+    private function credentialEpoch(): int
+    {
+        return (int) $this->connection->fetchOne(
+            'SELECT credential_epoch FROM users WHERE id = ?',
+            [$this->user->getId()->toString()],
+        );
+    }
+
+    private function storedPasswordHash(): string
+    {
+        $hash = $this->connection->fetchOne('SELECT password FROM users WHERE id = ?', [$this->user->getId()->toString()]);
+        self::assertIsString($hash);
+
+        return $hash;
+    }
+
+    /**
+     * An access token a paired TV holds for the user: issued to a device client, so it is a
+     * delegated token, under the user's current credential epoch and outside any refresh chain.
+     *
+     * @return string the token's id
+     */
+    private function issueDelegatedToken(): string
+    {
+        $manager = $this->kernel->getContainer()->get('oauth.acceptance.entity_manager');
+        self::assertInstanceOf(EntityManagerInterface::class, $manager);
+        $client = new ClientEntity(new PublicId(), 'Paired TV', '[]', deviceClient: true);
+        $manager->persist($client);
+        $this->createdClients[] = $client->getId()->toString();
+        $user = $manager->find(UserEntity::class, $this->user->getId());
+        self::assertInstanceOf(UserEntity::class, $user);
+        $tokenId = bin2hex(random_bytes(20));
+        $manager->persist(new AccessTokenEntity(
+            $tokenId,
+            $client,
+            $user,
+            scopes: ['library'],
+            expiresAt: new \DateTimeImmutable('+1 hour'),
+            credentialEpoch: $this->credentialEpoch(),
+        ));
+        $manager->flush();
+
+        return $tokenId;
+    }
+
+    /** The token id (the jti claim) of an access token. */
+    private static function tokenId(string $accessToken): string
+    {
+        $parts = explode('.', $accessToken);
+        self::assertCount(3, $parts);
+        $claims = json_decode((string) base64_decode(strtr($parts[1], '-_', '+/'), true), true, flags: JSON_THROW_ON_ERROR);
+        self::assertIsArray($claims);
+        self::assertIsString($claims['jti'] ?? null);
+
+        return $claims['jti'];
+    }
+
+    /**
+     * Every record of the kernel's JSON log, in order.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function prodLogRecords(): array
+    {
+        $path = self::$sharedDirectory . '/logs/prod.log';
+        self::assertFileExists($path);
+        $records = [];
+        foreach (explode("\n", (string) file_get_contents($path)) as $line) {
+            if ($line === '') {
+                continue;
+            }
+            $record = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
+            self::assertIsArray($record);
+            $records[] = $record;
+        }
+
+        return $records;
+    }
+
     /** @return array{array{accessToken: string, refreshToken: string}, SignedDpopProof, string} */
     private function signInWithExportedKey(): array
     {
@@ -526,6 +784,14 @@ final class PasswordChangeSessionRevocationTest extends TestCase
     private function me(string $accessToken, SignedDpopProof $key): Response
     {
         return $this->send('GET', '/api/auth/me', $accessToken, $key);
+    }
+
+    private function changeOwnPassword(string $accessToken, SignedDpopProof $key, string $password): Response
+    {
+        return $this->send('PUT', '/api/auth/me/password', $accessToken, $key, [
+            'currentPassword' => self::PASSWORD,
+            'newPassword' => $password,
+        ]);
     }
 
     /** Nonces are single-use and endpoint-independent; a nonce-less proof yields a fresh challenge. */

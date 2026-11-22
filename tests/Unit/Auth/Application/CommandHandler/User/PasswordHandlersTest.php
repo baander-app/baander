@@ -15,6 +15,8 @@ use App\Auth\Application\Exception\PasswordResetException;
 use App\Auth\Application\Exception\UserNotFoundException;
 use App\Auth\Application\Port\PasswordHasherInterface;
 use App\Auth\Application\Port\PasswordResetTokenRepositoryInterface;
+use App\Auth\Application\Service\ChainConnectionCloser;
+use App\Auth\Application\Service\CredentialChangeRevoker;
 use App\Auth\Application\Service\PasswordChanger;
 use App\Auth\Application\Service\UserLookup;
 use App\Auth\Domain\Model\OAuth\AccessToken;
@@ -26,10 +28,12 @@ use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
+use App\Shared\Application\Port\LiveConnectionsPortInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 /** The three password paths share PasswordChanger; these tests pin who may use it and which session survives. */
@@ -50,6 +54,8 @@ final class PasswordHandlersTest extends TestCase
     private array $removedPasskeys = [];
     /** @var list<bool> whether each TOTP step was cleared inside the transaction */
     private array $totpStepsCleared = [];
+    /** @var list<bool> whether each close of the revoked sessions' connections ran inside the reset transaction */
+    private array $closedInTransaction = [];
 
     protected function setUp(): void
     {
@@ -66,6 +72,7 @@ final class PasswordHandlersTest extends TestCase
         self::assertSame('hashed:new-password', $this->user->getPassword());
         self::assertSame(['none'], $this->keptSessions);
         self::assertSame([false], $this->hashedInTransaction, 'The new password is hashed before the reset transaction opens.');
+        self::assertSame([false], $this->closedInTransaction, 'The connections close after the reset transaction commits.');
     }
 
     public function testResetRejectsATokenThatRedeemsToNoUser(): void
@@ -132,7 +139,7 @@ final class PasswordHandlersTest extends TestCase
 
     public function testOperatorResetFindsTheUserByEmailOrPublicIdAndSignsOutEverySession(): void
     {
-        $handler = new SetUserPasswordHandler(new UserLookup($this->userRepository()), $this->changer());
+        $handler = new SetUserPasswordHandler(new UserLookup($this->userRepository()), $this->changer(), $this->revoker());
 
         $handler(new SetUserPasswordCommand('Owner@Baander.app', 'by-email-password'));
         self::assertSame('hashed:by-email-password', $this->user->getPassword());
@@ -144,7 +151,7 @@ final class PasswordHandlersTest extends TestCase
 
     public function testOperatorResetReportsAnUnknownUser(): void
     {
-        $handler = new SetUserPasswordHandler(new UserLookup($this->userRepository()), $this->changer());
+        $handler = new SetUserPasswordHandler(new UserLookup($this->userRepository()), $this->changer(), $this->revoker());
 
         foreach (['nobody@baander.app', Uuid::generate()->toString(), 'not-a-uuid'] as $identifier) {
             try {
@@ -200,12 +207,7 @@ final class PasswordHandlersTest extends TestCase
 
     private function changeHandler(): ChangePasswordHandler
     {
-        $accessTokens = $this->createStub(AccessTokenRepositoryInterface::class);
-        $accessTokens->method('findByTokenId')->willReturnCallback(
-            fn (TokenId $id): ?AccessToken => $this->storedToken?->getTokenId()->equals($id) ? $this->storedToken : null,
-        );
-
-        return new ChangePasswordHandler($this->userRepository(), $accessTokens, $this->hasher(), $this->changer());
+        return new ChangePasswordHandler($this->userRepository(), $this->hasher(), $this->changer(), $this->revoker());
     }
 
     private function resetHandler(?Uuid $redeemsTo): ResetPasswordHandler
@@ -226,7 +228,14 @@ final class PasswordHandlersTest extends TestCase
             }
         });
 
-        return new ResetPasswordHandler($this->resetTokens($redeemsTo), $users, $this->changer(), $passkeys, $transaction);
+        return new ResetPasswordHandler(
+            $this->resetTokens($redeemsTo),
+            $users,
+            $this->changer(),
+            $this->revoker(),
+            $passkeys,
+            $transaction,
+        );
     }
 
     private function passkey(): Passkey
@@ -277,22 +286,47 @@ final class PasswordHandlersTest extends TestCase
 
     private function changer(): PasswordChanger
     {
-        $accessTokens = $this->createStub(AccessTokenRepositoryInterface::class);
-        $accessTokens->method('revokeForUser')->willReturnCallback(function (Uuid $userId, ?AccessToken $keep): void {
-            self::assertTrue($this->user->getId()->equals($userId));
-            $this->keptSessions[] = $keep?->getTokenId()->toString() ?? 'none';
-        });
         $transaction = $this->createStub(TransactionPortInterface::class);
         $transaction->method('run')->willReturnCallback(static fn (callable $operation): mixed => $operation());
 
         return new PasswordChanger(
             $this->hasher(),
             $this->createStub(UserRepositoryInterface::class),
-            $accessTokens,
-            $this->createStub(RefreshTokenRepositoryInterface::class),
+            $this->revoker(),
             $transaction,
             $this->createStub(EventDispatcherInterface::class),
             $this->createStub(PasswordResetTokenRepositoryInterface::class),
+        );
+    }
+
+    /** Ends the user's sessions, keeping the stored token when it is the requesting one, and records each close. */
+    private function revoker(): CredentialChangeRevoker
+    {
+        $users = $this->createStub(UserRepositoryInterface::class);
+        $users->method('lockCredentialEpoch')->willReturn(0);
+        $accessTokens = $this->createStub(AccessTokenRepositoryInterface::class);
+        $accessTokens->method('findByTokenId')->willReturnCallback(
+            fn (TokenId $id): ?AccessToken => $this->storedToken?->getTokenId()->equals($id) === true ? $this->storedToken : null,
+        );
+        $accessTokens->method('isSessionCurrent')->willReturn(true);
+        $accessTokens->method('revokeForUser')->willReturnCallback(function (Uuid $userId, ?AccessToken $keep): array {
+            self::assertTrue($this->user->getId()->equals($userId));
+            $this->keptSessions[] = $keep?->getTokenId()->toString() ?? 'none';
+
+            return [];
+        });
+        $connections = $this->createStub(LiveConnectionsPortInterface::class);
+        $connections->method('closeForAccessTokens')->willReturnCallback(function (): int {
+            $this->closedInTransaction[] = $this->active;
+
+            return 0;
+        });
+
+        return new CredentialChangeRevoker(
+            $users,
+            $accessTokens,
+            $this->createStub(RefreshTokenRepositoryInterface::class),
+            new ChainConnectionCloser($connections, new NullLogger()),
         );
     }
 }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Infrastructure\Repository;
 
+use App\Auth\Domain\Model\OAuth\AccessToken;
+use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Infrastructure\Repository\OAuth\AccessTokenRepository;
@@ -206,48 +208,56 @@ final class AccessTokenRepositoryTest extends TestCase
     }
 
     // =========================================================================
-    // revokeForUser: bulk UPDATE
+    // revokeForUser: one statement that revokes and lists the revoked chains' tokens
     // =========================================================================
 
-    public function testRevokeForUserExecutesBulkUpdate(): void
-    {
-        $user = User::register(new Email('test@baander.app'), 'hashed', 'Test User');
-        $userId = $user->getId();
-
-        $this->connection->expects($this->once())
-            ->method('executeStatement')
-            ->with(
-                'UPDATE oauth_access_tokens SET revoked = TRUE, updated_at = NOW() WHERE user_id = :userId AND revoked = FALSE',
-                ['userId' => $userId->toString()],
-            );
-
-        $this->entityManager->expects($this->once())
-            ->method('clear');
-
-        $this->repository->revokeForUser($user->getId());
-    }
-
-    public function testRevokeForUserClearsEntityManager(): void
+    public function testRevokeForUserReturnsTheTokenIdsOfTheChainsItRevokedAndClearsTheEntityManager(): void
     {
         $user = User::register(new Email('test@baander.app'), 'hashed', 'Test User');
         $callOrder = [];
 
         $this->connection->expects($this->once())
-            ->method('executeStatement')
-            ->willReturnCallback(function () use (&$callOrder): int {
-                $callOrder[] = 'executeStatement';
-                return 1;
-            });
+            ->method('fetchFirstColumn')
+            ->with(
+                $this->logicalAnd($this->stringContains('UPDATE oauth_access_tokens'), $this->stringContains('RETURNING id, chain_id')),
+                ['userId' => $user->getId()->toString()],
+            )
+            ->willReturnCallback(function () use (&$callOrder): array {
+                $callOrder[] = 'revoke';
 
+                return ['token-revoked', 'token-rotated-away'];
+            });
+        $this->connection->expects($this->never())->method('executeStatement');
+        // Managed tokens would still read as live after the bulk update.
         $this->entityManager->expects($this->once())
             ->method('clear')
             ->willReturnCallback(function () use (&$callOrder): void {
                 $callOrder[] = 'clear';
             });
 
-        $this->repository->revokeForUser($user->getId());
+        $this->assertSame(['token-revoked', 'token-rotated-away'], $this->repository->revokeForUser($user->getId()));
+        $this->assertSame(['revoke', 'clear'], $callOrder);
+    }
 
-        $this->assertSame(['executeStatement', 'clear'], $callOrder);
+    public function testRevokeForUserLeavesTheKeptTokenAndItsChainOut(): void
+    {
+        $user = User::register(new Email('test@baander.app'), 'hashed', 'Test User');
+        $keep = AccessToken::issue(Client::create('SPA', ['https://baander.app']), $user, chainId: self::$chainId);
+
+        $this->connection->expects($this->once())
+            ->method('fetchFirstColumn')
+            ->with(
+                $this->stringContains('AND id <> :keepId AND chain_id IS DISTINCT FROM :keepChainId'),
+                [
+                    'userId' => $user->getId()->toString(),
+                    'keepId' => $keep->getId()->toString(),
+                    'keepChainId' => self::$chainId->toString(),
+                ],
+            )
+            ->willReturn([]);
+        $this->entityManager->expects($this->once())->method('clear');
+
+        $this->assertSame([], $this->repository->revokeForUser($user->getId(), $keep));
     }
 
     // =========================================================================
@@ -265,20 +275,5 @@ final class AccessTokenRepositoryTest extends TestCase
 
         // Should not throw
         $this->repository->revokeByChainId(self::$chainId);
-    }
-
-    public function testRevokeForUserWithNoMatchingTokensDoesNotError(): void
-    {
-        $user = User::register(new Email('test@baander.app'), 'hashed', 'Test User');
-
-        $this->connection->expects($this->once())
-            ->method('executeStatement')
-            ->willReturn(0); // No rows affected
-
-        $this->entityManager->expects($this->once())
-            ->method('clear');
-
-        // Should not throw
-        $this->repository->revokeForUser($user->getId());
     }
 }

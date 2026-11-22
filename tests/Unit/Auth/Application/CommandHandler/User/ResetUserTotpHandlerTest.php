@@ -6,6 +6,8 @@ namespace App\Tests\Unit\Auth\Application\CommandHandler\User;
 
 use App\Auth\Application\Command\User\ResetUserTotpCommand;
 use App\Auth\Application\CommandHandler\User\ResetUserTotpHandler;
+use App\Auth\Application\Service\ChainConnectionCloser;
+use App\Auth\Application\Service\CredentialChangeRevoker;
 use App\Auth\Application\Service\UserLookup;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\User;
@@ -14,15 +16,17 @@ use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\NotFoundException;
+use App\Shared\Application\Port\LiveConnectionsPortInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 /**
  * An operator's TOTP reset turns TOTP off, advances the credential epoch and ends every
- * session in one transaction.
+ * session in one transaction, then closes the ended sessions' connections.
  */
 final class ResetUserTotpHandlerTest extends TestCase
 {
@@ -48,7 +52,17 @@ final class ResetUserTotpHandlerTest extends TestCase
         self::assertSame($this->user, $returned, 'The admin API renders the returned user.');
         self::assertFalse($this->user->hasTotp());
         self::assertNull($this->user->getTotpSecretCiphertext());
-        self::assertSame(['begin', '+advance credential epoch', '+save', '+clear TOTP step', '+revoke access tokens', '+revoke refresh tokens', 'commit'], $this->log);
+        self::assertSame([
+            'begin',
+            '+lock the account',
+            '+save',
+            '+clear TOTP step',
+            '+advance credential epoch',
+            '+revoke refresh tokens',
+            '+revoke access tokens',
+            'commit',
+            'close the connections of session-token',
+        ], $this->log);
     }
 
     public function testAUserWithoutTotpIsAConflictAndNothingChanges(): void
@@ -77,6 +91,12 @@ final class ResetUserTotpHandlerTest extends TestCase
         $users = $this->createStub(UserRepositoryInterface::class);
         $users->method('findByPublicId')->willReturnCallback(fn (PublicId $id): ?User => $id->equals($this->user->getPublicId()) ? $this->user : null);
         $users->method('findByEmail')->willReturnCallback(fn (Email $email): ?User => $email->toString() === $this->user->getEmail() ? $this->user : null);
+        $users->method('lockCredentialEpoch')->willReturnCallback(function (Uuid $userId): int {
+            self::assertTrue($this->user->getId()->equals($userId));
+            $this->record('lock the account');
+
+            return 0;
+        });
         $users->method('advanceCredentialEpoch')->willReturnCallback(function (Uuid $userId): int {
             self::assertTrue($this->user->getId()->equals($userId));
             $this->record('advance credential epoch');
@@ -92,10 +112,12 @@ final class ResetUserTotpHandlerTest extends TestCase
             $this->record('clear TOTP step');
         });
         $accessTokens = $this->createStub(AccessTokenRepositoryInterface::class);
-        $accessTokens->method('revokeForUser')->willReturnCallback(function (Uuid $userId, ?AccessToken $keep): void {
+        $accessTokens->method('revokeForUser')->willReturnCallback(function (Uuid $userId, ?AccessToken $keep): array {
             self::assertTrue($this->user->getId()->equals($userId));
             self::assertNull($keep);
             $this->record('revoke access tokens');
+
+            return ['session-token'];
         });
         $refreshTokens = $this->createStub(RefreshTokenRepositoryInterface::class);
         $refreshTokens->method('revokeForUser')->willReturnCallback(function (Uuid $userId, ?AccessToken $keep): void {
@@ -115,7 +137,20 @@ final class ResetUserTotpHandlerTest extends TestCase
             }
         });
 
-        return new ResetUserTotpHandler(new UserLookup($users), $users, $accessTokens, $refreshTokens, $transaction);
+        $connections = $this->createStub(LiveConnectionsPortInterface::class);
+        $connections->method('closeForAccessTokens')->willReturnCallback(function (array $accessTokenIds): int {
+            $this->record('close the connections of ' . implode(', ', $accessTokenIds));
+
+            return count($accessTokenIds);
+        });
+        $revoker = new CredentialChangeRevoker(
+            $users,
+            $accessTokens,
+            $refreshTokens,
+            new ChainConnectionCloser($connections, new NullLogger()),
+        );
+
+        return new ResetUserTotpHandler(new UserLookup($users), $users, $revoker, $transaction);
     }
 
     private function record(string $step): void

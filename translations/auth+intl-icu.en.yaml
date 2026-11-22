@@ -18,6 +18,7 @@ errors:
   password_reset_failed: "This password reset link is invalid or has expired."
   current_password_incorrect: "Current password is incorrect."
   step_up_failed: "The password or code is incorrect."
+  credentials_changed: "This session has been signed out. Sign in again and repeat the change."
   email_unverified: "Verify your email address first."
   invalid_credentials: "Invalid credentials."
   account_disabled: "This account has been disabled."

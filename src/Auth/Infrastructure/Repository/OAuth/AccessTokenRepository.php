@@ -120,21 +120,60 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
         );
     }
 
-    public function revokeForUser(Uuid $userId, ?AccessToken $keep = null): void
+    public function revokeForUser(Uuid $userId, ?AccessToken $keep = null): array
     {
-        $sql = 'UPDATE oauth_access_tokens SET revoked = TRUE, updated_at = NOW() WHERE user_id = :userId AND revoked = FALSE';
+        $kept = '';
         $params = ['userId' => $userId->toString()];
         if ($keep !== null) {
-            $sql .= ' AND id <> :keepId';
+            $kept = ' AND id <> :keepId';
             $params['keepId'] = $keep->getId()->toString();
             if ($keep->getChainId() !== null) {
-                $sql .= ' AND chain_id IS DISTINCT FROM :keepChainId';
+                $kept .= ' AND chain_id IS DISTINCT FROM :keepChainId';
                 $params['keepChainId'] = $keep->getChainId()->toString();
             }
         }
 
-        $this->entityManager->getConnection()->executeStatement($sql, $params);
+        // SQL, because DQL has no RETURNING: one statement revokes the tokens and lists every
+        // token of the chains it revoked. The outer SELECT reads the rows as they were before
+        // the UPDATE, which changes no column it reads.
+        /** @var list<string> $tokenIds */
+        $tokenIds = $this->entityManager->getConnection()->fetchFirstColumn(
+            <<<SQL
+                WITH revoked AS (
+                    UPDATE oauth_access_tokens
+                       SET revoked = TRUE, updated_at = NOW()
+                     WHERE user_id = :userId AND revoked = FALSE{$kept}
+                 RETURNING id, chain_id
+                )
+                SELECT token_id
+                  FROM oauth_access_tokens
+                 WHERE user_id = :userId
+                   AND (id IN (SELECT id FROM revoked) OR chain_id IN (SELECT chain_id FROM revoked))
+                 ORDER BY id
+                SQL,
+            $params,
+        );
         $this->entityManager->clear();
+
+        return $tokenIds;
+    }
+
+    public function isSessionCurrent(AccessToken $token, int $credentialEpoch): bool
+    {
+        // Scalar results, so a token the entity manager already holds cannot answer from the
+        // state it was loaded with.
+        $live = $this->entityManager->createQuery(
+            'SELECT COUNT(live.id) FROM ' . AccessTokenEntity::class . ' live, ' . AccessTokenEntity::class . ' token
+              WHERE token.id = :token
+                AND token.credentialEpoch >= :credentialEpoch
+                AND live.revoked = false
+                AND (live.id = token.id OR live.chainId = token.chainId)',
+        )
+            ->setParameter('token', $token->getId(), 'uuid')
+            ->setParameter('credentialEpoch', $credentialEpoch, ParameterType::INTEGER)
+            ->getSingleScalarResult();
+
+        return (int) $live > 0;
     }
 
     public function currentCredentialEpoch(TokenId $tokenId): ?int

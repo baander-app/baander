@@ -14,6 +14,7 @@ use App\Auth\Application\Command\User\ResendEmailVerificationCommand;
 use App\Auth\Application\Command\User\ResetPasswordCommand;
 use App\Auth\Application\Command\User\VerifyEmailCommand;
 use App\Auth\Application\Http\AccessTokenAttributes;
+use App\Auth\Application\Exception\CredentialsChangedException;
 use App\Auth\Application\Exception\CurrentPasswordMismatchException;
 use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use App\Auth\Application\Exception\EmailVerificationException;
@@ -958,7 +959,7 @@ final class AuthController
             ),
             new OA\Response(
                 response: '401',
-                description: 'Not authenticated',
+                description: 'Not authenticated, or another change ended this session first (reason credentials_changed); nothing was changed',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
@@ -1061,9 +1062,10 @@ final class AuthController
             ? $exception->getPrevious()
             : $exception;
 
-        // Shared outcomes, answered by the exception subscribers: 422, 429 and 503.
+        // Shared outcomes, answered by the exception subscribers: 401, 422, 429 and 503.
         if ($previous instanceof StepUpFailedException
             || $previous instanceof StepUpRateLimitedException
+            || $previous instanceof CredentialsChangedException
             || $previous instanceof RateLimiterUnavailableException) {
             throw $previous;
         }

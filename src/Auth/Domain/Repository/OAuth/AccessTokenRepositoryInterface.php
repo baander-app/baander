@@ -49,10 +49,25 @@ interface AccessTokenRepositoryInterface
     /**
      * Revokes every access token issued to the user. When $keep is given, that token and
      * the tokens of its refresh chain stay valid.
+     *
+     * Returns the token ids of every access token of the chains it revoked, including tokens a
+     * rotation revoked earlier, whose WebSocket connections may still be open; a revoked token
+     * outside any chain counts as its own chain. Clears the entity manager, so later reads see
+     * the revocation; a caller saves its own aggregates before this call.
+     *
+     * @return list<string>
      */
-    public function revokeForUser(Uuid $userId, ?AccessToken $keep = null): void;
+    public function revokeForUser(Uuid $userId, ?AccessToken $keep = null): array;
 
-    /** Revoke every active access token issued to the client. */
+    /**
+     * Whether the token's session is still signed in under this credential epoch, as stored
+     * now: its refresh chain, or the token alone when it has none, holds an access token that
+     * is not revoked, and the token carries $credentialEpoch. A rotation revokes the token it
+     * replaces and leaves the session signed in; a logout, a revocation of the chain and a
+     * credential change made from another session end it.
+     */
+    public function isSessionCurrent(AccessToken $token, int $credentialEpoch): bool;
+
     /**
      * The credential epoch the token was issued under, read from storage; null when the token
      * is unknown or its user's credentials changed after it was issued (the user's epoch moved
@@ -61,10 +76,11 @@ interface AccessTokenRepositoryInterface
     public function currentCredentialEpoch(TokenId $tokenId): ?int;
 
     /**
-     * Stamps $keep and the access tokens of its chain with the credential epoch a password
-     * change moved the user to, so the session that changed it stays signed in.
+     * Stamps $keep and the access tokens of its chain with the credential epoch a credential
+     * change moved the user to, so the session that made the change stays signed in.
      */
     public function restampCredentialEpoch(AccessToken $keep, int $credentialEpoch): void;
 
+    /** Revoke every active access token issued to the client. */
     public function revokeByClientId(Uuid $clientId): void;
 }

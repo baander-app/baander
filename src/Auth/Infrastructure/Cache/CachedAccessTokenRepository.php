@@ -91,15 +91,22 @@ final readonly class CachedAccessTokenRepository implements AccessTokenRepositor
         return $revoked;
     }
 
-    public function revokeForUser(Uuid $userId, ?AccessToken $keep = null): void
+    public function revokeForUser(Uuid $userId, ?AccessToken $keep = null): array
     {
-        $this->inner->revokeForUser($userId, $keep);
+        $revoked = $this->inner->revokeForUser($userId, $keep);
 
         $this->invalidateCache(
             fn (): bool => $this->cache->invalidateTags([CacheTags::OAUTH_TOKEN]),
             'Failed to invalidate token cache on user revocation',
             ['user_id' => $userId->toString()],
         );
+
+        return $revoked;
+    }
+
+    public function isSessionCurrent(AccessToken $token, int $credentialEpoch): bool
+    {
+        return $this->inner->isSessionCurrent($token, $credentialEpoch);
     }
 
     public function currentCredentialEpoch(TokenId $tokenId): ?int
