@@ -8772,6 +8772,38 @@ export type GetDebugCoroutines200 = {
   worker_errors?: GetDebugCoroutines200WorkerErrorsItem[];
 };
 
+export type GetDebugHealth200Status = typeof GetDebugHealth200Status[keyof typeof GetDebugHealth200Status];
+
+
+export const GetDebugHealth200Status = {
+  healthy: 'healthy',
+} as const;
+
+export type GetDebugHealth200ChecksItemStatus = typeof GetDebugHealth200ChecksItemStatus[keyof typeof GetDebugHealth200ChecksItemStatus];
+
+
+export const GetDebugHealth200ChecksItemStatus = {
+  healthy: 'healthy',
+  unhealthy: 'unhealthy',
+  not_available: 'not_available',
+} as const;
+
+export type GetDebugHealth200ChecksItemDetails = { [key: string]: unknown };
+
+export type GetDebugHealth200ChecksItem = {
+  component: string;
+  status: GetDebugHealth200ChecksItemStatus;
+  responseTimeMs: number;
+  details: GetDebugHealth200ChecksItemDetails;
+};
+
+export type GetDebugHealth200 = {
+  status: GetDebugHealth200Status;
+  checks: GetDebugHealth200ChecksItem[];
+};
+
+export type GetDebugHealth503 = { [key: string]: unknown };
+
 export type GetMonitorAnalyticsSummaryParams = {
   /** Inclusive start of the job creation range (RFC 3339 with a timezone, up to six fractional digits). Defaults to 24 hours ago. */
   from?: string;
@@ -36930,6 +36962,108 @@ export function useGetDebugCoroutines<TData = Awaited<ReturnType<typeof getDebug
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetDebugCoroutinesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetDebugHealthUrl = () => {
+
+
+
+
+  return `/api/debug/health`
+}
+
+/**
+ * Runs the checks of `/health` and returns each with its latency and details: connection state, Redis key count, Swoole figures, the largest web worker's memory against its limit, the background worker's heartbeat, the deployment profile fingerprints, and a failed dependency's error. The status code follows `/health`: the background worker, the worker profile and memory can read unhealthy while it answers 200.
+ * @summary Full health report
+ */
+export const getDebugHealth = async ( options?: Parameters<typeof customInstance>[1]): Promise<GetDebugHealth200> => {
+
+  return customInstance<GetDebugHealth200>(getGetDebugHealthUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDebugHealthQueryKey = () => {
+    return [
+    `/api/debug/health`
+    ] as const;
+    }
+
+
+export const getGetDebugHealthQueryOptions = <TData = Awaited<ReturnType<typeof getDebugHealth>>, TError = ErrorType<GetDebugHealth503>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugHealth>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDebugHealthQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDebugHealth>>> = ({ signal }) => getDebugHealth({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDebugHealth>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetDebugHealthQueryResult = NonNullable<Awaited<ReturnType<typeof getDebugHealth>>>
+export type GetDebugHealthQueryError = ErrorType<GetDebugHealth503>
+
+
+export function useGetDebugHealth<TData = Awaited<ReturnType<typeof getDebugHealth>>, TError = ErrorType<GetDebugHealth503>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugHealth>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getDebugHealth>>,
+          TError,
+          Awaited<ReturnType<typeof getDebugHealth>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetDebugHealth<TData = Awaited<ReturnType<typeof getDebugHealth>>, TError = ErrorType<GetDebugHealth503>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugHealth>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getDebugHealth>>,
+          TError,
+          Awaited<ReturnType<typeof getDebugHealth>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetDebugHealth<TData = Awaited<ReturnType<typeof getDebugHealth>>, TError = ErrorType<GetDebugHealth503>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugHealth>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Full health report
+ */
+
+export function useGetDebugHealth<TData = Awaited<ReturnType<typeof getDebugHealth>>, TError = ErrorType<GetDebugHealth503>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugHealth>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetDebugHealthQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

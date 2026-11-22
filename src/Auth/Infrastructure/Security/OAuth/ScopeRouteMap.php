@@ -75,7 +75,7 @@ final class ScopeRouteMap
         'admin_settings_index', 'admin_settings_definitions', 'admin_settings_update', 'admin_settings_reset',
         'monitor_transport_status', 'monitor_transport_failed_list', 'monitor_transport_failed_show',
         'monitor_transport_failed_flush', 'monitor_transport_failed_retry', 'monitor_transport_failed_remove',
-        'debug_workers',
+        'debug_workers', 'debug_health',
         // Catalog, library, lyrics, metadata, radio source, transcode job, webhook and server
         // registration administration; each requires an admin role.
         'album_update', 'album_merge', 'album_destroy', 'album_cover_upload', 'album_cover_delete',

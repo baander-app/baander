@@ -18,6 +18,7 @@ use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Shared\Infrastructure\Swoole\WorkerMemoryTable;
 use App\Shared\Interface\Console\HealthCheckCommand;
 use App\Shared\Interface\Controller\HealthCheckController;
+use App\Shared\Interface\Controller\HealthReportController;
 use App\Tests\Fixtures\Redis\ArrayRedis;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Result;
@@ -29,8 +30,8 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 
 /**
- * A web worker near its memory limit alerts administrators and shows in /health, but
- * never makes the web container unready or unhealthy.
+ * A web worker near its memory limit alerts administrators and shows in the health probes
+ * and the full health report, but never makes the web container unready or unhealthy.
  */
 final class HealthCheckMemoryPressureTest extends TestCase
 {
@@ -83,9 +84,19 @@ final class HealthCheckMemoryPressureTest extends TestCase
         $body = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
         self::assertSame('healthy', $body['status']);
         $memory = array_values(array_filter($body['checks'], static fn (array $check): bool => $check['component'] === 'memory'));
-        self::assertCount(1, $memory);
+        self::assertSame([['component' => 'memory', 'status' => 'unhealthy']], $memory);
+    }
+
+    public function testTheFullReportNamesTheWorkerNearItsLimit(): void
+    {
+        $response = (new HealthReportController($this->service))();
+
+        self::assertSame(200, $response->getStatusCode());
+        $body = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('healthy', $body['status']);
+        $memory = array_values(array_filter($body['checks'], static fn (array $check): bool => $check['component'] === 'memory'));
         self::assertSame('unhealthy', $memory[0]['status']);
-        self::assertSame(1, $memory[0]['details']['workerId']);
+        self::assertSame(['workerId' => 1, 'usageMb' => 972.8, 'limitMb' => 1024, 'usagePercent' => 95], $memory[0]['details']);
     }
 
     public function testTheContainerHealthcheckPassesAndNamesMemory(): void

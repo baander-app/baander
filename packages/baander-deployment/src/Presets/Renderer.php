@@ -203,7 +203,7 @@ final class Renderer
      * unless a declared front proxy reported HTTP or HTTPS. On a dual-stack edge network the gateway
      * accepts clients in both families and reaches web in both, through Docker's A and AAAA answers for
      * web; on an IPv4-only one it uses IPv4 alone. Resolving web at run time follows a replaced web
-     * container to its new addresses.
+     * container to its new addresses. /metrics answers 404 here: Prometheus scrapes web directly.
      */
     private static function gateway(Configuration $configuration): string
     {
@@ -237,6 +237,9 @@ server {
     server_tokens off;
     access_log /dev/stdout preset;
     client_max_body_size 0;
+    location = /metrics {
+        return 404;
+    }
     location = /api/ws {
         error_log /dev/null;
         proxy_pass http://web;

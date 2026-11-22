@@ -14,6 +14,7 @@ use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Shared\Interface\Console\HealthCheckCommand;
 use App\Shared\Interface\Controller\HealthCheckController;
+use App\Shared\Interface\Controller\HealthReportController;
 use App\Tests\Fixtures\Redis\ArrayRedis;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Result;
@@ -26,7 +27,7 @@ use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 
-/** A worker outage shows in /health but never makes the web container unready or unhealthy. */
+/** A worker outage shows in the health probes but never makes the web container unready or unhealthy. */
 final class HealthCheckWorkerOutageTest extends TestCase
 {
     private ArrayRedis $redis;
@@ -67,7 +68,7 @@ final class HealthCheckWorkerOutageTest extends TestCase
         self::assertSame(503, $controller->ready()->getStatusCode());
     }
 
-    public function testPublicProbesReplaceDependencyErrorsWithAFixedStringAndLogThem(): void
+    public function testPublicProbesShowNoDependencyErrorAndLogIt(): void
     {
         $this->databaseUp = false;
         $log = new TestHandler();
@@ -78,11 +79,24 @@ final class HealthCheckWorkerOutageTest extends TestCase
             self::assertStringNotContainsString('Connection refused', (string) $response->getContent(), $probe);
             $body = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
             $postgres = array_values(array_filter($body['checks'], static fn (array $check): bool => $check['component'] === 'postgresql'));
-            self::assertSame(['error' => 'unavailable'], $postgres[0]['details'], $probe);
+            self::assertSame([['component' => 'postgresql', 'status' => 'unhealthy']], $postgres, $probe);
         }
         self::assertTrue($log->hasWarningThatContains('Health probe'));
         $errors = array_map(static fn (LogRecord $record): mixed => $record->context['error'] ?? null, $log->getRecords());
         self::assertContains('Connection refused', $errors);
+    }
+
+    public function testTheFullReportShowsTheDependencyError(): void
+    {
+        $this->databaseUp = false;
+
+        $response = (new HealthReportController($this->service($this->staleWorker())))();
+
+        self::assertSame(503, $response->getStatusCode());
+        $body = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('unhealthy', $body['status']);
+        $postgres = array_values(array_filter($body['checks'], static fn (array $check): bool => $check['component'] === 'postgresql'));
+        self::assertSame(['error' => 'Connection refused'], $postgres[0]['details']);
     }
 
     public function testReadyAnswers503WithoutCheckingDependenciesWhileTheServerDrains(): void
@@ -93,8 +107,7 @@ final class HealthCheckWorkerOutageTest extends TestCase
 
         self::assertSame(503, $ready->getStatusCode());
         $body = json_decode((string) $ready->getContent(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame('not_ready', $body['status']);
-        self::assertSame([['component' => 'server', 'status' => 'unhealthy', 'responseTimeMs' => 0, 'details' => ['draining' => true]]], $body['checks']);
+        self::assertSame(['status' => 'not_ready', 'draining' => true, 'checks' => [['component' => 'server', 'status' => 'unhealthy']]], $body);
         self::assertSame(0, $this->databaseQueries, 'A draining server checks no dependency.');
         // /health and /live keep answering as before.
         self::assertSame(200, $controller->health()->getStatusCode());
@@ -108,8 +121,7 @@ final class HealthCheckWorkerOutageTest extends TestCase
 
             self::assertSame(200, $live->getStatusCode(), 'Orchestrators read liveness from the status code alone.');
             $body = json_decode((string) $live->getContent(), true, flags: JSON_THROW_ON_ERROR);
-            self::assertSame('alive', $body['status']);
-            self::assertSame($draining, $body['draining']);
+            self::assertSame(['status' => 'alive', 'draining' => $draining, 'checks' => [['component' => 'swoole', 'status' => 'healthy']]], $body);
         }
     }
 

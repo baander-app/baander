@@ -16,7 +16,7 @@ test('a real console scan and asynchronous ingest refresh the mounted album', as
   const healthResponse = await request.get('/health')
   expect(healthResponse.ok()).toBe(true)
   const health = await healthResponse.json() as {
-    checks: { component: string; status: string; details: unknown }[]
+    checks: { component: string; status: string }[]
   }
   run.evidence.push({ kind: 'worker-health-before-scan', health })
   expect(health.checks.find(check => check.component === 'messenger'),

@@ -747,6 +747,17 @@ final class PresetDeploymentTest extends TestCase
         );
     }
 
+    public function testGatewayAnswersMetricsItselfInsteadOfForwardingIt(): void
+    {
+        foreach ([self::configuration(), self::configuration() + ['network' => ['ipv6' => false]]] as $data) {
+            $gateway = $this->gatewayConfiguration($data);
+
+            // Prometheus scrapes web directly; the public listener never forwards /metrics.
+            self::assertMatchesRegularExpression('/\n    location = \/metrics \{\s*return 404;\s*\}\n/', $gateway);
+            self::assertSame(2, substr_count($gateway, 'proxy_pass http://web;'));
+        }
+    }
+
     public function testAnIpv4OnlyEdgeNetworkCarriesNoIpv6Address(): void
     {
         $data = self::configuration() + ['network' => ['ipv6' => false]];

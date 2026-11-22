@@ -20972,6 +20972,82 @@
                 }
             }
         },
+        "/api/debug/health": {
+            "get": {
+                "tags": [
+                    "System"
+                ],
+                "summary": "Full health report",
+                "description": "Runs the checks of `/health` and returns each with its latency and details: connection state, Redis key count, Swoole figures, the largest web worker's memory against its limit, the background worker's heartbeat, the deployment profile fingerprints, and a failed dependency's error. The status code follows `/health`: the background worker, the worker profile and memory can read unhealthy while it answers 200.",
+                "operationId": "get_debug_health",
+                "responses": {
+                    "200": {
+                        "description": "This container is healthy",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "enum": [
+                                                "healthy"
+                                            ]
+                                        },
+                                        "checks": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "component": {
+                                                        "type": "string",
+                                                        "example": "postgresql"
+                                                    },
+                                                    "status": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "healthy",
+                                                            "unhealthy",
+                                                            "not_available"
+                                                        ]
+                                                    },
+                                                    "responseTimeMs": {
+                                                        "type": "number"
+                                                    },
+                                                    "details": {
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "component",
+                                                    "status",
+                                                    "responseTimeMs",
+                                                    "details"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "status",
+                                        "checks"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "A component that decides this container's health is unhealthy; the body is the same report, with status `unhealthy`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/monitor/analytics/summary": {
             "get": {
                 "tags": [

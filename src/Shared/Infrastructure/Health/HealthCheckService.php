@@ -88,6 +88,20 @@ final class HealthCheckService
     }
 
     /**
+     * Whether these results leave the web container healthy: no result that decides its
+     * health reads unhealthy.
+     *
+     * @param HealthCheckResult[] $results
+     */
+    public static function containerHealthy(array $results): bool
+    {
+        return !array_any(
+            $results,
+            static fn (HealthCheckResult $result): bool => $result->status === HealthStatus::Unhealthy && self::affectsContainerHealth($result),
+        );
+    }
+
+    /**
      * Process liveness — checks if the Swoole worker process is alive.
      * Always returns 200 if the process responds, even if Swoole stats are unavailable.
      */

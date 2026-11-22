@@ -14,12 +14,14 @@ use Psr\Log\NullLogger;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
+/**
+ * Unauthenticated probes for orchestrators and clients. They show each component's status and
+ * whether the server drains, nothing about how Baander is built or loaded; administrators read
+ * the full report from HealthReportController.
+ */
 #[OA\Tag(name: 'System', description: 'System utilities and background job monitoring')]
 final class HealthCheckController
 {
-    /** What a public probe shows in place of a failed check's error text. */
-    private const string UNAVAILABLE = 'unavailable';
-
     public function __construct(
         private readonly HealthCheckService $healthCheckService,
         private readonly ServerDrainStateInterface $drain,
@@ -30,7 +32,7 @@ final class HealthCheckController
     #[OA\Operation\Get(
         path: '/health',
         summary: 'Health check endpoint',
-        description: 'Returns the health status of all system components (PostgreSQL, Redis, the background worker, the worker deployment profile, Swoole, memory). A missing worker heartbeat reports the worker as not available until a worker has reported in. The worker profile reads unhealthy when the active worker boot was started with another deployment profile than web runs. The background worker, the worker profile and memory are listed but do not decide the status code: each can read unhealthy while the endpoint answers 200.',
+        description: 'Returns the status of each system component (PostgreSQL, Redis, the background worker, the worker deployment profile, Swoole, memory), with no latency, figures or errors: administrators read those at `/api/debug/health`. A missing worker heartbeat reports the worker as not available until a worker has reported in. The worker profile reads unhealthy when the active worker boot was started with another deployment profile than web runs. The background worker, the worker profile and memory are listed but do not decide the status code: each can read unhealthy while the endpoint answers 200.',
         responses: [
             new OA\Response(
                 response: '200',
@@ -69,15 +71,13 @@ final class HealthCheckController
     #[Route('/health', name: 'health_check', methods: ['GET'])]
     public function health(): JsonResponse
     {
-        $results = $this->healthCheckService->check();
-
-        return $this->buildResponse($results);
+        return $this->probeResponse($this->healthCheckService->check(), 'healthy', 'unhealthy');
     }
 
     #[OA\Operation\Get(
         path: '/ready',
         summary: 'Readiness probe',
-        description: 'Kubernetes readiness probe. Checks dependency availability (PostgreSQL, Redis). Returns 503 if any dependency is unreachable, and while the web server drains before it stops; the drain answer lists a single `server` check and checks no dependency. The background worker and memory are not dependencies: a worker outage or a web server worker near its memory limit does not make the web container unready.',
+        description: 'Kubernetes readiness probe. Checks dependency availability (PostgreSQL, Redis). Returns 503 if any dependency is unreachable, and while the web server drains before it stops; `draining` is then true and the answer lists a single `server` check and checks no dependency. The background worker and memory are not dependencies: a worker outage or a web server worker near its memory limit does not make the web container unready.',
         responses: [
             new OA\Response(
                 response: '200',
@@ -87,11 +87,17 @@ final class HealthCheckController
                         type: 'object',
                         properties: [
                             'status' => new OA\Schema(type: 'string', example: 'ready'),
+                            'draining' => new OA\Schema(
+                                description: 'Whether the web server is draining before it stops',
+                                type: 'boolean',
+                                example: false,
+                            ),
                             'checks' => new OA\Schema(
                                 type: 'array',
                                 items: new OA\Schema(type: 'object'),
                             ),
                         ],
+                        required: ['status', 'draining', 'checks'],
                     ),
                 ),
             ),
@@ -103,11 +109,17 @@ final class HealthCheckController
                         type: 'object',
                         properties: [
                             'status' => new OA\Schema(type: 'string', example: 'not_ready'),
+                            'draining' => new OA\Schema(
+                                description: 'Whether the web server is draining before it stops',
+                                type: 'boolean',
+                                example: true,
+                            ),
                             'checks' => new OA\Schema(
                                 type: 'array',
                                 items: new OA\Schema(type: 'object'),
                             ),
                         ],
+                        required: ['status', 'draining', 'checks'],
                     ),
                 ),
             ),
@@ -116,17 +128,12 @@ final class HealthCheckController
     #[Route('/ready', name: 'health_ready', methods: ['GET'])]
     public function ready(): JsonResponse
     {
-        if ($this->drain->isDraining()) {
-            return $this->buildResponse(
-                [new HealthCheckResult('server', HealthStatus::Unhealthy, 0.0, ['draining' => true])],
-                'ready',
-                'not_ready',
-            );
-        }
+        $draining = $this->drain->isDraining();
+        $results = $draining
+            ? [new HealthCheckResult('server', HealthStatus::Unhealthy, 0.0)]
+            : $this->healthCheckService->checkReadiness();
 
-        $results = $this->healthCheckService->checkReadiness();
-
-        return $this->buildResponse($results, 'ready', 'not_ready');
+        return $this->probeResponse($results, 'ready', 'not_ready', $draining);
     }
 
     #[OA\Operation\Get(
@@ -161,14 +168,12 @@ final class HealthCheckController
     #[Route('/live', name: 'health_live', methods: ['GET'])]
     public function live(): JsonResponse
     {
-        $result = $this->healthCheckService->checkLiveness();
-
         return new JsonResponse(
             data: [
                 'status' => 'alive',
                 // Liveness for orchestrators stays 200; clients read the drain from the body.
                 'draining' => $this->drain->isDraining(),
-                'checks' => [$result->toArray()],
+                'checks' => [$this->publicCheck($this->healthCheckService->checkLiveness())],
             ],
             status: 200,
         );
@@ -177,20 +182,15 @@ final class HealthCheckController
     /**
      * @param HealthCheckResult[] $results
      */
-    private function buildResponse(array $results, string $okStatus = 'healthy', string $failStatus = 'unhealthy'): JsonResponse
+    private function probeResponse(array $results, string $okStatus, string $failStatus, ?bool $draining = null): JsonResponse
     {
         // The worker, its profile and memory are listed, but none makes this container unhealthy.
-        $healthy = true;
-        foreach ($results as $result) {
-            if ($result->status === HealthStatus::Unhealthy && HealthCheckService::affectsContainerHealth($result)) {
-                $healthy = false;
-                break;
-            }
-        }
+        $healthy = HealthCheckService::containerHealthy($results);
 
         return new JsonResponse(
             data: [
                 'status' => $healthy ? $okStatus : $failStatus,
+                ...($draining === null ? [] : ['draining' => $draining]),
                 'checks' => array_map($this->publicCheck(...), $results),
             ],
             status: $healthy ? 200 : 503,
@@ -198,23 +198,20 @@ final class HealthCheckController
     }
 
     /**
-     * A check as an unauthenticated probe shows it: an error's text, which can carry hosts,
-     * credentials or driver detail, is logged and replaced by a fixed string. The operator
-     * console's configuration check keeps the detail.
+     * A check as an unauthenticated probe shows it: its component and status. A failed check's
+     * error, whose text can carry hosts, credentials or driver detail, goes to the log.
      *
-     * @return array<string, mixed>
+     * @return array{component: string, status: string}
      */
     private function publicCheck(HealthCheckResult $result): array
     {
-        $check = $result->toArray();
-        if (isset($check['details']['error'])) {
+        if (isset($result->details['error'])) {
             $this->logger->warning('Health probe check {component} failed: {error}', [
                 'component' => $result->component,
-                'error' => $check['details']['error'],
+                'error' => $result->details['error'],
             ]);
-            $check['details']['error'] = self::UNAVAILABLE;
         }
 
-        return $check;
+        return ['component' => $result->component, 'status' => $result->status->value];
     }
 }

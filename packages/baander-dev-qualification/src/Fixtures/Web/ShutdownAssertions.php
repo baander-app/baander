@@ -196,19 +196,36 @@ final class ShutdownAssertions
         );
     }
     /**
+     * The largest web worker's real memory in MiB from `app:server:stats --json`, against the
+     * memory_limit, in MiB, that every PHP process in the image reads.
+     *
      * @return array{peak:float,limit:float}|null
      */
 
-    public static function memory(string $health): ?array
+    public static function memory(string $stats, string $memoryLimit): ?array
     {
-        if (preg_match(
-            '/"component":"memory","status":"[a-z_]+","responseTimeMs":[0-9.]+,"details":\{"workerId":[0-9]+,"usageMb":([0-9.]+),"limitMb":([0-9.]+),/',
-            $health,
-            $match,
-        ) !== 1) {
+        $workers = json_decode($stats, true)['workers'] ?? null;
+        $real = is_array($workers)
+            ? array_filter(array_map(static fn(mixed $worker): mixed => is_array($worker) ? ($worker['memory']['real'] ?? null) : null, $workers), is_numeric(...))
+            : [];
+        $limit = self::mebibytes($memoryLimit);
+        if ($real === [] || $limit === null) {
             return null;
         }
-        return ['peak' => (float) $match[1], 'limit' => (float) $match[2]];
+        return ['peak' => (float) max($real), 'limit' => $limit];
+    }
+    /** A php.ini size such as 512M in MiB; null for -1, which sets no limit, or an unreadable value. */
+    private static function mebibytes(string $size): ?float
+    {
+        if (preg_match('/^([0-9]+)([KMG]?)$/i', trim($size), $match) !== 1) {
+            return null;
+        }
+        return (int) $match[1] * match (strtoupper($match[2])) {
+            'G' => 1024.0,
+            'M' => 1.0,
+            'K' => 1 / 1024,
+            default => 1 / 1_048_576,
+        };
     }
     public static function deliveryOnly(string $status, string $processes): void
     {
