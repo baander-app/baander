@@ -101,6 +101,18 @@ An access token issued to any client other than the first-party client: a third-
 
 Proof of the current password, plus a current TOTP code when TOTP is enabled, that a signed-in user gives before a sensitive change to their own account: their email address, a new TOTP factor or a new passkey.
 
+### Sign-in grant
+
+The grant that started a refresh token chain: a password sign-in, a passkey sign-in, an authorization code or a device code. Each access token records it, and rotation keeps it. A token acts with first-party authority only when it belongs to the first-party client and its sign-in grant is a password or passkey sign-in.
+
+### Self-registration
+
+Creating an account through the public registration endpoint rather than through an operator's console command or admin action. It is closed unless an operator opens it with the `auth.registration_open` server setting.
+
+### Unverified account
+
+An account whose current email address has not yet been confirmed through its verification link. Until then, the account reaches only public routes, its own profile, its verification link, resending that link, changing its own address, refreshing its session and signing out.
+
 ### Pending email change
 
 A new address a user asked for in a self-service email change that is not yet confirmed. The account keeps its current address, and that address's verification, until the user opens the link sent to the new address; then the new address replaces it, verified. Asking for the current address, an operator's email change and a password reset drop it.
@@ -179,6 +191,10 @@ A session in which signed-in users watch one video together. One member is the h
 The host's permission for one user, named by public ID, to join a watch party. A user joins only with an invitation or as an existing member; the party's public ID alone admits no one. An invitation lasts until the host revokes it or until its party or its user is deleted, and joining and leaving do not use it up. Revoking it also removes the user from the party when they had joined. The party's creator holds one from the party's creation, and invitations follow the party's current host, not the host who issued them.
 
 ## Rate limiting
+
+### Declared front proxy
+
+A reverse proxy in front of the preset gateway that the operator lists in the preset configuration. The gateway reads the client address and protocol from a declared front proxy's forwarding headers; for any other peer it uses the connection's own address and protocol. Rate limits therefore apply to each client's real address.
 
 ### Limiter generation
 
