@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Application\DTO;
 
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Shared\Domain\Model\Uuid;
 
 /**
@@ -25,5 +26,11 @@ final readonly class VerifiedPasskeyLogin
         public string $nextNonce,
         public int $credentialEpoch,
     ) {
+    }
+
+    /** The sign-in grant the session issued from this login records. */
+    public function grant(): SignInGrant
+    {
+        return SignInGrant::Passkey;
     }
 }

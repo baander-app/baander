@@ -7,7 +7,6 @@ namespace App\Auth\Interface\Controller\Passkey;
 use App\Auth\Application\Command\OAuth\IssueTokenCommand;
 use App\Auth\Application\DTO\VerifiedPasskeyLogin;
 use App\Auth\Application\Exception\CredentialsChangedException;
-use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Interface\Resource\TokenResource;
@@ -122,7 +121,7 @@ final class PasskeyLoginController
                 userId: $user->getId(),
                 dpopJkt: $login->dpopJkt,
                 credentialEpoch: $login->credentialEpoch,
-                grant: SignInGrant::Passkey,
+                grant: $login->grant(),
                 ipAddress: $request->getClientIp(),
                 userAgent: $request->headers->get('User-Agent'),
                 clientFingerprint: $request->headers->get(BaanderHeader::ClientFingerprint->value),

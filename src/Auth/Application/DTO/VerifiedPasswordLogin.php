@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Application\DTO;
 
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Shared\Domain\Model\Uuid;
 
 /**
@@ -29,5 +30,11 @@ final readonly class VerifiedPasswordLogin
         public int $credentialEpoch,
         public ?PasswordHashUpgrade $passwordHashUpgrade = null,
     ) {
+    }
+
+    /** The sign-in grant the session issued from this login records. */
+    public function grant(): SignInGrant
+    {
+        return SignInGrant::Password;
     }
 }
