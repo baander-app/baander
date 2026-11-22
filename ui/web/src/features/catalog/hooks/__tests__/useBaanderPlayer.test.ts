@@ -385,6 +385,144 @@ describe('useBaanderPlayer sessions and source end', () => {
   const attachments = () => vi.mocked(attachHlsPlayback).mock.calls.length
   const signal = () => AbortSignal.timeout(4000)
 
+  it('keeps the video mounted until explicit stop confirms authenticated cancellation', async () => {
+    const { execution, video, state } = await mount()
+    state.time = 42
+    let retire!: () => void
+    vi.mocked(AXIOS_INSTANCE.delete).mockImplementationOnce(
+      () => new Promise((resolve) => {
+        retire = () => resolve({ data: {} })
+      })
+    )
+    let stopped = false
+    let stop!: ReturnType<typeof execution.execute>
+    act(() => {
+      stop = execution.execute('stop', undefined, signal()).then((observation) => {
+        stopped = true
+        return observation
+      })
+    })
+    await waitFor(() => expect(retire).toBeDefined())
+    expect(AXIOS_INSTANCE.delete).toHaveBeenCalledWith(
+      '/api/transcode/sessions/session-1',
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
+    expect(video.isConnected).toBe(true)
+    expect(stopped).toBe(false)
+    await act(async () => {
+      retire()
+      expect(await stop).toMatchObject({ observedState: 'stopped', position: 42 })
+    })
+    expect(video.isConnected).toBe(false)
+  })
+
+  it('retries the same owned session when explicit stop cancellation fails', async () => {
+    const { execution, video } = await mount()
+    vi.mocked(AXIOS_INSTANCE.delete).mockRejectedValueOnce(
+      new Error('Cancellation is unavailable.')
+    )
+    await act(async () => {
+      await expect(execution.execute('stop', undefined, signal()))
+        .rejects.toThrow('Cancellation is unavailable.')
+    })
+    expect(video.isConnected).toBe(true)
+    await act(async () => {
+      expect(await execution.execute('stop', undefined, signal()))
+        .toMatchObject({ observedState: 'stopped' })
+    })
+    expect(AXIOS_INSTANCE.delete).toHaveBeenCalledTimes(2)
+    for (const [path] of vi.mocked(AXIOS_INSTANCE.delete).mock.calls) {
+      expect(path).toBe('/api/transcode/sessions/session-1')
+    }
+    expect(video.isConnected).toBe(false)
+  })
+
+  it('stops the local video without retiring a presentation after ownership moves', async () => {
+    const { execution, video } = await mount({ canControlPresentation: () => false })
+
+    await act(async () => {
+      expect(await execution.execute('stop', undefined, signal()))
+        .toMatchObject({ observedState: 'stopped' })
+    })
+
+    expect(AXIOS_INSTANCE.delete).not.toHaveBeenCalled()
+    expect(video.isConnected).toBe(false)
+  })
+
+  it.each(['copy negotiation', 'encoded signing'] as const)(
+    'retires initial %s that resolves during explicit stop without attaching it',
+    async (startup) => {
+      let completeAdmission!: () => void
+      const sessionId = startup === 'copy negotiation'
+        ? 'initial-copy-session'
+        : 'initial-encoded-session'
+      if (startup === 'copy negotiation') {
+        vi.mocked(negotiateMediaDelivery).mockImplementationOnce(
+          () => new Promise((resolve) => {
+            completeAdmission = () => resolve({
+              kind: 'copy',
+              url: 'https://media.baander.app/signed/copy.m3u8',
+              jobId: 'initial-copy-job',
+              sessionId,
+              selection: null,
+              requestId: 'client-request',
+              reason: null
+            })
+          })
+        )
+      } else {
+        vi.mocked(AXIOS_INSTANCE.post).mockImplementationOnce(
+          () => new Promise((resolve) => {
+            completeAdmission = () => resolve({ data: { ...first, sessionId } })
+          })
+        )
+      }
+      const containerRef = { current: container }
+      const rendered = renderHook(() => useBaanderPlayer({
+        videoId: 'video-1',
+        containerRef,
+        coordinated: true
+      }))
+      mounted.push(rendered)
+      const video = container.querySelector('video')!
+      await waitFor(() => expect(completeAdmission).toBeDefined())
+      let stopped = false
+      let stop!: ReturnType<typeof rendered.result.current.execution.execute>
+      act(() => {
+        stop = rendered.result.current.execution.execute('stop', undefined, signal())
+          .then((observation) => {
+            stopped = true
+            return observation
+          })
+      })
+      await act(async () => {})
+      expect(stopped).toBe(false)
+      expect(video.isConnected).toBe(true)
+      let retire!: () => void
+      vi.mocked(AXIOS_INSTANCE.delete).mockImplementationOnce(
+        () => new Promise((resolve) => {
+          retire = () => resolve({ data: {} })
+        })
+      )
+      await act(async () => completeAdmission())
+      await waitFor(() => expect(retire).toBeDefined())
+      expect(AXIOS_INSTANCE.delete).toHaveBeenCalledWith(
+        `/api/transcode/sessions/${sessionId}`,
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      )
+      expect(stopped).toBe(false)
+      expect(attachments()).toBe(0)
+      expect(attachNativePlayback).not.toHaveBeenCalled()
+      await act(async () => {
+        retire()
+        expect(await stop).toMatchObject({ observedState: 'stopped' })
+      })
+      expect(video.isConnected).toBe(false)
+      expect(attachments()).toBe(0)
+      expect(attachNativePlayback).not.toHaveBeenCalled()
+    }
+  )
+
   it('sends the attached rendition set with a refresh, never with a start', async () => {
     await mount()
     expect(signs[0]).not.toHaveProperty('refresh')

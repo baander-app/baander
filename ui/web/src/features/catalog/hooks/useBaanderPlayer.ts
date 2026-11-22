@@ -275,6 +275,8 @@ export function useBaanderPlayer({
     let presentationQuiescing = false
     let presentationCancellationError: unknown = null
     let presentationSessionId: string | null = null
+    let stopping = false
+    let pendingRefreshes = 0
     let recoveringPresentation = false
     let presentationRestore: {
       position: number
@@ -518,16 +520,26 @@ export function useBaanderPlayer({
     }
 
     const refresh = async (initial = false, presentation?: number) => {
-      const superseded = () =>
-        presentation !== undefined && presentation !== presentationRevision
-      if (!active() || terminal || recoveryFenced.current) return
+      if (!active() || terminal || recoveryFenced.current || stopping) return
       if (!initial && snapshot === null) return
       const revision = ++requestRevision
+      const superseded = () =>
+        !active() ||
+        terminal ||
+        stopping ||
+        revision < appliedRequest ||
+        (presentation !== undefined && presentation !== presentationRevision)
+      const rememberSession = (sessionId: string | null | undefined) => {
+        if (active() && revision >= appliedRequest && sessionId) {
+          presentationSessionId = sessionId
+        }
+      }
+      pendingRefreshes++
       try {
         const requestId = await (clientRequestId ??= getPlaybackClientRequestId(
           abort.signal
         ))
-        if (!active() || terminal || recoveryFenced.current) return
+        if (!active() || terminal || recoveryFenced.current || stopping) return
         const producerless =
           delivery?.kind === 'original' || delivery?.kind === 'cached'
         if (
@@ -540,6 +552,7 @@ export function useBaanderPlayer({
             video,
             'video'
           )
+          if (stopping) return
           if (active()) {
             setSettings((current) => {
               if (
@@ -570,8 +583,8 @@ export function useBaanderPlayer({
             },
             abort.signal
           )
-          if (!active() || terminal || revision < appliedRequest || superseded())
-            return
+          if (decision.kind === 'copy') rememberSession(decision.sessionId)
+          if (superseded()) return
           delivery = decision
         }
         if (delivery.kind === 'incompatible')
@@ -621,11 +634,8 @@ export function useBaanderPlayer({
           )
           data = result.data
         }
-        if (active() && revision >= appliedRequest && data.sessionId) {
-          presentationSessionId = data.sessionId
-        }
-        if (!active() || terminal || revision < appliedRequest || superseded())
-          return
+        rememberSession(data.sessionId)
+        if (superseded()) return
         const previous = snapshot
         // A later response cannot move an attached job backwards in durable state.
         if (
@@ -947,8 +957,7 @@ export function useBaanderPlayer({
           restorePendingLoad()
         }
       } catch (error) {
-        if (!active() || terminal || revision < appliedRequest || superseded())
-          return
+        if (superseded()) return
         if (error instanceof MediaCompatibilityError && active()) {
           terminalError = error
           setError(error.message)
@@ -974,6 +983,8 @@ export function useBaanderPlayer({
           return
         }
         fail()
+      } finally {
+        pendingRefreshes--
       }
     }
 
@@ -1830,6 +1841,10 @@ export function useBaanderPlayer({
       if (snapshot?.sessionId === null) await ready(signal)
       else await waitFor(() => sourceDuration > 0, signal)
     }
+    const ownsPresentation = () =>
+      active() &&
+      !recoveryFenced.current &&
+      callbacks.current.canControlPresentation?.() !== false
     const locallyControlled = () =>
       recoverySupported &&
       coordinated &&
@@ -1848,6 +1863,60 @@ export function useBaanderPlayer({
       return video.paused && locallyControlled()
         ? { observedState: 'stopped', position, volume: video.volume }
         : null
+    }
+    const waitForPendingWork = async (
+      pending: () => boolean,
+      signal: AbortSignal
+    ) => {
+      while (pending()) {
+        signal.throwIfAborted()
+        if (!active()) {
+          throw new DOMException('Video execution was replaced.', 'AbortError')
+        }
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 20))
+      }
+      signal.throwIfAborted()
+    }
+    const quiesce = async (signal: AbortSignal, retirePresentation = false) => {
+      signal.throwIfAborted()
+      const position = cursor()
+      presentationRevision++
+      retryPresentationRecovery = null
+      presentationQuiescing = true
+      requestedPresentation = { ...acceptedAudio, quality: acceptedQuality }
+      setSettings((current) => ({
+        ...current,
+        pendingAudio: null,
+        pendingQuality: null
+      }))
+      executionEpoch++
+      executionPermitted = false
+      playbackStarted = false
+      if (presentationRestore) presentationRestore.paused = true
+      video.pause()
+      try {
+        await waitForPendingWork(
+          () => pendingControls > 0 || pendingPresentationMutations > 0,
+          signal
+        )
+        if (retirePresentation && ownsPresentation()) {
+          stopping = true
+          // A delivery or signing request already in flight can still allocate the session.
+          await waitForPendingWork(() => pendingRefreshes > 0, signal)
+          const sessionId = presentationSessionId ?? snapshot?.sessionId
+          if (sessionId && ownsPresentation()) {
+            await retirePresentationSession(sessionId)
+          }
+          signal.throwIfAborted()
+        } else if (presentationCancellationError) {
+          throw presentationCancellationError
+        }
+        video.pause()
+        return { ...observe(), position }
+      } finally {
+        if (retirePresentation) stopping = false
+        presentationQuiescing = false
+      }
     }
     const execution: VideoExecution = {
       localRecovery: {
@@ -1882,7 +1951,7 @@ export function useBaanderPlayer({
         controlError = null
         nativePlayError = null
         if (action === 'stop') {
-          const observation = await execution.quiesce(signal)
+          const observation = await quiesce(signal, true)
           cleanup()
           return { ...observation, observedState: 'stopped' }
         }
@@ -1944,50 +2013,10 @@ export function useBaanderPlayer({
           signal.removeEventListener('abort', cancel)
         }
       },
-      quiesce: async (signal) => {
-        signal.throwIfAborted()
-        const position = cursor()
-        presentationRevision++
-        retryPresentationRecovery = null
-        presentationQuiescing = true
-        requestedPresentation = { ...acceptedAudio, quality: acceptedQuality }
-        setSettings((current) => ({
-          ...current,
-          pendingAudio: null,
-          pendingQuality: null
-        }))
-        executionEpoch++
-        executionPermitted = false
-        playbackStarted = false
-        if (presentationRestore) presentationRestore.paused = true
-        video.pause()
-        try {
-          while (pendingControls > 0 || pendingPresentationMutations > 0) {
-            signal.throwIfAborted()
-            if (!active()) {
-              throw new DOMException(
-                'Video execution was replaced.',
-                'AbortError'
-              )
-            }
-            await new Promise<void>((resolve) => window.setTimeout(resolve, 20))
-          }
-          signal.throwIfAborted()
-          if (presentationCancellationError) throw presentationCancellationError
-          video.pause()
-          return { ...observe(), position }
-        } finally {
-          presentationQuiescing = false
-        }
-      }
+      quiesce
     }
     const assertPresentationAvailable = () => {
-      if (
-        !active() ||
-        recoveryFenced.current ||
-        presentationQuiescing ||
-        callbacks.current.canControlPresentation?.() === false
-      ) {
+      if (!ownsPresentation() || presentationQuiescing) {
         throw new Error('Video presentation is unavailable.')
       }
     }
@@ -2057,11 +2086,7 @@ export function useBaanderPlayer({
       retryPresentationRecovery = null
       const selection = { ...requestedPresentation, ...patch }
       requestedPresentation = selection
-      const owned = () =>
-        active() &&
-        !recoveryFenced.current &&
-        callbacks.current.canControlPresentation?.() !== false &&
-        revision === presentationRevision
+      const owned = () => ownsPresentation() && revision === presentationRevision
       const assertOwned = () => {
         if (!owned()) {
           throw new DOMException(
@@ -2249,7 +2274,7 @@ export function useBaanderPlayer({
     window.addEventListener('pagehide', fence)
     refresh(true).catch(() => fail())
     const timer = window.setInterval(() => {
-      if (recoveryFenced.current) return
+      if (recoveryFenced.current || stopping) return
       if (retryPresentationRecovery && pendingPresentationMutations === 0) {
         const recover = retryPresentationRecovery
         retryPresentationRecovery = null

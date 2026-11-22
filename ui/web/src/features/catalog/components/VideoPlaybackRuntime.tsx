@@ -173,6 +173,7 @@ export function VideoPlaybackRuntime() {
         throw new Error('A video selection is required.')
       const next = payload.media.publicId
       if (mountedVideo.current) await execution.quiesce(signal)
+      stoppedObservation = null
       useVideoPresentation.getState().select(next)
       while (mountedVideo.current !== next) {
         signal.throwIfAborted()
@@ -185,7 +186,6 @@ export function VideoPlaybackRuntime() {
         payload.desiredState === 'playing',
         signal
       )
-      stoppedObservation = null
       if (volumeForNextMount !== null) {
         await execution.execute('volume', volumeForNextMount, signal)
         volumeForNextMount = null

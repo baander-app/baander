@@ -178,6 +178,33 @@ describe('VideoPlaybackRuntime', () => {
     expect(observation).toEqual(playing)
   })
 
+  it('stops a failed next movie before retrying after the previous movie stopped', async () => {
+    await run('prepare', 10, 'paused')
+    execution.execute.mockResolvedValueOnce({ observedState: 'stopped', position: 10 })
+    await run('stop', 10, 'paused')
+    expect(useVideoPresentation.getState().videoId).toBe('')
+
+    const nextCommand = command('start', 0, 'playing')
+    nextCommand.payload.media = { kind: 'video', publicId: 'video-2' }
+    execution.prepare.mockRejectedValueOnce(new Error('No video encoder slot is available.'))
+    await act(async () => {
+      await expect(adapters[0].execute(nextCommand, AbortSignal.timeout(2000)))
+        .rejects.toThrow('No video encoder slot is available.')
+    })
+    expect(useVideoPresentation.getState().videoId).toBe('video-2')
+
+    execution.execute.mockResolvedValueOnce({ observedState: 'stopped', position: 0 })
+    await run('stop', 0, 'paused')
+    expect(execution.execute.mock.calls.map(call => call[0])).toEqual(['stop', 'stop'])
+    expect(useVideoPresentation.getState().videoId).toBe('')
+
+    await act(async () => {
+      expect(await adapters[0].execute(nextCommand, AbortSignal.timeout(2000))).toEqual(playing)
+    })
+    expect(useVideoPresentation.getState().videoId).toBe('video-2')
+    expect(execution.execute.mock.calls.map(call => call[0])).toEqual(['stop', 'stop', 'play'])
+  })
+
   it('quiesces the mounted video before it prepares the next command', async () => {
     await run('prepare', 10, 'paused')
     execution.prepare.mockClear()
