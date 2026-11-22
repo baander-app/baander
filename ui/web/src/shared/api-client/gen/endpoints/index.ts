@@ -273,30 +273,23 @@ export interface RegisterPasskeyRequest {
   name?: string;
 }
 
-export interface WebAuthnOptionsRequest {
-  /** Optional user public ID to get passkey options for */
-  userId?: string;
-}
-
 /**
- * WebAuthn authenticator response (base64-encoded assertion)
+ * WebAuthn assertion from navigator.credentials.get()
  * @nullable
  */
 export type VerifyPasskeyChallengeRequestResponse = { [key: string]: unknown } | null;
 
 export interface VerifyPasskeyChallengeRequest {
-  /** @maxLength 255 */
+  /**
+     * Key returned by /api/auth/passkey/authenticate/options
+     * @maxLength 255
+     */
   challengeKey: string;
   /**
-     * WebAuthn authenticator response (base64-encoded assertion)
+     * WebAuthn assertion from navigator.credentials.get()
      * @nullable
      */
   response: VerifyPasskeyChallengeRequestResponse;
-  /**
-     * @maxLength 255
-     * @nullable
-     */
-  userId?: string | null;
 }
 
 export interface DeletePasskeyRequest {
@@ -5703,11 +5696,6 @@ export type PostPasskeyRegister201 = {
   data?: PostPasskeyRegister201Data;
 };
 
-export type PostPasskeyAuthenticateOptionsBody = {
-  /** Optional user public ID to get passkey options for */
-  userId?: string;
-};
-
 /**
  * WebAuthn PublicKeyCredentialRequestOptions
  */
@@ -5718,28 +5706,14 @@ export type PostPasskeyAuthenticateOptions200 = {
   data?: PostPasskeyAuthenticateOptions200Data;
 };
 
-/**
- * WebAuthn authenticator response (base64-encoded assertion)
- */
-export type PostPasskeyAuthenticateBodyResponse = { [key: string]: unknown };
-
-export type PostPasskeyAuthenticateBody = {
-  challengeKey: string;
-  /** WebAuthn authenticator response (base64-encoded assertion) */
-  response: PostPasskeyAuthenticateBodyResponse;
-  /** @nullable */
-  userId?: string | null;
-};
-
 export type PostPasskeyAuthenticate200Data = {
   /**
+     * Public ID of the account the passkey belongs to
      * @minLength 21
      * @maxLength 21
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
-  userId?: string;
-  credentialId?: string;
-  signCount?: number;
+  userId: string;
 };
 
 export type PostPasskeyAuthenticate200 = {
@@ -5775,8 +5749,6 @@ export type PostAuthPasskeyLoginPasskeyBody = {
   challengeKey: string;
   /** WebAuthn assertion from navigator.credentials.get() */
   response: PostAuthPasskeyLoginPasskeyBodyResponse;
-  /** Optional user ID the assertion must belong to */
-  userId?: string;
 };
 
 export type PostTotpSetup200Data = {
@@ -15592,30 +15564,17 @@ export const getPostPasskeyAuthenticateOptionsUrl = () => {
 }
 
 /**
+ * Passkey sign-in is discoverable: the options name no account and list no credential, so the authenticator offers the passkeys it holds for this relying party. The challenge is spent by the first sign-in or check that presents it and expires after 5 minutes.
  * @summary Get WebAuthn authentication options
  */
-export const postPasskeyAuthenticateOptions = async (postPasskeyAuthenticateOptionsBody: PostPasskeyAuthenticateOptionsBody, options?: Parameters<typeof customInstance>[1]): Promise<PostPasskeyAuthenticateOptions200> => {
+export const postPasskeyAuthenticateOptions = async ( options?: Parameters<typeof customInstance>[1]): Promise<PostPasskeyAuthenticateOptions200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostPasskeyAuthenticateOptions200>(getPostPasskeyAuthenticateOptionsUrl(),
+  return customInstance<PostPasskeyAuthenticateOptions200>(getPostPasskeyAuthenticateOptionsUrl(),
   {
     ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(postPasskeyAuthenticateOptionsBody)
+    method: 'POST'
+
+
   }
 );}
 
@@ -15625,9 +15584,9 @@ return customInstance<PostPasskeyAuthenticateOptions200>(getPostPasskeyAuthentic
 
 export const getPostPasskeyAuthenticateOptionsMutationKey = () => ['postPasskeyAuthenticateOptions'] as const;
 
-export const getPostPasskeyAuthenticateOptionsMutationOptions = <TError = ErrorType<ValidationError | ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>, TError,PostPasskeyAuthenticateOptionsMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>, TError,PostPasskeyAuthenticateOptionsMutationVariables, TContext> => {
+export const getPostPasskeyAuthenticateOptionsMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>, TError,void, TContext> => {
 
 const mutationKey = getPostPasskeyAuthenticateOptionsMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -15639,10 +15598,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>, PostPasskeyAuthenticateOptionsMutationVariables> = (props) => {
-          const {data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>, void> = () => {
 
-          return  postPasskeyAuthenticateOptions(data,requestOptions)
+
+          return  postPasskeyAuthenticateOptions(requestOptions)
         }
 
 
@@ -15653,19 +15612,19 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PostPasskeyAuthenticateOptionsMutationResult = NonNullable<Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>>
-    export type PostPasskeyAuthenticateOptionsMutationBody = BodyType<PostPasskeyAuthenticateOptionsBody>
-    export type PostPasskeyAuthenticateOptionsMutationError = ErrorType<ValidationError | ApiError>
-    export type PostPasskeyAuthenticateOptionsMutationVariables = {data: BodyType<PostPasskeyAuthenticateOptionsBody>}
+
+    export type PostPasskeyAuthenticateOptionsMutationError = ErrorType<ApiError>
+
 
     /**
  * @summary Get WebAuthn authentication options
  */
-export const usePostPasskeyAuthenticateOptions = <TError = ErrorType<ValidationError | ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>, TError,PostPasskeyAuthenticateOptionsMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+export const usePostPasskeyAuthenticateOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>,
         TError,
-        PostPasskeyAuthenticateOptionsMutationVariables,
+        void,
         TContext
       > => {
       return useMutation(getPostPasskeyAuthenticateOptionsMutationOptions(options), queryClient);
@@ -15680,10 +15639,10 @@ export const getPostPasskeyAuthenticateUrl = () => {
 }
 
 /**
- * The main passkey login flow goes through PasskeyAuthenticator at /api/auth/login/passkey. This endpoint is an alternative for API-based flows where the frontend manages the ceremony.
- * @summary Authenticate with a passkey (API-based flow)
+ * Runs the checks passkey sign-in runs and names the account the assertion proves, without issuing tokens; sign-in itself is `POST /api/auth/login/passkey`. The challenge is spent once; the signature counter must increase unless the authenticator keeps none; an account with TOTP on needs a passkey that verified the user; a disabled account is refused.
+ * @summary Check a passkey assertion without signing in
  */
-export const postPasskeyAuthenticate = async (postPasskeyAuthenticateBody: PostPasskeyAuthenticateBody, options?: Parameters<typeof customInstance>[1]): Promise<PostPasskeyAuthenticate200> => {
+export const postPasskeyAuthenticate = async (verifyPasskeyChallengeRequest: VerifyPasskeyChallengeRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPasskeyAuthenticate200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -15704,7 +15663,7 @@ return customInstance<PostPasskeyAuthenticate200>(getPostPasskeyAuthenticateUrl(
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(postPasskeyAuthenticateBody)
+    body: JSON.stringify(verifyPasskeyChallengeRequest)
   }
 );}
 
@@ -15742,12 +15701,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PostPasskeyAuthenticateMutationResult = NonNullable<Awaited<ReturnType<typeof postPasskeyAuthenticate>>>
-    export type PostPasskeyAuthenticateMutationBody = BodyType<PostPasskeyAuthenticateBody>
+    export type PostPasskeyAuthenticateMutationBody = BodyType<VerifyPasskeyChallengeRequest>
     export type PostPasskeyAuthenticateMutationError = ErrorType<ApiError | ValidationError>
-    export type PostPasskeyAuthenticateMutationVariables = {data: BodyType<PostPasskeyAuthenticateBody>}
+    export type PostPasskeyAuthenticateMutationVariables = {data: BodyType<VerifyPasskeyChallengeRequest>}
 
     /**
- * @summary Authenticate with a passkey (API-based flow)
+ * @summary Check a passkey assertion without signing in
  */
 export const usePostPasskeyAuthenticate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPasskeyAuthenticate>>, TError,PostPasskeyAuthenticateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}

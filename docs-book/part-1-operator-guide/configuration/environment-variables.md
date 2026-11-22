@@ -14,7 +14,7 @@ name shown in emails, passkey prompts or TOTP enrollment.
 | `APP_ENV` | `dev` | Symfony environment: `dev`, `prod`, or `test`. Controls debugging, caching, and error handling. |
 | `APP_SECRET` | — | One cryptographic secret for Symfony security components and encrypted webhook signing secrets. Generate a unique value for each deployment; use the [offline rotation procedure](../maintenance/credential-rotation.md#rotating-app_secret) to change it. With `APP_ENV=prod`, Baander refuses to boot while it is unset, a committed default, a `replace-with-` placeholder or shorter than 32 bytes. |
 | `AUTH_TOTP_ENCRYPTION_KEY` | development value | Key that encrypts stored TOTP secrets, 32 random bytes base64-encoded; production refuses committed and short values. See [OAuth 2.0](authentication-and-limits.md#oauth-20). |
-| `APP_URL` | `https://localhost` | Canonical URL of the application. Used for CORS configuration and URL generation, as the OAuth issuer, and as the origin DPoP proofs must name; further origins go in `AUTH_DPOP_EXTRA_ORIGINS` (see [OAuth 2.0](authentication-and-limits.md#oauth-20)). |
+| `APP_URL` | `https://localhost` | Canonical URL of the application. Used for CORS configuration and URL generation, as the OAuth issuer, and as the origin DPoP proofs must name; further origins go in `AUTH_EXTRA_ORIGINS` (see [OAuth 2.0](authentication-and-limits.md#oauth-20)). |
 | `APP_DOMAIN` | `localhost` | Domain name displayed or used in API responses. |
 
 ## Database

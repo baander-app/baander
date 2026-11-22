@@ -18,6 +18,7 @@ use App\Auth\Infrastructure\Security\Passkey\PasskeyService;
 use App\Auth\Interface\Controller\User\AuthController;
 use App\Auth\Interface\Request\User\VerifyEmailRequest;
 use App\Shared\Application\Http\AcceptLanguageMatcher;
+use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -60,7 +61,7 @@ final class AuthControllerVerifyEmailTest extends TestCase
         // verifyEmail() does not use these dependencies, but they are final and
         // cannot be doubled, so we provide lightweight real instances.
         $passkeyService = new PasskeyService(
-            appDomain: 'localhost',
+            publicOrigins: new PublicOrigins('https://localhost'),
             appName: 'Baander',
             timeout: 60000,
             authenticatorAttachment: 'platform',
@@ -77,7 +78,7 @@ final class AuthControllerVerifyEmailTest extends TestCase
 
         $dpopProofValidator = new DpopProofValidator(
             jtiCache: $this->createStub(DpopJtiCacheInterface::class),
-            publicUrl: 'https://baander.app',
+            publicOrigins: new PublicOrigins('https://baander.app'),
         );
 
         $redisClientFactory = new RedisClientFactory('redis://localhost:6379');

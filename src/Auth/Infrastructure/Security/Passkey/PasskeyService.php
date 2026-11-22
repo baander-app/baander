@@ -7,6 +7,7 @@ namespace App\Auth\Infrastructure\Security\Passkey;
 use App\Auth\Application\Exception\PasskeyChallengeUnavailableException;
 use App\Auth\Application\Port\PasskeyChallengeStoreInterface;
 use App\Auth\Application\Port\PasskeyVerifierInterface;
+use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Domain\Model\PublicId;
 use Cose\Algorithm\Manager;
 use Cose\Algorithm\Signature\ECDSA\ES256;
@@ -54,7 +55,6 @@ use Webauthn\PublicKeyCredentialRpEntity;
 use Webauthn\PublicKeyCredentialUserEntity;
 use Webauthn\Signal\AllAcceptedCredentials;
 use Webauthn\Signal\CurrentUserDetails;
-use Webauthn\Signal\UnknownCredential;
 use Webauthn\TrustPath\EmptyTrustPath;
 
 /**
@@ -67,12 +67,18 @@ use Webauthn\TrustPath\EmptyTrustPath;
  * Each challenge is stored for one ceremony: a registration for the user who asked
  * for it, or an anonymous login whose challenge key is its only identity. It can be
  * consumed once, from any worker, and only by the ceremony it was issued for.
+ *
+ * The relying party ID is the host of the public URL (APP_URL). Both ceremonies accept only
+ * the public origins whose host is that ID or a subdomain of it, each matched exactly, port
+ * included; a browser runs a ceremony for this relying party from no other origin. Sign-in is
+ * discoverable: its options name no account and list no credential.
  */
 final class PasskeyService implements PasskeyVerifierInterface
 {
     private const int CHALLENGE_TTL_SECONDS = 300;
     private const string LOGIN_CEREMONY = 'login';
 
+    private readonly string $relyingPartyId;
     private readonly SerializerInterface $serializer;
     private readonly AuthenticatorAttestationResponseValidator $attestationValidator;
     private readonly AuthenticatorAssertionResponseValidator $assertionValidator;
@@ -84,7 +90,7 @@ final class PasskeyService implements PasskeyVerifierInterface
      * @param list<int> $supportedAlgorithmIds COSE algorithm identifiers for registration
      */
     public function __construct(
-        private readonly string $appDomain,
+        PublicOrigins $publicOrigins,
         private readonly string $appName,
         private readonly int $timeout,
         private readonly string $authenticatorAttachment,
@@ -99,6 +105,7 @@ final class PasskeyService implements PasskeyVerifierInterface
         private readonly JsonEncoder $jsonEncoder,
     ) {
         $this->supportedAlgorithmIds = $supportedAlgorithmIds;
+        $this->relyingPartyId = (string) parse_url($publicOrigins->primary, PHP_URL_HOST);
 
         $algorithmManager = self::createAlgorithmManager($supportedAlgorithmIds);
 
@@ -111,6 +118,7 @@ final class PasskeyService implements PasskeyVerifierInterface
         $attestationStatementSupportManager->add(TPMAttestationStatementSupport::create());
 
         $csmFactory = new CeremonyStepManagerFactory();
+        $csmFactory->setAllowedOrigins(self::ceremonyOrigins($publicOrigins, $this->relyingPartyId));
         $csmFactory->setCounterChecker($this->counterChecker);
         $csmFactory->setAlgorithmManager($algorithmManager);
         $csmFactory->setAttestationStatementSupportManager($attestationStatementSupportManager);
@@ -130,6 +138,24 @@ final class PasskeyService implements PasskeyVerifierInterface
         $this->serializer = new WebauthnSerializerFactory(
             $attestationStatementSupportManager,
         )->create();
+    }
+
+    /**
+     * The public origins on the relying party ID or under it.
+     *
+     * @return list<string>
+     */
+    private static function ceremonyOrigins(PublicOrigins $publicOrigins, string $relyingPartyId): array
+    {
+        $onRelyingParty = static function (string $origin) use ($relyingPartyId): bool {
+            $host = (string) parse_url($origin, PHP_URL_HOST);
+
+            return $host === $relyingPartyId || str_ends_with($host, '.' . $relyingPartyId);
+        };
+
+        return $publicOrigins->all
+            |> (static fn (array $origins): array => array_filter($origins, $onRelyingParty))
+            |> array_values(...);
     }
 
     /**
@@ -253,7 +279,7 @@ final class PasskeyService implements PasskeyVerifierInterface
         $options = PublicKeyCredentialCreationOptions::create(
             PublicKeyCredentialRpEntity::create(
                 name: $this->appName,
-                id: $this->appDomain,
+                id: $this->relyingPartyId,
             ),
             PublicKeyCredentialUserEntity::create(
                 name: $username,
@@ -306,14 +332,13 @@ final class PasskeyService implements PasskeyVerifierInterface
         return $this->attestationValidator->check(
             $attestationResponse,
             $expectedOptions,
-            $this->appDomain,
+            $this->relyingPartyId,
         );
     }
 
     /**
-     * Create WebAuthn authentication options for navigator.credentials.get().
-     *
-     * @param string[] $allowedCredentialIds Base64url-encoded credential IDs allowed
+     * Create WebAuthn authentication options for navigator.credentials.get(): an empty
+     * allowCredentials, so the authenticator offers the user's discoverable credentials.
      *
      * @return array{challengeKey: string, options: array<string, mixed>}
      *
@@ -322,20 +347,12 @@ final class PasskeyService implements PasskeyVerifierInterface
      * @throws JsonException
      * @throws PasskeyChallengeUnavailableException
      */
-    public function createAuthenticationOptions(array $allowedCredentialIds = []): array
+    public function createAuthenticationOptions(): array
     {
-        $allowCredentials = array_map(
-            static fn (string $id): PublicKeyCredentialDescriptor => new PublicKeyCredentialDescriptor(
-                PublicKeyCredentialDescriptor::CREDENTIAL_TYPE_PUBLIC_KEY,
-                self::base64UrlDecode($id),
-            ),
-            $allowedCredentialIds,
-        );
-
         $options = PublicKeyCredentialRequestOptions::create(
             random_bytes(32),
-            rpId: $this->appDomain,
-            allowCredentials: $allowCredentials,
+            rpId: $this->relyingPartyId,
+            allowCredentials: [],
             userVerification: $this->userVerification,
             timeout: $this->timeout,
         );
@@ -379,7 +396,7 @@ final class PasskeyService implements PasskeyVerifierInterface
             $storedCredential,
             $assertionResponse,
             $expectedOptions,
-            $this->appDomain,
+            $this->relyingPartyId,
             $userHandle !== '' ? $userHandle : null,
         );
 
@@ -450,7 +467,7 @@ final class PasskeyService implements PasskeyVerifierInterface
         );
 
         $signal = new AllAcceptedCredentials(
-            PublicKeyCredentialRpEntity::create(name: $this->appName, id: $this->appDomain),
+            PublicKeyCredentialRpEntity::create(name: $this->appName, id: $this->relyingPartyId),
             PublicKeyCredentialUserEntity::create(name: $username, id: $userId, displayName: $username),
             $credentials,
         );
@@ -465,24 +482,8 @@ final class PasskeyService implements PasskeyVerifierInterface
     {
         PublicId::fromString($userId);
         $signal = new CurrentUserDetails(
-            PublicKeyCredentialRpEntity::create(name: $this->appName, id: $this->appDomain),
+            PublicKeyCredentialRpEntity::create(name: $this->appName, id: $this->relyingPartyId),
             PublicKeyCredentialUserEntity::create(name: $username, id: $userId, displayName: $displayName),
-        );
-
-        return $this->serializeSignal($signal);
-    }
-
-    /**
-     * @throws SerializerExceptionInterface
-     */
-    public function createUnknownCredentialSignal(string $credentialId): string
-    {
-        $signal = new UnknownCredential(
-            PublicKeyCredentialRpEntity::create(name: $this->appName, id: $this->appDomain),
-            new PublicKeyCredentialDescriptor(
-                PublicKeyCredentialDescriptor::CREDENTIAL_TYPE_PUBLIC_KEY,
-                self::base64UrlDecode($credentialId),
-            ),
         );
 
         return $this->serializeSignal($signal);

@@ -12,6 +12,7 @@ use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Security\Passkey\AuthenticatorCounterChecker;
 use App\Auth\Infrastructure\Security\Passkey\PasskeyService;
+use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Domain\Model\Email;
 use App\Tests\Fixtures\Auth\InMemoryPasskeyChallengeStore;
 use App\Tests\Fixtures\Auth\WebAuthnTestCredential;
@@ -21,6 +22,7 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
+use Webauthn\Exception\AuthenticatorResponseVerificationException;
 
 /** Passkey sign-in through the real WebAuthn library, with real signed assertions. */
 final class PasskeyLoginCeremonyTest extends TestCase
@@ -117,6 +119,41 @@ final class PasskeyLoginCeremonyTest extends TestCase
         self::assertSame(5, $passkey->getCounter());
     }
 
+    /**
+     * The public URL is https://baander.app, and https://lan.baander.app:8443 and
+     * http://127.0.0.1:9501 are listed as extra origins.
+     *
+     * @return iterable<string, array{string, bool}>
+     */
+    public static function origins(): iterable
+    {
+        yield 'the public origin' => ['https://baander.app', true];
+        yield 'a listed origin under the relying party' => ['https://lan.baander.app:8443', true];
+        yield 'an unlisted subdomain' => ['https://evil.baander.app', false];
+        yield 'an unlisted port' => ['https://baander.app:8443', false];
+        yield 'a listed origin off the relying party' => ['http://127.0.0.1:9501', false];
+    }
+
+    #[DataProvider('origins')]
+    public function testOnlyTheConfiguredOriginsOnTheRelyingPartyMaySignIn(string $origin, bool $accepted): void
+    {
+        $credential = new WebAuthnTestCredential($this->user->getPublicId()->toString(), 'baander.app');
+        $passkey = $credential->passkey();
+        $service = $this->service();
+        $options = $service->createAuthenticationOptions();
+
+        try {
+            $this->signIn($service, $passkey, $options['challengeKey'], $credential->assert($options['options']['challenge'], $origin));
+        } catch (AuthenticatorResponseVerificationException $error) {
+            self::assertFalse($accepted, $error->getMessage());
+            self::assertStringStartsWith('Invalid origin.', $error->getMessage());
+            self::assertSame(0, $passkey->getCounter(), 'A refused assertion does not move the counter.');
+
+            return;
+        }
+        self::assertTrue($accepted, 'An assertion from ' . $origin . ' must be refused.');
+    }
+
     /** @param array<string, mixed> $assertion */
     private function signIn(PasskeyService $service, Passkey $passkey, string $challengeKey, array $assertion): string
     {
@@ -126,14 +163,14 @@ final class PasskeyLoginCeremonyTest extends TestCase
         $users = $this->createStub(UserRepositoryInterface::class);
         $users->method('findByUuid')->willReturn($this->user);
 
-        return new AuthenticatePasskeyHandler($passkeys, $service, $users)(new AuthenticatePasskeyCommand(null, $challengeKey, $assertion))->userId->toString();
+        return new AuthenticatePasskeyHandler($passkeys, $service, $users)(new AuthenticatePasskeyCommand($challengeKey, $assertion))->userId->toString();
     }
 
     /** One worker's service; every instance shares the test's challenge store, as workers share Redis. */
     private function service(): PasskeyService
     {
         return new PasskeyService(
-            appDomain: 'baander.app',
+            publicOrigins: new PublicOrigins('https://baander.app', ['https://lan.baander.app:8443', 'http://127.0.0.1:9501']),
             appName: 'Baander',
             timeout: 60000,
             authenticatorAttachment: '',

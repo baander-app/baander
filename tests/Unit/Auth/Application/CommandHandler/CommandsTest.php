@@ -83,18 +83,10 @@ final class CommandsTest extends TestCase
     public function testAuthenticatePasskeyCommandGetters(): void
     {
         $response = ['id' => 'raw-id-value', 'clientDataJSON' => 'cdj', 'authenticatorData' => 'ad'];
-        $cmd = new AuthenticatePasskeyCommand('user-uuid', 'challenge-key', $response);
+        $cmd = new AuthenticatePasskeyCommand('challenge-key', $response);
 
-        $this->assertSame('user-uuid', $cmd->getUserId());
         $this->assertSame('challenge-key', $cmd->getChallengeKey());
         $this->assertSame($response, $cmd->getResponse());
-    }
-
-    public function testAuthenticatePasskeyCommandNullUserId(): void
-    {
-        $cmd = new AuthenticatePasskeyCommand(null, 'challenge-key', ['id' => 'raw-id']);
-
-        $this->assertNull($cmd->getUserId());
     }
 
     public function testRegisterPasskeyCommandGetters(): void

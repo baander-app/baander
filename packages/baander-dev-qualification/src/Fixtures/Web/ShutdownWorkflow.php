@@ -61,7 +61,7 @@ final class ShutdownWorkflow
             '-e',
             'APP_DOMAIN=http://127.0.0.1:9501',
             '-e',
-            'AUTH_DPOP_EXTRA_ORIGINS=http://127.0.0.1:9501',
+            'AUTH_EXTRA_ORIGINS=http://127.0.0.1:9501',
             '-e',
             'MAILER_DSN=null://null',
             '-e',

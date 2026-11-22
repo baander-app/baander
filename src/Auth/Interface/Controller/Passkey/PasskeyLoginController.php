@@ -51,7 +51,6 @@ final class PasskeyLoginController
                     properties: [
                         'challengeKey' => new OA\Schema(description: 'Key returned by /api/auth/passkey/authenticate/options', type: 'string'),
                         'response' => new OA\Schema(description: 'WebAuthn assertion from navigator.credentials.get()', type: 'object'),
-                        'userId' => new OA\Schema(description: 'Optional user ID the assertion must belong to', type: 'string'),
                     ],
                     required: ['challengeKey', 'response'],
                 ),

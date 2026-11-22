@@ -175,8 +175,8 @@ final class WebRuntimeWorkflowTest extends TestCase
         $application = array_values(array_filter($commands, static fn(array $command): bool => $command[0] === 'create' && in_array('APP_DOMAIN=http://127.0.0.1:9501', $command, true)));
         self::assertCount(1, $application);
         self::assertSame(
-            ['APP_URL=https://baander.app', 'DEFAULT_URI=https://baander.app', 'APP_DOMAIN=http://127.0.0.1:9501', 'AUTH_DPOP_EXTRA_ORIGINS=http://127.0.0.1:9501'],
-            array_values(array_filter($application[0], static fn(string $argument): bool => preg_match('/^(APP_URL|DEFAULT_URI|APP_DOMAIN|AUTH_DPOP_EXTRA_ORIGINS)=/', $argument) === 1)),
+            ['APP_URL=https://baander.app', 'DEFAULT_URI=https://baander.app', 'APP_DOMAIN=http://127.0.0.1:9501', 'AUTH_EXTRA_ORIGINS=http://127.0.0.1:9501'],
+            array_values(array_filter($application[0], static fn(string $argument): bool => preg_match('/^(APP_URL|DEFAULT_URI|APP_DOMAIN|AUTH_EXTRA_ORIGINS)=/', $argument) === 1)),
         );
         $preparations = array_values(array_filter($commands, static fn(array $command): bool => in_array('tests/Fixtures/web-runtime.php', $command, true) && in_array('prepare', $command, true)));
         self::assertCount(1, $preparations);

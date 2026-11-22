@@ -117,6 +117,16 @@ parameters:
     env(OAUTH_PUBLIC_KEY_PATH): '%kernel.project_dir%/config/secrets/oauth/public.key'
     auth.public_key_path: '%env(resolve:OAUTH_PUBLIC_KEY_PATH)%'
 
+    # --- Public Origins ---
+
+    # Comma-separated origins the deployment also answers on besides APP_URL's, such as a
+    # LAN address; never the scheme and Host a request arrived with. A DPoP proof's htu may
+    # name any of them. Passkeys use APP_URL's host as the relying party ID, and their
+    # ceremonies accept the origins on that host or a subdomain of it. An entry that is not an absolute http or https URL stops the
+    # container from booting. Default: none.
+    env(AUTH_EXTRA_ORIGINS): ''
+    auth.extra_origins: '%env(csv:AUTH_EXTRA_ORIGINS)%'
+
     # --- WebAuthn / Passkeys ---
 
     # Timeout for WebAuthn ceremonies in milliseconds. Default: 5 minutes.
@@ -129,7 +139,8 @@ parameters:
     auth.passkey.user_verification: 'preferred'
 
     # Resident key (discoverable credential) requirement: "required", "preferred", or "discouraged".
-    auth.passkey.resident_key: 'preferred'
+    # Passkey sign-in lists no credentials, so only a discoverable credential can sign in.
+    auth.passkey.resident_key: 'required'
 
     # Attestation conveyance preference: "none", "indirect", "direct", or "enterprise".
     auth.passkey.attestation: 'none'
@@ -156,11 +167,6 @@ parameters:
     # DPoP nonce TTL in seconds. Default: 5 minutes.
     auth.dpop.nonce_ttl: 300
 
-    # A DPoP proof's htu names APP_URL's origin or one of these comma-separated
-    # origins, never the scheme and Host the request arrived with. An entry that is
-    # not an absolute http or https URL stops the container from booting. Default: none.
-    env(AUTH_DPOP_EXTRA_ORIGINS): ''
-    auth.dpop.extra_origins: '%env(csv:AUTH_DPOP_EXTRA_ORIGINS)%'
 
     # --- Client Assertions (private_key_jwt, RFC 7523 and RFC 10070) ---
 

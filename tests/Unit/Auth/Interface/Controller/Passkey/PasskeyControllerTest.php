@@ -14,6 +14,7 @@ use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Auth\Interface\Controller\Passkey\PasskeyController;
 use App\Auth\Interface\Request\Passkey\PasskeyRegistrationOptionsRequest;
+use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -152,52 +153,6 @@ final class PasskeyControllerTest extends TestCase
         $this->assertSame('Older', $data['data'][1]['name']);
     }
 
-    public function testAuthenticationOptionsResolveOnlyPublicUserIdentity(): void
-    {
-        $owner = \App\Auth\Domain\Model\User::register(
-            new \App\Shared\Domain\Model\Email('passkey@baander.app'), 'hash', 'Passkey user',
-        );
-        $users = $this->createMock(\App\Auth\Application\Port\UserPortInterface::class);
-        $users->expects(self::once())->method('findByPublicId')
-            ->with(self::callback(fn ($id) => $id->equals($owner->getPublicId())))
-            ->willReturn($owner);
-        $users->expects(self::never())->method('findByUuid');
-        $repository = $this->createMock(PasskeyRepositoryInterface::class);
-        $repository->expects(self::once())->method('forUser')
-            ->with(self::callback(fn ($id) => $id->equals($owner->getId())))
-            ->willReturn([]);
-        $this->passkeyRepository = $repository;
-        $this->controller = $this->createController();
-        $this->setPrivate($this->controller, 'users', $users);
-        $this->setPrivate($this->controller, 'passkeyService', $this->authenticationOptionsService());
-
-        $response = $this->controller->authenticationOptions(
-            new \App\Auth\Interface\Request\Passkey\WebAuthnOptionsRequest($owner->getPublicId()->toString()),
-        );
-
-        self::assertSame(200, $response->getStatusCode());
-        self::assertStringNotContainsString($owner->getId()->toString(), $response->getContent());
-    }
-
-    public function testAuthenticationOptionsDoNotResolveInternalUserUuid(): void
-    {
-        $users = $this->createMock(\App\Auth\Application\Port\UserPortInterface::class);
-        $users->expects(self::never())->method('findByPublicId');
-        $users->expects(self::never())->method('findByUuid');
-        $repository = $this->createMock(PasskeyRepositoryInterface::class);
-        $repository->expects(self::never())->method('forUser');
-        $this->passkeyRepository = $repository;
-        $this->controller = $this->createController();
-        $this->setPrivate($this->controller, 'users', $users);
-        $this->setPrivate($this->controller, 'passkeyService', $this->authenticationOptionsService());
-
-        $response = $this->controller->authenticationOptions(
-            new \App\Auth\Interface\Request\Passkey\WebAuthnOptionsRequest(Uuid::v7()->toString()),
-        );
-
-        self::assertSame(200, $response->getStatusCode());
-    }
-
     public function testRegistrationOptionsNeedAVerifiedAddressBeforeStepUp(): void
     {
         $owner = \App\Auth\Domain\Model\User::register(new \App\Shared\Domain\Model\Email('passkey@baander.app'), 'hash', 'Owner');
@@ -224,7 +179,7 @@ final class PasskeyControllerTest extends TestCase
         $users->method('findByUuid')->willReturn($owner);
         $this->passkeyRepository->method('forUser')->willReturn([]);
         $this->setPrivate($this->controller, 'users', $users);
-        $this->setPrivate($this->controller, 'passkeyService', $this->authenticationOptionsService());
+        $this->setPrivate($this->controller, 'passkeyService', $this->passkeyService());
         $this->setPrivate($this->controller, 'stepUp', $this->stepUp());
 
         $response = $this->controller->registrationOptions(new PasskeyRegistrationOptionsRequest('current-password'));
@@ -255,7 +210,7 @@ final class PasskeyControllerTest extends TestCase
         });
         $this->controller->setTranslator(new \Symfony\Component\Translation\Translator('en'));
         $this->setPrivate($this->controller, 'users', $users);
-        $this->setPrivate($this->controller, 'passkeyService', $this->authenticationOptionsService());
+        $this->setPrivate($this->controller, 'passkeyService', $this->passkeyService());
         $this->setPrivate($this->controller, 'stepUp', $this->stepUp());
         $this->setPrivate($this->controller, 'commandBus', $bus);
         $credential = new \App\Tests\Fixtures\Auth\WebAuthnTestCredential($owner->getPublicId()->toString(), 'baander.app');
@@ -268,97 +223,17 @@ final class PasskeyControllerTest extends TestCase
         $completed = $this->controller->register(new \App\Auth\Interface\Request\Passkey\RegisterPasskeyRequest($options['challengeKey'], $attestation, 'Laptop'), new \Symfony\Component\HttpFoundation\Request());
 
         self::assertSame(400, $borrowed->getStatusCode(), (string) $borrowed->getContent());
+        self::assertSame('invalid_challenge', json_decode((string) $borrowed->getContent(), true, flags: JSON_THROW_ON_ERROR)['error']['details']['reason']);
         self::assertSame(201, $completed->getStatusCode(), (string) $completed->getContent());
         self::assertCount(1, $registered);
         self::assertInstanceOf(\App\Auth\Application\Command\Passkey\RegisterPasskeyCommand::class, $registered[0]);
         self::assertSame($owner->getId()->toString(), $registered[0]->getUserId());
     }
 
-    /** @return iterable<string, array{string, int}> */
-    public static function authenticationHints(): iterable
-    {
-        yield 'discoverable' => ['', 200];
-        yield 'public hint' => ['public', 200];
-        yield 'internal UUID hint' => ['uuid', 401];
-        yield 'foreign public hint' => ['foreign', 401];
-    }
-
-    #[\PHPUnit\Framework\Attributes\DataProvider('authenticationHints')]
-    public function testRealAssertionUsesPublicIdentityInHintAndResult(string $hint, int $status): void
-    {
-        $owner = \App\Auth\Domain\Model\User::register(new \App\Shared\Domain\Model\Email('passkey@baander.app'), 'hash', 'Owner');
-        $credential = new \App\Tests\Fixtures\Auth\WebAuthnTestCredential($owner->getPublicId()->toString(), 'baander.app');
-        $passkey = $credential->passkey();
-        $service = $this->authenticationOptionsService();
-        $options = $service->createAuthenticationOptions();
-        $assertion = $credential->assert($options['options']['challenge'], 'https://baander.app');
-        $users = $this->createStub(\App\Auth\Application\Port\UserPortInterface::class);
-        $users->method('findByUuid')->willReturn($owner);
-        $repository = $this->createMock(PasskeyRepositoryInterface::class);
-        $repository->expects(self::once())->method('ofCredentialId')->with($passkey->getCredentialId())->willReturn($passkey);
-        $repository->method('userIdForCredentialId')->willReturn($owner->getId());
-        $repository->expects($status === 200 ? self::once() : self::never())->method('markUsed');
-        $this->passkeyRepository = $repository;
-        $this->controller = $this->createController();
-        $this->controller->setTranslator(new \Symfony\Component\Translation\Translator('en'));
-        $this->setPrivate($this->controller, 'users', $users);
-        $this->setPrivate($this->controller, 'passkeyService', $service);
-        $claimed = match ($hint) {
-            'public' => $owner->getPublicId()->toString(),
-            'uuid' => $owner->getId()->toString(),
-            'foreign' => (new \App\Shared\Domain\Model\PublicId())->toString(),
-            default => '',
-        };
-
-        $response = $this->controller->authenticate(new \App\Auth\Interface\Request\Passkey\VerifyPasskeyChallengeRequest($options['challengeKey'], $assertion, $claimed));
-        self::assertSame($status, $response->getStatusCode());
-        self::assertStringNotContainsString($owner->getId()->toString(), $response->getContent());
-        self::assertSame($status === 200 ? 1 : 0, $passkey->getCounter());
-        if ($status === 200) {
-            $data = json_decode($response->getContent(), true, 512, JSON_THROW_ON_ERROR);
-            self::assertSame($owner->getPublicId()->toString(), $data['data']['userId']);
-        }
-    }
-
-    /** @return iterable<string, array{bool, int}> */
-    public static function userVerification(): iterable
-    {
-        yield 'user verified' => [true, 200];
-        yield 'user not verified' => [false, 401];
-    }
-
-    #[\PHPUnit\Framework\Attributes\DataProvider('userVerification')]
-    public function testAnAccountWithTotpOnNeedsAVerifiedUser(bool $verifiesUser, int $status): void
-    {
-        $owner = \App\Auth\Domain\Model\User::register(new \App\Shared\Domain\Model\Email('passkey@baander.app'), 'hash', 'Owner');
-        $owner->enableTotp('sealed-totp-secret');
-        $credential = new \App\Tests\Fixtures\Auth\WebAuthnTestCredential($owner->getPublicId()->toString(), 'baander.app', verifiesUser: $verifiesUser);
-        $passkey = $credential->passkey();
-        $service = $this->authenticationOptionsService();
-        $options = $service->createAuthenticationOptions();
-        $assertion = $credential->assert($options['options']['challenge'], 'https://baander.app');
-        $users = $this->createStub(\App\Auth\Application\Port\UserPortInterface::class);
-        $users->method('findByUuid')->willReturn($owner);
-        $repository = $this->createMock(PasskeyRepositoryInterface::class);
-        $repository->method('ofCredentialId')->willReturn($passkey);
-        $repository->method('userIdForCredentialId')->willReturn($owner->getId());
-        $repository->expects($status === 200 ? self::once() : self::never())->method('markUsed');
-        $this->passkeyRepository = $repository;
-        $this->controller = $this->createController();
-        $this->controller->setTranslator(new \Symfony\Component\Translation\Translator('en'));
-        $this->setPrivate($this->controller, 'users', $users);
-        $this->setPrivate($this->controller, 'passkeyService', $service);
-
-        $response = $this->controller->authenticate(new \App\Auth\Interface\Request\Passkey\VerifyPasskeyChallengeRequest($options['challengeKey'], $assertion, ''));
-
-        self::assertSame($status, $response->getStatusCode(), (string) $response->getContent());
-        self::assertSame($status === 200 ? 1 : 0, $passkey->getCounter());
-    }
-
-    private function authenticationOptionsService(): \App\Auth\Infrastructure\Security\Passkey\PasskeyService
+    private function passkeyService(): \App\Auth\Infrastructure\Security\Passkey\PasskeyService
     {
         return new \App\Auth\Infrastructure\Security\Passkey\PasskeyService(
-            appDomain: 'baander.app', appName: 'Baander', timeout: 60000,
+            publicOrigins: new PublicOrigins('https://baander.app'), appName: 'Baander', timeout: 60000,
             authenticatorAttachment: '', userVerification: 'preferred', residentKey: 'preferred', attestation: 'none',
             counterChecker: $this->createStub(\Webauthn\Counter\CounterChecker::class),
             eventDispatcher: $this->createStub(\Psr\EventDispatcher\EventDispatcherInterface::class),

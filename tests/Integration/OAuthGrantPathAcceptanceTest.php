@@ -1423,7 +1423,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
     /** @return array{challengeKey: string, response: array<string, mixed>} */
     private function passkeyAssertion(WebAuthnTestCredential $credential): array
     {
-        $options = $this->send('POST', '/api/auth/passkey/authenticate/options', json: ['userId' => $this->user->getPublicId()->toString()]);
+        $options = $this->send('POST', '/api/auth/passkey/authenticate/options');
         self::assertSame(200, $options->getStatusCode(), (string) $options->getContent());
         $data = json_decode((string) $options->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
         self::assertIsString($data['challengeKey']);

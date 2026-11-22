@@ -531,7 +531,6 @@ final class OpenApiSpecTest extends KernelTestCase
             'EnableTotpRequest',
             'DisableTotpRequest',
             'RegisterPasskeyRequest',
-            'WebAuthnOptionsRequest',
             'VerifyPasskeyChallengeRequest',
             'RevokeTokenRequest',
             // Auth resources
@@ -714,6 +713,8 @@ final class OpenApiSpecTest extends KernelTestCase
             '/api/auth/registration' => 'GET',
             '/api/auth/login' => 'POST',
             '/api/auth/login/passkey' => 'POST',
+            '/api/auth/passkey/authenticate/options' => 'POST',
+            '/api/auth/passkey/authenticate' => 'POST',
             '/api/auth/password/reset-request' => 'POST',
         ];
 

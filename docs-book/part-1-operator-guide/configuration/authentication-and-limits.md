@@ -12,12 +12,12 @@ reset and email verification have their own [account security reference](account
 | `OAUTH_PRIVATE_KEY_PATH` | `%kernel.project_dir%/config/secrets/oauth/private.key` | Path to the RSA private key for signing JWT access tokens. Generate with `app:oauth:generate-keys`. |
 | `OAUTH_PUBLIC_KEY_PATH` | `%kernel.project_dir%/config/secrets/oauth/public.key` | Path to the RSA public key for verifying JWT access tokens. |
 | `AUTH_SPA_CLIENT_ID` | `baander_dev_spa_00001` | Public ID of the first-party OAuth client that password and passkey login issue tokens to. The web and Electron apps both use it. Seeded by `app:auth:setup-clients`. Only tokens of this client act with the user's full authority; see [Delegated tokens and scopes](#delegated-tokens-and-scopes). |
-| `AUTH_DPOP_EXTRA_ORIGINS` | empty | Comma-separated origins, besides the origin of `APP_URL`, that a DPoP proof's `htu` may name, such as a LAN address the installation also answers on. Baander never takes the expected origin from the scheme and `Host` a request arrived with. An entry that is not an absolute `http` or `https` URL stops the application from booting. |
+| `AUTH_EXTRA_ORIGINS` | empty | Comma-separated origins, besides the origin of `APP_URL`, that a DPoP proof's `htu` may name, such as a LAN address the installation also answers on. Baander never takes the expected origin from the scheme and `Host` a request arrived with. An entry that is not an absolute `http` or `https` URL stops the application from booting. |
 | `AUTH_TOTP_ENCRYPTION_KEY` | development value in `.env` | Key that encrypts stored TOTP secrets: 32 random bytes, base64-encoded. Generate one with `openssl rand -base64 32`. Production refuses to boot without a private value; see [Hardening checklist](../maintenance/security.md#hardening-checklist). |
 
 A DPoP proof names the URL the client sent it to. Behind a TLS-terminating proxy the
 request reaches Baander as plain HTTP, so Baander checks the proof against `APP_URL`
-and `AUTH_DPOP_EXTRA_ORIGINS` instead of the request's own scheme. The shipped
+and `AUTH_EXTRA_ORIGINS` instead of the request's own scheme. The shipped
 production nginx passes the upstream proxy's `X-Forwarded-Proto` on, and uses its own
 scheme only when none arrived.
 

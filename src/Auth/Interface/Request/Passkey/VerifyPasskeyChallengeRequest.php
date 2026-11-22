@@ -12,22 +12,17 @@ use Symfony\Component\Validator\Constraints\Length;
     type: 'object',
     properties: [
         'challengeKey' => new OA\Schema(
+            description: 'Key returned by /api/auth/passkey/authenticate/options',
             type: 'string',
             maxLength: 255,
             example: 'challenge-key-abc123',
             default: '',
         ),
         'response' => new OA\Schema(
-            description: 'WebAuthn authenticator response (base64-encoded assertion)',
+            description: 'WebAuthn assertion from navigator.credentials.get()',
             type: 'object',
             nullable: true,
             default: null,
-        ),
-        'userId' => new OA\Schema(
-            type: 'string',
-            nullable: true,
-            maxLength: 255,
-            default: '',
         ),
     ],
     required: ['challengeKey', 'response'],
@@ -42,9 +37,6 @@ final readonly class VerifyPasskeyChallengeRequest
 
         #[NotBlank(message: 'response is required.')]
         public mixed $response = null,
-
-        #[Length(max: 255)]
-        public string $userId = '',
     ) {
     }
 }

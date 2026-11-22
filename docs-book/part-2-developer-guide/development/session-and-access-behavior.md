@@ -32,7 +32,7 @@ account security. See [Delegated tokens and scopes](../../part-1-operator-guide/
 ### DPoP origins
 
 A proof is valid only for the URL it names, and Baander compares that
-URL with `APP_URL` and `AUTH_DPOP_EXTRA_ORIGINS`, not with the scheme and `Host` the
+URL with `APP_URL` and `AUTH_EXTRA_ORIGINS`, not with the scheme and `Host` the
 request arrived with, which a proxy or the client can change.
 
 ### Client secrets

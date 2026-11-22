@@ -4165,7 +4165,7 @@
                         }
                     },
                     "400": {
-                        "description": "Invalid challenge or verification failed",
+                        "description": "The challenge is unknown, spent or issued to another user (`details.reason` `invalid_challenge`), or the ceremony was refused (`details.reason` `passkey_registration_failed`); why it was refused is logged, not returned",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4212,23 +4212,8 @@
                     "Auth"
                 ],
                 "summary": "Get WebAuthn authentication options",
+                "description": "Passkey sign-in is discoverable: the options name no account and list no credential, so the authenticator offers the passkeys it holds for this relying party. The challenge is spent by the first sign-in or check that presents it and expires after 5 minutes.",
                 "operationId": "post_passkey_authenticate_options",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "userId": {
-                                        "type": "string",
-                                        "description": "Optional user public ID to get passkey options for"
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "required": true
-                },
                 "responses": {
                     "200": {
                         "description": "Authentication options",
@@ -4246,16 +4231,6 @@
                             }
                         }
                     },
-                    "422": {
-                        "description": "Validation error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ValidationError"
-                                }
-                            }
-                        }
-                    },
                     "503": {
                         "description": "The passkey challenge store is unavailable; retry after the Retry-After delay.",
                         "headers": {
@@ -4275,7 +4250,8 @@
                             }
                         }
                     }
-                }
+                },
+                "security": []
             }
         },
         "/api/auth/passkey/authenticate": {
@@ -4283,32 +4259,14 @@
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Authenticate with a passkey (API-based flow)",
-                "description": "The main passkey login flow goes through PasskeyAuthenticator at /api/auth/login/passkey. This endpoint is an alternative for API-based flows where the frontend manages the ceremony.",
+                "summary": "Check a passkey assertion without signing in",
+                "description": "Runs the checks passkey sign-in runs and names the account the assertion proves, without issuing tokens; sign-in itself is `POST /api/auth/login/passkey`. The challenge is spent once; the signature counter must increase unless the authenticator keeps none; an account with TOTP on needs a passkey that verified the user; a disabled account is refused.",
                 "operationId": "post_passkey_authenticate",
                 "requestBody": {
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "challengeKey": {
-                                        "type": "string",
-                                        "example": "challenge-key-abc123"
-                                    },
-                                    "response": {
-                                        "type": "object",
-                                        "description": "WebAuthn authenticator response (base64-encoded assertion)"
-                                    },
-                                    "userId": {
-                                        "type": "string",
-                                        "nullable": true
-                                    }
-                                },
-                                "required": [
-                                    "challengeKey",
-                                    "response"
-                                ]
+                                "$ref": "#/components/schemas/VerifyPasskeyChallengeRequest"
                             }
                         }
                     },
@@ -4316,7 +4274,7 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Authentication successful",
+                        "description": "The assertion holds",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4327,35 +4285,23 @@
                                             "properties": {
                                                 "userId": {
                                                     "type": "string",
+                                                    "description": "Public ID of the account the passkey belongs to",
                                                     "minLength": 21,
                                                     "maxLength": 21,
                                                     "pattern": "^[0-9a-zA-Z_-]{21}$"
-                                                },
-                                                "credentialId": {
-                                                    "type": "string"
-                                                },
-                                                "signCount": {
-                                                    "type": "integer"
                                                 }
-                                            }
+                                            },
+                                            "required": [
+                                                "userId"
+                                            ]
                                         }
                                     }
                                 }
                             }
                         }
                     },
-                    "400": {
-                        "description": "Invalid challenge or verification failed",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ApiError"
-                                }
-                            }
-                        }
-                    },
                     "401": {
-                        "description": "No passkey found for credential ID",
+                        "description": "The assertion was refused. An unknown credential, a bad signature, a spent challenge and every other refusal get the same answer, with `details.reason` `passkey_auth_failed`.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4393,7 +4339,8 @@
                             }
                         }
                     }
-                }
+                },
+                "security": []
             }
         },
         "/api/auth/passkey/{publicId}": {
@@ -4516,10 +4463,6 @@
                                     "response": {
                                         "type": "object",
                                         "description": "WebAuthn assertion from navigator.credentials.get()"
-                                    },
-                                    "userId": {
-                                        "type": "string",
-                                        "description": "Optional user ID the assertion must belong to"
                                     }
                                 },
                                 "required": [
@@ -26436,36 +26379,21 @@
                     "response"
                 ]
             },
-            "WebAuthnOptionsRequest": {
-                "type": "object",
-                "properties": {
-                    "userId": {
-                        "type": "string",
-                        "description": "Optional user public ID to get passkey options for",
-                        "default": ""
-                    }
-                }
-            },
             "VerifyPasskeyChallengeRequest": {
                 "type": "object",
                 "properties": {
                     "challengeKey": {
                         "type": "string",
+                        "description": "Key returned by /api/auth/passkey/authenticate/options",
                         "maxLength": 255,
                         "default": "",
                         "example": "challenge-key-abc123"
                     },
                     "response": {
                         "type": "object",
-                        "description": "WebAuthn authenticator response (base64-encoded assertion)",
+                        "description": "WebAuthn assertion from navigator.credentials.get()",
                         "nullable": true,
                         "default": null
-                    },
-                    "userId": {
-                        "type": "string",
-                        "nullable": true,
-                        "maxLength": 255,
-                        "default": ""
                     }
                 },
                 "required": [

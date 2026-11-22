@@ -141,26 +141,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
 
     // --- Tests ---
 
-    public function testAuthenticateWithUserIdReturnsProvidedUserId(): void
-    {
-        $passkey = $this->createPasskey(self::CREDENTIAL_ID, 5);
-        $response = $this->createValidResponse();
-        $updatedCredential = $this->createUpdatedCredential(10);
-
-        $this->passkeyRepository->expects($this->once())->method('ofCredentialId')
-            ->with(self::CREDENTIAL_ID)
-            ->willReturn($passkey);
-        $this->setUpVerificationMocks($passkey, $response, $updatedCredential);
-        $this->passkeyRepository->expects($this->once())->method('markUsed');
-
-        $command = new AuthenticatePasskeyCommand(self::OWNER_ID, 'challenge-key-123', $response);
-        $result = ($this->handler)($command);
-
-        $this->assertSame(self::OWNER_ID, $result->userId->toString());
-        $this->assertSame(10, $passkey->getCounter());
-    }
-
-    public function testAuthenticateWithoutUserIdResolvesFromRepo(): void
+    public function testTheCredentialResolvesItsOwner(): void
     {
         $userId = Uuid::fromString(self::OWNER_ID);
         $passkey = $this->createPasskey(self::CREDENTIAL_ID, 5);
@@ -175,7 +156,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
             ->willReturn($userId);
         $this->setUpVerificationMocks($passkey, $response, $updatedCredential, true);
 
-        $command = new AuthenticatePasskeyCommand(null, 'challenge-key-123', $response);
+        $command = new AuthenticatePasskeyCommand('challenge-key-123', $response);
         $result = ($this->handler)($command);
 
         $this->assertSame($userId->toString(), $result->userId->toString());
@@ -194,7 +175,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('No passkey found');
 
-        ($this->handler)(new AuthenticatePasskeyCommand(null, 'challenge-key-123', $response));
+        ($this->handler)(new AuthenticatePasskeyCommand('challenge-key-123', $response));
     }
 
     public function testThrowsOnInvalidChallengeKey(): void
@@ -213,7 +194,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Challenge not found');
 
-        ($this->handler)(new AuthenticatePasskeyCommand(null, 'challenge-key-123', $response));
+        ($this->handler)(new AuthenticatePasskeyCommand('challenge-key-123', $response));
     }
 
     public function testThrowsOnInvalidSignature(): void
@@ -237,7 +218,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Signature verification failed');
 
-        ($this->handler)(new AuthenticatePasskeyCommand(null, 'challenge-key-123', $response));
+        ($this->handler)(new AuthenticatePasskeyCommand('challenge-key-123', $response));
     }
 
     public function testThrowsOnCounterMismatchClonedAuthenticator(): void
@@ -255,7 +236,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('cloned authenticator');
 
-        ($this->handler)(new AuthenticatePasskeyCommand(null, 'challenge-key-123', $response));
+        ($this->handler)(new AuthenticatePasskeyCommand('challenge-key-123', $response));
     }
 
     public function testAPasskeyWhoseCounterStaysAtZeroSignsIn(): void
@@ -267,7 +248,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $this->setUpVerificationMocks($passkey, $response, $this->createUpdatedCredential(0));
         $this->passkeyRepository->expects($this->once())->method('markUsed')->with($passkey);
 
-        self::assertSame(self::OWNER_ID, ($this->handler)(new AuthenticatePasskeyCommand(null, 'challenge-key-123', $response))->userId->toString());
+        self::assertSame(self::OWNER_ID, ($this->handler)(new AuthenticatePasskeyCommand('challenge-key-123', $response))->userId->toString());
         self::assertSame(0, $passkey->getCounter());
     }
 
@@ -286,7 +267,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('cloned authenticator');
 
-        ($this->handler)(new AuthenticatePasskeyCommand(null, 'challenge-key-123', $response));
+        ($this->handler)(new AuthenticatePasskeyCommand('challenge-key-123', $response));
     }
 
     public function testThrowsWhenUserCannotBeResolved(): void
@@ -305,7 +286,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('No passkey found');
 
-        ($this->handler)(new AuthenticatePasskeyCommand(null, 'challenge-key-123', $response));
+        ($this->handler)(new AuthenticatePasskeyCommand('challenge-key-123', $response));
     }
 
     public function testDoesNotMarkUsedWhenVerificationFails(): void
@@ -323,7 +304,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
 
         $this->expectException(RuntimeException::class);
 
-        ($this->handler)(new AuthenticatePasskeyCommand(null, 'challenge-key-123', $response));
+        ($this->handler)(new AuthenticatePasskeyCommand('challenge-key-123', $response));
     }
 
     public function testUpdatesCounterOnSuccessfulVerification(): void
@@ -337,7 +318,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
             ->willReturn($passkey);
         $this->setUpVerificationMocks($passkey, $response, $updatedCredential);
 
-        $command = new AuthenticatePasskeyCommand(self::OWNER_ID, 'challenge-key-123', $response);
+        $command = new AuthenticatePasskeyCommand('challenge-key-123', $response);
         ($this->handler)($command);
 
         $this->assertSame(15, $passkey->getCounter());
@@ -365,7 +346,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
             ->willReturn($passkey);
         $this->setUpVerificationMocks($passkey, $response, $updatedCredential);
 
-        $command = new AuthenticatePasskeyCommand(self::OWNER_ID, 'challenge-key-123', $response);
+        $command = new AuthenticatePasskeyCommand('challenge-key-123', $response);
         $result = ($this->handler)($command);
 
         $this->assertSame(self::OWNER_ID, $result->userId->toString());
@@ -405,36 +386,11 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $this->setUpVerificationMocks($passkey, $response, $this->createUpdatedCredential(10));
 
         $result = (new AuthenticatePasskeyHandler($this->passkeyRepository, $this->passkeyVerifier, $users))(
-            new AuthenticatePasskeyCommand(null, 'challenge-key-123', $response),
+            new AuthenticatePasskeyCommand('challenge-key-123', $response),
         );
 
         self::assertSame(['owner', 'passkey'], $reads);
         self::assertSame(7, $result->credentialEpoch);
-    }
-
-    public function testVictimHintCannotOverrideVerifiedCredentialOwner(): void
-    {
-        $this->assertRejectedOwnerHint('01900000-0000-7000-8000-000000000002');
-    }
-
-    public function testMalformedOwnerHintIsRejectedBeforeCounterPersistence(): void
-    {
-        $this->assertRejectedOwnerHint('not-a-uuid');
-    }
-
-    private function assertRejectedOwnerHint(string $hint): void
-    {
-        $passkey = $this->createPasskey(self::CREDENTIAL_ID, 5);
-        $response = $this->createValidResponse();
-        $this->passkeyRepository->method('ofCredentialId')->willReturn($passkey);
-        $this->setUpVerificationMocks($passkey, $response, $this->createUpdatedCredential(10));
-        $this->passkeyRepository->expects($this->never())->method('markUsed');
-        try {
-            ($this->handler)(new AuthenticatePasskeyCommand($hint, 'challenge-key-123', $response));
-            self::fail('A claimed user must own the verified credential.');
-        } catch (RuntimeException) {
-            self::assertSame(5, $passkey->getCounter());
-        }
     }
 
     public function testStoredUserHandleMustMatchRepositoryOwner(): void
@@ -447,7 +403,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $this->setUpVerificationMocks($passkey, $response, $this->createUpdatedCredential(), true);
         $this->passkeyRepository->expects($this->never())->method('markUsed');
         try {
-            ($this->handler)(new AuthenticatePasskeyCommand(null, 'challenge-key-123', $response));
+            ($this->handler)(new AuthenticatePasskeyCommand('challenge-key-123', $response));
             self::fail('Stored user handle must agree with the persisted owner.');
         } catch (RuntimeException) {
             self::assertSame(5, $passkey->getCounter());
@@ -468,7 +424,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $this->passkeyVerifier->method('verifyAuthenticationResponse')->willReturn($this->createUpdatedCredential());
 
         try {
-            ($this->handler)(new AuthenticatePasskeyCommand(null, 'challenge', $response));
+            ($this->handler)(new AuthenticatePasskeyCommand('challenge', $response));
             self::fail('An internal UUID handle must require re-enrollment.');
         } catch (RuntimeException $error) {
             self::assertSame('Credential owner does not match its registered user handle.', $error->getMessage());
@@ -485,7 +441,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
             $verifier->expects($this->never())->method('consumeLoginChallenge');
             try {
                 (new AuthenticatePasskeyHandler($repository, $verifier, $this->users))(
-                    new AuthenticatePasskeyCommand(null, 'challenge', ['rawId' => $rawId]),
+                    new AuthenticatePasskeyCommand('challenge', ['rawId' => $rawId]),
                 );
                 self::fail('Fixture has no credential.');
             } catch (RuntimeException $error) {
@@ -500,7 +456,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $this->passkeyVerifier->expects($this->never())->method('consumeLoginChallenge');
         foreach ([null, [], 42, '', '***', 'Zh', str_repeat('A', 2049)] as $rawId) {
             try {
-                ($this->handler)(new AuthenticatePasskeyCommand(null, 'challenge', ['rawId' => $rawId]));
+                ($this->handler)(new AuthenticatePasskeyCommand('challenge', ['rawId' => $rawId]));
                 self::fail('Invalid credential identifier must fail.');
             } catch (RuntimeException $error) {
                 self::assertSame('Invalid credential identifier.', $error->getMessage());

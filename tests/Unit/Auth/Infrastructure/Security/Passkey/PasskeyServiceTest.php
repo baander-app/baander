@@ -7,7 +7,10 @@ namespace App\Tests\Unit\Auth\Infrastructure\Security;
 use App\Auth\Application\Exception\PasskeyChallengeUnavailableException;
 use App\Auth\Application\Port\PasskeyChallengeStoreInterface;
 use App\Auth\Infrastructure\Security\Passkey\PasskeyService;
+use App\Shared\Application\Http\PublicOrigins;
 use App\Tests\Fixtures\Auth\InMemoryPasskeyChallengeStore;
+use App\Tests\Fixtures\Auth\WebAuthnTestCredential;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\EventDispatcher\EventDispatcherInterface;
@@ -16,6 +19,7 @@ use RuntimeException;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Webauthn\Counter\CounterChecker;
 use Webauthn\CredentialRecord;
+use Webauthn\Exception\AuthenticatorResponseVerificationException;
 use Webauthn\PublicKeyCredentialRequestOptions;
 
 final class PasskeyServiceTest extends TestCase
@@ -36,10 +40,10 @@ final class PasskeyServiceTest extends TestCase
         $this->service = $this->createService();
     }
 
-    private function createService(): PasskeyService
+    private function createService(PublicOrigins $publicOrigins = new PublicOrigins('https://localhost')): PasskeyService
     {
         return new PasskeyService(
-            appDomain: 'localhost',
+            publicOrigins: $publicOrigins,
             appName: 'Bånder',
             timeout: 60000,
             authenticatorAttachment: '',
@@ -175,24 +179,58 @@ final class PasskeyServiceTest extends TestCase
         $this->assertCount(1, $result['options']['excludeCredentials']);
     }
 
-    public function testCreateAuthenticationOptionsReturnsChallengeKeyAndOptions(): void
-    {
-        $credId = base64_encode('cred-id-1');
-
-        $result = $this->service->createAuthenticationOptions([$credId]);
-
-        $this->assertArrayHasKey('challengeKey', $result);
-        $this->assertArrayHasKey('options', $result);
-        $this->assertNotEmpty($result['options']['challenge']);
-        $this->assertSame('localhost', $result['options']['rpId']);
-        $this->assertCount(1, $result['options']['allowCredentials']);
-    }
-
-    public function testCreateAuthenticationOptionsWithNoCredentials(): void
+    public function testAuthenticationOptionsListNoCredential(): void
     {
         $result = $this->service->createAuthenticationOptions();
 
-        $this->assertEmpty($result['options']['allowCredentials']);
+        $this->assertArrayHasKey('challengeKey', $result);
+        $this->assertNotEmpty($result['options']['challenge']);
+        $this->assertSame('localhost', $result['options']['rpId']);
+        $this->assertSame([], $result['options']['allowCredentials']);
+    }
+
+    public function testTheRelyingPartyIsTheHostOfThePublicUrl(): void
+    {
+        $service = $this->createService(new PublicOrigins('https://Baander.App:8443/app', ['https://lan.baander.app', 'http://127.0.0.1:9501']));
+
+        $registration = $service->createRegistrationOptions(self::USER_A, 'a@baander.app');
+        $authentication = $service->createAuthenticationOptions();
+
+        $this->assertSame('baander.app', $registration['options']['rp']['id']);
+        $this->assertSame('baander.app', $authentication['options']['rpId']);
+    }
+
+    /**
+     * The public URL is https://baander.app, and https://lan.baander.app:8443 and
+     * http://127.0.0.1:9501 are listed as extra origins.
+     *
+     * @return iterable<string, array{string, bool}>
+     */
+    public static function registrationOrigins(): iterable
+    {
+        yield 'the public origin' => ['https://baander.app', true];
+        yield 'a listed origin under the relying party' => ['https://lan.baander.app:8443', true];
+        yield 'an unlisted subdomain' => ['https://evil.baander.app', false];
+        yield 'an unlisted port' => ['https://baander.app:8443', false];
+        yield 'a listed origin off the relying party' => ['http://127.0.0.1:9501', false];
+    }
+
+    #[DataProvider('registrationOrigins')]
+    public function testOnlyTheConfiguredOriginsOnTheRelyingPartyMayRegister(string $origin, bool $accepted): void
+    {
+        $service = $this->createService(new PublicOrigins('https://baander.app', ['https://lan.baander.app:8443', 'http://127.0.0.1:9501']));
+        $issued = $service->createRegistrationOptions(self::USER_A, 'a@baander.app');
+        $attestation = new WebAuthnTestCredential(self::USER_A, 'baander.app')->attest($issued['options']['challenge'], $origin);
+
+        try {
+            $service->verifyRegistrationResponse($attestation, $service->consumeRegistrationChallenge(self::USER_A, $issued['challengeKey']));
+        } catch (AuthenticatorResponseVerificationException $error) {
+            self::assertFalse($accepted, $error->getMessage());
+            self::assertStringStartsWith('Invalid origin.', $error->getMessage());
+
+            return;
+        }
+        self::assertTrue($accepted, 'A registration from ' . $origin . ' must be refused.');
     }
 
     // --- Credential record serialization ---
@@ -314,29 +352,5 @@ final class PasskeyServiceTest extends TestCase
         $this->assertSame(rtrim(strtr(base64_encode('sssssssssssssssssssss'), '+/', '-_'), '='), $data['userId']);
         $this->assertSame('user@baander.app', $data['name']);
         $this->assertSame('Test User', $data['displayName']);
-    }
-
-    public function testCreateUnknownCredentialSignalReturnsJson(): void
-    {
-        $credId = base64_encode('unknown-cred-id');
-
-        $signal = $this->service->createUnknownCredentialSignal($credId);
-
-        $data = json_decode($signal, true, 512, JSON_THROW_ON_ERROR);
-
-        $this->assertSame('localhost', $data['rpId']);
-        $this->assertArrayHasKey('credentialId', $data);
-    }
-
-    public function testCreateUnknownCredentialSignalWithBase64UrlCredentialId(): void
-    {
-        $binaryId = 'raw-binary-credential';
-        $b64UrlId = rtrim(strtr(base64_encode($binaryId), '+/', '-_'), '=');
-
-        $signal = $this->service->createUnknownCredentialSignal($b64UrlId);
-
-        $data = json_decode($signal, true, 512, JSON_THROW_ON_ERROR);
-
-        $this->assertNotEmpty($data['credentialId']);
     }
 }

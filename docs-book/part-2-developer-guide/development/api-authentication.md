@@ -80,7 +80,7 @@ sequenceDiagram
     A-->>C: Resource
 ```
 
-A proof's `htu` must name one of the deployment's public origins followed by the request path: the origin of `APP_URL`, or one of the comma-separated origins in `AUTH_DPOP_EXTRA_ORIGINS` (empty by default). The scheme and `Host` the request arrived with play no part, because behind a TLS-terminating proxy the request reaches Baander as plain HTTP and the client chooses the `Host` header. An origin in `AUTH_DPOP_EXTRA_ORIGINS` that is not an absolute `http` or `https` URL stops the application from booting.
+A proof's `htu` must name one of the deployment's public origins followed by the request path: the origin of `APP_URL`, or one of the comma-separated origins in `AUTH_EXTRA_ORIGINS` (empty by default). The scheme and `Host` the request arrived with play no part, because behind a TLS-terminating proxy the request reaches Baander as plain HTTP and the client chooses the `Host` header. An origin in `AUTH_EXTRA_ORIGINS` that is not an absolute `http` or `https` URL stops the application from booting.
 
 Issued tokens are bound to the proof key: the access token carries `cnf.jkt`. API requests send `Authorization: DPoP <accessToken>` with a `DPoP` proof from the same key that includes the access token hash (`ath`). Signed stream delivery URLs do not need a proof.
 

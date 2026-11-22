@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Controller\Passkey;
 
+use App\Auth\Application\Command\Passkey\AuthenticatePasskeyCommand;
 use App\Auth\Application\Command\Passkey\DeletePasskeyCommand;
 use App\Auth\Application\Command\Passkey\RegisterPasskeyCommand;
+use App\Auth\Application\DTO\AuthenticatedPasskeyOwner;
 use App\Auth\Application\Exception\CredentialsChangedException;
 use App\Auth\Application\Exception\EmailUnverifiedException;
 use App\Auth\Application\Exception\PasskeyChallengeUnavailableException;
@@ -20,13 +22,13 @@ use App\Auth\Interface\Request\Passkey\DeletePasskeyRequest;
 use App\Auth\Interface\Request\Passkey\PasskeyRegistrationOptionsRequest;
 use App\Auth\Interface\Request\Passkey\RegisterPasskeyRequest;
 use App\Auth\Interface\Request\Passkey\VerifyPasskeyChallengeRequest;
-use App\Auth\Interface\Request\Passkey\WebAuthnOptionsRequest;
 use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use OpenApi\Spec as OA;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -44,6 +46,10 @@ final class PasskeyController
     use ApiResponsesTrait;
     use TranslatorTrait;
 
+    private const string INVALID_CHALLENGE = 'invalid_challenge';
+    private const string REGISTRATION_FAILED = 'passkey_registration_failed';
+    private const string CHECK_FAILED = 'passkey_auth_failed';
+
     public function __construct(
         private readonly Security $security,
         private readonly PasskeyService $passkeyService,
@@ -52,6 +58,7 @@ final class PasskeyController
         private readonly JsonEncoder $jsonEncoder,
         private readonly UserPortInterface $users,
         private readonly StepUpVerifier $stepUp,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -268,7 +275,7 @@ final class PasskeyController
             ),
             new OA\Response(
                 response: '400',
-                description: 'Invalid challenge or verification failed',
+                description: 'The challenge is unknown, spent or issued to another user (`details.reason` `invalid_challenge`), or the ceremony was refused (`details.reason` `passkey_registration_failed`); why it was refused is logged, not returned',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
@@ -317,7 +324,10 @@ final class PasskeyController
         } catch (PasskeyChallengeUnavailableException) {
             return $this->challengeStoreUnavailable();
         } catch (\Throwable) {
-            return $this->errorResponse($this->trans('errors.invalid_challenge', domain: 'auth'));
+            return $this->errorResponse(
+                $this->trans('errors.invalid_challenge', domain: 'auth'),
+                details: ['reason' => self::INVALID_CHALLENGE],
+            );
         }
 
         try {
@@ -325,8 +335,8 @@ final class PasskeyController
                 $passkeyRequest->response,
                 $expectedOptions,
             );
-        } catch (\Throwable $e) {
-            return $this->errorResponse($this->trans('errors.passkey_registration_failed', ['{details}' => $e->getMessage()], 'auth'));
+        } catch (\Throwable $exception) {
+            return $this->registrationRefused($exception);
         }
 
         $credentialId = self::base64UrlEncode($credentialRecord->publicKeyCredentialId);
@@ -342,13 +352,13 @@ final class PasskeyController
 
         try {
             $this->commandBus->dispatch($command);
-        } catch (\Throwable $e) {
+        } catch (\Throwable $exception) {
             // Answered by CredentialsChangedListener: 401, so the client signs in again.
-            if (HandlerFailure::cause($e) instanceof CredentialsChangedException) {
-                throw $e;
+            if (HandlerFailure::cause($exception) instanceof CredentialsChangedException) {
+                throw $exception;
             }
 
-            return $this->errorResponse($e->getMessage());
+            return $this->registrationRefused($exception);
         }
 
         return $this->successResponse([
@@ -360,17 +370,7 @@ final class PasskeyController
     #[OA\Operation\Post(
         path: '/api/auth/passkey/authenticate/options',
         summary: 'Get WebAuthn authentication options',
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\MediaType\Json(
-                schema: new OA\Schema(
-                    type: 'object',
-                    properties: [
-                        'userId' => new OA\Schema(description: 'Optional user public ID to get passkey options for', type: 'string'),
-                    ],
-                ),
-            ),
-        ),
+        description: 'Passkey sign-in is discoverable: the options name no account and list no credential, so the authenticator offers the passkeys it holds for this relying party. The challenge is spent by the first sign-in or check that presents it and expires after 5 minutes.',
         responses: [
             new OA\Response(
                 response: '200',
@@ -385,13 +385,6 @@ final class PasskeyController
                 ),
             ),
             new OA\Response(
-                response: '422',
-                description: 'Validation error',
-                content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
-                ),
-            ),
-            new OA\Response(
                 response: '503',
                 description: 'The passkey challenge store is unavailable; retry after the Retry-After delay.',
                 headers: [
@@ -406,26 +399,13 @@ final class PasskeyController
                 ),
             ),
         ],
+        security: [],
     )]
     #[Route('/authenticate/options', name: 'authenticate_options', methods: ['POST'])]
-    public function authenticationOptions(#[MapRequestPayload] WebAuthnOptionsRequest $payload): JsonResponse
+    public function authenticationOptions(): JsonResponse
     {
-        $allowedCredentialIds = [];
-        if ($payload->userId !== '') {
-            try {
-                $owner = $this->users->findByPublicId(PublicId::fromString($payload->userId));
-                $passkeys = $owner === null ? [] : $this->passkeyRepository->forUser($owner->getId());
-                $allowedCredentialIds = array_map(
-                    static fn ($passkey) => $passkey->getCredentialId(),
-                    $passkeys,
-                );
-            } catch (\Throwable) {
-                // If user not found, return empty list — conditional UI
-            }
-        }
-
         try {
-            $result = $this->passkeyService->createAuthenticationOptions($allowedCredentialIds);
+            $result = $this->passkeyService->createAuthenticationOptions();
         } catch (PasskeyChallengeUnavailableException) {
             return $this->challengeStoreUnavailable();
         }
@@ -435,29 +415,18 @@ final class PasskeyController
 
     #[OA\Operation\Post(
         path: '/api/auth/passkey/authenticate',
-        summary: 'Authenticate with a passkey (API-based flow)',
-        description: 'The main passkey login flow goes through PasskeyAuthenticator at /api/auth/login/passkey. This endpoint is an alternative for API-based flows where the frontend manages the ceremony.',
+        summary: 'Check a passkey assertion without signing in',
+        description: 'Runs the checks passkey sign-in runs and names the account the assertion proves, without issuing tokens; sign-in itself is `POST /api/auth/login/passkey`. The challenge is spent once; the signature counter must increase unless the authenticator keeps none; an account with TOTP on needs a passkey that verified the user; a disabled account is refused.',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\MediaType\Json(
-                schema: new OA\Schema(
-                    type: 'object',
-                    properties: [
-                        'challengeKey' => new OA\Schema(type: 'string', example: 'challenge-key-abc123'),
-                        'response' => new OA\Schema(
-                            description: 'WebAuthn authenticator response (base64-encoded assertion)',
-                            type: 'object',
-                        ),
-                        'userId' => new OA\Schema(type: 'string', nullable: true),
-                    ],
-                    required: ['challengeKey', 'response'],
-                ),
+                schema: new OA\Schema(ref: VerifyPasskeyChallengeRequest::class),
             ),
         ),
         responses: [
             new OA\Response(
                 response: '200',
-                description: 'Authentication successful',
+                description: 'The assertion holds',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
                         type: 'object',
@@ -466,29 +435,22 @@ final class PasskeyController
                                 type: 'object',
                                 properties: [
                                     'userId' => new OA\Schema(
+                                        description: 'Public ID of the account the passkey belongs to',
                                         type: 'string',
                                         minLength: PublicId::LENGTH,
                                         maxLength: PublicId::LENGTH,
                                         pattern: PublicId::SCHEMA_PATTERN,
                                     ),
-                                    'credentialId' => new OA\Schema(type: 'string'),
-                                    'signCount' => new OA\Schema(type: 'integer'),
                                 ],
+                                required: ['userId'],
                             ),
                         ],
                     ),
                 ),
             ),
             new OA\Response(
-                response: '400',
-                description: 'Invalid challenge or verification failed',
-                content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
-                ),
-            ),
-            new OA\Response(
                 response: '401',
-                description: 'No passkey found for credential ID',
+                description: 'The assertion was refused. An unknown credential, a bad signature, a spent challenge and every other refusal get the same answer, with `details.reason` `passkey_auth_failed`.',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
@@ -515,72 +477,36 @@ final class PasskeyController
                 ),
             ),
         ],
+        security: [],
     )]
     #[Route('/authenticate', name: 'authenticate', methods: ['POST'])]
     public function authenticate(#[MapRequestPayload] VerifyPasskeyChallengeRequest $payload): JsonResponse
     {
-        try {
-            $expectedOptions = $this->passkeyService->consumeLoginChallenge($payload->challengeKey);
-        } catch (PasskeyChallengeUnavailableException) {
-            return $this->challengeStoreUnavailable();
-        } catch (\Throwable) {
-            return $this->errorResponse($this->trans('errors.invalid_challenge', domain: 'auth'));
+        if (!is_array($payload->response)) {
+            return $this->checkRefused();
         }
 
-        $rawId = $payload->response['rawId'] ?? $payload->response['id'] ?? '';
-        $credentialId = self::base64UrlEncode(base64_decode(strtr($rawId, '-_', '+/'), true) ?: $rawId);
-
-        $passkey = $this->passkeyRepository->ofCredentialId($credentialId);
-
-        if ($passkey === null) {
-            try {
-                $signal = $this->passkeyService->createUnknownCredentialSignal($credentialId);
-                $signalData = $this->jsonEncoder->decode($signal, 'json');
-            } catch (\UnexpectedValueException) {
-                $signalData = null;
+        try {
+            $verified = $this->commandBus->dispatch(new AuthenticatePasskeyCommand(
+                challengeKey: $payload->challengeKey,
+                response: $payload->response,
+            ))->last(HandledStamp::class)?->getResult();
+        } catch (\Throwable $exception) {
+            if (HandlerFailure::cause($exception) instanceof PasskeyChallengeUnavailableException) {
+                return $this->challengeStoreUnavailable();
             }
+            $this->logger->debug('Passkey check refused.', ['exception' => $exception]);
 
-            return $this->errorResponse(
-                $this->trans('errors.no_passkey_found', domain: 'auth'),
-                Response::HTTP_UNAUTHORIZED,
-                array_filter(['signal' => $signalData]),
-            );
+            return $this->checkRefused();
         }
 
-        $userId = $this->passkeyRepository->userIdForCredentialId($credentialId);
-        $owner = $userId === null ? null : $this->users->findByUuid($userId);
-        if ($owner === null || !hash_equals($owner->getPublicId()->toString(), (string) ($passkey->getData()['userHandle'] ?? ''))
-            || ($payload->userId !== '' && $payload->userId !== $owner->getPublicId()->toString())) {
-            return $this->errorResponse($this->trans('errors.passkey_auth_failed', ['{details}' => 'Invalid credential owner.'], 'auth'), Response::HTTP_UNAUTHORIZED);
+        // Passkey sign-in refuses a disabled account once the assertion holds, and so does the check.
+        $owner = $verified instanceof AuthenticatedPasskeyOwner ? $this->users->findByUuid($verified->userId) : null;
+        if ($owner === null || $owner->isDisabled()) {
+            return $this->checkRefused();
         }
 
-        $storedCredential = $this->passkeyService->credentialRecordFromArray(
-            $passkey->getData(),
-            $passkey->getCounter(),
-        );
-
-        try {
-            $updatedCredential = $this->passkeyService->verifyAuthenticationResponse(
-                $payload->response,
-                $expectedOptions,
-                $storedCredential,
-                $owner->hasTotp(),
-            );
-        } catch (\Throwable $e) {
-            return $this->errorResponse($this->trans('errors.passkey_auth_failed', ['{details}' => $e->getMessage()], 'auth'), Response::HTTP_UNAUTHORIZED);
-        }
-
-        if ($updatedCredential->counter > $passkey->getCounter()) {
-            $passkey->updateCounter($updatedCredential->counter);
-        }
-
-        $this->passkeyRepository->markUsed($passkey);
-
-        return $this->successResponse([
-            'userId' => $owner->getPublicId()->toString(),
-            'credentialId' => $credentialId,
-            'signCount' => $updatedCredential->counter,
-        ]);
+        return $this->successResponse(['userId' => $owner->getPublicId()->toString()]);
     }
 
     #[OA\Operation\Delete(
@@ -711,6 +637,27 @@ final class PasskeyController
         $response->headers->set('Cache-Control', 'no-store');
 
         return $response;
+    }
+
+    /** Every refused registration gets one answer; why it was refused goes to the log only. */
+    private function registrationRefused(\Throwable $reason): JsonResponse
+    {
+        $this->logger->info('Passkey registration refused.', ['exception' => $reason]);
+
+        return $this->errorResponse(
+            $this->trans('errors.passkey_registration_failed', domain: 'auth'),
+            details: ['reason' => self::REGISTRATION_FAILED],
+        );
+    }
+
+    /** Every refused check gets one answer, so it tells nobody which check refused it. */
+    private function checkRefused(): JsonResponse
+    {
+        return $this->errorResponse(
+            $this->trans('errors.passkey_auth_failed', domain: 'auth'),
+            Response::HTTP_UNAUTHORIZED,
+            ['reason' => self::CHECK_FAILED],
+        );
     }
 
     private function getCurrentSecurityUser(): ?SecurityUser
