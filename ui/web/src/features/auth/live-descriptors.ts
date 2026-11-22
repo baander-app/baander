@@ -10,9 +10,4 @@ export const authLiveDescriptors: readonly LiveQueryDescriptor[] = [
     refreshPolicy: 'demand',
     matches: key => keyStartsWith(key, 'oauth-authorize'),
   },
-  {
-    family: 'account',
-    refreshPolicy: 'demand',
-    matches: key => keyStartsWith(key, '/api/auth/registration'),
-  },
 ]
