@@ -95,11 +95,10 @@ final class RequestsTest extends TestCase
 
     public function testVerifyPasskeyChallengeRequestConstructor(): void
     {
-        $req = new VerifyPasskeyChallengeRequest(challengeKey: 'ck', response: [], userId: 'u1');
+        $req = new VerifyPasskeyChallengeRequest(challengeKey: 'ck', response: []);
 
         $this->assertSame('ck', $req->challengeKey);
         $this->assertSame([], $req->response);
-        $this->assertSame('u1', $req->userId);
     }
 
     public function testVerifyPasskeyChallengeRequestDefaults(): void
@@ -108,7 +107,6 @@ final class RequestsTest extends TestCase
 
         $this->assertSame('', $req->challengeKey);
         $this->assertNull($req->response);
-        $this->assertSame('', $req->userId);
     }
 
     public function testCreateClientRequestConstructor(): void
