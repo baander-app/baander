@@ -758,6 +758,9 @@ final class ApplicationInventoryTest extends TestCase
         mkdir($this->temporary . '/fake-bin');
         symlink(dirname(__DIR__, 3) . '/packages/baander-images/tests/Fixtures/inventory-docker.php', $this->temporary . '/fake-bin/docker');
         $environment = getenv();
+        // CI turns off dev.local.json discovery, keeping the collector off the developer's settings; in a
+        // linked worktree the discovery's git probes in each command push readiness past the waits below.
+        $environment['CI'] = '1';
         $environment['PATH'] = $this->temporary . '/fake-bin:' . ($environment['PATH'] ?? '');
         $environment['INVENTORY_DOCKER_STATE'] = $this->temporary;
         $environment['TMPDIR'] = $this->temporary;
