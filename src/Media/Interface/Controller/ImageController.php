@@ -188,12 +188,13 @@ final class ImageController
             return $this->notFound($this->trans('errors.image_not_found', domain: 'media'));
         }
 
-        $fullPath = $this->storage->resolve($image->getPath());
+        $sourceFullPath = $this->storage->resolve($image->getPath());
 
-        if (!file_exists($fullPath)) {
+        if (!file_exists($sourceFullPath)) {
             return $this->notFound($this->trans('errors.image_file_not_found', domain: 'media'));
         }
 
+        $fullPath = $sourceFullPath;
         $extension = $image->getExtension();
         $sourcePath = $image->getPath();
         $sourceDirectory = pathinfo($sourcePath, PATHINFO_DIRNAME);
@@ -219,7 +220,7 @@ final class ImageController
             }
         }
 
-        $servedType = $fullPath === $this->storage->resolve($sourcePath) ? $image->getMimeType() : 'image/webp';
+        $servedType = $fullPath === $sourceFullPath ? $image->getMimeType() : 'image/webp';
 
         $response = new BinaryFileResponse($fullPath);
         if (in_array($servedType, self::SERVED_TYPES, true)) {
