@@ -80,10 +80,11 @@ Each limiter counts requests per key:
 | `batch_cover_extract` | `POST /api/albums/covers/extract` (10 per minute) | Client IP |
 | `musicbrainz` | Every MusicBrainz request and every Cover Art Archive cover fetch, from workers and web requests alike (1 per second) | One bucket shared by all callers |
 | `musicbrainz_user` | `GET /api/metadata/browse/*`, and `GET /api/metadata/search/*` when it searches MusicBrainz, the default source (1 per 10 seconds) | User ID |
+| `metadata_provider_user` | `GET /api/metadata/search/*` when it searches Discogs or Last.fm (10 per minute for both providers together) | User ID |
 | `lrclib` | Every LRCLIB request, from workers and web requests alike (1 per 2 seconds) | One bucket shared by all callers |
-| `discovery_endpoint_ip` | Discovery registration and pairing (30 per minute) | Client IP |
+| `discovery_endpoint_ip` | `POST /api/discovery/register`, `POST /api/discovery/pairing-code`, `POST /api/discovery/qr-payload/{serverPublicId}`, `POST /api/discovery/complete-pairing` (30 per minute, one shared bucket) | Client IP |
 
-The last six have fixed limits in `config/packages/framework.yaml` and no `auth.yaml` parameter.
+The last seven have fixed limits in `config/packages/framework.yaml` and no `auth.yaml` parameter.
 
 The per-IP limits run before Baander authenticates the request. The per-account login failure and step-up limits run once the account's address or user is known, and the per-client limits once the client has authenticated, so a caller who merely names a client in `client_id` cannot use up that client's allowance.
 
@@ -109,13 +110,15 @@ The `musicbrainz` limit never answers `429`; callers wait for their turn instead
 
 A MusicBrainz search or lookup on the metadata search and browse routes, which any signed-in user may call, first spends one call of the user's `musicbrainz_user` allowance and answers `429` when the allowance is spent. It then waits at most 10 seconds for a turn, and answers `503 Service Unavailable` when no turn comes within those 10 seconds or when the limiter state in Redis cannot be read.
 
+A Discogs or Last.fm search on the metadata search routes spends one call of the user's `metadata_provider_user` allowance and answers `429` when the allowance is spent, so one user cannot use up the quota of the server's Discogs token or Last.fm API key. The search routes accept a `limit` of 1 to 100 and answer `422` to any other value before calling a provider. When Discogs answers `429` with a `Retry-After` of at most 5 seconds, Baander waits that long and retries once. With a longer `Retry-After`, the request does not wait, and the search returns no results.
+
 The `lrclib` limit never answers `429` either. Every LRCLIB request, from any worker or web process, reserves the next free turn in its shared bucket and waits for it; each turn starts at least two seconds after the one before it. The fetch of one song, a lyrics search and an apply, which only administrators may call, wait at most 10 seconds, and a queued lyrics fetch at most 30.
 
 A request whose turn comes later is not sent: LRCLIB then counts as unavailable, as it does when the limiter state in Redis cannot be read, and the lyrics routes answer `503`. Clearing `lrclib`, from the **Rate Limits** tab or with `app:rate-limiter:clear lrclib`, resets these turns only. A pause that LRCLIB asked for with a `429`, or a `503` with a `Retry-After` header, is stored outside the limiter and ends on its own, after one hour at most; see [External APIs](../media/external-apis.md#supported-apis).
 
 Media delivery routes are exempt from `anonymous_api` and `authenticated_api`, so playback is never throttled by the general API budget: the audio stream (`/api/stream/track`), the original-file streams (`/api/stream/video`, `/api/stream/original/track`), the HLS and DASH manifests and segments under `/api/transcode/{id}/` (`master.m3u8`, `media.m3u8`, `manifest.mpd`, `init`, `segment`), the completed-video playlists and segments under `/api/transcode/artifacts/`, subtitle playlists and segments, image files (`/api/images/{id}/file`) and album covers (`GET /api/albums/{id}/cover`). Health, readiness and metrics endpoints (`/health`, `/ready`, `/live`, `/metrics`) are outside `/api` and are never limited.
 
-With `APP_ENV=dev`, only the `config_check`, `auth_password_reset_email`, `auth_email_verification_user`, `auth_login_email_failures`, `auth_step_up_user`, `musicbrainz`, `musicbrainz_user` and `lrclib` limits apply; the others are skipped.
+With `APP_ENV=dev`, only the `config_check`, `auth_password_reset_email`, `auth_email_verification_user`, `auth_login_email_failures`, `auth_step_up_user`, `musicbrainz`, `musicbrainz_user`, `metadata_provider_user` and `lrclib` limits apply; the others are skipped.
 
 Both HTTP layers read `TRUSTED_PROXIES`, a comma-separated list of trusted proxy
 addresses or CIDRs that defaults to empty. With that default, a direct client

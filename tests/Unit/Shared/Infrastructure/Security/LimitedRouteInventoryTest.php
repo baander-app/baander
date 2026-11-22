@@ -57,6 +57,7 @@ final class LimitedRouteInventoryTest extends TestCase
         DiscoveryRateLimitListener::REGISTER_ROUTE => ['POST', '/api/discovery/register'],
         DiscoveryRateLimitListener::PAIRING_CODE_ROUTE => ['POST', '/api/discovery/pairing-code'],
         DiscoveryRateLimitListener::COMPLETE_PAIRING_ROUTE => ['POST', '/api/discovery/complete-pairing'],
+        DiscoveryRateLimitListener::QR_PAYLOAD_ROUTE => ['POST', '/api/discovery/qr-payload/{serverPublicId}'],
         AdminRateLimitListener::COVER_EXTRACTION_ROUTE => ['POST', '/api/albums/covers/extract'],
     ];
 

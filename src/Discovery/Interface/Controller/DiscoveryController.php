@@ -136,9 +136,9 @@ final class DiscoveryController
         return $this->created(PairingSessionResource::from($session));
     }
 
-    #[OA\Operation\Get(
+    #[OA\Operation\Post(
         path: '/api/discovery/qr-payload/{serverPublicId}',
-        summary: 'Get QR payload for a pending pairing session',
+        summary: 'Create a QR code pairing session and return its payload',
         parameters: [
             new OA\Parameter(
                 name: 'serverPublicId',
@@ -173,7 +173,7 @@ final class DiscoveryController
             ),
         ],
     )]
-    #[Route('/qr-payload/{serverPublicId}', name: 'qr_payload', methods: ['GET'])]
+    #[Route('/qr-payload/{serverPublicId}', name: 'qr_payload', methods: ['POST'])]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
     public function qrPayload(string $serverPublicId): JsonResponse
     {

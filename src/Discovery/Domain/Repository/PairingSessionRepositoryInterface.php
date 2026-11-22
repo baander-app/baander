@@ -7,6 +7,7 @@ namespace App\Discovery\Domain\Repository;
 use App\Discovery\Domain\Model\PairingSession;
 use App\Discovery\Domain\ValueObject\PairingCode;
 use App\Shared\Domain\Model\Uuid;
+use DateTimeImmutable;
 
 interface PairingSessionRepositoryInterface
 {
@@ -23,4 +24,7 @@ interface PairingSessionRepositoryInterface
     public function findPendingByServer(Uuid $serverId): ?PairingSession;
 
     public function delete(PairingSession $session): void;
+
+    /** Deletes every session whose expiry is before $now, completed or not. */
+    public function deleteExpired(DateTimeImmutable $now): void;
 }

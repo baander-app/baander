@@ -921,6 +921,24 @@ export interface DeliveryRequest {
   qualityTier?: DeliveryRequestQualityTier;
 }
 
+export interface SearchMetadataRequest {
+  /** Search query */
+  q: string;
+  /** Data source */
+  source?: string;
+  /**
+     * Filter by artist name
+     * @nullable
+     */
+  artist?: string | null;
+  /**
+     * Maximum number of results
+     * @minimum 1
+     * @maximum 100
+     */
+  limit?: number;
+}
+
 export interface ExtractMetadataRequest {
   /** Filesystem path to the media file to analyze */
   path: string;
@@ -6791,13 +6809,13 @@ export type PostDiscoveryPairingCodeBody = {
   method: PostDiscoveryPairingCodeBodyMethod;
 };
 
-export type GetDiscoveryQrPayload200Data = {
+export type PostDiscoveryQrPayload200Data = {
   qrData?: string;
   pairingCode?: string;
 };
 
-export type GetDiscoveryQrPayload200 = {
-  data?: GetDiscoveryQrPayload200Data;
+export type PostDiscoveryQrPayload200 = {
+  data?: PostDiscoveryQrPayload200Data;
 };
 
 export type PostDiscoveryCompletePairingBody = {
@@ -23456,7 +23474,7 @@ export const usePostDiscoveryPairingCode = <TError = ErrorType<unknown>,
       return useMutation(getPostDiscoveryPairingCodeMutationOptions(options), queryClient);
     }
 
-export const getGetDiscoveryQrPayloadUrl = (serverPublicId: string,) => {
+export const getPostDiscoveryQrPayloadUrl = (serverPublicId: string,) => {
 
 
 
@@ -23465,14 +23483,14 @@ export const getGetDiscoveryQrPayloadUrl = (serverPublicId: string,) => {
 }
 
 /**
- * @summary Get QR payload for a pending pairing session
+ * @summary Create a QR code pairing session and return its payload
  */
-export const getDiscoveryQrPayload = async (serverPublicId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetDiscoveryQrPayload200> => {
+export const postDiscoveryQrPayload = async (serverPublicId: string, options?: Parameters<typeof customInstance>[1]): Promise<PostDiscoveryQrPayload200> => {
 
-  return customInstance<GetDiscoveryQrPayload200>(getGetDiscoveryQrPayloadUrl(serverPublicId),
+  return customInstance<PostDiscoveryQrPayload200>(getPostDiscoveryQrPayloadUrl(serverPublicId),
   {
     ...options,
-    method: 'GET'
+    method: 'POST'
 
 
   }
@@ -23482,80 +23500,53 @@ export const getDiscoveryQrPayload = async (serverPublicId: string, options?: Pa
 
 
 
-export const getGetDiscoveryQrPayloadQueryKey = (serverPublicId: string,) => {
-    return [
-    `/api/discovery/qr-payload/${serverPublicId}`
-    ] as const;
-    }
+export const getPostDiscoveryQrPayloadMutationKey = () => ['postDiscoveryQrPayload'] as const;
 
+export const getPostDiscoveryQrPayloadMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDiscoveryQrPayload>>, TError,PostDiscoveryQrPayloadMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postDiscoveryQrPayload>>, TError,PostDiscoveryQrPayloadMutationVariables, TContext> => {
 
-export const getGetDiscoveryQrPayloadQueryOptions = <TData = Awaited<ReturnType<typeof getDiscoveryQrPayload>>, TError = ErrorType<unknown>>(serverPublicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDiscoveryQrPayload>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetDiscoveryQrPayloadQueryKey(serverPublicId);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDiscoveryQrPayload>>> = ({ signal }) => getDiscoveryQrPayload(serverPublicId, { signal, ...requestOptions });
+const mutationKey = getPostDiscoveryQrPayloadMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
 
 
 
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postDiscoveryQrPayload>>, PostDiscoveryQrPayloadMutationVariables> = (props) => {
+          const {serverPublicId} = props ?? {};
 
-   return  { queryKey, queryFn, enabled: serverPublicId !== null && serverPublicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDiscoveryQrPayload>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetDiscoveryQrPayloadQueryResult = NonNullable<Awaited<ReturnType<typeof getDiscoveryQrPayload>>>
-export type GetDiscoveryQrPayloadQueryError = ErrorType<unknown>
+          return  postDiscoveryQrPayload(serverPublicId,requestOptions)
+        }
 
 
-export function useGetDiscoveryQrPayload<TData = Awaited<ReturnType<typeof getDiscoveryQrPayload>>, TError = ErrorType<unknown>>(
- serverPublicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDiscoveryQrPayload>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getDiscoveryQrPayload>>,
-          TError,
-          Awaited<ReturnType<typeof getDiscoveryQrPayload>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetDiscoveryQrPayload<TData = Awaited<ReturnType<typeof getDiscoveryQrPayload>>, TError = ErrorType<unknown>>(
- serverPublicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDiscoveryQrPayload>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getDiscoveryQrPayload>>,
-          TError,
-          Awaited<ReturnType<typeof getDiscoveryQrPayload>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetDiscoveryQrPayload<TData = Awaited<ReturnType<typeof getDiscoveryQrPayload>>, TError = ErrorType<unknown>>(
- serverPublicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDiscoveryQrPayload>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get QR payload for a pending pairing session
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostDiscoveryQrPayloadMutationResult = NonNullable<Awaited<ReturnType<typeof postDiscoveryQrPayload>>>
+
+    export type PostDiscoveryQrPayloadMutationError = ErrorType<unknown>
+    export type PostDiscoveryQrPayloadMutationVariables = {serverPublicId: string}
+
+    /**
+ * @summary Create a QR code pairing session and return its payload
  */
-
-export function useGetDiscoveryQrPayload<TData = Awaited<ReturnType<typeof getDiscoveryQrPayload>>, TError = ErrorType<unknown>>(
- serverPublicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDiscoveryQrPayload>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetDiscoveryQrPayloadQueryOptions(serverPublicId,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
+export const usePostDiscoveryQrPayload = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDiscoveryQrPayload>>, TError,PostDiscoveryQrPayloadMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postDiscoveryQrPayload>>,
+        TError,
+        PostDiscoveryQrPayloadMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostDiscoveryQrPayloadMutationOptions(options), queryClient);
+    }
 
 export const getPostDiscoveryCompletePairingUrl = () => {
 

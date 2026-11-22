@@ -287,7 +287,7 @@ final class OpenApiSpecTest extends KernelTestCase
             $schema = $paths[$path]['post']['requestBody']['content']['application/json']['schema'];
             $this->assertPublicIdentifierSchema($schema['properties']['serverPublicId']);
         }
-        $parameters = array_column($paths['/api/discovery/qr-payload/{serverPublicId}']['get']['parameters'], null, 'name');
+        $parameters = array_column($paths['/api/discovery/qr-payload/{serverPublicId}']['post']['parameters'], null, 'name');
         $this->assertPublicIdentifierSchema($parameters['serverPublicId']['schema']);
     }
 

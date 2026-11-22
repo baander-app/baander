@@ -72,7 +72,7 @@ final class MutationRouteInventoryTest extends TestCase
             'radio_starred_star', 'radio_starred_unstar',
             'radio_subscription_subscribe', 'radio_subscription_unsubscribe', 'radio_subscription_refresh',
         ],
-        'discovery' => ['discovery_register', 'discovery_pairing_code', 'discovery_complete_pairing'],
+        'discovery' => ['discovery_register', 'discovery_pairing_code', 'discovery_qr_payload', 'discovery_complete_pairing'],
         'party' => [
             'party_session_create', 'party_session_join', 'party_session_leave', 'party_session_sync', 'party_session_end',
             'party_member_update_me', 'party_member_transfer_host',

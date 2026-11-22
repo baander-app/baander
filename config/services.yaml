@@ -1063,6 +1063,7 @@ services:
     App\Metadata\Interface\Controller\MetadataSearchController:
         arguments:
             $musicbrainzUserLimiter: '@limiter.musicbrainz_user'
+            $metadataProviderUserLimiter: '@limiter.metadata_provider_user'
 
     App\Metadata\Interface\Controller\MetadataBrowseController:
         arguments:

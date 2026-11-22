@@ -10627,12 +10627,12 @@
             }
         },
         "/api/discovery/qr-payload/{serverPublicId}": {
-            "get": {
+            "post": {
                 "tags": [
                     "Discovery"
                 ],
-                "summary": "Get QR payload for a pending pairing session",
-                "operationId": "get_discovery_qr_payload",
+                "summary": "Create a QR code pairing session and return its payload",
+                "operationId": "post_discovery_qr_payload",
                 "parameters": [
                     {
                         "name": "serverPublicId",
@@ -13581,8 +13581,18 @@
                             }
                         }
                     },
+                    "422": {
+                        "description": "The result count is outside 1 to 100",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "429": {
-                        "description": "The user already searched MusicBrainz in the last ten seconds",
+                        "description": "The user already searched MusicBrainz in the last ten seconds, or Discogs and Last.fm ten times in the last minute",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -13688,8 +13698,18 @@
                             }
                         }
                     },
+                    "422": {
+                        "description": "The result count is outside 1 to 100",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "429": {
-                        "description": "The user already searched MusicBrainz in the last ten seconds",
+                        "description": "The user already searched MusicBrainz in the last ten seconds, or Discogs and Last.fm ten times in the last minute",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -13795,8 +13815,18 @@
                             }
                         }
                     },
+                    "422": {
+                        "description": "The result count is outside 1 to 100",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "429": {
-                        "description": "The user already searched MusicBrainz in the last ten seconds",
+                        "description": "The user already searched MusicBrainz in the last ten seconds, or Discogs and Last.fm ten times in the last minute",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -27464,6 +27494,36 @@
                     "kind",
                     "id",
                     "containers"
+                ]
+            },
+            "SearchMetadataRequest": {
+                "type": "object",
+                "properties": {
+                    "q": {
+                        "type": "string",
+                        "description": "Search query",
+                        "default": ""
+                    },
+                    "source": {
+                        "type": "string",
+                        "description": "Data source",
+                        "default": "musicbrainz"
+                    },
+                    "artist": {
+                        "type": "string",
+                        "description": "Filter by artist name",
+                        "nullable": true
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of results",
+                        "minimum": 1,
+                        "maximum": 100,
+                        "default": 25
+                    }
+                },
+                "required": [
+                    "q"
                 ]
             },
             "ExtractMetadataRequest": {

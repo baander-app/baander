@@ -248,7 +248,7 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         yield 'server registration' => ['POST', '/api/discovery/register'];
         yield 'pairing code' => ['POST', '/api/discovery/pairing-code'];
         yield 'pairing completion' => ['POST', '/api/discovery/complete-pairing'];
-        yield 'pairing QR payload' => ['GET', '/api/discovery/qr-payload/' . '00000000-0000-7000-8000-000000000001'];
+        yield 'pairing QR payload' => ['POST', '/api/discovery/qr-payload/' . '00000000-0000-7000-8000-000000000001'];
     }
 
     #[DataProvider('protectedRoutes')]

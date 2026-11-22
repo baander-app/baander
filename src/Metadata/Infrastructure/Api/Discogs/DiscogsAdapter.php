@@ -23,6 +23,8 @@ final class DiscogsAdapter
 {
     private const BASE_URL = 'https://api.discogs.com';
     private const USER_AGENT = 'Baander/0.1 +https://baander.app';
+    /** The adapter runs inside web requests, so a longer provider pause fails the call instead. */
+    private const int MAX_RETRY_AFTER_SECONDS = 5;
 
     public function __construct(
         private readonly string $token,
@@ -31,13 +33,12 @@ final class DiscogsAdapter
         private readonly PublicHttpClient $httpClient,
     ) {}
 
-    public function searchArtist(string $query, int $limit = 25, int $offset = 0): DiscogsSearchResultDto
+    public function searchArtist(string $query, int $limit = 25): DiscogsSearchResultDto
     {
         $data = $this->request('/database/search', [
             'q' => $query,
             'type' => 'artist',
-            'limit' => $limit,
-            'offset' => $offset,
+            'per_page' => $limit,
         ]);
 
         $artists = [];
@@ -62,7 +63,7 @@ final class DiscogsAdapter
         $params = [
             'q' => $query,
             'type' => 'release',
-            'limit' => $limit,
+            'per_page' => $limit,
         ];
 
         if ($artist !== null && $artist !== '') {
@@ -97,7 +98,7 @@ final class DiscogsAdapter
         $params = [
             'q' => $query,
             'type' => 'master',
-            'limit' => $limit,
+            'per_page' => $limit,
         ];
 
         if ($artist !== null && $artist !== '') {
@@ -176,8 +177,9 @@ final class DiscogsAdapter
      * Execute an HTTP GET request against the Discogs API.
      *
      * Handles rate limiting (HTTP 429 with Retry-After header) by sleeping
-     * and retrying once. Returns an empty array on any unrecoverable failure
-     * so callers always receive a safely iterable value.
+     * and retrying once, when the requested wait is at most MAX_RETRY_AFTER_SECONDS.
+     * Returns an empty array on any unrecoverable failure so callers always
+     * receive a safely iterable value.
      *
      * @param array<string, string|int> $params Query-string parameters
      * @return array<string, mixed> Decoded JSON response, or [] on failure
@@ -211,14 +213,14 @@ final class DiscogsAdapter
             }
             if ($status === 429) {
                 $retryAfter = $headers['retry-after'][0] ?? null;
-                if ($retryAfter !== null && !$retried) {
-                    $wait = max(0, (int) $retryAfter);
+                $wait = max(0, (int) $retryAfter);
+                if ($retryAfter !== null && !$retried && $wait <= self::MAX_RETRY_AFTER_SECONDS) {
                     $this->logger->info('Discogs rate limit hit, retrying', ['service' => 'discogs', 'retry_after' => $wait]);
                     Async::sleep($wait);
                     $retried = true;
                     continue;
                 }
-                $this->logger->warning('Discogs API rate limit exceeded', ['service' => 'discogs']);
+                $this->logger->warning('Discogs API rate limit exceeded', ['service' => 'discogs', 'retry_after' => $retryAfter]);
 
                 return [];
             }

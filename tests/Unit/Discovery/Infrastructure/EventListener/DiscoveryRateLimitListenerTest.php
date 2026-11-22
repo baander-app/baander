@@ -65,6 +65,7 @@ final class DiscoveryRateLimitListenerTest extends TestCase
         yield 'server registration' => [DiscoveryRateLimitListener::REGISTER_ROUTE, '/api/discovery/%72egister'];
         yield 'pairing code' => [DiscoveryRateLimitListener::PAIRING_CODE_ROUTE, '/api/discovery/pairing-cod%65'];
         yield 'pairing completion' => [DiscoveryRateLimitListener::COMPLETE_PAIRING_ROUTE, '/%61pi/discovery/complete-pairing'];
+        yield 'QR pairing payload' => [DiscoveryRateLimitListener::QR_PAYLOAD_ROUTE, '/api/discovery/qr-p%61yload/0192f3a1-7b2c-7d4e-8f90-a1b2c3d4e5f6'];
     }
 
     #[DataProvider('limitedRoutes')]

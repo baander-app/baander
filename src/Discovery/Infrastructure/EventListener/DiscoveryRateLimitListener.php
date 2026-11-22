@@ -28,11 +28,13 @@ final class DiscoveryRateLimitListener
 {
     public const string REGISTER_ROUTE = 'discovery_register';
     public const string PAIRING_CODE_ROUTE = 'discovery_pairing_code';
+    public const string QR_PAYLOAD_ROUTE = 'discovery_qr_payload';
     public const string COMPLETE_PAIRING_ROUTE = 'discovery_complete_pairing';
 
     private const array RATE_LIMITED_ROUTES = [
         self::REGISTER_ROUTE,
         self::PAIRING_CODE_ROUTE,
+        self::QR_PAYLOAD_ROUTE,
         self::COMPLETE_PAIRING_ROUTE,
     ];
 
