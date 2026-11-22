@@ -2,7 +2,7 @@
 title: Settle stale playback control retries
 date: 2026-11-22
 type: fix
-status: active
+status: completed
 ---
 
 # Settle stale playback control retries
@@ -43,3 +43,5 @@ Record the behavior and check counts under Playback destinations and notificatio
 ## Definition of Done
 
 The refusal and authority cases are covered at the coordinator boundary, with evidence recorded in the roadmap.
+
+The [roadmap checkpoint](../../ROADMAP.md#playback-destinations-and-notifications) records the focused CI-image and web suite results.

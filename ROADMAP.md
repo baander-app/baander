@@ -735,9 +735,20 @@ after Play. One instrumented rerun passed reload, tab-close and renderer-crash
 recovery with the duration assertions. The first failure remains an unexplained
 intermittent resume issue; the rerun does not establish its cause.
 
-Follow-up: the separate retry path can retain a pending control after a network
-failure followed by a rejected retry. Initial rejected requests are cleared; the
-retry-after-network-failure case remains outside this recovery check.
+After a lost response, an old playback control no longer blocks the next intent
+when the server confirms that the request is absent from the ledger and its
+revision is already stale. The browser reports the refusal and clears the pending
+control. Endpoint authority and transport failures leave the request pending
+for reconciliation. Recorded controls still answer with their exact result.
+[Playback control retry plan](docs/plans/2026-11-22-fix-playback-control-retry-plan.md).
+
+Verification on 2026-11-22 passed 190 backend unit tests with 1,149 assertions
+and 78 PostgreSQL-backed integration tests with 1,311 assertions in the CI
+image. All 248 web Session tests passed. Web typecheck, lint on the changed files,
+PHP syntax checks and `git diff --check` passed. Full web lint reported zero
+errors and 12 existing warnings.
+[Backend control tests](tests/Unit/Session/Application/PlaybackControlDeliveryTest.php),
+[web coordinator tests](ui/web/src/features/session/__tests__/playback-session-coordinator.test.ts).
 
 ## Bånder Audio Core in the server transcoder
 
