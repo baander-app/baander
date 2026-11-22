@@ -89,7 +89,7 @@ final readonly class Configuration
             throw new \InvalidArgumentException('Listen requires an IP address and TCP port.');
         }
         $frontProxies = self::frontProxies($listen['frontProxies'] ?? []);
-        $edge = EdgeNetwork::fromSubnet(self::edgeSubnet($data));
+        $edge = self::edgeNetwork($data);
         $images = self::map($data, 'images');
         JsonDocument::keys($images, self::IMAGE_ROLES, 'deployment images');
         $selections = [];
@@ -145,13 +145,13 @@ final readonly class Configuration
 
     /**
      * The peers whose forwarding headers the gateway accepts: the declared front proxies and, for a
-     * loopback listener, the edge bridge address that host-local clients of the published port arrive from.
+     * loopback listener, the edge bridge addresses that host-local clients of the published port arrive from.
      *
      * @return list<string>
      */
     public function gatewayFrontProxies(): array
     {
-        return $this->listensOnLoopback() ? [...$this->frontProxies, $this->edge->bridgeAddress] : $this->frontProxies;
+        return $this->listensOnLoopback() ? [...$this->frontProxies, ...$this->edge->bridgeAddresses()] : $this->frontProxies;
     }
 
     public function listensOnLoopback(): bool
@@ -286,16 +286,20 @@ final readonly class Configuration
         return $bits !== null && ($prefix === null || (preg_match('/^\d{1,3}$/D', $prefix) === 1 && (int) $prefix <= $bits));
     }
 
-    /** @param array<string,mixed> $data */
-    private static function edgeSubnet(array $data): string
+    /**
+     * The edge network's IPv4 `subnet` and IPv6 `subnet6`; each one left out takes its default.
+     *
+     * @param array<string,mixed> $data
+     */
+    private static function edgeNetwork(array $data): EdgeNetwork
     {
-        if (!array_key_exists('network', $data)) {
-            return EdgeNetwork::DEFAULT_SUBNET;
-        }
-        $network = self::map($data, 'network');
-        JsonDocument::keys($network, ['subnet'], 'network configuration');
+        $network = array_key_exists('network', $data) ? self::map($data, 'network') : [];
+        JsonDocument::keys($network, ['subnet', 'subnet6'], 'network configuration');
 
-        return self::string($network, 'subnet');
+        return EdgeNetwork::fromSubnets(
+            array_key_exists('subnet', $network) ? self::string($network, 'subnet') : EdgeNetwork::DEFAULT_SUBNET,
+            array_key_exists('subnet6', $network) ? self::string($network, 'subnet6') : EdgeNetwork::DEFAULT_SUBNET6,
+        );
     }
 
     /** @return array<string,mixed> */
@@ -303,7 +307,7 @@ final readonly class Configuration
     {
         return ['version' => 2, 'name' => $this->name, 'capability' => $this->capability, 'size' => $this->size, 'origin' => $this->origin,
             'listen' => ['address' => $this->listenAddress, 'port' => $this->listenPort, 'frontProxies' => $this->frontProxies],
-            'network' => ['subnet' => $this->edge->subnet],
+            'network' => ['subnet' => $this->edge->ipv4->subnet, 'subnet6' => $this->edge->ipv6->subnet],
             'images' => array_map(static fn(ImageSelection $image): string => $image->reference, $this->images),
             'environment' => $this->environment, 'resources' => $this->resources, 'volumes' => $this->volumes]
             + ($this->hardwareEncoder === null ? [] : ['hardware' => $this->hardwareEncoder]);

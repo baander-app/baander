@@ -62,31 +62,38 @@ generation is automatic for an empty secrets volume and preserves an existing pa
 
 ## Gateway and client addresses
 
-The gateway serves HTTP on `listen.address` and `listen.port` and is web's only
-trusted proxy. It shares the deployment's edge network, `<name>-edge`, with web alone
-and holds a fixed address there; the deployment sets `TRUSTED_PROXIES` to that address
-and refuses the variable in `environment`. Because web believes the gateway's
-forwarding headers, the gateway writes all of them: `X-Forwarded-For` carries the
-client address, `X-Forwarded-Host` the request's `Host` header and
-`X-Forwarded-Proto` the protocol, and `X-Forwarded-Port` is dropped. Web therefore
-rate limits each client under its own address, and a client's own forwarding headers
-cannot change the scheme, host or port that web sees.
+The gateway serves HTTP on `listen.address` and `listen.port`; the address may be IPv4
+or IPv6. The gateway is web's only trusted proxy. It shares the deployment's edge
+network, `<name>-edge`, with web alone, and holds a fixed address in each of that
+network's two subnets, one IPv4 and one IPv6. The deployment sets `TRUSTED_PROXIES` to
+those two addresses and refuses the variable in `environment`.
+
+Because web believes the gateway's forwarding headers, the gateway writes all of them:
+`X-Forwarded-For` carries the client address, `X-Forwarded-Host` the request's `Host`
+header and `X-Forwarded-Proto` the protocol, and `X-Forwarded-Port` is dropped. Web
+therefore rate limits each client under its own address, and a client's own forwarding
+headers cannot change the scheme, host or port that web sees. This holds in both
+families: the gateway accepts clients over IPv4 and IPv6, and it reaches web over IPv4,
+the only family web listens on.
 
 For an HTTPS origin, run a TLS reverse proxy in front of the gateway. The gateway
 reads the client address from `X-Forwarded-For` and the protocol from
 `X-Forwarded-Proto` only on connections from a declared front proxy; for any other
 peer it ignores both headers and uses the connection's own address and protocol.
-List front proxies in `listen.frontProxies` as IP addresses or CIDR ranges. Each
-must append the client address to `X-Forwarded-For` and set `X-Forwarded-Proto`. A
-loopback listener, the default, also declares the Docker host: host connections reach
-the gateway from the edge network's bridge address, the subnet's first host address,
-so any process on the host can report a client address.
+List front proxies in `listen.frontProxies` as IPv4 or IPv6 addresses or CIDR ranges.
+Each must append the client address to `X-Forwarded-For` and set `X-Forwarded-Proto`.
+A loopback listener, the default, also declares the Docker host; any address in
+`127.0.0.0/8` or `::1` counts as loopback. Host connections reach the gateway from the
+edge network's bridge address in their own family, which is that subnet's first host
+address, so any process on the host can report a client address.
 
-The edge subnet defaults to `10.231.0.0/28`. If that range is in use, set
-`network.subnet` to another IPv4 network of /29 or larger; start refuses a subnet
-that overlaps another Docker network. The gateway takes the subnet's second host
-address. Docker assigns web's address from the subnet's upper half, so no container
-can take the gateway's address first.
+The IPv4 subnet defaults to `10.231.0.0/28` and the IPv6 subnet to the unique local
+range `fd00:baa:231::/64`. If a range is in use, set `network.subnet` to another IPv4
+network of /29 or larger, or `network.subnet6` to another IPv6 network of /125 or
+larger; start refuses a subnet that overlaps another Docker network. In each subnet the
+gateway takes the second host address, and Docker assigns web's address from the upper
+half, so no container can take the gateway's address first. Because the edge network
+carries both families, the Docker daemon must be able to create IPv6 networks.
 
 ## Render and start
 

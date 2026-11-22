@@ -299,6 +299,9 @@ final class PresetDeploymentTest extends TestCase
             [['network' => ['subnet' => '10.231.0.4/28']], 'The edge network subnet must be an IPv4 network address with a prefix of /29 or shorter.'],
             [['network' => ['subnet' => '10.231.0.0/30']], 'The edge network subnet must be an IPv4 network address with a prefix of /29 or shorter.'],
             [['network' => ['subnet' => 'fd00:baa::/64']], 'The edge network subnet must be an IPv4 network address with a prefix of /29 or shorter.'],
+            [['network' => ['subnet6' => 'fd00:baa:231::4/64']], 'The edge network subnet6 must be an IPv6 network address with a prefix of /125 or shorter.'],
+            [['network' => ['subnet6' => 'fd00:baa:231::/126']], 'The edge network subnet6 must be an IPv6 network address with a prefix of /125 or shorter.'],
+            [['network' => ['subnet6' => '10.231.1.0/28']], 'The edge network subnet6 must be an IPv6 network address with a prefix of /125 or shorter.'],
             [['network' => ['gateway' => '10.231.0.1']], 'Unknown key in network configuration.'],
             [
                 ['listen' => ['address' => '127.0.0.1', 'port' => 8080, 'frontProxies' => ['192.0.2.10; allow all']]],
@@ -450,8 +453,11 @@ final class PresetDeploymentTest extends TestCase
         self::assertCount(6, $examples);
         $layout = ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']);
         foreach ($examples as $path) {
-            $configuration = Configuration::fromArray(JsonDocument::read($path));
+            $document = JsonDocument::read($path);
+            $configuration = Configuration::fromArray($document);
             self::assertStringEndsWith('-' . $configuration->capability . '.json', $path);
+            // Each example spells out the edge network's subnet in both families.
+            self::assertSame(['subnet' => '10.231.0.0/28', 'subnet6' => 'fd00:baa:231::/64'], $document['network'], $path);
             $settings = $configuration->profileSettings();
             $deployment = new DeploymentProfile(
                 $settings['capability'],
@@ -599,24 +605,39 @@ final class PresetDeploymentTest extends TestCase
         self::assertSame($profile->deployment, json_decode(str_replace('$$', '$', $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE']), true, flags: JSON_THROW_ON_ERROR));
     }
 
-    public function testWebTrustsExactlyTheGatewaysPinnedEdgeAddress(): void
+    public function testWebTrustsExactlyTheGatewaysPinnedEdgeAddressInEachFamily(): void
     {
         $default = $this->compose(self::configuration());
-        self::assertSame(['edge' => ['ipv4_address' => '10.231.0.2']], $default['services']['gateway']['networks']);
-        self::assertSame('10.231.0.2', $default['services']['web']['environment']['TRUSTED_PROXIES']);
-        // Docker assigns dynamic addresses from the upper half only, so no container can take the gateway's.
+        self::assertSame(['edge' => ['ipv4_address' => '10.231.0.2', 'ipv6_address' => 'fd00:baa:231::2']], $default['services']['gateway']['networks']);
+        self::assertSame('10.231.0.2,fd00:baa:231::2', $default['services']['web']['environment']['TRUSTED_PROXIES']);
+        self::assertTrue($default['networks']['edge']['enable_ipv6']);
+        // Docker assigns dynamic addresses from each subnet's upper half only, so no container can take the gateway's.
         self::assertSame(
-            [['subnet' => '10.231.0.0/28', 'gateway' => '10.231.0.1', 'ip_range' => '10.231.0.8/29']],
+            [
+                ['subnet' => '10.231.0.0/28', 'gateway' => '10.231.0.1', 'ip_range' => '10.231.0.8/29'],
+                ['subnet' => 'fd00:baa:231::/64', 'gateway' => 'fd00:baa:231::1', 'ip_range' => 'fd00:baa:231:0:8000::/65'],
+            ],
             $default['networks']['edge']['ipam']['config'],
         );
 
-        $configured = $this->compose(self::configuration() + ['network' => ['subnet' => '192.168.240.0/24']]);
-        self::assertSame(['edge' => ['ipv4_address' => '192.168.240.2']], $configured['services']['gateway']['networks']);
-        self::assertSame('192.168.240.2', $configured['services']['web']['environment']['TRUSTED_PROXIES']);
+        $network = ['subnet' => '192.168.240.0/24', 'subnet6' => 'fd12:3456:789a:1::/112'];
+        $configured = $this->compose(self::configuration() + ['network' => $network]);
+        self::assertSame(['edge' => ['ipv4_address' => '192.168.240.2', 'ipv6_address' => 'fd12:3456:789a:1::2']], $configured['services']['gateway']['networks']);
+        self::assertSame('192.168.240.2,fd12:3456:789a:1::2', $configured['services']['web']['environment']['TRUSTED_PROXIES']);
         self::assertSame(
-            [['subnet' => '192.168.240.0/24', 'gateway' => '192.168.240.1', 'ip_range' => '192.168.240.128/25']],
+            [
+                ['subnet' => '192.168.240.0/24', 'gateway' => '192.168.240.1', 'ip_range' => '192.168.240.128/25'],
+                ['subnet' => 'fd12:3456:789a:1::/112', 'gateway' => 'fd12:3456:789a:1::1', 'ip_range' => 'fd12:3456:789a:1::8000/113'],
+            ],
             $configured['networks']['edge']['ipam']['config'],
         );
+        self::assertSame($network, Configuration::fromArray(self::configuration() + ['network' => $network])->toArray()['network']);
+
+        // Either subnet may be set alone; the other keeps its default.
+        $ipv4Only = $this->compose(self::configuration() + ['network' => ['subnet' => '192.168.240.0/24']]);
+        self::assertSame('192.168.240.2,fd00:baa:231::2', $ipv4Only['services']['web']['environment']['TRUSTED_PROXIES']);
+        $ipv6Only = $this->compose(self::configuration() + ['network' => ['subnet6' => 'fd12:3456:789a:1::/112']]);
+        self::assertSame('10.231.0.2,fd12:3456:789a:1::2', $ipv6Only['services']['web']['environment']['TRUSTED_PROXIES']);
     }
 
     public function testOnlyTheGatewayAndWebJoinTheEdgeNetwork(): void
@@ -651,17 +672,24 @@ final class PresetDeploymentTest extends TestCase
             ['Name' => 'bridge', 'IPAM' => ['Config' => [['Subnet' => '172.17.0.0/16'], ['Subnet' => 'fd00:baa::/64']]]],
             ['Name' => 'host', 'IPAM' => ['Config' => []]],
             // The deployment's own edge network, left by an interrupted start.
-            ['Name' => 'baander-preset-edge', 'IPAM' => ['Config' => [['Subnet' => '10.231.0.0/28']]]],
+            ['Name' => 'baander-preset-edge', 'IPAM' => ['Config' => [['Subnet' => '10.231.0.0/28'], ['Subnet' => 'fd00:baa:231::/64']]]],
         ];
         $this->assertEdgeSubnetFree(self::configuration(), $networks);
 
-        foreach (['10.0.0.0/8', '10.231.0.8/29', '10.231.0.0/24'] as $subnet) {
+        foreach ([
+            '10.0.0.0/8' => ['10.231.0.0/28', 'network.subnet'],
+            '10.231.0.8/29' => ['10.231.0.0/28', 'network.subnet'],
+            '10.231.0.0/24' => ['10.231.0.0/28', 'network.subnet'],
+            'fd00::/8' => ['fd00:baa:231::/64', 'network.subnet6'],
+            'fd00:baa:231:0:8000::/65' => ['fd00:baa:231::/64', 'network.subnet6'],
+            'fd00:baa:231::/48' => ['fd00:baa:231::/64', 'network.subnet6'],
+        ] as $subnet => [$edge, $setting]) {
             try {
                 $this->assertEdgeSubnetFree(self::configuration(), [...$networks, ['Name' => 'baander-other', 'IPAM' => ['Config' => [['Subnet' => $subnet]]]]]);
                 self::fail('Accepted an edge subnet that overlaps ' . $subnet . '.');
             } catch (\RuntimeException $error) {
                 self::assertSame(
-                    'Docker network baander-other uses ' . $subnet . ', which overlaps the edge subnet 10.231.0.0/28; set network.subnet to a free range.',
+                    'Docker network baander-other uses ' . $subnet . ', which overlaps the edge subnet ' . $edge . '; set ' . $setting . ' to a free range.',
                     $error->getMessage(),
                 );
             }
@@ -691,42 +719,79 @@ final class PresetDeploymentTest extends TestCase
         self::assertMatchesRegularExpression('/map "\$from_front_proxy:\$http_x_forwarded_proto" \$forwarded_proto \{\s*default \$scheme;/', $gateway);
     }
 
+    public function testGatewayAcceptsClientsInBothFamiliesAndReachesWebOverIpv4(): void
+    {
+        $gateway = $this->gatewayConfiguration(self::configuration());
+
+        self::assertMatchesRegularExpression('/server \{\s*listen 80;\s*listen \[::\]:80;/', $gateway);
+        // Docker's DNS also answers web's IPv6 edge address, where web's IPv4 server refuses the connection.
+        self::assertMatchesRegularExpression(
+            '/upstream web \{\s*zone web \d+k;\s*resolver 127\.0\.0\.11 ipv6=off valid=\d+s;\s*server web:9501 resolve;\s*\}/',
+            $gateway,
+        );
+        self::assertSame(2, substr_count($gateway, 'proxy_pass http://web;'));
+        self::assertStringNotContainsString('proxy_pass http://web:', $gateway);
+    }
+
     public function testDeclaredFrontProxiesAloneReportTheClientAndItsProtocol(): void
     {
         $data = self::configuration();
-        $data['listen'] = ['address' => '192.0.2.40', 'port' => 8080, 'frontProxies' => ['192.0.2.10', '2001:db8:1::/64']];
+        $proxies = ['192.0.2.10', '198.51.100.0/24', '2001:db8:2::10', '2001:db8:1::/64'];
+        $data['listen'] = ['address' => '192.0.2.40', 'port' => 8080, 'frontProxies' => $proxies];
         $configuration = Configuration::fromArray($data);
         $gateway = $this->gatewayConfiguration($data);
 
-        self::assertSame(['192.0.2.10', '2001:db8:1::/64'], $configuration->toArray()['listen']['frontProxies']);
+        self::assertSame($proxies, $configuration->toArray()['listen']['frontProxies']);
         self::assertStringContainsString(
-            "set_real_ip_from 192.0.2.10;\nset_real_ip_from 2001:db8:1::/64;\nreal_ip_header X-Forwarded-For;\nreal_ip_recursive on;\n",
+            "set_real_ip_from 192.0.2.10;\nset_real_ip_from 198.51.100.0/24;\nset_real_ip_from 2001:db8:2::10;\nset_real_ip_from 2001:db8:1::/64;\n"
+            . "real_ip_header X-Forwarded-For;\nreal_ip_recursive on;\n",
             $gateway,
         );
-        self::assertMatchesRegularExpression('/geo \$realip_remote_addr \$from_front_proxy \{\s*default 0;\s*192\.0\.2\.10 1;\s*2001:db8:1::\/64 1;\s*\}/', $gateway);
+        // The protocol gate lists every front proxy of either family.
+        self::assertMatchesRegularExpression(
+            '/geo \$realip_remote_addr \$from_front_proxy \{\s*default 0;\s*192\.0\.2\.10 1;\s*198\.51\.100\.0\/24 1;\s*2001:db8:2::10 1;\s*2001:db8:1::\/64 1;\s*\}/',
+            $gateway,
+        );
         // A declared front proxy's HTTP or HTTPS is passed on; any other peer's header falls back to the gateway's scheme.
         self::assertMatchesRegularExpression(
             '/map "\$from_front_proxy:\$http_x_forwarded_proto" \$forwarded_proto \{\s*default \$scheme;\s*"~\^1:\(https\?\)\$" \$1;\s*\}/',
             $gateway,
         );
+        // An IPv6 front proxy connects to the gateway over IPv6.
+        self::assertStringContainsString('listen [::]:80;', $gateway);
         self::assertArrayNotHasKey('TRUSTED_PROXIES', $configuration->environment);
-        self::assertSame('10.231.0.2', $this->compose($data)['services']['web']['environment']['TRUSTED_PROXIES']);
+        self::assertSame('10.231.0.2,fd00:baa:231::2', $this->compose($data)['services']['web']['environment']['TRUSTED_PROXIES']);
     }
 
-    public function testALoopbackListenerTrustsHostClientsArrivingFromTheEdgeBridge(): void
+    public function testALoopbackListenerTrustsHostClientsArrivingFromEitherEdgeBridge(): void
     {
-        foreach (['127.0.0.1', '127.0.1.1', '::1'] as $address) {
+        // Host-local clients reach an IPv4 loopback port from the IPv4 bridge and an IPv6 loopback port from the IPv6 bridge.
+        foreach (['127.0.0.1', '127.0.1.1', '::1', '0:0:0:0:0:0:0:1'] as $address) {
             $data = self::configuration();
             $data['listen'] = ['address' => $address, 'port' => 8080];
             $gateway = $this->gatewayConfiguration($data);
-            self::assertStringContainsString("set_real_ip_from 10.231.0.1;\nreal_ip_header X-Forwarded-For;\n", $gateway, $address);
-            self::assertMatchesRegularExpression('/geo \$realip_remote_addr \$from_front_proxy \{\s*default 0;\s*10\.231\.0\.1 1;\s*\}/', $gateway, $address);
+            self::assertStringContainsString("set_real_ip_from 10.231.0.1;\nset_real_ip_from fd00:baa:231::1;\nreal_ip_header X-Forwarded-For;\n", $gateway, $address);
+            self::assertMatchesRegularExpression('/geo \$realip_remote_addr \$from_front_proxy \{\s*default 0;\s*10\.231\.0\.1 1;\s*fd00:baa:231::1 1;\s*\}/', $gateway, $address);
+            self::assertSame(
+                [['target' => 80, 'published' => '8080', 'host_ip' => $address, 'protocol' => 'tcp']],
+                $this->compose($data)['services']['gateway']['ports'],
+                $address,
+            );
         }
-        $data = self::configuration() + ['network' => ['subnet' => '192.168.240.0/24']];
+        $data = self::configuration() + ['network' => ['subnet' => '192.168.240.0/24', 'subnet6' => 'fd12:3456:789a:1::/112']];
         $data['listen']['frontProxies'] = ['192.0.2.10'];
         self::assertStringContainsString(
-            "set_real_ip_from 192.0.2.10;\nset_real_ip_from 192.168.240.1;\n",
+            "set_real_ip_from 192.0.2.10;\nset_real_ip_from 192.168.240.1;\nset_real_ip_from fd12:3456:789a:1::1;\n",
             $this->gatewayConfiguration($data),
+        );
+
+        // An IPv6 listener on another address publishes there and trusts neither bridge.
+        $data = self::configuration();
+        $data['listen'] = ['address' => '2001:db8::40', 'port' => 8443];
+        self::assertStringNotContainsString('set_real_ip_from', $this->gatewayConfiguration($data));
+        self::assertSame(
+            [['target' => 80, 'published' => '8443', 'host_ip' => '2001:db8::40', 'protocol' => 'tcp']],
+            $this->compose($data)['services']['gateway']['ports'],
         );
     }
 

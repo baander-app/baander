@@ -18,6 +18,7 @@ use Baander\Containers\Resources\DisposableContainer;
 use Baander\Deployment\Presets\StateStore;
 use Baander\Deployment\Presets\Configuration as PresetConfiguration;
 use Baander\Deployment\Presets\EdgeNetwork;
+use Baander\Deployment\Presets\EdgeSubnet;
 use Baander\Deployment\Workers\KillOrder;
 use Baander\Deployment\Profiles\ImageProfile;
 use Baander\Deployment\Database\PostgresConfiguration;
@@ -289,8 +290,8 @@ final readonly class Preset
     }
 
     /**
-     * Refuses an edge subnet that shares addresses with another Docker network before anything
-     * starts; the deployment's own edge network, whose ownership is already checked, is exempt.
+     * Refuses an edge subnet, in either family, that shares addresses with another Docker network before
+     * anything starts; the deployment's own edge network, whose ownership is already checked, is exempt.
      */
     private function assertEdgeSubnetFree(PresetConfiguration $configuration): void
     {
@@ -299,18 +300,21 @@ final readonly class Preset
             |> (static fn(string $output): array => preg_split('/\s+/', $output, flags: PREG_SPLIT_NO_EMPTY) ?: []);
         $networks = $ids === [] ? [] : json_decode($this->docker->run(['network', 'inspect', ...$ids])->stdout, true, flags: JSON_THROW_ON_ERROR);
         $own = EdgeNetwork::name($configuration->name);
+        $edges = ['network.subnet' => $configuration->edge->ipv4, 'network.subnet6' => $configuration->edge->ipv6];
         foreach ($networks as $network) {
             if (($network['Name'] ?? null) === $own) {
                 continue;
             }
             foreach ($network['IPAM']['Config'] ?? [] as $pool) {
                 $subnet = $pool['Subnet'] ?? null;
-                if (is_string($subnet) && $configuration->edge->overlaps($subnet)) {
+                $setting = is_string($subnet) ? array_find_key($edges, static fn(EdgeSubnet $edge): bool => $edge->overlaps($subnet)) : null;
+                if ($setting !== null) {
                     throw new \RuntimeException(sprintf(
-                        'Docker network %s uses %s, which overlaps the edge subnet %s; set network.subnet to a free range.',
+                        'Docker network %s uses %s, which overlaps the edge subnet %s; set %s to a free range.',
                         $network['Name'] ?? 'unnamed',
                         $subnet,
-                        $configuration->edge->subnet,
+                        $edges[$setting]->subnet,
+                        $setting,
                     ));
                 }
             }

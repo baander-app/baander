@@ -11,6 +11,7 @@ use Baander\Deployment\Profiles\ContainerMeasurement;
 use Baander\Deployment\Preset;
 use Baander\Deployment\Presets\Configuration;
 use Baander\Deployment\Presets\EdgeNetwork;
+use Baander\Deployment\Presets\EdgeSubnet;
 use Baander\Deployment\Presets\StateStore;
 use Baander\Deployment\Workers\Lifecycle;
 use Baander\Containers\Docker\Client;
@@ -34,6 +35,8 @@ final class Qualification
     private const int HEALTH_DEADLINE_SECONDS = 120;
     /** The client address the forwarding probe claims; web must not charge the request to it. */
     private const string FORGED_CLIENT = '198.51.100.7';
+    /** Each edge address family's name in failures and the key of a container's address in Docker's network inspection. */
+    private const array EDGE_FAMILIES = ['ipv4' => ['IPv4', 'IPAddress'], 'ipv6' => ['IPv6', 'GlobalIPv6Address']];
     /** Player failures that show playback stopped advancing, as opposed to a run that never measured. */
     private const array STALL_FAILURES = ['continuous-stall', 'post-ready-waiting-or-stalled'];
     /**
@@ -769,9 +772,9 @@ CODE;
 
     /**
      * Observes how web sees clients through the gateway. Web asks the gateway for its health route and
-     * sends one request through the gateway that forges X-Forwarded-For; for a loopback listener, a
-     * host-network container sends one to the published port. Web's access log then shows the client
-     * address each probe was charged to.
+     * sends the gateway's pinned address in each family one request that forges X-Forwarded-For; for a
+     * loopback listener, a host-network container sends one to the published port. Web's access log
+     * then shows the client address each probe was charged to.
      *
      * @return array<string,mixed>
      */
@@ -788,8 +791,15 @@ CODE;
         }
         $healthStatus = $this->webProgram(self::requestProgram(), ['http://gateway/health'])['httpStatus'] ?? null;
         $token = bin2hex(random_bytes(8));
-        $this->webProgram(self::requestProgram(), ['http://gateway/qualification-forwarding-' . $token, self::FORGED_CLIENT]);
-        $forwardedClient = $this->webProgram(self::accessLogProgram(), ['qualification-forwarding-' . $token])['client'] ?? null;
+        $forwardedClients = [];
+        foreach (self::edgeSubnets($configuration) as $family => $subnet) {
+            // The gateway's literal address decides the family the request travels in.
+            $host = $family === 'ipv6' ? '[' . $subnet->gatewayAddress . ']' : $subnet->gatewayAddress;
+            $path = 'qualification-forwarding-' . $family . '-' . $token;
+            $this->webProgram(self::requestProgram(), ['http://' . $host . '/' . $path, self::FORGED_CLIENT]);
+            $client = $this->webProgram(self::accessLogProgram(), [$path])['client'] ?? null;
+            $forwardedClients[$family] = is_string($client) ? $client : null;
+        }
         $hairpinClient = null;
         if ($configuration->listensOnLoopback()) {
             $host = str_contains($configuration->listenAddress, ':') ? '[' . $configuration->listenAddress . ']' : $configuration->listenAddress;
@@ -806,52 +816,60 @@ CODE;
             $services['web'] ?? [],
             $services['gateway'] ?? [],
             is_int($healthStatus) ? $healthStatus : null,
-            is_string($forwardedClient) ? $forwardedClient : null,
+            $forwardedClients,
             is_string($hairpinClient) ? $hairpinClient : null,
         );
     }
 
     /**
-     * Web must trust exactly the gateway's pinned edge address, and the gateway must join the edge
-     * network alone. Web must reach the gateway's health route. A request from web that forges
-     * X-Forwarded-For must reach web under web's own edge address. For a loopback listener, a
-     * host-local client must arrive from the edge bridge address the gateway trusts for the host.
+     * Web must trust exactly the gateway's two pinned edge addresses, and the gateway must hold both and
+     * join the edge network alone. Web must reach the gateway's health route. A request from web that
+     * forges X-Forwarded-For must reach web under web's own edge address in the family it travelled
+     * in. For a loopback listener, a host-local client must arrive from the edge bridge address of the
+     * listener's family, which the gateway trusts for the host.
      *
      * @param array<string,mixed> $web Docker's inspection of the web container.
      * @param array<string,mixed> $gateway Docker's inspection of the gateway container.
      * @param ?int $healthStatus The HTTP status web got from the gateway's health route.
-     * @param ?string $forwardedClient The client address web logged for the forged request.
+     * @param array<string,?string> $forwardedClients The client address web logged for the forged request, keyed `ipv4` and `ipv6` by the family it travelled in.
      * @param ?string $hairpinClient The client address web logged for the host-local request.
-     * @return array{status:string,failures:list<string>,trustedProxies:?string,gatewayNetworks:list<string>,gatewayAddress:?string,forwardedClient:?string,expectedForwardedClient:?string,hairpinClient:?string,expectedHairpinClient:?string,healthStatus:?int}
+     * @return array{status:string,failures:list<string>,trustedProxies:?string,gatewayNetworks:list<string>,gatewayAddresses:array<string,?string>,forwardedClients:array<string,?string>,expectedForwardedClients:array<string,?string>,hairpinClient:?string,expectedHairpinClient:?string,healthStatus:?int}
      */
-    public static function proxyTrustCheck(Configuration $deployment, array $web, array $gateway, ?int $healthStatus, ?string $forwardedClient, ?string $hairpinClient): array
+    public static function proxyTrustCheck(Configuration $deployment, array $web, array $gateway, ?int $healthStatus, array $forwardedClients, ?string $hairpinClient): array
     {
         $edge = EdgeNetwork::name($deployment->name);
         $prefix = 'TRUSTED_PROXIES=';
         $trusted = array_find($web['Config']['Env'] ?? [], static fn(mixed $variable): bool => is_string($variable) && str_starts_with($variable, $prefix))
             |> (static fn(?string $variable): ?string => $variable === null ? null : substr($variable, strlen($prefix)));
+        $expectedTrust = implode(',', $deployment->edge->gatewayAddresses());
         $gatewayNetworks = array_keys($gateway['NetworkSettings']['Networks'] ?? []);
-        $gatewayAddress = $gateway['NetworkSettings']['Networks'][$edge]['IPAddress'] ?? null;
-        $webAddress = $web['NetworkSettings']['Networks'][$edge]['IPAddress'] ?? null;
-        $hairpinExpected = $deployment->listensOnLoopback() ? $deployment->edge->bridgeAddress : null;
+        $gatewayAddresses = self::edgeAddresses($gateway, $edge);
+        $webAddresses = self::edgeAddresses($web, $edge);
+        $listenSubnet = str_contains($deployment->listenAddress, ':') ? $deployment->edge->ipv6 : $deployment->edge->ipv4;
+        $hairpinExpected = $deployment->listensOnLoopback() ? $listenSubnet->bridgeAddress : null;
 
         $failures = [];
         if ($gatewayNetworks !== [$edge]) {
             $failures[] = 'The gateway joins ' . implode(', ', $gatewayNetworks) . ' instead of the edge network alone.';
         }
-        if ($gatewayAddress !== $deployment->edge->gatewayAddress) {
-            $failures[] = 'The gateway does not hold its pinned edge address ' . $deployment->edge->gatewayAddress . '.';
+        foreach (self::edgeSubnets($deployment) as $family => $subnet) {
+            if (!self::sameAddress($gatewayAddresses[$family], $subnet->gatewayAddress)) {
+                $failures[] = 'The gateway does not hold its pinned edge address ' . $subnet->gatewayAddress . '.';
+            }
         }
-        if ($trusted !== $deployment->edge->gatewayAddress) {
-            $failures[] = 'Web trusts "' . $trusted . '" instead of exactly the gateway address ' . $deployment->edge->gatewayAddress . '.';
+        if ($trusted !== $expectedTrust) {
+            $failures[] = 'Web trusts "' . $trusted . '" instead of exactly the gateway addresses ' . $expectedTrust . '.';
         }
         if ($healthStatus === null) {
             $failures[] = 'Web cannot reach the gateway health route.';
         }
-        if ($webAddress === null || $forwardedClient !== $webAddress) {
-            $failures[] = 'A request that forged X-Forwarded-For reached web as "' . $forwardedClient . '" instead of its sender\'s address.';
+        foreach (self::EDGE_FAMILIES as $family => [$label]) {
+            $client = $forwardedClients[$family] ?? null;
+            if ($webAddresses[$family] === null || !self::sameAddress($client, $webAddresses[$family])) {
+                $failures[] = 'A request over ' . $label . ' that forged X-Forwarded-For reached web as "' . $client . '" instead of its sender\'s address.';
+            }
         }
-        if ($hairpinExpected !== null && $hairpinClient !== $hairpinExpected) {
+        if ($hairpinExpected !== null && !self::sameAddress($hairpinClient, $hairpinExpected)) {
             $failures[] = 'A host-local client reached web as "' . $hairpinClient . '" instead of the trusted edge bridge address ' . $hairpinExpected . '.';
         }
 
@@ -860,13 +878,40 @@ CODE;
             'failures' => $failures,
             'trustedProxies' => $trusted,
             'gatewayNetworks' => $gatewayNetworks,
-            'gatewayAddress' => is_string($gatewayAddress) ? $gatewayAddress : null,
-            'forwardedClient' => $forwardedClient,
-            'expectedForwardedClient' => is_string($webAddress) ? $webAddress : null,
+            'gatewayAddresses' => $gatewayAddresses,
+            'forwardedClients' => $forwardedClients,
+            'expectedForwardedClients' => $webAddresses,
             'hairpinClient' => $hairpinClient,
             'expectedHairpinClient' => $hairpinExpected,
             'healthStatus' => $healthStatus,
         ];
+    }
+
+    /** @return array{ipv4:EdgeSubnet,ipv6:EdgeSubnet} The deployment's edge subnet in each family. */
+    private static function edgeSubnets(Configuration $deployment): array
+    {
+        return ['ipv4' => $deployment->edge->ipv4, 'ipv6' => $deployment->edge->ipv6];
+    }
+
+    /**
+     * @param array<string,mixed> $container Docker's inspection of a container.
+     * @return array<string,?string> The container's address on the network in each family, keyed `ipv4` and `ipv6`.
+     */
+    private static function edgeAddresses(array $container, string $network): array
+    {
+        $inspected = $container['NetworkSettings']['Networks'][$network] ?? [];
+
+        return array_map(static function (array $family) use ($inspected): ?string {
+            $address = $inspected[$family[1]] ?? null;
+
+            return is_string($address) && $address !== '' ? $address : null;
+        }, self::EDGE_FAMILIES);
+    }
+
+    /** Whether a logged or inspected address is the expected one, whatever its spelling. */
+    private static function sameAddress(?string $address, string $expected): bool
+    {
+        return $address !== null && filter_var($address, FILTER_VALIDATE_IP) !== false && inet_pton($address) === inet_pton($expected);
     }
 
     /** Sends one GET that closes its connection, with an optional forged client: argv[1] the URL, argv[2] the forged X-Forwarded-For. */

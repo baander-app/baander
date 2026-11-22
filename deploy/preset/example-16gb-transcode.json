@@ -18,7 +18,8 @@
         "frontProxies": []
     },
     "network": {
-        "subnet": "10.231.0.0/28"
+        "subnet": "10.231.0.0/28",
+        "subnet6": "fd00:baa:231::/64"
     },
     "images": {
         "application": "martinjuul/baander-app:latest",
