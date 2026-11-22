@@ -352,7 +352,7 @@ final class PasskeyController
             credentialId: $credentialId,
             credentialRecordData: $this->passkeyService->credentialRecordToArray($credentialRecord),
             counter: $credentialRecord->counter,
-            currentAccessTokenId: self::currentAccessTokenId($request),
+            currentAccessTokenId: $request->attributes->get(AccessTokenAttributes::TOKEN_ID) |> AccessTokenAttributes::tokenId(...),
         );
 
         try {
@@ -607,7 +607,7 @@ final class PasskeyController
             passkeyPublicId: $publicId,
             currentPassword: $payload->currentPassword,
             totpCode: $payload->totpCode,
-            currentAccessTokenId: self::currentAccessTokenId($request),
+            currentAccessTokenId: $request->attributes->get(AccessTokenAttributes::TOKEN_ID) |> AccessTokenAttributes::tokenId(...),
         ))->last(HandledStamp::class)?->getResult();
         if (!is_array($remainingCredentialIds)) {
             throw new \LogicException('Deleting a passkey returned no remaining credentials.');
@@ -673,12 +673,6 @@ final class PasskeyController
         }
 
         return $user;
-    }
-
-    /** The access token the request was made with, whose session a passkey change keeps signed in. */
-    private static function currentAccessTokenId(Request $request): ?string
-    {
-        return $request->attributes->get(AccessTokenAttributes::TOKEN_ID) |> AccessTokenAttributes::tokenId(...);
     }
 
     private static function base64UrlEncode(string $data): string

@@ -821,15 +821,13 @@ final class AuthController
             return $this->notFound();
         }
 
-        // OAuth2Authenticator copies the presenting token's identifier here; when the link
-        // confirms an email change, its session stays signed in.
-        $currentAccessTokenId = $request->attributes->get(AccessTokenAttributes::TOKEN_ID);
-
         try {
             $emailChanged = $this->commandBus->dispatch(new VerifyEmailCommand(
                 token: $payload->token,
                 userId: $user->getId()->toString(),
-                currentAccessTokenId: is_string($currentAccessTokenId) && $currentAccessTokenId !== '' ? $currentAccessTokenId : null,
+                // OAuth2Authenticator copies the presenting token's identifier here; when the link
+                // confirms an email change, its session stays signed in.
+                currentAccessTokenId: $request->attributes->get(AccessTokenAttributes::TOKEN_ID) |> AccessTokenAttributes::tokenId(...),
             ))->last(HandledStamp::class)?->getResult() === true;
         } catch (\Throwable $e) {
             return $this->handleCommandException(

@@ -201,7 +201,7 @@ final class TotpController
         $command = new EnableTotpCommand(
             userId: $user->getId(),
             code: $payload->code,
-            currentAccessTokenId: self::currentAccessTokenId($request),
+            currentAccessTokenId: $request->attributes->get(AccessTokenAttributes::TOKEN_ID) |> AccessTokenAttributes::tokenId(...),
         );
 
         try {
@@ -285,7 +285,7 @@ final class TotpController
             userId: $user->getId(),
             currentPassword: $payload->currentPassword,
             totpCode: $payload->totpCode,
-            currentAccessTokenId: self::currentAccessTokenId($request),
+            currentAccessTokenId: $request->attributes->get(AccessTokenAttributes::TOKEN_ID) |> AccessTokenAttributes::tokenId(...),
         );
 
         try {
@@ -330,12 +330,6 @@ final class TotpController
             $this->trans($cause->refusal->translationKey(), domain: 'auth'),
             $cause->refusal === TotpChangeRefusal::AlreadyEnabled ? Response::HTTP_CONFLICT : Response::HTTP_BAD_REQUEST,
         );
-    }
-
-    /** The access token the request was made with, whose session a TOTP change keeps signed in. */
-    private static function currentAccessTokenId(Request $request): ?string
-    {
-        return $request->attributes->get(AccessTokenAttributes::TOKEN_ID) |> AccessTokenAttributes::tokenId(...);
     }
 
     private function buildProvisioningUri(string $secret, string $email): string
