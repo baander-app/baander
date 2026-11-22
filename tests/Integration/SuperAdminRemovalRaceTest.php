@@ -4,26 +4,32 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
+use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
+use App\Auth\Infrastructure\Doctrine\Entity\OAuth\RefreshTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Tests\Fixtures\Auth\OAuthRevocationRace;
-use App\Tests\Fixtures\Auth\SuperAdminDemotionRace;
+use App\Tests\Fixtures\Auth\SuperAdminRemoval;
+use App\Tests\Fixtures\Auth\SuperAdminRemovalRace;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Tools\SchemaTool;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Two enabled super admins who demote each other at the same moment leave one of them a super
- * admin: the changes that can take an enabled super admin away serialize on an advisory lock, and
- * the second one counts the super admins after the first committed.
+ * When one of two enabled super admins demotes the other while the other demotes, disables or
+ * deletes the first, one of them stays an enabled super admin: the changes that can take an
+ * enabled super admin away serialize on an advisory lock, and the second one counts the super
+ * admins after the first committed.
  *
- * The test process holds one demotion's transaction open after its writes while a child process
- * runs the other demotion over its own PostgreSQL session; pg_stat_activity shows when the child
- * waits on the advisory lock. SetUserRolesHandler and the production user repository run over the
+ * The test process holds the demotion's transaction open after its writes while a child process
+ * runs the other change over its own PostgreSQL session; pg_stat_activity shows when the child
+ * waits on the advisory lock. The production handlers and user repository run over the
  * production mapping in a disposable schema.
  */
-final class SuperAdminDemotionRaceTest extends TestCase
+final class SuperAdminRemovalRaceTest extends TestCase
 {
     private const string ROOT = 'root@baander.app';
     private const string SECOND = 'second@baander.app';
@@ -43,14 +49,18 @@ final class SuperAdminDemotionRaceTest extends TestCase
         $this->schema = 'super_admin_race_' . (random_bytes(8) |> bin2hex(...));
         $this->observer = OAuthRevocationRace::connect('public');
         self::assertStringStartsWith('18.', (string) $this->observer->fetchOne('SHOW server_version'));
-        // The count after the lock sees the other demotion's commit only under READ COMMITTED.
+        // The count after the lock sees the other change's commit only under READ COMMITTED.
         self::assertSame('read committed', $this->observer->fetchOne('SHOW default_transaction_isolation'));
         $this->observer->executeStatement('CREATE EXTENSION IF NOT EXISTS citext');
         $this->observer->executeStatement('CREATE SCHEMA ' . $this->schema);
         $this->observer->executeStatement('SET search_path TO ' . $this->schema . ', public');
         $this->writer = OAuthRevocationRace::connect($this->schema);
         $this->manager = OAuthRevocationRace::entityManager($this->writer);
-        (new SchemaTool($this->manager))->createSchema([$this->manager->getClassMetadata(UserEntity::class)]);
+        // The token tables let a disable that is not refused revoke the user's tokens and report what it stored.
+        (new SchemaTool($this->manager))->createSchema(array_map(
+            $this->manager->getClassMetadata(...),
+            [UserEntity::class, ClientEntity::class, AccessTokenEntity::class, RefreshTokenEntity::class],
+        ));
 
         foreach ([self::ROOT, self::SECOND] as $email) {
             $this->manager->persist(new UserEntity(new PublicId(), 'Super Admin', $email, 'hashed', roles: self::SUPER_ADMIN));
@@ -73,26 +83,35 @@ final class SuperAdminDemotionRaceTest extends TestCase
         }
     }
 
-    public function testOfTwoSuperAdminsDemotingEachOtherAtOnceOneSucceedsAndTheOtherIsRefused(): void
+    /** @return iterable<string, array{SuperAdminRemoval}> */
+    public static function racingRemovals(): iterable
+    {
+        foreach (SuperAdminRemoval::cases() as $removal) {
+            yield $removal->value => [$removal];
+        }
+    }
+
+    #[DataProvider('racingRemovals')]
+    public function testOfTwoSuperAdminsRemovingEachOtherAtOnceOneSucceedsAndTheOtherIsRefused(SuperAdminRemoval $racing): void
     {
         $child = null;
-        SuperAdminDemotionRace::setRoles($this->manager, self::SECOND, ['ROLE_USER', 'ROLE_ADMIN'], function () use (&$child): void {
-            // The first demotion holds the lock and has written, but not committed.
-            $child = SuperAdminDemotionRace::start($this->schema, self::ROOT, ['ROLE_USER', 'ROLE_ADMIN']);
+        SuperAdminRemovalRace::remove($this->manager, SuperAdminRemoval::Demotion, self::SECOND, function () use ($racing, &$child): void {
+            // The demotion holds the lock and has written, but not committed.
+            $child = SuperAdminRemovalRace::start($this->schema, $racing, self::ROOT);
             $this->awaitAdvisoryLockWait($child);
         });
         self::assertNotNull($child);
 
         self::assertSame(['refused' => 'last_super_admin'], $this->finish($child));
-        self::assertSame(self::SUPER_ADMIN, $this->storedRoles(self::ROOT));
-        self::assertSame(['ROLE_USER', 'ROLE_ADMIN'], $this->storedRoles(self::SECOND));
+        self::assertSame(['roles' => self::SUPER_ADMIN, 'disabled' => false], $this->stored(self::ROOT));
+        self::assertSame(['roles' => SuperAdminRemovalRace::DEMOTED_ROLES, 'disabled' => false], $this->stored(self::SECOND));
     }
 
     public function testTheLockRequiresAnOpenTransaction(): void
     {
         $this->expectException(\LogicException::class);
 
-        SuperAdminDemotionRace::users($this->manager)->lockSuperAdminRemovals();
+        SuperAdminRemovalRace::users($this->manager)->lockSuperAdminRemovals();
     }
 
     /** @param array{process: resource, output: resource, application: string} $child */
@@ -111,7 +130,7 @@ final class SuperAdminDemotionRaceTest extends TestCase
             }
             if (microtime(true) > $deadline || !proc_get_status($child['process'])['running']) {
                 rewind($child['output']);
-                self::fail('The second demotion must wait on the advisory lock: ' . stream_get_contents($child['output']));
+                self::fail('The racing change must wait on the advisory lock: ' . stream_get_contents($child['output']));
             }
             usleep(1000);
         }
@@ -128,7 +147,7 @@ final class SuperAdminDemotionRaceTest extends TestCase
         while (proc_get_status($child['process'])['running']) {
             if (microtime(true) > $deadline) {
                 proc_terminate($child['process'], 9);
-                self::fail('The second demotion did not finish after the lock was released.');
+                self::fail('The racing change did not finish after the lock was released.');
             }
             usleep(1000);
         }
@@ -143,12 +162,16 @@ final class SuperAdminDemotionRaceTest extends TestCase
         return $decoded;
     }
 
-    /** @return list<string> */
-    private function storedRoles(string $email): array
+    /** @return array{roles: list<string>, disabled: bool} */
+    private function stored(string $email): array
     {
-        $roles = json_decode((string) $this->observer->fetchOne('SELECT roles FROM users WHERE email = ?', [$email]), true, flags: JSON_THROW_ON_ERROR);
+        $row = $this->observer->fetchAssociative('SELECT roles, disabled FROM users WHERE email = ?', [$email]);
+        self::assertIsArray($row, $email . ' is still stored.');
+        $roles = json_decode((string) $row['roles'], true, flags: JSON_THROW_ON_ERROR);
         self::assertIsArray($roles);
+        self::assertIsBool($row['disabled']);
 
-        return $roles;
+        /** @var list<string> $roles */
+        return ['roles' => $roles, 'disabled' => $row['disabled']];
     }
 }

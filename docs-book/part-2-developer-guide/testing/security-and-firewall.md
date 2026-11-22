@@ -187,8 +187,9 @@ passes `verified: false`.
   discoverable registration; `tests/Unit/Auth/Infrastructure/Security/Passkey/PasskeyServiceTest.php`
   checks that the relying party is the host of `APP_URL`, that only the configured
   origins on it may register, and that sign-in options list no credential.
-- `tests/Integration/SuperAdminDemotionRaceTest.php` runs two super admins demoting each
-  other at once in two processes: one succeeds and the other gets `last_super_admin`.
+- `tests/Integration/SuperAdminRemovalRaceTest.php` holds one super admin's demotion of the
+  other open while a second process demotes, disables or deletes the first: that change waits
+  on the advisory lock and gets `last_super_admin`.
 - `tests/Functional/Auth/LoginAccountThrottleTest.php` limits failed logins per
   account across client addresses. The test environment raises every limit to 10000,
   so each test spends the bucket down to the failures it then makes over HTTP.
