@@ -126,6 +126,8 @@ All endpoints are prefixed with `/api`. Routes under `/api/libraries` are served
 | `PUT` | `/api/admin/users/{userId}/libraries/{libraryId}` | Grant the user access to a library (`ROLE_SUPER_ADMIN`) |
 | `DELETE` | `/api/admin/users/{userId}/libraries/{libraryId}` | Revoke the user's access to a library (`ROLE_SUPER_ADMIN`) |
 
+A library's `path` is its absolute directory on the server, and only administrators read it. `GET /api/libraries` and `GET /api/libraries/{id}` answer anyone else with `LibraryResource::forMember()`, every field except `path`, so `path` is optional in the `LibraryResource` schema. Console commands and admin-only routes keep the full resource.
+
 ### Console Commands
 
 | Command | Class | Purpose |

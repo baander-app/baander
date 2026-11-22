@@ -99,7 +99,9 @@ The page shows the client's name and one line for each scope it would get. A req
 
 The reference works for 5 minutes by default (`auth.par.request_uri_ttl`), long enough to sign in first, and only for one decision. If the client is unknown or revoked, or the reference is unknown, expired or already used, the page shows the error and does not redirect; the application has to start over. The authorization code itself lives 60 seconds by default (`auth.auth_code.ttl`) and works only for the application that holds the key its pushed request named. Baander keeps no record of earlier consent.
 
-The page may approve a request from the first-party client or from one of the user's own personal access clients without asking; every other client asks the user each time. Another user's personal access client is refused.
+The page asks the user about every request; it approves none on its own. For one of the user's own personal access clients it also names the client type and the local address, port included, that the answer returns to, so the user can tell which program asks. Another user's personal access client is refused. The first-party client is not an OAuth client: the push, the consent page and the token endpoint refuse it, so Baander's own apps get tokens only by signing in with a password or passkey.
+
+Baander stores authorization codes and device codes only as SHA-256 hashes, so a copy of the database cannot redeem them.
 
 #### Device page
 

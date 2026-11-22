@@ -5,7 +5,7 @@ Use this reference to identify the budget a request consumes, adjust a configura
 ## Rate limiting
 
 Limits are set in `config/packages/auth.yaml`. They feed the Symfony policies in
-`config/packages/framework.yaml`; all 26 configured limiters consume state through
+`config/packages/framework.yaml`; all 27 configured limiters consume state through
 atomic Redis compare-and-set. Each limiter has its own namespace, so the admin
 **Rate Limits** tab and `app:rate-limiter:clear` reset its generation without
 changing other limiters. The catalog reports `storageNamespace`, not a cache pool.
@@ -24,7 +24,7 @@ See [Rate Limiter Monitor](../operations/health-and-metrics.md#rate-limiter-moni
 | `auth.rate_limit.login_per_email.max_attempts` | `10` | Max login attempts per IP and email pair within the window. |
 | `auth.rate_limit.login_failures_per_email.max_attempts` | `10` | Max failed logins per account (normalized email), from all IPs together, within the sliding window. |
 | `auth.rate_limit.login_failures_per_email.window` | `300` (5 min) | Window in seconds for the per-account failure limit. |
-| `auth.rate_limit.step_up.max_attempts` | `10` | Max step-up attempts per account within the window, from all IPs together: the password, plus a TOTP code when TOTP is on, that an email change, TOTP setup and passkey registration ask for. |
+| `auth.rate_limit.step_up.max_attempts` | `10` | Max step-up attempts per account within the window, from all IPs together: the password, plus a TOTP code when TOTP is on, that an email change, a password change, TOTP setup, turning TOTP off, passkey registration and passkey removal ask for. |
 | `auth.rate_limit.step_up.window` | `900` (15 min) | Window in seconds for step-up attempts. |
 | `auth.rate_limit.passkey.max_attempts` | `40` | Max passkey sign-in requests per IP within the window. One sign-in uses two requests. |
 | `auth.rate_limit.passkey.window` | `300` (5 min) | Window in seconds for passkey sign-in. |
@@ -61,7 +61,7 @@ Each limiter counts requests per key:
 | `auth_login_ip` | `POST /api/auth/login` | Client IP |
 | `auth_login_ip_email` | `POST /api/auth/login` | Client IP and email |
 | `auth_login_email_failures` | Failed `POST /api/auth/login` attempts: an unknown address, a wrong password or a rejected TOTP code (sliding window) | Normalized email |
-| `auth_step_up_user` | `PUT /api/auth/me/email`, `POST /api/auth/totp/setup`, `POST /api/auth/passkey/options` | User ID |
+| `auth_step_up_user` | `PUT /api/auth/me/email`, `PUT /api/auth/me/password`, `POST /api/auth/totp/setup`, `POST /api/auth/totp/disable`, `POST /api/auth/passkey/options`, `DELETE /api/auth/passkey/{publicId}` | User ID |
 | `auth_passkey_ip` | `POST /api/auth/passkey/authenticate/options`, `POST /api/auth/passkey/authenticate`, `POST /api/auth/login/passkey` | Client IP |
 | `auth_register_ip` | `POST /api/auth/register` | Client IP |
 | `auth_password_reset_ip` | `POST /api/auth/password/reset-request`, `POST /api/auth/password/reset` (one shared bucket) | Client IP |
@@ -87,6 +87,8 @@ Each limiter counts requests per key:
 The last seven have fixed limits in `config/packages/framework.yaml` and no `auth.yaml` parameter.
 
 The per-IP limits run before Baander authenticates the request. The per-account login failure and step-up limits run once the account's address or user is known, and the per-client limits once the client has authenticated, so a caller who merely names a client in `client_id` cannot use up that client's allowance.
+
+The auth, OAuth, discovery and cover-extraction limits are tied to the route the router matched, not to the path as the client spelled it. The router decodes the path first, so a percent-encoded request such as `POST /%61pi/auth/registe%72` reaches `POST /api/auth/register` and is charged to `auth_register_ip` like any other registration; `anonymous_api` and `authenticated_api` likewise judge whether a request is an API request from its decoded path. Each route fixes its own methods, so a `HEAD` request to a limited `GET` route is charged like `GET`.
 
 ### Login attempts and account failures
 
@@ -128,3 +130,11 @@ make that proxy replace incoming forwarding headers. Otherwise clients share the
 proxy's address and its anonymous budget. Do not enable broad subnet trust merely
 because the service runs in Docker. See
 [Request identity and proxy deployment](../../part-2-developer-guide/architecture/application-threat-model.md#request-identity-and-proxy-deployment).
+
+The [deployment preset](../../../deploy/preset/README.md#gateway-and-client-addresses)
+sets `TRUSTED_PROXIES` itself, to its gateway's fixed addresses on the edge network,
+and refuses the variable in its configuration. The gateway writes every forwarding
+header from the connection it received, so each client is limited under its own
+address. A reverse proxy in front of the gateway belongs in `listen.frontProxies`;
+only for those peers does the gateway take the client address and protocol from the
+forwarding headers.

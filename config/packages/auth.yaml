@@ -78,8 +78,9 @@ parameters:
     # --- First-Party Login Client ---
     # Public ID of the pre-registered client that password and passkey login
     # issue tokens to, for every first-party app (web, Electron and mobile).
-    # Only its tokens act with the user's full authority; every other client's
-    # tokens are delegated and limited to their scopes.
+    # Only its tokens from a password or passkey sign-in act with the user's full
+    # authority, and the OAuth endpoints refuse it; every other client's tokens are
+    # delegated and limited to their scopes.
     # Run `php bin/console app:auth:setup-clients` to create it.
     auth.spa_client_id: '%env(AUTH_SPA_CLIENT_ID)%'
 
@@ -122,8 +123,11 @@ parameters:
     # Comma-separated origins the deployment also answers on besides APP_URL's, such as a
     # LAN address; never the scheme and Host a request arrived with. A DPoP proof's htu may
     # name any of them. Passkeys use APP_URL's host as the relying party ID, and their
-    # ceremonies accept the origins on that host or a subdomain of it. An entry that is not an absolute http or https URL stops the
-    # container from booting. Default: none.
+    # ceremonies accept the origins on that host or a subdomain of it. A request on a listed
+    # origin gets that origin rendered into the web app page, its CSP and absolute API URLs;
+    # any other request gets APP_URL's. The WebSocket handshake accepts APP_URL's origin
+    # only (WebSocketOriginPolicy), not these. An entry that is not an absolute http or
+    # https URL stops the container from booting. Default: none.
     env(AUTH_EXTRA_ORIGINS): ''
     auth.extra_origins: '%env(csv:AUTH_EXTRA_ORIGINS)%'
 

@@ -40,7 +40,7 @@ After the disable is saved, the web server closes the user's open WebSocket conn
 Two kinds of media access do not end at once:
 
 - A media response that is already being sent finishes. A track file, or a transcode that is still encoding, keeps streaming until that response ends. The next request is refused, including a byte-range request for the same track.
-- Signed video stream URLs (HLS and DASH) are not tied to a user, so disabling the account does not revoke them. A manifest URL works for the lifetime requested when it was signed, at most 24 hours, and every URL a manifest lists keeps that manifest URL's expiry. A player can therefore stream that video for at most 24 hours after the URL was signed. The user cannot sign new stream URLs once the account is disabled. To end the signed URLs sooner, see [Disabled accounts](../administration/sessions-and-access.md#disabled-accounts).
+- Signed video stream URLs (HLS and DASH) are not tied to the user's tokens, so revoking the tokens does not end them. Every manifest, segment and subtitle request checks that the owner of the transcode job it names may still play the video, so once the account is disabled, the next request on one of the user's URLs answers `409`; the player keeps only what it has buffered. The user cannot sign new stream URLs once the account is disabled. See [Disabled accounts](../administration/sessions-and-access.md#disabled-accounts).
 
 Disabling an account that is already disabled leaves the account unchanged and closes any WebSocket connection of the user that is still open.
 

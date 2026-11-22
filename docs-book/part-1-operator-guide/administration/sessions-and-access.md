@@ -12,7 +12,7 @@ Disabling a user, from the admin panel or with [app:user:disable](../commands/ap
 
 In a container without a web server, it disables the account and logs a warning that it could not reach the open connections; the socket reconciliation (see [Sessions, logout and a Redis outage](#sessions-logout-and-a-redis-outage)) closes them within a minute.
 
-Two kinds of media access outlive the disable:
+Two kinds of media access do not end with the tokens:
 
 ### A response already being sent
 
@@ -20,11 +20,17 @@ A track file, or a transcode that is still encoding, keeps streaming until that 
 
 ### Signed video stream URLs
 
-HLS and DASH URLs carry an HMAC signature, not the user's token, so they keep working until they expire. A signed manifest URL lives at most 24 hours, and every URL a manifest lists keeps that manifest URL's expiry. A player that keeps fetching can therefore stream that one video for at most 24 hours after the URL was signed. To end every signed URL at once, for every user, set a new `STREAM_URL_HMAC_SECRET` and restart the web server.
+HLS and DASH URLs carry an HMAC signature, not the user's token, so revoking the tokens does not end them. Every manifest, segment and subtitle request on one checks instead that the owner of the transcode job it names may still play the video, as original-file and completed-video URLs do. Once the owner is disabled, loses the video's library or the job is gone, the next request answers `409 Conflict` (`Playback media is unavailable.`), and the player keeps only what it has already buffered.
 
-A signed URL is a bearer capability: it serves whoever holds it, with no session, until it expires, and a member of another library or a signed-out browser is served alike. A request that does present a token on a signed URL must present a valid one: an expired, revoked, foreign-audience or malformed token, or a fingerprint-bound token without its header, answers `401` even with a valid signature, because the firewall validates any token it is shown before the signature is read.
+While the owner keeps access, a URL works until it expires. A signed manifest URL lives at most 24 hours, and every URL a manifest lists keeps that manifest URL's expiry. To end every signed URL at once, for every user, set a new `STREAM_URL_HMAC_SECRET` and restart the web server.
+
+A signed URL is a bearer capability: it is not bound to a user or session, and it serves whoever holds it, with no session, until it expires or its owner loses access. A member of another library or a signed-out browser is served alike. A request that does present a token on a signed URL must present a valid one: an expired, revoked, foreign-audience or malformed token, or a fingerprint-bound token without its header, answers `401` even with a valid signature, because the firewall validates any token it is shown before the signature is read.
 
 The DPoP proof is not read on delivery routes, so no replay key is recorded there. The signature value is redacted from every log record, the access log included, so a logged URL cannot be replayed. A DPoP-bound token presented with the `Bearer` scheme instead of `DPoP` answers `401` on every route the API firewall authenticates; WebSocket upgrades accept only a single-use handshake ticket, not an access token.
+
+## Sign-in method changes
+
+A user who changes their password, turns TOTP on or off, adds or removes a passkey or confirms a new email address ends every other session of their account at once, paired devices, personal access tools and third-party apps included, and the web server closes those sessions' WebSocket connections. The session that made the change stays signed in. An operator's password reset or TOTP reset ends every session of the user; an operator's email change ends none. Signed video URLs are not sessions and follow the rules above. See [session behavior](../../part-2-developer-guide/development/session-and-access-behavior.md#sign-in-method-changes) for the exact responses.
 
 ## Who can change the catalog, and who can share a playlist
 

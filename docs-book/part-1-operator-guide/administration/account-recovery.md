@@ -4,7 +4,7 @@ Use these procedures to help a user recover access, verify an address or change 
 
 ## Passkeys (WebAuthn)
 
-Each user registers their own passkeys in the browser through the standard WebAuthn API; operators do not manage passkeys on a user's behalf. Adding a passkey needs a verified email address and the user's current password, plus a TOTP code when TOTP is on. An account with TOTP on accepts a passkey sign-in only when the authenticator verified the user, for example with a PIN or fingerprint.
+Each user registers their own passkeys in the browser through the standard WebAuthn API; operators do not manage passkeys on a user's behalf. Adding a passkey needs a verified email address and the user's current password, plus a TOTP code when TOTP is on, and removing one needs the same password and code. Adding or removing a passkey signs the user out of every other session, paired devices and apps included. An account with TOTP on accepts a passkey sign-in only when the authenticator verified the user, for example with a PIN or fingerprint. Passkey sign-in names no account: the browser offers the passkeys the device holds for this installation.
 
 Browser and authenticator support depend on the client device. Test registration and
 sign-in with the clients your installation supports.
@@ -18,8 +18,9 @@ authentication through the API, using a compatible authenticator app.
 
 The setup endpoint needs a verified email address and the user's current password,
 and returns a secret and provisioning URI. The user confirms a code from their
-authenticator before TOTP is enabled; disabling TOTP also requires a current code.
-Each code works once. Baander stores the secret encrypted under
+authenticator before TOTP is enabled; disabling TOTP requires the current password and
+a current code. Turning TOTP on or off signs the user out of every other session,
+paired devices and apps included. Each code works once. Baander stores the secret encrypted under
 `AUTH_TOTP_ENCRYPTION_KEY`; see [Authentication](../configuration/account-security.md#totp).
 
 There are no recovery codes. When a user has lost their authenticator, or their
@@ -62,11 +63,11 @@ By default a user can ask for a link 10 times per 15 minutes; after that the pag
 
 ## Verifying Email Addresses
 
-Baander sends notification email only to verified addresses, and a user needs a verified address to add a passkey or turn on TOTP. Operator-created accounts start verified. Self-registered accounts start unverified, and Baander emails the address a verification link once [email is configured](../configuration/environment-variables.md#mail):
+Baander sends notification email only to verified addresses. Until its address is verified, an account can only confirm it: it reads its own profile, opens its link, asks for a new one, changes its address and signs out, and the web app shows a verification screen in place of the app. Operator-created accounts start verified. Self-registered accounts start unverified, and Baander emails the address a verification link once [email is configured](../configuration/environment-variables.md#mail):
 
-1. The user opens the link, which leads to the web app's **Verify your email** page. The page confirms the address, or says the link is invalid or has expired.
+1. The user opens the link, which leads to the web app's **Verify your email** page. The link confirms the address only in a signed-in session of the account it was sent for. Signed out, the page asks the user to sign in and then returns to the link; signed in to another account, it says so and offers to sign out, and the link stays usable. The page confirms the address, or says the link is invalid or has expired.
 2. The link works once and expires after 24 hours. It verifies only the address it was sent to, so after another email change it no longer works.
-3. A signed-in user whose address is unverified sees **Not verified** under the email address in **Settings** and can select **Resend verification email**. A new link replaces the earlier one. By default a user can ask 3 times per hour; after that the page still confirms but no email is sent.
+3. The verification screen offers **Resend verification email**. A new link replaces the earlier one. By default a user can ask 3 times per hour; after that the page still confirms but no email is sent.
 
 On an installation without email, or for a user who cannot receive the link, mark the current address verified yourself:
 
@@ -88,7 +89,7 @@ dc exec app php bin/console app:user:change-email alice@baander.app alice.new@ba
 
 The command accepts the current email address or the public ID. The two ways differ:
 
-- **A user's own change** needs their current password, plus a TOTP code when TOTP is on. The new address stays pending, shown in **Settings**, and Baander emails it a verification link. The account keeps its old address, and that address's verification, until the user opens the link. The request gets the same answer whether or not another account uses the new address; if one does when the link is opened, the change is dropped.
-- **An operator's change** in the admin panel or with the CLI takes effect at once and counts as verified. It drops a pending change. An administrator cannot change their own address through the admin API; they use **Settings** like any user.
+- **A user's own change** needs their current password, plus a TOTP code when TOTP is on. The new address stays pending, shown in **Settings**, and Baander emails it a verification link. The account keeps its old address, and that address's verification, until the user opens the link while signed in to the account. The request gets the same answer whether or not another account uses the new address; if one does when the link is opened, the change is dropped. When the change takes effect, every other session of the account ends, paired devices and apps included.
+- **An operator's change** in the admin panel or with the CLI takes effect at once and counts as verified. It drops a pending change and ends no session. An administrator cannot change their own address through the admin API; they use **Settings** like any user.
 
 When the change takes effect, Baander emails the old address that the account's address changed, and the verification and password reset links sent to the old address stop working. See [app:user:change-email](../commands/app-user-change-email.md).

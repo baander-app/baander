@@ -13,7 +13,9 @@ instances; see the [development environment guide](../../part-2-developer-guide/
 
 ## Creating Users
 
-Users can self-register through the public `POST /api/auth/register` endpoint, or an operator can create the account directly with the `app:user:create` command. An account the operator creates starts verified, so the user can log in right away.
+An operator creates accounts with the `app:user:create` command or in the admin panel. An account the operator creates starts verified, so the user can log in right away.
+
+Self-registration through the sign-up page and the public `POST /api/auth/register` endpoint is closed by default. A super administrator opens it with the `auth.registration_open` [server setting](../configuration/server-settings.md#server-settings). A self-registered account starts unverified and can do little more than confirm its address until the user opens the emailed link, so open registration only when the server sends email. See [Registration and address changes](../configuration/account-security.md#registration-and-address-changes).
 
 Create a regular user:
 
@@ -68,6 +70,8 @@ Roles are assigned at creation time with the `--role` flag. To change them later
 ```bash
 dc exec app php bin/console app:user:roles alice@baander.app ROLE_USER ROLE_ADMIN
 ```
+
+The install keeps at least one enabled super administrator. Demoting, disabling or deleting the only enabled one is refused, in the admin API with `409` and `details.reason` `last_super_admin` and on the console with exit code 1; make another user a super administrator first. A disabled super administrator does not count, and an install that has no enabled super administrator refuses none of these changes. Such changes take turns, so two super administrators who demote each other at the same moment leave one of them a super administrator.
 
 ### Who can manage users
 
@@ -136,8 +140,9 @@ revoked tokens: the user signs in again. See [app:user:disable](../commands/app-
 
 Disabling acts on one account; global credential rotation affects every user and
 belongs to [Security](../maintenance/security.md). A disable does not end every media transfer
-at once: a response already streaming can finish, and signed video URLs use a separate
-secret. Read [Disabled accounts](sessions-and-access.md#disabled-accounts) before treating a disable as the end of every media transfer.
+at once: a response already streaming can finish, and a signed video URL carries no
+token, so it serves whoever holds it until it expires or its job's owner loses access;
+disabling the owner refuses its next request. Read [Disabled accounts](sessions-and-access.md#disabled-accounts) before treating a disable as the end of every media transfer.
 
 ## Deleting Users
 
@@ -147,7 +152,7 @@ secret. Read [Disabled accounts](sessions-and-access.md#disabled-accounts) befor
 dc exec app php bin/console app:user:delete alice@baander.app
 ```
 
-Deletion cannot be undone. To stop someone from signing in while keeping their account, disable it instead.
+Deletion cannot be undone. Once it is saved, the web server closes the user's open WebSocket connections; run the command in the app container so it can reach that server. To stop someone from signing in while keeping their account, disable it instead.
 
 ## OAuth Clients
 

@@ -37,10 +37,11 @@ symptom-led checks.
 
 | Command / Endpoint | Description |
 |---------------------|-------------|
-| `GET /health` | System health check (no auth) |
+| `GET /health` | System health check, each component's status only (no auth) |
 | `GET /ready` | Readiness probe (no auth) |
 | `GET /live` | Liveness probe (no auth) |
-| `GET /metrics` | Prometheus metrics (no auth) |
+| `GET /metrics` | Prometheus metrics on the web server's port `9501` (no auth); the shipped gateways answer `404` |
+| `GET /api/debug/health` | Full health report with latency and details (admin) |
 | `GET /api/debug/stats` | Server diagnostics (admin) |
 | `GET /api/debug/config-check` | Configuration validation (admin) |
 | `GET /api/monitor/status` | Job status summary (admin) |

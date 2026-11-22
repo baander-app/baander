@@ -8,14 +8,14 @@ Other clients use the OAuth 2.0 authorization server: the authorization code gra
 
 Every token pair, whichever path issues it, is bound to the client's DPoP key, and refresh tokens rotate.
 
-Tokens of the first-party client act with the user's full authority; every other client's tokens are delegated and reach only the routes their scopes cover (see [Scope Enforcement](auth-tokens.md#scope-enforcement)).
+Tokens of the first-party client whose chain began with a password or passkey sign-in act with the user's full authority; every other token is delegated and reaches only the routes its scopes cover (see [Scope Enforcement](auth-tokens.md#scope-enforcement)).
 
 Auth implements the authorization server itself; it uses League OAuth2 Server only to validate access tokens, behind an anti-corruption layer. There is no client credentials grant.
 
 ## Development guides
 
 - [Implementation inventory](auth-inventory.md): models, commands, handlers, ports, events and API entry points.
-- [Account security and credential emails](auth-account-security.md): passwords, verification, passkeys, TOTP and delivery after the response.
+- [Account security and credential emails](auth-account-security.md): passwords, credential changes and the sessions they end, verification and unverified accounts, passkeys, TOTP and delivery after the response.
 - [Tokens and request validation](auth-tokens.md): issuance, rotation, revocation, DPoP checks and scope enforcement.
 - [OAuth authorization server](auth-oauth-server.md): pushed requests, consent, code and device grants, and expiry cleanup.
 - [Client authentication and registration](auth-client-authentication.md): secrets, assertions, key retrieval and administration.

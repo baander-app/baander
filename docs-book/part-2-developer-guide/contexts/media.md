@@ -46,12 +46,12 @@ All endpoints are prefixed with `/api`.
 | Method | Path | Controller | Purpose |
 |--------|------|------------|---------|
 | `GET` | `/api/images/{publicId}` | `ImageController` | Get image metadata (dimensions, MIME type, size) |
-| `GET` | `/api/images/{publicId}/file` | `ImageController` | Serve the image file binary (or a cached WebP derivative / `preset`) |
+| `GET` | `/api/images/{publicId}/file` | `ImageController` | Serve the image file binary (or a cached WebP derivative / `preset`). The source is served with the media type recorded for the image when it is JPEG, PNG, WebP or GIF, and a derivative as `image/webp`; any other recorded type goes out as an `application/octet-stream` attachment. Every response carries `Content-Security-Policy: default-src 'none'; sandbox`, so a file that parses as SVG or HTML cannot run script at the application origin |
 | `GET` | `/api/images/{publicId}/blurhash` | `ImageController` | Get the BlurHash placeholder string for progressive image loading |
 | `GET` | `/api/stream/track` | `StreamController` | Stream a track by public ID after checking library access; supports byte ranges. With `format` (`opus`, `aac` or `mp3`) and an optional `bitrate` in bits per second, streams a cached transcoded rendition while `transcode.enabled` is on (see [Transcode](transcode.md#audio-renditions)) |
 | `POST` | `/api/stream/delivery` | `DeliveryController` | Choose a compatible delivery mode (`original`, `copy`, `cached`, `encoded`, `incompatible`) and signed URL for a video or track |
-| `GET, HEAD` | `/api/stream/video` | `OriginalMediaController` | Deliver an authorized original video with byte-range support |
-| `GET, HEAD` | `/api/stream/original/track` | `OriginalMediaController` | Deliver authorized original track audio, stream-copied AAC (`mode=copy`), or a completed cached audio rendition with byte-range support |
+| `GET, HEAD` | `/api/stream/video` | `OriginalMediaController` | Deliver an authorized original video with byte-range support. A signed URL needs no token; a request that presents a delegated token needs its `library` scope |
+| `GET, HEAD` | `/api/stream/original/track` | `OriginalMediaController` | Deliver authorized original track audio, stream-copied AAC (`mode=copy`), or a completed cached audio rendition with byte-range support. A signed URL needs no token; a request that presents a delegated token needs its `library` scope |
 | `GET` | `/api/admin/media/storage-stats` | `MediaAdminController` | Get image counts and stored byte sizes grouped by owner type (`ROLE_ADMIN`) |
 | `POST` | `/api/admin/media/prune-missing` | `MediaAdminController` | Dispatch `PruneMissingImagesCommand` to remove image records with missing files (`ROLE_ADMIN`) |
 | `GET` | `/api/admin/media/missing-check` | `MediaAdminController` | Dry-run check listing image records whose backing files are missing (`ROLE_ADMIN`) |

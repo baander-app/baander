@@ -205,6 +205,10 @@ Endpoints are split between session management and streaming delivery.
 
 The live media playlist, init segment, media segment and subtitle segment routes take a required `generation` query naming the pinned transcode execution generation. The signed URLs in the master manifest carry it; a request without it answers `404`. Completed video artifact routes carry `{generation}` in the URL path.
 
+The live routes require `{videoId}` and `{jobPublicId}` to be public IDs and `{language}` to be a source subtitle track key of the form `s<index>`, such as `s0`, and `{segment}` is always `full`. The `security.yaml` rows that admit delivery without a token match the same patterns, so any other path under `/api/transcode/`, such as `/api/transcode/jobs/master.m3u8`, needs authentication.
+
+A signed URL is not bound to the user who presents it, but it serves only while the owner of each job it names may still play the job's video. Each live manifest, segment and subtitle request checks that once, after the signature, through `LiveDeliveryAccessPort`; the master and DASH manifests check every job of their rendition set. A lost library, a disabled owner and a missing job all answer `409` (`Playback media is unavailable.`). The wait for a segment to be published re-resolves the job every 0.25 seconds without repeating the check. Completed video artifacts check the job owner the same way in `CompletedVideoDeliveryAdapter`.
+
 ## Cross-Context Relationships
 
 | Direction | Context | Details |

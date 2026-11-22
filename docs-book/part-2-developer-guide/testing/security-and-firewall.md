@@ -1,6 +1,6 @@
 # Security, Firewall, and Network Suites
 
-This page covers the integration and functional suites for token rotation and reuse grace, DPoP store outages, signed video delivery, catalog and playlist mutation firewalls, delegated token scopes, step-up and sign-in limits, atomic rate-limit storage, and outbound destination policies.
+This page covers the integration and functional suites for token rotation and reuse grace, DPoP store outages, signed video delivery, catalog and playlist mutation firewalls, delegated token scopes and sign-in grants, step-up, credential changes and sign-in limits, verification and registration, atomic rate-limit storage, and outbound destination policies.
 
 ## Session, Token, and Firewall Matrices
 
@@ -80,7 +80,16 @@ and the access log, and `StreamSignatureRedactionProcessor` now redacts it.
 `tests/Unit/Shared/Infrastructure/Security/DeliveryRouteInventoryTest.php` keeps
 the delivery route set equal across the security configuration, the binding
 listener's exemption list and the rate limiter's exemption list, and the suite
-derives its unsigned-request loop from that inventory.
+derives its unsigned-request loop from that inventory. It substitutes sample public
+IDs into every delivery route and checks that paths no delivery route serves, such
+as `/api/transcode/jobs/master.m3u8`, are not public.
+
+A signed live URL serves only while the owner of the job it names may still play the
+job's video. The suite signs live URLs as a member and then removes the member's
+library access, disables the owner, or signs for a job whose owner belongs to another
+library; each next manifest or segment request answers `409`.
+`tests/Unit/Transcode/Infrastructure/Transcode/LiveDeliveryAccessAdapterTest.php`
+covers the owner check itself, a missing job included.
 
 The catalog, library and playlist mutations have their own matrices.
 `tests/Integration/CatalogMutationFirewallTest.php` crosses thirty routes (albums,
@@ -116,7 +125,11 @@ real membership), `ImageReadFirewallTest.php`, `PlaylistReadFirewallTest.php`,
 production OAuth and DPoP chain over the image, playlist, artist, catalog and library
 mutation, lyrics and push unsubscribe routes with PostgreSQL adapters).
 These suites act as the web app, so their tokens are minted on the first-party client
-(`tests/Fixtures/Auth/FirstPartyOAuthClient.php`).
+(`tests/Fixtures/Auth/FirstPartyOAuthClient.php`). `FirstPartyOAuthClient::accessToken()`
+takes the sign-in grant the token records, without a default, because only a password or
+passkey grant gives a first-party token its authority. `createTestUser()` in
+`tests/Functional/TestCase.php` creates a verified user; a test of an unverified account
+passes `verified: false`.
 
 ## Delegated tokens, step-up and sign-in limits
 
@@ -125,20 +138,79 @@ These suites act as the web app, so their tokens are minted on the first-party c
   first-party only or reachable with named scopes, and no route a delegated token may
   reach requires an admin role. A new route fails it until it is classified. It loads
   the routes through the routing component, without compiling the container.
+- `tests/Unit/Auth/Infrastructure/Security/OAuth/PublicRouteIdentityTest.php` reflects
+  the controller method of every public `/api/` route, follows the same-class helpers
+  it calls, and fails when one reads the caller's identity, through a current-user
+  parameter included. It is a deny-list of known identity reads.
 - `tests/Integration/OAuthScopeEnforcementTest.php` sends delegated tokens through the
   production firewall, PostgreSQL and Redis: a token of any client other than the
   first-party one reaches only the routes its scopes cover and never carries its
   user's admin authority, while the first-party token keeps both.
+- `tests/Integration/OAuthGrantPathAcceptanceTest.php` refuses an anonymous push that
+  names the first-party client and stores nothing, and refuses the first-party client
+  at the token endpoint for every grant. `tests/Integration/OAuthFirewallAcceptanceTest.php`
+  checks that only a password or passkey sign-in of the first-party client carries the
+  administrator's role, and that a first-party token from an authorization code keeps
+  no scopes. `tests/Integration/OAuthAccessTokenGrantMigrationTest.php` and
+  `tests/Integration/OAuthPersonalAccessClientMigrationTest.php` cover the stored grant
+  column and the personal access clients' first-party flag.
+- `tests/Functional/Controller/StreamControllerAccessTest.php` serves the original media
+  to a delegated token only with the `library` scope, and a signed original fetch
+  without a token still works.
 - `tests/Integration/TotpLoginReplayTest.php` signs in with a TOTP code through the
   production firewall: the web client's nonce challenge and retry with the same code,
   single use of each code, the encrypted secret at rest, and two logins racing with
   one code (the second in a child process, `tests/Fixtures/Auth/totp-login-race.php`).
-- `tests/Functional/Auth/StepUpTest.php` covers the email change, TOTP setup and
-  passkey registration options: each needs the current password, plus a code when
-  TOTP is on, every mismatch gets one answer, and attempts are limited per account.
+- `tests/Functional/Auth/StepUpTest.php` covers the email change, the password change,
+  TOTP setup and disable, and passkey registration options and removal: each needs the
+  current password, plus a code when TOTP is on, every mismatch gets one answer, a
+  refusal that costs no attempt comes first, and attempts are limited per account.
+- `tests/Integration/PasswordChangeSessionRevocationTest.php` proves that turning TOTP
+  on or off, adding or removing a passkey, changing the password and confirming a new
+  address keep the requesting session and end every other one, a paired device's
+  included, and close their sockets when the change commits. Two-process races
+  (`tests/Fixtures/Auth/session-request-race.php`) show that a change from a session
+  another change ended is refused and stores nothing, while two changes from one
+  session both succeed. `tests/Unit/Auth/Application/Service/CredentialChangeRevokerTest.php`
+  covers the fence alone.
+- `tests/Functional/Auth/PasswordResetClaimTest.php` opens a verification link signed
+  out and checks that it verifies nothing and that the owner's later reset claims the
+  account; `tests/Functional/Auth/EmailVerificationDeliveryTest.php` covers redemption
+  in the account's own session and another account's link.
+- `tests/Functional/Auth/UnverifiedAccountGateTest.php` refuses an unverified account
+  outside its verification routes, delegated tokens included, and lets it read its
+  profile, resend its link and change its address. `ScopeRouteInventoryTest` holds
+  that allowlist to the compiled routes.
+- `tests/Functional/Auth/PasskeyEndpointsTest.php` covers the passkey check endpoint and
+  discoverable registration; `tests/Unit/Auth/Infrastructure/Security/Passkey/PasskeyServiceTest.php`
+  checks that the relying party is the host of `APP_URL`, that only the configured
+  origins on it may register, and that sign-in options list no credential.
+- `tests/Integration/SuperAdminDemotionRaceTest.php` runs two super admins demoting each
+  other at once in two processes: one succeeds and the other gets `last_super_admin`.
 - `tests/Functional/Auth/LoginAccountThrottleTest.php` limits failed logins per
   account across client addresses. The test environment raises every limit to 10000,
   so each test spends the bucket down to the failures it then makes over HTTP.
+- `tests/Functional/Auth/AuthEndpointRateLimitTest.php` charges a percent-encoded
+  registration path to the registration limit.
+  `tests/Unit/Shared/Infrastructure/Security/LimitedRouteInventoryTest.php` holds every
+  route a limiter names to its method and path, and fails when a listener declares a
+  route the inventory does not list.
+
+## Exposure and hardening
+
+- `tests/Functional/Controller/HealthCheckControllerTest.php` checks that `/health`,
+  `/ready` and `/live` show each component's status and no detail, and that the full
+  report is refused to an anonymous caller. `tests/Integration/Docker/NginxTemplateTest.php`
+  and `packages/baander-deployment/tests/PresetDeploymentTest.php` check that the
+  production nginx and the preset gateway answer `/metrics` themselves.
+- `tests/Functional/Media/Interface/Controller/ImageFileResponseTest.php` serves an
+  allowed stored type even when the bytes sniff as markup, and any other stored type as
+  an attachment.
+- `tests/Unit/Shared/Infrastructure/Security/ProductionSecretsTest.php` refuses empty or
+  committed service credentials and committed VAPID keys, reading only tracked
+  environment files.
+- `tests/Functional/Shared/ApiClientErrorEnvelopeTest.php` checks that framework client
+  errors on `/api` paths answer in the error envelope.
 
 ## Atomic rate-limit storage
 
@@ -147,7 +219,7 @@ Baander's continuous token bucket for `token_bucket`, against operation-local
 snapshots, and commit state through Redis compare-and-set.
 The focused regressions must distinguish an absent subject from failed or corrupt
 storage, preserve ordinary exhaustion responses, and refuse protected effects when
-state cannot be established. All 24 configured names and budgets remain in force.
+state cannot be established. All 27 configured names and budgets remain in force.
 Container compilation rejects policies other than fixed windows, sliding windows and token buckets.
 
 Storage cases cover policy parity, negative token counts, state identity and TTLs,

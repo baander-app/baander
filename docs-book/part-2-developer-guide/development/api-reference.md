@@ -162,7 +162,7 @@ Returned as a `PaginatedResponse`. The `meta` object contains the page metadata:
 
 ### Error Responses
 
-Application errors generally follow the `ApiError` format. Protocol endpoints and DPoP nonce challenges can instead use OAuth-style `error` and `error_description` strings, as described under [Authentication](api-authentication.md#authentication):
+Every client error on an `/api` path answers in the `ApiError` format, the framework's own included: an unmatched path or one that fails a route requirement, a method the route does not allow (with its `Allow` header), a body that is not JSON, and every rate limiter's `429` (with `Retry-After`). `ExceptionSubscriber` gives such an HTTP exception the message for its status from the `messages` catalog, in the request's language, and never shows the exception's own text. A path counts as an API path when it starts with `/api/` after percent-decoding, as `ApiRequestPath` reads it, so `/%61pi/...` is answered like `/api/...`. A `401` or `403` takes the envelope on every path; other client errors outside `/api`, such as the web app's pages, keep Symfony's renderer. The OAuth protocol endpoints and DPoP nonce challenges answer with OAuth-style `error` and `error_description` strings instead (RFC 6749, RFC 9449), as described under [Authentication](api-authentication.md#authentication):
 
 ```json
 {

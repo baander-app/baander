@@ -14,15 +14,16 @@ name shown in emails, passkey prompts or TOTP enrollment.
 | `APP_ENV` | `dev` | Symfony environment: `dev`, `prod`, or `test`. Controls debugging, caching, and error handling. |
 | `APP_SECRET` | — | One cryptographic secret for Symfony security components and encrypted webhook signing secrets. Generate a unique value for each deployment; use the [offline rotation procedure](../maintenance/credential-rotation.md#rotating-app_secret) to change it. With `APP_ENV=prod`, Baander refuses to boot while it is unset, a committed default, a `replace-with-` placeholder or shorter than 32 bytes. |
 | `AUTH_TOTP_ENCRYPTION_KEY` | development value | Key that encrypts stored TOTP secrets, 32 random bytes base64-encoded; production refuses committed and short values. See [OAuth 2.0](authentication-and-limits.md#oauth-20). |
-| `APP_URL` | `https://localhost` | Canonical URL of the application. Used for CORS configuration and URL generation, as the OAuth issuer, and as the origin DPoP proofs must name; further origins go in `AUTH_EXTRA_ORIGINS` (see [OAuth 2.0](authentication-and-limits.md#oauth-20)). |
+| `APP_URL` | `https://localhost` | Canonical URL of the application. Used for CORS configuration and URL generation, as the OAuth issuer, and as the origin DPoP proofs must name; further origins go in `AUTH_EXTRA_ORIGINS` (see [OAuth 2.0](authentication-and-limits.md#oauth-20)). Its origin is also what Baander renders into the web app page as the API URL, into that page's Content-Security-Policy as the WebSocket origin, and into absolute URLs in API responses, such as cover image URLs, whenever a request's origin is neither `APP_URL`'s nor one listed in `AUTH_EXTRA_ORIGINS`. A `Host` header, sent by the client or forwarded by a trusted proxy, never chooses an unlisted origin. The WebSocket handshake accepts only `APP_URL`'s origin, so a page served on a listed extra origin cannot open its WebSocket connection. |
 | `APP_DOMAIN` | `localhost` | Domain name displayed or used in API responses. |
+| `BAANDER_DEVELOPMENT_INSTANCE` | unset | Set to `1` on a development instance. The development-only commands [`app:dev:setup`](../commands/app-dev-setup.md) and [`app:dev:create-users`](../commands/app-dev-create-users.md) run only under `APP_ENV=dev` or with this variable set; otherwise they exit with code 1 and change nothing. The development lifecycle sets it on the persistent development instance and on worktree previews, whose kernel runs as `prod`. Production images and the preset deployment never set it; leave it unset on an installation. |
 
 ## Database
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATABASE_URL` | `postgresql://baander:baander@pooler:6432/baander?serverVersion=18&charset=utf8` | Full Doctrine DBAL connection URL for the pooler's application alias. Format: `postgresql://user:password@host:port/dbname?serverVersion=18&charset=utf8`. The `serverVersion` parameter should match your PostgreSQL version. |
-| `DATABASE_CONTROL_URL` | `postgresql://baander_control:baander@pooler:6432/baander_control?serverVersion=18&charset=utf8` | Connection URL for the pooler's control alias, used by worker leases, media authority checks and the scheduler. Its user and database names append `_control`; its password is the database password. See [Connection pooler](deployment-profiles.md#connection-pooler). |
+| `DATABASE_URL` | `postgresql://baander:baander@pooler:6432/baander?serverVersion=18&charset=utf8` | Full Doctrine DBAL connection URL for the pooler's application alias. Format: `postgresql://user:password@host:port/dbname?serverVersion=18&charset=utf8`. The `serverVersion` parameter should match your PostgreSQL version. With `APP_ENV=prod`, Baander refuses to boot while it is unset, carries no password, or carries the committed development password `baander`. |
+| `DATABASE_CONTROL_URL` | `postgresql://baander_control:baander@pooler:6432/baander_control?serverVersion=18&charset=utf8` | Connection URL for the pooler's control alias, used by worker leases, media authority checks and the scheduler. Its user and database names append `_control`; its password is the database password. See [Connection pooler](deployment-profiles.md#connection-pooler). When it is set, `APP_ENV=prod` refuses it on the same password terms as `DATABASE_URL`. |
 
 The test database uses `baander_test` as the database name — configured in `.env.test`.
 
@@ -30,7 +31,7 @@ The test database uses `baander_test` as the database name — configured in `.e
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `REDIS_PASSWORD` | — | Password for the Redis instance. Optional in dev, **required in production**. Used by cache pools, messenger transport, and session storage. |
+| `REDIS_PASSWORD` | — | Password for the Redis instance. Optional in dev, **required in production**: with `APP_ENV=prod`, Baander refuses to boot while it is unset or the committed development password `baander`. Used by cache pools, messenger transport, and session storage. |
 | `REDIS_URL` | `redis://default:${REDIS_PASSWORD}@redis:6379` | Redis endpoint URL. Worker deployments require it to be pathless and queryless because the scheduler appends its stream and group. The password is interpolated from `REDIS_PASSWORD`. |
 
 Redis is used for:
@@ -96,7 +97,7 @@ the configured retry policy; they do not impose an unconditional execution cap.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `VAPID_PUBLIC_KEY` | — | VAPID public key for browser push notifications. Generate with `php bin/console app:generate-vapid-keys`. |
-| `VAPID_PRIVATE_KEY` | — | VAPID private key. Keep this secret. |
+| `VAPID_PRIVATE_KEY` | — | VAPID private key. Keep this secret. With `APP_ENV=prod`, Baander refuses to boot with a private key the repository has ever committed, because anyone can read those keys from its history; generate a pair of your own. |
 
 ## Mail
 

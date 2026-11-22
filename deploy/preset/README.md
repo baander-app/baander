@@ -44,7 +44,9 @@ its `size` if needed, replace every secret and set the origin and
 listening address for your installation. Rendering and starting refuse any value that
 still begins with `replace-with-`. `APP_SECRET`, `STREAM_URL_HMAC_SECRET` and
 `AUTH_TOTP_ENCRYPTION_KEY` must each be at least 32 bytes, or the containers refuse to
-boot; generate the TOTP key with `openssl rand -base64 32`. The default listener is
+boot; generate the TOTP key with `openssl rand -base64 32`. The containers also refuse
+to boot with `baander`, the repository's development password, as the Redis or database
+password, and with a VAPID private key the repository has committed. The default listener is
 reachable only from the local host; [Gateway and client addresses](#gateway-and-client-addresses)
 covers HTTPS and reverse proxies. Keep the configuration file and state directory
 accessible only to the operator.
@@ -55,9 +57,13 @@ socket for the trusted worker operator. The Docker daemon must run rootful;
 rendering refuses a rootless daemon, which cannot apply the negative
 out-of-memory scores. The web container has no Docker socket.
 The account bootstrap commands documented in the operator guide remain applicable;
-this preset creates no default account. After first startup, run `app:auth:setup-clients`
-and [create an administrator](../../docs-book/part-1-operator-guide/administration/user-management.md)
-in the web container. OAuth key
+this preset creates no default account, and self-registration ships closed. After first
+startup, run `app:auth:setup-clients` and
+[create the first account](../../docs-book/part-1-operator-guide/administration/user-management.md)
+as a super admin with `app:user:create` and `--role=super-admin` in the web container.
+The examples set `MAILER_DSN` to `null://null`, which discards mail; opening
+self-registration on that mailer draws a configuration warning, because new accounts
+never receive their verification link. OAuth key
 generation is automatic for an empty secrets volume and preserves an existing pair.
 
 ## Gateway and client addresses

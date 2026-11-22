@@ -31,7 +31,7 @@ Since the backend test runner stopped using a committed `.env` (2026-11-21, "fix
 
 - Reading the rate-limit path. `OAuthController` maps a client over its allowance to 429 correctly; the 503 came from its catch-all for server faults (`src/Auth/Interface/Controller/OAuth/OAuthController.php:450-455`), which wraps any non-protocol exception.
 - Looking for a second message handler. `debug:messenger` shows one handler for the refresh command; the error is raised while that one handler is constructed, not by another handler running after it.
-- Overriding the paths in `.env.test` without committing. A run with the edit in the working tree still failed; an instrumented run showed the container's `.env.test` did not contain the new lines. The edit took effect only after it was committed (observed in this session, 2026-11-22).
+- Overriding the paths in `.env.test` without committing. A run with the edit in the working tree still failed; an instrumented run showed the container's `.env.test` did not contain the new lines. The edit took effect only after it was committed (observed on 2026-11-22).
 
 ## Solution
 
@@ -52,7 +52,7 @@ The storage path matters to requests that have nothing to do with media because 
 
 ## Prevention
 
-- Keep every storage root that `.env.example` sets to a production path overridden in `.env.test`. A cheap check would hold this: a unit test that parses both files and fails when a `*_STORAGE_PATH` value in `.env.example` has no `.env.test` override.
+- Keep every storage root that `.env.example` sets to a production path overridden in `.env.test`. A unit test could hold this rule: parse both files and fail when a `*_STORAGE_PATH` value in `.env.example` has no `.env.test` override.
 - Commit an `.env.test` change before verifying it in the container runner; a working-tree edit to it did not reach the container.
 - When a functional test fails with an exception from an unrelated context's constructor, read the full stack trace of the innermost exception (switch the kernel browser to `catchExceptions(false)` in a throwaway edit) before suspecting the code under test.
 - Not done here, and worth doing: the same chain means a broken conversions volume in production would also break token refresh, sign-out and user disabling. Creating the QoL state directory on first write, and building server control operations lazily, would remove that coupling.

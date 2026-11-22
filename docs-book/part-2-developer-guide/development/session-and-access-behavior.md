@@ -24,8 +24,10 @@ See [Token lifetimes](../../part-1-operator-guide/configuration/authentication-a
 ### Delegated tokens
 
 Only tokens of the first-party client, the one `AUTH_SPA_CLIENT_ID`
-names, carry the user's full authority. Every other client's tokens count the user as a
-plain user, whatever roles the account has, and reach only the routes their scopes cover;
+names, carry the user's full authority, and only when their session began with a password
+or passkey sign-in. The OAuth endpoints refuse the first-party client, so no OAuth grant
+yields such a token. Every other token counts the user as a
+plain user, whatever roles the account has, and reaches only the routes its scopes cover;
 any other route answers `403` `insufficient_scope`. No scope reaches administration or
 account security. See [Delegated tokens and scopes](../../part-1-operator-guide/configuration/authentication-and-limits.md#delegated-tokens-and-scopes).
 
@@ -100,6 +102,10 @@ Revokes a token of the signed-in user together with its chain and sockets, like 
 ### Reuse of a refresh token
 
 A consumed refresh token presented outside the lost-response grace (see the token binding rule under [OAuth clients and cross-origin access](../../part-1-operator-guide/administration/sessions-and-access.md#oauth-clients-and-cross-origin-access)) is treated as stolen: the chain is revoked and the web server closes its WebSocket connections, exactly as a logout does, before the `401` is answered.
+
+### Sign-in method changes
+
+Changing the password, turning TOTP on or off, adding or removing a passkey and confirming a new email address end every other session of the user at once, paired devices, personal access tools and third-party apps included. The web server closes their WebSocket connections once the change commits, and socket reconciliation closes any it missed. The session that made the change stays signed in. A change sent from a session that another change has already ended answers `401` with `details.reason` `credentials_changed` and changes nothing. An operator's password reset or TOTP reset ends every session of the user; an operator's email change ends none. See [Credential Changes](../contexts/auth-account-security.md#credential-changes).
 
 ### A Redis outage
 

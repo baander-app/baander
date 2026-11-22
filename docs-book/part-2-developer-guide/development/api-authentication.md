@@ -102,7 +102,7 @@ An unknown address, a wrong password, a wrong TOTP code and a disabled account w
 
 Passkey login uses the browser's WebAuthn API:
 
-1. `POST /api/auth/passkey/authenticate/options` (optionally with `userId`) returns `{"data": {"challengeKey": "...", "options": { ... }}}`.
+1. `POST /api/auth/passkey/authenticate/options` returns `{"data": {"challengeKey": "...", "options": { ... }}}`. The options name no account and list no credential, so the authenticator offers the passkeys it holds for Baander.
 2. The client calls `navigator.credentials.get()` with `options`.
 3. The client sends the assertion with a `DPoP` header:
 
@@ -111,14 +111,14 @@ POST /api/auth/login/passkey
 Content-Type: application/json
 DPoP: <proof>
 
-{"challengeKey": "...", "response": { ... }, "userId": "..."}
+{"challengeKey": "...", "response": { ... }}
 ```
 
-`userId` is an optional user public ID. The server checks the DPoP proof before the assertion, so a nonce challenge leaves the assertion valid for the retry. Disabled accounts cannot sign in. For an account with TOTP enabled, the assertion must carry the user-verified flag (a PIN or biometric check on the authenticator); the flag is checked only after the signature verifies. An authenticator that always reports a signature counter of 0 can sign in; the clone check compares counters only when one of them is non-zero.
+Sign-in works only with a discoverable credential, so new passkeys are created as discoverable ones. The relying party ID is the host of `APP_URL`, and both ceremonies accept only the public origins (`APP_URL` and `AUTH_EXTRA_ORIGINS`) on that host or a subdomain of it, each matched exactly, port included. The server checks the DPoP proof before the assertion, so a nonce challenge leaves the assertion valid for the retry. Disabled accounts cannot sign in. For an account with TOTP enabled, the assertion must carry the user-verified flag (a PIN or biometric check on the authenticator); the flag is checked only after the signature verifies. An authenticator that always reports a signature counter of 0 can sign in; the clone check compares counters only when one of them is non-zero.
 
 Each challenge works once. Challenges live only in Redis, under a key bound to the ceremony: a registration challenge to the user who asked for it, a login challenge to its `challengeKey`. While Redis is unavailable, the options, verification and login endpoints answer `503` with `Retry-After`.
 
-To register a passkey, an authenticated user calls `POST /api/auth/passkey/options` and passes the browser's credential to `POST /api/auth/passkey/register`. The options request needs a verified email address and [step-up](#step-up-re-authentication). Registration options encode the user's public ID as the WebAuthn user handle. Authentication and account signals use the same public identity; there is no UUID-handle fallback.
+To register a passkey, an authenticated user calls `POST /api/auth/passkey/options` and passes the browser's credential to `POST /api/auth/passkey/register`. The options request needs a verified email address and [step-up](#step-up-re-authentication). A registration ends the user's other sessions (see [Changing the Email Address and Password](#changing-the-email-address-and-password)). A refused ceremony answers `400` with `error.details.reason` `passkey_registration_failed`, or `invalid_challenge` for an unknown, spent or foreign challenge; the reason for a refusal is logged, not returned. `POST /api/auth/passkey/authenticate` checks an assertion with the sign-in checks without issuing tokens, and answers every refusal `401` with `passkey_auth_failed`. Registration options encode the user's public ID as the WebAuthn user handle. Authentication and account signals use the same public identity; there is no UUID-handle fallback.
 
 ### Refresh
 
@@ -142,7 +142,7 @@ Password login, passkey login, and the token endpoint accept an optional `X-Baan
 
 ### First-party and Delegated Tokens
 
-A token is first-party when it was issued to the first-party client: the client registered with type `first_party` whose public ID is `AUTH_SPA_CLIENT_ID`. Password login, passkey login and `POST /api/auth/refresh` issue only first-party tokens, which act with the user's full authority and carry no scopes. Every other token is delegated, whichever grant issued it and whether its client is public, confidential, a device or one of the user's own personal access clients. A delegated token differs in two ways:
+A token is first-party when it was issued to the first-party client, the client registered with type `first_party` whose public ID is `AUTH_SPA_CLIENT_ID`, and its refresh token chain began with a password or passkey sign-in. Each access token records that [sign-in grant](../../../CONCEPTS.md#sign-in-grant), and refresh keeps it. Password login, passkey login and `POST /api/auth/refresh` issue only first-party tokens, which act with the user's full authority and carry no scopes; the OAuth endpoints refuse the first-party client. Every other token is delegated, whichever grant issued it and whether its client is public, confidential, a device or one of the user's own personal access clients. A delegated token differs in two ways:
 
 - Its user authenticates with `ROLE_USER` alone, so no administrator authority travels with it, even for an administrator's account.
 - It reaches only public routes and the routes its scopes cover. Every other route answers `403` before the controller runs:
@@ -169,23 +169,26 @@ Everything else is first-party only: administration and monitoring, account secu
 
 ### Step-up Re-authentication
 
-Three self-service changes ask the signed-in user to prove they are present, with fields in the JSON body:
+Six self-service changes ask the signed-in user to prove they are present, with fields in the JSON body:
 
 | Request | Needs |
 |---------|-------|
 | `PUT /api/auth/me/email` | `currentPassword`, plus `totpCode` when TOTP is on |
+| `PUT /api/auth/me/password` | `currentPassword`, plus `totpCode` when TOTP is on; a new password outside 8 to 255 characters answers `422` first |
 | `POST /api/auth/passkey/options` | `currentPassword`, plus `totpCode` when TOTP is on |
+| `DELETE /api/auth/passkey/{publicId}` | `currentPassword`, plus `totpCode` when TOTP is on; an unknown passkey answers `404` first |
 | `POST /api/auth/totp/setup` | `currentPassword`; the request is refused with `409` while TOTP is on |
+| `POST /api/auth/totp/disable` | `currentPassword` and `totpCode`; the request is refused with `400` while TOTP is off |
 
-A wrong password, and a missing or wrong code, all get the same `422` with `error.details.reason` `step_up_failed`. A code that confirms a change is spent like a login code and cannot confirm a second one. Every attempt counts against the account's step-up limit, 10 per 15 minutes by default from any address, checked before the password; over the limit the request answers `429` with `Retry-After`.
+A refusal listed in the table comes before step-up and spends no attempt. A wrong password, and a missing or wrong code, all get the same `422` with `error.details.reason` `step_up_failed`. A code that confirms a change is spent like a login code and cannot confirm a second one. Every attempt counts against the account's step-up limit, 10 per 15 minutes by default from any address, checked before the password; over the limit the request answers `429` with `Retry-After`.
 
-Passkey registration options and TOTP setup also need a verified email address. An unverified one answers `422` with `error.details.reason` `email_unverified`, before step-up spends an attempt.
+Passkey registration options and TOTP setup also need a verified email address. An account whose address is unverified reaches only the public routes, `GET /api/auth/me`, `POST /api/auth/email/verify`, `POST /api/auth/me/email/verification`, `PUT /api/auth/me/email` and `POST /api/auth/logout`; every other route, these two included, answers `403` with `error.details.reason` `email_unverified` before the controller runs, whatever the token (see [Unverified Accounts](../contexts/auth-account-security.md#unverified-accounts)).
 
 ### Changing the Email Address and Password
 
-`PUT /api/auth/me/email` with `{"email": "new@baander.app", "currentPassword": "...", "totpCode": "123456"}` does not change the address at once. It holds the new address as the account's pending address, which a first-party `GET /api/auth/me` returns as `pendingEmail`, and emails a verification link to it. The account keeps its current address, and that address's verification, until the link is used. The request answers `202` with the same body whether or not another account uses the new address; if one does by the time the link is opened, the link fails like an invalid one and the pending change is dropped. Using the link moves the pending address into the account, verifies it, and emails the previous address that the account's address changed. Asking for the current address drops a pending change, and asking for a different one ends the earlier link.
+`PUT /api/auth/me/email` with `{"email": "new@baander.app", "currentPassword": "...", "totpCode": "123456"}` does not change the address at once. It holds the new address as the account's pending address, which a first-party `GET /api/auth/me` returns as `pendingEmail`, and emails a verification link to it. The account keeps its current address, and that address's verification, until the link is used. The request answers `202` with the same body whether or not another account uses the new address; if one does by the time the link is opened, the link fails like an invalid one and the pending change is dropped. The link works only in a signed-in session of the account: `POST /api/auth/email/verify` with `{"token": "..."}` needs a first-party token, and a valid link sent for another account answers `403` with `error.details.reason` `verification_link_other_account` and stays usable. Using the link moves the pending address into the account, verifies it, ends every other session of the user, answers `emailChanged: true`, and emails the previous address that the account's address changed. Asking for the current address drops a pending change, and asking for a different one ends the earlier link.
 
-`PUT /api/auth/me/password` changes the password. It ends every other session of the user, including one issued while the change was running, and the session that made the change stays signed in.
+`PUT /api/auth/me/password` changes the password after [step-up](#step-up-re-authentication). It ends every other session of the user, including one issued while the change was running, and the session that made the change stays signed in. Turning TOTP on or off and adding or removing a passkey do the same: every other session ends, paired devices and third-party apps included, and their WebSocket connections close. A change sent from a session that another change already ended answers `401` with `error.details.reason` `credentials_changed` and changes nothing; sign in again.
 
 ### Revocation
 

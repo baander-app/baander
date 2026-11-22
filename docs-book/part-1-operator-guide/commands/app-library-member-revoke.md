@@ -23,9 +23,9 @@ make exec cmd="php bin/console app:library:member:revoke listener@baander.app my
 
 ## Details
 
-The user's next request no longer shows the library's media, and they stop receiving its scan-completed notifications. Two things the revocation does not reach:
+The user's next request no longer shows the library's media, and they stop receiving its scan-completed notifications. Signed video stream URLs of the user's transcode jobs for the library's videos stop as well: every manifest, segment and subtitle request checks the job owner's current access, so the next one answers `409`. Two things the revocation does not reach:
 
-- Signed video segment URLs issued before it stay valid until they expire, up to 24 hours later.
+- A media response that is already being sent finishes.
 - Items the user already queued in a party stay in the queue.
 
 Revoking access the user lacks succeeds and changes nothing. Administrators see every library whatever their grants, so revoking an administrator's access hides nothing from them. In the API, only super admins may revoke access.
