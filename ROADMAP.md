@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-11-21. This roadmap selects future work and records unresolved
+Updated: 2026-11-22. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
@@ -777,11 +777,8 @@ that limitation is recorded for follow-up, with no runtime change in the 2026-10
 
 ## Resume here
 
-Continue the Back-to-next-movie investigation through a newly reviewed, bounded
-scope. Capture the browser failure and the next movie's actual startup outcome,
-including its mounted/retry state, then complete authenticated cancellation and
-recovery controls. The evidence below confirms retained producer ownership but
-does not yet select a production remedy or another automatic test run.
+The Back-to-next-movie follow-up is complete. Its reproduction, recovery and
+verification are recorded under [Playback investigation and evidence limits](#playback-investigation-and-evidence-limits).
 
 Select other work for a concrete user workflow, demonstrated runtime gap or named
 release decision. Historical unchecked items, old plan limitations and incomplete
@@ -1116,18 +1113,50 @@ versioned profile request the image can refuse with a reason.
 
 ## Playback investigation and evidence limits
 
-**Movie departure:** Back closed the player, but three original producers retained
+**Original movie departure checkpoint:** Back closed the player, but three producers retained
 live ownership and renewed leases at a fixed cursor across 31 database samples
 spanning 30.111 seconds. Native snapshots before and after that window showed the same three
 stopped encoders. The next movie began admission, but the browser test exited
 before its startup outcome, cancellation of the first movie or recovery could be
 captured. Both diagnostic attempts remain nonpassing; both cleaned up successfully.
 
-The detailed investigation remains in [Git history](#completed-work-and-evidence),
-including the observer-timeout hypothesis and missing browser error evidence.
-Any later design
-must resolve departure ownership, in-flight startup, rapid reopening and shared
-sessions. Unconditional cancellation from React effect cleanup is not prescribed.
+The detailed investigation remains in commit `f31c3ef3f`, including the
+observer-timeout hypothesis and missing browser error evidence.
+
+**Movie departure follow-up, 2026-11-22:** On `3f0a87f2d`, Chromium reproduced
+the failure with one video encoder slot. Back closed the first movie while its
+producer still held the slot. The next movie's signing request ended with
+`net::ERR_ABORTED`, and its job reached `refused` without a claim. The movie
+dialog stayed closed. The local video reported ready state 0 and zero decoded
+frames, and the page showed “The destination rejected the playback request.”
+The failed player had no dedicated Retry button. An authenticated DELETE returned
+200 and released the first claim. The failed second player then exposed a stale
+stop observation that prevented Play from attempting admission again.
+
+Back now cancels the browser's owned presentation before acknowledging stop.
+It waits for admission in flight and uses the session identifier returned by
+delivery or signing. A cancellation failure keeps the player open for another
+Back. Selecting the next movie clears the previous stop observation so a failed
+player can close and start fresh. With only that runtime correction applied,
+the browser gate recovered from the original retained claim using the
+authenticated DELETE followed by Back and Play in the second movie. With both
+fixes applied, the first Back issued the authenticated DELETE, the first claim
+was released, and the second movie mounted and decoded advancing frames in
+the same SPA session. Both browser checks cleaned up with zero fixture survivors.
+[Plan](docs/plans/2026-11-22-fix-movie-departure-recovery-plan.md),
+[browser gate](ui/web/tests/e2e/playback-destinations/movie-departure.spec.ts),
+[playback controls](docs-book/part-2-developer-guide/development/video-playback-controls.md#audio-tracks-and-timing).
+
+The focused web suites passed 274 tests across six files. They cover stop
+ordering, failed cancellation, a connection that loses presentation ownership,
+late copy and encoded admission, recovery after failed preparation and transfer
+quiesce. Web typecheck, touched-file ESLint, fixture PHP lint and `git diff --check`
+passed. Full web lint reported zero errors and 12 existing warnings.
+
+An admission request can allocate a producer before a lost response or a server
+error leaves the browser without the session identifier. That cleanup case still
+needs server-side reconciliation using the Playback client-session identity.
+[Playback controls](docs-book/part-2-developer-guide/development/video-playback-controls.md#audio-tracks-and-timing).
 
 **Frame capture:** the historical native timestamp of 24.64 seconds versus a
 24.60-second callback remains unexplained. Failure diagnostics are delivered and

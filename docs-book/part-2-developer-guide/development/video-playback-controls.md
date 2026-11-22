@@ -167,8 +167,18 @@ Settings survive seeks and attachment renewal for the same movie and reset when
 a different movie is selected. Remote destinations keep transport controls;
 presentation settings explain that they must be changed on the playing destination.
 
-Closing the owner while an admission response is lost has a separate cleanup
-limit: the server may already have admitted a session whose identifier the player
-never received. That session can remain until server expiry. Cancelling it safely
-requires a server-scoped cancellation protocol; cancelling the former owner's
-whole session group after ownership changes could also cancel its successor.
+Back from the active local movie waits for admission already in flight and
+cancels the presentation owned by that browser before it closes the player.
+The cancellation asks the worker to release its slot. If cancellation fails,
+the player stays open and Back retries the same session. Destination handoff
+quiesces the source player so it can retain its presentation and cursor.
+
+If a movie fails to start, open its player and use Back to close the failed
+attempt. Reopen the movie and choose Play in the player to start a new attempt.
+
+If a response is lost or the server returns an error after admission, the player
+can close without receiving the allocated session identifier. The session can
+remain until server expiry. Safe cleanup requires server-side reconciliation of
+admission and cancellation. A successor page can use the same Playback
+client-session identity, so cancelling the whole group can also cancel the
+successor's presentation.
