@@ -6,6 +6,7 @@ namespace App\Auth\Infrastructure\Adapter\OAuth;
 
 use App\Auth\Domain\Model\OAuth\RefreshToken;
 use App\Auth\Domain\Model\OAuth\RefreshTokenState;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Shared\Domain\Model\Uuid;
@@ -136,7 +137,7 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
             {
                 return '';
             }
-        }) extends AccessTokenEntity {
+        }, SignInGrant::AuthorizationCode) extends AccessTokenEntity {
         };
     }
 }

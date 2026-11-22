@@ -12,6 +12,7 @@ use App\Auth\Application\Service\CredentialChangeRevoker;
 use App\Auth\Application\Service\StepUpVerifier;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\User;
@@ -48,7 +49,7 @@ trait RecordsCredentialChanges
     /** @return string the token id of a session the user signed in with */
     private function signedInSession(User $user): string
     {
-        $token = AccessToken::issue(Client::create('SPA', ['https://baander.app']), $user, chainId: ChainId::generate());
+        $token = AccessToken::issue(Client::create('SPA', ['https://baander.app']), SignInGrant::Password, $user, chainId: ChainId::generate());
         $this->storedSessions[] = $token;
 
         return $token->getTokenId()->toString();

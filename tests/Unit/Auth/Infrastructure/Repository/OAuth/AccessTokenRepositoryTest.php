@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Auth\Infrastructure\Repository;
 
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Infrastructure\Repository\OAuth\AccessTokenRepository;
@@ -242,7 +243,7 @@ final class AccessTokenRepositoryTest extends TestCase
     public function testRevokeForUserLeavesTheKeptTokenAndItsChainOut(): void
     {
         $user = User::register(new Email('test@baander.app'), 'hashed', 'Test User');
-        $keep = AccessToken::issue(Client::create('SPA', ['https://baander.app']), $user, chainId: self::$chainId);
+        $keep = AccessToken::issue(Client::create('SPA', ['https://baander.app']), SignInGrant::Password, $user, chainId: self::$chainId);
 
         $this->connection->expects($this->once())
             ->method('fetchFirstColumn')

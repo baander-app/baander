@@ -8,6 +8,7 @@ use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Infrastructure\Security\OAuth\ScopeRouteMap;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\FrameworkBundle\Routing\AttributeRouteControllerLoader;
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\Config\Loader\DelegatingLoader;
 use Symfony\Component\Config\Loader\LoaderResolver;
@@ -176,7 +177,7 @@ final class PublicRouteIdentityTest extends TestCase
 /** Controller shapes the identity check must catch, and one it must accept. */
 final class IdentityReadingFixture
 {
-    public function __construct(private readonly \stdClass $security)
+    public function __construct(private readonly Security $security)
     {
     }
 

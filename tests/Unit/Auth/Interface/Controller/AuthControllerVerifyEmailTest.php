@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Auth\Interface\Controller;
 
 use App\Auth\Application\Exception\EmailVerificationException;
 use App\Auth\Application\Port\DpopJtiCacheInterface;
+use App\Auth\Application\Port\SelfRegistrationInterface;
 use App\Auth\Application\Port\UserPortInterface;
 use App\Auth\Infrastructure\Security\OAuth\DpopNonceManager;
 use App\Auth\Infrastructure\Security\OAuth\DpopProofValidator;
@@ -84,6 +85,7 @@ final class AuthControllerVerifyEmailTest extends TestCase
             $this->jsonEncoder,
             new NullLogger(),
             new AcceptLanguageMatcher(),
+            $this->createStub(SelfRegistrationInterface::class),
             'baander_dev_spa_00001',
         );
 

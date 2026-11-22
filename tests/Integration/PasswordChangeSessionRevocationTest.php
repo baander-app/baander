@@ -9,6 +9,7 @@ use App\Auth\Application\Command\User\ChangePasswordCommand;
 use App\Auth\Application\Command\User\SetUserPasswordCommand;
 use App\Auth\Application\Port\PasswordResetTokenRepositoryInterface;
 use App\Auth\Application\Port\TotpSecretCipherInterface;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\Passkey\Passkey;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
@@ -871,6 +872,7 @@ final class PasswordChangeSessionRevocationTest extends TestCase
         $manager->persist(new AccessTokenEntity(
             $tokenId,
             $client,
+            SignInGrant::DeviceCode,
             $user,
             scopes: ['library'],
             expiresAt: new \DateTimeImmutable('+1 hour'),

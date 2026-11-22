@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Auth\Interface\Controller;
 
 use App\Auth\Application\Command\OAuth\RevokeTokenCommand;
 use App\Auth\Application\Port\DpopJtiCacheInterface;
+use App\Auth\Application\Port\SelfRegistrationInterface;
 use App\Auth\Application\Port\UserPortInterface;
 use App\Auth\Infrastructure\Security\OAuth\DpopNonceManager;
 use App\Auth\Infrastructure\Security\OAuth\DpopProofValidator;
@@ -75,6 +76,7 @@ final class AuthControllerLogoutFaultTest extends TestCase
             $jsonEncoder,
             $this->logger,
             new AcceptLanguageMatcher(),
+            $this->createStub(SelfRegistrationInterface::class),
             'baander_dev_spa_00001',
         );
         $translator = $this->createStub(TranslatorInterface::class);

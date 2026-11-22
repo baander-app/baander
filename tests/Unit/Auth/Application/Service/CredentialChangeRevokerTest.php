@@ -10,6 +10,7 @@ use App\Auth\Application\Service\ChainConnectionCloser;
 use App\Auth\Application\Service\CredentialChangeRevoker;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\User;
@@ -178,7 +179,7 @@ final class CredentialChangeRevokerTest extends TestCase
 
     private function storedToken(User $owner): AccessToken
     {
-        $token = AccessToken::issue(Client::create('SPA', ['https://baander.app']), $owner, chainId: ChainId::generate());
+        $token = AccessToken::issue(Client::create('SPA', ['https://baander.app']), SignInGrant::Password, $owner, chainId: ChainId::generate());
         $this->storedTokens[] = $token;
 
         return $token;

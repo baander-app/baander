@@ -9,6 +9,7 @@ use App\Auth\Application\CommandHandler\Passkey\RegisterPasskeyHandler;
 use App\Auth\Application\Service\ChainConnectionCloser;
 use App\Auth\Application\Service\CredentialChangeRevoker;
 use App\Auth\Domain\Event\Passkey\PasskeyRegistered;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\RefreshTokenEntity;
@@ -120,8 +121,8 @@ final class PasskeyRegistrationOutboxTransactionTest extends TestCase
         // Token ids are at least 32 characters; the prefixes keep them in this order.
         $registeringId = 'registering-session-' . bin2hex(random_bytes(16));
         $otherId = 'other-session-' . bin2hex(random_bytes(16));
-        $registering = new AccessTokenEntity($registeringId, $client, $userEntity, chainId: Uuid::v7());
-        $other = new AccessTokenEntity($otherId, $client, $userEntity, chainId: Uuid::v7());
+        $registering = new AccessTokenEntity($registeringId, $client, SignInGrant::Password, $userEntity, chainId: Uuid::v7());
+        $other = new AccessTokenEntity($otherId, $client, SignInGrant::Password, $userEntity, chainId: Uuid::v7());
         $this->manager->persist($registering);
         $this->manager->persist($other);
         $this->manager->flush();

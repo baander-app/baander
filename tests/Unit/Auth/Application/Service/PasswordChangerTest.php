@@ -84,7 +84,7 @@ final class PasswordChangerTest extends TestCase
     public function testAChangeFromASessionAnotherChangeEndedLeavesThePasswordAlone(): void
     {
         $user = User::register(new Email('owner@baander.app'), 'old-hash', 'Owner');
-        $this->storedToken = AccessToken::issue(Client::create('SPA', ['https://baander.app']), $user);
+        $this->storedToken = AccessToken::issue(Client::create('SPA', ['https://baander.app']), SignInGrant::Password, $user);
         $this->keptSessionCurrent = false;
 
         $changer = $this->changer();
