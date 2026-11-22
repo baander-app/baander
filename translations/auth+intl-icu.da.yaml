@@ -20,6 +20,7 @@ errors:
   step_up_failed: "Adgangskoden eller koden er forkert."
   credentials_changed: "Denne session er logget ud. Log ind igen, og gentag ændringen."
   email_unverified: "Bekræft din e-mailadresse først."
+  last_super_admin: "Denne bruger er den eneste aktive superadministrator. Gør en anden bruger til superadministrator først."
   invalid_credentials: "Ugyldige loginoplysninger."
   account_disabled: "Denne konto er deaktiveret."
   totp_required: "TOTP-kode er påkrævet."

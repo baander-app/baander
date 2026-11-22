@@ -44,6 +44,8 @@ Two kinds of media access do not end at once:
 
 Disabling an account that is already disabled leaves the account unchanged and closes any WebSocket connection of the user that is still open.
 
+The command does not disable the only enabled super admin: the install keeps one, and the account stays enabled. The admin API refuses that disable the same way, with `409` and `details.reason` `last_super_admin`. To disable the account, first make another user a super admin with [app:user:roles](app-user-roles.md). A disabled super admin does not count, and an install with no enabled super admin refuses nothing. Disables, deletions and demotions take turns, so two of them running at the same moment cannot remove the last two super admins between them.
+
 With `--json` the command prints only the user as the API's `data` object, the same user resource `POST /api/admin/users/{publicId}/disable` returns: `publicId`, `name`, `email`, `emailVerifiedAt`, `roles`, `disabled`, `createdAt` and `updatedAt`.
 
 ## Exit codes
@@ -51,7 +53,7 @@ With `--json` the command prints only the user as the API's `data` object, the s
 | Code | Meaning |
 |------|---------|
 | 0 | The account is disabled |
-| 1 | The user was not found, the web server did not close the user's open WebSocket connections (the account is disabled all the same), or another error occurred; the message says why |
+| 1 | The user was not found, the user is the only enabled super admin, the web server did not close the user's open WebSocket connections (the account is disabled all the same), or another error occurred; the message says why |
 
 ## Tips
 

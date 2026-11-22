@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Auth\Application\CommandHandler\User;
 
 use App\Auth\Application\Command\User\DisableUserCommand;
+use App\Auth\Application\Exception\LastSuperAdminException;
 use App\Auth\Application\Exception\LiveConnectionsNotClosedException;
 use App\Auth\Application\Exception\UserNotFoundException;
+use App\Auth\Application\Service\SuperAdminContinuity;
 use App\Auth\Application\Service\UserLookup;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
@@ -28,7 +30,8 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * would let a reconnect pass on a token the commit has not yet revoked. Enabling the
  * account later restores none of the tokens; the user signs in again. Disabling a
  * disabled account leaves it unchanged and closes any connection still open, which
- * is how an operator retries a close that failed.
+ * is how an operator retries a close that failed. The install's only enabled super admin
+ * is not disabled.
  */
 final readonly class DisableUserHandler
 {
@@ -38,6 +41,7 @@ final readonly class DisableUserHandler
         private AccessTokenRepositoryInterface $accessTokenRepository,
         private RefreshTokenRepositoryInterface $refreshTokenRepository,
         private TransactionPortInterface $transaction,
+        private SuperAdminContinuity $superAdminContinuity,
         private LiveConnectionsPortInterface $liveConnections,
         private LoggerInterface $logger,
     ) {
@@ -47,6 +51,7 @@ final readonly class DisableUserHandler
      * @return User the disabled user
      *
      * @throws UserNotFoundException when no user has the email address or public ID
+     * @throws LastSuperAdminException when the user is the only enabled super admin
      * @throws LiveConnectionsNotClosedException when the disable committed but the web server did not close the connections
      */
     #[AsMessageHandler]
@@ -55,6 +60,7 @@ final readonly class DisableUserHandler
         $user = $this->userLookup->byIdentifier($command->getIdentifier());
         if (!$user->isDisabled()) {
             $this->transaction->run(function () use ($user): void {
+                $this->superAdminContinuity->assertAnotherRemains($user);
                 $user->disable();
                 $this->userRepository->save($user);
                 $this->accessTokenRepository->revokeForUser($user->getId());
@@ -80,7 +86,7 @@ final readonly class DisableUserHandler
                 ['user' => $identifier],
             );
         } catch (ServerControlException $exception) {
-            throw LiveConnectionsNotClosedException::forUser($identifier, $exception);
+            throw LiveConnectionsNotClosedException::forDisabledUser($identifier, $exception);
         }
     }
 }

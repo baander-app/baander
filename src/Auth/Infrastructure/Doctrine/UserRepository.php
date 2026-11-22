@@ -18,6 +18,14 @@ use Doctrine\ORM\Query\ResultSetMappingBuilder;
 
 final class UserRepository implements UserRepositoryInterface
 {
+    /**
+     * The advisory lock that serializes the changes which can take an enabled super admin away:
+     * hashtextextended(key, seed). Its own seed keeps it apart from the other advisory locks of
+     * the application; a hash collision only makes unrelated work wait for these changes.
+     */
+    private const string SUPER_ADMIN_REMOVAL_LOCK_KEY = 'super-admin-removals';
+    private const int SUPER_ADMIN_REMOVAL_LOCK_SEED = 20261122141800;
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly PasswordResetTokenRepositoryInterface $passwordResetTokens,
@@ -163,6 +171,36 @@ final class UserRepository implements UserRepositoryInterface
         $conn = $this->entityManager->getConnection();
 
         return (int) $conn->executeQuery($sql, $params, $types)->fetchOne();
+    }
+
+    public function lockSuperAdminRemovals(): void
+    {
+        $connection = $this->entityManager->getConnection();
+        if (!$connection->isTransactionActive()) {
+            // Outside a transaction the lock would end with its own statement and serialize nothing.
+            throw new \LogicException('Lock super admin removals inside the transaction that makes the removal.');
+        }
+
+        // SQL because DQL has no advisory lock. An advisory lock rather than row locks on the
+        // super admins: lockCredentialEpoch takes FOR NO KEY UPDATE on a user's row at every
+        // sign-in, so locking those rows here would queue the super admins' sign-ins too.
+        $connection->executeQuery(
+            'SELECT pg_advisory_xact_lock(hashtextextended(:key, ' . self::SUPER_ADMIN_REMOVAL_LOCK_SEED . '))',
+            ['key' => self::SUPER_ADMIN_REMOVAL_LOCK_KEY],
+        )->free();
+    }
+
+    public function soleEnabledSuperAdmin(): ?Uuid
+    {
+        // SQL for the jsonb containment DQL cannot express, as in count(). A statement of its own
+        // after the lock: under READ COMMITTED it sees what the lock's previous holder committed.
+        // Two rows tell one super admin from several.
+        $ids = $this->entityManager->getConnection()->fetchFirstColumn(
+            'SELECT id FROM users WHERE roles @> :role AND NOT disabled LIMIT 2',
+            ['role' => json_encode(['ROLE_SUPER_ADMIN'])],
+        );
+
+        return count($ids) === 1 ? Uuid::fromString((string) $ids[0]) : null;
     }
 
     public function upgradePasswordHash(

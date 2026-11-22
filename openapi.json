@@ -2273,6 +2273,16 @@
                                 }
                             }
                         }
+                    },
+                    "409": {
+                        "description": "The user is the only enabled super admin",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -2322,6 +2332,16 @@
                     },
                     "404": {
                         "description": "User not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The user is the only enabled super admin",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2564,6 +2584,16 @@
                     },
                     "404": {
                         "description": "User not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The user is the only enabled super admin",
                         "content": {
                             "application/json": {
                                 "schema": {

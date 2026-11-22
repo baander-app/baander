@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Controller;
 
+use App\Shared\Application\Http\BaanderHeader;
 use App\Tests\Functional\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 final class AdminUserControllerTest extends TestCase
 {
@@ -415,5 +417,82 @@ final class AdminUserControllerTest extends TestCase
         );
 
         $this->assertSame(204, $response->getStatusCode());
+    }
+
+    // ---------------------------------------------------------------
+    // The install keeps an enabled super admin
+    // ---------------------------------------------------------------
+
+    /** @return iterable<string, array{string, string, array<string, list<string>>}> */
+    public static function superAdminRemovals(): iterable
+    {
+        yield 'delete' => ['DELETE', '', []];
+        yield 'disable' => ['POST', '/disable', []];
+        yield 'demote to admin' => ['POST', '/roles', ['roles' => ['ROLE_USER', 'ROLE_ADMIN']]];
+    }
+
+    /** @param array<string, list<string>> $body */
+    #[DataProvider('superAdminRemovals')]
+    public function testTheOnlyEnabledSuperAdminCannotRemoveThemselves(string $method, string $suffix, array $body): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $former = $this->createSuperAdminUser();
+        $former->disable();
+        $this->userRepository->save($former);
+        $this->assertSame(1, $this->enabledSuperAdmins(), 'A disabled super admin does not count.');
+
+        $response = $this->authenticatedRequest($method, '/api/admin/users/' . $superAdmin->getPublicId()->toString() . $suffix, $superAdmin, $body);
+
+        $error = $this->assertJsonResponse($response, 409, 'error');
+        $this->assertSame('last_super_admin', $error['error']['details']['reason'] ?? null);
+        $this->assertSame('This user is the only enabled super admin. Make another user a super admin first.', $error['error']['message']);
+        $this->entityManager->clear();
+        $stored = $this->userRepository->findByUuid($superAdmin->getId());
+        $this->assertNotNull($stored);
+        $this->assertFalse($stored->isDisabled());
+        $this->assertTrue($stored->hasRole('ROLE_SUPER_ADMIN'));
+    }
+
+    public function testTheRefusalIsTranslatedIntoTheRequestLanguage(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+
+        $this->client->request('DELETE', '/api/admin/users/' . $superAdmin->getPublicId()->toString(), server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_ACCEPT_LANGUAGE' => 'da',
+            BaanderHeader::TestUserId->serverKey() => $superAdmin->getId()->toString(),
+        ]);
+
+        $error = $this->assertJsonResponse($this->client->getResponse(), 409, 'error');
+        $this->assertSame('Denne bruger er den eneste aktive superadministrator. Gør en anden bruger til superadministrator først.', $error['error']['message']);
+    }
+
+    public function testOfTwoEnabledSuperAdminsOneCanBeDemotedAndTheOtherThenStays(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $second = $this->createSuperAdminUser();
+
+        $demoted = $this->authenticatedRequest('POST', '/api/admin/users/' . $second->getPublicId()->toString() . '/roles', $superAdmin, ['roles' => ['ROLE_USER', 'ROLE_ADMIN']]);
+        $this->assertSame(['ROLE_USER', 'ROLE_ADMIN'], $this->assertJsonResponse($demoted, 200, 'data')['data']['roles']);
+
+        $refused = $this->authenticatedRequest('POST', '/api/admin/users/' . $superAdmin->getPublicId()->toString() . '/roles', $superAdmin, ['roles' => ['ROLE_USER']]);
+        $this->assertSame('last_super_admin', $this->assertJsonResponse($refused, 409, 'error')['error']['details']['reason'] ?? null);
+        $this->assertSame(1, $this->enabledSuperAdmins());
+    }
+
+    public function testTheOnlySuperAdminChangingOtherRolesStaysASuperAdmin(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+
+        $response = $this->authenticatedRequest('POST', '/api/admin/users/' . $superAdmin->getPublicId()->toString() . '/roles', $superAdmin, ['roles' => ['ROLE_SUPER_ADMIN']]);
+
+        $this->assertSame(['ROLE_SUPER_ADMIN'], $this->assertJsonResponse($response, 200, 'data')['data']['roles']);
+    }
+
+    private function enabledSuperAdmins(): int
+    {
+        return (int) $this->entityManager->getConnection()->fetchOne(
+            "SELECT count(*) FROM users WHERE roles @> '[\"ROLE_SUPER_ADMIN\"]' AND NOT disabled",
+        );
     }
 }

@@ -323,6 +323,13 @@ final class AdminUserController
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
             ),
+            new OA\Response(
+                response: '409',
+                description: 'The user is the only enabled super admin',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'delete', methods: ['DELETE'])]
@@ -361,6 +368,13 @@ final class AdminUserController
             new OA\Response(
                 response: '404',
                 description: 'User not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'The user is the only enabled super admin',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
@@ -556,6 +570,13 @@ final class AdminUserController
             new OA\Response(
                 response: '404',
                 description: 'User not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'The user is the only enabled super admin',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),

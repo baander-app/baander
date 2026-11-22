@@ -10,24 +10,35 @@ use App\Auth\Application\Command\User\SetUserRolesCommand;
 use App\Auth\Application\CommandHandler\User\DeleteUserHandler;
 use App\Auth\Application\CommandHandler\User\RenameUserHandler;
 use App\Auth\Application\CommandHandler\User\SetUserRolesHandler;
+use App\Auth\Application\Exception\LiveConnectionsNotClosedException;
 use App\Auth\Application\Query\User\ListUsersQuery;
 use App\Auth\Application\QueryHandler\User\ListUsersHandler;
+use App\Auth\Application\Service\SuperAdminContinuity;
 use App\Auth\Application\Service\UserLookup;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
+use App\Shared\Application\Port\LiveConnectionsPortInterface;
+use App\Shared\Application\Port\ServerControlException;
+use App\Shared\Application\Port\ServerNotRunningException;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 
 /** The rename, delete, role and list use cases behind the admin panel and the app:user:* commands. */
 final class UserAdministrationHandlersTest extends TestCase
 {
     private User $user;
-    /** @var list<string> */
+    /** @var list<string> what happened, in order; "+" marks a step inside the transaction */
     private array $log = [];
+    private bool $inTransaction = false;
+    private ?\Throwable $liveConnectionsFailure = null;
+    /** @var list<string> */
+    private array $warnings = [];
 
     protected function setUp(): void
     {
@@ -85,7 +96,7 @@ final class UserAdministrationHandlersTest extends TestCase
         $user = $this->rolesHandler()(new SetUserRolesCommand('member@baander.app', ['ROLE_USER', 'ROLE_ADMIN']));
 
         self::assertSame(['ROLE_USER', 'ROLE_ADMIN'], $user->getRoles());
-        self::assertSame(['save'], $this->log);
+        self::assertSame(['begin', '+save', 'commit'], $this->log);
     }
 
     public function testSettingTheCurrentRolesSucceedsWithoutChange(): void
@@ -108,11 +119,44 @@ final class UserAdministrationHandlersTest extends TestCase
         self::assertSame([], $this->log);
     }
 
-    public function testDeletingRemovesTheNamedUser(): void
+    public function testDeletingRemovesTheNamedUserAndThenClosesTheirConnections(): void
     {
         $this->deleteHandler()(new DeleteUserCommand($this->user->getPublicId()->toString()));
 
-        self::assertSame(['delete ' . $this->user->getId()->toString()], $this->log);
+        self::assertSame(
+            ['begin', '+delete ' . $this->user->getId()->toString(), 'commit', 'close live connections'],
+            $this->log,
+            'Live connections close after the commit, so a reconnect cannot pass on a token the deletion has not yet removed.',
+        );
+    }
+
+    public function testWithoutAWebServerInThisContainerTheDeletionSucceedsAndSaysConnectionsWereNotClosed(): void
+    {
+        $this->liveConnectionsFailure = new ServerNotRunningException();
+
+        $this->deleteHandler()(new DeleteUserCommand('member@baander.app'));
+
+        self::assertSame(['begin', '+delete ' . $this->user->getId()->toString(), 'commit'], $this->log);
+        self::assertCount(1, $this->warnings);
+        self::assertStringContainsString('No web server runs in this container', $this->warnings[0]);
+    }
+
+    public function testAWebServerThatCannotCloseTheConnectionsFailsTheDeletionAfterItCommitted(): void
+    {
+        $this->liveConnectionsFailure = new ServerControlException('the web server did not answer within 5 seconds');
+
+        try {
+            $this->deleteHandler()(new DeleteUserCommand('member@baander.app'));
+            self::fail('A failed close must be reported.');
+        } catch (LiveConnectionsNotClosedException $exception) {
+            self::assertSame(
+                'User "member@baander.app" is deleted, but its open WebSocket connections were not closed: '
+                . 'the web server did not answer within 5 seconds. The web server closes them within a minute.',
+                $exception->getMessage(),
+            );
+        }
+
+        self::assertSame(['begin', '+delete ' . $this->user->getId()->toString(), 'commit'], $this->log);
     }
 
     public function testAnUnknownUserIsNotFoundAndNothingChanges(): void
@@ -169,14 +213,37 @@ final class UserAdministrationHandlersTest extends TestCase
     {
         $users = $this->userRepository();
 
-        return new SetUserRolesHandler(new UserLookup($users), $users);
+        return new SetUserRolesHandler(new UserLookup($users), $users, $this->transaction(), new SuperAdminContinuity($users));
     }
 
     private function deleteHandler(): DeleteUserHandler
     {
+        $liveConnections = $this->createStub(LiveConnectionsPortInterface::class);
+        $liveConnections->method('closeForUser')->willReturnCallback(function (Uuid $userId): int {
+            self::assertTrue($this->user->getId()->equals($userId));
+            if ($this->liveConnectionsFailure !== null) {
+                throw $this->liveConnectionsFailure;
+            }
+            $this->record('close live connections');
+
+            return 2;
+        });
+
+        $logger = $this->createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(function (string|\Stringable $message, array $context): void {
+            $this->warnings[] = (string) $message;
+        });
+
         $users = $this->userRepository();
 
-        return new DeleteUserHandler(new UserLookup($users), $users);
+        return new DeleteUserHandler(
+            new UserLookup($users),
+            $users,
+            $this->transaction(),
+            new SuperAdminContinuity($users),
+            $liveConnections,
+            $logger,
+        );
     }
 
     private function listHandler(): ListUsersHandler
@@ -195,10 +262,10 @@ final class UserAdministrationHandlersTest extends TestCase
         );
         $users->method('save')->willReturnCallback(function (User $user): void {
             self::assertSame($this->user, $user);
-            $this->log[] = 'save';
+            $this->record('save');
         });
         $users->method('delete')->willReturnCallback(function (Uuid $id): void {
-            $this->log[] = 'delete ' . $id->toString();
+            $this->record('delete ' . $id->toString());
         });
         $users->method('findAll')->willReturnCallback(function (?string $role, ?bool $disabled, int $limit, int $offset): array {
             $this->log[] = sprintf('findAll %s %d %d %d', $role, $disabled, $limit, $offset);
@@ -212,5 +279,32 @@ final class UserAdministrationHandlersTest extends TestCase
         });
 
         return $users;
+    }
+
+    private function transaction(): TransactionPortInterface
+    {
+        $transaction = $this->createStub(TransactionPortInterface::class);
+        $transaction->method('run')->willReturnCallback(function (callable $operation): mixed {
+            $this->log[] = 'begin';
+            $this->inTransaction = true;
+            try {
+                $result = $operation();
+            } catch (\Throwable $exception) {
+                $this->log[] = 'rollback';
+                throw $exception;
+            } finally {
+                $this->inTransaction = false;
+            }
+            $this->log[] = 'commit';
+
+            return $result;
+        });
+
+        return $transaction;
+    }
+
+    private function record(string $step): void
+    {
+        $this->log[] = ($this->inTransaction ? '+' : '') . $step;
     }
 }
