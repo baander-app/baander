@@ -10,6 +10,9 @@ use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Library\Infrastructure\Doctrine\Entity\UserLibraryAccessEntity;
 use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistEntity;
@@ -165,6 +168,38 @@ final class OAuthScopeEnforcementTest extends TestCase
         $this->assertInsufficientScope($this->send($jwt, 'GET', '/api/albums/'));
     }
 
+    public function testVideoPlaybackReadsRequireBothLibraryScopeAndAGrant(): void
+    {
+        $granted = '/api/videos/' . $this->videoInLibrary($this->admin);
+        $ungranted = '/api/videos/' . $this->videoInLibrary();
+        $client = $this->deviceClient();
+        $library = $this->token($client, $this->admin, ['library']);
+        $profile = $this->token($client, $this->admin, ['profile']);
+
+        $information = $this->data($this->send($library, 'GET', $granted . '/playback-information'));
+        self::assertSame('Opening', $information['chapters'][0]['title']);
+        self::assertSame('unavailable', $information['preview']['state']);
+        $preview = $this->send($library, 'GET', $granted . '/timeline-preview');
+        self::assertSame(404, $preview->getStatusCode(), (string) $preview->getContent());
+        self::assertNull($preview->headers->get('WWW-Authenticate'));
+
+        foreach (['playback-information', 'timeline-preview'] as $route) {
+            $this->assertInsufficientScope($this->send($profile, 'GET', $granted . '/' . $route));
+            self::assertSame(404, $this->send($library, 'GET', $ungranted . '/' . $route)->getStatusCode());
+        }
+    }
+
+    public function testAdminLogsRemainFirstPartyEvenForADelegatedSuperAdministratorWithEveryScope(): void
+    {
+        $superAdmin = $this->user(['ROLE_USER', 'ROLE_SUPER_ADMIN']);
+        $jwt = $this->token($this->thirdPartyClient(), $superAdmin, ['profile', 'email', 'library', 'playlist']);
+
+        $this->assertInsufficientScope($this->send($jwt, 'GET', '/api/admin/logs/sources'));
+        $this->assertInsufficientScope($this->send($jwt, 'GET', '/api/admin/logs/entries'));
+        $this->assertInsufficientScope($this->send($jwt, 'GET', '/api/admin/logs/entries/unknown'));
+        $this->assertInsufficientScope($this->send($jwt, 'POST', '/api/admin/logs/query', ['sql' => 'SELECT 1']));
+    }
+
     public function testAProfileTokenReadsTheProfileWithoutEmailOrRoles(): void
     {
         $profile = $this->send($this->token($this->personalAccessClient(), $this->admin, ['profile']), 'GET', '/api/auth/me');
@@ -219,6 +254,29 @@ final class OAuthScopeEnforcementTest extends TestCase
         $suffix = bin2hex(random_bytes(8));
 
         return $this->persist(new LibraryEntity('Scope library', 'scopes-' . $suffix, '/tmp/scopes-' . $suffix, 'music', 'local'));
+    }
+
+    private function videoInLibrary(?UserEntity $grantee = null): PublicId
+    {
+        $slug = 'scope-video-' . bin2hex(random_bytes(8));
+        $directory = self::$directory . '/' . $slug;
+        self::assertTrue(mkdir($directory, 0700));
+        $path = $directory . '/source.mkv';
+        $contents = 'Video metadata fixture for ' . $slug;
+        self::assertSame(strlen($contents), file_put_contents($path, $contents));
+
+        $library = $this->persist(new LibraryEntity('Scope video library', $slug, $directory, 'movie', 'local'));
+        $movie = $this->persist(new MovieEntity(new PublicId(), $library, 'Scoped movie'));
+        $video = new VideoEntity(new PublicId(), $path, hash('xxh3', $contents));
+        $video->setProbe(['chapters' => [['start' => 0.0, 'end' => 10.0, 'title' => 'Opening']]]);
+        $this->persist($video);
+        $this->persist(new MovieVideoEntity($movie, $video));
+        if ($grantee !== null) {
+            $this->manager->persist(new UserLibraryAccessEntity($grantee->getId(), $library, new \DateTimeImmutable()));
+            $this->manager->flush();
+        }
+
+        return $video->getPublicId();
     }
 
     private function thirdPartyClient(): ClientEntity
