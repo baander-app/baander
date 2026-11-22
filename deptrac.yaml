@@ -38,7 +38,7 @@ deptrac:
         Auth: ['Auth Live Authority Contract', 'Auth Domain', 'Auth Identity Contract', 'Auth User Identifier Contract', 'Auth Device Approval Event Contract', 'Auth WebSocket Contract', 'Auth Self-Registration Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
         Catalog: ['Catalog Video Contract', 'Catalog Song Availability Contract', 'Catalog Song Lookup Contract', 'Catalog Movie Contract', 'Catalog Director Contract', 'Catalog Person Contract', 'Catalog TV Contract', 'Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Persistence Associations', 'Catalog Resources', 'Catalog Interface']
         Filesystem: ['Filesystem Infrastructure', 'Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
-        Library: ['Library Live Audience Contract', 'Library File Availability Contract', 'Library Read Scope Contract', 'Library Content Stats Contract', 'Library Files Discovered Contract', 'Library Provisioning Contract', 'Library Media Files Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
+        Library: ['Library Live Audience Contract', 'Library File Availability Contract', 'Library Type Lookup Contract', 'Library Read Scope Contract', 'Library Content Stats Contract', 'Library Files Discovered Contract', 'Library Provisioning Contract', 'Library Media Files Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
         Lyrics: ['Lyrics Fetch Request Contract', 'Lyrics Album Merge Contract', 'Lyrics Domain', 'Lyrics Application', 'Lyrics Infrastructure', 'Lyrics Resources', 'Lyrics Interface']
         Media: ['Media Video Quality Contract', 'Media Playback Access Contract', 'Media Image Contract', 'Media Domain', 'Media Application', 'Media Infrastructure', 'Media Resources', 'Media Interface']
         Metadata: ['Metadata Sync Contract', 'Metadata MusicBrainz Lookup Contract', 'Metadata Person Provider Contract', 'Metadata Domain', 'Metadata Application', 'Metadata Infrastructure', 'Metadata Interface']
@@ -456,6 +456,11 @@ deptrac:
         - type: classLike
           value: '^App\\Library\\Application\\Port\\LibraryAudienceReader$'
 
+    - name: 'Library Type Lookup Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Library\\Application\\Port\\LibraryTypeLookupInterface$'
+
     - name: 'Library Application'
       collectors:
         - type: bool
@@ -477,6 +482,8 @@ deptrac:
               value: '^App\\Library\\Application\\Port\\LibraryMediaFile[A-Za-z]*$'
             - type: classLike
               value: '^App\\Library\\Application\\Port\\LibraryAudienceReader$'
+            - type: classLike
+              value: '^App\\Library\\Application\\Port\\LibraryTypeLookupInterface$'
 
     - name: 'Library Infrastructure'
       collectors:
@@ -1415,7 +1422,7 @@ deptrac:
       - 'Shared Domain'
       - 'Catalog Domain'
     'Catalog Application':
-      - 'Library Application'
+      - 'Library Type Lookup Contract'
       - 'Library Type Contract'
       - 'Catalog Person Contract'
       - 'Catalog TV Contract'
@@ -1529,6 +1536,10 @@ deptrac:
     'Library File Availability Contract':
       - Core
       - 'Shared Domain'
+    'Library Type Lookup Contract':
+      - Core
+      - 'Shared Domain'
+      - 'Library Type Contract'
     'Library Read Scope Contract':
       - Core
       - 'Shared Domain'
@@ -1569,6 +1580,7 @@ deptrac:
       - 'Auth Live Authority Contract'
       - 'Library Live Audience Contract'
       - 'Library File Availability Contract'
+      - 'Library Type Lookup Contract'
       - 'Library Media Files Contract'
       - 'Library Files Discovered Contract'
       - 'Library Content Stats Contract'

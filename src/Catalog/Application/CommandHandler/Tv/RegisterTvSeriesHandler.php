@@ -8,7 +8,7 @@ use App\Catalog\Application\Command\Tv\RegisterTvSeriesCommand;
 use App\Catalog\Application\DTO\TvTitleRecord;
 use App\Catalog\Application\Port\PersonCreditPortInterface;
 use App\Catalog\Application\Port\TvCatalogPortInterface;
-use App\Library\Application\Port\LibraryPortInterface;
+use App\Library\Application\Port\LibraryTypeLookupInterface;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Metadata\Application\Port\PersonProfileSyncRequestInterface;
 use App\Metadata\Application\Port\TvMetadataPortInterface;
@@ -22,7 +22,7 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 final readonly class RegisterTvSeriesHandler
 {
     public function __construct(
-        private LibraryPortInterface $libraries,
+        private LibraryTypeLookupInterface $libraries,
         private TvCatalogPortInterface $catalog,
         private TvMetadataPortInterface $metadata,
         private PersonCreditPortInterface $credits,
@@ -35,11 +35,11 @@ final readonly class RegisterTvSeriesHandler
         if ($command->tmdbId <= 0) {
             throw new InvalidInputException('TMDB series ID must be positive.');
         }
-        $library = $this->libraries->findByUuid($command->libraryId);
-        if ($library === null) {
+        $type = $this->libraries->findType($command->libraryId);
+        if ($type === null) {
             throw new NotFoundException('TV library was not found.');
         }
-        if ($library->getType() !== LibraryType::TvShow) {
+        if ($type !== LibraryType::TvShow) {
             throw new InvalidInputException('Series registration requires a TV show library.');
         }
         $data = $this->metadata->series($command->tmdbId);

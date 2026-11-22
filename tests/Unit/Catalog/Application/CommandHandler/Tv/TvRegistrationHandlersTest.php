@@ -11,10 +11,7 @@ use App\Catalog\Application\CommandHandler\Tv\RegisterTvSeriesHandler;
 use App\Catalog\Application\DTO\TvTitleRecord;
 use App\Catalog\Application\Port\PersonCreditPortInterface;
 use App\Catalog\Application\Port\TvCatalogPortInterface;
-use App\Library\Application\Port\LibraryPortInterface;
-use App\Library\Domain\Model\Library;
-use App\Library\Domain\ValueObject\LibraryPath;
-use App\Library\Domain\ValueObject\LibrarySlug;
+use App\Library\Application\Port\LibraryTypeLookupInterface;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Metadata\Application\DTO\TvTitleMetadata;
 use App\Metadata\Application\Port\PersonProfileSyncRequestInterface;
@@ -23,16 +20,15 @@ use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Domain\ValueObject\FilesystemType;
 use PHPUnit\Framework\TestCase;
 
 final class TvRegistrationHandlersTest extends TestCase
 {
     public function testWrongLibraryTypeCannotFetchOrWriteTVMetadata(): void
     {
-        $library = Library::create('Movies', new LibrarySlug('movie-tv-check'), new LibraryPath('/media/movies'), LibraryType::Movie, FilesystemType::Local);
-        $libraries = $this->createStub(LibraryPortInterface::class);
-        $libraries->method('findByUuid')->willReturn($library);
+        $libraryId = Uuid::v7();
+        $libraries = $this->createStub(LibraryTypeLookupInterface::class);
+        $libraries->method('findType')->willReturn(LibraryType::Movie);
         $catalog = $this->createMock(TvCatalogPortInterface::class);
         $catalog->expects(self::never())->method('registerSeries');
         $metadata = $this->createMock(TvMetadataPortInterface::class);
@@ -45,15 +41,15 @@ final class TvRegistrationHandlersTest extends TestCase
             $this->createStub(TransactionPortInterface::class),
         );
         $this->expectException(InvalidInputException::class);
-        $handler(new RegisterTvSeriesCommand($library->getId(), 12));
+        $handler(new RegisterTvSeriesCommand($libraryId, 12));
     }
 
     public function testSeriesWritesAndCreditsShareOneTransactionAfterTheLookup(): void
     {
-        $library = Library::create('TV', new LibrarySlug('tv-handler'), new LibraryPath('/media/tv'), LibraryType::TvShow, FilesystemType::Local);
-        $libraries = $this->createStub(LibraryPortInterface::class);
-        $libraries->method('findByUuid')->willReturn($library);
-        $title = new TvTitleRecord(Uuid::v7(), new PublicId(), $library->getId(), 12, 'A series');
+        $libraryId = Uuid::v7();
+        $libraries = $this->createStub(LibraryTypeLookupInterface::class);
+        $libraries->method('findType')->willReturnMap([[$libraryId, LibraryType::TvShow]]);
+        $title = new TvTitleRecord(Uuid::v7(), new PublicId(), $libraryId, 12, 'A series');
         $data = new TvTitleMetadata(12, 'A series', null, null, [], null);
         $trace = new \stdClass();
         $trace->steps = ['start'];
@@ -75,7 +71,7 @@ final class TvRegistrationHandlersTest extends TestCase
                 return $result;
             });
         $catalog = $this->createMock(TvCatalogPortInterface::class);
-        $catalog->expects(self::once())->method('registerSeries')->with($library->getId(), $data)
+        $catalog->expects(self::once())->method('registerSeries')->with($libraryId, $data)
             ->willReturnCallback(static function () use ($trace, $title): TvTitleRecord {
                 self::assertSame(['start', 'lookup', 'transaction'], $trace->steps);
 
@@ -93,7 +89,7 @@ final class TvRegistrationHandlersTest extends TestCase
             self::assertSame(['start', 'lookup', 'transaction', 'committed'], $trace->steps);
         });
         $handler = new RegisterTvSeriesHandler($libraries, $catalog, $metadata, $credits, $transaction, $profiles);
-        self::assertSame($title, $handler(new RegisterTvSeriesCommand($library->getId(), 12, true)));
+        self::assertSame($title, $handler(new RegisterTvSeriesCommand($libraryId, 12, true)));
     }
 
     public function testEpisodeQueuesProfilesAfterItsAcceptedCreditsCommit(): void

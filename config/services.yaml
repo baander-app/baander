@@ -802,6 +802,8 @@ services:
 
     App\Library\Application\Port\LibraryFileAvailabilityInterface:
         alias: App\Library\Infrastructure\LibraryFileAvailability
+    App\Library\Application\Port\LibraryTypeLookupInterface:
+        alias: App\Library\Infrastructure\LibraryTypeLookup
     App\Library\Application\Port\LibraryMediaFilesInterface:
         alias: App\Library\Infrastructure\Filesystem\LibraryMediaFiles
 

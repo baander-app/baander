@@ -14,8 +14,13 @@ final class LibraryContractBoundaryTest extends TestCase
     {
         $violations = self::deptracViolations(<<<'SOURCE'
 <?php
+namespace App\Library\Domain\ValueObject;
+enum LibraryType: string { case TvShow = 'tv_show'; }
 namespace App\Library\Application\Port;
 interface LibraryContentStatsInterface {}
+interface LibraryTypeLookupInterface {
+    public function findType(\App\Shared\Domain\Model\Uuid $libraryId): ?\App\Library\Domain\ValueObject\LibraryType;
+}
 namespace App\Library\Application\Message;
 final class FilesDiscovered {}
 final class DiscoveredFile {}
@@ -24,6 +29,7 @@ final class InternalApplicationService {}
 namespace App\Catalog\Application\CommandHandler;
 final class BoundaryFilesHandler {
     public function handle(\App\Library\Application\Message\FilesDiscovered $message, \App\Library\Application\Message\DiscoveredFile $file): void {}
+    public function libraryType(\App\Library\Application\Port\LibraryTypeLookupInterface $types): ?\App\Library\Domain\ValueObject\LibraryType {}
     public function internal(\App\Library\Application\InternalApplicationService $service): void {}
 }
 namespace App\Catalog\Infrastructure\Doctrine\Query;
