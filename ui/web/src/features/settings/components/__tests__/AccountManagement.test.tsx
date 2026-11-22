@@ -5,17 +5,15 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
-import { AXIOS_INSTANCE, customInstance } from '@/shared/api-client/axios-instance'
+import { customInstance } from '@/shared/api-client/axios-instance'
 import type { UserResource } from '@/shared/api-client/gen/endpoints'
 import { render } from '../../../../../tests/test-utils'
 import { AccountManagement } from '../AccountManagement'
 
 vi.mock('@/shared/api-client/axios-instance', () => ({
-  AXIOS_INSTANCE: { put: vi.fn() },
   customInstance: vi.fn(),
 }))
 
-const mockPut = vi.mocked(AXIOS_INSTANCE.put)
 const mockRequest = vi.mocked(customInstance)
 
 const VERIFIED_AT = '2026-10-01T09:30:00+00:00'
@@ -94,27 +92,35 @@ async function saveAccountChange(kind: 'email' | 'password') {
     await user.type(screen.getByLabelText('Current password'), 'current-password')
     if (useAuthStore.getState().user?.totpEnabled) await user.type(screen.getByLabelText('Authentication code'), '123456')
   } else {
-    await user.type(screen.getByLabelText('Current password'), 'current-password')
     await user.type(screen.getByLabelText('New password'), 'new-password')
     await user.type(screen.getByLabelText('Confirm new password'), 'new-password')
+    await user.type(screen.getByLabelText('Current password'), 'current-password')
+    if (useAuthStore.getState().user?.totpEnabled) await user.type(screen.getByLabelText('Authentication code'), '123456')
   }
 
   await user.click(screen.getByRole('button', { name: 'Save' }))
 }
 
-/** Routes the email change PUT through the generated client and anything else to /me. */
-function answerEmailChange(answer: () => Promise<unknown>) {
+/** Routes a PUT of the account change at this path through the generated client and anything else to /me. */
+function answerAccountChange(path: '/api/auth/me/email' | '/api/auth/me/password', answer: () => Promise<unknown>) {
   const me = mockRequest.getMockImplementation()
   mockRequest.mockImplementation(async (url: string, init: RequestInit) => {
-    if (url === '/api/auth/me/email') return answer()
+    if (url === path) return answer()
 
     return me ? me(url, init) : undefined
   })
 }
 
+function answerEmailChange(answer: () => Promise<unknown>) {
+  answerAccountChange('/api/auth/me/email', answer)
+}
+
+function answerPasswordChange(answer: () => Promise<unknown>) {
+  answerAccountChange('/api/auth/me/password', answer)
+}
+
 describe('AccountManagement', () => {
   beforeEach(() => {
-    mockPut.mockReset()
     mockRequest.mockReset()
     signIn(profile())
   })
@@ -141,14 +147,17 @@ describe('AccountManagement', () => {
     })
 
     it('shows the nested backend message after a failed password save', async () => {
-      mockPut.mockRejectedValueOnce(httpError(400, 'The current password is incorrect.'))
+      answerPasswordChange(() => Promise.reject(httpError(422, 'Password must be at least 8 characters.')))
 
       await saveAccountChange('password')
 
-      expect(await screen.findByText('The current password is incorrect.')).toBeInTheDocument()
+      expect(await screen.findByText('Password must be at least 8 characters.')).toBeInTheDocument()
       expect(screen.getByRole('dialog', { name: 'Change password' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
-      expect(mockPut).toHaveBeenCalledWith('/api/auth/me/password', { currentPassword: 'current-password', newPassword: 'new-password' })
+      expect(mockRequest).toHaveBeenCalledWith('/api/auth/me/password', expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({ newPassword: 'new-password', currentPassword: 'current-password' }),
+      }))
       expect(screen.queryByText('Failed to change password.')).not.toBeInTheDocument()
     })
 
@@ -163,13 +172,75 @@ describe('AccountManagement', () => {
     })
 
     it('keeps the password fallback for an unstructured failure', async () => {
-      mockPut.mockRejectedValueOnce(new Error('Network unavailable'))
+      answerPasswordChange(() => Promise.reject(new Error('Network unavailable')))
 
       await saveAccountChange('password')
 
       expect(await screen.findByText('Failed to change password.')).toBeInTheDocument()
       expect(screen.getByRole('dialog', { name: 'Change password' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    })
+  })
+
+  describe('step-up for a password change', () => {
+    it('asks for a code only when TOTP is on, and says other devices and apps sign out', async () => {
+      const user = userEvent.setup()
+      renderAccount()
+      await waitForProfileRefresh()
+      await user.click(screen.getAllByRole('button', { name: 'Change' })[1])
+
+      const dialog = screen.getByRole('dialog', { name: 'Change password' })
+      expect(dialog).toHaveTextContent('This signs you out on your other devices and apps.')
+      expect(within(dialog).getByLabelText('Current password')).toHaveAttribute('autocomplete', 'current-password')
+      expect(within(dialog).queryByLabelText('Authentication code')).not.toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+      signIn(profile({ totpEnabled: true }))
+      renderAccount()
+      await user.click(screen.getAllByRole('button', { name: 'Change' })[1])
+
+      expect(screen.getByLabelText('Authentication code')).toHaveAttribute('autocomplete', 'one-time-code')
+    })
+
+    it('submits the password and the code with the new password', async () => {
+      signIn(profile({ totpEnabled: true }))
+      answerPasswordChange(async () => ({ data: { message: 'Password changed.' } }))
+
+      await saveAccountChange('password')
+
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Change password' })).not.toBeInTheDocument())
+      expect(mockRequest).toHaveBeenCalledWith('/api/auth/me/password', expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({ newPassword: 'new-password', currentPassword: 'current-password', totpCode: '123456' }),
+      }))
+    })
+
+    it('keeps the new password and clears the password and code when they are wrong', async () => {
+      signIn(profile({ totpEnabled: true }))
+      answerPasswordChange(() => Promise.reject(httpError(422, 'The password or code is incorrect.', {}, { reason: 'step_up_failed' })))
+
+      await saveAccountChange('password')
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Password or code is incorrect')
+      expect(screen.getByLabelText('Current password')).toHaveValue('')
+      expect(screen.getByLabelText('Authentication code')).toHaveValue('')
+      expect(screen.getByLabelText('New password')).toHaveValue('new-password')
+    })
+
+    it('sends nothing while the confirmation differs from the new password', async () => {
+      const user = userEvent.setup()
+      renderAccount()
+      await waitForProfileRefresh()
+      await user.click(screen.getAllByRole('button', { name: 'Change' })[1])
+
+      await user.type(screen.getByLabelText('New password'), 'new-password')
+      await user.type(screen.getByLabelText('Confirm new password'), 'other-password')
+      await user.type(screen.getByLabelText('Current password'), 'current-password')
+      await user.click(screen.getByRole('button', { name: 'Save' }))
+
+      expect(screen.getByLabelText('Confirm new password')).toBeInvalid()
+      expect(screen.getByLabelText('Current password')).toHaveValue('current-password')
+      expect(mockRequest).not.toHaveBeenCalledWith('/api/auth/me/password', expect.anything())
     })
   })
 

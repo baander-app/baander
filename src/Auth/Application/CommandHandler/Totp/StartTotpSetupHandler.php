@@ -17,7 +17,7 @@ use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
- * Starts TOTP setup: refuses while TOTP is on, which only the current code can turn off, and
+ * Starts TOTP setup: refuses while TOTP is on, which only step-up with a current code turns off, and
  * for an unverified email address, confirms the current password, and holds a new secret for the user until enable confirms it.
  */
 final readonly class StartTotpSetupHandler

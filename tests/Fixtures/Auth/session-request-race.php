@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 /*
  * Child process of PasswordChangeSessionRevocationTest: sends one request a signed-in session
- * makes, such as a password change, to the production kernel over its own PostgreSQL session,
- * so it can wait on the account's row lock while the test process holds a competing change
- * open.
+ * makes, such as a password change or the completion of a passkey registration, to the test's
+ * production kernel over its own PostgreSQL session, so it can wait on the account's row lock
+ * while the test process holds a competing change open.
  *
  * Arguments: the shared directory (JWT keys and logs of the kernel), the application name to
  * report in pg_stat_activity, the client IP, the path of the DPoP private key (PEM) the
@@ -14,7 +14,7 @@ declare(strict_types=1);
  * JSON body. Prints the status and the decoded body of the answer as JSON.
  */
 
-use App\Tests\Fixtures\Auth\ProductionOAuthKernel;
+use App\Tests\Fixtures\Auth\PasswordChangeOAuthKernel;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Dotenv\Dotenv;
@@ -37,7 +37,8 @@ if (!is_string($url) || $url === '') {
     throw new LogicException('OUTBOX_TEST_DATABASE_URL must name a disposable PostgreSQL database.');
 }
 
-$kernel = new ProductionOAuthKernel($directory, $url);
+// The test's own kernel, so a passkey registration the test started verifies against the same relying party.
+$kernel = new PasswordChangeOAuthKernel($directory, $url);
 $kernel->boot();
 $manager = $kernel->getContainer()->get('oauth.acceptance.entity_manager');
 if (!$manager instanceof EntityManagerInterface) {

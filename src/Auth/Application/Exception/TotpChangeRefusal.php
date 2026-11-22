@@ -11,7 +11,6 @@ enum TotpChangeRefusal: string
     case SetupMissing = 'totp_setup_missing';
     case InvalidCode = 'totp_code_invalid';
     case NotEnabled = 'totp_not_enabled';
-    case SecretUnavailable = 'totp_unavailable';
 
     /** The message key in the auth translation domain. */
     public function translationKey(): string

@@ -4099,6 +4099,7 @@
                     "Auth"
                 ],
                 "summary": "Register a new passkey",
+                "description": "Signs the account out of every other session, paired devices and third-party apps included; the session that completes the registration stays signed in.",
                 "operationId": "post_passkey_register",
                 "requestBody": {
                     "content": {
@@ -4154,7 +4155,7 @@
                         }
                     },
                     "401": {
-                        "description": "Not authenticated",
+                        "description": "Not authenticated, or another change ended this session first (reason credentials_changed); nothing was stored",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4401,6 +4402,7 @@
                     "Auth"
                 ],
                 "summary": "Delete a passkey",
+                "description": "Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. An unknown passkey answers 404 before any step-up attempt is spent. Signs the account out of every other session, paired devices and third-party apps included; the session that made the request stays signed in.",
                 "operationId": "delete_passkey_delete",
                 "parameters": [
                     {
@@ -4413,6 +4415,16 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DeletePasskeyRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
                 "responses": {
                     "200": {
                         "description": "Passkey deleted",
@@ -4441,7 +4453,7 @@
                         }
                     },
                     "401": {
-                        "description": "Not authenticated",
+                        "description": "Not authenticated, or another change ended this session first (reason credentials_changed); nothing was changed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4452,6 +4464,26 @@
                     },
                     "404": {
                         "description": "Passkey not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error, or the password or code is wrong",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many step-up attempts for this account",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4646,21 +4678,13 @@
                     "Auth"
                 ],
                 "summary": "Enable TOTP after verifying a code from the authenticator app",
+                "description": "Signs the account out of every other session, paired devices and third-party apps included; the session that sent the code stays signed in.",
                 "operationId": "post_totp_enable",
                 "requestBody": {
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "code": {
-                                        "type": "string",
-                                        "example": "123456"
-                                    }
-                                },
-                                "required": [
-                                    "code"
-                                ]
+                                "$ref": "#/components/schemas/EnableTotpRequest"
                             }
                         }
                     },
@@ -4689,7 +4713,7 @@
                         }
                     },
                     "401": {
-                        "description": "Not authenticated",
+                        "description": "Not authenticated, or another change ended this session first (reason credentials_changed); nothing was changed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4736,22 +4760,14 @@
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Disable TOTP (requires current TOTP code to verify)",
+                "summary": "Disable TOTP",
+                "description": "Refused with 400 while TOTP is off, before any step-up attempt is spent. Needs the current password and a current TOTP code; a missing or wrong password or code gets the same 422 with `details.reason` `step_up_failed`. Signs the account out of every other session, paired devices and third-party apps included; the session that made the request stays signed in.",
                 "operationId": "post_totp_disable",
                 "requestBody": {
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "code": {
-                                        "type": "string",
-                                        "example": "123456"
-                                    }
-                                },
-                                "required": [
-                                    "code"
-                                ]
+                                "$ref": "#/components/schemas/DisableTotpRequest"
                             }
                         }
                     },
@@ -4780,7 +4796,7 @@
                         }
                     },
                     "401": {
-                        "description": "Not authenticated",
+                        "description": "Not authenticated, or another change ended this session first (reason credentials_changed); nothing was changed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4790,7 +4806,7 @@
                         }
                     },
                     "400": {
-                        "description": "Invalid TOTP code or TOTP not enabled",
+                        "description": "TOTP is not on",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4800,11 +4816,21 @@
                         }
                     },
                     "422": {
-                        "description": "Validation error",
+                        "description": "The password or code is wrong",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many step-up attempts for this account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -5636,29 +5662,13 @@
                     "Auth"
                 ],
                 "summary": "Change the current user password",
-                "description": "Signs the account out of every other session; the session that made the request stays signed in.",
+                "description": "Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. A new password outside the length policy is refused before any step-up attempt is spent. Signs the account out of every other session, paired devices and third-party apps included; the session that made the request stays signed in.",
                 "operationId": "put_auth_me_password",
                 "requestBody": {
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "currentPassword": {
-                                        "type": "string",
-                                        "example": "********"
-                                    },
-                                    "newPassword": {
-                                        "type": "string",
-                                        "minLength": 8,
-                                        "maxLength": 255,
-                                        "example": "********"
-                                    }
-                                },
-                                "required": [
-                                    "currentPassword",
-                                    "newPassword"
-                                ]
+                                "$ref": "#/components/schemas/ChangePasswordRequest"
                             }
                         }
                     },
@@ -5697,11 +5707,21 @@
                         }
                     },
                     "422": {
-                        "description": "Validation error or wrong current password",
+                        "description": "Validation error, or the password or code is wrong",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many step-up attempts for this account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -26320,6 +26340,26 @@
                     "response"
                 ]
             },
+            "DeletePasskeyRequest": {
+                "type": "object",
+                "properties": {
+                    "currentPassword": {
+                        "type": "string",
+                        "default": "",
+                        "example": "********"
+                    },
+                    "totpCode": {
+                        "type": "string",
+                        "description": "A current TOTP code; needed when TOTP is on",
+                        "nullable": true,
+                        "default": null,
+                        "example": "123456"
+                    }
+                },
+                "required": [
+                    "currentPassword"
+                ]
+            },
             "StartTotpSetupRequest": {
                 "type": "object",
                 "properties": {
@@ -26351,16 +26391,22 @@
             "DisableTotpRequest": {
                 "type": "object",
                 "properties": {
-                    "code": {
+                    "currentPassword": {
                         "type": "string",
-                        "minLength": 6,
-                        "maxLength": 6,
                         "default": "",
+                        "example": "********"
+                    },
+                    "totpCode": {
+                        "type": "string",
+                        "description": "A current TOTP code",
+                        "nullable": true,
+                        "default": null,
                         "example": "123456"
                     }
                 },
                 "required": [
-                    "code"
+                    "currentPassword",
+                    "totpCode"
                 ]
             },
             "RegisterRequest": {
@@ -26512,6 +26558,13 @@
                         "maxLength": 255,
                         "default": "",
                         "example": "********"
+                    },
+                    "totpCode": {
+                        "type": "string",
+                        "description": "A current TOTP code; needed when TOTP is on",
+                        "nullable": true,
+                        "default": null,
+                        "example": "123456"
                     }
                 },
                 "required": [

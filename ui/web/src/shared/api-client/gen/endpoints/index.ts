@@ -299,6 +299,15 @@ export interface VerifyPasskeyChallengeRequest {
   userId?: string | null;
 }
 
+export interface DeletePasskeyRequest {
+  currentPassword: string;
+  /**
+     * A current TOTP code; needed when TOTP is on
+     * @nullable
+     */
+  totpCode?: string | null;
+}
+
 export interface StartTotpSetupRequest {
   currentPassword: string;
 }
@@ -312,11 +321,12 @@ export interface EnableTotpRequest {
 }
 
 export interface DisableTotpRequest {
+  currentPassword: string;
   /**
-     * @minLength 6
-     * @maxLength 6
+     * A current TOTP code
+     * @nullable
      */
-  code: string;
+  totpCode: string | null;
 }
 
 export interface RegisterRequest {
@@ -384,6 +394,11 @@ export interface ChangePasswordRequest {
      * @maxLength 255
      */
   newPassword: string;
+  /**
+     * A current TOTP code; needed when TOTP is on
+     * @nullable
+     */
+  totpCode?: string | null;
 }
 
 export interface UpdateAlbumRequest {
@@ -5755,20 +5770,12 @@ export type PostTotpSetup200 = {
   data?: PostTotpSetup200Data;
 };
 
-export type PostTotpEnableBody = {
-  code: string;
-};
-
 export type PostTotpEnable200Data = {
   message?: string;
 };
 
 export type PostTotpEnable200 = {
   data?: PostTotpEnable200Data;
-};
-
-export type PostTotpDisableBody = {
-  code: string;
 };
 
 export type PostTotpDisable200Data = {
@@ -5918,15 +5925,6 @@ export type PutAuthMeEmail202Data = {
 
 export type PutAuthMeEmail202 = {
   data?: PutAuthMeEmail202Data;
-};
-
-export type PutAuthMePasswordBody = {
-  currentPassword: string;
-  /**
-     * @minLength 8
-     * @maxLength 255
-     */
-  newPassword: string;
 };
 
 export type PutAuthMePassword200Data = {
@@ -15453,6 +15451,7 @@ export const getPostPasskeyRegisterUrl = () => {
 }
 
 /**
+ * Signs the account out of every other session, paired devices and third-party apps included; the session that completes the registration stays signed in.
  * @summary Register a new passkey
  */
 export const postPasskeyRegister = async (postPasskeyRegisterBody: PostPasskeyRegisterBody, options?: Parameters<typeof customInstance>[1]): Promise<PostPasskeyRegister201> => {
@@ -15718,16 +15717,32 @@ export const getDeletePasskeyDeleteUrl = (publicId: string,) => {
 }
 
 /**
+ * Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. An unknown passkey answers 404 before any step-up attempt is spent. Signs the account out of every other session, paired devices and third-party apps included; the session that made the request stays signed in.
  * @summary Delete a passkey
  */
-export const deletePasskeyDelete = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<DeletePasskeyDelete200> => {
+export const deletePasskeyDelete = async (publicId: string,
+    deletePasskeyRequest: DeletePasskeyRequest, options?: Parameters<typeof customInstance>[1]): Promise<DeletePasskeyDelete200> => {
 
-  return customInstance<DeletePasskeyDelete200>(getDeletePasskeyDeleteUrl(publicId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<DeletePasskeyDelete200>(getDeletePasskeyDeleteUrl(publicId),
   {
     ...options,
-    method: 'DELETE'
-
-
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(deletePasskeyRequest)
   }
 );}
 
@@ -15737,7 +15752,7 @@ export const deletePasskeyDelete = async (publicId: string, options?: Parameters
 
 export const getDeletePasskeyDeleteMutationKey = () => ['deletePasskeyDelete'] as const;
 
-export const getDeletePasskeyDeleteMutationOptions = <TError = ErrorType<ApiError>,
+export const getDeletePasskeyDeleteMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePasskeyDelete>>, TError,DeletePasskeyDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof deletePasskeyDelete>>, TError,DeletePasskeyDeleteMutationVariables, TContext> => {
 
@@ -15752,9 +15767,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof deletePasskeyDelete>>, DeletePasskeyDeleteMutationVariables> = (props) => {
-          const {publicId} = props ?? {};
+          const {publicId,data} = props ?? {};
 
-          return  deletePasskeyDelete(publicId,requestOptions)
+          return  deletePasskeyDelete(publicId,data,requestOptions)
         }
 
 
@@ -15765,14 +15780,14 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type DeletePasskeyDeleteMutationResult = NonNullable<Awaited<ReturnType<typeof deletePasskeyDelete>>>
-
-    export type DeletePasskeyDeleteMutationError = ErrorType<ApiError>
-    export type DeletePasskeyDeleteMutationVariables = {publicId: string}
+    export type DeletePasskeyDeleteMutationBody = BodyType<DeletePasskeyRequest>
+    export type DeletePasskeyDeleteMutationError = ErrorType<ApiError | ValidationError>
+    export type DeletePasskeyDeleteMutationVariables = {publicId: string;data: BodyType<DeletePasskeyRequest>}
 
     /**
  * @summary Delete a passkey
  */
-export const useDeletePasskeyDelete = <TError = ErrorType<ApiError>,
+export const useDeletePasskeyDelete = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePasskeyDelete>>, TError,DeletePasskeyDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deletePasskeyDelete>>,
@@ -15970,9 +15985,10 @@ export const getPostTotpEnableUrl = () => {
 }
 
 /**
+ * Signs the account out of every other session, paired devices and third-party apps included; the session that sent the code stays signed in.
  * @summary Enable TOTP after verifying a code from the authenticator app
  */
-export const postTotpEnable = async (postTotpEnableBody: PostTotpEnableBody, options?: Parameters<typeof customInstance>[1]): Promise<PostTotpEnable200> => {
+export const postTotpEnable = async (enableTotpRequest: EnableTotpRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostTotpEnable200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -15993,7 +16009,7 @@ return customInstance<PostTotpEnable200>(getPostTotpEnableUrl(),
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(postTotpEnableBody)
+    body: JSON.stringify(enableTotpRequest)
   }
 );}
 
@@ -16031,9 +16047,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PostTotpEnableMutationResult = NonNullable<Awaited<ReturnType<typeof postTotpEnable>>>
-    export type PostTotpEnableMutationBody = BodyType<PostTotpEnableBody>
+    export type PostTotpEnableMutationBody = BodyType<EnableTotpRequest>
     export type PostTotpEnableMutationError = ErrorType<ApiError | ValidationError>
-    export type PostTotpEnableMutationVariables = {data: BodyType<PostTotpEnableBody>}
+    export type PostTotpEnableMutationVariables = {data: BodyType<EnableTotpRequest>}
 
     /**
  * @summary Enable TOTP after verifying a code from the authenticator app
@@ -16058,9 +16074,10 @@ export const getPostTotpDisableUrl = () => {
 }
 
 /**
- * @summary Disable TOTP (requires current TOTP code to verify)
+ * Refused with 400 while TOTP is off, before any step-up attempt is spent. Needs the current password and a current TOTP code; a missing or wrong password or code gets the same 422 with `details.reason` `step_up_failed`. Signs the account out of every other session, paired devices and third-party apps included; the session that made the request stays signed in.
+ * @summary Disable TOTP
  */
-export const postTotpDisable = async (postTotpDisableBody: PostTotpDisableBody, options?: Parameters<typeof customInstance>[1]): Promise<PostTotpDisable200> => {
+export const postTotpDisable = async (disableTotpRequest: DisableTotpRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostTotpDisable200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -16081,7 +16098,7 @@ return customInstance<PostTotpDisable200>(getPostTotpDisableUrl(),
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(postTotpDisableBody)
+    body: JSON.stringify(disableTotpRequest)
   }
 );}
 
@@ -16119,12 +16136,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PostTotpDisableMutationResult = NonNullable<Awaited<ReturnType<typeof postTotpDisable>>>
-    export type PostTotpDisableMutationBody = BodyType<PostTotpDisableBody>
+    export type PostTotpDisableMutationBody = BodyType<DisableTotpRequest>
     export type PostTotpDisableMutationError = ErrorType<ApiError | ValidationError>
-    export type PostTotpDisableMutationVariables = {data: BodyType<PostTotpDisableBody>}
+    export type PostTotpDisableMutationVariables = {data: BodyType<DisableTotpRequest>}
 
     /**
- * @summary Disable TOTP (requires current TOTP code to verify)
+ * @summary Disable TOTP
  */
 export const usePostTotpDisable = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTotpDisable>>, TError,PostTotpDisableMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -17117,10 +17134,10 @@ export const getPutAuthMePasswordUrl = () => {
 }
 
 /**
- * Signs the account out of every other session; the session that made the request stays signed in.
+ * Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. A new password outside the length policy is refused before any step-up attempt is spent. Signs the account out of every other session, paired devices and third-party apps included; the session that made the request stays signed in.
  * @summary Change the current user password
  */
-export const putAuthMePassword = async (putAuthMePasswordBody: PutAuthMePasswordBody, options?: Parameters<typeof customInstance>[1]): Promise<PutAuthMePassword200> => {
+export const putAuthMePassword = async (changePasswordRequest: ChangePasswordRequest, options?: Parameters<typeof customInstance>[1]): Promise<PutAuthMePassword200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -17141,7 +17158,7 @@ return customInstance<PutAuthMePassword200>(getPutAuthMePasswordUrl(),
     ...options,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(putAuthMePasswordBody)
+    body: JSON.stringify(changePasswordRequest)
   }
 );}
 
@@ -17179,9 +17196,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PutAuthMePasswordMutationResult = NonNullable<Awaited<ReturnType<typeof putAuthMePassword>>>
-    export type PutAuthMePasswordMutationBody = BodyType<PutAuthMePasswordBody>
+    export type PutAuthMePasswordMutationBody = BodyType<ChangePasswordRequest>
     export type PutAuthMePasswordMutationError = ErrorType<ApiError | ValidationError>
-    export type PutAuthMePasswordMutationVariables = {data: BodyType<PutAuthMePasswordBody>}
+    export type PutAuthMePasswordMutationVariables = {data: BodyType<ChangePasswordRequest>}
 
     /**
  * @summary Change the current user password

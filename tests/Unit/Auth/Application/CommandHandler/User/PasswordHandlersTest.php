@@ -10,14 +10,18 @@ use App\Auth\Application\Command\User\SetUserPasswordCommand;
 use App\Auth\Application\CommandHandler\User\ChangePasswordHandler;
 use App\Auth\Application\CommandHandler\User\ResetPasswordHandler;
 use App\Auth\Application\CommandHandler\User\SetUserPasswordHandler;
-use App\Auth\Application\Exception\CurrentPasswordMismatchException;
+use App\Auth\Application\Exception\PasswordPolicyException;
 use App\Auth\Application\Exception\PasswordResetException;
+use App\Auth\Application\Exception\StepUpFailedException;
 use App\Auth\Application\Exception\UserNotFoundException;
 use App\Auth\Application\Port\PasswordHasherInterface;
 use App\Auth\Application\Port\PasswordResetTokenRepositoryInterface;
+use App\Auth\Application\Port\StepUpAttemptThrottleInterface;
+use App\Auth\Application\Port\TotpVerifierInterface;
 use App\Auth\Application\Service\ChainConnectionCloser;
 use App\Auth\Application\Service\CredentialChangeRevoker;
 use App\Auth\Application\Service\PasswordChanger;
+use App\Auth\Application\Service\StepUpVerifier;
 use App\Auth\Application\Service\UserLookup;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
@@ -56,6 +60,7 @@ final class PasswordHandlersTest extends TestCase
     private array $totpStepsCleared = [];
     /** @var list<bool> whether each close of the revoked sessions' connections ran inside the reset transaction */
     private array $closedInTransaction = [];
+    private int $stepUpAttempts = 0;
 
     protected function setUp(): void
     {
@@ -171,7 +176,7 @@ final class PasswordHandlersTest extends TestCase
             $this->user->getId()->toString(),
             'current-password',
             'new-password',
-            $this->storedToken->getTokenId()->toString(),
+            currentAccessTokenId: $this->storedToken->getTokenId()->toString(),
         ));
 
         self::assertSame('hashed:new-password', $this->user->getPassword());
@@ -187,7 +192,7 @@ final class PasswordHandlersTest extends TestCase
             $this->user->getId()->toString(),
             'current-password',
             'new-password',
-            $this->storedToken->getTokenId()->toString(),
+            currentAccessTokenId: $this->storedToken->getTokenId()->toString(),
         ));
 
         self::assertSame(['none'], $this->keptSessions);
@@ -195,19 +200,61 @@ final class PasswordHandlersTest extends TestCase
 
     public function testChangeRequiresTheCurrentPassword(): void
     {
-        $this->expectException(CurrentPasswordMismatchException::class);
+        $this->assertChangeRefusedByStepUp(new ChangePasswordCommand($this->user->getId()->toString(), 'wrong-password', 'new-password'));
+    }
 
+    /** With TOTP on, the right password without a code gets the answer of a wrong password. */
+    public function testWithTotpOnAChangeNeedsACurrentCode(): void
+    {
+        $this->user->enableTotp('sealed-secret');
+
+        $this->assertChangeRefusedByStepUp(new ChangePasswordCommand($this->user->getId()->toString(), 'current-password', 'new-password'));
+        $this->assertChangeRefusedByStepUp(new ChangePasswordCommand($this->user->getId()->toString(), 'current-password', 'new-password', '654321'));
+
+        $this->changeHandler()(new ChangePasswordCommand($this->user->getId()->toString(), 'current-password', 'new-password', '123456'));
+        self::assertSame('hashed:new-password', $this->user->getPassword());
+    }
+
+    public function testANewPasswordOutsideThePolicyIsRefusedBeforeAnyStepUpAttempt(): void
+    {
         try {
-            $this->changeHandler()(new ChangePasswordCommand($this->user->getId()->toString(), 'wrong-password', 'new-password'));
-        } finally {
-            self::assertSame('hashed:current-password', $this->user->getPassword());
-            self::assertSame([], $this->keptSessions);
+            $this->changeHandler()(new ChangePasswordCommand($this->user->getId()->toString(), 'current-password', 'short'));
+            self::fail('A password outside the policy must be refused.');
+        } catch (PasswordPolicyException) {
         }
+
+        self::assertSame(0, $this->stepUpAttempts);
+        self::assertSame('hashed:current-password', $this->user->getPassword());
+    }
+
+    private function assertChangeRefusedByStepUp(ChangePasswordCommand $command): void
+    {
+        try {
+            $this->changeHandler()($command);
+            self::fail('The change must be refused.');
+        } catch (StepUpFailedException) {
+        }
+
+        self::assertSame('hashed:current-password', $this->user->getPassword());
+        self::assertSame([], $this->keptSessions);
     }
 
     private function changeHandler(): ChangePasswordHandler
     {
-        return new ChangePasswordHandler($this->userRepository(), $this->hasher(), $this->changer(), $this->revoker());
+        return new ChangePasswordHandler($this->userRepository(), $this->stepUp(), $this->changer(), $this->revoker());
+    }
+
+    /** Accepts the password "current-password" and, when TOTP is on, the code "123456"; counts every attempt. */
+    private function stepUp(): StepUpVerifier
+    {
+        $throttle = $this->createStub(StepUpAttemptThrottleInterface::class);
+        $throttle->method('acquire')->willReturnCallback(function (): void {
+            ++$this->stepUpAttempts;
+        });
+        $totp = $this->createStub(TotpVerifierInterface::class);
+        $totp->method('verifyAndSpend')->willReturnCallback(static fn (User $user, string $code): bool => $code === '123456');
+
+        return new StepUpVerifier($throttle, $this->hasher(), $totp, new NullLogger());
     }
 
     private function resetHandler(?Uuid $redeemsTo): ResetPasswordHandler

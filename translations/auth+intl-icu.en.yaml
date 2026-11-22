@@ -7,7 +7,6 @@ errors:
   passkey_unavailable: "Passkeys are temporarily unavailable. Try again in a moment."
   no_passkey_found: "No passkey found for the given credential ID."
   cannot_resolve_user: "Unable to resolve user for the given credential ID."
-  failed_delete_passkey: "Failed to delete passkey."
   user_not_found: "User not found."
   client_auth_failed: "Client authentication failed."
   user_code_required: 'The "user_code" parameter is required.'
@@ -17,7 +16,6 @@ errors:
   email_verification_failed: "This verification link is invalid or has expired."
   internal: "Internal server error."
   password_reset_failed: "This password reset link is invalid or has expired."
-  current_password_incorrect: "Current password is incorrect."
   step_up_failed: "The password or code is incorrect."
   credentials_changed: "This session has been signed out. Sign in again and repeat the change."
   email_unverified: "Verify your email address first."

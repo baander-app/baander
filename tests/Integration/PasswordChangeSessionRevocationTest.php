@@ -4,23 +4,31 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Auth\Application\Command\Totp\DisableTotpCommand;
 use App\Auth\Application\Command\User\ChangePasswordCommand;
 use App\Auth\Application\Command\User\SetUserPasswordCommand;
 use App\Auth\Application\Port\PasswordResetTokenRepositoryInterface;
+use App\Auth\Application\Port\TotpSecretCipherInterface;
+use App\Auth\Domain\Model\Passkey\Passkey;
 use App\Auth\Domain\Model\User;
+use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Auth\PasswordChangeOAuthKernel;
 use App\Tests\Fixtures\Auth\RecordingLiveConnections;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
+use App\Tests\Fixtures\Auth\WebAuthnTestCredential;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
 use Doctrine\ORM\EntityManagerInterface;
+use OTPHP\TOTP;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
@@ -31,14 +39,17 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
- * Every way of changing a password ends the sessions the old password started, through the
- * production firewall with real PostgreSQL and Redis. Only a user's own change keeps the
- * session that made it, and only while no other change has ended that session first.
+ * Every way of changing a password ends the sessions the old password started, and so does
+ * every change of the account's other sign-in factors: turning TOTP on or off, and adding or
+ * removing a passkey. Through the production firewall with real PostgreSQL and Redis. Only a
+ * user's own change keeps the session that made it, and only while no other change has ended
+ * that session first.
  */
 final class PasswordChangeSessionRevocationTest extends TestCase
 {
     private const string ORIGIN = 'https://baander.app';
     private const string PASSWORD = 'session-test-password';
+    private const string TOTP_SECRET = 'JBSWY3DPEHPK3PXP';
 
     private static string $sharedDirectory;
     private PasswordChangeOAuthKernel $kernel;
@@ -281,6 +292,133 @@ final class PasswordChangeSessionRevocationTest extends TestCase
         self::assertSame(200, $this->refresh($session['refreshToken'], $key)->getStatusCode());
     }
 
+    /**
+     * Turning TOTP off from session A keeps A signed in. Session B and a paired TV are signed
+     * out, and their WebSocket connections close as soon as the change commits.
+     */
+    public function testTurningTotpOffKeepsTheRequestingSessionAndEndsTheOthers(): void
+    {
+        [$current, $currentKey] = $this->signIn($this->user);
+        [$other, $otherKey] = $this->signIn($this->user);
+        $pairedDevice = $this->issueDelegatedToken();
+        $this->enrolTotp();
+        $offset = RecordingLiveConnections::size(self::$sharedDirectory);
+
+        $response = $this->send('POST', '/api/auth/totp/disable', $current['accessToken'], $currentKey, [
+            'currentPassword' => self::PASSWORD,
+            'totpCode' => self::currentTotpCode(),
+        ]);
+
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+        $this->assertStillSignedIn($current, $currentKey);
+        $this->assertSignedOut($other, $otherKey);
+        self::assertTrue($this->accessTokenRevoked($pairedDevice), "The paired device's token is revoked too.");
+        $closes = RecordingLiveConnections::closedAccessTokens(self::$sharedDirectory, (int) getmypid(), $offset);
+        self::assertCount(1, $closes, 'One close request carries every ended session.');
+        self::assertEqualsCanonicalizing([self::tokenId($other['accessToken']), $pairedDevice], $closes[0]);
+    }
+
+    /**
+     * TOTP setup and enable are two requests. The session that sends the code turning TOTP on
+     * stays signed in, even when another session started the setup; every other session ends.
+     */
+    public function testTurningTotpOnKeepsTheSessionThatSentTheCode(): void
+    {
+        [$starter, $starterKey] = $this->signIn($this->user);
+        [$confirmer, $confirmerKey] = $this->signIn($this->user);
+        $setup = $this->send('POST', '/api/auth/totp/setup', $starter['accessToken'], $starterKey, ['currentPassword' => self::PASSWORD]);
+        self::assertSame(200, $setup->getStatusCode(), (string) $setup->getContent());
+        $secret = json_decode((string) $setup->getContent(), true, flags: JSON_THROW_ON_ERROR)['data']['secret'];
+
+        $response = $this->send('POST', '/api/auth/totp/enable', $confirmer['accessToken'], $confirmerKey, ['code' => TOTP::create($secret)->now()]);
+
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+        $this->assertStillSignedIn($confirmer, $confirmerKey);
+        $this->assertSignedOut($starter, $starterKey);
+    }
+
+    /**
+     * Registration options and registration are two requests. The session that completes the
+     * registration stays signed in, even when another session asked for the options; every
+     * other session ends.
+     */
+    public function testRegisteringAPasskeyKeepsTheSessionThatCompletedIt(): void
+    {
+        [$starter, $starterKey] = $this->signIn($this->user);
+        [$completer, $completerKey] = $this->signIn($this->user);
+        $registration = $this->passkeyRegistration($starter, $starterKey, 'Laptop');
+
+        $response = $this->send('POST', '/api/auth/passkey/register', $completer['accessToken'], $completerKey, $registration);
+
+        self::assertSame(201, $response->getStatusCode(), (string) $response->getContent());
+        self::assertSame(1, $this->storedPasskeys());
+        $this->assertStillSignedIn($completer, $completerKey);
+        $this->assertSignedOut($starter, $starterKey);
+    }
+
+    public function testRemovingAPasskeyKeepsTheRequestingSessionAndEndsTheOthers(): void
+    {
+        [$current, $currentKey] = $this->signIn($this->user);
+        [$other, $otherKey] = $this->signIn($this->user);
+        $passkey = Passkey::create(Uuid::v7(), 'Laptop', 'credential-' . bin2hex(random_bytes(8)), [], 0);
+        $this->passkeys()->save($passkey, $this->user->getId());
+
+        $response = $this->send('DELETE', '/api/auth/passkey/' . $passkey->getPublicId()->toString(), $current['accessToken'], $currentKey, [
+            'currentPassword' => self::PASSWORD,
+        ]);
+
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+        self::assertSame(0, $this->storedPasskeys());
+        $this->assertStillSignedIn($current, $currentKey);
+        $this->assertSignedOut($other, $otherKey);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function competingChanges(): iterable
+    {
+        yield 'a password change' => ['password'];
+        yield 'turning TOTP off' => ['totp'];
+    }
+
+    /**
+     * Session B asks for registration options, then session A changes a credential. B's
+     * registration completes while A's change holds the account's row, and is refused once A's
+     * change has ended B: no passkey is stored and A stays signed in.
+     */
+    #[DataProvider('competingChanges')]
+    public function testAPasskeyRegistrationWhoseSessionAConcurrentChangeEndedStoresNothing(string $competingChange): void
+    {
+        $this->assertReadCommitted();
+        [$current, $currentKey] = $this->signIn($this->user);
+        [$other, $otherKey, $otherKeyPath] = $this->signInWithExportedKey();
+        $registration = $this->passkeyRegistration($other, $otherKey, 'Started before the change');
+        if ($competingChange === 'totp') {
+            $this->enrolTotp();
+        }
+
+        $this->connection->beginTransaction();
+        try {
+            match ($competingChange) {
+                'password' => $this->changePasswordInThisTransaction($current['accessToken'], 'changed-during-registration'),
+                'totp' => $this->turnTotpOffInThisTransaction($current['accessToken']),
+            };
+            $late = $this->startSessionRequest($otherKeyPath, $other['accessToken'], 'POST', '/api/auth/passkey/register', $registration);
+            $this->awaitWaitOnThisSession($late);
+            $this->connection->commit();
+        } catch (\Throwable $failure) {
+            $this->connection->rollBack();
+            throw $failure;
+        }
+
+        $answer = $this->finish($late);
+
+        self::assertSame(401, $answer['status'], json_encode($answer, JSON_THROW_ON_ERROR));
+        self::assertSame('credentials_changed', $answer['body']['error']['details']['reason'] ?? null);
+        self::assertSame(0, $this->storedPasskeys(), 'The ended session stored no passkey.');
+        self::assertSame(200, $this->me($current['accessToken'], $currentKey)->getStatusCode(), 'The session that made the change stays signed in.');
+        $this->assertSignedOut($other, $otherKey);
+    }
+
     public function testRedeemingAResetTokenEndsEverySession(): void
     {
         [$first, $firstKey] = $this->signIn($this->user);
@@ -496,6 +634,75 @@ final class PasswordChangeSessionRevocationTest extends TestCase
             newPassword: $password,
             currentAccessTokenId: self::tokenId($accessToken),
         ));
+    }
+
+    /** The user's own TOTP disable from the session of this access token, inside the transaction this test holds open. */
+    private function turnTotpOffInThisTransaction(string $accessToken): void
+    {
+        $bus = $this->kernel->getContainer()->get('oauth.acceptance.bus');
+        self::assertInstanceOf(MessageBusInterface::class, $bus);
+        $bus->dispatch(new DisableTotpCommand(
+            $this->user->getId()->toString(),
+            self::PASSWORD,
+            self::currentTotpCode(),
+            self::tokenId($accessToken),
+        ));
+    }
+
+    /** Turns TOTP on for the user directly, so no session ends and no time step is spent. */
+    private function enrolTotp(): void
+    {
+        $cipher = $this->kernel->getContainer()->get('oauth.acceptance.totp_cipher');
+        self::assertInstanceOf(TotpSecretCipherInterface::class, $cipher);
+        $this->user->enableTotp($cipher->seal(self::TOTP_SECRET));
+        $this->users->save($this->user);
+    }
+
+    private static function currentTotpCode(): string
+    {
+        return TOTP::create(self::TOTP_SECRET)->now();
+    }
+
+    /**
+     * Asks for registration options from this session, with the password, and returns the
+     * request that completes the registration with a credential the authenticator created for
+     * them, as the web client sends it.
+     *
+     * @param array{accessToken: string, refreshToken: string} $session
+     *
+     * @return array{challengeKey: string, response: array<string, mixed>, name: string}
+     */
+    private function passkeyRegistration(array $session, SignedDpopProof $key, string $name): array
+    {
+        $options = $this->send('POST', '/api/auth/passkey/options', $session['accessToken'], $key, ['currentPassword' => self::PASSWORD]);
+        self::assertSame(200, $options->getStatusCode(), (string) $options->getContent());
+        $data = json_decode((string) $options->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
+        $credential = new WebAuthnTestCredential($this->user->getPublicId()->toString(), PasswordChangeOAuthKernel::RELYING_PARTY);
+        $attestation = $credential->attest($data['options']['challenge'], self::ORIGIN);
+        $standard = static fn (string $base64Url): string => base64_encode((string) base64_decode(strtr($base64Url, '-_', '+/'), true));
+
+        return [
+            'challengeKey' => $data['challengeKey'],
+            'response' => [
+                ...$attestation,
+                'rawId' => $standard($attestation['rawId']),
+                'response' => array_map($standard, $attestation['response']),
+            ],
+            'name' => $name,
+        ];
+    }
+
+    private function passkeys(): PasskeyRepositoryInterface
+    {
+        $passkeys = $this->kernel->getContainer()->get('oauth.acceptance.passkeys');
+        self::assertInstanceOf(PasskeyRepositoryInterface::class, $passkeys);
+
+        return $passkeys;
+    }
+
+    private function storedPasskeys(): int
+    {
+        return (int) $this->connection->fetchOne('SELECT count(*) FROM passkeys WHERE user_id = ?', [$this->user->getId()->toString()]);
     }
 
     /** @return array{process: resource, output: resource, application: string} */
@@ -752,6 +959,13 @@ final class PasswordChangeSessionRevocationTest extends TestCase
             'SELECT EXISTS (SELECT 1 FROM password_reset_tokens WHERE user_id = ?)',
             [$this->user->getId()->toString()],
         ));
+    }
+
+    /** @param array{accessToken: string, refreshToken: string} $session */
+    private function assertStillSignedIn(array $session, SignedDpopProof $key): void
+    {
+        self::assertSame(200, $this->me($session['accessToken'], $key)->getStatusCode(), 'The access token still authenticates.');
+        self::assertSame(200, $this->refresh($session['refreshToken'], $key)->getStatusCode(), 'The refresh token still refreshes.');
     }
 
     /** @param array{accessToken: string, refreshToken: string} $session */

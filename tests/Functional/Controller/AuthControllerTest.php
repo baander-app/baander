@@ -300,7 +300,8 @@ final class AuthControllerTest extends TestCase
         ]);
 
         $data = $this->assertJsonResponse($response, 422, 'error');
-        $this->assertSame('Current password is incorrect.', $data['error']['message']);
+        $this->assertSame('The password or code is incorrect.', $data['error']['message']);
+        $this->assertSame('step_up_failed', $data['error']['details']['reason'] ?? null);
     }
 
     private function openRegistration(): void

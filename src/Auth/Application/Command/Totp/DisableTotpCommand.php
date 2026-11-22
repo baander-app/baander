@@ -4,15 +4,20 @@ declare(strict_types=1);
 
 namespace App\Auth\Application\Command\Totp;
 
+/**
+ * A signed-in user turns their own TOTP off, confirmed by their current password and a current
+ * code. Operators turn it off with ResetUserTotpCommand instead.
+ */
 final readonly class DisableTotpCommand
 {
-    /**
-     * @param string $userId User UUID string
-     * @param string $code   Current TOTP code provided by the user to verify identity
-     */
     public function __construct(
         private string $userId,
-        private string $code,
+        #[\SensitiveParameter]
+        private string $currentPassword,
+        #[\SensitiveParameter]
+        private ?string $totpCode,
+        /** The access token the request was made with; its session stays signed in. */
+        private ?string $currentAccessTokenId = null,
     ) {
     }
 
@@ -21,8 +26,18 @@ final readonly class DisableTotpCommand
         return $this->userId;
     }
 
-    public function getCode(): string
+    public function getCurrentPassword(): string
     {
-        return $this->code;
+        return $this->currentPassword;
+    }
+
+    public function getTotpCode(): ?string
+    {
+        return $this->totpCode;
+    }
+
+    public function getCurrentAccessTokenId(): ?string
+    {
+        return $this->currentAccessTokenId;
     }
 }

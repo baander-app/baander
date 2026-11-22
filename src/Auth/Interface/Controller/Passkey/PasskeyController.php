@@ -4,19 +4,24 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Controller\Passkey;
 
+use App\Auth\Application\Command\Passkey\DeletePasskeyCommand;
 use App\Auth\Application\Command\Passkey\RegisterPasskeyCommand;
+use App\Auth\Application\Exception\CredentialsChangedException;
 use App\Auth\Application\Exception\EmailUnverifiedException;
 use App\Auth\Application\Exception\PasskeyChallengeUnavailableException;
+use App\Auth\Application\Http\AccessTokenAttributes;
 use App\Auth\Application\Port\UserPortInterface;
 use App\Auth\Application\Service\StepUpVerifier;
 use App\Auth\Domain\Model\Passkey\Passkey;
 use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
 use App\Auth\Infrastructure\Security\Passkey\PasskeyService;
 use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Auth\Interface\Request\Passkey\DeletePasskeyRequest;
 use App\Auth\Interface\Request\Passkey\PasskeyRegistrationOptionsRequest;
 use App\Auth\Interface\Request\Passkey\RegisterPasskeyRequest;
 use App\Auth\Interface\Request\Passkey\VerifyPasskeyChallengeRequest;
 use App\Auth\Interface\Request\Passkey\WebAuthnOptionsRequest;
+use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
@@ -28,6 +33,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
@@ -216,6 +222,7 @@ final class PasskeyController
     #[OA\Operation\Post(
         path: '/api/auth/passkey/register',
         summary: 'Register a new passkey',
+        description: 'Signs the account out of every other session, paired devices and third-party apps included; the session that completes the registration stays signed in.',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\MediaType\Json(
@@ -254,7 +261,7 @@ final class PasskeyController
             ),
             new OA\Response(
                 response: '401',
-                description: 'Not authenticated',
+                description: 'Not authenticated, or another change ended this session first (reason credentials_changed); nothing was stored',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
@@ -290,7 +297,7 @@ final class PasskeyController
         ],
     )]
     #[Route('/register', name: 'register', methods: ['POST'])]
-    public function register(#[MapRequestPayload] RegisterPasskeyRequest $passkeyRequest): JsonResponse
+    public function register(#[MapRequestPayload] RegisterPasskeyRequest $passkeyRequest, Request $request): JsonResponse
     {
         $user = $this->getCurrentSecurityUser();
         if ($user === null) {
@@ -330,11 +337,17 @@ final class PasskeyController
             credentialId: $credentialId,
             credentialRecordData: $this->passkeyService->credentialRecordToArray($credentialRecord),
             counter: $credentialRecord->counter,
+            currentAccessTokenId: self::currentAccessTokenId($request),
         );
 
         try {
             $this->commandBus->dispatch($command);
         } catch (\Throwable $e) {
+            // Answered by CredentialsChangedListener: 401, so the client signs in again.
+            if (HandlerFailure::cause($e) instanceof CredentialsChangedException) {
+                throw $e;
+            }
+
             return $this->errorResponse($e->getMessage());
         }
 
@@ -573,6 +586,7 @@ final class PasskeyController
     #[OA\Operation\Delete(
         path: '/api/auth/passkey/{publicId}',
         summary: 'Delete a passkey',
+        description: 'Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. An unknown passkey answers 404 before any step-up attempt is spent. Signs the account out of every other session, paired devices and third-party apps included; the session that made the request stays signed in.',
         parameters: [
             new OA\Parameter(
                 name: 'publicId',
@@ -582,6 +596,12 @@ final class PasskeyController
                 schema: new OA\Schema(type: 'string'),
             ),
         ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType\Json(
+                schema: new OA\Schema(ref: DeletePasskeyRequest::class),
+            ),
+        ),
         responses: [
             new OA\Response(
                 response: '200',
@@ -607,7 +627,7 @@ final class PasskeyController
             ),
             new OA\Response(
                 response: '401',
-                description: 'Not authenticated',
+                description: 'Not authenticated, or another change ended this session first (reason credentials_changed); nothing was changed',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
@@ -619,10 +639,24 @@ final class PasskeyController
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
             ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error, or the password or code is wrong',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '429',
+                description: 'Too many step-up attempts for this account',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'delete', methods: ['DELETE'])]
-    public function delete(string $publicId): JsonResponse
+    public function delete(string $publicId, #[MapRequestPayload(mapWhenEmpty: true)] DeletePasskeyRequest $payload, Request $request): JsonResponse
     {
         $user = $this->getCurrentSecurityUser();
         if ($user === null) {
@@ -635,33 +669,20 @@ final class PasskeyController
             return $this->errorResponse($this->trans('errors.invalid_public_id'));
         }
 
+        // A refused step-up, a missing passkey or a session another change ended propagates to
+        // the exception listeners, which answer 422, 429, 404 or 401.
+        $remainingCredentialIds = $this->commandBus->dispatch(new DeletePasskeyCommand(
+            userId: $user->getId(),
+            passkeyPublicId: $publicId,
+            currentPassword: $payload->currentPassword,
+            totpCode: $payload->totpCode,
+            currentAccessTokenId: self::currentAccessTokenId($request),
+        ))->last(HandledStamp::class)?->getResult();
+        if (!is_array($remainingCredentialIds)) {
+            throw new \LogicException('Deleting a passkey returned no remaining credentials.');
+        }
+
         $userUuid = Uuid::fromString($user->getId());
-        $passkeys = $this->passkeyRepository->forUser($userUuid);
-
-        $targetPasskey = null;
-        foreach ($passkeys as $passkey) {
-            if ($passkey->getPublicId()->toString() === $publicId) {
-                $targetPasskey = $passkey;
-                break;
-            }
-        }
-
-        if ($targetPasskey === null) {
-            return $this->notFound();
-        }
-
-        try {
-            $this->passkeyRepository->remove($targetPasskey);
-        } catch (\Throwable) {
-            return $this->errorResponse($this->trans('errors.failed_delete_passkey', domain: 'auth'), Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        $remainingPasskeys = $this->passkeyRepository->forUser($userUuid);
-        $remainingCredentialIds = array_map(
-            static fn ($passkey) => $passkey->getCredentialId(),
-            $remainingPasskeys,
-        );
-
         try {
             $owner = $this->users->findByUuid($userUuid) ?? throw new \UnexpectedValueException('User not found.');
             $signal = $this->passkeyService->createAllAcceptedCredentialsSignal(
@@ -700,6 +721,12 @@ final class PasskeyController
         }
 
         return $user;
+    }
+
+    /** The access token the request was made with, whose session a passkey change keeps signed in. */
+    private static function currentAccessTokenId(Request $request): ?string
+    {
+        return $request->attributes->get(AccessTokenAttributes::TOKEN_ID) |> AccessTokenAttributes::tokenId(...);
     }
 
     private static function base64UrlEncode(string $data): string

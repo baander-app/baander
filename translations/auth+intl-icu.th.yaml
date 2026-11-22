@@ -7,7 +7,6 @@ errors:
   passkey_unavailable: "พาสคีย์ใช้งานไม่ได้ชั่วคราว โปรดลองอีกครั้งในอีกสักครู่"
   no_passkey_found: "ไม่พบพาสคีย์สำหรับ credential ID ที่ระบุ"
   cannot_resolve_user: "ไม่พบผู้ใช้สำหรับ credential ID ที่ระบุ"
-  failed_delete_passkey: "ลบพาสคีย์ไม่สำเร็จ"
   user_not_found: "ไม่พบผู้ใช้"
   client_auth_failed: "การยืนยันตัวตนของไคลเอนต์ล้มเหลว"
   user_code_required: 'ต้องระบุพารามิเตอร์ "user_code"'
@@ -17,7 +16,6 @@ errors:
   email_verification_failed: "ลิงก์ยืนยันนี้ไม่ถูกต้องหรือหมดอายุแล้ว"
   internal: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์"
   password_reset_failed: "ลิงก์รีเซ็ตรหัสผ่านนี้ไม่ถูกต้องหรือหมดอายุแล้ว"
-  current_password_incorrect: "รหัสผ่านปัจจุบันไม่ถูกต้อง"
   step_up_failed: "รหัสผ่านหรือรหัสยืนยันไม่ถูกต้อง"
   credentials_changed: "เซสชันนี้ออกจากระบบแล้ว โปรดเข้าสู่ระบบอีกครั้งแล้วทำการเปลี่ยนแปลงนั้นอีกครั้ง"
   email_unverified: "โปรดยืนยันอีเมลของคุณก่อน"

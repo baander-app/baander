@@ -263,9 +263,9 @@ final class PasskeyControllerTest extends TestCase
         $options = json_decode($this->controller->registrationOptions(new PasskeyRegistrationOptionsRequest('current-password'))->getContent(), true, 512, JSON_THROW_ON_ERROR)['data'];
         $attestation = self::asTheWebClientSendsIt($credential->attest($options['options']['challenge'], 'https://baander.app'));
         $signedIn = $other;
-        $borrowed = $this->controller->register(new \App\Auth\Interface\Request\Passkey\RegisterPasskeyRequest($options['challengeKey'], $attestation, 'Borrowed'));
+        $borrowed = $this->controller->register(new \App\Auth\Interface\Request\Passkey\RegisterPasskeyRequest($options['challengeKey'], $attestation, 'Borrowed'), new \Symfony\Component\HttpFoundation\Request());
         $signedIn = $owner;
-        $completed = $this->controller->register(new \App\Auth\Interface\Request\Passkey\RegisterPasskeyRequest($options['challengeKey'], $attestation, 'Laptop'));
+        $completed = $this->controller->register(new \App\Auth\Interface\Request\Passkey\RegisterPasskeyRequest($options['challengeKey'], $attestation, 'Laptop'), new \Symfony\Component\HttpFoundation\Request());
 
         self::assertSame(400, $borrowed->getStatusCode(), (string) $borrowed->getContent());
         self::assertSame(201, $completed->getStatusCode(), (string) $completed->getContent());

@@ -5,29 +5,35 @@ declare(strict_types=1);
 namespace App\Auth\Interface\Request\Totp;
 
 use OpenApi\Spec as OA;
-use Symfony\Component\Validator\Constraints\NotBlank;
-use Symfony\Component\Validator\Constraints\Length;
 
 #[OA\Schema(
     type: 'object',
     properties: [
-        'code' => new OA\Schema(
+        'currentPassword' => new OA\Schema(
             type: 'string',
-            minLength: 6,
-            maxLength: 6,
-            example: '123456',
+            example: '********',
             default: '',
         ),
+        'totpCode' => new OA\Schema(
+            description: 'A current TOTP code',
+            type: 'string',
+            nullable: true,
+            example: '123456',
+            default: null,
+        ),
     ],
-    required: ['code'],
+    required: ['currentPassword', 'totpCode'],
     component: 'DisableTotpRequest',
 )]
 final readonly class DisableTotpRequest
 {
+    /*
+     * Neither field is validated on purpose: a missing password or code gets the same answer as
+     * a wrong one, so turning TOTP off from a session without the password reveals nothing.
+     */
     public function __construct(
-        #[NotBlank(message: 'code is required.')]
-        #[Length(exactly: 6)]
-        public string $code = '',
+        public string $currentPassword = '',
+        public ?string $totpCode = null,
     ) {
     }
 }

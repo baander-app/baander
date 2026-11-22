@@ -36,6 +36,12 @@ final class AccessTokenAttributes
         return $attribute === true;
     }
 
+    /** Null when the request carries no access token id, so a credential change keeps no session. */
+    public static function tokenId(mixed $attribute): ?string
+    {
+        return is_string($attribute) && $attribute !== '' ? $attribute : null;
+    }
+
     /** Null when the request carries no epoch, which a caller must treat as unauthenticated. */
     public static function credentialEpoch(mixed $attribute): ?int
     {

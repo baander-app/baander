@@ -7,7 +7,6 @@ errors:
   passkey_unavailable: "Passkeys er midlertidigt utilgængelige. Prøv igen om et øjeblik."
   no_passkey_found: "Ingen passkey fundet for det angivne passkey."
   cannot_resolve_user: "Kan ikke finde brugeren for det angivne passkey."
-  failed_delete_passkey: "Kunne ikke slette passkey."
   user_not_found: "Bruger ikke fundet."
   client_auth_failed: "Klientgodkendelse mislykkedes."
   user_code_required: 'Parameteren "user_code" er påkrævet.'
@@ -17,7 +16,6 @@ errors:
   email_verification_failed: "Bekræftelseslinket er ugyldigt eller udløbet."
   internal: "Intern serverfejl."
   password_reset_failed: "Linket til nulstilling af adgangskode er ugyldigt eller udløbet."
-  current_password_incorrect: "Den nuværende adgangskode er forkert."
   step_up_failed: "Adgangskoden eller koden er forkert."
   credentials_changed: "Denne session er logget ud. Log ind igen, og gentag ændringen."
   email_unverified: "Bekræft din e-mailadresse først."

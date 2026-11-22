@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react'
+import { type ComponentProps, type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import { AxiosError } from 'axios'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { parseApiError } from '@/features/auth/lib/parse-api-error'
@@ -29,6 +29,8 @@ interface StepUpDialogProps {
   title: string
   description: ReactNode
   submitLabel: string
+  /** The submit button's look; `destructive` for a change that can lock the user out. */
+  submitVariant?: ComponentProps<typeof Button>['variant']
   /** Shown while the error has no message of its own. */
   fallbackError: string
   /** Fields of the change itself, shown above the password. */
@@ -72,9 +74,9 @@ function reasonOf(data: unknown): string | undefined {
 
 /**
  * Asks for the current password, and a code from the authenticator app when TOTP is on,
- * before a sensitive change such as a new email address or a passkey. A wrong password or
- * code clears the fields and keeps the dialog open; after too many attempts the dialog stays
- * locked until it is closed.
+ * before a sensitive change such as a new email address or password, or adding or removing a
+ * passkey. A wrong password or code clears the fields and keeps the dialog open; after too many
+ * attempts the dialog stays locked until it is closed.
  */
 export function StepUpDialog({
   open,
@@ -82,6 +84,7 @@ export function StepUpDialog({
   title,
   description,
   submitLabel,
+  submitVariant = 'default',
   fallbackError,
   children,
   trigger,
@@ -208,7 +211,7 @@ export function StepUpDialog({
               <Button variant="outline" type="button" disabled={loading} onClick={() => handleOpenChange(false)}>
                 {t('common.cancel')}
               </Button>
-              <Button type="submit" disabled={loading || refusal?.kind === 'limited'}>
+              <Button type="submit" variant={submitVariant} disabled={loading || refusal?.kind === 'limited'}>
                 {loading ? <SpinningIconWithMargin size={14} /> : null}
                 {submitLabel}
               </Button>

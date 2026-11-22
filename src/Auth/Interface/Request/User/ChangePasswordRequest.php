@@ -23,6 +23,13 @@ use Symfony\Component\Validator\Constraints\NotBlank;
             example: '********',
             default: '',
         ),
+        'totpCode' => new OA\Schema(
+            description: 'A current TOTP code; needed when TOTP is on',
+            type: 'string',
+            nullable: true,
+            example: '123456',
+            default: null,
+        ),
     ],
     required: ['currentPassword', 'newPassword'],
     component: 'ChangePasswordRequest',
@@ -36,6 +43,9 @@ final readonly class ChangePasswordRequest
         #[NotBlank(message: 'New password is required.')]
         #[Length(min: 8, max: 255, minMessage: 'Password must be at least {{ limit }} characters.')]
         public string $newPassword = '',
+
+        // Optional on purpose: a missing code gets the same answer as a wrong password.
+        public ?string $totpCode = null,
     ) {
     }
 }

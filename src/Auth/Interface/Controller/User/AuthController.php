@@ -15,7 +15,6 @@ use App\Auth\Application\Command\User\ResetPasswordCommand;
 use App\Auth\Application\Command\User\VerifyEmailCommand;
 use App\Auth\Application\Http\AccessTokenAttributes;
 use App\Auth\Application\Exception\CredentialsChangedException;
-use App\Auth\Application\Exception\CurrentPasswordMismatchException;
 use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use App\Auth\Application\Exception\EmailVerificationException;
 use App\Auth\Application\Exception\OAuthProtocolException;
@@ -963,23 +962,11 @@ final class AuthController
     #[OA\Operation\Put(
         path: '/api/auth/me/password',
         summary: 'Change the current user password',
-        description: 'Signs the account out of every other session; the session that made the request stays signed in.',
+        description: 'Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. A new password outside the length policy is refused before any step-up attempt is spent. Signs the account out of every other session, paired devices and third-party apps included; the session that made the request stays signed in.',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\MediaType\Json(
-                schema: new OA\Schema(
-                    type: 'object',
-                    properties: [
-                        'currentPassword' => new OA\Schema(type: 'string', example: '********'),
-                        'newPassword' => new OA\Schema(
-                            type: 'string',
-                            minLength: 8,
-                            maxLength: 255,
-                            example: '********',
-                        ),
-                    ],
-                    required: ['currentPassword', 'newPassword'],
-                ),
+                schema: new OA\Schema(ref: ChangePasswordRequest::class),
             ),
         ),
         responses: [
@@ -1009,9 +996,16 @@ final class AuthController
             ),
             new OA\Response(
                 response: '422',
-                description: 'Validation error or wrong current password',
+                description: 'Validation error, or the password or code is wrong',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '429',
+                description: 'Too many step-up attempts for this account',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
             ),
         ],
@@ -1024,15 +1018,14 @@ final class AuthController
             return $this->notFound();
         }
 
-        // OAuth2Authenticator copies the presenting token's identifier here; its session stays signed in.
-        $currentAccessTokenId = $request->attributes->get(AccessTokenAttributes::TOKEN_ID);
-
         try {
             $this->commandBus->dispatch(new ChangePasswordCommand(
                 userId: $user->getId()->toString(),
                 currentPassword: $payload->currentPassword,
                 newPassword: $payload->newPassword,
-                currentAccessTokenId: is_string($currentAccessTokenId) && $currentAccessTokenId !== '' ? $currentAccessTokenId : null,
+                totpCode: $payload->totpCode,
+                // OAuth2Authenticator copies the presenting token's identifier here; its session stays signed in.
+                currentAccessTokenId: $request->attributes->get(AccessTokenAttributes::TOKEN_ID) |> AccessTokenAttributes::tokenId(...),
             ));
         } catch (\Throwable $e) {
             return $this->handleCommandException(
@@ -1125,13 +1118,6 @@ final class AuthController
             return $this->errorResponse(
                 $this->trans('errors.password_reset_failed', domain: 'auth'),
                 Response::HTTP_BAD_REQUEST,
-            );
-        }
-
-        if ($previous instanceof CurrentPasswordMismatchException) {
-            return $this->errorResponse(
-                $this->trans('errors.current_password_incorrect', domain: 'auth'),
-                Response::HTTP_UNPROCESSABLE_ENTITY,
             );
         }
 

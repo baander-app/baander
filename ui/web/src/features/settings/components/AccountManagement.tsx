@@ -1,31 +1,20 @@
-import { type FormEvent, type ReactNode, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { useCurrentUserRefresh } from '@/features/auth/hooks/use-current-user-refresh'
-import { parseApiError } from '@/features/auth/lib/parse-api-error'
-import { getGetAuthMeQueryKey, putAuthMeEmail } from '@/shared/api-client/gen/endpoints'
+import { getGetAuthMeQueryKey, putAuthMeEmail, putAuthMePassword } from '@/shared/api-client/gen/endpoints'
 import { useTranslation } from '@/shared/i18n'
 import { textRole } from '@/shared/theme'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
 import { Card, CardContent } from '@/shared/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/shared/components/ui/dialog'
-import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { EmailVerificationNotice } from './EmailVerificationNotice'
 import { PendingEmailNotice } from './PendingEmailNotice'
 import { StepUpDialog, type StepUpCredentials } from './StepUpDialog'
-import { ErrorBox, FieldLabel, Form, SpinningIconWithMargin } from './settings-form-styles'
+import { FieldLabel } from './settings-form-styles'
 
 const CardContentStyled = styled(CardContent)`
   display: flex;
@@ -221,112 +210,76 @@ function ChangeEmailDialog({ open, onOpenChange, children }: { open: boolean; on
   )
 }
 
+/**
+ * The new password and its confirmation, then the step-up prompt. A confirmation that differs
+ * blocks the submit in the browser, so the password and code typed below are kept.
+ */
 function ChangePasswordDialog({ open, onOpenChange, children }: { open: boolean; onOpenChange: (open: boolean) => void; children: ReactNode }) {
-  const [currentPassword, setCurrentPassword] = useState('')
+  const { t } = useTranslation()
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const confirmInput = useRef<HTMLInputElement>(null)
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    setError(null)
+  useEffect(() => {
+    confirmInput.current?.setCustomValidity(confirmPassword === newPassword ? '' : t('auth.passwordMismatch'))
+  }, [newPassword, confirmPassword, t])
 
-    if (newPassword !== confirmPassword) {
-      setError('Passwords do not match.')
-      return
-    }
-
-    if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters.')
-      return
-    }
-
-    setLoading(true)
-
-    try {
-      await AXIOS_INSTANCE.put('/api/auth/me/password', {
-        currentPassword,
-        newPassword,
-      })
-      setCurrentPassword('')
+  // Closing, after a change or without one, drops the new password.
+  const handleOpenChange = (next: boolean) => {
+    if (!next) {
       setNewPassword('')
       setConfirmPassword('')
-      onOpenChange(false)
-    } catch (err: unknown) {
-      setError(parseApiError(err, 'Failed to change password.').message)
-    } finally {
-      setLoading(false)
     }
+    onOpenChange(next)
+  }
+
+  const changePassword = async (stepUp: StepUpCredentials) => {
+    await putAuthMePassword({ newPassword, ...stepUp })
+
+    return true
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Change password</DialogTitle>
-          <DialogDescription>
-            Enter your current password and choose a new one.
-          </DialogDescription>
-        </DialogHeader>
-        <Form onSubmit={handleSubmit}>
-          {error && (
-            <ErrorBox>{error}</ErrorBox>
-          )}
-          <div>
-            <FieldLabel htmlFor="current-password">
-              Current password
-            </FieldLabel>
-            <Input
-              id="current-password"
-              type="password"
-              required
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              autoComplete="current-password"
-              autoFocus
-            />
-          </div>
-          <div>
-            <FieldLabel htmlFor="new-password">
-              New password
-            </FieldLabel>
-            <Input
-              id="new-password"
-              type="password"
-              required
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              autoComplete="new-password"
-              minLength={8}
-            />
-          </div>
-          <div>
-            <FieldLabel htmlFor="confirm-password">
-              Confirm new password
-            </FieldLabel>
-            <Input
-              id="confirm-password"
-              type="password"
-              required
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              autoComplete="new-password"
-              minLength={8}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? <SpinningIconWithMargin size={14} /> : null}
-              Save
-            </Button>
-          </DialogFooter>
-        </Form>
-      </DialogContent>
-    </Dialog>
+    <StepUpDialog
+      open={open}
+      onOpenChange={handleOpenChange}
+      trigger={children}
+      title="Change password"
+      description={<>Choose a new password. {t('auth.stepUp.signsOutOtherSessions')}</>}
+      submitLabel="Save"
+      fallbackError="Failed to change password."
+      onConfirm={changePassword}
+    >
+      <div>
+        <FieldLabel htmlFor="new-password">
+          New password
+        </FieldLabel>
+        <Input
+          id="new-password"
+          type="password"
+          required
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          autoComplete="new-password"
+          minLength={8}
+          maxLength={255}
+          autoFocus
+        />
+      </div>
+      <div>
+        <FieldLabel htmlFor="confirm-password">
+          Confirm new password
+        </FieldLabel>
+        <Input
+          ref={confirmInput}
+          id="confirm-password"
+          type="password"
+          required
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          autoComplete="new-password"
+        />
+      </div>
+    </StepUpDialog>
   )
 }

@@ -211,9 +211,10 @@ parameters:
     auth.rate_limit.password_reset_per_email.max_attempts: 10
 
     # Maximum step-up attempts per account within the window: the current password,
-    # plus a TOTP code when TOTP is on, that a user's own email change, TOTP setup
-    # and passkey registration ask for. Every attempt counts, from any address. Over
-    # the limit the request answers 429 with Retry-After. Default: 10 per 15 minutes.
+    # plus a TOTP code when TOTP is on, that a user's own email or password change,
+    # TOTP setup, turning TOTP off, and adding or removing a passkey ask for. Every
+    # attempt counts, from any address. Over the limit the request answers 429 with
+    # Retry-After. Default: 10 per 15 minutes.
     auth.rate_limit.step_up.max_attempts: 10
     auth.rate_limit.step_up.window: 900
 

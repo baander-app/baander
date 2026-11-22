@@ -504,7 +504,7 @@ final class AdminUserController
     public function resetTotp(string $publicId): JsonResponse
     {
         $publicId = $this->publicIdentifier($publicId);
-        // An administrator's own TOTP goes off only with a current code, through POST /api/auth/totp/disable.
+        // An administrator's own TOTP goes off only with step-up, through POST /api/auth/totp/disable.
         if ($this->isSignedInUser($publicId)) {
             return $this->forbidden(self::OWN_CREDENTIALS_REFUSAL);
         }
