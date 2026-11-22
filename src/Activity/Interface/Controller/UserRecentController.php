@@ -9,6 +9,7 @@ use App\Activity\Application\Port\ActivityPortInterface;
 use App\Activity\Domain\Model\MediaActivity;
 use App\Activity\Infrastructure\ActivityEnrichmentService;
 use App\Activity\Interface\Resource\RecentItemResource;
+use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
@@ -29,6 +30,7 @@ final class UserRecentController
         private readonly Security $security,
         private readonly ActivityPortInterface $activityService,
         private readonly ActivityEnrichmentService $enrichmentService,
+        private readonly PublicOrigins $publicOrigins,
     ) {
     }
 
@@ -110,8 +112,7 @@ final class UserRecentController
             $activities = array_slice($activities, 0, $limit);
         }
 
-        $baseUrl = $request->getSchemeAndHttpHost();
-        $enriched = $this->enrichmentService->enrich($activities, $baseUrl);
+        $enriched = $this->enrichmentService->enrich($activities, $this->publicOrigins->forRequest($request));
 
         $mapped = array_map(
             fn(array $item) => RecentItemResource::from($item),

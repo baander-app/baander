@@ -16,6 +16,7 @@ use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
@@ -48,6 +49,7 @@ final class ActivityController
         private readonly ArtistPortInterface $artistPort,
         private readonly MoviePortInterface $moviePort,
         private readonly \App\Activity\Application\Port\ActivityIdentityProjectionPortInterface $identities,
+        private readonly PublicOrigins $publicOrigins,
     ) {
     }
 
@@ -130,8 +132,7 @@ final class ActivityController
             $pagination->offset,
         );
 
-        $baseUrl = $request->getSchemeAndHttpHost();
-        $enriched = $this->enrichmentService->enrich($activities, $baseUrl);
+        $enriched = $this->enrichmentService->enrich($activities, $this->publicOrigins->forRequest($request));
 
         return $this->successResponse($enriched);
     }

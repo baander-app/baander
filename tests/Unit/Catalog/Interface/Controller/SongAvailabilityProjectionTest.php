@@ -17,6 +17,7 @@ use App\Catalog\Interface\Controller\SongController;
 use App\Catalog\Interface\Request\UpdateSongRequest;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Media\Application\Port\ImagePortInterface;
+use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Domain\Model\CursorPage;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
@@ -66,7 +67,7 @@ final class SongAvailabilityProjectionTest extends TestCase
             $albums = $this->createStub(AlbumPortInterface::class);
             $albums->method('findVisibleByPublicId')->willReturn($album);
             $albums->method('findVisibleWithSongs')->willReturn([$album, $listed]);
-            $controller = new AlbumController($albums, $scopes, $this->createStub(ImagePortInterface::class), $this->createStub(AlbumDuplicatePortInterface::class), $this->createStub(AlbumMergePortInterface::class), $bus, $availability, $this->createStub(AuthorizationCheckerInterface::class));
+            $controller = new AlbumController($albums, $scopes, $this->createStub(ImagePortInterface::class), $this->createStub(AlbumDuplicatePortInterface::class), $this->createStub(AlbumMergePortInterface::class), $bus, $availability, $this->createStub(AuthorizationCheckerInterface::class), new PublicOrigins('https://baander.app'));
             $response = $controller->show($album->getPublicId()->toString(), Request::create('https://baander.app/api/albums/' . $album->getPublicId()->toString()));
         } else {
             $controller = new SongController($songs, $scopes, new CursorCodec(new JsonEncoder()), $bus, $availability, $this->createStub(AuthorizationCheckerInterface::class));

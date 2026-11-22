@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Application\Http;
 
 use InvalidArgumentException;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * The origins the deployment answers on: the origin of the public URL (APP_URL) and each further
@@ -37,6 +38,18 @@ final readonly class PublicOrigins
             |> (fn (array $origins): array => [$this->primary, ...$origins])
             |> array_unique(...)
             |> array_values(...);
+    }
+
+    /**
+     * The origin a response renders into its URLs and policies: the request's origin when all
+     * lists it, the primary origin otherwise. A trusted proxy's forwarded scheme, Host and port
+     * count as the request's, so they too can only select a listed origin.
+     */
+    public function forRequest(Request $request): string
+    {
+        $origin = $request->getSchemeAndHttpHost();
+
+        return in_array($origin, $this->all, true) ? $origin : $this->primary;
     }
 
     private static function origin(string $url): string

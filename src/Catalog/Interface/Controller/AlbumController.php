@@ -19,6 +19,7 @@ use App\Catalog\Interface\Resource\AlbumResource;
 use App\Catalog\Interface\Resource\SongResource;
 use App\Catalog\Interface\Resource\DuplicateGroupResource;
 use App\Media\Application\Port\ImagePortInterface;
+use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
@@ -60,6 +61,7 @@ final class AlbumController
         private readonly MessageBusInterface $bus,
         private readonly SongAvailabilityPortInterface $availability,
         private readonly AuthorizationCheckerInterface $authorization,
+        private readonly PublicOrigins $publicOrigins,
     ) {
     }
 
@@ -181,7 +183,7 @@ final class AlbumController
         ));
         $images = $coverImageIds !== [] ? $this->imagePort->findByUuids($coverImageIds) : [];
 
-        $baseUrl = $request->getSchemeAndHttpHost();
+        $baseUrl = $this->publicOrigins->forRequest($request);
 
         $results = array_map(
             fn(Album $album) => AlbumResource::fromWithCoverAndArtists(
@@ -311,7 +313,7 @@ final class AlbumController
                 $album,
                 $coverImage,
                 $this->albumService->getVisibleArtistNamesForAlbum($album->getId(), $scope),
-                $request->getSchemeAndHttpHost(),
+                $this->publicOrigins->forRequest($request),
             ),
             ['songs' => $songs],
         ));

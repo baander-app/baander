@@ -19,9 +19,11 @@ use App\Recommendation\Application\QueryHandler\GetRecommendationsForUserHandler
 use App\Recommendation\Domain\Model\Recommendation;
 use App\Recommendation\Domain\ValueObject\RecommendationType;
 use App\Recommendation\Domain\Repository\RecommendationRepositoryInterface;
+use App\Shared\Application\Http\PublicOrigins;
 use App\Tests\Functional\TestCase;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\Stub;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -58,6 +60,7 @@ final class GetRecommendationsForUserHandlerTest extends TestCase
             $this->songRepository,
             $this->imagePort,
             $this->requestStack,
+            new PublicOrigins('https://baander.app'),
             $this->projection(),
         );
     }
@@ -175,8 +178,17 @@ final class GetRecommendationsForUserHandlerTest extends TestCase
         $this->assertSame('https://baander.app/api/images/' . $coverPublicId->toString() . '/file', $result[0]['coverImageUrl']);
     }
 
-    public function testEnrichesArtistRecommendationsWithNameAndCoverUrl(): void
+    /** @return iterable<string, array{string}> */
+    public static function requestUrls(): iterable
     {
+        yield 'the public origin' => ['https://baander.app/api/recommendations'];
+        yield 'a forged Host' => ['https://other.baander.app/api/recommendations'];
+    }
+
+    #[DataProvider('requestUrls')]
+    public function testEnrichesArtistRecommendationsWithNameAndACoverUrlOnThePublicOrigin(string $requestUrl): void
+    {
+        $this->requestStack->push(Request::create($requestUrl));
         $user = $this->createTestUser();
         $userId = $user->getId();
         $artistId = Uuid::v7();

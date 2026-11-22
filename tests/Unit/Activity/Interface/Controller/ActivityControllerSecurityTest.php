@@ -14,6 +14,7 @@ use App\Catalog\Application\Port\ArtistPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Media\Application\Port\ImagePortInterface;
+use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\MockObject\Stub;
@@ -72,6 +73,7 @@ final class ActivityControllerSecurityTest extends TestCase
             artistPort: $this->artistPort,
             moviePort: $this->moviePort,
             identities: $this->users(),
+            publicOrigins: new PublicOrigins('https://baander.app'),
         );
 
         $translator = $this->createStub(TranslatorInterface::class);

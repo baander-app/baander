@@ -1803,7 +1803,6 @@ services:
 
     App\Shared\Infrastructure\EventListener\SecurityHeadersListener:
         arguments:
-            $appUrl: '%env(APP_URL)%'
             $developmentOrigins: '%app.csp.development_origins%'
 
     App\Recommendation\Application\Port\RecommendationPublicIdentityInterface:

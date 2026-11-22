@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\EventListener;
 
+use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Infrastructure\EventListener\SecurityHeadersListener;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -22,7 +23,7 @@ final class SecurityHeadersListenerTest extends TestCase
 
     public function testEachHtmlResponseCarriesItsOwnNonceAndRefusesFraming(): void
     {
-        $listener = new SecurityHeadersListener('https://baander.app');
+        $listener = new SecurityHeadersListener(new PublicOrigins('https://baander.app'));
         $first = $this->respond($listener, Request::create('https://baander.app/library'), new Response('<html></html>'));
         $second = $this->respond($listener, Request::create('https://baander.app/library'), new Response('<html></html>'));
 
@@ -39,7 +40,7 @@ final class SecurityHeadersListenerTest extends TestCase
 
     public function testTheNonceInThePolicyIsTheOneTheRequestCarriesForTemplates(): void
     {
-        $listener = new SecurityHeadersListener('https://baander.app');
+        $listener = new SecurityHeadersListener(new PublicOrigins('https://baander.app'));
         $request = Request::create('https://baander.app/');
         $response = $this->respond($listener, $request, new Response('<html></html>', 200, ['Content-Type' => 'text/html; charset=UTF-8']));
 
@@ -50,7 +51,8 @@ final class SecurityHeadersListenerTest extends TestCase
 
     public function testJsonResponsesCarryNoPolicyButKeepTheBaselineHeaders(): void
     {
-        $response = $this->respond(new SecurityHeadersListener('https://baander.app'), Request::create('https://baander.app/api/me'), new JsonResponse([]));
+        $listener = new SecurityHeadersListener(new PublicOrigins('https://baander.app'));
+        $response = $this->respond($listener, Request::create('https://baander.app/api/me'), new JsonResponse([]));
 
         self::assertFalse($response->headers->has('Content-Security-Policy'));
         self::assertSame('nosniff', $response->headers->get('X-Content-Type-Options'));
@@ -59,7 +61,10 @@ final class SecurityHeadersListenerTest extends TestCase
 
     public function testSignedMediaOnAnotherApplicationOriginAndTheDevelopmentServerAreAllowed(): void
     {
-        $listener = new SecurityHeadersListener('https://media.baander.app', ['http://localhost:5174']);
+        $listener = new SecurityHeadersListener(
+            new PublicOrigins('https://media.baander.app', ['http://localhost:9501']),
+            ['http://localhost:5174'],
+        );
         $policy = $this->directives($this->respond($listener, Request::create('http://localhost:9501/'), new Response('<html></html>'))->headers->get('Content-Security-Policy'));
 
         self::assertContains('https://media.baander.app', $policy['connect-src']);
@@ -69,9 +74,25 @@ final class SecurityHeadersListenerTest extends TestCase
         self::assertContains('ws://localhost:5174', $policy['connect-src']);
     }
 
+    public function testTheSocketOriginIsAListedRequestOriginAndTheApplicationOriginForAnyOtherHost(): void
+    {
+        $listener = new SecurityHeadersListener(new PublicOrigins('https://baander.app', ['https://192.168.1.20:8443']));
+        $listed = $this->respond($listener, Request::create('https://192.168.1.20:8443/'), new Response('<html></html>'));
+        $forged = $this->respond($listener, Request::create('https://other.baander.app/'), new Response('<html></html>'));
+
+        self::assertContains(
+            'wss://192.168.1.20:8443',
+            $this->directives($listed->headers->get('Content-Security-Policy'))['connect-src'],
+        );
+        self::assertSame(
+            ["'self'", 'wss://baander.app', 'https://baander.app'],
+            $this->directives($forged->headers->get('Content-Security-Policy'))['connect-src'],
+        );
+    }
+
     public function testHstsIsSentOnlyForHttpsThroughATrustedProxy(): void
     {
-        $listener = new SecurityHeadersListener('https://baander.app');
+        $listener = new SecurityHeadersListener(new PublicOrigins('https://baander.app'));
         Request::setTrustedProxies(['10.0.0.1'], Request::HEADER_X_FORWARDED_PROTO);
 
         $proxied = Request::create('http://baander.app/', server: ['REMOTE_ADDR' => '10.0.0.1', 'HTTP_X_FORWARDED_PROTO' => 'https']);

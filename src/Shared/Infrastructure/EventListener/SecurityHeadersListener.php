@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\EventListener;
 
+use App\Shared\Application\Http\PublicOrigins;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -18,9 +19,10 @@ use Symfony\Component\HttpKernel\KernelEvents;
  * trusted proxy, get HSTS.
  *
  * The policy follows what the web app loads: its own scripts, WebAssembly DSP modules and
- * audio worklets, the stream service worker and blob: media workers, a WebSocket to its own
- * host, signed media on the application URL, and radio streams and station logos from any
- * host. Styles allow inline because libraries and the development server inject style tags.
+ * audio worklets, the stream service worker and blob: media workers, a WebSocket to the public
+ * origin the page names as its API URL, signed media on the primary public origin, and radio
+ * streams and station logos from any host. Styles allow inline because libraries and the
+ * development server inject style tags.
  */
 final readonly class SecurityHeadersListener
 {
@@ -37,11 +39,10 @@ final readonly class SecurityHeadersListener
     private const string HSTS = 'max-age=31536000';
 
     /**
-     * @param string       $appUrl             The application URL signed media URLs are prefixed with
      * @param list<string> $developmentOrigins Origins of a development asset server, empty in production
      */
     public function __construct(
-        private string $appUrl = '',
+        private PublicOrigins $publicOrigins,
         private array $developmentOrigins = [],
     ) {
     }
@@ -79,8 +80,6 @@ final readonly class SecurityHeadersListener
     private function policy(Request $request, string $nonce): string
     {
         $development = array_map(self::origin(...), $this->developmentOrigins) |> array_filter(...) |> array_values(...);
-        $application = self::origin($this->appUrl);
-        $applicationSources = $application === null ? [] : [$application];
 
         $directives = [
             'default-src' => ["'self'"],
@@ -91,8 +90,8 @@ final readonly class SecurityHeadersListener
             'font-src' => ["'self'", 'data:', ...$development],
             'connect-src' => [
                 "'self'",
-                self::socketOrigin($request->getSchemeAndHttpHost()),
-                ...$applicationSources,
+                self::socketOrigin($this->publicOrigins->forRequest($request)),
+                $this->publicOrigins->primary,
                 ...$development,
                 ...array_map(self::socketOrigin(...), $development),
             ],

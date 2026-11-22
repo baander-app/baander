@@ -10,6 +10,7 @@ use App\Catalog\Domain\Repository\SongRepositoryInterface;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Recommendation\Application\Query\GetRecommendationsForUserQuery;
 use App\Recommendation\Domain\Repository\RecommendationRepositoryInterface;
+use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -23,6 +24,7 @@ final class GetRecommendationsForUserHandler
         private readonly SongRepositoryInterface $songRepository,
         private readonly ImagePortInterface $imagePort,
         private readonly RequestStack $requestStack,
+        private readonly PublicOrigins $publicOrigins,
         private readonly \App\Recommendation\Application\Port\RecommendationPublicIdentityInterface $identities,
     ) {
     }
@@ -129,7 +131,9 @@ final class GetRecommendationsForUserHandler
 
         // Build image URL map
         $request = $this->requestStack->getCurrentRequest();
-        $baseUrl = $request !== null ? $request->getSchemeAndHttpHost() : '';
+        $baseUrl = $request === null
+            ? $this->publicOrigins->primary
+            : $this->publicOrigins->forRequest($request);
 
         $imageUrlMap = [];
         foreach ($images as $image) {
