@@ -112,7 +112,36 @@ The low-severity items:
 Also delivered on the branch: every `/api` client error answers in the error envelope
 with a translated message (`9fc97fadd`, `71dd0b5ce`).
 
-Verification checkpoint: _to be recorded by the lead (suite counts and static gates)._
+Code review (twelve reviewers plus a second security pass, verdict ready with fixes)
+added: a whitespace-only registration name no longer tells a taken address from a free
+one, and a registration that fails after the hash still waits out the response floor;
+TOTP enable closes the other sessions' sockets before it forgets the pending secret
+(`e24d7fb29`); a password reset that races an operator's disable or demotion no longer
+reverts it, shown first by a two-process race test (`1f1531443`); the super admin race
+test covers demotion, disable and deletion (`6d4b69643`); a refused party join answers
+in the request's language like an unknown party (`3d5066477`); the register page reads
+the registration state with a direct request (`2a20cde13`). Failures inherited from
+master and fixed here: Person and TV capture coverage and cascades (`8e2aace42`,
+`5c99c6273`), movie public ID routes (`ef74d1c2f`), the swoole-bundle inventory
+(`795f191b4`), five unit failures (`d2a5e6f6b` to `53598d4f0`) and four tooling
+failures (`b4f0b1b60` to `63727ec5c`).
+
+Verification checkpoint, 2026-11-22, branch head `29ba8790f`: `make ci` on `6d4b69643`
+passed Composer validation, PHPStan (no errors) and Deptrac (0 violations); its backend
+suite selected 14,503 tests in 1,318 files, the unit lane failed 8 party tests and the
+native lane 1 production-kernel test (both fixed in `29ba8790f`, party unit suite 213
+tests OK), and both stack lanes hit the runner's one-hour Docker timeout under host load,
+so a full rerun was still in progress at the merge. Merged batches in the CI image: 3,182
+tests in 243 files (auth, controllers, OAuth integration), 3,907 in 331 files (after the
+simplify pass), 441, 148 and 76, all green after their fixes. Web: 3,876 tests in 317
+files, typecheck clean; the OpenAPI drift check and `generate:check` match. Tooling: 1,735
+tests with 6 failures inherited from master, fixed and rechecked (75 tests OK);
+`analyse:tooling` no errors; `check:tooling-architecture` exits 0. Browser, against a fresh
+preview: the auth, settings and admin e2e specs passed 35 of 41 at `6d4b69643`, with the
+register specs failing until `2a20cde13` and three admin specs failing on a stale route
+(see Open); at `63727ec5c` auth and settings passed 18 of 20, with one timing-sensitive
+volume spec failing under concurrent CI load after passing in the first run. The preset
+qualification was not run.
 
 Open:
 
@@ -123,6 +152,19 @@ Open:
   configurator to take the policy instead of an array, because its container
   expression is evaluated at compile time, where the `csv:` placeholder of
   `AUTH_EXTRA_ORIGINS` is still a string.
+- Gates to finish: the full `make ci` backend suite on a quiet host, the preset
+  qualification, and a quiet rerun of
+  `tests/e2e/settings/sign-in-conflict.spec.ts`.
+- `tests/e2e/admin/admin.spec.ts` (from the initial commit) still targets
+  `/admin/monitor` and a "Job Monitor" heading; the app redirects that route to
+  `/admin?tab=jobs`, so three of its tests fail on master and here.
+- Review residual risks: credential-change transactions take the user row lock without
+  the issuance lock timeout; `VerifyEmailHandler` reads `isDisabled()` before the lock, so
+  a confirmation racing an operator disable is untested; members' song file paths are
+  stripped by each caller rather than once; TOTP enable attempts are bounded only by the
+  generic per-account API limiter.
+- The preview of the main checkout (`preview-fd790a887b6899cb`) is blocked on a migration
+  history the dev environment will not reconcile; its database was preserved.
 - Deferred by the plan, each separate work: binding personal access pushes to a
   secret held by the client's owner, so nobody else can push as that client; a
   sessions list where users see and end their devices and app grants; a TOTP settings
