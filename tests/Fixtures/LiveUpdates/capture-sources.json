@@ -244,6 +244,27 @@
       "capture": "child-row-or-exempt"
     },
     {
+      "parent": "tv_episodes",
+      "child": "episode_person_credit_state",
+      "foreign_key": "episode_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "people",
+      "child": "episode_person_credits",
+      "foreign_key": "person_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "tv_episodes",
+      "child": "episode_person_credits",
+      "foreign_key": "episode_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
       "parent": "users",
       "child": "eq_device_profiles",
       "foreign_key": "user_id",
@@ -753,6 +774,27 @@
       "foreign_key": "user_id",
       "action": "CASCADE",
       "capture": "before-parent-delete"
+    },
+    {
+      "parent": "tv_series",
+      "child": "series_person_credit_state",
+      "foreign_key": "series_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "people",
+      "child": "series_person_credits",
+      "foreign_key": "person_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "tv_series",
+      "child": "series_person_credits",
+      "foreign_key": "series_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
     },
     {
       "parent": "albums",

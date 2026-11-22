@@ -29,18 +29,20 @@ final class Version20261121194700 extends AbstractMigration
         $this->addSql('CREATE UNIQUE INDEX uniq_tv_episodes_public_id ON tv_episodes (public_id)');
         $this->addSql('CREATE UNIQUE INDEX uniq_tv_episodes_season_id_episode_number ON tv_episodes (season_id, episode_number)');
         $this->addSql('ALTER TABLE tv_episodes ADD CONSTRAINT fk_tv_episodes_season_id FOREIGN KEY (season_id) REFERENCES tv_seasons (id) ON DELETE CASCADE');
-        foreach (['series' => 'tv_series', 'episode' => 'tv_episodes'] as $kind => $target) {
-            $credits = $kind . '_person_credits';
-            $state = $kind . '_person_credit_state';
-            $column = $kind . '_id';
-            $this->addSql(sprintf('CREATE TABLE %s (id UUID NOT NULL, %s UUID NOT NULL, person_id UUID NOT NULL, category TEXT NOT NULL, role TEXT NOT NULL, job TEXT NOT NULL, character_name TEXT DEFAULT NULL, department TEXT DEFAULT NULL, credited_name TEXT DEFAULT NULL, billing_order INT DEFAULT NULL, provider_credit_id TEXT DEFAULT NULL, credit_key TEXT NOT NULL, PRIMARY KEY (id), CONSTRAINT chk_%s_category CHECK (category IN (\'cast\', \'crew\')))', $credits, $column, $credits));
-            $this->addSql(sprintf('CREATE UNIQUE INDEX uniq_%s_%s_credit_key ON %s (%s, credit_key)', $credits, $column, $credits, $column));
-            $this->addSql(sprintf('CREATE INDEX idx_%s_person_id ON %s (person_id)', $credits, $credits));
-            $this->addSql(sprintf('ALTER TABLE %s ADD CONSTRAINT fk_%s_%s FOREIGN KEY (%s) REFERENCES %s (id) ON DELETE CASCADE', $credits, $credits, $column, $column, $target));
-            $this->addSql(sprintf('ALTER TABLE %s ADD CONSTRAINT fk_%s_person_id FOREIGN KEY (person_id) REFERENCES people (id) ON DELETE CASCADE', $credits, $credits));
-            $this->addSql(sprintf('CREATE TABLE %s (%s UUID NOT NULL, cast_initialized BOOLEAN NOT NULL DEFAULT FALSE, crew_initialized BOOLEAN NOT NULL DEFAULT FALSE, PRIMARY KEY (%s))', $state, $column, $column));
-            $this->addSql(sprintf('ALTER TABLE %s ADD CONSTRAINT fk_%s_%s FOREIGN KEY (%s) REFERENCES %s (id) ON DELETE CASCADE', $state, $state, $column, $column, $target));
-        }
+        $this->addSql('CREATE TABLE series_person_credits (id UUID NOT NULL, series_id UUID NOT NULL, person_id UUID NOT NULL, category TEXT NOT NULL, role TEXT NOT NULL, job TEXT NOT NULL, character_name TEXT DEFAULT NULL, department TEXT DEFAULT NULL, credited_name TEXT DEFAULT NULL, billing_order INT DEFAULT NULL, provider_credit_id TEXT DEFAULT NULL, credit_key TEXT NOT NULL, PRIMARY KEY (id), CONSTRAINT chk_series_person_credits_category CHECK (category IN (\'cast\', \'crew\')))');
+        $this->addSql('CREATE UNIQUE INDEX uniq_series_person_credits_series_id_credit_key ON series_person_credits (series_id, credit_key)');
+        $this->addSql('CREATE INDEX idx_series_person_credits_person_id ON series_person_credits (person_id)');
+        $this->addSql('ALTER TABLE series_person_credits ADD CONSTRAINT fk_series_person_credits_series_id FOREIGN KEY (series_id) REFERENCES tv_series (id) ON DELETE CASCADE');
+        $this->addSql('ALTER TABLE series_person_credits ADD CONSTRAINT fk_series_person_credits_person_id FOREIGN KEY (person_id) REFERENCES people (id) ON DELETE CASCADE');
+        $this->addSql('CREATE TABLE series_person_credit_state (series_id UUID NOT NULL, cast_initialized BOOLEAN NOT NULL DEFAULT FALSE, crew_initialized BOOLEAN NOT NULL DEFAULT FALSE, PRIMARY KEY (series_id))');
+        $this->addSql('ALTER TABLE series_person_credit_state ADD CONSTRAINT fk_series_person_credit_state_series_id FOREIGN KEY (series_id) REFERENCES tv_series (id) ON DELETE CASCADE');
+        $this->addSql('CREATE TABLE episode_person_credits (id UUID NOT NULL, episode_id UUID NOT NULL, person_id UUID NOT NULL, category TEXT NOT NULL, role TEXT NOT NULL, job TEXT NOT NULL, character_name TEXT DEFAULT NULL, department TEXT DEFAULT NULL, credited_name TEXT DEFAULT NULL, billing_order INT DEFAULT NULL, provider_credit_id TEXT DEFAULT NULL, credit_key TEXT NOT NULL, PRIMARY KEY (id), CONSTRAINT chk_episode_person_credits_category CHECK (category IN (\'cast\', \'crew\')))');
+        $this->addSql('CREATE UNIQUE INDEX uniq_episode_person_credits_episode_id_credit_key ON episode_person_credits (episode_id, credit_key)');
+        $this->addSql('CREATE INDEX idx_episode_person_credits_person_id ON episode_person_credits (person_id)');
+        $this->addSql('ALTER TABLE episode_person_credits ADD CONSTRAINT fk_episode_person_credits_episode_id FOREIGN KEY (episode_id) REFERENCES tv_episodes (id) ON DELETE CASCADE');
+        $this->addSql('ALTER TABLE episode_person_credits ADD CONSTRAINT fk_episode_person_credits_person_id FOREIGN KEY (person_id) REFERENCES people (id) ON DELETE CASCADE');
+        $this->addSql('CREATE TABLE episode_person_credit_state (episode_id UUID NOT NULL, cast_initialized BOOLEAN NOT NULL DEFAULT FALSE, crew_initialized BOOLEAN NOT NULL DEFAULT FALSE, PRIMARY KEY (episode_id))');
+        $this->addSql('ALTER TABLE episode_person_credit_state ADD CONSTRAINT fk_episode_person_credit_state_episode_id FOREIGN KEY (episode_id) REFERENCES tv_episodes (id) ON DELETE CASCADE');
     }
 
     public function down(Schema $schema): void
