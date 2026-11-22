@@ -686,10 +686,10 @@
             "recommended_disposition": "preserve-and-adapt",
             "rationale": "Retain Baander API binding/drain mode; cherry-pick needed Symfony command compatibility, not whole command.",
             "qualification": "Source-only recommendation; not a runtime proof or permission to change behavior.",
-            "current_local_sha256": "28d47d1b1c791fb09ab504ae9918524ce515e701bfe83b1ca9fe471b9984b15c",
+            "current_local_sha256": "04465f19667f6c55793c5e5a725df30eb5141375a0c57eaf50ce22548d03faaa",
             "current_source_presence": "present",
             "final_disposition": "retained-local-behavior",
-            "final_reason": "Retain Baander API binding/drain mode; cherry-pick needed Symfony command compatibility, not whole command. Local contract retained; upstream behavior is not claimed byte-equivalent.",
+            "final_reason": "Retain Baander API binding/drain mode; cherry-pick needed Symfony command compatibility, not whole command. Locally runs gc_collect_cycles() and gc_mem_caches() just before the server starts, so forked workers do not inherit the cyclic garbage cold container compilation leaves; upstream has no such step. Local contract retained; upstream behavior is not claimed byte-equivalent.",
             "source_review_status": "recorded",
             "runtime_qualification": {
                 "status": "not-requalified",
@@ -1434,10 +1434,10 @@
             "recommended_disposition": "preserve-and-adapt",
             "rationale": "Retain loopback API and supported local settings; add only selected integration configuration, not upstream public defaults.",
             "qualification": "Source-only recommendation; not a runtime proof or permission to change behavior.",
-            "current_local_sha256": "876299971fa9ad6307a4add3ae449cb4ad78ee34733dabb85d822bc3cb5e970c",
+            "current_local_sha256": "68bac1f88223655e247a6b7f1a11c768586c6a75700023e3da7eae634dd1b65f",
             "current_source_presence": "present",
             "final_disposition": "retained-local-behavior",
-            "final_reason": "Retain loopback API and supported local settings; add only selected integration configuration, not upstream public defaults. Local contract retained; upstream behavior is not claimed byte-equivalent.",
+            "final_reason": "Retain loopback API and supported local settings; add only selected integration configuration, not upstream public defaults. Locally adds the http_server.settings.hook_flags option, a non-negative integer that selects the Swoole coroutine runtime hooks of HTTP workers; upstream has no such option and derives hook_flags from the Swoole runtime when coroutines are enabled. Local contract retained; upstream behavior is not claimed byte-equivalent.",
             "source_review_status": "recorded",
             "runtime_qualification": {
                 "status": "not-requalified",
@@ -2512,10 +2512,10 @@
             "recommended_disposition": "adapt-cohort",
             "rationale": "Adopt two-phase cleanup/drop behavior preserving PoolStatsInterface getters and explicit releaseFromCoroutine(cid) callers unless migrated deliberately.",
             "qualification": "Source-only recommendation; not a runtime proof or permission to change behavior.",
-            "current_local_sha256": "0856170a76ddf7d019567dea964b76409f15c61df4fb6b289f41edd25e18bf7a",
+            "current_local_sha256": "5fba21a27a84ff2654bda3f6debaf17c22a0b097c299f9cba79db5faf343873e",
             "current_source_presence": "present",
             "final_disposition": "adopted-adapted",
-            "final_reason": "Implemented reset-before-release, failure isolation and worker-exit cleanup with local lifecycle interface; retains explicit coroutine IDs, stats and application drain/event ownership.",
+            "final_reason": "Implemented reset-before-release, failure isolation and worker-exit cleanup with local lifecycle interface; retains explicit coroutine IDs, stats and application drain/event ownership. Locally implements IdleServicePool: each free instance records its release time, and pruneFree discards free instances idle for at least the given age (60 s by default) while keeping a minimum free count (one by default) and leaving assigned instances alone. pruneFree and drainFree publish the remaining free pool before the discarded instances are destroyed, so a borrower that runs while a hooked destructor yields cannot take a discarded instance. Upstream has no idle reclamation.",
             "source_review_status": "recorded",
             "runtime_qualification": {
                 "status": "pending-authoritative-gates",
@@ -2560,6 +2560,25 @@
             "runtime_qualification": {
                 "status": "pending-authoritative-gates",
                 "scope": "Source disposition only; full build/native/static/application qualification is not claimed by this record."
+            }
+        },
+        {
+            "path": "src/Bridge/Symfony/Container/ServicePool/IdleServicePool.php",
+            "status": "introduced-during-reconciliation",
+            "local_sha256": null,
+            "upstream_sha256": null,
+            "subsystem": "pool",
+            "behavior_delta": "Local pool interface for idle reclamation: pruneFree releases unassigned instances idle for at least the given age while keeping a minimum number warm. BaseServicePool implements it, and ServicePoolContainer runs it for the application's periodic HTTP-worker memory maintenance. No upstream counterpart.",
+            "recommended_disposition": "introduced-local-implementation",
+            "rationale": "Local pool interface for idle reclamation: pruneFree releases unassigned instances idle for at least the given age while keeping a minimum number warm. BaseServicePool implements it, and ServicePoolContainer runs it for the application's periodic HTTP-worker memory maintenance. No upstream counterpart.",
+            "current_local_sha256": "afeb70d1fe19c46935448f3cf4719a2e7e204e0fe2fce7a8de8f50766be857c3",
+            "current_source_presence": "present",
+            "final_disposition": "introduced-local-implementation",
+            "final_reason": "Local pool interface for idle reclamation: pruneFree releases unassigned instances idle for at least the given age while keeping a minimum number warm. BaseServicePool implements it, and ServicePoolContainer runs it for the application's periodic HTTP-worker memory maintenance. No upstream counterpart.",
+            "source_review_status": "recorded",
+            "runtime_qualification": {
+                "status": "pending-authoritative-gates",
+                "scope": "Source recorded; full gates pending."
             }
         },
         {
@@ -2631,10 +2650,10 @@
             "recommended_disposition": "adapt-cohort",
             "rationale": "Adopt exception-isolated two-phase reset/release and unstable discard; preserve getPools diagnostics/owner-specific release ordering and no pooled logging.",
             "qualification": "Source-only recommendation; not a runtime proof or permission to change behavior.",
-            "current_local_sha256": "5991003a87500622fb99d1c57256b513cbe466387b03a04af18895d96ee19c18",
+            "current_local_sha256": "c328d57a9ac9c8fbb4aa3fe425a42a7feb2c2a7e9635d94cb242cbe20563e8a9",
             "current_source_presence": "present",
             "final_disposition": "adopted-adapted",
-            "final_reason": "Implemented reset-before-release, failure isolation and worker-exit cleanup with local lifecycle interface; retains explicit coroutine IDs, stats and application drain/event ownership.",
+            "final_reason": "Implemented reset-before-release, failure isolation and worker-exit cleanup with local lifecycle interface; retains explicit coroutine IDs, stats and application drain/event ownership. Locally adds pruneFree, which prunes every IdleServicePool and reports a failing pool without stopping the others, and serializes it with drain: a drain requested while pruning runs once pruning finishes, and a prune requested while pruning or draining runs is skipped. Upstream has no idle reclamation.",
             "source_review_status": "recorded",
             "runtime_qualification": {
                 "status": "pending-authoritative-gates",
@@ -5832,10 +5851,10 @@
             "recommended_disposition": "preserve",
             "rationale": "Retain configured watchdog behavior across worker lifecycle.",
             "qualification": "Source-only recommendation; not a runtime proof or permission to change behavior.",
-            "current_local_sha256": "8e8b9e6905c24c11276d1011f9afce4144af01c2ff6ab5a96f9b4058d11719bd",
+            "current_local_sha256": "7230f9805fc3d639ee59bd698dafc68b5b193f3e31a353d4515aeb55682e145e",
             "current_source_presence": "present",
             "final_disposition": "retained-local-behavior",
-            "final_reason": "Retain configured watchdog behavior across worker lifecycle. Local contract retained; upstream behavior is not claimed byte-equivalent.",
+            "final_reason": "Retain configured watchdog behavior across worker lifecycle. Locally treats a Channel->pop wait called directly from SerialQueue::consume, the serial queue consumer's idle wait between payloads, as intentional, so an idle consumer is not reported as stalled; a channel wait inside a queued callback remains subject to stall detection. Local contract retained; upstream behavior is not claimed byte-equivalent.",
             "source_review_status": "recorded",
             "runtime_qualification": {
                 "status": "not-requalified",
@@ -7113,10 +7132,10 @@
             "recommended_disposition": "adopt",
             "rationale": "Port containment check; characterize traversal/symlink swap and cached-path escape behavior against static server contract.",
             "qualification": "Source-only recommendation; not a runtime proof or permission to change behavior.",
-            "current_local_sha256": "037035f7b1509a549b70f20505345f6651d6e5a824ec248edbf5d8834abcbb5a",
+            "current_local_sha256": "94e640c566a9407f5e27781ceb16fe8a2be6123ee1ad2210078977f10f809103",
             "current_source_presence": "present",
             "final_disposition": "adopted-adapted",
-            "final_reason": "Enforces resolved-path containment beneath publicDir, including cached MIME paths. Locally adds Cache-Control: public, max-age=31536000, immutable to files resolved beneath publicDir/assets, which holds only content-hashed build output.",
+            "final_reason": "Enforces resolved-path containment beneath publicDir, including cached MIME paths. Locally adds Cache-Control: public, max-age=31536000, immutable to files resolved beneath publicDir/assets, which holds only content-hashed build output. Locally sends X-Content-Type-Options: nosniff and X-Frame-Options: DENY with every static file it serves, because these responses bypass the kernel's response listeners.",
             "source_review_status": "recorded",
             "runtime_qualification": {
                 "status": "pending-authoritative-gates",
@@ -8004,7 +8023,7 @@
     "reconciliation": {
         "baseline_fields_immutable": true,
         "baseline_entry_count": 403,
-        "current_record_entry_count": 406,
+        "current_record_entry_count": 407,
         "hash_scope": "Current packages/swoole-bundle/src file bytes at reconciliation; concurrent edits require hash refresh.",
         "source_disposition_scope": "All baseline and introduced package source paths have an explicit implementation, local alternative, retained contract, platform decision or optional-feature/defect deferral. Runtime acceptance is tracked separately.",
         "runtime_qualification_status": "pending-authoritative-gates",
@@ -8015,7 +8034,7 @@
             "deferred-optional-feature": 28,
             "deferred-unconfigured-defect": 3,
             "deferred-unconfigured-feature": 103,
-            "introduced-local-implementation": 3,
+            "introduced-local-implementation": 4,
             "not-applicable": 1,
             "not-applicable-current-platform": 1,
             "retained-equivalent": 144,
