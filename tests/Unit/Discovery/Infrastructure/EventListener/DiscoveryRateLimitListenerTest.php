@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Discovery\Infrastructure\EventListener;
 
 use App\Discovery\Infrastructure\EventListener\DiscoveryRateLimitListener;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpFoundation\Request;
@@ -25,7 +26,7 @@ final class DiscoveryRateLimitListenerTest extends TestCase
         $limiter->expects($this->never())->method('create');
 
         $listener = new DiscoveryRateLimitListener($limiter, new NullLogger(), 'prod');
-        $event = $this->createRequestEvent(Request::create('/api/auth/login', 'POST'));
+        $event = $this->createRequestEvent($this->routed(Request::create('/api/auth/login', 'POST'), 'auth_login_login'));
 
         $listener->onKernelRequest($event);
 
@@ -45,14 +46,29 @@ final class DiscoveryRateLimitListenerTest extends TestCase
             ->willReturn($limiterMock);
 
         $listener = new DiscoveryRateLimitListener($limiter, new NullLogger(), 'prod');
-        $event = $this->createRequestEvent(Request::create('/api/discovery/register', 'POST', [], [], [], ['REMOTE_ADDR' => '127.0.0.1']));
+        $request = Request::create('/api/discovery/register', 'POST', [], [], [], ['REMOTE_ADDR' => '127.0.0.1']);
+        $event = $this->createRequestEvent($this->routed($request, DiscoveryRateLimitListener::REGISTER_ROUTE));
 
         $listener->onKernelRequest($event);
 
         $this->assertSame(9, $event->getRequest()->attributes->get('rate_limit_remaining'));
     }
 
-    public function testRejectsRequestOverLimit(): void
+    /**
+     * The router matches the decoded path, so a percent-encoded path reaches the same
+     * route and its limit.
+     *
+     * @return iterable<string, array{string, string}>
+     */
+    public static function limitedRoutes(): iterable
+    {
+        yield 'server registration' => [DiscoveryRateLimitListener::REGISTER_ROUTE, '/api/discovery/%72egister'];
+        yield 'pairing code' => [DiscoveryRateLimitListener::PAIRING_CODE_ROUTE, '/api/discovery/pairing-cod%65'];
+        yield 'pairing completion' => [DiscoveryRateLimitListener::COMPLETE_PAIRING_ROUTE, '/%61pi/discovery/complete-pairing'];
+    }
+
+    #[DataProvider('limitedRoutes')]
+    public function testRejectsRequestOverLimitWhateverThePathEncoding(string $route, string $path): void
     {
         $rateLimit = new RateLimit(0, new \DateTimeImmutable('+30 seconds'), false, 10);
 
@@ -60,10 +76,14 @@ final class DiscoveryRateLimitListenerTest extends TestCase
         $limiterMock->method('consume')->willReturn($rateLimit);
 
         $limiter = $this->createMock(RateLimiterFactoryInterface::class);
-        $limiter->method('create')->willReturn($limiterMock);
+        $limiter->expects($this->once())
+            ->method('create')
+            ->with('127.0.0.1')
+            ->willReturn($limiterMock);
 
         $listener = new DiscoveryRateLimitListener($limiter, new NullLogger(), 'prod');
-        $event = $this->createRequestEvent(Request::create('/api/discovery/pairing-code', 'POST', [], [], [], ['REMOTE_ADDR' => '127.0.0.1']));
+        $request = Request::create($path, 'POST', [], [], [], ['REMOTE_ADDR' => '127.0.0.1']);
+        $event = $this->createRequestEvent($this->routed($request, $route));
 
         $this->expectException(TooManyRequestsHttpException::class);
 
@@ -76,11 +96,19 @@ final class DiscoveryRateLimitListenerTest extends TestCase
         $limiter->expects($this->never())->method('create');
 
         $listener = new DiscoveryRateLimitListener($limiter, new NullLogger(), 'dev');
-        $event = $this->createRequestEvent(Request::create('/api/discovery/register', 'POST'));
+        $request = Request::create('/api/discovery/register', 'POST');
+        $event = $this->createRequestEvent($this->routed($request, DiscoveryRateLimitListener::REGISTER_ROUTE));
 
         $listener->onKernelRequest($event);
 
         $this->assertNull($event->getRequest()->attributes->get('rate_limit_remaining'));
+    }
+
+    private function routed(Request $request, string $route): Request
+    {
+        $request->attributes->set('_route', $route);
+
+        return $request;
     }
 
     private function createRequestEvent(Request $request): RequestEvent

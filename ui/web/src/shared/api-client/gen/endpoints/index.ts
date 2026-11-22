@@ -6303,7 +6303,7 @@ export type PostArtistCoverUpload200 = {
   height?: number;
 };
 
-export type PostExtractCoversAppCatalogInterfaceExtractcoversInvoke202 = {
+export type PostAlbumCoversExtract202 = {
   albums?: number;
 };
 
@@ -19366,7 +19366,7 @@ export const useDeleteArtistCoverDelete = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteArtistCoverDeleteMutationOptions(options), queryClient);
     }
 
-export const getPostExtractCoversAppCatalogInterfaceExtractcoversInvokeUrl = () => {
+export const getPostAlbumCoversExtractUrl = () => {
 
 
 
@@ -19378,9 +19378,9 @@ export const getPostExtractCoversAppCatalogInterfaceExtractcoversInvokeUrl = () 
  * Queues individual extraction jobs for embedded cover art from audio files for all albums without a cover image.
  * @summary Extract cover art for all albums missing one
  */
-export const postExtractCoversAppCatalogInterfaceExtractcoversInvoke = async ( options?: Parameters<typeof customInstance>[1]): Promise<PostExtractCoversAppCatalogInterfaceExtractcoversInvoke202> => {
+export const postAlbumCoversExtract = async ( options?: Parameters<typeof customInstance>[1]): Promise<PostAlbumCoversExtract202> => {
 
-  return customInstance<PostExtractCoversAppCatalogInterfaceExtractcoversInvoke202>(getPostExtractCoversAppCatalogInterfaceExtractcoversInvokeUrl(),
+  return customInstance<PostAlbumCoversExtract202>(getPostAlbumCoversExtractUrl(),
   {
     ...options,
     method: 'POST'
@@ -19393,13 +19393,13 @@ export const postExtractCoversAppCatalogInterfaceExtractcoversInvoke = async ( o
 
 
 
-export const getPostExtractCoversAppCatalogInterfaceExtractcoversInvokeMutationKey = () => ['postExtractCoversAppCatalogInterfaceExtractcoversInvoke'] as const;
+export const getPostAlbumCoversExtractMutationKey = () => ['postAlbumCoversExtract'] as const;
 
-export const getPostExtractCoversAppCatalogInterfaceExtractcoversInvokeMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postExtractCoversAppCatalogInterfaceExtractcoversInvoke>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postExtractCoversAppCatalogInterfaceExtractcoversInvoke>>, TError,void, TContext> => {
+export const getPostAlbumCoversExtractMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAlbumCoversExtract>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAlbumCoversExtract>>, TError,void, TContext> => {
 
-const mutationKey = getPostExtractCoversAppCatalogInterfaceExtractcoversInvokeMutationKey();
+const mutationKey = getPostAlbumCoversExtractMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -19409,10 +19409,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postExtractCoversAppCatalogInterfaceExtractcoversInvoke>>, void> = () => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAlbumCoversExtract>>, void> = () => {
 
 
-          return  postExtractCoversAppCatalogInterfaceExtractcoversInvoke(requestOptions)
+          return  postAlbumCoversExtract(requestOptions)
         }
 
 
@@ -19422,23 +19422,23 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostExtractCoversAppCatalogInterfaceExtractcoversInvokeMutationResult = NonNullable<Awaited<ReturnType<typeof postExtractCoversAppCatalogInterfaceExtractcoversInvoke>>>
+    export type PostAlbumCoversExtractMutationResult = NonNullable<Awaited<ReturnType<typeof postAlbumCoversExtract>>>
 
-    export type PostExtractCoversAppCatalogInterfaceExtractcoversInvokeMutationError = ErrorType<ApiError>
+    export type PostAlbumCoversExtractMutationError = ErrorType<ApiError>
 
 
     /**
  * @summary Extract cover art for all albums missing one
  */
-export const usePostExtractCoversAppCatalogInterfaceExtractcoversInvoke = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postExtractCoversAppCatalogInterfaceExtractcoversInvoke>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+export const usePostAlbumCoversExtract = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAlbumCoversExtract>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postExtractCoversAppCatalogInterfaceExtractcoversInvoke>>,
+        Awaited<ReturnType<typeof postAlbumCoversExtract>>,
         TError,
         void,
         TContext
       > => {
-      return useMutation(getPostExtractCoversAppCatalogInterfaceExtractcoversInvokeMutationOptions(options), queryClient);
+      return useMutation(getPostAlbumCoversExtractMutationOptions(options), queryClient);
     }
 
 export const getGetGenreIndexUrl = (params?: GetGenreIndexParams,) => {

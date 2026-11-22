@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Infrastructure\Security;
 
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
+use App\Shared\Infrastructure\Http\ApiRequestPath;
 use Baander\RedisRateLimiter\Exception\RateLimiterUnavailableException;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
@@ -20,7 +21,8 @@ use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Http\Event\LoginFailureEvent;
 
 /**
- * Enforces the generic `anonymous_api` and `authenticated_api` limiters on `/api/*`.
+ * Enforces the generic `anonymous_api` and `authenticated_api` limiters on `/api/*`,
+ * judged on the decoded path, so a percent-encoded API path is charged too.
  *
  * A request with an authenticated user consumes `authenticated_api`, keyed by user
  * ID, so users behind one address do not share a bucket. Any other request consumes
@@ -139,7 +141,7 @@ final class ApiRateLimitListener
             return false;
         }
 
-        if (!str_starts_with($request->getPathInfo(), '/api/')) {
+        if (!ApiRequestPath::isApi($request)) {
             return false;
         }
 

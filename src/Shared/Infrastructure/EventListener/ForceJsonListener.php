@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\EventListener;
 
+use App\Shared\Infrastructure\Http\ApiRequestPath;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
@@ -13,7 +14,8 @@ use Symfony\Component\HttpKernel\KernelEvents;
  *
  * This ensures that Accept: star/star and missing Accept headers on /api/ routes
  * are treated as application/json, preventing the Symfony router from
- * returning 406 for content negotiation.
+ * returning 406 for content negotiation. A percent-encoded API path counts as
+ * an API request, because the router matches the decoded path.
  */
 #[AsEventListener(event: KernelEvents::REQUEST, priority: 256)]
 final class ForceJsonListener
@@ -22,7 +24,7 @@ final class ForceJsonListener
     {
         $request = $event->getRequest();
 
-        if (!str_starts_with($request->getPathInfo(), '/api/')) {
+        if (!ApiRequestPath::isApi($request)) {
             return;
         }
 

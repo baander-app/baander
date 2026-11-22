@@ -23,6 +23,13 @@ final class ApiRateLimitTest extends RateLimitTestCase
         self::assertSame(401, $this->requestFrom('198.51.100.11', 'GET', '/api/playlists')->getStatusCode());
     }
 
+    public function testAnEncodedApiPathIsLimitedLikeItsDecodedPath(): void
+    {
+        $this->exhaust('anonymous_api', '198.51.100.141');
+
+        $this->assertTooManyRequests($this->requestFrom('198.51.100.141', 'GET', '/%61pi/playlists'));
+    }
+
     public function testRejectedCredentialsAreChargedToTheClientIp(): void
     {
         $this->exhaust('anonymous_api', '198.51.100.12');

@@ -82,7 +82,7 @@ final class ScopeRouteMap
         'artist_store', 'artist_update', 'artist_destroy', 'artist_add_song', 'artist_remove_song',
         'artist_update_song_role', 'artist_add_album', 'artist_remove_album', 'artist_update_album_role',
         'artist_cover_upload', 'artist_cover_delete',
-        'extract_covers_app_catalog_interface_extractcovers__invoke', 'genre_store', 'genre_update',
+        'album_covers_extract', 'genre_store', 'genre_update',
         'genre_destroy', 'genre_add_song', 'genre_remove_song', 'genre_add_album', 'genre_remove_album',
         'movie_update', 'movie_destroy', 'song_update', 'song_destroy', 'discovery_register', 'library_store',
         'library_update', 'library_delete', 'library_scan', 'library_validate_path', 'library_scan_all',

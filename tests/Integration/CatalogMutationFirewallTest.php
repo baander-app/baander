@@ -89,7 +89,7 @@ final class CatalogMutationFirewallTest extends TestCase
         'album_cover_delete',
         'artist_cover_upload',
         'artist_cover_delete',
-        'extract_covers_app_catalog_interface_extractcovers__invoke',
+        'album_covers_extract',
         'admin_album_delete',
         'admin_album_delete_preview',
         'admin_song_delete',
@@ -659,7 +659,7 @@ final class CatalogMutationFirewallTest extends TestCase
             'album_cover_delete' => $this->row('DELETE', '/api/albums/' . $album . '/cover', [], 204),
             'artist_cover_upload' => $this->row('POST', '/api/artists/' . $this->artist->getPublicId()->toString() . '/cover', [], 200) + ['upload' => $this->pixel()],
             'artist_cover_delete' => $this->row('DELETE', '/api/artists/' . $this->artist->getPublicId()->toString() . '/cover', [], 204),
-            'extract_covers_app_catalog_interface_extractcovers__invoke' => $this->row('POST', '/api/albums/covers/extract', [], 202),
+            'album_covers_extract' => $this->row('POST', '/api/albums/covers/extract', [], 202),
             'admin_album_delete' => $this->row('DELETE', '/api/admin/albums/' . $album, [], 200),
             'admin_album_delete_preview' => $this->row('GET', '/api/admin/albums/' . $album . '/delete-preview', [], 200),
             'admin_song_delete' => $this->row('DELETE', '/api/admin/songs/' . $song, [], 200),
@@ -811,7 +811,7 @@ final class CatalogMutationFirewallTest extends TestCase
                 self::assertNull($after['artistCover'], 'The artist no longer points at a cover.');
                 $this->assertNothingQueued();
                 break;
-            case 'extract_covers_app_catalog_interface_extractcovers__invoke':
+            case 'album_covers_extract':
                 self::assertSame($before, $after, 'Queueing the extraction changes nothing yet.');
                 self::assertIsInt($data['albums'] ?? null);
                 $queued = $this->sent($this->asyncTransport);

@@ -7809,7 +7809,7 @@
                 ],
                 "summary": "Extract cover art for all albums missing one",
                 "description": "Queues individual extraction jobs for embedded cover art from audio files for all albums without a cover image.",
-                "operationId": "post_extract_covers_app_catalog_interface_extractcovers__invoke",
+                "operationId": "post_album_covers_extract",
                 "responses": {
                     "202": {
                         "description": "Batch extraction dispatched",
