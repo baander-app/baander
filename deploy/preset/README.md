@@ -44,10 +44,10 @@ its `size` if needed, replace every secret and set the origin and
 listening address for your installation. Rendering and starting refuse any value that
 still begins with `replace-with-`. `APP_SECRET`, `STREAM_URL_HMAC_SECRET` and
 `AUTH_TOTP_ENCRYPTION_KEY` must each be at least 32 bytes, or the containers refuse to
-boot; generate the TOTP key with `openssl rand -base64 32`. The gateway serves HTTP. For an HTTPS
-origin, configure an external TLS reverse proxy and the application's trusted proxy
-settings for that proxy. The default listener is reachable only from the local host.
-Keep the configuration file and state directory accessible only to the operator.
+boot; generate the TOTP key with `openssl rand -base64 32`. The default listener is
+reachable only from the local host; [Gateway and client addresses](#gateway-and-client-addresses)
+covers HTTPS and reverse proxies. Keep the configuration file and state directory
+accessible only to the operator.
 
 Install the standalone tooling loader with `composer tooling:autoload`. The host
 requires the normal tooling runtime, Docker Compose, and a daemon-visible Unix
@@ -59,6 +59,34 @@ this preset creates no default account. After first startup, run `app:auth:setup
 and [create an administrator](../../docs-book/part-1-operator-guide/administration/user-management.md)
 in the web container. OAuth key
 generation is automatic for an empty secrets volume and preserves an existing pair.
+
+## Gateway and client addresses
+
+The gateway serves HTTP on `listen.address` and `listen.port` and is web's only
+trusted proxy. It shares the deployment's edge network, `<name>-edge`, with web alone
+and holds a fixed address there; the deployment sets `TRUSTED_PROXIES` to that address
+and refuses the variable in `environment`. Because web believes the gateway's
+forwarding headers, the gateway writes all of them: `X-Forwarded-For` carries the
+client address, `X-Forwarded-Host` the request's `Host` header and
+`X-Forwarded-Proto` the protocol, and `X-Forwarded-Port` is dropped. Web therefore
+rate limits each client under its own address, and a client's own forwarding headers
+cannot change the scheme, host or port that web sees.
+
+For an HTTPS origin, run a TLS reverse proxy in front of the gateway. The gateway
+reads the client address from `X-Forwarded-For` and the protocol from
+`X-Forwarded-Proto` only on connections from a declared front proxy; for any other
+peer it ignores both headers and uses the connection's own address and protocol.
+List front proxies in `listen.frontProxies` as IP addresses or CIDR ranges. Each
+must append the client address to `X-Forwarded-For` and set `X-Forwarded-Proto`. A
+loopback listener, the default, also declares the Docker host: host connections reach
+the gateway from the edge network's bridge address, the subnet's first host address,
+so any process on the host can report a client address.
+
+The edge subnet defaults to `10.231.0.0/28`. If that range is in use, set
+`network.subnet` to another IPv4 network of /29 or larger; start refuses a subnet
+that overlaps another Docker network. The gateway takes the subnet's second host
+address. Docker assigns web's address from the subnet's upper half, so no container
+can take the gateway's address first.
 
 ## Render and start
 
@@ -93,7 +121,7 @@ OpenTelemetry export stays off unless the configuration's `environment` sets
 takes effect when the deployment starts again, which retires the old worker pair
 before installing the selected release; no live toggle exists.
 
-Stop retires workers and removes service containers and the private network. It
+Stop retires workers and removes service containers and the private and edge networks. It
 retains every named data volume. Application code caches remain inside each
 container, while media, storage, conversions, transcode state and OAuth keys
 persist separately. The media volume is mounted read-only for playback and workers;

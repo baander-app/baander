@@ -6,6 +6,7 @@ namespace Baander\DevQualification\Tests;
 
 use Baander\Configuration\ApplicationLayout;
 use Baander\Configuration\ToolingConfiguration;
+use Baander\Deployment\Presets\Configuration;
 use Baander\Deployment\Presets\StateStore;
 use Baander\Containers\Docker\Client;
 use Baander\Containers\Docker\Target;
@@ -155,8 +156,12 @@ final class QualificationTest extends TestCase
     {
         $before = ['profileFingerprint' => str_repeat('a', 64), 'composeHash' => str_repeat('b', 64), 'size' => self::SIZE, 'workerBootId' => str_repeat('c', 32)];
         $after = ['profileFingerprint' => str_repeat('d', 64), 'composeHash' => str_repeat('e', 64), 'size' => array_replace(self::SIZE, ['webWorkers' => 1]), 'workerBootId' => str_repeat('f', 32)];
-        $receipt = ['failure' => null, 'before' => $before, 'after' => $after, 'serving' => ['workersReady' => true, 'healthy' => true, 'catalogIntact' => true]];
+        $serving = ['workersReady' => true, 'healthy' => true, 'catalogIntact' => true, 'proxyTrust' => ['status' => 'passed', 'failures' => []]];
+        $receipt = ['failure' => null, 'before' => $before, 'after' => $after, 'serving' => $serving];
         self::assertSame('passed', Qualification::replacementCheck($receipt)['status']);
+        $receipt['serving']['proxyTrust'] = ['status' => 'failed', 'failures' => ['Web cannot reach the gateway health route.']];
+        self::assertSame(['The new boot does not see clients through exactly its gateway.'], Qualification::replacementCheck($receipt)['failures']);
+        $receipt['serving'] = $serving;
         $receipt['after']['profileFingerprint'] = $before['profileFingerprint'];
         $check = Qualification::replacementCheck($receipt);
         self::assertSame('failed', $check['status']);
@@ -187,6 +192,64 @@ final class QualificationTest extends TestCase
             $this->expectException(\InvalidArgumentException::class);
             $qualification->scenario('deployment-replacement', 1, 1);
         });
+    }
+
+    public function testProxyTrustNeedsWebToTrustExactlyTheGatewayAndSeeEachSendersOwnAddress(): void
+    {
+        $deployment = Configuration::fromArray($this->configuration()['deployment']);
+        $web = ['Config' => ['Env' => ['APP_ENV=prod', 'TRUSTED_PROXIES=10.231.0.2']], 'NetworkSettings' => ['Networks' => [
+            'baander-qualification-private' => ['IPAddress' => '172.30.0.5'],
+            'baander-qualification-edge' => ['IPAddress' => '10.231.0.8'],
+        ]]];
+        $gateway = ['NetworkSettings' => ['Networks' => ['baander-qualification-edge' => ['IPAddress' => '10.231.0.2']]]];
+
+        $check = Qualification::proxyTrustCheck($deployment, $web, $gateway, 200, '10.231.0.8', '10.231.0.1');
+        self::assertSame(['passed', []], [$check['status'], $check['failures']]);
+        self::assertSame(['10.231.0.2', '10.231.0.1'], [$check['trustedProxies'], $check['expectedHairpinClient']]);
+
+        $rangeTrusted = $web;
+        $rangeTrusted['Config']['Env'][1] = 'TRUSTED_PROXIES=10.231.0.0/28';
+        $twoNetworks = $gateway;
+        $twoNetworks['NetworkSettings']['Networks']['baander-qualification-private'] = ['IPAddress' => '172.30.0.6'];
+        foreach ([
+            [[$rangeTrusted, $gateway, 200, '10.231.0.8', '10.231.0.1'], 'Web trusts "10.231.0.0/28" instead of exactly the gateway address 10.231.0.2.'],
+            [[$web, $twoNetworks, 200, '10.231.0.8', '10.231.0.1'], 'The gateway joins baander-qualification-edge, baander-qualification-private instead of the edge network alone.'],
+            [[$web, $gateway, null, '10.231.0.8', '10.231.0.1'], 'Web cannot reach the gateway health route.'],
+            [[$web, $gateway, 200, '198.51.100.7', '10.231.0.1'], 'A request that forged X-Forwarded-For reached web as "198.51.100.7" instead of its sender\'s address.'],
+            [[$web, $gateway, 200, '10.231.0.8', null], 'A host-local client reached web as "" instead of the trusted edge bridge address 10.231.0.1.'],
+        ] as [$observed, $failure]) {
+            self::assertSame([$failure], Qualification::proxyTrustCheck($deployment, ...$observed)['failures']);
+        }
+
+        // A listener on a LAN address trusts no host-local source, so no hairpin request is expected.
+        $lan = $this->configuration()['deployment'];
+        $lan['listen']['address'] = '192.0.2.40';
+        self::assertSame('passed', Qualification::proxyTrustCheck(Configuration::fromArray($lan), $web, $gateway, 200, '10.231.0.8', null)['status']);
+    }
+
+    public function testAccessLogProgramReportsTheClientWebChargedTheProbePathTo(): void
+    {
+        $directory = sys_get_temp_dir() . '/baander.app-access-log-' . bin2hex(random_bytes(8));
+        mkdir($directory, 0700);
+        $line = static fn(string $channel, string $message): string => json_encode(['message' => $message, 'context' => [], 'channel' => $channel], JSON_THROW_ON_ERROR) . "\n";
+        file_put_contents($directory . '/prod.log', implode('', [
+            "not a JSON record qualification-forwarding-0a1b\n",
+            $line('app', 'Probe qualification-forwarding-0a1b mentioned outside a request line'),
+            $line('swoole.access_log', '10.231.0.9 - - [22/Nov/2026:15:00:00 +0100] "GET /qualification-forwarding-ffff HTTP/1.1" 200 512'),
+            $line('swoole.access_log', '10.231.0.8 - - [22/Nov/2026:15:00:01 +0100] "GET /qualification-forwarding-0a1b HTTP/1.1" 200 512'),
+        ]));
+        $executor = new EngineExecutor(ExecutionContext::bounded(15, getenv()));
+        try {
+            $result = $executor->run(new ProcessSpec(
+                [PHP_BINARY, '-r', Qualification::accessLogProgram(), 'qualification-forwarding-0a1b'],
+                environment: [...getenv(), 'BAANDER_LOG_DIR' => $directory],
+            ));
+            self::assertSame(['client' => '10.231.0.8'], json_decode($result->stdout, true, flags: JSON_THROW_ON_ERROR));
+            self::assertNotEmpty(token_get_all('<?php ' . Qualification::requestProgram(), TOKEN_PARSE));
+        } finally {
+            $executor->close();
+            Collector::remove($directory);
+        }
     }
 
     public function testHealthyAnswerNeedsHttpOkAndNoUnhealthyCheck(): void

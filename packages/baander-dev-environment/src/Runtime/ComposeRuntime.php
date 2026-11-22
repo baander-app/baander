@@ -105,7 +105,7 @@ class ComposeRuntime
             EnvironmentVariable::APP_URL => $origin,
             EnvironmentVariable::DEFAULT_URI => $origin,
             EnvironmentVariable::APP_DOMAIN => $instance['hostname'],
-            'TRUSTED_PROXIES' => $instance['proxy_ip'] ?? '',
+            EnvironmentVariable::TRUSTED_PROXIES => $instance['proxy_ip'] ?? '',
             EnvironmentVariable::BAANDER_LOG_DIR => LogCollection::ROOT . '/web/' . ($instance['log_boot_id'] ?? $instance['id']),
             EnvironmentVariable::BAANDER_LOG_NODES => LogCollection::nodes($project, $environment[EnvironmentVariable::BAANDER_LOG_NODES] ?? '[]'),
         ]);

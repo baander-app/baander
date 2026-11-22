@@ -10,6 +10,7 @@ use Baander\Configuration\ToolingConfiguration;
 use Baander\Deployment\Profiles\ContainerMeasurement;
 use Baander\Deployment\Preset;
 use Baander\Deployment\Presets\Configuration;
+use Baander\Deployment\Presets\EdgeNetwork;
 use Baander\Deployment\Presets\StateStore;
 use Baander\Deployment\Workers\Lifecycle;
 use Baander\Containers\Docker\Client;
@@ -31,6 +32,8 @@ final class Qualification
     private const int POSTGRES_OUTAGE_SECONDS = 30;
     private const int RECOVERY_DEADLINE_SECONDS = 300;
     private const int HEALTH_DEADLINE_SECONDS = 120;
+    /** The client address the forwarding probe claims; web must not charge the request to it. */
+    private const string FORGED_CLIENT = '198.51.100.7';
     /** Player failures that show playback stopped advancing, as opposed to a run that never measured. */
     private const array STALL_FAILURES = ['continuous-stall', 'post-ready-waiting-or-stalled'];
     /**
@@ -446,6 +449,10 @@ CODE;
             $receipt['nativeBefore'] = $this->verifyImageWrappers($state, $directory);
             $this->preset()->start(Configuration::fromArray($state['effectiveDeployment']));
             $observer->update($this->roles(), 'measured');
+            $receipt['proxyTrust'] = $this->proxyTrust($directory);
+            if ($receipt['proxyTrust']['status'] !== 'passed') {
+                throw new \RuntimeException('Proxy trust failed: ' . implode(' ', $receipt['proxyTrust']['failures']));
+            }
             $users = [];
             for ($index = 0; $index < 6; ++$index) {
                 $users[] = ['email' => $this->configuration['name'] . '-' . $index . '@baander.app', 'name' => 'Qualification ' . $index, 'password' => bin2hex(random_bytes(24))];
@@ -723,7 +730,7 @@ CODE;
             $state['effectiveDeployment'] = $replacement;
             AtomicFile::writeJson($this->directory . '/deployment-configuration.json', $replacement);
             $receipt['after'] = $this->bootIdentity();
-            $receipt['serving'] = $this->serving($state);
+            $receipt['serving'] = $this->serving($state, $directory);
         } catch (\Throwable $error) {
             $receipt['failure'] = $error->getMessage();
         } finally {
@@ -750,14 +757,177 @@ CODE;
      * @param array<string,mixed> $state
      * @return array<string,mixed>
      */
-    private function serving(array $state): array
+    private function serving(array $state, string $directory): array
     {
         $this->operatorCheckpoint();
         $diagnostics = $this->diagnostics();
         $snapshot = $this->database(new DatabaseSampler(array_map(static fn(array $library): string => $library['id'], $state['provision']['libraries']), gmdate('Y-m-d\TH:i:s') . 'Z'));
         $health = $this->health();
         return ['workersReady' => true, 'webWorkers' => $diagnostics['web'], 'health' => $health, 'healthy' => self::healthy($health),
-            'catalogIntact' => self::catalogIntact($snapshot)];
+            'catalogIntact' => self::catalogIntact($snapshot), 'proxyTrust' => $this->proxyTrust($directory)];
+    }
+
+    /**
+     * Observes how web sees clients through the gateway. Web asks the gateway for its health route and
+     * sends one request through the gateway that forges X-Forwarded-For; for a loopback listener, a
+     * host-network container sends one to the published port. Web's access log then shows the client
+     * address each probe was charged to.
+     *
+     * @return array<string,mixed>
+     */
+    private function proxyTrust(string $directory): array
+    {
+        $deployment = $this->deploymentState();
+        $configuration = Configuration::fromArray($deployment['configuration']);
+        $services = [];
+        foreach ($this->containers() as $container) {
+            $service = $container['Config']['Labels']['com.docker.compose.service'] ?? null;
+            if (in_array($service, ['web', 'gateway'], true)) {
+                $services[$service] = $container;
+            }
+        }
+        $healthStatus = $this->webProgram(self::requestProgram(), ['http://gateway/health'])['httpStatus'] ?? null;
+        $token = bin2hex(random_bytes(8));
+        $this->webProgram(self::requestProgram(), ['http://gateway/qualification-forwarding-' . $token, self::FORGED_CLIENT]);
+        $forwardedClient = $this->webProgram(self::accessLogProgram(), ['qualification-forwarding-' . $token])['client'] ?? null;
+        $hairpinClient = null;
+        if ($configuration->listensOnLoopback()) {
+            $host = str_contains($configuration->listenAddress, ':') ? '[' . $configuration->listenAddress . ']' : $configuration->listenAddress;
+            DisposableContainer::run($this->docker, $directory . '/hairpin-probe-resources.json', [
+                '--network', 'host', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--entrypoint', 'php',
+                $deployment['images']['application']['id'], '-d', 'memory_limit=32M', '-r', self::requestProgram(),
+                'http://' . $host . ':' . $configuration->listenPort . '/qualification-hairpin-' . $token,
+            ], $this->runtime->environment, $this->runtime->configuration->budgets->seconds('cleanup'), timeout: 30);
+            $hairpinClient = $this->webProgram(self::accessLogProgram(), ['qualification-hairpin-' . $token])['client'] ?? null;
+        }
+
+        return self::proxyTrustCheck(
+            $configuration,
+            $services['web'] ?? [],
+            $services['gateway'] ?? [],
+            is_int($healthStatus) ? $healthStatus : null,
+            is_string($forwardedClient) ? $forwardedClient : null,
+            is_string($hairpinClient) ? $hairpinClient : null,
+        );
+    }
+
+    /**
+     * Web must trust exactly the gateway's pinned edge address, and the gateway must join the edge
+     * network alone. Web must reach the gateway's health route. A request from web that forges
+     * X-Forwarded-For must reach web under web's own edge address. For a loopback listener, a
+     * host-local client must arrive from the edge bridge address the gateway trusts for the host.
+     *
+     * @param array<string,mixed> $web Docker's inspection of the web container.
+     * @param array<string,mixed> $gateway Docker's inspection of the gateway container.
+     * @param ?int $healthStatus The HTTP status web got from the gateway's health route.
+     * @param ?string $forwardedClient The client address web logged for the forged request.
+     * @param ?string $hairpinClient The client address web logged for the host-local request.
+     * @return array{status:string,failures:list<string>,trustedProxies:?string,gatewayNetworks:list<string>,gatewayAddress:?string,forwardedClient:?string,expectedForwardedClient:?string,hairpinClient:?string,expectedHairpinClient:?string,healthStatus:?int}
+     */
+    public static function proxyTrustCheck(Configuration $deployment, array $web, array $gateway, ?int $healthStatus, ?string $forwardedClient, ?string $hairpinClient): array
+    {
+        $edge = EdgeNetwork::name($deployment->name);
+        $prefix = 'TRUSTED_PROXIES=';
+        $trusted = array_find($web['Config']['Env'] ?? [], static fn(mixed $variable): bool => is_string($variable) && str_starts_with($variable, $prefix))
+            |> (static fn(?string $variable): ?string => $variable === null ? null : substr($variable, strlen($prefix)));
+        $gatewayNetworks = array_keys($gateway['NetworkSettings']['Networks'] ?? []);
+        $gatewayAddress = $gateway['NetworkSettings']['Networks'][$edge]['IPAddress'] ?? null;
+        $webAddress = $web['NetworkSettings']['Networks'][$edge]['IPAddress'] ?? null;
+        $hairpinExpected = $deployment->listensOnLoopback() ? $deployment->edge->bridgeAddress : null;
+
+        $failures = [];
+        if ($gatewayNetworks !== [$edge]) {
+            $failures[] = 'The gateway joins ' . implode(', ', $gatewayNetworks) . ' instead of the edge network alone.';
+        }
+        if ($gatewayAddress !== $deployment->edge->gatewayAddress) {
+            $failures[] = 'The gateway does not hold its pinned edge address ' . $deployment->edge->gatewayAddress . '.';
+        }
+        if ($trusted !== $deployment->edge->gatewayAddress) {
+            $failures[] = 'Web trusts "' . $trusted . '" instead of exactly the gateway address ' . $deployment->edge->gatewayAddress . '.';
+        }
+        if ($healthStatus === null) {
+            $failures[] = 'Web cannot reach the gateway health route.';
+        }
+        if ($webAddress === null || $forwardedClient !== $webAddress) {
+            $failures[] = 'A request that forged X-Forwarded-For reached web as "' . $forwardedClient . '" instead of its sender\'s address.';
+        }
+        if ($hairpinExpected !== null && $hairpinClient !== $hairpinExpected) {
+            $failures[] = 'A host-local client reached web as "' . $hairpinClient . '" instead of the trusted edge bridge address ' . $hairpinExpected . '.';
+        }
+
+        return [
+            'status' => $failures === [] ? 'passed' : 'failed',
+            'failures' => $failures,
+            'trustedProxies' => $trusted,
+            'gatewayNetworks' => $gatewayNetworks,
+            'gatewayAddress' => is_string($gatewayAddress) ? $gatewayAddress : null,
+            'forwardedClient' => $forwardedClient,
+            'expectedForwardedClient' => is_string($webAddress) ? $webAddress : null,
+            'hairpinClient' => $hairpinClient,
+            'expectedHairpinClient' => $hairpinExpected,
+            'healthStatus' => $healthStatus,
+        ];
+    }
+
+    /** Sends one GET that closes its connection, with an optional forged client: argv[1] the URL, argv[2] the forged X-Forwarded-For. */
+    public static function requestProgram(): string
+    {
+        return <<<'PHP'
+$headers = ['Connection: close'];
+if (($argv[2] ?? '') !== '') {
+    $headers[] = 'X-Forwarded-For: ' . $argv[2];
+}
+$context = stream_context_create(['http' => ['timeout' => 10, 'ignore_errors' => true, 'header' => $headers]]);
+@file_get_contents($argv[1], false, $context);
+$status = preg_match('~^HTTP/\S+ ([0-9]{3})~', http_get_last_response_headers()[0] ?? '', $match) === 1 ? (int) $match[1] : null;
+echo json_encode(['httpStatus' => $status], JSON_THROW_ON_ERROR);
+PHP;
+    }
+
+    /**
+     * Prints the client address of web's access log line for one probe path, waiting up to ten seconds
+     * for the line: argv[1] the probe path's token, which no other request carries.
+     */
+    public static function accessLogProgram(): string
+    {
+        return <<<'PHP'
+$log = rtrim((string) getenv('BAANDER_LOG_DIR'), '/') . '/prod.log';
+$pattern = '~^(\S+) .*"GET /' . preg_quote($argv[1], '~') . ' ~';
+$client = null;
+$deadline = microtime(true) + 10;
+while (true) {
+    clearstatcache(true, $log);
+    $handle = @fopen($log, 'rb');
+    if ($handle !== false) {
+        fseek($handle, max(0, (int) @filesize($log) - 4194304));
+        while ($client === null && ($line = fgets($handle)) !== false) {
+            $message = str_contains($line, $argv[1]) ? (json_decode($line, true)['message'] ?? null) : null;
+            if (is_string($message) && preg_match($pattern, $message, $match) === 1) {
+                $client = $match[1];
+            }
+        }
+        fclose($handle);
+    }
+    if ($client !== null || microtime(true) >= $deadline) {
+        break;
+    }
+    usleep(250000);
+}
+echo json_encode(['client' => $client], JSON_THROW_ON_ERROR);
+PHP;
+    }
+
+    /**
+     * @param list<string> $arguments
+     * @return array<string,mixed>
+     */
+    private function webProgram(string $program, array $arguments): array
+    {
+        $deployment = $this->deploymentState();
+        $output = $this->docker->compose($deployment['configuration']['name'], $deployment['composeFile'], ['exec', '-T', 'web', 'php', '-r', $program, ...$arguments], timeout: 30)->stdout;
+        $result = json_decode(trim($output), true, flags: JSON_THROW_ON_ERROR);
+
+        return is_array($result) ? $result : [];
     }
 
     /**
@@ -840,6 +1010,9 @@ CODE;
         }
         if (($serving['catalogIntact'] ?? null) !== true) {
             $failures[] = 'The new boot does not serve the imported catalog.';
+        }
+        if (($serving['proxyTrust']['status'] ?? null) !== 'passed') {
+            $failures[] = 'The new boot does not see clients through exactly its gateway.';
         }
         $failures = array_values(array_unique($failures));
         return ['version' => 1, 'scenario' => 'deployment-replacement', 'status' => $failures === [] ? 'passed' : 'failed', 'failures' => $failures];

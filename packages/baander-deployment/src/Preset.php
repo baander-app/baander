@@ -17,6 +17,7 @@ use Baander\Process\Execution\ExecutionContext;
 use Baander\Containers\Resources\DisposableContainer;
 use Baander\Deployment\Presets\StateStore;
 use Baander\Deployment\Presets\Configuration as PresetConfiguration;
+use Baander\Deployment\Presets\EdgeNetwork;
 use Baander\Deployment\Workers\KillOrder;
 use Baander\Deployment\Profiles\ImageProfile;
 use Baander\Deployment\Database\PostgresConfiguration;
@@ -166,6 +167,7 @@ final readonly class Preset
         $state['phase'] = 'starting';
         $this->store->save($state);
         $this->assertOwnedServices($state);
+        $this->assertEdgeSubnetFree($configuration);
         $this->prepareVolumes($configuration, $state);
         $this->docker->compose($configuration->name, $this->composeFile(), ['up', '-d', '--wait', 'postgres', 'redis'], timeout: 180);
         $this->poolerCredentials($configuration, $state);
@@ -275,11 +277,42 @@ final readonly class Preset
                 }
             }
         }
-        $network = $this->docker->run(['network', 'inspect', $name . '-private'], check: false);
-        if ($network->exitCode === 0) {
-            $document = json_decode($network->stdout, true, flags: JSON_THROW_ON_ERROR);
-            if (($document[0]['Labels']['org.baander.preset.owner'] ?? null) !== $state['owner']) {
-                throw new \RuntimeException('Private network is owned by another deployment.');
+        foreach (['Private' => $name . '-private', 'Edge' => EdgeNetwork::name($name)] as $role => $networkName) {
+            $network = $this->docker->run(['network', 'inspect', $networkName], check: false);
+            if ($network->exitCode === 0) {
+                $document = json_decode($network->stdout, true, flags: JSON_THROW_ON_ERROR);
+                if (($document[0]['Labels']['org.baander.preset.owner'] ?? null) !== $state['owner']) {
+                    throw new \RuntimeException($role . ' network is owned by another deployment.');
+                }
+            }
+        }
+    }
+
+    /**
+     * Refuses an edge subnet that shares addresses with another Docker network before anything
+     * starts; the deployment's own edge network, whose ownership is already checked, is exempt.
+     */
+    private function assertEdgeSubnetFree(PresetConfiguration $configuration): void
+    {
+        $ids = $this->docker->run(['network', 'ls', '--quiet', '--no-trunc'])->stdout
+            |> trim(...)
+            |> (static fn(string $output): array => preg_split('/\s+/', $output, flags: PREG_SPLIT_NO_EMPTY) ?: []);
+        $networks = $ids === [] ? [] : json_decode($this->docker->run(['network', 'inspect', ...$ids])->stdout, true, flags: JSON_THROW_ON_ERROR);
+        $own = EdgeNetwork::name($configuration->name);
+        foreach ($networks as $network) {
+            if (($network['Name'] ?? null) === $own) {
+                continue;
+            }
+            foreach ($network['IPAM']['Config'] ?? [] as $pool) {
+                $subnet = $pool['Subnet'] ?? null;
+                if (is_string($subnet) && $configuration->edge->overlaps($subnet)) {
+                    throw new \RuntimeException(sprintf(
+                        'Docker network %s uses %s, which overlaps the edge subnet %s; set network.subnet to a free range.',
+                        $network['Name'] ?? 'unnamed',
+                        $subnet,
+                        $configuration->edge->subnet,
+                    ));
+                }
             }
         }
     }

@@ -30,6 +30,8 @@ final class Renderer
             EnvironmentVariable::REDIS_URL => $redis, EnvironmentVariable::MESSENGER_TRANSPORT_DSN => $redis . '/messages',
             EnvironmentVariable::MAILER_DSN => $env[EnvironmentVariable::MAILER_DSN] ?? 'null://null',
             EnvironmentVariable::MEDIA_STORAGE_PATH => '/storage/media', EnvironmentVariable::CONVERT_STORAGE_PATH => '/storage/conversions',
+            // Web takes forwarding headers from the gateway alone, which sets every one of them itself.
+            EnvironmentVariable::TRUSTED_PROXIES => $configuration->edge->gatewayAddress,
         ]);
     }
 
@@ -110,6 +112,9 @@ final class Renderer
                 'oom_score_adj' => KillOrder::GATEWAY,
             ],
         ];
+        // Web and the gateway alone share the edge network, where the gateway holds the one address web trusts.
+        $services['web']['networks'] = ['private', 'edge'];
+        $services['gateway']['networks'] = ['edge' => ['ipv4_address' => $configuration->edge->gatewayAddress]];
         if ($logging !== null) {
             $target = \Baander\Containers\Docker\Target::fromArray($logging['target']);
             $groups = [['labels' => ['org.baander.preset' => $configuration->name, 'org.baander.preset.owner' => $owner]], ['labels' => ['app.baander.worker.namespace' => $configuration->name], 'serviceLabel' => 'app.baander.worker.role']];
@@ -130,15 +135,27 @@ final class Renderer
         foreach (self::configurationFiles($configuration, $postgresConfiguration) as $role => $file) {
             $volumes[$role] = ['name' => $file['volume'], 'external' => true];
         }
-        return self::escapeInterpolation(['name' => $configuration->name, 'services' => $services, 'volumes' => $volumes,
-            'networks' => ['private' => ['name' => $configuration->name . '-private', 'labels' => $labels]]]);
+        $networks = [
+            'private' => ['name' => $configuration->name . '-private', 'labels' => $labels],
+            'edge' => [
+                'name' => EdgeNetwork::name($configuration->name),
+                'labels' => $labels,
+                'ipam' => ['config' => [[
+                    'subnet' => $configuration->edge->subnet,
+                    'gateway' => $configuration->edge->bridgeAddress,
+                    'ip_range' => $configuration->edge->dynamicRange,
+                ]]],
+            ],
+        ];
+
+        return self::escapeInterpolation(['name' => $configuration->name, 'services' => $services, 'volumes' => $volumes, 'networks' => $networks]);
     }
 
     /** @return array<string,array{volume:string,name:string,content:string}> */
     public static function configurationFiles(Configuration $configuration, string $postgresConfiguration): array
     {
         $files = [];
-        foreach (['postgres_configuration' => ['postgresql.conf', $postgresConfiguration], 'gateway_configuration' => ['default.conf', self::gateway()]] as $role => [$name, $content]) {
+        foreach (['postgres_configuration' => ['postgresql.conf', $postgresConfiguration], 'gateway_configuration' => ['default.conf', self::gateway($configuration)]] as $role => [$name, $content]) {
             $files[$role] = ['volume' => $configuration->name . '-' . str_replace('_', '-', $role) . '-' . substr(hash('sha256', $content), 0, 16), 'name' => $name, 'content' => $content];
         }
         return $files;
@@ -167,18 +184,32 @@ final class Renderer
         return $document;
     }
 
-    private static function gateway(): string
+    /**
+     * Web trusts the gateway's forwarding headers, so the gateway sets each one itself: the client is the
+     * TCP peer unless that peer is a declared front proxy, and the protocol is the gateway's own scheme
+     * unless a declared front proxy reported HTTP or HTTPS.
+     */
+    private static function gateway(Configuration $configuration): string
     {
-        return <<<'NGINX'
+        $proxies = $configuration->gatewayFrontProxies();
+        $realIp = $proxies === [] ? '' : implode('', [
+            ...array_map(static fn(string $proxy): string => 'set_real_ip_from ' . $proxy . ";\n", $proxies),
+            "real_ip_header X-Forwarded-For;\n",
+            "real_ip_recursive on;\n",
+        ]);
+        $template = <<<'NGINX'
 map $http_upgrade $connection_upgrade {
     default upgrade;
     '' close;
 }
-map $http_x_forwarded_proto $forwarded_proto {
-    default $http_x_forwarded_proto;
-    '' $scheme;
+geo $realip_remote_addr $from_front_proxy {
+    default 0;
+@FRONT_PROXIES@}
+map "$from_front_proxy:$http_x_forwarded_proto" $forwarded_proto {
+    default $scheme;
+    "~^1:(https?)$" $1;
 }
-log_format preset escape=json '{"host":"$host","method":"$request_method","uri":"$uri","status":$status,"bytes":$body_bytes_sent}';
+@REAL_IP@log_format preset escape=json '{"host":"$host","method":"$request_method","uri":"$uri","status":$status,"bytes":$body_bytes_sent}';
 server {
     listen 80;
     server_name _;
@@ -190,8 +221,10 @@ server {
         proxy_pass http://web:9501;
         proxy_http_version 1.1;
         proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Host $http_host;
         proxy_set_header X-Forwarded-Proto $forwarded_proto;
+        proxy_set_header X-Forwarded-Port "";
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;
         proxy_buffering off;
@@ -201,8 +234,10 @@ server {
         proxy_pass http://web:9501;
         proxy_http_version 1.1;
         proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Host $http_host;
         proxy_set_header X-Forwarded-Proto $forwarded_proto;
+        proxy_set_header X-Forwarded-Port "";
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;
         proxy_buffering off;
@@ -211,5 +246,10 @@ server {
     }
 }
 NGINX;
+
+        return strtr($template, [
+            '@FRONT_PROXIES@' => implode('', array_map(static fn(string $proxy): string => '    ' . $proxy . " 1;\n", $proxies)),
+            '@REAL_IP@' => $realIp,
+        ]);
     }
 }

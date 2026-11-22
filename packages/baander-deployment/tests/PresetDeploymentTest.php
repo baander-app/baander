@@ -292,6 +292,22 @@ final class PresetDeploymentTest extends TestCase
             [['size' => array_diff_key($size, ['webWorkers' => true])], 'Deployment size requires webWorkers.'],
             [['volumes' => ['media' => '/home/operator/music']], 'Persistent storage requires named Docker volumes.'],
             [['environment' => $data['environment'] + ['BAANDER_DEPLOYMENT_PROFILE' => '{}']], 'Deployment derives environment variable BAANDER_DEPLOYMENT_PROFILE.'],
+            [
+                ['environment' => $data['environment'] + ['TRUSTED_PROXIES' => '192.0.2.10']],
+                'Deployment derives TRUSTED_PROXIES from the gateway; declare reverse proxies in front of the gateway in listen.frontProxies.',
+            ],
+            [['network' => ['subnet' => '10.231.0.4/28']], 'The edge network subnet must be an IPv4 network address with a prefix of /29 or shorter.'],
+            [['network' => ['subnet' => '10.231.0.0/30']], 'The edge network subnet must be an IPv4 network address with a prefix of /29 or shorter.'],
+            [['network' => ['subnet' => 'fd00:baa::/64']], 'The edge network subnet must be an IPv4 network address with a prefix of /29 or shorter.'],
+            [['network' => ['gateway' => '10.231.0.1']], 'Unknown key in network configuration.'],
+            [
+                ['listen' => ['address' => '127.0.0.1', 'port' => 8080, 'frontProxies' => ['192.0.2.10; allow all']]],
+                'listen.frontProxies must list IP addresses or CIDR ranges.',
+            ],
+            [
+                ['listen' => ['address' => '127.0.0.1', 'port' => 8080, 'frontProxies' => '192.0.2.10']],
+                'listen.frontProxies must list IP addresses or CIDR ranges.',
+            ],
         ] as [$override, $message]) {
             try {
                 Configuration::fromArray(array_replace($data, $override));
@@ -559,9 +575,6 @@ final class PresetDeploymentTest extends TestCase
         self::assertSame('secret$$literal', $compose['services']['postgres']['environment']['POSTGRES_PASSWORD']);
         $gateway = Renderer::configurationFiles($configuration, 'max_connections = 36')['gateway_configuration']['content'];
         self::assertStringContainsString('$http_upgrade', $gateway);
-        // The gateway listens on plain HTTP behind the operator's TLS proxy: it passes on the scheme that proxy reported.
-        self::assertMatchesRegularExpression('/map \$http_x_forwarded_proto \$forwarded_proto \{\s*default\s+\$http_x_forwarded_proto;\s*\'\'\s+\$scheme;\s*\}/', $gateway);
-        self::assertStringContainsString('proxy_set_header X-Forwarded-Proto $forwarded_proto;', $gateway);
         self::assertStringContainsString('noeviction', $compose['services']['redis']['command'][2]);
         self::assertSame('memory_limit=256M', $compose['services']['web']['command'][1]);
         self::assertSame($profile->fingerprint(), $compose['services']['web']['labels']['org.baander.deployment.fingerprint']);
@@ -584,6 +597,137 @@ final class PresetDeploymentTest extends TestCase
         self::assertArrayNotHasKey('DB_PASSWORD', $workerEnvironment);
         self::assertArrayNotHasKey('APP_DOMAIN', $workerEnvironment);
         self::assertSame($profile->deployment, json_decode(str_replace('$$', '$', $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE']), true, flags: JSON_THROW_ON_ERROR));
+    }
+
+    public function testWebTrustsExactlyTheGatewaysPinnedEdgeAddress(): void
+    {
+        $default = $this->compose(self::configuration());
+        self::assertSame(['edge' => ['ipv4_address' => '10.231.0.2']], $default['services']['gateway']['networks']);
+        self::assertSame('10.231.0.2', $default['services']['web']['environment']['TRUSTED_PROXIES']);
+        // Docker assigns dynamic addresses from the upper half only, so no container can take the gateway's.
+        self::assertSame(
+            [['subnet' => '10.231.0.0/28', 'gateway' => '10.231.0.1', 'ip_range' => '10.231.0.8/29']],
+            $default['networks']['edge']['ipam']['config'],
+        );
+
+        $configured = $this->compose(self::configuration() + ['network' => ['subnet' => '192.168.240.0/24']]);
+        self::assertSame(['edge' => ['ipv4_address' => '192.168.240.2']], $configured['services']['gateway']['networks']);
+        self::assertSame('192.168.240.2', $configured['services']['web']['environment']['TRUSTED_PROXIES']);
+        self::assertSame(
+            [['subnet' => '192.168.240.0/24', 'gateway' => '192.168.240.1', 'ip_range' => '192.168.240.128/25']],
+            $configured['networks']['edge']['ipam']['config'],
+        );
+    }
+
+    public function testOnlyTheGatewayAndWebJoinTheEdgeNetwork(): void
+    {
+        $target = new Target('/usr/bin/docker', 'unix:///run/owner/docker.sock', 'captured-daemon', null, null);
+        $compose = Renderer::render(
+            Configuration::fromArray(self::configuration()),
+            $this->images(),
+            ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']),
+            $this->profile(),
+            'max_connections = 21',
+            'owner',
+            ['target' => $target->toArray(), 'credentials' => '/private/log-credentials', 'boot' => 'fresh-web-boot'],
+        );
+        $networks = array_map(
+            static fn(array $service): array => array_is_list($service['networks']) ? $service['networks'] : array_keys($service['networks']),
+            $compose['services'],
+        );
+
+        self::assertSame(
+            ['web' => ['private', 'edge'], 'postgres' => ['private'], 'pooler' => ['private'], 'redis' => ['private'], 'gateway' => ['edge'], 'log-agent' => ['private']],
+            $networks,
+        );
+        self::assertSame('baander-preset-edge', $compose['networks']['edge']['name']);
+        self::assertSame('owner', $compose['networks']['edge']['labels']['org.baander.preset.owner']);
+        self::assertSame('baander-preset-private', $compose['networks']['private']['name']);
+    }
+
+    public function testStartRefusesAnEdgeSubnetThatOverlapsAnotherDockerNetwork(): void
+    {
+        $networks = [
+            ['Name' => 'bridge', 'IPAM' => ['Config' => [['Subnet' => '172.17.0.0/16'], ['Subnet' => 'fd00:baa::/64']]]],
+            ['Name' => 'host', 'IPAM' => ['Config' => []]],
+            // The deployment's own edge network, left by an interrupted start.
+            ['Name' => 'baander-preset-edge', 'IPAM' => ['Config' => [['Subnet' => '10.231.0.0/28']]]],
+        ];
+        $this->assertEdgeSubnetFree(self::configuration(), $networks);
+
+        foreach (['10.0.0.0/8', '10.231.0.8/29', '10.231.0.0/24'] as $subnet) {
+            try {
+                $this->assertEdgeSubnetFree(self::configuration(), [...$networks, ['Name' => 'baander-other', 'IPAM' => ['Config' => [['Subnet' => $subnet]]]]]);
+                self::fail('Accepted an edge subnet that overlaps ' . $subnet . '.');
+            } catch (\RuntimeException $error) {
+                self::assertSame(
+                    'Docker network baander-other uses ' . $subnet . ', which overlaps the edge subnet 10.231.0.0/28; set network.subnet to a free range.',
+                    $error->getMessage(),
+                );
+            }
+        }
+    }
+
+    public function testGatewaySetsEveryForwardingHeaderItself(): void
+    {
+        $data = self::configuration();
+        $data['listen'] = ['address' => '192.0.2.40', 'port' => 8080];
+        $gateway = $this->gatewayConfiguration($data);
+
+        // Both locations, the WebSocket upgrade and everything else, replace what a client sent.
+        foreach ([
+            'proxy_set_header Host $http_host;',
+            'proxy_set_header X-Forwarded-For $remote_addr;',
+            'proxy_set_header X-Forwarded-Host $http_host;',
+            'proxy_set_header X-Forwarded-Proto $forwarded_proto;',
+            'proxy_set_header X-Forwarded-Port "";',
+        ] as $header) {
+            self::assertSame(2, substr_count($gateway, $header), $header);
+        }
+        self::assertStringNotContainsString('$proxy_add_x_forwarded_for', $gateway);
+        // A listener on a LAN address with no declared front proxy takes no peer's word for the client.
+        self::assertStringNotContainsString('set_real_ip_from', $gateway);
+        self::assertMatchesRegularExpression('/geo \$realip_remote_addr \$from_front_proxy \{\s*default 0;\s*\}/', $gateway);
+        self::assertMatchesRegularExpression('/map "\$from_front_proxy:\$http_x_forwarded_proto" \$forwarded_proto \{\s*default \$scheme;/', $gateway);
+    }
+
+    public function testDeclaredFrontProxiesAloneReportTheClientAndItsProtocol(): void
+    {
+        $data = self::configuration();
+        $data['listen'] = ['address' => '192.0.2.40', 'port' => 8080, 'frontProxies' => ['192.0.2.10', '2001:db8:1::/64']];
+        $configuration = Configuration::fromArray($data);
+        $gateway = $this->gatewayConfiguration($data);
+
+        self::assertSame(['192.0.2.10', '2001:db8:1::/64'], $configuration->toArray()['listen']['frontProxies']);
+        self::assertStringContainsString(
+            "set_real_ip_from 192.0.2.10;\nset_real_ip_from 2001:db8:1::/64;\nreal_ip_header X-Forwarded-For;\nreal_ip_recursive on;\n",
+            $gateway,
+        );
+        self::assertMatchesRegularExpression('/geo \$realip_remote_addr \$from_front_proxy \{\s*default 0;\s*192\.0\.2\.10 1;\s*2001:db8:1::\/64 1;\s*\}/', $gateway);
+        // A declared front proxy's HTTP or HTTPS is passed on; any other peer's header falls back to the gateway's scheme.
+        self::assertMatchesRegularExpression(
+            '/map "\$from_front_proxy:\$http_x_forwarded_proto" \$forwarded_proto \{\s*default \$scheme;\s*"~\^1:\(https\?\)\$" \$1;\s*\}/',
+            $gateway,
+        );
+        self::assertArrayNotHasKey('TRUSTED_PROXIES', $configuration->environment);
+        self::assertSame('10.231.0.2', $this->compose($data)['services']['web']['environment']['TRUSTED_PROXIES']);
+    }
+
+    public function testALoopbackListenerTrustsHostClientsArrivingFromTheEdgeBridge(): void
+    {
+        foreach (['127.0.0.1', '127.0.1.1', '::1'] as $address) {
+            $data = self::configuration();
+            $data['listen'] = ['address' => $address, 'port' => 8080];
+            $gateway = $this->gatewayConfiguration($data);
+            self::assertStringContainsString("set_real_ip_from 10.231.0.1;\nreal_ip_header X-Forwarded-For;\n", $gateway, $address);
+            self::assertMatchesRegularExpression('/geo \$realip_remote_addr \$from_front_proxy \{\s*default 0;\s*10\.231\.0\.1 1;\s*\}/', $gateway, $address);
+        }
+        $data = self::configuration() + ['network' => ['subnet' => '192.168.240.0/24']];
+        $data['listen']['frontProxies'] = ['192.0.2.10'];
+        self::assertStringContainsString(
+            "set_real_ip_from 192.0.2.10;\nset_real_ip_from 192.168.240.1;\n",
+            $this->gatewayConfiguration($data),
+        );
     }
 
     public function testRendererRoutesClientsThroughAPoolerThatAloneMountsItsCredentials(): void
@@ -802,6 +946,56 @@ final class PresetDeploymentTest extends TestCase
             'composeFile' => $directory . '/compose-fixture.json', 'composeHash' => hash('sha256', '{}'), 'configurationVolumes' => []]);
         try {
             $test(new Preset($store, new Client($executor, $target, []), $executor, []), $store, $commands);
+        } finally {
+            Collector::remove($directory);
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $data
+     * @return array<string,mixed>
+     */
+    private function compose(array $data): array
+    {
+        return Renderer::render(
+            Configuration::fromArray($data),
+            $this->images(),
+            ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']),
+            $this->profile(),
+            'max_connections = 21',
+            'owner',
+        );
+    }
+
+    /** @param array<string,mixed> $data */
+    private function gatewayConfiguration(array $data): string
+    {
+        return Renderer::configurationFiles(Configuration::fromArray($data), 'max_connections = 21')['gateway_configuration']['content'];
+    }
+
+    /**
+     * Runs the start check against a daemon whose network inventory is the given inspections.
+     *
+     * @param array<string,mixed> $data
+     * @param list<array<string,mixed>> $networks
+     */
+    private function assertEdgeSubnetFree(array $data, array $networks): void
+    {
+        $executor = $this->createStub(CommandExecutor::class);
+        $executor->method('run')->willReturnCallback(static function (ProcessSpec $command) use ($networks): ProcessResult {
+            $arguments = array_slice($command->argv, 3);
+            $output = match (array_slice($arguments, 0, 2)) {
+                ['network', 'ls'] => implode("\n", array_map(static fn(int $index): string => 'network-' . $index, array_keys($networks))) . "\n",
+                ['network', 'inspect'] => json_encode($networks, JSON_THROW_ON_ERROR),
+                default => throw new \LogicException('Unexpected Docker command: ' . implode(' ', $arguments)),
+            };
+            return new ProcessResult(0, null, false, false, $output, '', 0);
+        });
+        $target = new Target('/usr/bin/docker', 'unix:///run/baander.app-docker.sock', 'owned-daemon', null, null);
+        $directory = sys_get_temp_dir() . '/baander.app-preset-' . bin2hex(random_bytes(8));
+        $preset = new Preset(new StateStore($directory), new Client($executor, $target, []), $executor, []);
+        try {
+            new \ReflectionMethod(Preset::class, 'assertEdgeSubnetFree')->invoke($preset, Configuration::fromArray($data));
         } finally {
             Collector::remove($directory);
         }
