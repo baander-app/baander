@@ -9,6 +9,7 @@ use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\PublicId;
 use App\Tests\Functional\TestCase;
 use App\UserPreference\Application\Port\UserSettingsContractInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -101,6 +102,33 @@ final class ApiLanguageTest extends TestCase
 
         self::assertSame('Validering mislykkedes.', $this->assertJsonResponse($response, 422)['error']['message']);
         self::assertSame('en', $this->translator()->getLocale());
+    }
+
+    /**
+     * The router refuses a malformed ID on a route whose requirement guards it, the controller
+     * an unknown one; an album lookup answers both in the controller. Each answers the same 404.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function lookupsByPublicId(): iterable
+    {
+        yield 'person, guarded by a route requirement' => ['/api/people/'];
+        yield 'album' => ['/api/albums/'];
+    }
+
+    #[DataProvider('lookupsByPublicId')]
+    public function testAMalformedAndAnUnknownIdAreTheSameNotFoundInTheAcceptLanguage(string $prefix): void
+    {
+        $server = [...$this->server($this->createTestUser()), 'HTTP_ACCEPT_LANGUAGE' => 'da'];
+
+        $this->client->request('GET', $prefix . 'not-a-public-id', server: $server);
+        $malformed = $this->assertJsonResponse($this->client->getResponse(), 404);
+        $this->client->request('GET', $prefix . new PublicId(), server: $server);
+        $unknown = $this->assertJsonResponse($this->client->getResponse(), 404);
+
+        $notFound = ['error' => ['message' => 'Ressource ikke fundet.', 'code' => 404]];
+        self::assertSame($notFound, $malformed);
+        self::assertSame($notFound, $unknown);
     }
 
     private function userWithLanguage(string $language): User

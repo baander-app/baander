@@ -19,6 +19,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Translation\Translator;
 
 final class PlaylistIdentityTest extends TestCase
 {
@@ -40,6 +41,7 @@ final class PlaylistIdentityTest extends TestCase
             $this->createStub(PlaylistSongVisibilityInterface::class),
             $this->createStub(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class),
         );
+        $controller->setTranslator(new Translator('en'));
 
         self::assertSame(401, $controller->index(new Request())->getStatusCode());
         self::assertSame(401, $controller->store(new CreatePlaylistRequest('Playlist'))->getStatusCode());

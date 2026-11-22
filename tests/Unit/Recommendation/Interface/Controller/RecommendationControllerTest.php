@@ -17,6 +17,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
+use Symfony\Component\Translation\Translator;
 
 final class RecommendationControllerTest extends TestCase
 {
@@ -37,6 +38,7 @@ final class RecommendationControllerTest extends TestCase
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($this->never())->method('dispatch');
         $controller = new RecommendationController($security, $bus, new JsonEncoder(), $this->createStub(\App\Recommendation\Application\Port\RecommendationPublicIdentityInterface::class));
+        $controller->setTranslator(new Translator('en'));
 
         $response = $controller->{$action}(new Request());
 

@@ -31,6 +31,7 @@ use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Http\Controller\UserValueResolver;
+use Symfony\Component\Translation\Translator;
 
 final class PartySessionControllerTest extends TestCase
 {
@@ -62,6 +63,7 @@ final class PartySessionControllerTest extends TestCase
             $this->identities,
             $this->memberPort,
         );
+        $this->controller->setTranslator(new Translator('en'));
     }
 
     public function testCreateUnwrapsEnvelopeBeforeMappingResource(): void

@@ -14,6 +14,7 @@ use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\Translation\Translator;
 
 final class NotificationControllerTest extends TestCase
 {
@@ -160,6 +161,9 @@ final class NotificationControllerTest extends TestCase
         $security = $this->createStub(Security::class);
         $security->method('getUser')->willReturn(new SecurityUser($userId->toString(), 'user@baander.app', 'hashed', $roles));
 
-        return new NotificationController($repository, $security);
+        $controller = new NotificationController($repository, $security);
+        $controller->setTranslator(new Translator('en'));
+
+        return $controller;
     }
 }

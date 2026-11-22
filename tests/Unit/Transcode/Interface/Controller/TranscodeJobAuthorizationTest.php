@@ -26,6 +26,7 @@ use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
+use Symfony\Component\Translation\Translator;
 
 final class TranscodeJobAuthorizationTest extends TestCase
 {
@@ -280,7 +281,10 @@ final class TranscodeJobAuthorizationTest extends TestCase
             static fn (mixed $attribute): bool => $admin && $attribute === 'ROLE_ADMIN',
         );
 
-        return new TranscodeJobController($bus ?? $this->createStub(MessageBusInterface::class), $jobs, $view, $playback, $authorization);
+        $controller = new TranscodeJobController($bus ?? $this->createStub(MessageBusInterface::class), $jobs, $view, $playback, $authorization);
+        $controller->setTranslator(new Translator('en'));
+
+        return $controller;
     }
 
     private function cleanupController(MessageBusInterface $bus): TranscodeJobController

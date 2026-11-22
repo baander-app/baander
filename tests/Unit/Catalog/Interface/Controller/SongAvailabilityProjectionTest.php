@@ -29,6 +29,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
+use Symfony\Component\Translation\Translator;
 
 final class SongAvailabilityProjectionTest extends TestCase
 {
@@ -94,6 +95,7 @@ final class SongAvailabilityProjectionTest extends TestCase
         $scopes = $this->createStub(LibraryReadScopeProviderInterface::class);
         $scopes->method('current')->willReturn(LibraryReadScope::none());
         $controller = new SongController($this->createStub(SongPortInterface::class), $scopes, new CursorCodec(new JsonEncoder()), $this->createStub(MessageBusInterface::class), $availability, $this->createStub(AuthorizationCheckerInterface::class));
+        $controller->setTranslator(new Translator('en'));
 
         self::assertSame(404, $controller->show((new \App\Shared\Domain\Model\PublicId())->toString())->getStatusCode());
     }

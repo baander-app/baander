@@ -30,6 +30,7 @@ use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorage;
 use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Translation\Translator;
 
 /**
  * The party in these tests has a host and one member who is not the host. Its ports answer for
@@ -188,7 +189,7 @@ final class PartyInvitationControllerTest extends TestCase
         ?PartyInvitationPortInterface $invitations = null,
         ?PartyPublicIdentityPortInterface $identities = null,
     ): PartyInvitationController {
-        return new PartyInvitationController(
+        $controller = new PartyInvitationController(
             $this->security($caller === null ? null : new SecurityUser($caller->toString(), 'caller@baander.app', '')),
             $bus ?? $this->createStub(MessageBusInterface::class),
             $this->sessions,
@@ -196,6 +197,9 @@ final class PartyInvitationControllerTest extends TestCase
             $invitations ?? $this->createStub(PartyInvitationPortInterface::class),
             $identities ?? $this->createStub(PartyPublicIdentityPortInterface::class),
         );
+        $controller->setTranslator(new Translator('en'));
+
+        return $controller;
     }
 
     private function identitiesThatKnowNobody(): PartyPublicIdentityPortInterface&Stub

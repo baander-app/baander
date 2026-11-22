@@ -43,6 +43,7 @@ final class PasskeyControllerTest extends TestCase
 
         $this->setPrivate($controller, 'security', $this->security);
         $this->setPrivate($controller, 'passkeyRepository', $this->passkeyRepository);
+        $controller->setTranslator(new \Symfony\Component\Translation\Translator('en'));
         return $controller;
     }
 
@@ -208,7 +209,6 @@ final class PasskeyControllerTest extends TestCase
 
             return new \Symfony\Component\Messenger\Envelope($message);
         });
-        $this->controller->setTranslator(new \Symfony\Component\Translation\Translator('en'));
         $this->setPrivate($this->controller, 'users', $users);
         $this->setPrivate($this->controller, 'passkeyService', $this->passkeyService());
         $this->setPrivate($this->controller, 'stepUp', $this->stepUp());

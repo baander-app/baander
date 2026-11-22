@@ -15,6 +15,7 @@ use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
+use Symfony\Component\Translation\Translator;
 
 final class ClientCreationTest extends TestCase
 {
@@ -53,8 +54,10 @@ final class ClientCreationTest extends TestCase
         $security->method('getUser')->willReturn(null);
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
+        $controller = new ClientController($security, $bus);
+        $controller->setTranslator(new Translator('en'));
 
-        $response = (new ClientController($security, $bus))->create(new CreateClientRequest('Library player'));
+        $response = $controller->create(new CreateClientRequest('Library player'));
 
         self::assertSame(401, $response->getStatusCode());
     }
