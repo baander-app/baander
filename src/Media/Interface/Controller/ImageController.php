@@ -20,12 +20,19 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[OA\Tag(name: 'Media', description: 'Media file and streaming endpoints')]
 #[Route('/api/images', name: 'image_')]
 final class ImageController
 {
+    /**
+     * Media types an image file is served with: the types covers are stored as, plus GIF, which is
+     * served without conversion. Any other recorded type is served as a download.
+     */
+    private const array SERVED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
     use ApiResponsesTrait;
     use TranslatorTrait;
 
@@ -212,11 +219,18 @@ final class ImageController
             }
         }
 
+        $servedType = $fullPath === $this->storage->resolve($sourcePath) ? $image->getMimeType() : 'image/webp';
+
         $response = new BinaryFileResponse($fullPath);
-        $mimeType = mime_content_type($fullPath);
-        $response->headers->set('Content-Type', $mimeType !== false ? $mimeType : 'application/octet-stream');
+        if (in_array($servedType, self::SERVED_TYPES, true)) {
+            $response->headers->set('Content-Type', $servedType);
+        } else {
+            $response->headers->set('Content-Type', 'application/octet-stream');
+            $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, basename($fullPath));
+        }
         $response->headers->set('Content-Length', (string) filesize($fullPath));
         $response->headers->set('Cache-Control', 'private, no-store');
+        $response->headers->set('Content-Security-Policy', "default-src 'none'; sandbox");
 
         return $response;
     }
