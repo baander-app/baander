@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Health;
 
+use App\Auth\Application\Port\SelfRegistrationInterface;
 use App\Shared\Application\Port\AdminAlertPortInterface;
 use App\Shared\Application\Port\ServerDrainStateInterface;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
@@ -193,6 +194,8 @@ final class HealthMonitorSubscriberTest extends TestCase
             oauthPublicKeyPath: '',
             vapidPublicKey: '',
             vapidPrivateKey: '',
+            mailerDsn: 'smtp://mail.baander.app:587',
+            selfRegistration: $this->createStub(SelfRegistrationInterface::class),
             messengerWorkerHealth: new MessengerWorkerHealth($redis, new MockClock(), new HealthAlertTable()),
             workerProfileHealth: new WorkerProfileHealth($connection, new DeploymentProfile()),
         );

@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Controller;
 
 use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
+use App\Auth\Application\Settings\UserManagementSettingDefinitions;
 use App\Auth\Domain\Model\User;
+use App\Shared\Application\Port\SystemSettingStoreInterface;
 use App\Shared\Domain\Model\Email;
 use App\Tests\Functional\TestCase;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Component\Console\Tester\CommandTester;
 
 final class AuthControllerTest extends TestCase
 {
@@ -15,8 +19,54 @@ final class AuthControllerTest extends TestCase
     // POST /api/auth/register
     // ---------------------------------------------------------------
 
+    public function testRegistrationIsClosedUntilAnOperatorOpensIt(): void
+    {
+        $email = 'closed-' . bin2hex(random_bytes(4)) . '@baander.app';
+
+        $response = $this->anonymousRequest('POST', '/api/auth/register', [
+            'email' => $email,
+            'name' => 'Turned Away',
+            'password' => 'securepassword123',
+        ]);
+
+        $data = $this->assertJsonResponse($response, 403, 'error');
+        $this->assertSame('registration_closed', $data['error']['details']['reason'] ?? null);
+        $this->assertSame('Registration is closed. Ask the administrator for an account.', $data['error']['message']);
+        $this->assertNull($this->userRepository->findByEmail(new Email($email)), 'A closed registration creates no account.');
+        $this->assertEmailCount(0);
+    }
+
+    public function testTheSettingsCommandOpensRegistration(): void
+    {
+        $tester = new CommandTester(new Application(static::$kernel)->find('app:settings:set'));
+        $tester->execute(['key' => 'auth.registration_open', 'value' => 'true']);
+        $tester->assertCommandIsSuccessful();
+        $email = 'opened-' . bin2hex(random_bytes(4)) . '@baander.app';
+
+        $response = $this->anonymousRequest('POST', '/api/auth/register', [
+            'email' => $email,
+            'name' => 'Let In',
+            'password' => 'securepassword123',
+        ]);
+
+        $this->assertJsonResponse($response, 202, 'data');
+        $this->assertNotNull($this->userRepository->findByEmail(new Email($email)));
+    }
+
+    public function testTheRegistrationStateIsPublic(): void
+    {
+        $closed = $this->anonymousRequest('GET', '/api/auth/registration');
+        $this->assertSame(['open' => false], $this->assertJsonResponse($closed, 200, 'data')['data']);
+
+        $this->openRegistration();
+
+        $open = $this->anonymousRequest('GET', '/api/auth/registration');
+        $this->assertSame(['open' => true], $this->assertJsonResponse($open, 200, 'data')['data']);
+    }
+
     public function testRegisterCreatesUser(): void
     {
+        $this->openRegistration();
         $email = 'new-' . bin2hex(random_bytes(4)) . '@baander.app';
 
         $response = $this->anonymousRequest('POST', '/api/auth/register', [
@@ -31,6 +81,7 @@ final class AuthControllerTest extends TestCase
 
     public function testRegisterPersistsUser(): void
     {
+        $this->openRegistration();
         $email = 'persist-' . bin2hex(random_bytes(4)) . '@baander.app';
 
         $this->anonymousRequest('POST', '/api/auth/register', [
@@ -49,6 +100,7 @@ final class AuthControllerTest extends TestCase
     /** A taken address gets the answer a new one gets; only its owner learns of the attempt. */
     public function testRegisteringATakenAddressAnswersLikeANewOneAndEmailsTheOwner(): void
     {
+        $this->openRegistration();
         $email = 'dup-' . bin2hex(random_bytes(4)) . '@baander.app';
         $owner = $this->createTestUser($email, name: 'Original Owner');
         $fresh = 'fresh-' . bin2hex(random_bytes(4)) . '@baander.app';
@@ -249,6 +301,11 @@ final class AuthControllerTest extends TestCase
 
         $data = $this->assertJsonResponse($response, 422, 'error');
         $this->assertSame('Current password is incorrect.', $data['error']['message']);
+    }
+
+    private function openRegistration(): void
+    {
+        static::getContainer()->get(SystemSettingStoreInterface::class)->save([UserManagementSettingDefinitions::REGISTRATION_OPEN => true]);
     }
 
     private function verificationTokens(): EmailVerificationTokenRepositoryInterface

@@ -13,6 +13,7 @@ errors:
   user_code_required: 'The "user_code" parameter is required.'
   invalid_user_code: "Invalid or expired user code."
   device_already_processed: "Device code already processed."
+  registration_closed: "Registration is closed. Ask the administrator for an account."
   email_verification_failed: "This verification link is invalid or has expired."
   internal: "Internal server error."
   password_reset_failed: "This password reset link is invalid or has expired."

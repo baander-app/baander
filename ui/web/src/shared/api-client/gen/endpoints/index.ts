@@ -5793,6 +5793,14 @@ export type PostAuthRegister202 = {
   data?: PostAuthRegister202Data;
 };
 
+export type GetAuthRegistration200Data = {
+  open: boolean;
+};
+
+export type GetAuthRegistration200 = {
+  data: GetAuthRegistration200Data;
+};
+
 export type PostAuthLogout200Data = {
   message?: string;
 };
@@ -16216,6 +16224,108 @@ export const usePostAuthRegister = <TError = ErrorType<ApiError | ValidationErro
       > => {
       return useMutation(getPostAuthRegisterMutationOptions(options), queryClient);
     }
+
+export const getGetAuthRegistrationUrl = () => {
+
+
+
+
+  return `/api/auth/registration`
+}
+
+/**
+ * Lets the sign-up page show whether it takes registrations. Operators open and close self-registration with the `auth.registration_open` server setting.
+ * @summary Whether self-registration is open
+ */
+export const getAuthRegistration = async ( options?: Parameters<typeof customInstance>[1]): Promise<GetAuthRegistration200> => {
+
+  return customInstance<GetAuthRegistration200>(getGetAuthRegistrationUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAuthRegistrationQueryKey = () => {
+    return [
+    `/api/auth/registration`
+    ] as const;
+    }
+
+
+export const getGetAuthRegistrationQueryOptions = <TData = Awaited<ReturnType<typeof getAuthRegistration>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthRegistration>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAuthRegistrationQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAuthRegistration>>> = ({ signal }) => getAuthRegistration({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAuthRegistration>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAuthRegistrationQueryResult = NonNullable<Awaited<ReturnType<typeof getAuthRegistration>>>
+export type GetAuthRegistrationQueryError = ErrorType<unknown>
+
+
+export function useGetAuthRegistration<TData = Awaited<ReturnType<typeof getAuthRegistration>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthRegistration>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAuthRegistration>>,
+          TError,
+          Awaited<ReturnType<typeof getAuthRegistration>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAuthRegistration<TData = Awaited<ReturnType<typeof getAuthRegistration>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthRegistration>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAuthRegistration>>,
+          TError,
+          Awaited<ReturnType<typeof getAuthRegistration>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAuthRegistration<TData = Awaited<ReturnType<typeof getAuthRegistration>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthRegistration>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Whether self-registration is open
+ */
+
+export function useGetAuthRegistration<TData = Awaited<ReturnType<typeof getAuthRegistration>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthRegistration>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAuthRegistrationQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getPostAuthLogoutUrl = () => {
 

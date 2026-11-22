@@ -345,6 +345,7 @@ services:
             $oauthPublicKeyPath: '%auth.public_key_path%'
             $vapidPublicKey: '%env(VAPID_PUBLIC_KEY)%'
             $vapidPrivateKey: '%env(VAPID_PRIVATE_KEY)%'
+            $mailerDsn: '%env(default::MAILER_DSN)%'
             $apiKeys:
                 Discogs: '%env(DISCOGS_TOKEN)%'
                 Last.fm: '%env(LASTFM_API_KEY)%'

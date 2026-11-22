@@ -13,6 +13,7 @@ errors:
   user_code_required: 'Parameteren "user_code" er påkrævet.'
   invalid_user_code: "Ugyldig eller udløbet brugerkode."
   device_already_processed: "Enhedskode er allerede behandlet."
+  registration_closed: "Tilmelding er lukket. Bed administratoren om en konto."
   email_verification_failed: "Bekræftelseslinket er ugyldigt eller udløbet."
   internal: "Intern serverfejl."
   password_reset_failed: "Linket til nulstilling af adgangskode er ugyldigt eller udløbet."

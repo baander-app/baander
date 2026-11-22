@@ -60,6 +60,17 @@ parameters:
     # Email verification token time-to-live. Default: 24 hours.
     auth.email_verification_token.ttl: 86400
 
+    # --- Self-Registration ---
+    # Operators open and close self-registration at runtime with the auth.registration_open
+    # server setting, which ships closed.
+
+    # Shortest time, in milliseconds, from a registration's password hash to its answer.
+    # A new address stores an account, a taken one only tells its owner; both answer after
+    # this floor, so the response time does not reveal which addresses have accounts. Keep
+    # it above the longest time a new account takes to store after the hash on this host,
+    # including its slowest moments under load. Default: 500.
+    auth.registration.response_floor_ms: 500
+
     # Password reset token lifetime in minutes, from PASSWORD_RESET_EXPIRE. Default: 60.
     env(PASSWORD_RESET_EXPIRE): '60'
     auth.password_reset_token.lifetime_minutes: '%env(int:PASSWORD_RESET_EXPIRE)%'

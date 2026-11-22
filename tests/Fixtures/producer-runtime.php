@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Auth\Application\Command\User\CreateUserCommand;
 use App\Auth\Application\Command\User\RegisterUserCommand;
 use App\Auth\Application\Command\User\VerifyEmailCommand;
+use App\Auth\Application\Settings\UserManagementSettingDefinitions;
+use App\Shared\Application\Command\UpdateSystemSettingsCommand;
 use App\Shared\Domain\Model\Email;
 use Doctrine\DBAL\DriverManager;
 
@@ -57,6 +59,8 @@ $assertUserState = static function (string $email, int $users, int $tokens, int 
 
 try {
     App\Tests\Support\FinalSchemaBootstrap::bootstrap($db);
+    // Self-registration ships closed; open it as app:settings:set does.
+    $bus->dispatch(new UpdateSystemSettingsCommand([UserManagementSettingDefinitions::REGISTRATION_OPEN => 'true']));
 
     $registerEmail = 'producer-register@baander.app';
     $register = new RegisterUserCommand(Email::fromString($registerEmail), 'Producer Registration', 'Test-password-42');

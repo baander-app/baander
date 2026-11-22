@@ -4851,7 +4851,7 @@
                 },
                 "responses": {
                     "202": {
-                        "description": "Registration received. The answer is the same whether or not an account uses the address: a new account is created and emailed a verification link, while the owner of an existing account is emailed that someone tried to register with it.",
+                        "description": "Registration received. The answer and its timing are the same whether or not an account uses the address: a new account is created and emailed a verification link, while the owner of an existing account is emailed that someone tried to register with it.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4887,6 +4887,56 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Self-registration is closed; `details.reason` is `registration_closed`. Nothing was stored or sent.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        },
+        "/api/auth/registration": {
+            "get": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Whether self-registration is open",
+                "description": "Lets the sign-up page show whether it takes registrations. Operators open and close self-registration with the `auth.registration_open` server setting.",
+                "operationId": "get_auth_registration",
+                "responses": {
+                    "200": {
+                        "description": "The current state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "open": {
+                                                    "type": "boolean",
+                                                    "example": false
+                                                }
+                                            },
+                                            "required": [
+                                                "open"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
                                 }
                             }
                         }

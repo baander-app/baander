@@ -711,6 +711,7 @@ final class OpenApiSpecTest extends KernelTestCase
         $spec = $this->getSpec();
         $publicPaths = [
             '/api/auth/register' => 'POST',
+            '/api/auth/registration' => 'GET',
             '/api/auth/login' => 'POST',
             '/api/auth/login/passkey' => 'POST',
             '/api/auth/password/reset-request' => 'POST',

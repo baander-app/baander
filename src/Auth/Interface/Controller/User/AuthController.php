@@ -22,9 +22,11 @@ use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Exception\PasswordPolicyException;
 use App\Auth\Application\Exception\PasswordResetException;
 use App\Auth\Application\Exception\RefreshTokenRejectedException;
+use App\Auth\Application\Exception\RegistrationClosedException;
 use App\Auth\Application\Exception\StepUpFailedException;
 use App\Auth\Application\Exception\StepUpRateLimitedException;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
+use App\Auth\Application\Port\SelfRegistrationInterface;
 use App\Auth\Application\Port\UserPortInterface;
 use App\Auth\Domain\Model\User;
 use App\Auth\Infrastructure\Security\OAuth\DpopNonceManager;
@@ -80,6 +82,7 @@ final class AuthController
         private readonly JsonEncoder $jsonEncoder,
         private readonly LoggerInterface $logger,
         private readonly AcceptLanguageMatcher $acceptLanguage,
+        private readonly SelfRegistrationInterface $selfRegistration,
         #[Autowire(param: 'auth.spa_client_id')]
         private readonly string $spaClientId,
     ) {
@@ -109,7 +112,7 @@ final class AuthController
         responses: [
             new OA\Response(
                 response: '202',
-                description: 'Registration received. The answer is the same whether or not an account uses the address: a new account is created and emailed a verification link, while the owner of an existing account is emailed that someone tried to register with it.',
+                description: 'Registration received. The answer and its timing are the same whether or not an account uses the address: a new account is created and emailed a verification link, while the owner of an existing account is emailed that someone tried to register with it.',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(
                         type: 'object',
@@ -134,6 +137,13 @@ final class AuthController
             new OA\Response(
                 response: '400',
                 description: 'Bad request',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'Self-registration is closed; `details.reason` is `registration_closed`. Nothing was stored or sent.',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
@@ -164,6 +174,39 @@ final class AuthController
         return $this->successResponse([
             'message' => $this->trans('success.registration_received', domain: 'auth'),
         ], Response::HTTP_ACCEPTED);
+    }
+
+    #[OA\Operation\Get(
+        path: '/api/auth/registration',
+        summary: 'Whether self-registration is open',
+        description: 'Lets the sign-up page show whether it takes registrations. Operators open and close self-registration with the `auth.registration_open` server setting.',
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'The current state',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'data' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'open' => new OA\Schema(type: 'boolean', example: false),
+                                ],
+                                required: ['open'],
+                            ),
+                        ],
+                        required: ['data'],
+                    ),
+                ),
+            ),
+        ],
+        security: [],
+    )]
+    #[Route('/registration', name: 'registration', methods: ['GET'])]
+    public function registration(): JsonResponse
+    {
+        return $this->successResponse(['open' => $this->selfRegistration->isOpen()]);
     }
 
     #[OA\Operation\Post(
@@ -1068,6 +1111,14 @@ final class AuthController
             || $previous instanceof CredentialsChangedException
             || $previous instanceof RateLimiterUnavailableException) {
             throw $previous;
+        }
+
+        if ($previous instanceof RegistrationClosedException) {
+            return $this->errorResponse(
+                $this->trans('errors.registration_closed', domain: 'auth'),
+                Response::HTTP_FORBIDDEN,
+                ['reason' => RegistrationClosedException::REASON],
+            );
         }
 
         if ($previous instanceof PasswordResetException) {

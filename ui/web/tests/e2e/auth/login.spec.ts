@@ -47,6 +47,11 @@ test.describe('Unauthenticated access', () => {
 })
 
 test.describe('Register', () => {
+  // Self-registration ships closed; these tests cover the form an open server offers.
+  test.beforeEach(async ({ page }) => {
+    await page.route('**/api/auth/registration', (route) => route.fulfill({ json: { data: { open: true } } }))
+  })
+
   test('renders registration form with fields', async ({ page }) => {
     await page.goto('/register')
     await page.waitForSelector('form')

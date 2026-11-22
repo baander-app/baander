@@ -35,7 +35,7 @@ deptrac:
       groups:
         Shared: ['Shared Domain', 'Shared Application', 'Shared Infrastructure', 'Shared Live Snapshot Infrastructure', 'Shared Interface']
         Activity: ['Activity Artist Merge Contract', 'Activity Album Merge Contract', 'Activity Domain', 'Activity Application', 'Activity Infrastructure', 'Activity Resources', 'Activity Interface']
-        Auth: ['Auth Live Authority Contract', 'Auth Domain', 'Auth Identity Contract', 'Auth User Identifier Contract', 'Auth Device Approval Event Contract', 'Auth WebSocket Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
+        Auth: ['Auth Live Authority Contract', 'Auth Domain', 'Auth Identity Contract', 'Auth User Identifier Contract', 'Auth Device Approval Event Contract', 'Auth WebSocket Contract', 'Auth Self-Registration Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
         Catalog: ['Catalog Video Contract', 'Catalog Song Availability Contract', 'Catalog Song Lookup Contract', 'Catalog Movie Contract', 'Catalog Director Contract', 'Catalog Person Contract', 'Catalog TV Contract', 'Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Persistence Associations', 'Catalog Resources', 'Catalog Interface']
         Filesystem: ['Filesystem Infrastructure', 'Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
         Library: ['Library Live Audience Contract', 'Library File Availability Contract', 'Library Read Scope Contract', 'Library Content Stats Contract', 'Library Files Discovered Contract', 'Library Provisioning Contract', 'Library Media Files Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
@@ -221,6 +221,12 @@ deptrac:
         - type: classLike
           value: '^App\\Auth\\Application\\(Port\\CurrentUserAuthorityReader|DTO\\CurrentUserAuthority)$'
 
+    # Whether self-registration is open, for the configuration check that needs mail behind it.
+    - name: 'Auth Self-Registration Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Auth\\Application\\Port\\SelfRegistrationInterface$'
+
     - name: 'Auth Application'
       collectors:
         - type: bool
@@ -236,6 +242,8 @@ deptrac:
               value: '^App\\Auth\\Application\\(Port\\WebSocketTicketRedeemerInterface|DTO\\WebSocketIdentity|Exception\\WebSocketTicketUnavailableException)$'
             - type: classLike
               value: '^App\\Auth\\Application\\(Port\\CurrentUserAuthorityReader|DTO\\CurrentUserAuthority)$'
+            - type: classLike
+              value: '^App\\Auth\\Application\\Port\\SelfRegistrationInterface$'
 
     - name: 'Auth Infrastructure'
       collectors:
@@ -1260,6 +1268,7 @@ deptrac:
       - 'Rate Limiter Implementation'
       - 'Rate Limiter Contracts'
       - 'Auth WebSocket Contract'
+      - 'Auth Self-Registration Contract'
       - 'Shared Domain'
       - 'Shared Application'
     'Shared Interface':
@@ -1331,6 +1340,7 @@ deptrac:
       - Core
       - 'Rate Limiter Contracts'
       - 'Auth WebSocket Contract'
+      - 'Auth Self-Registration Contract'
       - 'UserPreference Settings Contract'
       - 'Auth Identity Contract'
       - 'Auth User Identifier Contract'
@@ -1364,6 +1374,7 @@ deptrac:
       - Core
       - 'Rate Limiter Contracts'
       - 'Auth WebSocket Contract'
+      - 'Auth Self-Registration Contract'
       - 'UserPreference Settings Contract'
       - 'Auth Resources'
       - 'Auth Identity Contract'

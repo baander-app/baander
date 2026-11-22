@@ -63,6 +63,16 @@ export function parseApiError(err: unknown, fallback: string): ParsedApiError {
   return { code: null, message: fallback }
 }
 
+/** The `error.details.reason` an API error answer names, or null when it names none. */
+export function apiErrorReason(err: unknown): string | null {
+  if (!(err instanceof AxiosError)) return null
+  const data: unknown = err.response?.data
+  const details = isRecord(data) && isRecord(data.error) ? data.error.details : undefined
+  const reason = isRecord(details) ? details.reason : undefined
+
+  return typeof reason === 'string' ? reason : null
+}
+
 /**
  * The messages a 422 validation error carries for one field in `error.details`.
  *

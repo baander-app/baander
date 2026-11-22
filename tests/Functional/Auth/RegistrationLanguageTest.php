@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Auth;
 
+use App\Auth\Application\Settings\UserManagementSettingDefinitions;
 use App\Shared\Application\Port\SystemSettingStoreInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
@@ -33,7 +34,10 @@ final class RegistrationLanguageTest extends TestCase
     #[DataProvider('browsers')]
     public function testStoresTheBrowserLanguageOnlyWhenItDiffersFromTheServerDefault(string $serverDefault, ?string $acceptLanguage, ?string $stored): void
     {
-        static::getContainer()->get(SystemSettingStoreInterface::class)->save(['i18n.default_language' => $serverDefault]);
+        static::getContainer()->get(SystemSettingStoreInterface::class)->save([
+            'i18n.default_language' => $serverDefault,
+            UserManagementSettingDefinitions::REGISTRATION_OPEN => true,
+        ]);
         $server = ['CONTENT_TYPE' => 'application/json', 'REMOTE_ADDR' => '198.51.100.' . random_int(1, 254)];
         if ($acceptLanguage !== null) {
             $server['HTTP_ACCEPT_LANGUAGE'] = $acceptLanguage;

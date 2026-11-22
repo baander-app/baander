@@ -31,7 +31,7 @@ final class ScopeRouteMap
         'oauth_authorization_server_metadata', 'jwks', 'oauth_par', 'oauth_token', 'oauth_device_authorize',
         'passkey_authenticate_options', 'passkey_authenticate', 'auth_passkey_login_passkey', 'auth_register',
         'auth_refresh', 'auth_password_reset_request', 'auth_password_reset', 'auth_email_verify',
-        'auth_login_login', 'health_check', 'health_ready',
+        'auth_login_login', 'auth_registration', 'health_check', 'health_ready',
         'health_live', 'prometheus_metrics', 'stream_artifact_master', 'stream_artifact_media',
         'stream_artifact_init', 'stream_artifact_segment', 'stream_master_manifest', 'stream_media_manifest',
         'stream_dash_manifest', 'stream_subtitle_manifest', 'stream_segment_init_segment',

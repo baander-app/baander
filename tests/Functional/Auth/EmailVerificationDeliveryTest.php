@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Auth;
 
+use App\Auth\Application\Settings\UserManagementSettingDefinitions;
 use App\Auth\Domain\Model\User;
 use App\Auth\Infrastructure\Mail\AfterResponseMailer;
+use App\Shared\Application\Port\SystemSettingStoreInterface;
 use App\UserPreference\Application\Port\UserSettingStoreInterface;
 use Doctrine\DBAL\Connection;
 use Monolog\Handler\TestHandler;
@@ -36,6 +38,14 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
     private const string LINK_PATTERN = '~(https?://[^\s"<]+/verify-email#token=([0-9a-f]{64}))~';
 
     private int $nextIp = 60;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Registration is the way into most of these flows; it ships closed.
+        static::getContainer()->get(SystemSettingStoreInterface::class)->save([UserManagementSettingDefinitions::REGISTRATION_OPEN => true]);
+    }
 
     public function testRegistrationSendsOneEmailWhoseLinkVerifiesTheAddress(): void
     {

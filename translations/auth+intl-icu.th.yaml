@@ -13,6 +13,7 @@ errors:
   user_code_required: 'ต้องระบุพารามิเตอร์ "user_code"'
   invalid_user_code: "รหัสผู้ใช้ไม่ถูกต้องหรือหมดอายุแล้ว"
   device_already_processed: "รหัสอุปกรณ์นี้ได้รับการดำเนินการแล้ว"
+  registration_closed: "ปิดรับสมัครแล้ว โปรดขอบัญชีจากผู้ดูแลระบบ"
   email_verification_failed: "ลิงก์ยืนยันนี้ไม่ถูกต้องหรือหมดอายุแล้ว"
   internal: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์"
   password_reset_failed: "ลิงก์รีเซ็ตรหัสผ่านนี้ไม่ถูกต้องหรือหมดอายุแล้ว"
