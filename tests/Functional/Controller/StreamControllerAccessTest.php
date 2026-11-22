@@ -132,6 +132,19 @@ final class StreamControllerAccessTest extends TestCase
         $this->assertJsonResponse($this->anonymousRequest('GET', $this->uri()), 401);
     }
 
+    public function testADelegatedTokenFetchesTheOriginalOnlyWithTheLibraryScope(): void
+    {
+        $member = $this->createTestUser();
+        $this->access->grant($member->getId(), $this->libraryId);
+        $original = '/api/stream/original/track?id=' . $this->trackId->toString();
+
+        $refused = $this->delegatedRequest('GET', $original, $member, ['profile']);
+        self::assertSame(403, $refused->getStatusCode());
+        self::assertSame('insufficient_scope', json_decode((string) $refused->getContent(), true)['error']['code']);
+
+        self::assertSame(200, $this->delegatedRequest('GET', $original, $member, ['library'])->getStatusCode());
+    }
+
     private function signedOriginal(Uuid $owner, int $lifetime = 60): string
     {
         $path = '/api/stream/original/track?' . http_build_query([
